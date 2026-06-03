@@ -260,7 +260,7 @@ pub async fn handle_otlp_request(
             log::warn!(
                 "[TRACES:OTLP] Failed to ensure gen_ai schema fields for {}/{}: {e}",
                 org_id,
-                &traces_stream_name
+                traces_stream_name
             );
         }
     }
@@ -757,7 +757,7 @@ pub async fn ingest_json(
         if timestamp < min_ts {
             log::error!(
                 "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                &trace_id
+                trace_id
             );
             partial_success.rejected_spans += 1;
             continue;
@@ -765,7 +765,7 @@ pub async fn ingest_json(
         if timestamp > max_ts {
             log::error!(
                 "[TRACES:JSON] skipping span with timestamp newer than allowed retention period, trace_id: {}",
-                &trace_id
+                trace_id
             );
             partial_success.rejected_spans += 1;
             continue;
@@ -781,7 +781,7 @@ pub async fn ingest_json(
             _ => {
                 log::error!(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
-                    &trace_id
+                    trace_id
                 );
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,

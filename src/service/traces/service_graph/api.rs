@@ -149,9 +149,8 @@ pub async fn get_current_topology(
     );
 
     log::debug!(
-        "[ServiceGraph] Processing {} edge records for org '{}'",
+        "[ServiceGraph] Processing {} edge records for org '{org_id}'",
         edges.len(),
-        &org_id
     );
 
     let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges, baselines);
@@ -273,6 +272,7 @@ pub async fn query_edges_from_stream_internal(
             streaming_output: false,
             sampling_config: None,
             sampling_ratio: None,
+            timezone: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
@@ -410,6 +410,7 @@ pub async fn get_edge_history(
             streaming_output: false,
             sampling_config: None,
             sampling_ratio: None,
+            timezone: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

@@ -255,7 +255,7 @@ pub async fn search_multi(
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
-                    range_error, &stream_name, max_query_range
+                    range_error, stream_name, max_query_range
                 );
 
                 if multi_res.new_start_time.is_none() {

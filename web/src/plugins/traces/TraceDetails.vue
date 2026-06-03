@@ -309,7 +309,7 @@ size="sm">
               class="unified-search-group tw:mr-0! tw:gap-1 tw:flex tw:items-center"
             >
               <div class="log-stream-search-input">
-                <OInput
+                <OSearchInput
                   v-model="searchQuery"
                   data-test="trace-details-search-input"
                   :placeholder="t('traces.searchInSpans')"
@@ -317,11 +317,7 @@ size="sm">
                   size="sm"
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
-                >
-                  <template v-slot:icon-left>
-                    <OIcon name="search" size="sm" />
-                  </template>
-                </OInput>
+                />
               </div>
               <!-- Search Results Navigation -->
               <div class="search-navigation-container tw:h-8.2! tw:py-[0.125px]!">
@@ -857,7 +853,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -969,7 +965,7 @@ export default defineComponent({
     ),
     OSpinner,
     OTooltip,
-    OInput,
+    OSearchInput,
     OSelect,
   },
 

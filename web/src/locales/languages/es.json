@@ -2450,7 +2450,16 @@
     "delete": "Eliminar",
     "variable_guide_header": "Guía de variables de plantilla",
     "variable_usage_examples": "Ejemplos de uso",
-    "body": "Cuerpo"
+    "body": "Cuerpo",
+    "clone": "Clon",
+    "cloneTitle": "Plantilla de clonación",
+    "systemReadOnly": "Plantilla prediseñada: la eliminación está deshabilitada. Clónala para hacer una copia modificable.",
+    "prebuiltBadge": "Preconstruido",
+    "prebuiltBadgeHint": "Gestionado por el sistema. Puede editar, pero la eliminación está deshabilitada.",
+    "customBadge": "Personalizado",
+    "filterAll": "Todas",
+    "filterPrebuilt": "Preconstruido",
+    "filterCustom": "Personalizado"
   },
   "alert_destinations": {
     "header": "Destinos",
@@ -2487,7 +2496,13 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Introduzca un separador (p. ej., |,\\n,\\ t, espacio)",
-    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)"
+    "separator_hint": "Cadena separadora para usar entre registros (se permiten espacios)",
+    "filterAll": "Todas",
+    "filterPrebuilt": "Preconstruido",
+    "filterCustom": "Personalizado",
+    "templateDefaultBadge": "Predeterminado",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Buscar una métrica",
@@ -3987,19 +4002,23 @@
     "capabilities": {
       "query": {
         "title": "Escribe una consulta",
-        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas."
+        "description": "SQL para registros, seguimientos, RUM o PromQL para métricas.",
+        "prompt": "Ayúdame a escribir una consulta"
       },
       "incident": {
         "title": "Investigue los incidentes",
-        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»"
+        "description": "Causa raíz en registros, rastreos y alertas, por ejemplo, «¿Por qué se activó Gateway-5xx?»",
+        "prompt": "Ayúdame a investigar los incidentes"
       },
       "dashboard": {
         "title": "Cree un tablero",
-        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles."
+        "description": "De un tema, por ejemplo, «Estado del nodo K8: CPU, memoria, reinicios». También crea paneles.",
+        "prompt": "Ayúdame a crear un tablero"
       },
       "alert": {
         "title": "Crear una alerta",
-        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta."
+        "description": "Alertas de umbral o programadas y canalizaciones de VRL de tiempo de ingesta.",
+        "prompt": "Ayúdame a crear una alerta"
       }
     },
     "suggestions": {

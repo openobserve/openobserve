@@ -23,16 +23,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <OInput
-              v-model="filterQuery"
-              class="tw:ml-auto no-border o2-search-input"
-              :placeholder="t('template.search')"
+          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="(v: any) => { activeTab = v; }"
+              data-test="template-list-tabs"
+              class="tw:mr-2"
             >
-              <template #icon-left>
-                <OIcon class="o2-search-input-icon" name="search" size="sm" />
-              </template>
-            </OInput>
+              <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                {{ t("alert_templates.filterAll") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                {{ t("alert_templates.filterPrebuilt") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+                <template #icon-left><OIcon name="settings" size="sm" /></template>
+                {{ t("alert_templates.filterCustom") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSearchInput
+              v-model="filterQuery"
+              class="tw:ml-auto"
+              :placeholder="t('template.search')"
+            />
           <OButton
             variant="outline"
             size="sm-action"
@@ -60,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :selected-ids="selectedTemplateIds"
         selection="multiple"
+        :is-row-selectable="isTemplateRowSelectable"
         pagination="client"
         :page-size="20"
         :page-size-options="[5, 10, 20, 50, 100]"
@@ -72,6 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #empty>
           <NoData />
+        </template>
+        <template #cell-name="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <span>{{ row.name }}</span>
+            <span
+              v-if="row.isPrebuilt"
+              class="dimension-badge badge-blue"
+              :title="t('alert_templates.prebuiltBadgeHint')"
+              data-test="alert-template-prebuilt-badge"
+            >{{ t('alert_templates.prebuiltBadge') }}</span>
+            <span
+              v-else
+              class="dimension-badge"
+              data-test="alert-template-custom-badge"
+            >{{ t('alert_templates.customBadge') }}</span>
+          </div>
         </template>
         <template #cell-actions="{ row }">
           <OButton
@@ -95,11 +127,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="edit" size="sm" />
           </OButton>
           <OButton
+            :data-test="`alert-template-list-${row.name}-clone-template`"
+            class="tw:ml-1"
+            variant="ghost"
+            size="icon-sm"
+            :title="t('alert_templates.clone')"
+            @click="cloneTemplate(row)"
+          >
+            <OIcon name="content-copy" size="sm" />
+          </OButton>
+          <OButton
             :data-test="`alert-template-list-${row.name}-delete-template`"
             class="tw:ml-1"
             variant="ghost"
             size="icon-sm"
-            :title="t('alert_templates.delete')"
+            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
+            :disabled="row.isPrebuilt"
             @click="conformDeleteDestination(row)"
           >
             <OIcon name="delete" size="sm" />
@@ -128,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
         :template="editingTemplate"
+        :is-clone="cloningTemplate"
         @cancel:hideform="toggleTemplateEditor"
         @get:templates="getTemplates"
       />
@@ -172,8 +216,10 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -208,13 +254,16 @@ const columns: OTableColumnDef[] = [
     header: t("alert_templates.actions"),
     isAction: true,
     pinned: "right",
-    size: 120,
-    meta: { align: "center", actionCount: 3 },
+    size: 150,
+    meta: { align: "center", actionCount: 4 },
   },
 ];
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
+// True when the editor was opened via the clone action — the AddTemplate
+// form should treat the prefilled data as a fresh template (not an update).
+const cloningTemplate = ref(false);
 const resultTotal = ref<number>(0);
 
 const confirmDelete: Ref<{
@@ -224,6 +273,9 @@ const confirmDelete: Ref<{
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
 const filterQuery = ref("");
+// Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
+// system templates (name starts with `prebuilt_`), "custom" shows the rest.
+const activeTab = ref<"all" | "prebuilt" | "custom">("all");
 
 const selectedTemplateIds = computed(() =>
   selectedTemplates.value.map((item: any) => item.name),
@@ -231,8 +283,18 @@ const selectedTemplateIds = computed(() =>
 
 const handleSelectedIdsUpdate = (ids: string[]) => {
   const map = new Map(templates.value.map((r: any) => [r.name, r]));
-  selectedTemplates.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+  // OTable's "Select All" header ignores `isRowSelectable` and emits every
+  // visible row's id; strip prebuilt rows here so they can never land in the
+  // bulk-delete payload.
+  selectedTemplates.value = ids
+    .map((id: any) => map.get(id))
+    .filter((r: any) => r && !r.isPrebuilt);
 };
+
+// Disables the individual row checkbox for prebuilt templates. The select-all
+// filtering happens in `handleSelectedIdsUpdate` above, since that's the only
+// signal we get when the header checkbox is used.
+const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
@@ -306,6 +368,7 @@ const editTemplate = (template: any = null) => {
     });
   }
   resetEditingTemplate();
+  cloningTemplate.value = false;
   toggleTemplateEditor();
 
   const query: { [key: string]: string } = {
@@ -337,6 +400,30 @@ const editTemplate = (template: any = null) => {
 };
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
+};
+const cloneTemplate = (template: any) => {
+  track("Button Click", {
+    button: "Clone Template",
+    page: "Alert Templates",
+  });
+  // Pre-fill the editor with a copy of the source template. AddTemplate
+  // treats this as a create (since isClone=true), so the user can rename
+  // and save without overwriting the original.
+  // Underscored prefix because template names reject spaces and the other
+  // reserved characters (':', '#', '?', '&', '%', '/', quotes).
+  editingTemplate.value = {
+    ...template,
+    name: `Copy_of_${template.name}`,
+  };
+  cloningTemplate.value = true;
+  showTemplateEditor.value = true;
+  router.push({
+    name: "alertTemplates",
+    query: {
+      action: "add",
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
 };
 const deleteTemplate = () => {
   if (confirmDelete.value?.data?.name) {
@@ -423,8 +510,15 @@ const exportTemplate = (row: any) => {
 };
 
 const visibleRows = computed(() => {
-  if (!filterQuery.value) return templates.value || [];
-  return filterData(templates.value || [], filterQuery.value);
+  const base = templates.value || [];
+  const byTab =
+    activeTab.value === "prebuilt"
+      ? base.filter((t: any) => !!t.isPrebuilt)
+      : activeTab.value === "custom"
+        ? base.filter((t: any) => !t.isPrebuilt)
+        : base;
+  if (!filterQuery.value) return byTab;
+  return filterData(byTab, filterQuery.value);
 });
 // Watch visibleRows to sync resultTotal with search filter
 watch(
@@ -486,4 +580,40 @@ const bulkDeleteTemplates = () => {
     });
 };
 </script>
-<style lang=""></style>
+<style lang="scss" scoped>
+// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
+// labels match the LLM-pricing list visually.
+.dimension-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid #d1d5db;
+  color: inherit;
+}
+
+.badge-blue {
+  border: 1px solid #1d4ed8;
+}
+
+.badge-green {
+  border: 1px solid #065f46;
+}
+
+:global(body.body--dark) .dimension-badge {
+  color: #ffffff;
+  border-color: #4b5563;
+}
+
+:global(body.body--dark) .badge-blue {
+  border-color: #93c5fd;
+}
+
+:global(body.body--dark) .badge-green {
+  border-color: #6ee7b7;
+}
+</style>

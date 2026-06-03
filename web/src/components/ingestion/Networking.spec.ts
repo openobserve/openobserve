@@ -558,7 +558,7 @@ describe("Networking Component", () => {
     });
 
     it("should render search input with correct attributes", () => {
-      const input = wrapper.findComponent({ name: 'OInput' });
+      const input = wrapper.findComponent({ name: 'OSearchInput' });
       expect(input.exists()).toBe(true);
     });
   });

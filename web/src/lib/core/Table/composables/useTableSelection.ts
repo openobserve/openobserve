@@ -10,6 +10,17 @@ export function useTableSelection<TData>(
     selection: OTableSelectionMode;
     selectedIds?: string[];
     rowKey?: string;
+    /**
+     * Predicate that decides whether a row participates in selection. When
+     * provided, "Select All" and the indeterminate / all-selected state of
+     * the header checkbox only consider rows that pass this predicate.
+     * Without this, a parent that filters non-selectable rows out of the
+     * controlled `selectedIds` would break the header toggle: `allSelected`
+     * could never become true (because the visible non-selectable rows are
+     * never in the set), so the header could only ever select, never
+     * deselect.
+     */
+    isRowSelectable?: (row: TData) => boolean;
   },
   emit: any,
 ) {
@@ -55,10 +66,16 @@ export function useTableSelection<TData>(
     emitSelection(newSet);
   }
 
+  function selectableRows(): Row<TData>[] {
+    const rows = table.getRowModel().rows;
+    if (!props.isRowSelectable) return rows;
+    return rows.filter((r) => props.isRowSelectable!(r.original));
+  }
+
   function toggleAllRows() {
     const newSet = new Set(localSelectedIds.value);
     const allIds = props.selection === "multiple"
-      ? table.getRowModel().rows.map((r) => getRowId(r.original))
+      ? selectableRows().map((r) => getRowId(r.original))
       : [];
 
     if (allIds.length === 0) return;
@@ -76,13 +93,13 @@ export function useTableSelection<TData>(
   }
 
   function isAllSelected(): boolean {
-    const rows = table.getRowModel().rows;
+    const rows = selectableRows();
     if (rows.length === 0) return false;
     return rows.every((r) => isRowSelected(r.original));
   }
 
   function isIndeterminate(): boolean {
-    const rows = table.getRowModel().rows;
+    const rows = selectableRows();
     if (rows.length === 0) return false;
     const selectedCount = rows.filter((r) => isRowSelected(r.original)).length;
     return selectedCount > 0 && selectedCount < rows.length;

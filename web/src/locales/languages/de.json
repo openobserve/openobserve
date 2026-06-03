@@ -2450,7 +2450,16 @@
     "delete": "Löschen",
     "variable_guide_header": "Leitfaden für Vorlagenvariablen",
     "variable_usage_examples": "Beispiele für die Verwendung",
-    "body": "Inhalt"
+    "body": "Inhalt",
+    "clone": "Klonen",
+    "cloneTitle": "Vorlage klonen",
+    "systemReadOnly": "Vorgefertigte Vorlage — Löschen ist deaktiviert. Klonen Sie sie, um eine modifizierbare Kopie zu erstellen.",
+    "prebuiltBadge": "Vorgefertigt",
+    "prebuiltBadgeHint": "Wird vom System verwaltet. Sie können bearbeiten, aber das Löschen ist deaktiviert.",
+    "customBadge": "Benutzerdefiniert",
+    "filterAll": "Alle",
+    "filterPrebuilt": "Vorgefertigt",
+    "filterCustom": "Benutzerdefiniert"
   },
   "alert_destinations": {
     "header": "Ziele",
@@ -2487,7 +2496,13 @@
     "custom": "Benutzerdefiniert",
     "separator": "Trennzeichen",
     "separator_placeholder": "Geben Sie ein Trennzeichen ein (z. B. |,\\n,\\ t, Leerzeichen)",
-    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)"
+    "separator_hint": "Trennzeichenfolge, die zwischen Datensätzen verwendet werden soll (Leerzeichen erlaubt)",
+    "filterAll": "Alle",
+    "filterPrebuilt": "Vorgefertigt",
+    "filterCustom": "Benutzerdefiniert",
+    "templateDefaultBadge": "Standard",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Suchen Sie nach einer Metrik",
@@ -3989,19 +4004,23 @@
     "capabilities": {
       "query": {
         "title": "Schreiben Sie eine Anfrage",
-        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken."
+        "description": "SQL für Logs, Traces, RUM oder PromQL für Metriken.",
+        "prompt": "Hilf mir, eine Anfrage zu schreiben"
       },
       "incident": {
         "title": "Vorfälle untersuchen",
-        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“"
+        "description": "Ursache für Logs, Traces und Alerts — z. B. „Warum hat Gateway-5xx gezündet?“",
+        "prompt": "Hilf mir, einen Vorfall zu untersuchen"
       },
       "dashboard": {
         "title": "Erstellen Sie ein Dashboard",
-        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels."
+        "description": "Aus einem Thema — z. B. „Zustand des K8s-Knotens: CPU, Speicher, Neustarts“. Erstellt auch Panels.",
+        "prompt": "Hilf mir, ein Dashboard zu erstellen"
       },
       "alert": {
         "title": "Eine Warnung erstellen",
-        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme."
+        "description": "Schwellenwerte oder geplante Warnungen und VRL-Pipelines zum Zeitpunkt der Aufnahme.",
+        "prompt": "Hilf mir, eine Warnung zu erstellen"
       }
     },
     "suggestions": {

@@ -28,17 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("iam.basicUsers") }}
         </div>
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-          <OInput
+          <OSearchInput
               v-model="filterQuery"
-              class="tw:w-[12.5rem]"
+              style="width: 12.5rem"
               :placeholder="t('user.search')"
               data-test="iam-users-search-input"
-            >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
-          <div class="tw:w-1/2" v-if="config.isCloud == 'true'">
+            />
+          <div v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
@@ -225,7 +221,7 @@ import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -263,7 +259,7 @@ export default defineComponent({
     OBadge,
     OIcon,
     ODialog,
-    OInput,
+    OSearchInput,
     NoData,
   },
   emits: [

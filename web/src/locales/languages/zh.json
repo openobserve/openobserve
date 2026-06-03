@@ -2450,7 +2450,16 @@
     "delete": "删除",
     "variable_guide_header": "模板变量指南",
     "variable_usage_examples": "用法示例",
-    "body": "Body"
+    "body": "Body",
+    "clone": "克隆",
+    "cloneTitle": "克隆模板",
+    "systemReadOnly": "预建模板 — 删除已禁用。将其克隆以制作可修改的副本。",
+    "prebuiltBadge": "预建的",
+    "prebuiltBadgeHint": "由系统管理。您可以编辑，但删除功能已禁用。",
+    "customBadge": "自定义",
+    "filterAll": "全部",
+    "filterPrebuilt": "预建的",
+    "filterCustom": "自定义"
   },
   "alert_destinations": {
     "header": "地址",
@@ -2487,7 +2496,13 @@
     "custom": "自定义",
     "separator": "分隔符",
     "separator_placeholder": "输入分隔符（例如，|、\\n、\\ t、空格）",
-    "separator_hint": "在记录之间使用的分隔字符串（允许空格）"
+    "separator_hint": "在记录之间使用的分隔字符串（允许空格）",
+    "filterAll": "全部",
+    "filterPrebuilt": "预建的",
+    "filterCustom": "自定义",
+    "templateDefaultBadge": "默认",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "搜索指标",
@@ -3993,19 +4008,23 @@
     "capabilities": {
       "query": {
         "title": "写一个查询",
-        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。"
+        "description": "SQL 用于日志、跟踪，RUM，或用于衡量指标的 PromQL。",
+        "prompt": "帮我写一个查询"
       },
       "incident": {
         "title": "调查事件",
-        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”"
+        "description": "日志、跟踪、警报的根本原因，例如 “Gateway-5xx 为什么会触发？”",
+        "prompt": "帮我调查一个事件"
       },
       "dashboard": {
         "title": "构建仪表板",
-        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。"
+        "description": "来自一个主题，例如 “K8s 节点运行状况：CPU、内存、重启”。还会创建面板。",
+        "prompt": "帮我构建一个仪表板或面板"
       },
       "alert": {
         "title": "创建警报",
-        "description": "阈值或预设警报，以及采集时间 VRL 管道。"
+        "description": "阈值或预设警报，以及采集时间 VRL 管道。",
+        "prompt": "帮我创建一个警报或管道"
       }
     },
     "suggestions": {

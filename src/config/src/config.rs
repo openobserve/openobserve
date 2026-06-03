@@ -376,7 +376,7 @@ pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Erro
 pub fn load_config() -> Result<(), anyhow::Error> {
     match crate::config_path_manager::get_config_file_path() {
         Some(path) => {
-            log::info!("Loading config from file {:?}", &path);
+            log::info!("Loading config from file {:?}", path);
             if dotenvy::from_path_override(&path).is_err() {
                 return Err(anyhow::anyhow!("Config loading from file failed"));
             }
@@ -776,7 +776,7 @@ pub struct Http {
     pub access_log_format: String,
     #[env_config(
         name = "ZO_HTTP_REAL_IP_SOURCE",
-        default = "XEnvoyExternalAddress,XRealIp",
+        default = "XEnvoyExternalAddress,XRealIp,RightmostXForwardedFor",
         help = "Comma-separated list of sources to resolve the real client IP; tried in \
                 order, first match wins. TCP peer (ConnectInfo) is always used as the final \
                 fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
@@ -1174,7 +1174,7 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_PRINT_KEY_EVENT", default = false)]
     pub print_key_event: bool,
-    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]

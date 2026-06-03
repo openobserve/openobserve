@@ -302,8 +302,8 @@ impl Writer {
         log::info!(
             "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
             wal_dir.display(),
-            &key.org_id,
-            &key.stream_type,
+            key.org_id,
+            key.stream_type,
             wal_id
         );
 
@@ -573,8 +573,8 @@ impl Writer {
         log::info!(
             "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
             wal_dir.display(),
-            &self.key.org_id,
-            &self.key.stream_type,
+            self.key.org_id,
+            self.key.stream_type,
             wal_id
         );
         let (new_wal, _header_size) = WalWriter::new(

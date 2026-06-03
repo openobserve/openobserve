@@ -35,28 +35,32 @@
 <!-- Form Section -->
 <div class="tw:w-full tw:flex tw:justify-center">
   <div class="tw:w-full tw:max-w-[500px] tw:flex tw:flex-col tw:items-center tw:gap-y-2 tw:px-4">
-    <OInput
+    <OForm ref="formRef" :default-values="{ hearAboutUs: '', whereDoYouWork: '' }" @submit="doSubmit" class="tw:w-full tw:flex tw:flex-col tw:gap-y-2">
+    <OFormInput
+      name="hearAboutUs"
       class="o2-input"
       v-model="hearAboutUs"
       :label="`How did you hear about us? *`"
       placeholder="Eg. From a friend"
       style="width: 100%;"
+      :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
-    <OInput
+    <OFormInput
+      name="whereDoYouWork"
       class="tw:-mt-2"
       v-model="whereDoYouWork"
       :label="`Where do you work? *`"
       placeholder="Company Name"
       style="width: 100%;"
+      :validators="[(val) => !String(val ?? '').trim() ? 'This field is required' : undefined]"
     />
-    <div class="tw:w-full tw:flex tw:items-center">
-      <OCheckbox v-model="isAgree">
-        <span class="tw:text-sm">
-          I have read and agree with the
-          <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
-          <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
-        </span>
-      </OCheckbox>
+    <div class="tw:w-full tw:flex tw:items-center tw:gap-2">
+      <OCheckbox v-model="isAgree" />
+      <span class="tw:text-sm">
+        I have read and agree with the
+        <a href="#" class="tw:text-[#6B76E3] hover:underline">Terms of use</a> and
+        <a href="#" class="tw:text-[#6B76E3] hover:underline">Privacy policy*</a>
+      </span>
     </div>
     <div class="tw:w-full tw:mt-4">
       <OButton
@@ -65,11 +69,12 @@
         block
         :disabled="!isAgree || isSubmitting"
         :loading="isSubmitting"
-        @click="onSubmit"
+        @click="formRef?.submit()"
       >
         Start your 14-day Trial
       </OButton>
     </div>
+    </OForm>
   </div>
 </div>
 
@@ -92,6 +97,8 @@ import { ref } from 'vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
+import OForm from '@/lib/forms/Form/OForm.vue'
+import OFormInput from '@/lib/forms/Input/OFormInput.vue'
 import { useStore } from 'vuex'
   import billings from '@/services/billings'
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -101,25 +108,10 @@ const isAgree = ref(false)
 const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
 const isSubmitting = ref(false);
+const formRef = ref(null);
 
-const validateForm = () => {
-  if(!hearAboutUs.value.trim() || !whereDoYouWork.value.trim()) {
-    return false
-  }
-  return true
-}
-const onSubmit = async () => {
-
+const doSubmit = async () => {
   isSubmitting.value = true
-  if(!validateForm()) {
-    toast({
-      message: 'Please fill all the fields',
-      variant: 'warning',
-    })
-    isSubmitting.value = false
-    return
-  }
-
   const res = await billings.submit_new_user_info(store.state.selectedOrganization.identifier, {
     from: hearAboutUs.value,
     company: whereDoYouWork.value,

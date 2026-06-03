@@ -17,6 +17,11 @@ dependencies = [
     "pytest-order>=1.1.1",
     "pytest-sugar>=1.0.1",
     "pytest-pretty>=1.2.0",
+    # pytest-xdist enables `-n <N>` parallel execution. Used by the ENT
+    # RBAC shard to halve wall time on its ~280-test serial run. Requires
+    # tests to use unique resource names (uuid4 suffixes, not just
+    # int(time.time())) — the rbac helper was updated accordingly.
+    "pytest-xdist>=3.0",
     "requests>=2.31.0",
     "ruff>=0.1.8",
     "tink>=1.10.0",

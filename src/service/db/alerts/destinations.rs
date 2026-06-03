@@ -91,7 +91,7 @@ pub async fn set(destination: Destination) -> Result<Destination, DestinationErr
     // trigger watch event to update in-memory cache
     let event_key = format!(
         "{DESTINATION_WATCHER_PREFIX}{}/{}",
-        &saved.org_id, &saved.name
+        saved.org_id, saved.name
     );
     infra::coordinator::destinations::emit_put_event(&event_key).await?;
     // super cluster

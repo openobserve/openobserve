@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Cross-Alert Fingerprint Groups -->
-      <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
+      <div class="tw:mb-6" v-if="localConfig.enabled && localConfig.alert_dedup_enabled">
         <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
           {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
           <OIcon
@@ -226,7 +226,7 @@ const emitUpdate = () => {
 
 const saveSettings = async () => {
   // Validate cross-alert dedup requires fingerprint groups
-  if (localConfig.value.alert_dedup_enabled) {
+  if (localConfig.value.enabled && localConfig.value.alert_dedup_enabled) {
     if (!localConfig.value.alert_fingerprint_groups ||
         localConfig.value.alert_fingerprint_groups.length === 0) {
       toast({
@@ -239,7 +239,6 @@ const saveSettings = async () => {
 
   saving.value = true;
   try {
-    // Sanitize: convert empty string/NaN time_window_minutes to null
     const rawWindow = localConfig.value.time_window_minutes;
     const configToSave = {
       ...localConfig.value,

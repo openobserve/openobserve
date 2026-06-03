@@ -76,17 +76,13 @@
             <div class="tw:text-sm display-total-fields">
                 All Fields ({{ schemaData.schema.length }})
             </div>
-                <OInput
+                <OSearchInput
                   data-test="schema-field-search-input"
                   v-model="filterField"
                   data-cy="schema-index-field-search-input"
                   debounce="1"
                   :placeholder="t('search.searchField')"
-                >
-                  <template #icon-left>
-                    <OIcon name="search" size="sm" />
-                  </template>
-                </OInput>
+                />
               </div>
           <div>
 
@@ -144,9 +140,8 @@
     import OTable from "@/lib/core/Table/OTable.vue";
         import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-    import OInput from "@/lib/forms/Input/OInput.vue";
+    import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
         import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     const defaultStreamData = {
         name: '',
@@ -179,9 +174,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
         OTable,
         ODrawer,
         OButton,
-        OInput,
+        OSearchInput,
         OSpinner,
-        OIcon,
 },
     emits: ['update:open'],
     setup(props) {

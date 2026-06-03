@@ -1,5 +1,8 @@
+import logging
 import random
 from requests.auth import HTTPBasicAuth
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -22,24 +25,30 @@ class ServiceAccountPage:
         payload = {
             "email": email_address,
             "organization": org_id,
-            "first_name": "Shyam",
-            "last_name": "Panjiyar"
+            # Standard convention: all automated-test users / service
+            # accounts use the same display name so they're identifiable
+            # as test-created in the IAM users page (and safe to clean up).
+            "first_name": "Automation",
+            "last_name": "TestUser",
         }
-        print("Payload for service account creation:", payload)  # Log the payload
+        logger.debug("Payload for service account creation: %s", payload)
         response = session.post(
-            f"{base_url}api/{org_id}/service_accounts", 
-            json=payload, 
+            f"{base_url}api/{org_id}/service_accounts",
+            json=payload,
             headers=headers
         )
         assert response.status_code == 200, f"Failed to create service account: {response.content.decode()}"
 
         response_data = response.json()
-        print(f"Service account created successfully: {response_data}")
+        logger.debug("Service account created successfully: %s", response_data)
 
-        # Token is returned in the create response
+        # Token is returned in the create response.
         token = response_data['token']
 
-        print(f"Token: {token}")
+        # Token is a credential — debug-level only so it doesn't surface
+        # in default CI output, but still available if someone enables
+        # debug logging to chase a service-account auth issue.
+        logger.debug("Token: %s", token)
 
         return token
 

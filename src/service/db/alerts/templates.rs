@@ -52,6 +52,16 @@ pub enum TemplateError {
     DeleteWithAlert(String),
     #[error("Template not found")]
     NotFound,
+    #[error(
+        "Template '{0}' is a system prebuilt template and cannot be modified or deleted. \
+         Create a copy with a different name to customize it."
+    )]
+    PrebuiltReadOnly(String),
+    #[error(
+        "Template name '{0}' is reserved for system prebuilt templates. \
+         Pick a different name."
+    )]
+    ReservedName(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {

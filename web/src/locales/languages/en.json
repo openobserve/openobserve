@@ -252,7 +252,6 @@
     "legendLabel": "Legend",
     "logs": "Logs",
     "traces": "Traces",
-    "metrics": "Metrics",
     "enrichmentTables": "Enrichment Tables",
     "switchToLogs": "click to switch back to Logs",
     "savedViewsLabel": "Saved View",
@@ -790,6 +789,10 @@
         "service_maps": {
           "name": "Service Graph",
           "note": "Visualize service dependencies"
+        },
+        "byob": {
+          "name": "Bring Your Own Bucket",
+          "note": "Route org data to your own cloud bucket"
         }
       },
       "buttons": {
@@ -2067,19 +2070,23 @@
     "capabilities": {
       "query": {
         "title": "Write a Query",
-        "description": "SQL for logs, traces, RUM, or PromQL for metrics."
+        "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
+        "prompt": "Help me write a query"
       },
       "incident": {
         "title": "Investigate Incidents",
-        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\""
+        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
+        "prompt": "Help me investigate an incident"
       },
       "dashboard": {
         "title": "Build a Dashboard",
-        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels."
+        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels.",
+        "prompt": "Help me build a dashboard or panel"
       },
       "alert": {
         "title": "Create an Alert",
-        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines."
+        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines.",
+        "prompt": "Help me create an alert or pipeline"
       }
     },
     "suggestions": {
@@ -2765,7 +2772,7 @@
       "selectTemplate": "Select Template"
     },
     "editJson": "Edit Alert JSON",
-    "additional_settings":"Additional Settings",
+    "additional_settings": "Additional Settings",
     "alertNamePlaceholder": "Alert name",
     "nameRequired": "Alert name is required.",
     "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
@@ -2833,13 +2840,26 @@
     "delete": "Delete",
     "variable_guide_header": "Template Variable Guide",
     "variable_usage_examples": "Usage Examples",
-    "body": "Body"
+    "body": "Body",
+    "clone": "Clone",
+    "cloneTitle": "Clone template",
+    "systemReadOnly": "Prebuilt template — delete is disabled. Clone it to make a modifiable copy.",
+    "prebuiltBadge": "Prebuilt",
+    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
+    "customBadge": "Custom",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom"
   },
   "alert_destinations": {
     "header": "Notification Destinations",
     "add": "New destination",
     "edit": "Edit",
     "search": "Search destination",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom",
+    "templateDefaultBadge": "Default",
     "name": "Name",
     "destination_type": "Destination Type",
     "template": "Template",
@@ -2870,28 +2890,30 @@
     "custom": "Custom",
     "separator": "Separator",
     "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
-    "separator_hint": "Separator string to use between records (spaces allowed)"
+    "separator_hint": "Separator string to use between records (spaces allowed)",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
     "search": "Search destination"
   },
   "storage_settings": {
-    "tabLabel": "Storage Settings",
-    "title": "Storage Settings",
-    "notEnabled": "storage settings is not enabled for this organization",
-    "notConfigured": "configure a custom storage provider for this organization's data",
+    "tabLabel": "BYOB",
+    "title": "Bring Your Own Bucket",
+    "notEnabled": "BYOB is not enabled for this organization",
+    "notConfigured": "Configure a custom bucket for this organization's data",
     "configured": "configured",
-    "heroHeadline": "Bring your own storage to",
+    "heroHeadline": "Bring your own bucket to",
     "heroSub": "Connect your own cloud bucket, data stays in your infrastructure — full control, zero lock-in.",
     "configureStorage": "Configure storage",
     "supportedProviders": "Supported providers",
-    "noStorageConfigured": "No storage configured",
+    "noStorageConfigured": "No bucket configured",
     "routeDataDesc": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
     "perOrgIsolation": "Per-org isolation",
     "appliesImmediately": "Applies to new data immediately",
     "usesOrgCredentials": "Uses org-scoped credentials",
-    "updateStorage": "Update Storage",
+    "updateStorage": "Update Bucket",
     "active": "active",
     "bucketName": "bucket name",
     "region": "region",
@@ -2906,7 +2928,7 @@
     "featureSecureTitle": "Secure & compliant",
     "featureSecureDesc": "Fine grained access keys, your sensitive data stays in your infrastructure.",
     "goBack": "Go Back",
-    "newStorageConfiguration": "New Storage Configuration",
+    "newStorageConfiguration": "New Bucket Configuration",
     "selectProviderDesc": "Select a cloud storage provider to store this organization's data.",
     "bucketNameRequired": "Bucket name is required",
     "accessKeyRequired": "Access key is required",
@@ -3382,7 +3404,7 @@
       "criteriaFromTemplate": "Evaluation Criteria (from template)",
       "criteriaDifferentTemplate": "Evaluation Criteria (different template — for reference only)",
       "criteriaTemplateMismatchNote": "These criteria belong to {template}, not the template that ran this evaluation ({evaluated}).",
-      "criteriaSyntaxNote": "Placeholders like \u007bquery\u007d, \u007bresponse\u007d, \u007bmodel\u007d are substituted at evaluation time and shown here in their raw template form.",
+      "criteriaSyntaxNote": "Placeholders like {query}, {response}, {model} are substituted at evaluation time and shown here in their raw template form.",
       "recommendedFixes": "Recommended Fixes",
       "fixSuggestion": "Suggestion:",
       "weakestDimension": "Weakest Dimension:",

@@ -105,9 +105,7 @@ impl JsonEncoder {
                         }
                         // individual buckets
                         let timestamp = crate::utils::time::now_micros();
-                        for (bound, value) in
-                            upper_bounds.into_iter().zip(cumulative_counts.into_iter())
-                        {
+                        for (bound, value) in upper_bounds.into_iter().zip(cumulative_counts) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));
                             row.insert("__name__".to_string(), json!(format!("{}_bucket", name)));
@@ -122,8 +120,7 @@ impl JsonEncoder {
                         let count = json!(h.get_sample_count());
                         let sum = json!(h.get_sample_sum());
 
-                        for (ty, val) in ["count", "sum"].into_iter().zip([count, sum].into_iter())
-                        {
+                        for (ty, val) in ["count", "sum"].into_iter().zip([count, sum]) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));
                             row.insert("__name__".to_string(), json!(format!("{}_{}", name, ty)));
@@ -150,7 +147,7 @@ impl JsonEncoder {
 
                         // individual buckets
                         let timestamp = crate::utils::time::now_micros();
-                        for (quantile, value) in quantiles.into_iter().zip(values.into_iter()) {
+                        for (quantile, value) in quantiles.into_iter().zip(values) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));
                             row.insert("__name__".to_string(), json!(format!("{}_bucket", name)));
@@ -164,7 +161,7 @@ impl JsonEncoder {
                         let names = ["sum".to_string(), "count".to_string()];
 
                         let values = [json!(s.sample_sum()), json!(s.sample_count())];
-                        for (key, value) in names.into_iter().zip(values.into_iter()) {
+                        for (key, value) in names.into_iter().zip(values) {
                             let mut row = Map::new();
                             row.insert("_timestamp".to_string(), json!(timestamp));
                             row.insert("__name__".to_string(), json!(format!("{name}_{key}")));

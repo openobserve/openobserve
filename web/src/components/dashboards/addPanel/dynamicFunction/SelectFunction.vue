@@ -85,14 +85,18 @@
                   />
                 </div>
 
-                <OInput
+                <div
                   v-if="fields.args[argIndex]?.type === 'string'"
-                  type="text"
-                  v-model="fields.args[argIndex].value"
-                  placeholder="Enter string"
-                  class="tw:w-52"
-                  :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
-                />
+                  class="tw:w-52 tw:flex-none"
+                >
+                  <OInput
+                    type="text"
+                    v-model="fields.args[argIndex].value"
+                    placeholder="Enter string"
+                    class="tw:w-full"
+                    :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
+                  />
+                </div>
 
                 <OInput
                   v-if="fields.args[argIndex]?.type === 'number'"
@@ -557,8 +561,7 @@ export default {
   }
 
   :deep(button[type="button"]) {
-    min-width: 2.5rem;
-    height: 2.5rem;
+    min-width: 2rem;
     padding-inline-end: 1.5rem !important;
   }
 }

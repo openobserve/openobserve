@@ -159,6 +159,7 @@ mod tests {
                 group_by: Default::default(),
                 order_by,
                 histogram_interval,
+                timezone: None,
                 sorted_by_time: false,
                 sampling_config: None,
             },

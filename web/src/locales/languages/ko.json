@@ -2448,7 +2448,16 @@
     "delete": "삭제",
     "variable_guide_header": "템플릿 변수 가이드",
     "variable_usage_examples": "사용 예시",
-    "body": "바디"
+    "body": "바디",
+    "clone": "클론",
+    "cloneTitle": "클론 템플릿",
+    "systemReadOnly": "사전 빌드된 템플릿 — 삭제가 비활성화되었습니다.복제하여 수정 가능한 사본을 만드세요.",
+    "prebuiltBadge": "사전 구축",
+    "prebuiltBadgeHint": "시스템에 의해 관리됩니다.편집은 가능하지만 삭제는 불가능합니다.",
+    "customBadge": "사용자 지정",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정"
   },
   "alert_destinations": {
     "header": "여행지",
@@ -2485,7 +2494,13 @@
     "custom": "사용자 지정",
     "separator": "분리기",
     "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
-    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정",
+    "templateDefaultBadge": "디폴트",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "지표 검색",
@@ -4000,19 +4015,23 @@
     "capabilities": {
       "query": {
         "title": "쿼리 작성",
-        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL"
+        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL",
+        "prompt": "쿼리 작성을 도와주세요"
       },
       "incident": {
         "title": "인시던트 조사",
-        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)"
+        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)",
+        "prompt": "인시던트 조사를 도와주세요"
       },
       "dashboard": {
         "title": "대시보드 구축",
-        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다."
+        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다.",
+        "prompt": "대시보드 또는 패널 구축을 도와주세요"
       },
       "alert": {
         "title": "알림 생성",
-        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인."
+        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인.",
+        "prompt": "알림 또는 파이프라인 생성을 도와주세요"
       }
     },
     "suggestions": {

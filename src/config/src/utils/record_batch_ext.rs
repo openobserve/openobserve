@@ -1078,13 +1078,7 @@ fn append_value_optimized(
                     }
                 }
                 Value::String(s) => s.parse::<i64>().unwrap_or(0),
-                Value::Bool(bo) => {
-                    if *bo {
-                        1
-                    } else {
-                        0
-                    }
-                }
+                Value::Bool(bo) if *bo => 1,
                 _ => 0,
             };
             b.append_value(val);
@@ -1106,13 +1100,7 @@ fn append_value_optimized(
                     }
                 }
                 Value::String(s) => s.parse::<u64>().unwrap_or(0),
-                Value::Bool(bo) => {
-                    if *bo {
-                        1
-                    } else {
-                        0
-                    }
-                }
+                Value::Bool(bo) if *bo => 1,
                 _ => 0,
             };
             b.append_value(val);
@@ -1126,13 +1114,7 @@ fn append_value_optimized(
             let val = match value {
                 Value::Number(n) => n.as_f64().unwrap_or(0.0),
                 Value::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                Value::Bool(bo) => {
-                    if *bo {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+                Value::Bool(bo) if *bo => 1.0,
                 _ => 0.0,
             };
             b.append_value(val);

@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="features-list">
             <div
               v-for="feature in enterpriseFeatures"
+              v-show="!feature.cloudOnly"
               :key="feature.name"
               class="feature-list-item"
               :class="{ 'has-link': feature.link }"
@@ -274,6 +275,7 @@ const FEATURE_LINKS = {
   broadcast_join: "broadcast_join",
   logs_metrics_traces_correlation: "telemetry_corr",
   service_maps: "service_maps",
+  byob: "byob",
 };
 
 export default defineComponent({
@@ -639,6 +641,15 @@ export default defineComponent({
         icon: "account-tree",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
+      },
+      {
+        name: t("about.enterprise_offer.enterprise_features.byob.name"),
+        note: t("about.enterprise_offer.enterprise_features.byob.note"),
+        icon: "database",
+        requiresHA: false,
+        beta: true,
+        cloudOnly: true,
+        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.byob,
       },
     ];
 

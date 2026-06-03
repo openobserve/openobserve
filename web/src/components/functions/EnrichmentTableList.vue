@@ -49,16 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
 
-              <OInput
+              <OSearchInput
                 data-test="enrichment-tables-search-input"
                 v-model="filterQuery"
                 class="tw:ml-2 tw:w-[200px]"
                 :placeholder="t('function.searchEnrichmentTable')"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+              />
               <OButton
                 data-test="enrichment-tables-add-btn"
                 class="tw:ml-2"
@@ -349,7 +345,7 @@ import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -367,7 +363,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     ODrawer,
-    OInput,
+    OSearchInput,
     OTooltip,
     OCheckbox,
     OIcon,

@@ -49,16 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-service-accounts-selection-search-input"
           class="tw:mr-3"
         >
-          <OInput
+          <OSearchInput
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
-            class=" no-border o2-search-input tw:h-[36px] tw:w-[200px]"
+            class="tw:h-[36px] tw:w-[200px]"
             placeholder="Search Service Accounts"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="tw:cursor-pointer o2-search-input-icon" />
-            </template>
-          </OInput>
+          />
         </div>
       </div>
       <div data-test="iam-service-accounts-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
@@ -99,8 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import NoData from "@/components/shared/grid/NoData.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-  import OInput from "@/lib/forms/Input/OInput.vue";
-  import OIcon from "@/lib/core/Icon/OIcon.vue";
+  import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
   import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
   import usePermissions from "@/composables/iam/usePermissions";
   import { cloneDeep } from "lodash-es";

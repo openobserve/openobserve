@@ -2448,7 +2448,16 @@
     "delete": "Verwijderen",
     "variable_guide_header": "Handleiding voor sjabloonvariabelen",
     "variable_usage_examples": "Voorbeelden van gebruik",
-    "body": "Lichaam"
+    "body": "Lichaam",
+    "clone": "Kloon",
+    "cloneTitle": "Sjabloon klonen",
+    "systemReadOnly": "Vooraf gebouwde sjabloon — verwijderen is uitgeschakeld. Kloon het om een aanpasbare kopie te maken.",
+    "prebuiltBadge": "Voorgebouwd",
+    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt bewerken, maar verwijderen is uitgeschakeld.",
+    "customBadge": "Op maat",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat"
   },
   "alert_destinations": {
     "header": "Bestemmingen",
@@ -2485,7 +2494,13 @@
     "custom": "Op maat",
     "separator": "Separator",
     "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
-    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat",
+    "templateDefaultBadge": "Standaard",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
@@ -4000,19 +4015,23 @@
     "capabilities": {
       "query": {
         "title": "Een vraag schrijven",
-        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken."
+        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken.",
+        "prompt": "Help me een vraag te schrijven"
       },
       "incident": {
         "title": "Incidenten onderzoeken",
-        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”"
+        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”",
+        "prompt": "Help me incidenten te onderzoeken"
       },
       "dashboard": {
         "title": "Een dashboard bouwen",
-        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen."
+        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen.",
+        "prompt": "Help me een dashboard of paneel te bouwen"
       },
       "alert": {
         "title": "Een waarschuwing aanmaken",
-        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt."
+        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt.",
+        "prompt": "Help me een waarschuwing of pipeline aan te maken"
       }
     },
     "suggestions": {
