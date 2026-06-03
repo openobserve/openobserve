@@ -188,7 +188,7 @@ export class AlertsPage {
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators

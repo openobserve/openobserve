@@ -57,10 +57,10 @@ export class ReportFoldersPage {
       '[data-test="reports-index-dropdown-stream_type-popover"]'
     );
     this.moveSubmitBtn = page.locator(
-      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.moveCancelBtn = page.locator(
-      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-drawer-secondary-btn"]'
+      '[data-test="report-move-to-another-folder-dialog"] [data-test="o-dialog-secondary-btn"]'
     );
 
     // Report list
