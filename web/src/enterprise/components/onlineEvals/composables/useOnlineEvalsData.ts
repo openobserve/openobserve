@@ -22,22 +22,40 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     isLoading.value = true;
     try {
-      const [providerList, scoreConfigList, scorerList, jobList] = await Promise.all([
-        onlineEvalsService.providers.list(orgId),
-        onlineEvalsService.scoreConfigs.list(orgId),
-        onlineEvalsService.scorers.list(orgId),
-        onlineEvalsService.jobs.list(orgId),
-      ]);
+      const [providerResult, scoreConfigResult, scorerResult, jobResult] =
+        await Promise.allSettled([
+          onlineEvalsService.providers.list(orgId),
+          onlineEvalsService.scoreConfigs.list(orgId),
+          onlineEvalsService.scorers.list(orgId),
+          onlineEvalsService.jobs.list(orgId),
+        ]);
 
-      providers.value = providerList;
-      scoreConfigs.value = scoreConfigList;
-      scoreConfigVersions.value = Object.fromEntries(
-        scoreConfigList.map((config) => [entityId(config), [config]]),
-      );
-      scorers.value = scorerList;
-      jobs.value = jobList;
-    } catch (err: any) {
-      showError(err, t("onlineEvals.loadError"));
+      if (providerResult.status === "fulfilled") {
+        providers.value = providerResult.value;
+      } else {
+        showError(providerResult.reason, t("onlineEvals.loadError"));
+      }
+
+      if (scoreConfigResult.status === "fulfilled") {
+        scoreConfigs.value = scoreConfigResult.value;
+        scoreConfigVersions.value = Object.fromEntries(
+          scoreConfigResult.value.map((config) => [entityId(config), [config]]),
+        );
+      } else {
+        showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
+      }
+
+      if (scorerResult.status === "fulfilled") {
+        scorers.value = scorerResult.value;
+      } else {
+        showError(scorerResult.reason, t("onlineEvals.loadError"));
+      }
+
+      if (jobResult.status === "fulfilled") {
+        jobs.value = jobResult.value;
+      } else {
+        showError(jobResult.reason, t("onlineEvals.loadError"));
+      }
     } finally {
       isLoading.value = false;
     }

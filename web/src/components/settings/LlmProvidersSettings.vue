@@ -11,8 +11,7 @@
 
     <template v-else>
       <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
-        style="border-color: var(--color-dialog-header-border, var(--o2-border));"
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px] tw:border-[var(--color-dialog-header-border,var(--o2-border))]"
       >
         <div
           class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
@@ -274,11 +273,14 @@ async function loadProviders() {
   }
 }
 
+const DEFAULT_ENDPOINTS: Record<string, string> = {
+  openai: "api.openai.com",
+  anthropic: "api.anthropic.com",
+};
+
 function endpointFallback(provider: Provider) {
   const type = providerTypeOf(provider).toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
+  return DEFAULT_ENDPOINTS[type] ?? "—";
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {

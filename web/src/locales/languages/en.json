@@ -4273,6 +4273,7 @@
       "saveError": "Failed to save provider"
     },
     "scoreConfig": {
+      "booleanValues": "true / false",
       "detail": {
         "eyebrow": "Score Config",
         "close": "Close",

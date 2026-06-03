@@ -172,6 +172,19 @@ import {
   statusOf,
 } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";
+import {
+  buildCrossNavigationQuery,
+  computeViewState,
+  findRowById as findRowByIdPure,
+  parseTabFromRoute,
+  rowIdOf as rowIdOfPure,
+  VALID_TABS,
+  type ActiveTab,
+  type AnyRow,
+  type FullPageEntity,
+  type RowTab,
+  type RowsByTab,
+} from "./onlineEvals/utils/routeSync";
 import ScoreConfigList from "./onlineEvals/ScoreConfigList.vue";
 import ScorerList from "./onlineEvals/ScorerList.vue";
 import EvalJobList from "./onlineEvals/EvalJobList.vue";
@@ -185,24 +198,11 @@ import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
-type ActiveTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
-type FullPageEntity = Exclude<ActiveTab, "scoreConfigs" | "quality">;
-type AnyRow = EvalJob | Scorer | ScoreConfig;
-
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
-
-const VALID_TABS: ActiveTab[] = ["quality", "jobs", "scorers", "scoreConfigs"];
-
-function parseTabFromRoute(value: unknown): ActiveTab {
-  if (typeof value === "string" && (VALID_TABS as string[]).includes(value)) {
-    return value as ActiveTab;
-  }
-  return "quality";
-}
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
 const filterQuery = ref("");
@@ -249,9 +249,7 @@ async function refreshProviders() {
   }
 }
 
-type RowTab = Exclude<ActiveTab, "quality">;
-
-const rowsByTab = computed<Record<RowTab, AnyRow[]>>(() => ({
+const rowsByTab = computed<RowsByTab>(() => ({
   jobs: jobs.value,
   scorers: scorers.value,
   scoreConfigs: scoreConfigs.value,
@@ -307,17 +305,11 @@ onBeforeMount(async () => {
 });
 
 function rowIdOf(row: AnyRow): string {
-  if (activeTab.value === "jobs") return String((row as EvalJob).id);
-  return entityId(row as ScoreConfig | Scorer);
+  return rowIdOfPure(row, activeTab.value);
 }
 
 function findRowById(tab: ActiveTab, id: string): AnyRow | null {
-  if (tab === "quality") return null;
-  const rows = rowsByTab.value[tab];
-  if (tab === "jobs") {
-    return (rows.find((r) => String((r as EvalJob).id) === id) as AnyRow) ?? null;
-  }
-  return (rows.find((r) => entityId(r as ScoreConfig | Scorer) === id) as AnyRow) ?? null;
+  return findRowByIdPure(tab, id, rowsByTab.value);
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -392,11 +384,13 @@ function closeJobView() {
  * and overwrite the `action` / `id` params. The URL → state watcher then
  * syncs activeTab + opens the right drawer. */
 function crossNavigateToScorer(row: Scorer) {
-  pushRouteAction({ tab: "scorers", action: "view", id: entityId(row) });
+  const query = buildCrossNavigationQuery({ ...route.query }, "scorers", entityId(row));
+  router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 function crossNavigateToJob(row: EvalJob) {
-  pushRouteAction({ tab: "jobs", action: "view", id: String(row.id) });
+  const query = buildCrossNavigationQuery({ ...route.query }, "jobs", String(row.id));
+  router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 async function activateJob(row: EvalJob) {
@@ -463,11 +457,7 @@ async function handleSaved() {
 }
 
 function syncFromRoute() {
-  const action = route.query.action;
-  const id = route.query.id;
-  const tab = parseTabFromRoute(route.query.tab);
-
-  // Route is the source of truth — reset everything first
+  // Route is the source of truth — reset everything first.
   formPage.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
@@ -475,50 +465,44 @@ function syncFromRoute() {
   scorerViewRow.value = null;
   jobViewRow.value = null;
 
-  if (action !== "add" && action !== "update" && action !== "view") return;
+  const state = computeViewState(route.query, rowsByTab.value);
 
-  // View action — open the read-only detail drawer for the active tab.
-  if (action === "view" && typeof id === "string") {
-    const row = findRowById(tab, id);
-    if (!row) return;
-    if (tab === "scoreConfigs") viewRow.value = row as ScoreConfig;
-    else if (tab === "scorers") scorerViewRow.value = row as Scorer;
-    else if (tab === "jobs") jobViewRow.value = row as EvalJob;
-    return;
-  }
-
-  if (tab === "scoreConfigs") {
-    if (action === "add") {
+  switch (state.kind) {
+    case "none":
+      return;
+    case "viewScoreConfig":
+      viewRow.value = state.row;
+      return;
+    case "viewScorer":
+      scorerViewRow.value = state.row;
+      return;
+    case "viewJob":
+      jobViewRow.value = state.row;
+      return;
+    case "scoreConfigCreate":
       dialog.value = { open: true, mode: "create", row: null };
-    } else if (typeof id === "string") {
-      const row = findRowById("scoreConfigs", id) as ScoreConfig | null;
-      if (row) dialog.value = { open: true, mode: "edit", row };
-    }
-    return;
-  }
-
-  if (tab === "scorers" && action === "add") {
-    const type = route.query.scorer_type;
-    if (typeof type === "string") {
-      pendingScorerType.value = type as ScorerType;
-      formPage.value = { entity: "scorers", mode: "create" };
-    } else {
+      return;
+    case "scoreConfigEdit":
+      dialog.value = { open: true, mode: "edit", row: state.row };
+      return;
+    case "scorerTypeDialog":
       scorerTypeDialog.value = true;
-    }
-    return;
-  }
-
-  if (action === "add") {
-    formPage.value = { entity: tab as FullPageEntity, mode: "create" };
-    return;
-  }
-
-  if (action === "update" && typeof id === "string") {
-    const row = findRowById(tab, id);
-    if (row) {
-      dialog.value = { open: false, mode: "edit", row };
-      formPage.value = { entity: tab as FullPageEntity, mode: "edit" };
-    }
+      return;
+    case "scorerFormCreate":
+      pendingScorerType.value = state.scorerType;
+      formPage.value = { entity: "scorers", mode: "create" };
+      return;
+    case "scorerFormEdit":
+      dialog.value = { open: false, mode: "edit", row: state.row };
+      formPage.value = { entity: "scorers", mode: "edit" };
+      return;
+    case "jobFormCreate":
+      formPage.value = { entity: "jobs", mode: "create" };
+      return;
+    case "jobFormEdit":
+      dialog.value = { open: false, mode: "edit", row: state.row };
+      formPage.value = { entity: "jobs", mode: "edit" };
+      return;
   }
 }
 

@@ -254,7 +254,7 @@ function rangeOrValues(row: ScoreConfig) {
     if (!Array.isArray(cats) || cats.length === 0) return "—";
     return cats.join(" · ");
   }
-  return "true / false";
+  return t("onlineEvals.scoreConfig.booleanValues");
 }
 
 function healthyDisplay(row: ScoreConfig) {
