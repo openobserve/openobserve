@@ -85,11 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
           </button>
           <span
-            v-if="selectedTrace.metadata?.duration"
+            v-if="selectedTrace.metadata?.e2eDuration"
             class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
-            {{ formatDuration(selectedTrace.metadata.duration / 1000) }}
+            {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :end-time-prop="selectedTraceEndTime"
           :show-header="false"
           :show-back-button="false"
+          :hide-session-replay-button="true"
           :show-timeline="true"
           :show-log-stream-selector="false"
           :show-share-button="false"
@@ -130,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- List view -->
-    <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full">
+    <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:px-2">
       <!-- Filter bar -->
       <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
         <OBadge
@@ -147,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Traces table -->
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:rounded">
         <TenstackTable
           :rows="correlatedViews"
           :columns="traceColumns"
@@ -191,23 +192,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="{ width: cell.column.getSize() + 'px' }"
             >
               <span class="tw:text-xs tw:tabular-nums">
-                {{ formatTimeWithSuffix(item.metadata?.duration) }}
+                {{ formatTimeWithSuffix(item.metadata?.e2eDuration * 1000) }}
               </span>
             </div>
           </template>
-          <template #cell-errors="{ item, cell }">
+          <template #cell-status="{ item, cell }">
             <div
-              class="tw:overflow-hidden tw:flex tw:justify-center"
+              class="tw:overflow-hidden tw:flex tw:items-center"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
-              <OBadge
-                v-if="item.metadata?.errorCount > 0"
-                variant="error-outline"
-                size="sm"
-              >
-                {{ item.metadata.errorCount }}
-              </OBadge>
-              <span v-else class="tw:text-[var(--o2-text-muted)] tw:text-xs">—</span>
+              <TraceStatusCell :item="{ errors: item.metadata?.errorCount ?? 0 }" />
             </div>
           </template>
         </TenstackTable>
@@ -221,12 +215,13 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
-import { formatDuration, formatLargeNumber, formatTimeWithSuffix, generateTraceContext } from "@/utils/zincutils";
+import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
@@ -294,20 +289,20 @@ const traceColumns = computed(() => [
   {
     id: "duration",
     header: t("rum.duration"),
-    accessorFn: (row: any) => row.metadata?.duration ?? 0,
+    accessorFn: (row: any) => row.metadata?.e2eDuration ?? 0,
     size: 100,
     minSize: 50,
     maxSize: 200,
     meta: { align: "right", slot: true },
   },
   {
-    id: "errors",
-    header: t("rum.errors"),
+    id: "status",
+    header: t("traces.status"),
     accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
-    size: 100,
-    minSize: 50,
-    maxSize: 120,
-    meta: { align: "center", slot: true },
+    size: 120,
+    minSize: 80,
+    maxSize: 180,
+    meta: { align: "left", slot: true },
   },
 ]);
 
@@ -455,6 +450,7 @@ async function fetchTraces() {
       const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {
         traceId,
+        rumDate: hit._date || 0,
         route: viewUrl,
         label: viewUrl ? shortRoute(viewUrl).replace(/\/$/, "") || "/" : traceId,
         kind: (hit._view_loading_type || hit.view_loading_type) === "initial_load" ? "load" : "route_change",
@@ -474,7 +470,13 @@ async function fetchTraces() {
         // Only keep views whose trace_id exists in the traces stream, sorted by start time
         filteredViews = views
           .filter(view => metadata[view.traceId])
-          .map(view => ({ ...view, metadata: metadata[view.traceId] }))
+          .map(view => {
+            const meta = metadata[view.traceId];
+            const e2eDuration = view.rumDate && meta.end_time
+              ? Math.max(0, Math.floor(meta.end_time / 1_000_000) - view.rumDate)
+              : 0;
+            return { ...view, metadata: { ...meta, e2eDuration: e2eDuration } };
+          })
           .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));
 
         traceMetadata.value = metadata;

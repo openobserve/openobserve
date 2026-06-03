@@ -224,18 +224,28 @@ export default function useRumSpanBuilder(
 
   const tsCol = () => store.state.zoConfig.timestamp_column;
 
-  const parseActionId = (actionId: string): string => {
-    try {
-      const parsed = JSON.parse(actionId || "[]");
-      return parsed[0] || "";
-    } catch {
-      return "";
-    }
-  };
+  const resolveParentSpanId = (event: any, actionEvents: any[] = []): string => {
+    // Build a lookup of action IDs that were actually fetched and have a span in the tree.
+    const fetchedActionIds = new Set(
+      actionEvents.map((a: any) => String(a.action_id)),
+    );
 
-  const resolveParentSpanId = (event: any): string => {
-    const actionId = parseActionId(event.action_id);
-    if (actionId) return `rum_action_${actionId}`;
+    let actionIds: string[] = [];
+    try {
+      const parsed = JSON.parse(event.action_id || "[]");
+      actionIds = Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      // Not a JSON array — treat as a plain string ID.
+      if (event.action_id) actionIds = [String(event.action_id)];
+    }
+
+    // Use the first action ID that has a real fetched span.
+    // If none match, fall through to view_id — a ghost action reference
+    // would leave the span orphaned at the root level.
+    for (const id of actionIds) {
+      if (fetchedActionIds.has(id)) return `rum_action_${id}`;
+    }
+
     if (event.view_id) return `rum_view_${event.view_id}`;
     return "";
   };
@@ -476,21 +486,22 @@ export default function useRumSpanBuilder(
     return { staticAssets, apiCalls, errors, longTasks };
   };
 
-  const buildResourceSpans = (apiCalls: any[]): any[] =>
+  const buildResourceSpans = (apiCalls: any[], actionEvents: any[]): any[] =>
     apiCalls.map((event) =>
-      createLeafSpan(event, resolveParentSpanId(event)),
+      createLeafSpan(event, resolveParentSpanId(event, actionEvents)),
     );
 
   const buildErrorSpans = (
     errors: any[],
     firstTracedResource: any,
     traceId: string,
+    actionEvents: any[] = [],
   ): any[] => {
     if (!errors.length) return [];
     const spans: any[] = [];
 
     for (const event of errors.slice(0, 3)) {
-      spans.push(createLeafSpan(event, resolveParentSpanId(event)));
+      spans.push(createLeafSpan(event, resolveParentSpanId(event, actionEvents)));
     }
 
     if (errors.length > 3) {
@@ -613,8 +624,8 @@ export default function useRumSpanBuilder(
       ...buildSessionSpans(allViewEvents, traceId),
       ...buildViewSpans(viewEvents, traceId),
       ...buildActionSpans(actionEvents, firstTracedResource, traceId, tracedTimestamp),
-      ...buildResourceSpans(apiCalls),
-      ...buildErrorSpans(errors, firstTracedResource, traceId),
+      ...buildResourceSpans(apiCalls, actionEvents),
+      ...buildErrorSpans(errors, firstTracedResource, traceId, actionEvents),
       ...buildStaticAssetSpans(staticAssets, firstTracedResource, traceId),
       ...buildLongTaskSpans(longTasks, firstTracedResource, traceId),
     ];
