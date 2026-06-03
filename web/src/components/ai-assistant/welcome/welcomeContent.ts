@@ -4,7 +4,7 @@
  */
 
 export interface CapabilityCard {
-  /** i18n key — under aiAssistant.capabilities.<id>.title */
+  /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
   id: "query" | "incident" | "dashboard" | "alert";
   /** OIcon registry name */
   icon: string;
@@ -12,8 +12,6 @@ export interface CapabilityCard {
   iconColorClass: string;
   /** Tailwind tinted background class for the icon chip */
   iconBgClass: string;
-  /** Pre-filled prompt to send when the card is clicked */
-  prompt: string;
 }
 
 export const CAPABILITY_CARDS: CapabilityCard[] = [
@@ -22,28 +20,24 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
     icon: "edit",
     iconColorClass: "tw:text-[#7B61FF]",
     iconBgClass: "tw:bg-[#7B61FF]/10",
-    prompt: "Help me write a query",
   },
   {
     id: "incident",
     icon: "warning",
     iconColorClass: "tw:text-[#F59E0B]",
     iconBgClass: "tw:bg-[#F59E0B]/10",
-    prompt: "Help me investigate an incident",
   },
   {
     id: "dashboard",
     icon: "dashboard",
     iconColorClass: "tw:text-[#10B981]",
     iconBgClass: "tw:bg-[#10B981]/10",
-    prompt: "Help me build a dashboard or panel",
   },
   {
     id: "alert",
     icon: "notifications",
     iconColorClass: "tw:text-[#EF4444]",
     iconBgClass: "tw:bg-[#EF4444]/10",
-    prompt: "Help me create an alert or pipeline",
   },
 ];
 
