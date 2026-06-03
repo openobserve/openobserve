@@ -27,6 +27,7 @@ use datafusion::{
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
         aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+        coalesce_partitions::CoalescePartitionsExec,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
@@ -341,7 +342,7 @@ fn wrap_partial_reduce(
         return Ok(input);
     };
     if *agg.mode() != AggregateMode::Partial {
-        return Ok(input.clone());
+        return Ok(input);
     }
     // PartialReduce receives Partial's output, so group expressions must be
     // simple Column refs into that schema rather than the original scan-level exprs.
@@ -376,12 +377,13 @@ fn wrap_partial_reduce(
         agg.group_expr().groups().to_vec(),
         !agg.group_expr().is_single(),
     );
+    let coalesce_partition_exec = Arc::new(CoalescePartitionsExec::new(input.clone()));
     Ok(Arc::new(AggregateExec::try_new(
         AggregateMode::PartialReduce,
         new_group_by,
         agg.aggr_expr().to_vec(),
         vec![None; agg.aggr_expr().len()],
-        input.clone(),
+        coalesce_partition_exec,
         partial_schema,
     )?) as Arc<dyn ExecutionPlan>)
 }
