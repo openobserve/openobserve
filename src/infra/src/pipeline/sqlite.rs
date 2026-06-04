@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS pipeline
     stream_name     VARCHAR(256),
     stream_type     VARCHAR(50),
     derived_stream  TEXT,
-    kind            VARCHAR(50) not null default 'user',
     nodes           TEXT,
     edges           TEXT
 );
