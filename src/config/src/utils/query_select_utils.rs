@@ -325,6 +325,37 @@ pub fn replace_o2_custom_patterns(sql: &str) -> Result<String, String> {
     Ok(StringMatchReplacer::clean_sql_output(modified_sql))
 }
 
+/// Like `replace_o2_custom_patterns` but also returns the parsed AST so callers
+/// can run additional visitors without a second `Parser::parse_sql` call.
+pub fn parse_and_replace_o2_custom_patterns(
+    sql: &str,
+) -> Result<(String, Vec<sqlparser::ast::Statement>), String> {
+    use sqlparser::{dialect::GenericDialect, parser::Parser};
+
+    let mut statements =
+        Parser::parse_sql(&GenericDialect {}, sql).map_err(|e| format!("Parse error: {e}"))?;
+
+    if statements.is_empty() {
+        return Err("No statements found".to_string());
+    }
+
+    if sql.contains(O2_CUSTOM_SUFFIX) {
+        let mut replacer = StringMatchReplacer::new();
+        for statement in &mut statements {
+            let _ = replacer.pre_visit_statement(statement);
+        }
+        let modified_sql = statements
+            .iter()
+            .map(|stmt| stmt.to_string())
+            .collect::<Vec<_>>()
+            .join(";\n");
+        let modified_sql = StringMatchReplacer::clean_sql_output(modified_sql);
+        Ok((modified_sql, statements))
+    } else {
+        Ok((sql.to_string(), statements))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

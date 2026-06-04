@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:px-3 tw:py-2 add-dashboard-form-card-section">
-      <OForm ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
+  <div class="add-dashboard-form-card-section">
+      <OForm id="add-dashboard-form" ref="addDashboardForm" :default-values="{ name: '', description: '' }" @submit="onSubmit.execute">
         <OInput
           v-if="beingUpdated"
           v-model="dashboardData.id"

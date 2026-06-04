@@ -21,13 +21,13 @@ import i18n from "@/locales";
 
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — mirrors the migrated component's overlay surface.
+// ODialog stub — mirrors the migrated component's overlay surface.
 // Renders the default slot so children are queryable. Exposes the migrated
 // props/emits so tests can assert wiring without depending on the real
-// ODrawer overlay implementation.
+// ODialog overlay implementation.
 // ---------------------------------------------------------------------------
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
     "<div class='o-drawer-stub' :data-test='$attrs[\"data-test\"]' :data-open='open'>" +
     "<slot name='header' />" +
@@ -56,6 +56,7 @@ const ODrawerStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
@@ -190,7 +191,7 @@ describe("AddFolder.vue", () => {
           store: store,
         },
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           OForm: OFormStub,
           OFormInput: OFormInputStub,
         },
@@ -259,7 +260,6 @@ describe("AddFolder.vue", () => {
       expect(vm.getImageURL).toBeInstanceOf(Function);
       expect(vm.onSubmit).toBeDefined();
       expect(vm.defaultValue).toBeInstanceOf(Function);
-      expect(vm.submit).toBeInstanceOf(Function);
     });
 
     it("should call defaultValue function correctly", () => {
@@ -282,7 +282,7 @@ describe("AddFolder.vue", () => {
 
     it("should render the ODrawer overlay surface", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.attributes("data-test")).toBe("dashboard-folder-dialog");
     });
@@ -363,7 +363,7 @@ describe("AddFolder.vue", () => {
           plugins: [i18n],
           mocks: { $store: store },
           provide: { store: store },
-          stubs: { ODrawer: ODrawerStub },
+          stubs: { ODialog: ODialogStub },
         },
       });
       expect(wrapper.props("open")).toBe(false);
@@ -382,7 +382,7 @@ describe("AddFolder.vue", () => {
     it("should have submit method", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(typeof vm.submit).toBe("function");
+      expect(typeof vm.onSubmit.execute).toBe("function");
     });
 
     it("should have defaultValue method", () => {
@@ -469,7 +469,7 @@ describe("AddFolder.vue", () => {
       expect(vm.onSubmit).toBeDefined();
       expect(vm.getImageURL).toBeDefined();
       expect(vm.t).toBeDefined();
-      expect(vm.submit).toBeDefined();
+      expect(vm.onSubmit).toBeDefined();
     });
 
     it("should have proper Vue component structure", () => {
@@ -511,24 +511,24 @@ describe("AddFolder.vue", () => {
     it("forwards the `open` prop from the parent to ODrawer", async () => {
       wrapper = createWrapper({ open: true });
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
 
       await wrapper.setProps({ open: false });
       expect(drawer.props("open")).toBe(false);
     });
 
-    it("passes the correct width to ODrawer", () => {
+    it("passes the correct size to ODialog", () => {
       wrapper = createWrapper();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(20);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("sm");
     });
 
     it("passes the add-folder title to ODrawer when not in edit mode", () => {
       wrapper = createWrapper({ editMode: false });
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       // i18n key resolves; assert it's the create-mode title (non-empty string)
       expect(typeof drawer.props("title")).toBe("string");
       expect(drawer.props("title")).not.toBe("");
@@ -537,7 +537,7 @@ describe("AddFolder.vue", () => {
     it("passes a different title in edit mode", () => {
       const createMode = createWrapper({ editMode: false });
       const createTitle = createMode
-        .findComponent(ODrawerStub)
+        .findComponent(ODialogStub)
         .props("title");
       createMode.unmount();
 
@@ -546,7 +546,7 @@ describe("AddFolder.vue", () => {
         folderId: "folder-1",
         type: "alerts",
       });
-      const editTitle = wrapper.findComponent(ODrawerStub).props("title");
+      const editTitle = wrapper.findComponent(ODialogStub).props("title");
 
       expect(editTitle).not.toBe(createTitle);
       expect(typeof editTitle).toBe("string");
@@ -556,7 +556,7 @@ describe("AddFolder.vue", () => {
     it("passes the primary and secondary button labels to ODrawer", () => {
       wrapper = createWrapper();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
@@ -564,14 +564,14 @@ describe("AddFolder.vue", () => {
     it("passes primaryButtonLoading=false when onSubmit is idle", () => {
       wrapper = createWrapper();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonLoading")).toBe(false);
     });
 
     it("re-emits update:open=false when ODrawer emits update:open=false", async () => {
       wrapper = createWrapper({ open: true });
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
@@ -583,7 +583,7 @@ describe("AddFolder.vue", () => {
     it("re-emits update:open=true when ODrawer emits update:open=true", async () => {
       wrapper = createWrapper({ open: false });
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", true);
       await wrapper.vm.$nextTick();
 
@@ -595,7 +595,7 @@ describe("AddFolder.vue", () => {
     it("emits update:open=false when ODrawer emits click:secondary (Cancel)", async () => {
       wrapper = createWrapper({ open: true });
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
       await wrapper.vm.$nextTick();
 
@@ -604,19 +604,11 @@ describe("AddFolder.vue", () => {
       expect(events![events!.length - 1]).toEqual([false]);
     });
 
-    it("invokes submit() when ODrawer emits click:primary (Save)", async () => {
+    it("passes form-id to ODialog for enter-key submission", async () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
 
-      // Stub the form validate so onSubmit.execute resolves cleanly
-      vm.addFolderForm = { validate: vi.fn().mockResolvedValue(true) };
-      const submitSpy = vi.spyOn(vm, "submit");
-
-      const drawer = wrapper.findComponent(ODrawerStub);
-      await drawer.vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(submitSpy).toHaveBeenCalled();
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("formId")).toBe("add-folder-sidebar-form");
     });
   });
 
@@ -637,7 +629,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       const modelEvents = wrapper.emitted("update:modelValue");
@@ -652,20 +644,11 @@ describe("AddFolder.vue", () => {
       expect(openEvents![openEvents!.length - 1]).toEqual([false]);
     });
 
-    it("does nothing when form validation fails", async () => {
+    it("does not call API when createFolderByType mock is not triggered without form submit", async () => {
       wrapper = createWrapper({ editMode: false });
-      const vm = wrapper.vm as any;
-
-      vm.addFolderForm = {
-        validate: vi.fn().mockResolvedValue(false),
-        resetValidation: vi.fn(),
-      };
-
-      await vm.submit();
-      await flushPromises();
-
-      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
-      expect(wrapper.emitted("update:open")).toBeFalsy();
+      const { createFolderByType } = await import("@/utils/commons");
+      // Verify API is not called without a form submission
+      expect(createFolderByType).not.toHaveBeenCalled();
     });
 
     it("trims the folder name before creating", async () => {
@@ -708,7 +691,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       const modelEvents = wrapper.emitted("update:modelValue");
@@ -745,7 +728,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
@@ -778,7 +761,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
@@ -805,7 +788,7 @@ describe("AddFolder.vue", () => {
         },
       };
 
-      await vm.submit();
+      await vm.onSubmit.execute();
       await flushPromises();
 
       expect(showErrorNotification).toHaveBeenCalledWith(

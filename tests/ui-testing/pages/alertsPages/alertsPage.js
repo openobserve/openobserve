@@ -50,8 +50,8 @@ export class AlertsPage {
             folderNameInputField: '[data-test="dashboard-folder-add-name-field"]',
             folderDescriptionInput: '[data-test="dashboard-folder-add-description"]',
             folderDescriptionInputField: '[data-test="dashboard-folder-add-description-field"]',
-            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]',
-            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-secondary-btn"]',
+            folderSaveButton: '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]',
+            folderCancelButton: '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-secondary-btn"]',
             noDataAvailableText: 'No data available',
             folderExistsError: 'Folder with this name already exists in this organization',
             folderMoreOptionsButton: '[data-test="dashboard-more-icon"]',
@@ -188,7 +188,7 @@ export class AlertsPage {
             selectAllCheckboxRowName: '# Name Owner Period Frequency',
             moveAcrossFoldersButton: '[data-test="alert-list-move-across-folders-btn"]',
             folderDropdown: '[data-test="alerts-index-dropdown-stream_type"]',
-            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-drawer-primary-btn"]',
+            moveButton: '[data-test="dashboard-move-to-another-folder-dialog"] [data-test="o-dialog-primary-btn"]',
             alertsMovedMessage: 'alerts Moved successfully',
 
             // Alert search and deletion locators

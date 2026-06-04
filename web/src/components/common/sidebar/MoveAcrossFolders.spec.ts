@@ -48,12 +48,12 @@ vi.mock('./SelectFolderDropDown.vue', () => ({
 
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — mirrors the migrated overlay surface.
+// ODialog stub — mirrors the migrated overlay surface.
 // Renders the default slot so the form/inputs are queryable.
 // Exposes all migrated props and emits so we can assert/drive them.
 // ---------------------------------------------------------------------------
-const ODrawerStub = {
-  name: 'ODrawer',
+const ODialogStub = {
+  name: 'ODialog',
   template:
     "<div class='o-drawer-stub' :data-open='open' :data-title='title'>" +
     "<slot name='header' />" +
@@ -137,7 +137,7 @@ const createWrapper = (props: Record<string, any> = {}) => {
       plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
-      stubs: { ODrawer: ODrawerStub },
+      stubs: { ODialog: ODialogStub },
     },
   });
 };
@@ -211,7 +211,7 @@ describe('MoveAcrossFolders.vue', () => {
   it('should pass title with capitalized type to ODrawer', () => {
     wrapper = createWrapper({ type: 'pipelines' });
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.exists()).toBe(true);
     expect(drawer.props('title')).toBe('Move Pipelines To Another Folder');
   });
@@ -253,7 +253,7 @@ describe('MoveAcrossFolders.vue', () => {
     // Initial selectedFolder is { label, value: activeFolderId } already.
     await nextTick();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('primaryButtonDisabled')).toBe(true);
   });
 
@@ -269,7 +269,7 @@ describe('MoveAcrossFolders.vue', () => {
     await selectDropdown.vm.$emit('folder-selected', { value: 'folder2', label: 'Test Folder 2' });
     await nextTick();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('primaryButtonDisabled')).toBe(false);
   });
 
@@ -430,7 +430,7 @@ describe('MoveAcrossFolders.vue', () => {
         plugins: [mockI18n],
         provide: { store: mockStore },
         mocks: { $store: mockStore },
-        stubs: { ODrawer: ODrawerStub },
+        stubs: { ODialog: ODialogStub },
       },
     });
 
@@ -444,7 +444,7 @@ describe('MoveAcrossFolders.vue', () => {
   it('should wire the cancel surface through ODrawer secondaryButtonLabel', async () => {
     wrapper = createWrapper();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     // The migrated component drives the cancel action through click:secondary,
     // and the listener calls emit('update:open', false). The listener itself
     // is bound at the template level — we assert the surface is configured.
@@ -457,7 +457,7 @@ describe('MoveAcrossFolders.vue', () => {
   it('should pass secondaryButtonLabel "Cancel" to ODrawer', () => {
     wrapper = createWrapper();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('secondaryButtonLabel')).toBe('Cancel');
   });
 
@@ -497,7 +497,7 @@ describe('MoveAcrossFolders.vue', () => {
 
     wrapper = createWrapper();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('primaryButtonLoading')).toBe(true);
     expect(wrapper.vm.onSubmit.isLoading.value).toBe(true);
   });
@@ -666,7 +666,7 @@ describe('MoveAcrossFolders.vue', () => {
     await selectDropdown.vm.$emit('folder-selected', { value: null, label: 'None' });
     await nextTick();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('primaryButtonDisabled')).toBe(false);
   });
 
@@ -723,7 +723,7 @@ describe('MoveAcrossFolders.vue', () => {
       type: 'alerts',
     });
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit('click:primary');
     await flushPromises();
 
@@ -788,7 +788,7 @@ describe('MoveAcrossFolders.vue', () => {
   it('should pass correct primary and secondary button labels to ODrawer', () => {
     wrapper = createWrapper();
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('primaryButtonLabel')).toBe('Move');
     expect(drawer.props('secondaryButtonLabel')).toBe('Cancel');
   });
@@ -797,7 +797,7 @@ describe('MoveAcrossFolders.vue', () => {
   it('should pass open prop through to ODrawer', () => {
     wrapper = createWrapper({ open: true });
 
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.props('open')).toBe(true);
   });
 
@@ -849,7 +849,7 @@ describe('MoveAcrossFolders.vue', () => {
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
     // Trigger via the ODrawer primary-click — the migrated flow
-    const drawer = wrapper.findComponent(ODrawerStub);
+    const drawer = wrapper.findComponent(ODialogStub);
     await drawer.vm.$emit('click:primary');
     await flushPromises();
 

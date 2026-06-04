@@ -37,7 +37,7 @@ export default class DashboardSetting {
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name-field"]');
     this.saveTab = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.closeSetting = page.locator(
       '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
@@ -46,7 +46,7 @@ export default class DashboardSetting {
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
     this.addTabCancel = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-drawer-secondary-btn"]'
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-secondary-btn"]'
     );
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'

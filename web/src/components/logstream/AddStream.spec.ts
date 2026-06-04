@@ -57,10 +57,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
-    '<div class="o-drawer-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
+    '<div class="o-dialog-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
   props: [
     "open",
     "size",
@@ -110,7 +110,7 @@ describe("AddStream", () => {
 
   const globalStubs = {
     StreamFieldInputs: true,
-    ODrawer: ODrawerStub,
+    ODialog: ODialogStub,
     OForm: OFormStub,
   };
 
@@ -139,7 +139,7 @@ describe("AddStream", () => {
     it("should render ODrawer with localized title and button labels", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("title")).toBeTruthy();
       expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
@@ -149,14 +149,14 @@ describe("AddStream", () => {
     it("should pass through the open prop to ODrawer", async () => {
       const wrapper = mountComp(undefined, { open: true });
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
     });
 
     it("should pass open=false to ODrawer when closed", async () => {
       const wrapper = mountComp(undefined, { open: false });
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(false);
     });
 
@@ -184,7 +184,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       // Pipeline mode should not have ODrawer
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(false);
 
       // Pipeline mode should have inputs
@@ -209,7 +209,7 @@ describe("AddStream", () => {
     it("should emit update:open=false when Cancel button is clicked", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
       expect(wrapper.emitted("update:open")).toBeTruthy();
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
@@ -218,7 +218,7 @@ describe("AddStream", () => {
     it("should propagate ODrawer's update:open event to parent", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
       expect(wrapper.emitted("update:open")).toBeTruthy();
       expect(wrapper.emitted("update:open")!.at(-1)).toEqual([false]);
@@ -229,7 +229,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       // In drawer mode, Save is wired to ODrawer's click:primary event
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
       await flushPromises();
 
