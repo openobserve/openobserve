@@ -16,12 +16,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
-    <div class="tw:flex tw:justify-between tw:items-center">
+    <div v-if="!isChildOrg" class="tw:flex tw:justify-between tw:items-center">
       <div>
         <h1 class="page-title">{{ t("billing.title") }}</h1>
         <p class="page-subtitle">{{ t("billing.subtitle") }}</p>
       </div>
     </div>
+    <!-- Managed billing empty state for child orgs -->
+    <div
+      v-if="isChildOrg"
+      class="managed-empty"
+      data-test="plans-managed-billing-panel"
+    >
+      <div class="managed-empty__icon-outer">
+        <div class="managed-empty__icon-inner">
+          <OIcon name="account-balance" size="lg" class="managed-empty__icon" />
+        </div>
+      </div>
+
+      <div class="managed-empty__title">
+        {{ t("billing.billingGroup.plansManagedTitle") }}
+      </div>
+      <div class="managed-empty__desc">
+        {{
+          t("billing.billingGroup.plansManagedDescription", {
+            name: membership?.payer_org_name,
+            id: membership?.payer_org_id,
+          })
+        }}
+      </div>
+
+      <div class="managed-empty__chips">
+        <span class="managed-empty__chip">
+          <OIcon name="receipt-long" size="xs" />
+          {{ t("billing.billingGroup.chipConsolidatedBill") }}
+        </span>
+        <span class="managed-empty__chip">
+          <OIcon name="lock" size="xs" />
+          {{ t("billing.billingGroup.chipPlanManaged") }}
+        </span>
+        <span class="managed-empty__chip">
+          <OIcon name="description" size="xs" />
+          {{ t("billing.billingGroup.chipNoInvoices") }}
+        </span>
+      </div>
+
+      <OButton
+        variant="primary"
+        class="managed-empty__btn"
+        data-test="plans-view-org-group-btn"
+        @click="goToOrgGroup"
+      >
+        {{ t("billing.billingGroup.viewOrgGroup") }}
+        <template #icon-right>
+          <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+        </template>
+      </OButton>
+    </div>
+    <template v-else>
     <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
     <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
@@ -87,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :pricingError="pricingError"
       ></enterprise-plan>
     </div>
+    </template>
   </div>
 </template>
 
@@ -95,6 +148,8 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
 import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
@@ -103,7 +158,6 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -117,14 +171,37 @@ export default defineComponent({
     OProgressBar,
     OIcon,
     OBadge,
-},
+    OButton,
+  },
+
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
+    this.fetchMembership();
     await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
     this.fetchAiUsage();
   },
   methods: {
+    goToOrgGroup() {
+      this.$router.push({
+        name: "billing_group",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
+    },
+    fetchMembership() {
+      if (config.isCloud !== "true") return;
+      BillingService.get_billing_group_membership(
+        this.store.state.selectedOrganization.identifier
+      )
+        .then((res: any) => {
+          this.membership = res.data?.membership ?? null;
+        })
+        .catch(() => {
+          // membership not available
+        });
+    },
     fetchAiUsage() {
       BillingService.get_ai_usage(
         this.store.state.selectedOrganization.identifier
@@ -340,6 +417,8 @@ export default defineComponent({
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
     const pricingError = ref(false);
+    const membership = ref<any>(null);
+    const isChildOrg = computed(() => membership.value != null);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -378,6 +457,8 @@ export default defineComponent({
       proPlanFeatures,
       enterprisePlanFeatures,
       pricingError,
+      membership,
+      isChildOrg,
     };
   },
 });
@@ -457,5 +538,78 @@ export default defineComponent({
 .plans-grid > * {
   width: 100%;
   min-width: 0;
+}
+
+.managed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: calc(100vh - var(--navbar-height) - 200px);
+  padding: 48px 24px;
+
+  &__icon-outer {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 1px dashed color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  &__icon-inner {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--color-primary-600) 24%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  &__icon {
+    color: var(--color-primary-600);
+    opacity: 0.85;
+  }
+  &__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin-bottom: 10px;
+  }
+  &__desc {
+    font-size: 0.88rem;
+    line-height: 1.65;
+    opacity: 0.65;
+    max-width: 440px;
+    margin-bottom: 24px;
+  }
+  &__chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 32px;
+  }
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.85;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.1));
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+  &__btn {
+    height: 40px;
+    padding: 0 24px;
+    font-weight: 600;
+  }
 }
 </style>

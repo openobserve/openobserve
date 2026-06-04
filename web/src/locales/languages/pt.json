@@ -930,7 +930,8 @@
     "nameRequired": "O nome é obrigatório",
     "subscription_type": "Tipo de plano",
     "proceed_subscription": "Prosseguir com a assinatura",
-    "subscription_plan": "Plano de assinatura"
+    "subscription_plan": "Plano de assinatura",
+    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}"
   },
   "template": {
     "header": "Modelos",
@@ -1812,7 +1813,105 @@
     "aiModePayAsYouGo": "Pague conforme o uso",
     "aiModeExhausted": "Exausta",
     "aiExhaustedMessage": "Inscreva-se para continuar usando os recursos de IA",
-    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura"
+    "aiPaygMessage": "Créditos gratuitos esgotados — uso cobrado na assinatura",
+    "organizationGroup": {
+      "tabLabel": "Grupo organizacional",
+      "inviteOrgButton": "Organização de convites",
+      "viewUsage": "Exibir uso",
+      "statTotal": "Total de organizações infantis",
+      "statActive": "Ativo",
+      "statPending": "Convites pendentes",
+      "statRejected": "Rejeitado",
+      "statusActive": "Ativo",
+      "statusPending": "Pendente",
+      "statusRejected": "Rejeitado",
+      "filterAll": "Todos",
+      "childOrgColumn": "Organização infantil",
+      "dateColumn": "Data",
+      "cancel": "Cancelar",
+      "invitedBy": "Convidado por",
+      "acceptedBy": "Aceito por",
+      "addedOnCreation": "Adicionado na criação",
+      "memberSince": "Membro desde",
+      "noMembers": "Ainda não há organizações membros",
+      "inviteTitle": "Convide uma organização",
+      "inviteOrgIdLabel": "Identificador da organização",
+      "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "sendInvite": "Enviar convite",
+      "inviteSent": "Convite enviado com sucesso",
+      "inviteSameOrg": "Uma organização não pode se convidar",
+      "childHeadline": "Faturamento gerenciado por",
+      "childHeroSub": "Seu uso é cobrado dessa organização. As mudanças no plano e as faturas são gerenciadas pela organização-mãe — não há nada para gerenciar aqui.",
+      "receivedInvitesTab": "Convites pendentes",
+      "noPendingInvites": "Sem convites pendentes",
+      "noPendingInvitesHint": "Você verá convites aqui quando outra organização convidar você para participar do grupo de cobrança.",
+      "invitedByOn": "Convidado por {inviter}",
+      "inviteTabPrompt": "Convide outra organização para participar do seu grupo de cobrança. Seu uso será cobrado dessa organização.",
+      "emptyTitle": "Iniciar grupo de cobrança",
+      "chipConsolidatedBill": "Um projeto de lei consolidado",
+      "chipLinkOrgs": "Vincular várias organizações",
+      "accept": "Aceitar",
+      "reject": "Rejeitar",
+      "inviteAccepted": "Convite aceito com sucesso",
+      "inviteRejected": "Convite rejeitado com sucesso",
+      "plansManagedTitle": "Faturamento gerenciado pela organização-mãe",
+      "plansManagedDescription": "O faturamento dessa organização é gerenciado por {payer}. As mudanças no plano são tratadas pela organização-mãe.",
+      "chipPlanManaged": "Plano gerenciado pelos pais",
+      "chipNoInvoices": "Sem faturas separadas",
+      "viewOrgGroup": "Exibir grupo organizacional",
+      "usageMemberLabel": "Organização membro",
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
+    },
+    "billingGroup": {
+      "tabLabel": "Grupo de cobrança",
+      "inviteOrgButton": "Organização de convites",
+      "viewUsage": "Exibir uso",
+      "statTotal": "Total de organizações infantis",
+      "statActive": "Ativo",
+      "statPending": "Convites pendentes",
+      "statRejected": "Rejeitado",
+      "statusActive": "Ativo",
+      "statusPending": "Pendente",
+      "statusRejected": "Rejeitado",
+      "filterAll": "Todos",
+      "childOrgColumn": "Organização infantil",
+      "orgColumn": "Organização",
+      "orgIdColumn": "Identificador da organização",
+      "actionsColumn": "Ações",
+      "dateColumn": "Data",
+      "cancel": "Cancelar",
+      "invitedBy": "Convidado por",
+      "acceptedBy": "Aceito por",
+      "addedOnCreation": "Adicionado na criação",
+      "memberSince": "Membro desde",
+      "noMembers": "Ainda não há organizações membros",
+      "inviteTitle": "Convide uma organização",
+      "inviteOrgIdLabel": "Identificador da organização",
+      "inviteOrgIdPlaceholder": "Insira o identificador da organização",
+      "sendInvite": "Enviar convite",
+      "inviteSent": "Convite enviado com sucesso",
+      "inviteSameOrg": "Uma organização não pode se convidar",
+      "childHeadline": "Faturamento gerenciado por",
+      "childHeroSub": "Seu uso é cobrado dessa organização. As mudanças no plano e as faturas são gerenciadas pela organização-mãe — não há nada para gerenciar aqui.",
+      "invitesPanelHint": "Essas organizações convidaram você para participar do grupo de cobrança. Se você aceitar, o uso dessa organização será cobrado deles.",
+      "inviteTabPrompt": "Convide outra organização para participar do seu grupo de cobrança. Seu uso será cobrado dessa organização.",
+      "emptyTitle": "Iniciar grupo de cobrança",
+      "chipConsolidatedBill": "Um projeto de lei consolidado",
+      "chipLinkOrgs": "Vincular várias organizações",
+      "accept": "Aceitar",
+      "reject": "Rejeitar",
+      "inviteAccepted": "Convite aceito com sucesso",
+      "inviteRejected": "Convite rejeitado com sucesso",
+      "plansManagedTitle": "Faturamento gerenciado pela organização-mãe",
+      "plansManagedDescription": "O faturamento dessa organização é gerenciado por {payer}. As mudanças no plano são tratadas pela organização-mãe.",
+      "chipPlanManaged": "Plano gerenciado pelos pais",
+      "chipNoInvoices": "Sem faturas separadas",
+      "viewOrgGroup": "Exibir grupo organizacional",
+      "usageMemberLabel": "Organização membro",
+      "usageAllMembers": "Organização atual",
+      "currentOrgTitle": "Organização Atual"
+    }
   },
   "message": {
     "ServerInternalError": "Erro: Algo deu errado. Erro interno do servidor.",
@@ -2356,7 +2455,16 @@
     "delete": "Excluir",
     "variable_guide_header": "Guia de variáveis de modelo",
     "variable_usage_examples": "Exemplos de uso",
-    "body": "Corpo"
+    "body": "Corpo",
+    "clone": "Clonar",
+    "cloneTitle": "Modelo de clone",
+    "systemReadOnly": "Modelo pré-construído — a exclusão está desativada. Clone para criar uma cópia modificável.",
+    "prebuiltBadge": "Pré-construído",
+    "prebuiltBadgeHint": "Gerenciado pelo sistema. Você pode editar, mas a exclusão está desativada.",
+    "customBadge": "Personalizado",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado"
   },
   "alert_destinations": {
     "header": "Destinos",
@@ -2393,7 +2501,13 @@
     "custom": "Personalizado",
     "separator": "Separador",
     "separator_placeholder": "Insira o separador (por exemplo, |,\\n,\\ t, espaço)",
-    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)"
+    "separator_hint": "Cadeia de caracteres separadora a ser usada entre registros (espaços permitidos)",
+    "filterAll": "Todos",
+    "filterPrebuilt": "Pré-construído",
+    "filterCustom": "Personalizado",
+    "templateDefaultBadge": "Padrão",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Pesquisar uma métrica",
@@ -3895,19 +4009,23 @@
     "capabilities": {
       "query": {
         "title": "Escrever uma consulta",
-        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas."
+        "description": "SQL para registros, rastreamentos, RUM ou ProMQL para métricas.",
+        "prompt": "Ajude-me a escrever uma consulta"
       },
       "incident": {
         "title": "Investigue incidentes",
-        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”"
+        "description": "Causa raiz em registros, rastreamentos e alertas — por exemplo, “Por que o gateway-5xx foi acionado?”",
+        "prompt": "Ajude-me a investigar incidentes"
       },
       "dashboard": {
         "title": "Crie um painel",
-        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis."
+        "description": "De um tópico — por exemplo, “Integridade do nó K8s: CPU, memória, reinicializações”. Também cria painéis.",
+        "prompt": "Ajude-me a criar um painel ou dashboard"
       },
       "alert": {
         "title": "Crie um alerta",
-        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão."
+        "description": "Alertas limitados ou programados e pipelines de VRL com tempo de ingestão.",
+        "prompt": "Ajude-me a criar um alerta ou pipeline"
       }
     },
     "suggestions": {

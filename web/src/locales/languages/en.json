@@ -252,7 +252,6 @@
     "legendLabel": "Legend",
     "logs": "Logs",
     "traces": "Traces",
-    "metrics": "Metrics",
     "enrichmentTables": "Enrichment Tables",
     "switchToLogs": "click to switch back to Logs",
     "savedViewsLabel": "Saved View",
@@ -977,6 +976,7 @@
     "orgName": "Organization Name",
     "createOrganization": "New organization",
     "updateOrganization": "Update organization",
+    "makeBilledMember": "Add this organization as a billing member of current organization.",
     "nameHolder": "Type name here",
     "add": "New organization",
     "save": "Save",
@@ -2075,19 +2075,23 @@
     "capabilities": {
       "query": {
         "title": "Write a Query",
-        "description": "SQL for logs, traces, RUM, or PromQL for metrics."
+        "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
+        "prompt": "Help me write a query"
       },
       "incident": {
         "title": "Investigate Incidents",
-        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\""
+        "description": "Root-cause across logs, traces, alerts — e.g. \"Why did gateway-5xx fire?\"",
+        "prompt": "Help me investigate an incident"
       },
       "dashboard": {
         "title": "Build a Dashboard",
-        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels."
+        "description": "From a topic — e.g. \"K8s node health: CPU, memory, restarts\". Also creates panels.",
+        "prompt": "Help me build a dashboard or panel"
       },
       "alert": {
         "title": "Create an Alert",
-        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines."
+        "description": "Threshold or scheduled alerts, and ingest-time VRL pipelines.",
+        "prompt": "Help me create an alert or pipeline"
       }
     },
     "suggestions": {
@@ -2162,7 +2166,60 @@
     "aiModePayAsYouGo": "Pay as you go",
     "aiModeExhausted": "Exhausted",
     "aiExhaustedMessage": "Subscribe to continue using AI features",
-    "aiPaygMessage": "Free credits exhausted — usage billed to subscription"
+    "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
+    "billingGroup": {
+      "tabLabel": "Billing Group",
+      "inviteOrgButton": "Invite Organization",
+      "viewUsage": "View Usage",
+      "statTotal": "Total Child Orgs",
+      "statActive": "Active",
+      "statPending": "Pending Invites",
+      "statusActive": "Active",
+      "statusPending": "Pending",
+      "filterAll": "All",
+      "childOrgIdColumn": "Child Organization Identifier",
+      "childOrgNameColumn": "Child Organization Name",
+      "orgColumn": "Organization",
+      "orgIdColumn": "Organization Identifier",
+      "actionsColumn": "Actions",
+      "dateColumn": "Date",
+      "cancel": "Cancel",
+      "invitedBy": "Invited By",
+      "acceptedBy": "Accepted By",
+      "addedOnCreation": "Added On Creation",
+      "memberSince": "Member Since",
+      "noMembers": "No Member Organizations Yet",
+      "inviteTitle": "Invite An Organization",
+      "inviteOrgIdLabel": "Organization Identifier",
+      "inviteOrgIdPlaceholder": "Enter Organization Identifier",
+      "sendInvite": "Send Invite",
+      "inviteSent": "Invite Sent Successfully",
+      "inviteSameOrg": "An Organization Cannot Invite Itself",
+      "childHeadline": "Billing managed by",
+      "childHeroSub": "Your usage is billed to this organization. Plan changes and invoices are handled by the parent organization — there's nothing to manage here.",
+      "invitesPanelHint": "These organizations have invited you to join their billing group. If you accept, this organization's usage will be billed to them.",
+      "inviteTabPrompt": "Invite another organization to join your billing group. Their usage will be billed to this organization.",
+      "emptyTitle": "Start Billing Group",
+      "notEnabledTitle": "Billing Group Not Available",
+      "notEnabledDesc": "This organization isn't enabled to start a billing group. Contact your administrator if you need this feature.",
+      "chipConsolidatedBill": "One Consolidated Bill",
+      "chipLinkOrgs": "Link Multiple Orgs",
+      "accept": "Accept",
+      "reject": "Reject",
+      "inviteAccepted": "Invite Accepted Successfully",
+      "inviteRejected": "Invite Rejected Successfully",
+      "plansManagedTitle": "Billing Managed By Parent Organization",
+      "plansManagedDescription": "This organization's billing is managed by {name} ({id}). Plan changes are handled by the parent organization.",
+      "chipPlanManaged": "Plan Managed By Parent",
+      "chipNoInvoices": "No Separate Invoices",
+      "viewOrgGroup": "View Organization Group",
+      "usageMemberLabel": "Member Organization",
+      "usageAllMembers": "All Members",
+      "currentOrgTitle": "Current Organization",
+      "memberOrgsTitle": "Member Organizations",
+      "searchMemberOrg": "Search Organization",
+      "noMemberMatch": "No Matching Organizations"
+    }
   },
   "awsMarketplace": {
     "title": "AWS Marketplace Registration",
@@ -2720,7 +2777,7 @@
       "selectTemplate": "Select Template"
     },
     "editJson": "Edit Alert JSON",
-    "additional_settings":"Additional Settings",
+    "additional_settings": "Additional Settings",
     "alertNamePlaceholder": "Alert name",
     "nameRequired": "Alert name is required.",
     "nameNoSpecialChars": "Alert name cannot contain ':', '#', '?', '&', '%', quotes or space characters. Use underscores (_) instead.",
@@ -2788,13 +2845,26 @@
     "delete": "Delete",
     "variable_guide_header": "Template Variable Guide",
     "variable_usage_examples": "Usage Examples",
-    "body": "Body"
+    "body": "Body",
+    "clone": "Clone",
+    "cloneTitle": "Clone template",
+    "systemReadOnly": "Prebuilt template — delete is disabled. Clone it to make a modifiable copy.",
+    "prebuiltBadge": "Prebuilt",
+    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
+    "customBadge": "Custom",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom"
   },
   "alert_destinations": {
     "header": "Notification Destinations",
     "add": "New destination",
     "edit": "Edit",
     "search": "Search destination",
+    "filterAll": "All",
+    "filterPrebuilt": "Prebuilt",
+    "filterCustom": "Custom",
+    "templateDefaultBadge": "Default",
     "name": "Name",
     "destination_type": "Destination Type",
     "template": "Template",
@@ -2825,7 +2895,9 @@
     "custom": "Custom",
     "separator": "Separator",
     "separator_placeholder": "Enter separator (e.g., |, \\n, \\t, space)",
-    "separator_hint": "Separator string to use between records (spaces allowed)"
+    "separator_hint": "Separator string to use between records (spaces allowed)",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "Pipeline Destinations",
@@ -3337,7 +3409,7 @@
       "criteriaFromTemplate": "Evaluation Criteria (from template)",
       "criteriaDifferentTemplate": "Evaluation Criteria (different template — for reference only)",
       "criteriaTemplateMismatchNote": "These criteria belong to {template}, not the template that ran this evaluation ({evaluated}).",
-      "criteriaSyntaxNote": "Placeholders like \u007bquery\u007d, \u007bresponse\u007d, \u007bmodel\u007d are substituted at evaluation time and shown here in their raw template form.",
+      "criteriaSyntaxNote": "Placeholders like {query}, {response}, {model} are substituted at evaluation time and shown here in their raw template form.",
       "recommendedFixes": "Recommended Fixes",
       "fixSuggestion": "Suggestion:",
       "weakestDimension": "Weakest Dimension:",

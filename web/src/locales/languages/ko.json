@@ -930,7 +930,8 @@
     "nameRequired": "이름은 필수입니다",
     "subscription_type": "계획 유형",
     "proceed_subscription": "구독으로 이동",
-    "subscription_plan": "서브스크립션 플랜"
+    "subscription_plan": "서브스크립션 플랜",
+    "makeBilledMember": "이 조직을 {org} 의 결제 회원으로 설정"
   },
   "template": {
     "header": "템플릿",
@@ -1812,7 +1813,105 @@
     "aiModePayAsYouGo": "사용량에 따라 지불",
     "aiModeExhausted": "지쳤다",
     "aiExhaustedMessage": "구독하여 AI 기능을 계속 사용하세요",
-    "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨"
+    "aiPaygMessage": "무료 크레딧 소진 — 사용량이 구독에 청구됨",
+    "organizationGroup": {
+      "tabLabel": "조직 그룹",
+      "inviteOrgButton": "조직 초대",
+      "viewUsage": "사용 보기",
+      "statTotal": "전체 아동 조직",
+      "statActive": "액티브",
+      "statPending": "대기 중인 초대",
+      "statRejected": "거부됨",
+      "statusActive": "액티브",
+      "statusPending": "보류 중",
+      "statusRejected": "거부됨",
+      "filterAll": "모두",
+      "childOrgColumn": "아동 조직",
+      "dateColumn": "날짜",
+      "cancel": "취소",
+      "invitedBy": "초대 받은 사람",
+      "acceptedBy": "수락 주체",
+      "addedOnCreation": "작성 시 추가됨",
+      "memberSince": "회원 이후",
+      "noMembers": "아직 회원 조직이 없습니다",
+      "inviteTitle": "조직 초대",
+      "inviteOrgIdLabel": "조직 식별자",
+      "inviteOrgIdPlaceholder": "조직 식별자 입력",
+      "sendInvite": "초대 보내기",
+      "inviteSent": "초대가 성공적으로 전송됨",
+      "inviteSameOrg": "조직은 자신을 초대할 수 없습니다",
+      "childHeadline": "청구 관리 주체",
+      "childHeroSub": "사용량은 이 조직에 청구됩니다.플랜 변경 및 청구서는 상위 조직에서 처리하므로 여기서는 관리할 것이 없습니다.",
+      "receivedInvitesTab": "대기 중인 초대",
+      "noPendingInvites": "대기 중인 초대 없음",
+      "noPendingInvitesHint": "다른 조직에서 사용자를 해당 결제 그룹에 초대하면 여기에 초대가 표시됩니다.",
+      "invitedByOn": "{초대자} 님이 초대했습니다",
+      "inviteTabPrompt": "다른 조직을 초대하여 결제 그룹에 가입하세요.사용량은 이 조직에 청구됩니다.",
+      "emptyTitle": "결제 그룹 시작",
+      "chipConsolidatedBill": "통합 청구서 1개",
+      "chipLinkOrgs": "여러 조직 연결",
+      "accept": "수락",
+      "reject": "거부",
+      "inviteAccepted": "초대가 성공적으로 수락됨",
+      "inviteRejected": "초대가 성공적으로 거부됨",
+      "plansManagedTitle": "상위 조직에서 관리하는 청구",
+      "plansManagedDescription": "이 조직의 대금 청구는 {payer} 가 관리합니다.플랜 변경은 상위 조직에서 처리합니다.",
+      "chipPlanManaged": "부모가 관리하는 플랜",
+      "chipNoInvoices": "별도 청구서 없음",
+      "viewOrgGroup": "조직 그룹 보기",
+      "usageMemberLabel": "회원 조직",
+      "usageAllMembers": "현재 조직",
+      "currentOrgTitle": "현재 조직"
+    },
+    "billingGroup": {
+      "tabLabel": "결제 그룹",
+      "inviteOrgButton": "조직 초대",
+      "viewUsage": "사용 보기",
+      "statTotal": "전체 아동 조직",
+      "statActive": "액티브",
+      "statPending": "대기 중인 초대",
+      "statRejected": "거부됨",
+      "statusActive": "액티브",
+      "statusPending": "보류 중",
+      "statusRejected": "거부됨",
+      "filterAll": "모두",
+      "childOrgColumn": "아동 조직",
+      "orgColumn": "조직",
+      "orgIdColumn": "조직 식별자",
+      "actionsColumn": "액션",
+      "dateColumn": "날짜",
+      "cancel": "취소",
+      "invitedBy": "초대 받은 사람",
+      "acceptedBy": "수락 주체",
+      "addedOnCreation": "작성 시 추가됨",
+      "memberSince": "회원 이후",
+      "noMembers": "아직 회원 조직이 없습니다",
+      "inviteTitle": "조직 초대",
+      "inviteOrgIdLabel": "조직 식별자",
+      "inviteOrgIdPlaceholder": "조직 식별자 입력",
+      "sendInvite": "초대 보내기",
+      "inviteSent": "초대가 성공적으로 전송됨",
+      "inviteSameOrg": "조직은 자신을 초대할 수 없습니다",
+      "childHeadline": "청구 관리 주체",
+      "childHeroSub": "사용량은 이 조직에 청구됩니다.플랜 변경 및 청구서는 상위 조직에서 처리하므로 여기서는 관리할 것이 없습니다.",
+      "invitesPanelHint": "이러한 조직은 귀하를 해당 결제 그룹에 가입하도록 초대했습니다.수락하면 이 조직의 사용량이 해당 사용자에게 청구됩니다.",
+      "inviteTabPrompt": "다른 조직을 초대하여 결제 그룹에 가입하세요.사용량은 이 조직에 청구됩니다.",
+      "emptyTitle": "결제 그룹 시작",
+      "chipConsolidatedBill": "통합 청구서 1개",
+      "chipLinkOrgs": "여러 조직 연결",
+      "accept": "수락",
+      "reject": "거부",
+      "inviteAccepted": "초대가 성공적으로 수락됨",
+      "inviteRejected": "초대가 성공적으로 거부됨",
+      "plansManagedTitle": "상위 조직에서 관리하는 청구",
+      "plansManagedDescription": "이 조직의 대금 청구는 {payer} 가 관리합니다.플랜 변경은 상위 조직에서 처리합니다.",
+      "chipPlanManaged": "부모가 관리하는 플랜",
+      "chipNoInvoices": "별도 청구서 없음",
+      "viewOrgGroup": "조직 그룹 보기",
+      "usageMemberLabel": "회원 조직",
+      "usageAllMembers": "현재 조직",
+      "currentOrgTitle": "현재 조직"
+    }
   },
   "message": {
     "ServerInternalError": "오류: 문제가 발생했습니다. 내부 서버 오류입니다.",
@@ -2356,7 +2455,16 @@
     "delete": "삭제",
     "variable_guide_header": "템플릿 변수 가이드",
     "variable_usage_examples": "사용 예시",
-    "body": "바디"
+    "body": "바디",
+    "clone": "클론",
+    "cloneTitle": "클론 템플릿",
+    "systemReadOnly": "사전 빌드된 템플릿 — 삭제가 비활성화되었습니다.복제하여 수정 가능한 사본을 만드세요.",
+    "prebuiltBadge": "사전 구축",
+    "prebuiltBadgeHint": "시스템에 의해 관리됩니다.편집은 가능하지만 삭제는 불가능합니다.",
+    "customBadge": "사용자 지정",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정"
   },
   "alert_destinations": {
     "header": "여행지",
@@ -2393,7 +2501,13 @@
     "custom": "사용자 지정",
     "separator": "분리기",
     "separator_placeholder": "구분자 입력 (예: |,\\n,\\ t, 공백)",
-    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)"
+    "separator_hint": "레코드 사이에 사용할 구분자 문자열 (공백 허용)",
+    "filterAll": "모두",
+    "filterPrebuilt": "사전 구축",
+    "filterCustom": "사용자 지정",
+    "templateDefaultBadge": "디폴트",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "지표 검색",
@@ -3908,19 +4022,23 @@
     "capabilities": {
       "query": {
         "title": "쿼리 작성",
-        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL"
+        "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL",
+        "prompt": "쿼리 작성을 도와주세요"
       },
       "incident": {
         "title": "인시던트 조사",
-        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)"
+        "description": "로그, 트레이스, 경보의 근본 원인 (예: “게이트웨이 5xx가 왜 작동했나요?”)",
+        "prompt": "인시던트 조사를 도와주세요"
       },
       "dashboard": {
         "title": "대시보드 구축",
-        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다."
+        "description": "주제 (예: “K8s 노드 상태: CPU, 메모리, 재시작”)또한 패널을 생성합니다.",
+        "prompt": "대시보드 또는 패널 구축을 도와주세요"
       },
       "alert": {
         "title": "알림 생성",
-        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인."
+        "description": "임계값 또는 예약된 알림, 인제스트 타임 VRL 파이프라인.",
+        "prompt": "알림 또는 파이프라인 생성을 도와주세요"
       }
     },
     "suggestions": {

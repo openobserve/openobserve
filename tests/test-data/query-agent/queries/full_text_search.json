@@ -1,0 +1,746 @@
+{
+  "queries": [
+    {
+      "id": "Q074",
+      "sql": "SELECT _timestamp, log, facility_zone FROM \"{stream}\" WHERE match_all('warehouse') ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "Q074 warehouse event record 9",
+            "ZONE-2"
+          ],
+          [
+            "Q076 warehouse event record 2",
+            "ZONE-3"
+          ],
+          [
+            "Q075 warehouse event record 5",
+            "ZONE-2"
+          ],
+          [
+            "Q074 warehouse event record 8",
+            "ZONE-1"
+          ],
+          [
+            "Q076 warehouse event record 1",
+            "ZONE-2"
+          ],
+          [
+            "Q075 warehouse event record 4",
+            "ZONE-1"
+          ],
+          [
+            "Q074 warehouse event record 7",
+            "ZONE-4"
+          ],
+          [
+            "Q076 warehouse event record 0",
+            "ZONE-1"
+          ],
+          [
+            "Q075 warehouse event record 3",
+            "ZONE-4"
+          ],
+          [
+            "Q074 warehouse event record 6",
+            "ZONE-3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4379000000,
+        "end_offset": 4543000000
+      }
+    },
+    {
+      "id": "Q075",
+      "sql": "SELECT _timestamp, log, pallet_id FROM \"{stream}\" WHERE match_all('event') ORDER BY _timestamp ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "pallet_id"
+        ],
+        "results": [
+          [
+            "Q075 warehouse event record 0",
+            "PL-001"
+          ],
+          [
+            "Q073 warehouse event record 7",
+            "PL-008"
+          ],
+          [
+            "Q074 warehouse event record 4",
+            "PL-005"
+          ],
+          [
+            "Q075 warehouse event record 1",
+            "PL-002"
+          ],
+          [
+            "Q073 warehouse event record 8",
+            "PL-001"
+          ],
+          [
+            "Q074 warehouse event record 5",
+            "PL-006"
+          ],
+          [
+            "Q075 warehouse event record 2",
+            "PL-003"
+          ],
+          [
+            "Q073 warehouse event record 9",
+            "PL-002"
+          ],
+          [
+            "Q074 warehouse event record 6",
+            "PL-007"
+          ],
+          [
+            "Q075 warehouse event record 3",
+            "PL-004"
+          ],
+          [
+            "Q076 warehouse event record 0",
+            "PL-001"
+          ],
+          [
+            "Q074 warehouse event record 7",
+            "PL-008"
+          ],
+          [
+            "Q075 warehouse event record 4",
+            "PL-005"
+          ],
+          [
+            "Q076 warehouse event record 1",
+            "PL-002"
+          ],
+          [
+            "Q074 warehouse event record 8",
+            "PL-001"
+          ],
+          [
+            "Q075 warehouse event record 5",
+            "PL-006"
+          ],
+          [
+            "Q076 warehouse event record 2",
+            "PL-003"
+          ],
+          [
+            "Q074 warehouse event record 9",
+            "PL-002"
+          ],
+          [
+            "Q075 warehouse event record 6",
+            "PL-007"
+          ],
+          [
+            "Q076 warehouse event record 3",
+            "PL-004"
+          ],
+          [
+            "Q077 warehouse event record 0",
+            "PL-001"
+          ],
+          [
+            "Q075 warehouse event record 7",
+            "PL-008"
+          ],
+          [
+            "Q076 warehouse event record 4",
+            "PL-005"
+          ],
+          [
+            "Q077 warehouse event record 1",
+            "PL-002"
+          ],
+          [
+            "Q075 warehouse event record 8",
+            "PL-001"
+          ],
+          [
+            "Q076 warehouse event record 5",
+            "PL-006"
+          ],
+          [
+            "Q077 warehouse event record 2",
+            "PL-003"
+          ],
+          [
+            "Q075 warehouse event record 9",
+            "PL-002"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4439000000,
+        "end_offset": 4603000000
+      }
+    },
+    {
+      "id": "Q076",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt FROM \"{stream}\" WHERE match_all('record') AND throughput_rate > 200.0 GROUP BY facility_zone ORDER BY cnt DESC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "9"
+          ],
+          [
+            "ZONE-3",
+            "5"
+          ],
+          [
+            "ZONE-4",
+            "5"
+          ],
+          [
+            "ZONE-1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4499000000,
+        "end_offset": 4663000000
+      }
+    },
+    {
+      "id": "Q077",
+      "sql": "SELECT histogram(_timestamp) AS _time, COUNT(*) AS match_count FROM \"{stream}\" WHERE match_all('warehouse') GROUP BY _time ORDER BY _time ASC",
+      "category": "full_text_search",
+      "expected": {
+        "row_count": 17,
+        "columns": [
+          "_time",
+          "match_count"
+        ],
+        "note": "match_all with histogram aggregation",
+        "skip_row_count": true,
+        "assertions": [
+          {
+            "type": "value_range",
+            "column": "match_count",
+            "min": 0
+          }
+        ]
+      },
+      "time_offset": {
+        "start_offset": 4559000000,
+        "end_offset": 4723000000
+      }
+    },
+    {
+      "id": "Q078",
+      "sql": "SELECT _timestamp, pallet_id, facility_zone, sorter_model, throughput_rate, load_factor FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate > 400.0 AND facility_zone IN ('ZONE-1', 'ZONE-2') ORDER BY throughput_rate DESC LIMIT 10",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "facility_zone",
+          "sorter_model",
+          "throughput_rate",
+          "load_factor"
+        ],
+        "results": [
+          [
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "725.0",
+            "88.1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4619000000,
+        "end_offset": 4783000000
+      }
+    },
+    {
+      "id": "Q079",
+      "sql": "SELECT facility_zone, COUNT(*) AS match_cnt, ROUND(AVG(throughput_rate), 2) AS avg_tput, ROUND(AVG(load_factor), 2) AS avg_load FROM \"{stream}\" WHERE match_all('event') AND operation_mode != 'manual' GROUP BY facility_zone HAVING COUNT(*) >= 1 ORDER BY match_cnt DESC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "match_cnt",
+          "avg_tput",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "6",
+            "170.0",
+            "16.95"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "404.0",
+            "51.24"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "610.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4679000000,
+        "end_offset": 4843000000
+      }
+    },
+    {
+      "id": "Q080",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS time_block, COUNT(*) FILTER (WHERE match_all('warehouse')) AS warehouse_hits, COUNT(*) AS total_events, ROUND(CAST(COUNT(*) FILTER (WHERE match_all('warehouse')) AS FLOAT) / NULLIF(COUNT(*), 0) * 100.0, 2) AS hit_rate_pct FROM \"{stream}\" GROUP BY time_block ORDER BY time_block ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "time_block",
+          "warehouse_hits",
+          "total_events",
+          "hit_rate_pct"
+        ],
+        "results": [
+          [
+            "2026-06-03T05:12:00",
+            "10",
+            "10",
+            "100.0"
+          ],
+          [
+            "2026-06-03T05:13:00",
+            "10",
+            "10",
+            "100.0"
+          ],
+          [
+            "2026-06-03T05:14:00",
+            "8",
+            "8",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 4739000000,
+        "end_offset": 4903000000
+      }
+    },
+    {
+      "id": "Q081",
+      "sql": "SELECT _timestamp, log, pallet_id, facility_zone, sorter_model, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY _timestamp DESC) AS recency_rank FROM \"{stream}\" WHERE match_all('record') ORDER BY facility_zone ASC, recency_rank ASC",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "log",
+          "pallet_id",
+          "facility_zone",
+          "sorter_model",
+          "recency_rank"
+        ],
+        "results": [
+          [
+            "Q081 warehouse event record 8",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 4",
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "2"
+          ],
+          [
+            "Q083 warehouse event record 0",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "3"
+          ],
+          [
+            "Q080 warehouse event record 8",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "4"
+          ],
+          [
+            "Q081 warehouse event record 4",
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "5"
+          ],
+          [
+            "Q082 warehouse event record 0",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "6"
+          ],
+          [
+            "Q079 warehouse event record 8",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "7"
+          ],
+          [
+            "Q080 warehouse event record 4",
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "8"
+          ],
+          [
+            "Q081 warehouse event record 0",
+            "PL-001",
+            "ZONE-1",
+            "SORT-X1",
+            "9"
+          ],
+          [
+            "Q081 warehouse event record 9",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 5",
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "2"
+          ],
+          [
+            "Q083 warehouse event record 1",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "3"
+          ],
+          [
+            "Q080 warehouse event record 9",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "4"
+          ],
+          [
+            "Q081 warehouse event record 5",
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "5"
+          ],
+          [
+            "Q082 warehouse event record 1",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "6"
+          ],
+          [
+            "Q079 warehouse event record 9",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "7"
+          ],
+          [
+            "Q080 warehouse event record 5",
+            "PL-006",
+            "ZONE-2",
+            "SORT-A7",
+            "8"
+          ],
+          [
+            "Q081 warehouse event record 1",
+            "PL-002",
+            "ZONE-2",
+            "SORT-A7",
+            "9"
+          ],
+          [
+            "Q083 warehouse event record 2",
+            "PL-003",
+            "ZONE-3",
+            "SORT-M3",
+            "1"
+          ],
+          [
+            "Q081 warehouse event record 6",
+            "PL-007",
+            "ZONE-3",
+            "SORT-M3",
+            "2"
+          ],
+          [
+            "Q082 warehouse event record 2",
+            "PL-003",
+            "ZONE-3",
+            "SORT-M3",
+            "3"
+          ],
+          [
+            "Q080 warehouse event record 6",
+            "PL-007",
+            "ZONE-3",
+            "SORT-M3",
+            "4"
+          ],
+          [
+            "Q081 warehouse event record 2",
+            "PL-003",
+            "ZONE-3",
+            "SORT-M3",
+            "5"
+          ],
+          [
+            "Q081 warehouse event record 7",
+            "PL-008",
+            "ZONE-4",
+            "SORT-Q5",
+            "1"
+          ],
+          [
+            "Q082 warehouse event record 3",
+            "PL-004",
+            "ZONE-4",
+            "SORT-Z9",
+            "2"
+          ],
+          [
+            "Q080 warehouse event record 7",
+            "PL-008",
+            "ZONE-4",
+            "SORT-Q5",
+            "3"
+          ],
+          [
+            "Q081 warehouse event record 3",
+            "PL-004",
+            "ZONE-4",
+            "SORT-Z9",
+            "4"
+          ],
+          [
+            "Q079 warehouse event record 7",
+            "PL-008",
+            "ZONE-4",
+            "SORT-Q5",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4799000000,
+        "end_offset": 4963000000
+      }
+    },
+    {
+      "id": "Q082",
+      "sql": "SELECT 'primary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('warehouse') AND throughput_rate >= 500.0 UNION ALL SELECT 'secondary_hits' AS source, _timestamp, pallet_id, facility_zone, throughput_rate FROM \"{stream}\" WHERE match_all('event') AND throughput_rate < 500.0 ORDER BY source ASC, throughput_rate DESC LIMIT 15",
+      "category": "full_text_search",
+      "expected": {
+        "columns": [
+          "source",
+          "pallet_id",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "primary_hits",
+            "PL-002",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "primary_hits",
+            "PL-002",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "primary_hits",
+            "PL-002",
+            "ZONE-2",
+            "900.0"
+          ],
+          [
+            "primary_hits",
+            "PL-006",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "primary_hits",
+            "PL-006",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "primary_hits",
+            "PL-006",
+            "ZONE-2",
+            "840.0"
+          ],
+          [
+            "primary_hits",
+            "PL-005",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "primary_hits",
+            "PL-005",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "primary_hits",
+            "PL-005",
+            "ZONE-1",
+            "725.0"
+          ],
+          [
+            "primary_hits",
+            "PL-004",
+            "ZONE-4",
+            "610.0"
+          ],
+          [
+            "primary_hits",
+            "PL-004",
+            "ZONE-4",
+            "610.0"
+          ],
+          [
+            "primary_hits",
+            "PL-008",
+            "ZONE-4",
+            "555.0"
+          ],
+          [
+            "primary_hits",
+            "PL-008",
+            "ZONE-4",
+            "555.0"
+          ],
+          [
+            "primary_hits",
+            "PL-008",
+            "ZONE-4",
+            "555.0"
+          ],
+          [
+            "secondary_hits",
+            "PL-003",
+            "ZONE-3",
+            "480.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 4859000000,
+        "end_offset": 5023000000
+      }
+    }
+  ],
+  "last_query_id": 82
+}

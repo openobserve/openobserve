@@ -37,6 +37,9 @@ impl From<TemplateError> for Response {
             TemplateError::DeleteWithDestination(e) => {
                 MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
             }
+            TemplateError::PrebuiltReadOnly(name) => {
+                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
+            }
             other_err => MetaHttpResponse::bad_request(other_err),
         }
     }
@@ -456,6 +459,24 @@ mod tests {
         assert_eq!(
             status(TemplateError::InfraError(infra_err)),
             StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn test_prebuilt_read_only_is_forbidden() {
+        assert_eq!(
+            status(TemplateError::PrebuiltReadOnly(
+                "prebuilt_slack".to_string()
+            )),
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[test]
+    fn test_reserved_name_is_bad_request() {
+        assert_eq!(
+            status(TemplateError::ReservedName("prebuilt_slack".to_string())),
+            StatusCode::BAD_REQUEST
         );
     }
 }

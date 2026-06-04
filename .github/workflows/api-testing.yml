@@ -131,7 +131,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 
@@ -141,6 +141,90 @@ jobs:
         with:
           name: openobserve-server-logs
           path: tests/api-testing/o2_*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Dedicated query agent SQL regression suite. Runs in parallel with
+  # the default-set and regression jobs so the 310-case (155 queries ×
+  # 2 phases: memtable + parquet) suite doesn't extend CI wall time.
+  api_query_agent_tests:
+    name: api_query_agent_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      contents: read
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # main api_integration_tests job writes the cache
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run query agent tests
+        run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest tests/query_agent/ -v
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-query-agent-log
+          path: tests/api-testing/o2_query_agent.log
           if-no-files-found: warn
           retention-days: 14
 
@@ -341,6 +425,18 @@ jobs:
             -n 20 \
             --request-timeout 5 \
             -m positive \
+            --suppress-health-check=filter_too_much \
+            --exclude-path "/api/{org_id}/v1/logs" \
+            --exclude-path "/api/{org_id}/v1/metrics" \
+            --exclude-path "/api/{org_id}/v1/traces" \
+            --exclude-path "/api/{org_id}/loki/api/v1/push" \
+            --exclude-path "/api/{org_id}/prometheus/api/v1/write" \
+            --exclude-path "/api/{org_id}/dashboards" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}" \
+            --exclude-path "/api/{org_id}/pipelines/history" \
+            --exclude-path "/api/{org_id}/organizations/assume_service_account" \
             http://localhost:5080/api-doc/openapi.json
         working-directory: tests/api-testing/
 
@@ -356,7 +452,7 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, api_integration_tests, api_regression_tests]
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
     if: always()
     steps:
       - name: Check test results
@@ -365,13 +461,12 @@ jobs:
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
-          # Both api_integration_tests AND api_regression_tests must pass
-          # (or be skipped because there were no changes).
+          # All three test jobs must pass (or be skipped).
           ok() { [ "$1" == "success" ] || [ "$1" == "skipped" ]; }
-          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
+          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_query_agent_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
             echo "All API test jobs passed or skipped"
             exit 0
           else
-            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
+            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi

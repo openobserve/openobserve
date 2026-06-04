@@ -947,7 +947,8 @@
     "nameRequired": "名前が必要です",
     "subscription_type": "プランタイプ",
     "proceed_subscription": "購読に進む",
-    "subscription_plan": "サブスクリプションプラン"
+    "subscription_plan": "サブスクリプションプラン",
+    "makeBilledMember": "この組織を {org} の請求メンバーにする"
   },
   "template": {
     "header": "テンプレート",
@@ -1829,7 +1830,105 @@
     "aiModePayAsYouGo": "従量課金制",
     "aiModeExhausted": "疲れ果てた",
     "aiExhaustedMessage": "購読して引き続き AI 機能を使用する",
-    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます"
+    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
+    "organizationGroup": {
+      "tabLabel": "組織グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "receivedInvitesTab": "保留中の招待",
+      "noPendingInvites": "保留中の招待はありません",
+      "noPendingInvitesHint": "別の組織が請求グループへの参加を招待すると、ここに招待が表示されます。",
+      "invitedByOn": "{招待者} さんからの招待",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    },
+    "billingGroup": {
+      "tabLabel": "請求グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "orgColumn": "組織",
+      "orgIdColumn": "組織識別子",
+      "actionsColumn": "[アクション]",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "invitesPanelHint": "これらの組織は、あなたをその請求グループに参加するよう招待しています。同意すると、この組織の使用量が組織に請求されます。",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    }
   },
   "message": {
     "ServerInternalError": "エラー:問題が発生しました。内部サーバーエラー。",
@@ -2373,7 +2472,16 @@
     "delete": "削除",
     "variable_guide_header": "テンプレート変数ガイド",
     "variable_usage_examples": "使用例",
-    "body": "ボディ"
+    "body": "ボディ",
+    "clone": "クローン",
+    "cloneTitle": "テンプレートを複製",
+    "systemReadOnly": "ビルド済みテンプレート — 削除は無効になっています。クローンを作成して、変更可能なコピーを作成します。",
+    "prebuiltBadge": "構築済み",
+    "prebuiltBadgeHint": "システムによって管理されます。編集はできますが、削除はできません。",
+    "customBadge": "カスタム",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム"
   },
   "alert_destinations": {
     "header": "アラート送信先",
@@ -2410,7 +2518,13 @@
     "custom": "カスタム",
     "separator": "セパレーター",
     "separator_placeholder": "セパレータを入力してください (例:|、\\n、\\ t、スペース)",
-    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)"
+    "separator_hint": "レコード間に使用する区切り文字列 (スペース可)",
+    "filterAll": "[すべて]",
+    "filterPrebuilt": "構築済み",
+    "filterCustom": "カスタム",
+    "templateDefaultBadge": "デフォルト",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "pipeline_destinations": {
     "header": "パイプライン送信先",
@@ -3895,19 +4009,23 @@
     "capabilities": {
       "query": {
         "title": "クエリーを書く",
-        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。"
+        "description": "ログ用の SQL、トレース、RUM、またはメトリクス用の PromQL。",
+        "prompt": "クエリーの作成を手伝ってください"
       },
       "incident": {
         "title": "インシデントを調査",
-        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」"
+        "description": "ログ、トレース、アラートにわたる根本原因 — 例:「なぜgateway-5xxが起動したのか?」",
+        "prompt": "インシデントの調査を手伝ってください"
       },
       "dashboard": {
         "title": "ダッシュボードの作成",
-        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。"
+        "description": "トピックから — 例:「K8s ノードの状態:CPU、メモリ、再起動」パネルも作成します。",
+        "prompt": "ダッシュボードまたはパネルの作成を手伝ってください"
       },
       "alert": {
         "title": "アラートを作成",
-        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。"
+        "description": "しきい値またはスケジュールされたアラート、および取り込み時間の VRL パイプライン。",
+        "prompt": "アラートまたはパイプラインの作成を手伝ってください"
       }
     },
     "suggestions": {
