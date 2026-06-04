@@ -69,13 +69,6 @@ CREATE TABLE IF NOT EXISTS pipeline
         .execute(&pool)
         .await?;
 
-        // add kind column for existing tables that don't have it
-        let _ = sqlx::query(
-            r#"ALTER TABLE pipeline ADD COLUMN IF NOT EXISTS kind VARCHAR(50) not null default 'user';"#,
-        )
-        .execute(&pool)
-        .await;
-
         // drop created_at column for old version <= 0.40.0
         drop_column("pipeline", "created_at").await?;
 
