@@ -87,6 +87,21 @@ const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
 const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
+const RESERVED_SPAN_FIELDS: [&str; 13] = [
+    "trace_id",
+    "span_id",
+    "flags",
+    "span_status",
+    "span_kind",
+    "operation_name",
+    "start_time",
+    "end_time",
+    "duration",
+    "service_name",
+    "events",
+    "links",
+    TIMESTAMP_COL_NAME,
+];
 // ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
 const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
@@ -127,6 +142,27 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
                     .unwrap_or_else(|| json::Number::from_f64(0.0).unwrap()),
             );
         }
+    }
+}
+
+fn normalized_trace_key(key: &str) -> String {
+    let mut key = key.to_string();
+    flatten::format_key(&mut key);
+    key
+}
+
+fn span_attribute_key(raw_key: String, service_att_map: &HashMap<String, json::Value>) -> String {
+    let normalized_key = normalized_trace_key(&raw_key);
+    let collides_with_reserved = BLOCK_FIELDS.contains(&raw_key.as_str())
+        || RESERVED_SPAN_FIELDS.contains(&normalized_key.as_str());
+    let collides_with_resource = service_att_map
+        .keys()
+        .any(|service_key| normalized_trace_key(service_key) == normalized_key);
+
+    if collides_with_reserved || collides_with_resource {
+        format!("attr_{raw_key}")
+    } else {
+        raw_key
     }
 }
 
@@ -362,10 +398,7 @@ pub async fn handle_otlp_request(
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
-                    let mut key = span_att.key;
-                    if BLOCK_FIELDS.contains(&key.as_str()) {
-                        key = format!("attr_{key}");
-                    }
+                    let key = span_attribute_key(span_att.key, &service_att_map);
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
@@ -1913,6 +1946,43 @@ mod tests {
 
         assert!(service_att_map.contains_key("service_version"));
         assert_eq!(service_att_map.get("service_version").unwrap(), "1.0.0");
+    }
+
+    #[test]
+    fn test_span_attribute_key_preserves_resource_service_name() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        service_att_map.insert(super::SERVICE_NAME.to_string(), json!("serviceA"));
+
+        let key = super::span_attribute_key("service_name".to_string(), &service_att_map);
+
+        assert_eq!(key, "attr_service_name");
+    }
+
+    #[test]
+    fn test_span_attribute_key_preserves_resource_fields_after_normalization() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
+        service_att_map.insert("service.version".to_string(), json!("1.0.0"));
+
+        let key = super::span_attribute_key("service_version".to_string(), &service_att_map);
+
+        assert_eq!(key, "attr_service_version");
+    }
+
+    #[test]
+    fn test_span_attribute_key_allows_non_colliding_attributes() {
+        let service_att_map = std::collections::HashMap::new();
+
+        let key = super::span_attribute_key("http.method".to_string(), &service_att_map);
+
+        assert_eq!(key, "http.method");
     }
 
     // Test time validation boundary conditions
