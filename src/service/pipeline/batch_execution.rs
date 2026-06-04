@@ -39,7 +39,6 @@ use config::{
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
-use opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient;
 use proto::cluster_rpc;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 #[cfg(feature = "enterprise")]
@@ -47,7 +46,6 @@ use tokio::{
     sync::Mutex,
     time::{Duration, Instant},
 };
-use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 
 use crate::{
     common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
@@ -86,124 +84,6 @@ fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f6
     sample_key.hash(&mut hasher);
     let bucket = hasher.finish() as f64 / u64::MAX as f64;
     bucket < sampling_rate
-}
-
-async fn ingest_evaluator_traces(
-    org_id: &str,
-    traces: Vec<crate::service::llm_evaluations::evaluator_trace::EvaluatorTrace>,
-    node_idx: usize,
-) {
-    if traces.is_empty() {
-        return;
-    }
-
-    let request =
-        crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace_request(traces);
-    if request.resource_spans.is_empty() {
-        return;
-    }
-
-    let cfg = config::get_config();
-    let token: MetadataValue<_> = match config::meta::cluster::get_internal_grpc_token().parse() {
-        Ok(token) => token,
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to parse internal gRPC token for evaluator traces: {e}"
-            );
-            return;
-        }
-    };
-
-    let (_addr, channel) = match crate::service::grpc::get_ingester_channel().await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to get ingester channel for evaluator traces: {e}"
-            );
-            return;
-        }
-    };
-
-    let client = TraceServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
-        req.metadata_mut().insert("authorization", token.clone());
-        Ok(req)
-    });
-
-    let org_header_key: tonic::metadata::MetadataKey<_> = match cfg.grpc.org_header_key.parse() {
-        Ok(key) => key,
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to parse org header key for evaluator traces: {e}"
-            );
-            return;
-        }
-    };
-    let stream_header_key: tonic::metadata::MetadataKey<_> = match cfg
-        .grpc
-        .stream_header_key
-        .parse()
-    {
-        Ok(key) => key,
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to parse stream header key for evaluator traces: {e}"
-            );
-            return;
-        }
-    };
-    let org_header_value: MetadataValue<_> = match org_id.parse() {
-        Ok(value) => value,
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to parse org header value for evaluator traces: {e}"
-            );
-            return;
-        }
-    };
-    let stream_header_value: MetadataValue<_> =
-        match config::meta::self_reporting::evaluator::EVALUATOR_STREAM.parse() {
-            Ok(value) => value,
-            Err(e) => {
-                log::error!(
-                    "[Pipeline]: LLM evaluation node {node_idx} failed to parse _evaluator stream header value: {e}"
-                );
-                return;
-            }
-        };
-
-    let mut grpc_request = Request::new(request);
-    grpc_request.set_timeout(std::time::Duration::from_secs(
-        cfg.limit.grpc_ingest_timeout,
-    ));
-    grpc_request
-        .metadata_mut()
-        .insert(org_header_key, org_header_value);
-    grpc_request
-        .metadata_mut()
-        .insert(stream_header_key, stream_header_value);
-
-    match client
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-        .export(grpc_request)
-        .await
-    {
-        Ok(response) => {
-            if response.get_ref().partial_success.is_some() {
-                log::warn!(
-                    "[Pipeline]: LLM evaluation node {node_idx} exported evaluator traces with partial success: {:?}",
-                    response.get_ref()
-                );
-            }
-        }
-        Err(e) => {
-            log::error!(
-                "[Pipeline]: LLM evaluation node {node_idx} failed to export evaluator traces over OTLP gRPC: {e}"
-            );
-        }
-    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -1533,7 +1413,12 @@ async fn process_node(
                                     response: None,
                                 },
                             );
-                        ingest_evaluator_traces(&org_id, vec![skipped_trace], node_idx).await;
+                        crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                            &org_id,
+                            vec![skipped_trace],
+                            node_idx,
+                        )
+                        .await;
                         count += 1;
                         continue;
                     }
@@ -1557,8 +1442,12 @@ async fn process_node(
                                 )
                                 .await;
                             }
-                            ingest_evaluator_traces(&org_id, output.evaluator_traces, node_idx)
-                                .await;
+                            crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                                &org_id,
+                                output.evaluator_traces,
+                                node_idx,
+                            )
+                            .await;
                             for err in &output.errors {
                                 log::warn!(
                                     "[Pipeline]: LLM evaluation node {node_idx} scorer '{}' error: {}",

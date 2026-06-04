@@ -82,11 +82,6 @@ pub fn extract_context_from_span(
     job_id: Option<&str>,
     record: &Value,
 ) -> Option<SpanEvalContext> {
-    if is_evaluator_trace_span(record) {
-        log::debug!("[EXECUTOR-RUNTIME] Skipping internally generated evaluator span");
-        return None;
-    }
-
     let span_id = record
         .get("span_id")
         .and_then(|v| v.as_str())
@@ -158,38 +153,6 @@ pub fn extract_context_from_span(
         sampled: None,
         attributes,
     })
-}
-
-fn is_evaluator_trace_span(record: &Value) -> bool {
-    let has_target_marker = record.get("attributes.target_trace_id").is_some()
-        || record.get("attributes_target_trace_id").is_some()
-        || record
-            .get("attributes")
-            .and_then(|v| v.as_object())
-            .is_some_and(|attrs| attrs.contains_key(evaluator::ATTR_TARGET_TRACE_ID));
-
-    if has_target_marker {
-        return true;
-    }
-
-    let is_online_eval_service = record
-        .get("service_name")
-        .and_then(|v| v.as_str())
-        .is_some_and(|service_name| service_name == "online_eval");
-    let is_evaluator_operation = record
-        .get("operation_name")
-        .and_then(|v| v.as_str())
-        .is_some_and(|operation_name| {
-            matches!(
-                operation_name,
-                evaluator::SPAN_NAME_LLM_JUDGE
-                    | evaluator::SPAN_NAME_REMOTE_SCORER
-                    | evaluator::SPAN_NAME_UNKNOWN_SCORER
-                    | evaluator::SPAN_NAME_SPAN_SKIPPED
-            )
-        });
-
-    is_online_eval_service && is_evaluator_operation
 }
 
 fn resolve_scorer_input_variables(
@@ -429,48 +392,6 @@ mod tests {
         let ctx = extract_context_from_span("org2", None, &record).unwrap();
         assert_eq!(ctx.session_id, Some("session-1".to_string()));
         assert_eq!(ctx.attributes.is_empty(), true);
-    }
-
-    #[test]
-    fn test_extract_context_skips_internal_evaluator_span_marker() {
-        let record = serde_json::json!({
-            "span_id": "eval-span-1",
-            "trace_id": "eval-trace-1",
-            "operation_name": evaluator::SPAN_NAME_LLM_JUDGE,
-            "service_name": "online_eval",
-            "attributes.target_trace_id": "target-trace-1",
-            "attributes.target_span_id": "target-span-1",
-        });
-
-        assert!(extract_context_from_span("org1", Some("job-1"), &record).is_none());
-    }
-
-    #[test]
-    fn test_extract_context_skips_internal_evaluator_span_nested_attributes() {
-        let record = serde_json::json!({
-            "span_id": "eval-span-2",
-            "trace_id": "eval-trace-2",
-            "operation_name": evaluator::SPAN_NAME_REMOTE_SCORER,
-            "service_name": "online_eval",
-            "attributes": {
-                "target_trace_id": "target-trace-2",
-                "target_span_id": "target-span-2"
-            }
-        });
-
-        assert!(extract_context_from_span("org1", Some("job-1"), &record).is_none());
-    }
-
-    #[test]
-    fn test_extract_context_skips_internal_evaluator_span_by_service_and_operation() {
-        let record = serde_json::json!({
-            "span_id": "eval-span-3",
-            "trace_id": "eval-trace-3",
-            "operation_name": evaluator::SPAN_NAME_SPAN_SKIPPED,
-            "service_name": "online_eval"
-        });
-
-        assert!(extract_context_from_span("org1", Some("job-1"), &record).is_none());
     }
 
     #[test]

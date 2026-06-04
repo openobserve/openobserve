@@ -15,6 +15,7 @@
 
 pub mod eval_jobs;
 pub mod evaluator_trace;
+pub mod evaluator_trace_exporter;
 pub mod prepared_scorers;
 pub mod score_configs;
 pub mod score_writer;
