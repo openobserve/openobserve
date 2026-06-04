@@ -54,6 +54,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   defaultColumns: true,
   footerTitle: "",
   showHeader: true,
+  fillHeight: true,
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
@@ -398,13 +399,13 @@ defineExpose({
 <template>
   <div
     data-test="o2-table-root"
-    class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+    :class="['tw:flex tw:flex-col tw:overflow-hidden', props.fillHeight ? 'tw:h-full' : 'tw:h-auto']"
   >
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)]">
+    <div :class="['tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)]', props.fillHeight ? 'tw:flex-1' : '']">
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top"
@@ -446,7 +447,7 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      class="tw:flex tw:flex-col tw:flex-1 tw:overflow-auto tw:min-h-0 tw:relative"
+      :class="['tw:flex tw:flex-col tw:overflow-auto tw:min-h-0 tw:relative', props.fillHeight ? 'tw:flex-1' : '']"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'

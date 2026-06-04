@@ -546,4 +546,108 @@ mod tests {
         assert_eq!(convert_histogram_interval_to_seconds("3hr").unwrap(), 10800);
         assert_eq!(convert_histogram_interval_to_seconds("1d").unwrap(), 86400);
     }
+
+    #[test]
+    fn test_different_time_ranges_produce_different_intervals() {
+        let hour = 3600 * 1_000_000_i64;
+        let sql = "SELECT histogram(_timestamp) FROM logs";
+
+        let parse = |sql: &str| {
+            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+                .unwrap()
+                .pop()
+                .unwrap()
+        };
+
+        let mut statement = parse(sql);
+
+        // Full query range (1 hour) produces interval 30s
+        let mut v1 = HistogramIntervalVisitor::new((0, 1 * hour));
+        let _ = statement.visit(&mut v1);
+        assert_eq!(v1.interval, Some(30));
+
+        // Small partition range (2 minutes) produces interval 10s
+        let mut statement = parse(sql);
+        let mut v2 = HistogramIntervalVisitor::new((0, 2 * 60 * 1_000_000));
+        let _ = statement.visit(&mut v2);
+        assert_eq!(v2.interval, Some(10));
+
+        // Medium partition range (1 hour) produces interval 30s again
+        let mut statement = parse(sql);
+        let mut v3 = HistogramIntervalVisitor::new((0, 1 * hour));
+        let _ = statement.visit(&mut v3);
+        assert_eq!(v3.interval, Some(30));
+    }
+
+    #[test]
+    fn test_validate_adjust_preserves_valid_interval_regardless_of_time_range() {
+        let hour = 3600 * 1_000_000_i64;
+        let minute = 60 * 1_000_000_i64;
+
+        // When query.histogram_interval is preset (non-zero), validate_and_adjust
+        // should preserve it regardless of the time range
+        let preset = 30; // 30 seconds
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 1 * hour)),
+            30
+        );
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 2 * minute)),
+            30
+        );
+
+        let preset = 3600; // 1 hour
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 1 * hour)),
+            3600
+        );
+        assert_eq!(
+            validate_and_adjust_histogram_interval(preset, (0, 2 * minute)),
+            3600
+        );
+    }
+
+    /// Simulates the streaming fix: pre-compute interval from the full query time range,
+    /// then verify that running the visitor over each partition's (smaller) time range
+    /// with that preset value produces the same interval every time.
+    #[test]
+    fn test_preset_interval_is_consistent_across_partitions() {
+        let hour = 3600 * 1_000_000_i64;
+        let sql = "SELECT histogram(_timestamp) FROM logs";
+
+        let parse = |sql: &str| {
+            sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+                .unwrap()
+                .pop()
+                .unwrap()
+        };
+
+        // Step 1: pre-compute from full query range (mirrors mod.rs fix)
+        let full_range = (0_i64, 1 * hour);
+        let preset_interval = {
+            let mut stmt = parse(sql);
+            let mut v = HistogramIntervalVisitor::new(full_range);
+            let _ = stmt.visit(&mut v);
+            v.interval
+                .map(|i| validate_and_adjust_histogram_interval(i, full_range))
+                .unwrap_or(0)
+        };
+        assert_eq!(preset_interval, 30, "full-range interval should be 30s");
+
+        // Step 2: simulate three partitions with different time ranges;
+        // each uses the preset value — all must agree
+        let partitions: &[(i64, i64)] = &[
+            (0, 2 * 60 * 1_000_000),  // 2 min partition
+            (0, 15 * 60 * 1_000_000), // 15 min partition
+            (0, 1 * hour),            // full-range partition
+        ];
+
+        for &(start, end) in partitions {
+            let adjusted = validate_and_adjust_histogram_interval(preset_interval, (start, end));
+            assert_eq!(
+                adjusted, preset_interval,
+                "partition ({start},{end}) should preserve preset interval {preset_interval}, got {adjusted}"
+            );
+        }
+    }
 }

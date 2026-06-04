@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </template>
   <script lang="ts">
-  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick } from "vue";
+  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
@@ -253,7 +253,7 @@ import { getImageURL } from "@/utils/zincutils";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-  
+
   let currentDate = new Date(); // Get the current date and time
   
   // Subtract 30 days from the current date
@@ -290,6 +290,13 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         ai_credits: "0.00"
       });
       let chartData: any = ref({});
+      // The member-org selector lives in Billing.vue (rendered beside this
+      // component) and shares the current selection via this injected reactive.
+      const usageMember = inject<{ selected: string }>(
+        "usageMember",
+        undefined as any
+      );
+      const selectedMember = computed(() => usageMember?.selected || "");
       onMounted(async () => {
         selectUsageDate();
       });
@@ -303,6 +310,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
       watch(usageDataType, (val) => {
         getUsage();
       })
+      watch(selectedMember, () => {
+        getUsage();
+      })
       const getUsage = () => {
         const dismiss = toast({
           variant: "loading",
@@ -312,8 +322,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         dataLoading.value = true;
         BillingService.get_data_usage(
           store.state.selectedOrganization.identifier,
-          usageDate.value,  
-          usageDataType.value
+          usageDate.value,
+          usageDataType.value,
+          selectedMember.value || undefined
         )
           .then((res) => {
             dataLoading.value = false;
@@ -958,6 +969,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         remotePipelineIcon,
         dataRetentionIcon,
         aiIcon,
+        selectedMember,
       };
     },
   });

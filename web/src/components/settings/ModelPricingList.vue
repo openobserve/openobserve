@@ -185,12 +185,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-match_pattern="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
             <code
-              class="tw:text-xs pattern-code"
+              class="tw:text-xs tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-full pattern-code"
               :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
+            <OTooltip
+              v-if="row.match_pattern && row.match_pattern.length > 40"
+              side="top"
+              align="center"
+              :content="row.match_pattern"
+            />
             <OIcon
               v-if="isChildRow(row)"
               name="warning-amber"
