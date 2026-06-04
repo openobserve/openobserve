@@ -459,10 +459,7 @@ const placeholderPhrases = computed<string[]>(() => {
   if (currentLanguage.value === 'promql') {
     return ["Write a PromQL query (e.g. rate(http_requests_total[5m]))"];
   }
-  return [
-    "Add filter conditions (e.g. level='error' AND status=500 AND method='GET')",
-    "Write a SQL query (e.g. SELECT * FROM 'logs' WHERE level='error' LIMIT 100)",
-  ];
+  return ["Write a SQL query (e.g. SELECT * FROM 'logs' WHERE status=500 LIMIT 100)"];
 });
 
 const showPlaceholder = computed(
@@ -680,7 +677,6 @@ defineExpose({
 @keyframes query-editor-caret-blink {
   0%, 50% { opacity: 1; }
   50.01%, 100% { opacity: 0; }
-}
 }
 
 /* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
