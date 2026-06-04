@@ -91,13 +91,16 @@
         class="monaco-editor tw:w-full tw:h-full"
       />
 
-      <!-- Floating typewriter placeholder shown when editor is empty and unfocused -->
+      <!-- Floating placeholder shown when editor is empty and unfocused -->
+      <!-- VRL (function editor): static text, always visible -->
+      <!-- Query editor: fades between phrases -->
       <span
         v-if="showPlaceholder"
         class="query-editor__placeholder"
+        :class="{ 'query-editor__placeholder--visible': isVrlMode || placeholderFadeVisible }"
         :data-test="`${dataTestPrefix}-placeholder`"
         aria-hidden="true"
-      >{{ placeholderText }}<span class="query-editor__caret" /></span>
+      >{{ placeholderText }}</span>
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
@@ -458,9 +461,10 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   emit('generation-success', { type, message });
 };
 
-// ───── Floating typewriter placeholder ─────
+// ───── Floating placeholder ─────
 const editorFocused = ref(false);
 const placeholderText = ref('');
+const placeholderFadeVisible = ref(false);
 
 const placeholderPhrases = computed<string[]>(() => {
   if (currentLanguage.value === 'vrl') {
@@ -479,72 +483,66 @@ const showPlaceholder = computed(
   () => !editorFocused.value && (!props.query || !props.query.trim()),
 );
 
-const createTypewriter = (
-  getPhrases: () => string[],
-  target: { value: string },
-  isActive: () => boolean,
-) => {
-  let phraseIdx = 0;
-  let charIdx = 0;
-  let mode: 'typing' | 'pausing' | 'deleting' = 'typing';
-  let timer: ReturnType<typeof setTimeout> | null = null;
+// VRL (function editor) shows static text — no animation needed
+const isVrlMode = computed(() => currentLanguage.value === 'vrl');
 
-  const tick = () => {
-    if (!isActive()) {
-      target.value = '';
-      timer = setTimeout(tick, 400);
-      return;
-    }
-    const phrases = getPhrases();
-    phraseIdx = phraseIdx % phrases.length;
-    const current = phrases[phraseIdx];
-    if (mode === 'typing') {
-      charIdx++;
-      target.value = current.slice(0, charIdx);
-      if (charIdx >= current.length) {
-        mode = 'pausing';
-        timer = setTimeout(() => {
-          mode = phrases.length > 1 ? 'deleting' : 'typing';
-          charIdx = phrases.length > 1 ? charIdx : 0;
-          tick();
-        }, 1800);
-        return;
-      }
-      timer = setTimeout(tick, 60);
-    } else if (mode === 'deleting') {
-      charIdx--;
-      target.value = current.slice(0, charIdx);
-      if (charIdx <= 0) {
-        phraseIdx = (phraseIdx + 1) % phrases.length;
-        mode = 'typing';
-      }
-      timer = setTimeout(tick, 30);
-    }
-  };
+const FADE_MS = 400;
+const DISPLAY_MS = 3500;
 
-  return {
-    start: () => { if (timer) return; tick(); },
-    stop: () => { if (timer) clearTimeout(timer); timer = null; },
-    restart: () => {
-      if (timer) clearTimeout(timer);
-      timer = null;
-      phraseIdx = 0; charIdx = 0; mode = 'typing';
-      target.value = '';
-      tick();
-    },
-  };
+let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+let phraseIdx = 0;
+
+const stopFader = () => {
+  if (fadeTimer) clearTimeout(fadeTimer);
+  fadeTimer = null;
 };
 
-const typewriter = createTypewriter(
-  () => placeholderPhrases.value,
-  placeholderText,
-  () => showPlaceholder.value,
-);
+const startFader = () => {
+  const phrases = placeholderPhrases.value;
+  placeholderText.value = phrases[phraseIdx % phrases.length];
+  placeholderFadeVisible.value = true;
 
-watch(currentLanguage, () => { typewriter.restart(); });
+  if (phrases.length <= 1) return; // single phrase — show statically, no cycling
 
-onMounted(() => { typewriter.start(); });
-onBeforeUnmount(() => { typewriter.stop(); });
+  const cycle = () => {
+    // fade out
+    placeholderFadeVisible.value = false;
+    fadeTimer = setTimeout(() => {
+      phraseIdx = (phraseIdx + 1) % phrases.length;
+      placeholderText.value = phrases[phraseIdx];
+      // fade in
+      placeholderFadeVisible.value = true;
+      fadeTimer = setTimeout(cycle, DISPLAY_MS);
+    }, FADE_MS);
+  };
+
+  fadeTimer = setTimeout(cycle, DISPLAY_MS);
+};
+
+const restartFader = () => {
+  stopFader();
+  phraseIdx = 0;
+  placeholderFadeVisible.value = false;
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  // Brief delay so the fade-out completes before showing new text
+  fadeTimer = setTimeout(startFader, FADE_MS);
+};
+
+watch(currentLanguage, () => {
+  stopFader();
+  phraseIdx = 0;
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  placeholderFadeVisible.value = false;
+  if (!isVrlMode.value) {
+    fadeTimer = setTimeout(startFader, FADE_MS);
+  }
+});
+
+onMounted(() => {
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  if (!isVrlMode.value) startFader();
+});
+onBeforeUnmount(stopFader);
 
 // Watch for language prop changes
 watch(() => props.defaultLanguage, (newLang) => {
@@ -660,7 +658,7 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating typewriter placeholder shown when the editor is empty and unfocused.
+/* Floating placeholder shown when the editor is empty and unfocused.
    Font + left position match Monaco's actual render settings:
    glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
 .query-editor__placeholder {
@@ -675,21 +673,12 @@ defineExpose({
   color: var(--o2-text-placeholder, var(--o2-text-muted));
   white-space: nowrap;
   z-index: 10;
+  opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
-.query-editor__caret {
-  display: inline-block;
-  width: 0.0625rem;
-  height: 0.875rem;
-  margin-left: 0.125rem;
-  vertical-align: middle;
-  background: currentColor;
-  animation: query-editor-caret-blink 1s steps(1) infinite;
-}
-
-@keyframes query-editor-caret-blink {
-  0%, 50% { opacity: 1; }
-  50.01%, 100% { opacity: 0; }
+.query-editor__placeholder--visible {
+  opacity: 1;
 }
 
 /* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
