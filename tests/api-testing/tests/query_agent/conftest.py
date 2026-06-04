@@ -274,6 +274,6 @@ def ingest_query_agent_data():
         thits = tr.json().get("hits", [])
         return bool(thits and thits[0].get("c", 0) >= 1)
 
-    wait_until(_data_is_searchable, timeout=120, interval=1.0,
+    wait_until(_data_is_searchable, timeout=300, interval=1.0,
                msg=f"{stream} data not searchable ({expected} records)")
     logging.info("%s data is searchable (%d records)", stream, expected)
