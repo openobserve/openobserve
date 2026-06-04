@@ -517,9 +517,9 @@
     "ingestion_limit": "Limite de ingestão",
     "today_usage": "Uso atual",
     "feature_comparision_ent_msg": "Você está usando o OpenObserve Enterprise Edition com acesso a todos os recursos avançados listados abaixo.",
-    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 200 GB/dia (aproximadamente 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 50 GB/dia (aproximadamente 1.5 TB/mês) de ingestão de dados.",
     "feature_comparision_os_msg": "No momento, você está usando o OpenObserve Open Source Edition. Atualize para a Enterprise Edition para desbloquear os recursos avançados listados na tabela de comparação abaixo.",
-    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 200 GB/dia (~ 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 50 GB/dia (~ 1.5 TB/mês) de ingestão de dados.",
     "commit_lbl": "Comprometa-se",
     "build_lbl": "Construído",
     "no_license_installed_lbl": "Nenhuma licença instalada",
@@ -574,14 +574,14 @@
     "value_support_enterprise": "Empresarial",
     "value_support_cloud": "Nuvem",
     "value_cost_free": "Gratuito",
-    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 200 GB/dia de dados ingeridos. Pago depois disso",
+    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 50 GB/dia de dados ingeridos. Pago depois disso",
     "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso",
     "feature_comparison_lbl": "Comparação de recursos",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Características corporativas",
         "offer_text": "Obtenha todos os recursos corporativos totalmente gratuitos ao hospedar o OpenObserve por conta própria",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Recursos do OpenObserve Cloud",
         "features_subtitle": "Todos os recursos incluídos em sua assinatura de nuvem",
         "primary_button_text": "Faça o download agora"
@@ -593,7 +593,7 @@
         "features_title": "Recursos corporativos disponíveis",
         "features_subtitle": "Obtenha uma licença gratuita para desbloquear recursos ilimitados",
         "primary_button_text": "Obtenha uma licença gratuita",
-        "license_note": "100 GB/dia sem licença • 200 GB/dia com licença"
+        "license_note": "50 GB/dia sem licença • 50 GB/dia com licença"
       },
       "enterprise_with_license": {
         "hero_title": "Sua edição empresarial",
@@ -607,7 +607,7 @@
       "open_source": {
         "hero_title": "Obtenha a Enterprise Edition",
         "offer_text": "Baixe e desbloqueie todos os recursos corporativos de forma totalmente gratuita",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Desbloqueie todos os recursos corporativos",
         "features_subtitle": "Tudo o que você precisa para uma observabilidade pronta para produção",
         "primary_button_text": "Faça o download agora"
