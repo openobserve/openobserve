@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-logs-toggle"
             value="logs"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
-            :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
           >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:shrink-0" />
@@ -84,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-build-toggle"
             value="build"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
-            :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
           >
             <template #icon-left>
               <OIcon name="build" size="sm" class="tw:shrink-0" />
@@ -97,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-patterns-toggle"
             value="patterns"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
-            :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
           >
             <template #icon-left>
               <OIcon name="layers" size="sm" class="tw:shrink-0" />
@@ -128,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
         >
           <OSwitch
-            v-model="searchObj.meta.showHistogram"
+            :model-value="searchObj.meta.showHistogram"
             size="md"
             @click.stop
           />
@@ -4734,10 +4731,6 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
-      editorContainerRef,
-      editorFullscreenStyle,
-      toggleEditorFullscreen,
-
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
