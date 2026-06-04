@@ -58,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-logs-toggle"
             value="logs"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:shrink-0" />
@@ -72,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isVisualizeDisabled"
             :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
             value="visualize"
-            size="sm"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
@@ -83,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-build-toggle"
             value="build"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="build" size="sm" class="tw:shrink-0" />
@@ -96,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="config.isEnterprise == 'true'"
             data-test="logs-patterns-toggle"
             value="patterns"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
+            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
             <template #icon-left>
               <OIcon name="layers" size="sm" class="tw:shrink-0" />
@@ -128,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
         >
           <OSwitch
-            v-model="searchObj.meta.showHistogram"
+            :model-value="searchObj.meta.showHistogram"
             size="md"
             @click.stop
           />
@@ -4759,10 +4756,6 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
-      editorContainerRef,
-      editorFullscreenStyle,
-      toggleEditorFullscreen,
-
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
