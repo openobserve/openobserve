@@ -248,14 +248,13 @@ export default class DashboardMultiSQL {
   async openQueryInspector() {
     await this.queryInspectorBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.queryInspectorBtn.click();
-    // Wait for the inspector dialog to open (and its first query name to render)
-    // instead of a fixed sleep before reading page content.
-    await this.page
-      .locator('[data-test="query-inspector"]')
-      .waitFor({ state: "visible", timeout: 15000 });
-    await this.queryInspectorQueryName(0)
-      .waitFor({ state: "visible", timeout: 15000 })
-      .catch(() => {});
+    // Gate on the inspector CONTENT (first query name), NOT the ODialog wrapper:
+    // the wrapper's data-test is a teleported/zero-size anchor that never reports
+    // "visible", so waiting on it times out. The rendered query name is reliable.
+    await this.queryInspectorQueryName(0).waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
     return await this.page.content();
   }
 
