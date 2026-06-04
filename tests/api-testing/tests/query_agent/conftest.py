@@ -11,7 +11,6 @@ import json
 import logging
 import re
 import sys
-import time
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
@@ -27,8 +26,11 @@ _QUERIES_DIR = _DATA_DIR / "queries"
 sys.path.insert(0, str(_DATA_DIR))
 from data_gen import BASE_TS, build_dataset  # noqa: E402
 
-# Unique stream per test session — prevents row-count drift from accumulated data.
-STREAM = f"query_agent_test_{int(time.time())}"
+# Tie stream name to BASE_TS (stable within a session: comes from
+# base_ts_override.json written by compute_counts.py).  Using time.time()
+# caused a 1-second race between pytest collection and fixture setup,
+# producing two different stream names in the same run.
+STREAM = f"query_agent_test_{BASE_TS // 1_000_000}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────
