@@ -702,26 +702,66 @@ size="sm"
               </div>
             </div>
 
-            <!-- Map View Placeholder -->
+            <!-- Map View with Pattern/Span Toggle -->
             <div
               v-if="activeTab === 'map'"
               style="
                 display: flex;
                 flex: 1;
                 min-height: 0;
-                align-items: center;
-                justify-content: center;
+                flex-direction: column;
               "
+              class="tw:w-full tw:h-full"
             >
+              <!-- View Toggle Header -->
+              <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:bg-[var(--o2-surface)] tw:border-b tw:border-[var(--o2-border)]">
+                <h3 class="tw:text-sm tw:font-medium tw:text-[var(--o2-text-primary)]">
+                  {{ t("traces.serviceMap") }}
+                </h3>
+
+                <!-- Pattern/Span View Toggle -->
+                <OToggleGroup
+                  :model-value="mapViewMode"
+                  @update:model-value="mapViewMode = $event"
+                  size="sm"
+                  class="tw:ml-auto"
+                  data-test="trace-map-view-toggle"
+                >
+                  <OToggleGroupItem value="pattern">
+                    <template #icon-left>
+                      <OIcon name="account-tree" size="xs" />
+                    </template>
+                    {{ t("traces.patternView") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="span">
+                    <template #icon-left>
+                      <OIcon name="list" size="xs" />
+                    </template>
+                    {{ t("traces.spanView") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+              </div>
+
+              <!-- Chart Container -->
               <div
-                style="text-align: center"
-                class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                style="
+                  display: flex;
+                  flex: 1;
+                  min-height: 0;
+                  align-items: center;
+                  justify-content: center;
+                "
               >
-                <ChartRenderer
-                  data-test="trace-details-service-map-chart"
-                  :data="traceServiceMap"
-                  class="trace-chart-height tw:h-full! tw:w-full!"
-                />
+                <div
+                  style="text-align: center"
+                  class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                >
+                  <ChartRenderer
+                    data-test="trace-details-service-map-chart"
+                    :data="traceServiceMapChartOptions"
+                    class="trace-chart-height tw:h-full! tw:w-full!"
+                  />
+                </div>
               </div>
             </div>
 
@@ -821,6 +861,9 @@ import {
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { useTracePatternTree } from "@/composables/useTracePatternTree";
+import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_UNSPECIFIED,
@@ -1006,6 +1049,55 @@ export default defineComponent({
     };
 
     const traceServiceMap: any = ref({});
+
+    // Pattern View - new functionality
+    const mapViewMode = ref<'pattern' | 'span'>('pattern'); // Default to pattern view
+    const consolidatedPatterns = ref(new Map());
+    const isDarkMode = computed(() => store.state.theme === 'dark');
+
+    // Set up pattern tree composable and visualization engine
+    const { generateEChartsOptions } = createTreeVisualizationEngine();
+    const {
+      treeData: patternTreeData,
+      getNodeLabel: getPatternNodeLabel,
+      getNodeTooltip: getPatternNodeTooltip,
+      getNodeErrorRate: getPatternNodeErrorRate
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+
+    // Computed chart options that switches between pattern and span views
+    const traceServiceMapChartOptions = computed(() => {
+      if (mapViewMode.value === 'pattern') {
+        // Pattern view - use new pattern-based visualization
+        const chartOptions = generateEChartsOptions(
+          {
+            treeData: patternTreeData.value,
+            getNodeLabel: getPatternNodeLabel,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate
+          },
+          {
+            layoutType: 'horizontal',
+            isDarkMode: isDarkMode.value,
+            nodeSize: 'fixed'
+          }
+        );
+
+        // Wrap in the format expected by ChartRenderer
+        return {
+          options: chartOptions,
+          notMerge: true,
+          lazyUpdate: true
+        };
+      } else {
+        // Span view - use existing service tree logic (unchanged)
+        return {
+          options: traceServiceMap.value,
+          notMerge: true,
+          lazyUpdate: true
+        };
+      }
+    });
+
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -2215,6 +2307,10 @@ export default defineComponent({
         getService(span, serviceTree, "", 1, 1);
       });
 
+      // Build consolidated patterns for pattern view
+      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      // Pattern consolidation completed successfully
+
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
         maxDepth,
@@ -2789,6 +2885,8 @@ export default defineComponent({
       traceChart,
       updateChart,
       traceServiceMap,
+      traceServiceMapChartOptions,
+      mapViewMode,
       activeVisual,
       traceVisuals,
       getImageURL,
@@ -2889,6 +2987,7 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
+      traceServiceMapChartOptions
     };
   },
 });

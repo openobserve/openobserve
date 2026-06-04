@@ -149,3 +149,59 @@ export const calculateRootNodeMetrics = (
 
   return { requests: total, errors: failed, errorRate };
 };
+
+/**
+ * Generate service node tooltip content (for ServiceGraph)
+ */
+export const generateServiceNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return '';
+
+  const requests = metadata.requests || 0;
+  const errors = metadata.errors || 0;
+  const errorRate = metadata.errorRate || 0;
+
+  return `
+    <div class="tree-tooltip">
+      <div class="tooltip-header">${metadata.serviceName || 'Unknown Service'}</div>
+      <div class="tooltip-metrics">
+        <div>Requests: ${formatNumber(requests)}</div>
+        <div>Errors: ${formatNumber(errors)}</div>
+        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+      </div>
+    </div>
+  `;
+};
+
+/**
+ * Generate pattern node tooltip content (for TraceDetails patterns)
+ */
+export const generatePatternNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return '';
+
+  const {
+    pathSignature = 'Unknown Pattern',
+    count = 1,
+    avg = 0,
+    min = 0,
+    max = 0,
+    p75 = 0,
+    p95 = 0,
+    p99 = 0,
+    errorRate = 0,
+    traceTimePercent = 0
+  } = metadata;
+
+  return `
+    <div class="tree-tooltip">
+      <div class="tooltip-header">${pathSignature}</div>
+      <div class="tooltip-metrics">
+        <div>Calls: ${count}</div>
+        <div>Average: ${avg}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
+        <div>Min: ${min}ms | Max: ${max}ms</div>
+        <div>P75: ${p75}ms | P95: ${p95}ms | P99: ${p99}ms</div>
+        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+      </div>
+      <div class="tooltip-footer">Click to view individual spans</div>
+    </div>
+  `;
+};
