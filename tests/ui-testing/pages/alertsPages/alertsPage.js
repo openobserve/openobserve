@@ -1132,6 +1132,17 @@ export class AlertsPage {
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
+
+        // Error toasts (e.g. "Stream type is required.") have a 30-second auto-dismiss
+        // that is paused in headless mode — dismiss all now so they don't intercept
+        // bulk-action buttons (e.g. move drawer) later in the test.
+        const dismissBtnFRV = this.page.locator('button[aria-label="Dismiss notification"]');
+        for (let i = 0; i < 10; i++) {
+            const count = await dismissBtnFRV.count().catch(() => 0);
+            if (count === 0) break;
+            await dismissBtnFRV.first().click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(150);
+        }
     }
 
     /**
@@ -1183,6 +1194,18 @@ export class AlertsPage {
                 .first()
         ).toBeVisible({ timeout: 5000 });
         testLogger.info('Clone validation working - stream type required');
+
+        // Error toasts (including any lingering ones from earlier validation steps) have
+        // a 30-second auto-dismiss paused in headless mode — dismiss ALL of them now so
+        // they cannot intercept the move-drawer button later in the test.
+        const dismissBtnClone = this.page.locator('button[aria-label="Dismiss notification"]');
+        for (let i = 0; i < 10; i++) {
+            const count = await dismissBtnClone.count().catch(() => 0);
+            if (count === 0) break;
+            await dismissBtnClone.first().click({ force: true }).catch(() => {});
+            await this.page.waitForTimeout(150);
+        }
+        await this.page.waitForTimeout(300);
 
         await this.page.locator(this.locators.cloneCancelButton).click();
         await this.page.waitForTimeout(500);
