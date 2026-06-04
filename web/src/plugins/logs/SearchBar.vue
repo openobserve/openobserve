@@ -977,7 +977,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
               :class="{
                 'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
-                'fn-editor-open': searchObj.data.transformType
+                'fn-editor-open': showFunctionEditor
               }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
@@ -1954,19 +1954,18 @@ export default defineComponent({
 
     const isFocused = ref(false);
     const editorContainerRef = ref<HTMLElement | null>(null);
-    const fullscreenRect = ref<{ left: number; width: number; top: number; startHeight: number } | null>(null);
+    const fullscreenRect = ref<{ left: number; width: number; top: number } | null>(null);
 
     const editorFullscreenStyle = computed(() => {
       if (!isFocused.value || !fullscreenRect.value) return {};
-      const { left, width, top, startHeight } = fullscreenRect.value;
+      const { left, width, top } = fullscreenRect.value;
       return {
         position: 'fixed' as const,
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
-        height: `${Math.round(window.innerHeight * 0.8)}px`,
+        height: `${Math.round(window.innerHeight * 0.6)}px`,
         zIndex: 50,
-        '--qe-start-h': `${startHeight}px`,
       };
     });
 
@@ -1975,7 +1974,7 @@ export default defineComponent({
         const el = editorContainerRef.value;
         if (el) {
           const rect = el.getBoundingClientRect();
-          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top, startHeight: rect.height };
+          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top };
         }
         isFocused.value = true;
       } else {
@@ -4726,6 +4725,7 @@ export default defineComponent({
       editorContainerRef,
       editorFullscreenStyle,
       toggleEditorFullscreen,
+
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
@@ -5382,19 +5382,12 @@ html.dark .file-type label,
   min-height: 30px !important;
 }
 
-/* Fullscreen overlay */
-@keyframes editor-expand {
-  from { clip-path: inset(0 0 calc(100% - var(--qe-start-h, 3rem)) 0 round 0.375rem); }
-  to   { clip-path: inset(0 round 0.375rem); }
-}
-
 .editor-fullscreen {
+  overflow: hidden !important;
   background: var(--o2-body-primary-bg) !important;
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
-  animation: editor-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  overflow: hidden !important;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
 }
 
 .query-mode-toggle {
