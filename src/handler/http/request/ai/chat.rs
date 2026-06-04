@@ -297,6 +297,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let query_req = QueryRequest {
             query: last_user_message,
             context,
+            org_id: Some(org_id.clone()),
             model: if prompt_body.model.is_empty() {
                 None
             } else {
@@ -731,6 +732,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let query_req = QueryRequest {
             query: last_user_message,
             context,
+            org_id: Some(org_id_str.clone()),
             model: if prompt_body.model.is_empty() {
                 None
             } else {
