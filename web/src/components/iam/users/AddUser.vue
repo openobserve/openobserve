@@ -15,14 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-user-dialog"
+  <ODialog data-test="add-user-dialog"
     :open="open"
-    :width="30"
+    size="md"
     :title="beingUpdated ? t('user.editUser') : t('user.add')"
+    :primaryButtonLabel="t('user.save')"
+    :secondaryButtonLabel="t('user.cancel')"
+    form-id="add-user-form"
+    @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4 tw:w-full">
-        <OForm ref="updateUserForm" @submit="onSubmit">
+    <div class="tw:w-full">
+        <OForm id="add-user-form" ref="updateUserForm" @submit="onSubmit">
           <!-- <p class="tw:pt-2 tw:truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="tw:mt-2 tw:truncate" v-if="!existingUser">
             {{ t("user.email") }} : <strong>{{ formData.email }}</strong>
@@ -183,28 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="showLabelOnTop tw:mt-2"
             maxlength="100"
           />
-
-          <div class="tw:flex tw:justify-start tw:mt-6 tw:gap-2">
-            <OButton
-              variant="outline"
-              size="sm-action"
-            @click="$emit('update:open', false)"
-              data-test="cancel-user-button"
-            >
-              {{ t('user.cancel') }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              type="submit"
-              data-test="save-user-button"
-            >
-              {{ t('user.save') }}
-            </OButton>
-          </div>
         </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
   <ODialog data-test="add-user-logout-confirm-dialog"
     v-model:open="logout_confirm"
     persistent
@@ -226,9 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -265,7 +248,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODialog, ODrawer,
+  components: { ODialog,
     OIcon,
     OSwitch,
     OInput,

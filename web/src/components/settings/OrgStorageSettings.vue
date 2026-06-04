@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Card header: logo + name + badge | update button -->
         <OCardSection role="header">
-          <div class="tw:flex tw:items-center tw:flex-nowrap" style="gap: 14px;">
+          <div class="tw:flex tw:items-center tw:flex-nowrap tw:flex-1" style="gap: 14px;">
             <img
               :src="configuredProviderImage"
               :alt="configuredProviderLabel"
@@ -197,7 +197,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="storage-settings-update-btn"
             variant="primary"
-            class="no-border o2-primary-button tw:h-[36px]"
+            size="sm"
+            class="no-border o2-primary-button"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="navigateToEdit"
           >

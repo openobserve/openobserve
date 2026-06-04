@@ -28,7 +28,7 @@ export default class LogsVisualise {
     // migrated to ODrawer (SelectDashboardDropdown now hosts the form and
     // the footer primary button calls addDashboardRef?.submit()).
     this.dashboardSubmitBtn = page.locator(
-      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.panelTitleInput = page.locator(
       '[data-test="metrics-new-dashboard-panel-title-field"]'
@@ -37,7 +37,7 @@ export default class LogsVisualise {
     // `metrics-schema-update-settings-button` was removed when AddToDashboard.vue
     // migrated to ODrawer (parent slug: add-to-dashboard-dialog).
     this.updateSettingsBtn = page.locator(
-      '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]'
     );
 
     // Query editor locators

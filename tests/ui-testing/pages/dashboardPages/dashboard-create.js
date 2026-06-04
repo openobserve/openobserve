@@ -10,7 +10,7 @@ export default class DashboardCreate {
     this.dashCreateBtn = this.page.locator('[data-test="dashboard-new"]');
     this.dashName = this.page.locator('[data-test="add-dashboard-name"] input');
     this.submitBtn = this.page.locator(
-      '[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     this.deleteIcon = this.page.locator('[data-test="dashboard-delete"]');
     this.confirmDelete = this.page.locator(

@@ -27,7 +27,7 @@ class SchemaPage {
         this.addStreamTypeInput = page.locator('[data-test="add-stream-dialog"] [data-test="add-stream-type-input"]');
         this.addStreamTypeOptionLogs = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
         // AddStream renders ODrawer (isInPipeline=false) on the Streams page — save via ODrawer primary button.
-        this.addStreamSaveBtn = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.addStreamSaveBtn = page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]');
 
         // Schema drawer (schema.vue migrated to ODrawer with data-test="schema-drawer")
         this.schemaDrawer = page.locator('[data-test="schema-drawer"]');
@@ -141,7 +141,7 @@ class SchemaPage {
             nameLabel: 'Name *',
             // AddStream.vue migrated from q-btn to ODrawer's primary footer
             // button — there is no standalone "save-stream-btn" any more.
-            saveStreamBtn: '[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]',
+            saveStreamBtn: '[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
             menuLogsItem: '[data-test="menu-link-\\/logs-item"]',
             fnEditor: '[data-test="logs-vrl-function-editor"]',
