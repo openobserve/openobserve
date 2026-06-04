@@ -723,7 +723,7 @@ export default defineComponent({
     const isLogsMounted = ref(false);
 
     const expandedLogs = ref([]);
-    const splitterModel = ref(15);
+    const splitterModel = ref(10);
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -2336,6 +2336,24 @@ export default defineComponent({
         // rerender chart
         window.dispatchEvent(new Event("resize"));
       },
+    );
+
+    // Auto-expand splitter to 15 when either editor has >2 lines; collapse to 10 otherwise.
+    // Never overrides a user-set value above 15.
+    watch(
+      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent],
+      ([queryValue, fnValue]) => {
+        const queryLines = (queryValue || '').split('\n').length;
+        const fnLines = (fnValue || '').split('\n').length;
+        const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
+
+        if (hasMoreThanTwoLines && splitterModel.value < 15) {
+          splitterModel.value = 15;
+        } else if (!hasMoreThanTwoLines && splitterModel.value <= 15) {
+          splitterModel.value = 10;
+        }
+      },
+      { immediate: true },
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
