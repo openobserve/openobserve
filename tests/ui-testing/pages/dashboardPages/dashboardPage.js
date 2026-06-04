@@ -43,7 +43,7 @@ export class DashboardPage {
     this.dashboardAddDialog = page.locator('[data-test="dashboard-add-dialog"]');
     this.dashboardNameWrapper = page.locator('[data-test="add-dashboard-name"]');
     this.dashboardNameInput = page.locator('[data-test="add-dashboard-name-field"]');
-    this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]');
+    this.dashboardSubmitButton = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]');
 
     // Dashboard view/edit locators
     this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');

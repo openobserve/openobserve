@@ -520,9 +520,11 @@ watch(internalOpen, (open) => {
                 data-test="o-drawer-primary-btn"
                 :variant="primaryButtonVariant"
                 size="sm-action"
+                :type="formId ? 'submit' : 'button'"
+                :form="formId || undefined"
                 :disabled="primaryEffectivelyDisabled"
                 :loading="primaryButtonLoading"
-                @click="emit('click:primary')"
+                @click="!formId && emit('click:primary')"
               >
                 {{ primaryButtonLabel }}
               </OButton>

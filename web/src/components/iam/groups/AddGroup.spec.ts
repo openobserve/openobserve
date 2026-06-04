@@ -32,11 +32,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
-// Lightweight stubs for the in-house O* components. ODrawer renders its
-// default slot so children remain queryable, and OButton forwards click
-// events so tests can drive interactions directly.
-const ODrawerStub = {
-  name: "ODrawer",
+// Lightweight stub for ODialog: renders its default/footer slots so children
+// remain queryable, and exposes the built-in primary/secondary footer buttons
+// (emitting click:primary / click:secondary) so tests can drive interactions.
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -48,29 +48,36 @@ const ODrawerStub = {
     "primaryButtonLabel",
     "secondaryButtonLabel",
     "neutralButtonLabel",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
-    <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-width="width">
+    <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-width="width">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+      <div data-test-stub="o-drawer-footer">
+        <slot name="footer" />
+        <button
+          v-if="secondaryButtonLabel"
+          data-test="o-dialog-secondary-btn"
+          :disabled="secondaryButtonDisabled"
+          @click="$emit('click:secondary')"
+        >{{ secondaryButtonLabel }}</button>
+        <button
+          v-if="primaryButtonLabel"
+          data-test="o-dialog-primary-btn"
+          :disabled="primaryButtonDisabled"
+          @click="$emit('click:primary')"
+        >{{ primaryButtonLabel }}</button>
+      </div>
     </div>
   `,
 };
 
-const OButtonStub = {
-  name: "OButton",
-  props: ["variant", "size", "disabled", "loading"],
-  emits: ["click"],
-  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
-  inheritAttrs: false,
-};
-
 function buildStubs() {
   return {
-    ODrawer: ODrawerStub,
-    OButton: OButtonStub,
+    ODialog: ODialogStub,
   };
 }
 
@@ -108,7 +115,7 @@ describe("AddGroup Component", () => {
     });
 
     it("renders inside an ODrawer with the localized title", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = wrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.exists()).toBe(true);
       // i18n key resolves to "Add User Group" (en); assert via attribute,
       // not text, since the stub doesn't render the title body.
@@ -116,16 +123,16 @@ describe("AddGroup Component", () => {
     });
 
     it("propagates the open prop to the drawer", async () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = wrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.attributes("data-open")).toBe("true");
 
       await wrapper.setProps({ open: false });
-      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-open")).toBe("false");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("false");
     });
 
-    it("uses width=30 on the drawer", () => {
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-width")).toBe("30");
+    it("uses size=sm on the dialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("size")).toBe("sm");
     });
   });
 
@@ -196,8 +203,8 @@ describe("AddGroup Component", () => {
 
   describe("Button Actions", () => {
     it("renders cancel and save buttons", () => {
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const cancelButton = wrapper.find('[data-test="o-dialog-secondary-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
 
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);
@@ -206,7 +213,7 @@ describe("AddGroup Component", () => {
     });
 
     it("emits update:open(false) when cancel button is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
+      const cancelButton = wrapper.find('[data-test="o-dialog-secondary-btn"]');
       await cancelButton.trigger("click");
 
       const emitted = wrapper.emitted("update:open");
@@ -215,7 +222,7 @@ describe("AddGroup Component", () => {
     });
 
     it("re-emits update:open from the drawer's update:open event", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
 
       const emitted = wrapper.emitted("update:open");
@@ -226,21 +233,21 @@ describe("AddGroup Component", () => {
     it("disables save button when name is empty", async () => {
       wrapper.vm.name = "";
       await flushPromises();
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveButton.attributes("disabled")).toBeDefined();
     });
 
     it("disables save button when name is invalid", async () => {
       wrapper.vm.name = "invalid name!";
       await flushPromises();
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveButton.attributes("disabled")).toBeDefined();
     });
 
     it("enables save button when name is valid", async () => {
       wrapper.vm.name = "valid_group";
       await flushPromises();
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveButton.attributes("disabled")).toBeUndefined();
     });
   });
@@ -352,7 +359,7 @@ describe("AddGroup Component", () => {
       wrapper.vm.name = "valid_group";
       await flushPromises();
 
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
       await saveButton.trigger("click");
       await flushPromises();
 
@@ -396,7 +403,7 @@ describe("AddGroup Component", () => {
       });
 
       expect(localWrapper.props("open")).toBe(false);
-      const drawer = localWrapper.find('[data-test-stub="o-drawer"]');
+      const drawer = localWrapper.find('[data-test-stub="o-dialog"]');
       expect(drawer.attributes("data-open")).toBe("false");
       localWrapper.unmount();
     });
@@ -463,8 +470,8 @@ describe("AddGroup Component", () => {
 
   describe("Accessibility", () => {
     it("has cancel and save buttons rendered", () => {
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
+      const cancelButton = wrapper.find('[data-test="o-dialog-secondary-btn"]');
+      const saveButton = wrapper.find('[data-test="o-dialog-primary-btn"]');
 
       expect(cancelButton.exists()).toBe(true);
       expect(saveButton.exists()).toBe(true);

@@ -40,8 +40,8 @@ export class MetricsBuilderPage {
         this.addToDashboardButton = '[data-test="panel-editor-add-to-dashboard-btn"]';
         this.dashboardDialogTitle = '[data-test="add-to-dashboard-dialog"]';
         this.dashboardPanelTitleInput = '[data-test="metrics-new-dashboard-panel-title"]';
-        this.dashboardCancelButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-secondary-btn"]';
-        this.dashboardAddButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]';
+        this.dashboardCancelButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-secondary-btn"]';
+        this.dashboardAddButton = '[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]';
 
         // Confirm dialog for mode switching — ConfirmDialog.vue wraps ODialog with
         // hardcoded data-test="confirm-dialog"; the OK action is the ODialog primary
@@ -133,7 +133,7 @@ export class MetricsBuilderPage {
         this.newDashboardBtn = page.locator('[data-test="dashboard-dashboard-new-add"]');
         this.newDashboardNameInput = page.locator('[data-test="add-dashboard-name"]');
         this.newDashboardSubmitBtn = page.locator(
-            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-drawer-primary-btn"]'
+            '[data-test="dashboard-dashboard-add-dialog"] [data-test="o-dialog-primary-btn"]'
         );
         this.newDashboardDialogEl = page.locator('[data-test="dashboard-dashboard-add-dialog"]');
 
@@ -970,7 +970,7 @@ export class MetricsBuilderPage {
         // click is a no-op and the drawer never closes.
         const enabled = await this.page.waitForFunction(
             () => {
-                const btn = document.querySelector('[data-test="add-to-dashboard-dialog"] [data-test="o-drawer-primary-btn"]');
+                const btn = document.querySelector('[data-test="add-to-dashboard-dialog"] [data-test="o-dialog-primary-btn"]');
                 if (!btn) return false;
                 if (btn.hasAttribute('disabled')) return false;
                 if (btn.getAttribute('aria-disabled') === 'true') return false;

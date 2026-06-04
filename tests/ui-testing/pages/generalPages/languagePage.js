@@ -204,7 +204,7 @@ class LanguagePage {
     // Dashboard
     this.addDashboardBtn = page.locator('[data-test="dashboard-new"]');
     this.addDashboardDialog = page.locator('[data-test="dashboard-add-dialog"]');
-    this.addDashboardDialogCloseBtn = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-drawer-secondary-btn"]');
+    this.addDashboardDialogCloseBtn = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-dialog-secondary-btn"]');
   }
 
   /**

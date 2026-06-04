@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-update-organization-dialog"
+  <ODialog data-test="add-update-organization-dialog"
     :open="open"
-    :width="30"
+    size="sm"
     :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
     :primaryButtonLabel="t('organization.save')"
     :secondaryButtonLabel="t('organization.cancel')"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4">
+    <div>
       <div>
           <OInput
             v-if="beingUpdated"
@@ -69,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
@@ -97,7 +97,7 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, OCheckbox, ODrawer, OInput },
+  components: { OButton, OCheckbox, ODialog, OInput },
   props: {
     open: {
       type: Boolean,
