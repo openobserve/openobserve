@@ -132,7 +132,7 @@ pub fn create_evaluator_trace(input: EvaluatorTraceInput) -> EvaluatorTrace {
         push_string_attr(
             &mut attributes,
             evaluator_attr_key(evaluator::ATTR_SCORER_TYPE),
-            &scorer_type.to_string(),
+            scorer_type.to_string(),
         );
     }
 
@@ -284,14 +284,14 @@ pub fn create_evaluator_trace(input: EvaluatorTraceInput) -> EvaluatorTrace {
             push_string_attr(
                 &mut attributes,
                 evaluator::GEN_AI_INPUT_MESSAGES,
-                &messages_json(prompt, "user"),
+                messages_json(prompt, "user"),
             );
         }
         if let Some(ref response) = response {
             push_string_attr(
                 &mut attributes,
                 evaluator::GEN_AI_OUTPUT_MESSAGES,
-                &messages_json(response, "assistant"),
+                messages_json(response, "assistant"),
             );
         }
 
