@@ -404,7 +404,18 @@
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
     "functionEditorLabel": "Editor de funciones",
-    "loadingStream": "Cargando Stream..."
+    "loadingStream": "Cargando Stream...",
+    "hideHistogram": "Ocultar histograma",
+    "disableQuickMode": "Desactivar el modo rápido",
+    "menuGroupSetOnce": "Establecer una vez",
+    "menuGroupSavedViews": "Vistas guardadas",
+    "menuGroupTools": "Herramientas",
+    "menuGroupHistory": "Historia",
+    "menuGroupDownloads": "Descargas",
+    "menuGroupSchedule": "Programar",
+    "menuGroupInspect": "Inspeccionar",
+    "validSql": "SQL válido",
+    "invalidSql": "Consulta no válida"
   },
   "menu": {
     "home": "Inicio",

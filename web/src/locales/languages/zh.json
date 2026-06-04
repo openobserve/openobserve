@@ -404,7 +404,18 @@
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
-    "loadingStream": "正在加载直播..."
+    "loadingStream": "正在加载直播...",
+    "hideHistogram": "隐藏直方图",
+    "disableQuickMode": "禁用快速模式",
+    "menuGroupSetOnce": "设置一次",
+    "menuGroupSavedViews": "保存的视图",
+    "menuGroupTools": "工具",
+    "menuGroupHistory": "历史",
+    "menuGroupDownloads": "下载",
+    "menuGroupSchedule": "日程安排",
+    "menuGroupInspect": "检查",
+    "validSql": "有效的 SQL",
+    "invalidSql": "查询无效"
   },
   "menu": {
     "home": "主页",
