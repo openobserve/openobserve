@@ -1119,10 +1119,30 @@ export default defineComponent({
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
-          const perQueryFields: string[][] = [];
+          // data.value is in compacted/executor order (empty queries are
+          // skipped, time-shift queries expand into multiple entries), which
+          // does NOT line up with the panel query (tab) index. Re-key the
+          // detected fields by panelQueryIndex so downstream per-query field
+          // storage maps to the correct query tab. Build a DENSE array (one
+          // slot per panel query, default []) so the consumer's
+          // Array.isArray(fieldList[0]) format check and forEach both see every
+          // index even when a query returned no rows.
+          const totalQueries =
+            panelSchema.value?.queries?.length ?? data.value.length;
+          const perQueryFields: string[][] = Array.from(
+            { length: totalQueries },
+            () => [],
+          );
           for (let qi = 0; qi < data.value.length; qi++) {
+            const panelIdx =
+              metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
             const queryData = data.value[qi];
-            if (queryData && queryData.length) {
+            if (
+              queryData &&
+              queryData.length &&
+              panelIdx >= 0 &&
+              panelIdx < perQueryFields.length
+            ) {
               const maxAttributesIndex = queryData.reduce(
                 (
                   maxIndex: string | number | any,
@@ -1138,9 +1158,9 @@ export default defineComponent({
                 },
                 0,
               );
-              perQueryFields.push(Object.keys(queryData[maxAttributesIndex]));
-            } else {
-              perQueryFields.push([]);
+              perQueryFields[panelIdx] = Object.keys(
+                queryData[maxAttributesIndex],
+              );
             }
           }
           emit("updated:vrlFunctionFieldList", perQueryFields);

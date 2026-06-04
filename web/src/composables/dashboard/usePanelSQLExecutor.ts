@@ -590,6 +590,7 @@ export const usePanelSQLExecutor = (ctx: {
               seconds: 0,
               periodAsStr: "",
             },
+            panelQueryIndex: panelQueryIndex,
             tabName: it.tabName,
           };
           state.metadata.queries[panelQueryIndex] = metadata;

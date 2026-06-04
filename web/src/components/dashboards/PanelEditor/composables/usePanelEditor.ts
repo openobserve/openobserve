@@ -712,16 +712,6 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     disable.value = panelsValues.some((item: any) => item === true);
   });
 
-  // Watch currentQueryIndex ΓÇö restore the active query's per-query VRL field list
-  // so the field selector shows the correct VRL-derived fields per query tab
-  watch(
-    () => dashboardPanelData.layout.currentQueryIndex,
-    (newIndex) => {
-      const query = dashboardPanelData.data.queries[newIndex];
-      dashboardPanelData.meta.stream.vrlFunctionFieldList =
-        (query?.vrlFunctionFieldList) ?? [];
-    },
-  );
 
   // Check if externalChartData has actual VALUE (not just if the ref exists)
   // A ref is always truthy even if its value is undefined, so we must check .value

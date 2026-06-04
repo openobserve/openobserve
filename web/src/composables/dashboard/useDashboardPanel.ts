@@ -977,10 +977,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     parser = null;
   });
 
-  const importSqlParser = async () => {
+  const ensureParser = async () => {
+    if (parser) return parser;
     const useSqlParser: any = await import("@/composables/useParser");
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
+    return parser;
+  };
+
+  const importSqlParser = async () => {
+    await ensureParser();
 
     // do not allow to modify custom query fields for logs page
     updateQueryValue(pageKey == "logs" ? true : false);
@@ -1270,10 +1276,10 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         incomingQuery?.customQuery &&
         incomingQuery?.query &&
         dashboardPanelData.data.queryType == "sql" &&
-        qf.customQueryFields.length === 0 &&
-        parser
+        qf.customQueryFields.length === 0
       ) {
-        await updateQueryValue(pageKey == "logs" ? true : false);
+        await ensureParser();
+        if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       }
     },
   );
@@ -1307,6 +1313,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         // will skip custom query fields extraction for logs page
+        await ensureParser();
         if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
         // Only clear lists when switching modes within the same query
