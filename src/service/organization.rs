@@ -37,7 +37,8 @@ use {
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
     o2_enterprise::enterprise::cloud::{
-        InvitationRecord, OrgInviteStatus, billings::get_billing_by_org_id, org_invites,
+        InvitationRecord, OrgInviteStatus, billing_group::add_as_billing_member,
+        billings::get_billing_by_org_id, org_invites,
     },
 };
 
@@ -357,6 +358,7 @@ pub async fn list_org_users_by_user(
 pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
+    _make_billed_member_of: Option<String>,
 ) -> Result<
     (
         Organization,
@@ -383,10 +385,30 @@ pub async fn create_org(
         let o2cfg = o2_enterprise::enterprise::common::config::get_config();
         let orgs = list_orgs_by_user(user_email).await?;
         let mut free_org_count = 0;
+        let mut payer_org_checked = false;
         for org in orgs {
             let billings = get_billing_by_org_id(&org.identifier).await?;
             if billings.is_none() {
                 free_org_count += 1;
+            }
+
+            // this check here allows us to use same db call to check eligibility if possible
+            // instead of having to make another db call when we already had info of this org
+            if let Some(oid) = _make_billed_member_of.as_ref()
+                && &org.identifier == oid
+            {
+                let Some(billing) = billings else {
+                    return Err(anyhow::anyhow!(
+                        "org {oid} is not a paid org, so cannot make the new org billing member"
+                    ));
+                };
+                if !billing.provider.is_billing_group_eligible() {
+                    return Err(anyhow::anyhow!(
+                        "org {oid} uses {} as billing provider and thus cannot be made a billing group org",
+                        billing.provider
+                    ));
+                }
+                payer_org_checked = true;
             }
         }
         // if we allow creating a new org, the free org count would be max+1
@@ -396,6 +418,52 @@ pub async fn create_org(
                 "A user cannot be part of more than {} free organizations.",
                 o2cfg.cloud.max_free_orgs_allowed
             ));
+        }
+
+        // make sure that the to-be-made super org is not a member itself
+        if let Some(oid) = _make_billed_member_of.as_ref() {
+            let membership =
+                o2_enterprise::enterprise::cloud::billing_group::list_billing_membership_of(oid)
+                    .await?;
+            if membership.is_some() {
+                return Err(anyhow::anyhow!(
+                    "{oid} org itself is part of another billing group, and thus cannot make a new org its member",
+                ));
+            }
+
+            // check if the super org is in the allowlist
+            if o2cfg
+                .cloud
+                .billing_group_allowed_orgs
+                .split(",")
+                .find(|v| *v == oid)
+                .is_none()
+            {
+                return Err(anyhow::anyhow!(
+                    "Billing groups is not enabled for org {oid}",
+                ));
+            }
+        }
+
+        // if for some reason the "super" org was not part of user's org
+        // it should anyways fail the  rbac check, but in any case
+        // we do the check here
+        if let Some(oid) = _make_billed_member_of.as_ref()
+            && !payer_org_checked
+        {
+            let billings = get_billing_by_org_id(oid).await?;
+
+            let Some(billing) = billings else {
+                return Err(anyhow::anyhow!(
+                    "org {oid} is not a paid org, so cannot make the new org billing member"
+                ));
+            };
+            if !billing.provider.is_billing_group_eligible() {
+                return Err(anyhow::anyhow!(
+                    "org {oid} uses {} as billing provider and thus cannot be made a billing group org",
+                    billing.provider
+                ));
+            }
         }
     }
 
@@ -574,6 +642,17 @@ pub async fn create_org(
             } else {
                 None
             };
+
+            #[cfg(feature = "cloud")]
+            if let Some(payer_org) = _make_billed_member_of {
+                add_as_billing_member(user_email, &payer_org, &org.identifier, None)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "org created, but error in making new org billing member : {e}"
+                        )
+                    })?;
+            }
 
             Ok((org.clone(), service_account_info))
         }

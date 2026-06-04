@@ -49,6 +49,7 @@ import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
+import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
 import { ManagementPage } from "./generalPages/managementPage.js";
 import { AboutPage } from "./generalPages/aboutPage.js";
 import { CreateOrgPage } from "./generalPages/createOrgPage.js";
@@ -141,6 +142,7 @@ class PageManager {
     this.reportFoldersPage = new ReportFoldersPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
+    this.ingestionTokensPage = new IngestionTokensPage(page);
     this.managementPage = new ManagementPage(page);
     this.aboutPage = new AboutPage(page);
     this.createOrgPage = new CreateOrgPage(page);

@@ -113,6 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
             v-model:selected-ids="selectedIds"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
             style="width: 100%; height: 100%"
@@ -349,17 +352,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-        <!-- add dashboard -->
-        <ODrawer
-          v-model:open="showAddDashboardDialog"
-            :width="30"
+          <!-- add dashboard -->
+          <ODialog
+            v-model:open="showAddDashboardDialog"
+            size="md"
             :title="t('dashboard.createdashboard')"
             data-test="dashboard-add-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-dashboard-form"
             :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
-            @click:primary="addDashboardRef?.submit()"
           >
             <AddDashboard
               ref="addDashboardRef"
@@ -367,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @updated="updateDashboardList"
               :activeFolderId="activeFolderId"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- add dashboard from GitHub gallery -->
           <AddDashboardFromGitHub
@@ -376,9 +379,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- add/edit folder -->
-          <ODrawer
+          <ODialog
             v-model:open="showAddFolderDialog"
-            :width="30"
+            size="sm"
             :title="
               isFolderEditMode
                 ? t('dashboard.updateFolder')
@@ -387,8 +390,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-folder-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-folder-dashboards-form"
             @click:secondary="showAddFolderDialog = false"
-            @click:primary="addFolderRef?.submit()"
           >
             <AddFolder
               ref="addFolderRef"
@@ -396,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :edit-mode="isFolderEditMode"
               :folder-id="selectedFolderToEdit ?? 'default'"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- move dashboard to another folder -->
           <MoveDashboardToAnotherFolder
@@ -443,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -522,7 +525,7 @@ export default defineComponent({
     ODropdownItem,
     OInput,
     OCheckbox,
-    ODrawer,
+    ODialog,
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
@@ -620,7 +623,8 @@ export default defineComponent({
           header: t("dashboard.name"),
           accessorKey: "name",
           sortable: true,
-          size: 340,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -628,7 +632,8 @@ export default defineComponent({
           header: t("dashboard.identifier"),
           accessorKey: "identifier",
           sortable: true,
-          size: 200,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -636,7 +641,8 @@ export default defineComponent({
           header: t("dashboard.description"),
           accessorKey: "description",
           sortable: true,
-          size: 280,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -644,7 +650,8 @@ export default defineComponent({
           header: t("dashboard.owner"),
           accessorKey: "owner",
           sortable: true,
-          size: 180,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -652,7 +659,8 @@ export default defineComponent({
           header: t("dashboard.created"),
           accessorKey: "created",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -671,7 +679,8 @@ export default defineComponent({
           header: t("dashboard.folder"),
           accessorKey: "folder",
           sortable: true,
-          size: 160,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         });
       }

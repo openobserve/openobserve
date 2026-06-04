@@ -23,7 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="headerBasedOnRoute()"
       icon="paid"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2"
-    />
+    >
+      <template #actions>
+        <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
+          <OButton
+            v-if="orgGroupInvite.canInvite"
+            variant="primary"
+            size="sm-action"
+            data-test="org-group-invite-org-btn"
+            @click="orgGroupInvite.trigger++"
+          >
+            {{ t("billing.billingGroup.inviteOrgButton") }}
+          </OButton>
+        </div>
+      </template>
+    </AppPageHeader>
     <div
       v-if="isUsageRoute"
       class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
@@ -97,6 +111,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
             :label="t('billing.invoiceHistoryLabel')"
           />
+          <ORouteTab
+            v-if="config.isCloud == 'true'"
+            exact
+            name="billing_group"
+            :to="
+              '/billings/billing_group?org_identifier=' +
+              store.state.selectedOrganization.identifier
+            "
+            icon="groups"
+            :label="t('billing.billingGroup.tabLabel')"
+          />
         </OTabs>
         <!-- <OButton
               data-test="logs-search-field-list-collapse-btn"
@@ -114,8 +139,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-          <div class="card-container tw:pb-3"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:gap-[0.625rem]">
+          <div
+            v-if="isUsageRoute && billingMembers.length > 0"
+            class="tw:w-[260px] tw:shrink-0"
+            style="height: calc(100vh - var(--navbar-height) - 87px);"
+            data-test="usage-member-list"
+          >
+            <UsageMemberList
+              v-model="usageMember.selected"
+              :members="billingMembers"
+            />
+          </div>
+          <div class="card-container tw:pb-3 tw:flex-1 tw:min-w-0"  style="height: calc(100vh - var(--navbar-height) - 87px);">
+
             <router-view title=""> </router-view>
           </div>
         </div>
@@ -128,8 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
+import OButton from '@/lib/core/Button/OButton.vue'
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed, onMounted } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, onMounted, provide, reactive } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -144,13 +182,13 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import UsageMemberList from "./UsageMemberList.vue";
 
 export default defineComponent({
   name: "PageIngestion",
   components: {
     AppPageHeader, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
-    OIcon, OSplitter,
-},
+    OIcon, OSplitter, OButton, UsageMemberList },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -163,6 +201,27 @@ export default defineComponent({
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
+
+    // Billing-group members for the Usage member selector (rendered as a
+    // sidebar beside the usage view). Shared with usage.vue via provide/inject.
+    const billingMembers = ref<{ id: string; name: string }[]>([]);
+    const usageMember = reactive({ selected: "" });
+    provide("usageMember", usageMember);
+    const fetchBillingMembers = () => {
+      if (config.isCloud !== "true") return;
+      BillingService.list_billing_group_members(
+        store.state.selectedOrganization.identifier
+      )
+        .then((res: any) => {
+          billingMembers.value = (res.data ?? []).map((m: any) => ({
+            id: m.member_org_id,
+            name: m.member_org_name,
+          }));
+        })
+        .catch(() => {
+          billingMembers.value = [];
+        });
+    };
 
     // Fetch billing info to determine provider
     const fetchBillingInfo = async () => {
@@ -214,9 +273,11 @@ export default defineComponent({
     onMounted(async () => {
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
+      fetchBillingMembers();
 
-      // Default to current cycle for paid Stripe users
+      // Default to current cycle for paid Stripe users (only on the usage tab)
       if (
+        router.currentRoute.value.name == "usage" &&
         !router.currentRoute.value.query.usage_date &&
         billingProvider.value === "stripe" &&
         isPaidUser.value
@@ -238,6 +299,8 @@ export default defineComponent({
         return t("billing.plansLabel");
       } else if (router.currentRoute.value.name == "invoice_history") {
         return t("billing.invoiceHistoryLabel");
+      } else if (router.currentRoute.value.name == "billing_group") {
+        return t("billing.billingGroup.tabLabel");
       }
       return "";
     };
@@ -246,6 +309,16 @@ export default defineComponent({
     const isUsageRoute = computed(() => {
       return router.currentRoute.value.name == "usage";
     })
+    const isOrgGroupRoute = computed(() => {
+      return router.currentRoute.value.name == "billing_group";
+    })
+    // Shared with the BillingGroup route component (via inject): the child sets
+    // canInvite based on the org's role and we bump trigger to open its invite panel.
+    const orgGroupInvite = reactive({
+      trigger: 0,
+      canInvite: false,
+    });
+    provide("orgGroupInvite", orgGroupInvite);
     const selectUsageDate = () => {
       router.push({
         path: '/billings/usage',
@@ -287,6 +360,8 @@ export default defineComponent({
       usageDate,
       selectUsageDate,
       isUsageRoute,
+      isOrgGroupRoute,
+      orgGroupInvite,
       tabs,
       usageDataType,
       updateActiveTab,
@@ -296,6 +371,8 @@ export default defineComponent({
       showInvoiceTab,
       billingProvider,
       isPaidUser,
+      billingMembers,
+      usageMember,
     };
   },
 });
@@ -307,18 +384,4 @@ export default defineComponent({
   overflow-y: auto;
 }
 
-.custom-usage-date-select{
-  ::v-deep(.q-field--auto-height.q-field--dense .q-field__control) {
-  min-height: 32px !important;
-  height: 40px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  align-items: center !important;
-}
-
-::v-deep(.q-field--auto-height.q-field--dense .q-field__native) {
-  min-height: 42px !important;
-  height: 42px !important;
-}
-}
 </style>

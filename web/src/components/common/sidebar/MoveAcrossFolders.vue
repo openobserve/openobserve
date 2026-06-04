@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="move-across-folders-dialog"
+  <ODialog data-test="move-across-folders-dialog"
     :open="open"
-    :width="30"
+    size="md"
     :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-      <OCardSection
+      <div
         role="body"
         :data-test="`${type}-folder-move-body`"
       >
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- select folder or create new folder and select -->
           <SelectFolderDropDown :type="type" @folder-selected="selectedFolder = $event"  :activeFolderId="activeFolderId"/>
-      </OCardSection>
-  </ODrawer>
+        </div>
+  </ODialog>
   </template>
 
   <script lang="ts">
@@ -54,13 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
-  import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+  import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
   import OInput from "@/lib/forms/Input/OInput.vue";
-  import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
   export default defineComponent({
     name: "MoveAcrossFolders",
-    components: { SelectFolderDropDown, ODrawer, OInput, OCardSection },
+    components: { SelectFolderDropDown, ODialog, OInput },
     props: {
       activeFolderId: {
         type: String,

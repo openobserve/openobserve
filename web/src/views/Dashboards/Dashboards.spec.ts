@@ -228,7 +228,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
     },
     ODialog: {
       name: "ODialog",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel"],
+      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel", "formId"],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
       template: '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -524,11 +524,11 @@ describe("Dashboards.vue", () => {
     });
   });
 
-  // Helper: locate ODrawer instances by title prop.
-  // Each migrated drawer differs only by title, so this gives us a
+  // Helper: locate ODialog instances by title prop.
+  // Each migrated dialog differs only by title, so this gives us a
   // deterministic, attribute-free lookup against the global stub.
   const findDrawerByTitle = (w: any, title: string) => {
-    const drawers = w.findAllComponents({ name: "ODrawer" });
+    const drawers = w.findAllComponents({ name: "ODialog" });
     return drawers.find((d: any) => d.props("title") === title);
   };
 
@@ -544,7 +544,7 @@ describe("Dashboards.vue", () => {
       const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
       expect(drawer).toBeTruthy();
       expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("md");
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
@@ -582,7 +582,7 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showAddDashboardDialog).toBe(false);
     });
 
-    it("should invoke addDashboardRef.submit when ODrawer emits click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission (add dashboard)", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
       });
@@ -593,14 +593,8 @@ describe("Dashboards.vue", () => {
       wrapper.vm.showAddDashboardDialog = true;
       await nextTick();
 
-      const submitSpy = vi.fn();
-      wrapper.vm.addDashboardRef = { submit: submitSpy };
-
       const drawer = findDrawerByTitle(wrapper, "Create Dashboard");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-dashboard-form");
     });
 
     it("should not throw when click:primary fires with null addDashboardRef", async () => {
@@ -648,7 +642,7 @@ describe("Dashboards.vue", () => {
       const drawer = findDrawerByTitle(wrapper, "New Folder");
       expect(drawer).toBeTruthy();
       expect(drawer.props("open")).toBe(false);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("sm");
     });
 
     it("should switch drawer title to 'Update Folder' when in edit mode", async () => {
@@ -685,7 +679,7 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
     });
 
-    it("should invoke addFolderRef.submit on click:primary", async () => {
+    it("should pass form-id to ODialog for native form submission (add folder)", async () => {
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
       });
@@ -696,14 +690,8 @@ describe("Dashboards.vue", () => {
       wrapper.vm.showAddFolderDialog = true;
       await nextTick();
 
-      const submitSpy = vi.fn();
-      wrapper.vm.addFolderRef = { submit: submitSpy };
-
       const drawer = findDrawerByTitle(wrapper, "New Folder");
-      await drawer.vm.$emit("click:primary");
-      await nextTick();
-
-      expect(submitSpy).toHaveBeenCalledTimes(1);
+      expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
     });
 
     it("should not throw when click:primary fires with null addFolderRef", async () => {
