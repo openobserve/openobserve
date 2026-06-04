@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
         >
           <OSwitch
-            v-model="searchObj.meta.showHistogram"
+            :model-value="searchObj.meta.showHistogram"
             size="md"
             @click.stop
           />
@@ -4725,7 +4725,6 @@ export default defineComponent({
       editorContainerRef,
       editorFullscreenStyle,
       toggleEditorFullscreen,
-
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
