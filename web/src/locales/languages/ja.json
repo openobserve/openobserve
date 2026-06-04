@@ -4090,7 +4090,7 @@
         "authHint": "保存する前にプロバイダの認証情報を確認してください。",
         "schemaHeader": "スキーマのミスマッチ",
         "schemaHint": "応答が設定された出力スキーマと一致しませんでした。",
-        "valuePlaceholder": "{{{変数}}} の値"
+        "valuePlaceholder": "{variable} の値"
       }
     },
     "job": {

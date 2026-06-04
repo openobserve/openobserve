@@ -228,7 +228,14 @@
                 class="scorer-prompt-vars__chip scorer-mono"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
-            <div class="scorer-field__help">{{ t("onlineEvals.scorer.promptHelp") }}</div>
+            <div class="scorer-field__help">
+              {{
+                t("onlineEvals.scorer.promptHelp", {
+                  inputVar: formatTemplateVariable("input"),
+                  outputVar: formatTemplateVariable("output"),
+                })
+              }}
+            </div>
           </div>
 
           <div class="scorer-field scorer-field--schema">

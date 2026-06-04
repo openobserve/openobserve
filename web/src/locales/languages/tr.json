@@ -4101,7 +4101,7 @@
         "authHint": "Kaydetmeden önce sağlayıcı kimlik bilgilerini kontrol edin.",
         "schemaHeader": "Şema uyumsuzluğu",
         "schemaHint": "Yanıt yapılandırılmış çıktı şemasıyla eşleşmedi.",
-        "valuePlaceholder": "{{{variable}}} için değer"
+        "valuePlaceholder": "{variable} için değer"
       }
     },
     "job": {

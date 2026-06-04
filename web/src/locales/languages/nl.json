@@ -4101,7 +4101,7 @@
         "authHint": "Controleer de inloggegevens van de provider voordat u deze opslaat.",
         "schemaHeader": "Schema komt niet overeen",
         "schemaHint": "Het antwoord kwam niet overeen met het geconfigureerde uitvoerschema.",
-        "valuePlaceholder": "Waarde voor {{{variable}}}"
+        "valuePlaceholder": "Waarde voor {variable}"
       }
     },
     "job": {

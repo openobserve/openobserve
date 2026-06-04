@@ -13,7 +13,7 @@
           <textarea
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
-            :placeholder="t('onlineEvals.scorer.testPanel.valuePlaceholder', { variable })"
+            :placeholder="t('onlineEvals.scorer.testPanel.valuePlaceholder', { variable: formatTemplateVariable(variable) })"
             @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
           />
         </label>

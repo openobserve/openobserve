@@ -4090,7 +4090,7 @@
         "authHint": "Überprüfen Sie vor dem Speichern die Anmeldeinformationen des Anbieters.",
         "schemaHeader": "Schemafinkongruenz",
         "schemaHint": "Die Antwort entsprach nicht dem konfigurierten Ausgabeschema.",
-        "valuePlaceholder": "Wert für {{{variable}}}"
+        "valuePlaceholder": "Wert für {variable}"
       }
     },
     "job": {

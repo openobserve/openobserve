@@ -4099,7 +4099,7 @@
         "authHint": "Controlla le credenziali del provider prima di salvare.",
         "schemaHeader": "Mancata corrispondenza dello schema",
         "schemaHint": "La risposta non corrisponde allo schema di output configurato.",
-        "valuePlaceholder": "Valore per {{{variable}}}"
+        "valuePlaceholder": "Valore per {variable}"
       }
     },
     "job": {

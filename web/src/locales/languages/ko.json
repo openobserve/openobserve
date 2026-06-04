@@ -4101,7 +4101,7 @@
         "authHint": "저장하기 전에 제공자 자격 증명을 확인하십시오.",
         "schemaHeader": "스키마 불일치",
         "schemaHint": "응답이 구성된 출력 스키마와 일치하지 않습니다.",
-        "valuePlaceholder": "{{{변수}}} 의 값"
+        "valuePlaceholder": "{variable} 의 값"
       }
     },
     "job": {

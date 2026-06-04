@@ -4094,7 +4094,7 @@
         "authHint": "保存之前，请检查提供商凭据。",
         "schemaHeader": "架构不匹配",
         "schemaHint": "响应与配置的输出架构不匹配。",
-        "valuePlaceholder": "{{{变量}} 的值"
+        "valuePlaceholder": "{variable} 的值"
       }
     },
     "job": {

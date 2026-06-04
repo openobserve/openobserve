@@ -4507,7 +4507,7 @@
       "healthyLabel": "Healthy:",
       "typeLabel": "Type:",
       "promptVariablesLabel": "Variables:",
-      "promptHelp": "Focus on the evaluation logic. Use {{ input }} and {{ output }} as placeholders.",
+      "promptHelp": "Focus on the evaluation logic. Use {inputVar} and {outputVar} as placeholders.",
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
       "endpointSection": "Endpoint",
@@ -4548,7 +4548,7 @@
         "authHint": "Check provider credentials before saving.",
         "schemaHeader": "Schema mismatch",
         "schemaHint": "The response did not match the configured output schema.",
-        "valuePlaceholder": "Value for {{ {variable} }}"
+        "valuePlaceholder": "Value for {variable}"
       }
     },
     "job": {

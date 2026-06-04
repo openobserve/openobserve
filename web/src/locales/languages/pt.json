@@ -4090,7 +4090,7 @@
         "authHint": "Verifique as credenciais do provedor antes de salvar.",
         "schemaHeader": "Incompatibilidade de esquema",
         "schemaHint": "A resposta não correspondeu ao esquema de saída configurado.",
-        "valuePlaceholder": "Valor para {{{variável}}}"
+        "valuePlaceholder": "Valor para {variable}"
       }
     },
     "job": {

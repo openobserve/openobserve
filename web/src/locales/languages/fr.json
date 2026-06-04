@@ -4090,7 +4090,7 @@
         "authHint": "Vérifiez les informations d'identification du fournisseur avant d'enregistrer.",
         "schemaHeader": "Incompatibilité de schéma",
         "schemaHint": "La réponse ne correspondait pas au schéma de sortie configuré.",
-        "valuePlaceholder": "Valeur pour {{{variable}}}"
+        "valuePlaceholder": "Valeur pour {variable}"
       }
     },
     "job": {

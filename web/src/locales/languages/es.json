@@ -4088,7 +4088,7 @@
         "authHint": "Compruebe las credenciales del proveedor antes de guardar.",
         "schemaHeader": "Discordancia de esquemas",
         "schemaHint": "La respuesta no coincidió con el esquema de salida configurado.",
-        "valuePlaceholder": "Valor para {{{variable}}}"
+        "valuePlaceholder": "Valor para {variable}"
       }
     },
     "job": {
