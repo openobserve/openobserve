@@ -49,9 +49,6 @@ pub enum ScorerError {
     #[error("Invalid LLM Judge output schema: {0}")]
     InvalidOutputSchema(String),
 
-    #[error("Invalid scorer test request: {0}")]
-    InvalidTestRequest(String),
-
     #[error("Scorer name already exists")]
     DuplicateName,
 
@@ -277,7 +274,6 @@ mod tests {
             ScorerError::ScorerTypeImmutable,
             ScorerError::ProducesScoreConfigIdImmutable,
             ScorerError::InvalidOutputSchema("bad".to_string()),
-            ScorerError::InvalidTestRequest("bad".to_string()),
             ScorerError::DuplicateName,
             ScorerError::InUseByEvalJob,
         ];

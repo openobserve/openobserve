@@ -23,8 +23,7 @@ use crate::{
     handler::http::models::scorers::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
         LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
-        ScorerResponseBody, ScorerTestConfig, ScorerTestRequestBody, ScorerTestResponseBody,
-        ScorerTestScoreConfig, ScorerUpdateRequestBody,
+        ScorerResponseBody, ScorerTestRequestBody, ScorerTestResponseBody, ScorerUpdateRequestBody,
     },
     service::llm_evaluations::scorers::{
         llm_judge::ScoreConfigInfo,
@@ -46,7 +45,6 @@ impl From<ScorerError> for Response {
             | ScorerError::ProducesScoreConfigIdImmutable
             | ScorerError::ScoreConfigVersionNotFound
             | ScorerError::InvalidOutputSchema(_)
-            | ScorerError::InvalidTestRequest(_)
             | ScorerError::DuplicateName => MetaHttpResponse::bad_request(value),
             ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
         }
@@ -357,212 +355,53 @@ async fn score_config_info_for_schema_request(
         .ok_or(ScorerError::ScoreConfigVersionNotFound)
 }
 
-async fn scorer_for_test(
+fn scorer_for_test(
     org_id: &str,
     body: &ScorerTestRequestBody,
 ) -> Result<infra::table::scorers::Scorer, ScorerError> {
-    let Some(entity_id) = body.entity_id.as_deref().filter(|id| !id.is_empty()) else {
-        return scorer_from_inline_test_body(org_id, body);
-    };
+    let mut scorer: infra::table::scorers::Scorer = ScorerRequestBody {
+        name: body.name.clone(),
+        description: body.description.clone(),
+        scorer: body.scorer.clone(),
+    }
+    .into();
 
-    let mut scorer = scorers::get_scorer(org_id, entity_id).await?;
-    apply_scorer_test_overrides(&mut scorer, body)?;
+    scorer.name = scorer.name.trim().to_string();
+    if scorer.name.is_empty() {
+        return Err(ScorerError::MissingName);
+    }
+
+    scorer.id = "test_scorer".to_string();
+    scorer.entity_id = "test_scorer".to_string();
+    scorer.org_id = org_id.to_string();
+    scorer.version = 1;
+    scorer.is_active = true;
     Ok(scorer)
 }
 
-fn scorer_from_inline_test_body(
+async fn score_config_info_for_test_scorer(
     org_id: &str,
-    body: &ScorerTestRequestBody,
-) -> Result<infra::table::scorers::Scorer, ScorerError> {
-    let name = body
-        .name
-        .clone()
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| "test_scorer".to_string());
-    let entity_id = body
-        .entity_id
-        .clone()
-        .filter(|entity_id| !entity_id.is_empty())
-        .unwrap_or_else(|| "test_scorer".to_string());
-
-    match &body.scorer {
-        ScorerTestConfig::LlmJudge(test_scorer) => {
-            let params = test_scorer.params.as_ref().ok_or_else(|| {
-                ScorerError::InvalidTestRequest(
-                    "LLM Judge scorer test requires scorer.params when entityId is not provided"
-                        .to_string(),
-                )
-            })?;
-
-            Ok(infra::table::scorers::Scorer {
-                id: entity_id.clone(),
-                org_id: org_id.to_string(),
-                entity_id,
-                name,
-                version: 1,
-                scorer_type: infra::table::scorers::ScorerType::LlmJudge,
-                description: body.description.clone(),
-                produces_score_config_id: test_scorer
-                    .produces_score_config_id
-                    .clone()
-                    .or_else(|| score_config_entity_id_for_test(body)),
-                produces_score_config_version: test_scorer
-                    .produces_score_config_version
-                    .or_else(|| score_config_version_for_test(body)),
-                template: test_scorer.template.clone(),
-                output_schema: test_scorer.output_schema.clone(),
-                params: params_to_test_value(params)?,
-                is_active: true,
-                created_at: 0,
-                updated_at: 0,
-            })
-        }
-        ScorerTestConfig::Remote(test_scorer) => {
-            let params = test_scorer.params.as_ref().ok_or_else(|| {
-                ScorerError::InvalidTestRequest(
-                    "Remote scorer test requires scorer.params when entityId is not provided"
-                        .to_string(),
-                )
-            })?;
-
-            Ok(infra::table::scorers::Scorer {
-                id: entity_id.clone(),
-                org_id: org_id.to_string(),
-                entity_id,
-                name,
-                version: 1,
-                scorer_type: infra::table::scorers::ScorerType::Remote,
-                description: body.description.clone(),
-                produces_score_config_id: test_scorer
-                    .produces_score_config_id
-                    .clone()
-                    .or_else(|| score_config_entity_id_for_test(body)),
-                produces_score_config_version: test_scorer
-                    .produces_score_config_version
-                    .or_else(|| score_config_version_for_test(body)),
-                template: test_scorer.template.clone(),
-                output_schema: None,
-                params: params_to_test_value(params)?,
-                is_active: true,
-                created_at: 0,
-                updated_at: 0,
-            })
-        }
-    }
-}
-
-fn apply_scorer_test_overrides(
     scorer: &mut infra::table::scorers::Scorer,
-    body: &ScorerTestRequestBody,
-) -> Result<(), ScorerError> {
-    let test_scorer_type = match &body.scorer {
-        ScorerTestConfig::LlmJudge(_) => infra::table::scorers::ScorerType::LlmJudge,
-        ScorerTestConfig::Remote(_) => infra::table::scorers::ScorerType::Remote,
+) -> Result<Option<ScoreConfigInfo>, ScorerError> {
+    let Some(entity_id) = scorer
+        .produces_score_config_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+    else {
+        return Ok(None);
     };
-    if test_scorer_type != scorer.scorer_type {
-        return Err(ScorerError::ScorerTypeImmutable);
-    }
 
-    if let Some(name) = body.name.as_ref().filter(|name| !name.trim().is_empty()) {
-        scorer.name = name.clone();
-    }
-    if body.description.is_some() {
-        scorer.description = body.description.clone();
-    }
-
-    match &body.scorer {
-        ScorerTestConfig::LlmJudge(test_scorer) => {
-            scorer.template = test_scorer.template.clone();
-            scorer.output_schema = test_scorer.output_schema.clone();
-            apply_score_config_ref_overrides(
-                scorer,
-                test_scorer.produces_score_config_id.as_ref(),
-                test_scorer.produces_score_config_version,
-                body,
-            );
-            if let Some(params) = &test_scorer.params {
-                merge_test_params(&mut scorer.params, params_to_test_value(params)?);
-            }
+    let score_config = match scorer.produces_score_config_version {
+        Some(version) => {
+            infra::table::score_configs::get_by_entity_id_and_version(org_id, entity_id, version)
+                .await?
         }
-        ScorerTestConfig::Remote(test_scorer) => {
-            scorer.template = test_scorer.template.clone();
-            apply_score_config_ref_overrides(
-                scorer,
-                test_scorer.produces_score_config_id.as_ref(),
-                test_scorer.produces_score_config_version,
-                body,
-            );
-            if let Some(params) = &test_scorer.params {
-                merge_test_params(&mut scorer.params, params_to_test_value(params)?);
-            }
-        }
+        None => infra::table::score_configs::get_by_entity_id(org_id, entity_id).await?,
     }
+    .ok_or(ScorerError::ScoreConfigVersionNotFound)?;
 
-    Ok(())
-}
-
-fn apply_score_config_ref_overrides(
-    scorer: &mut infra::table::scorers::Scorer,
-    scorer_score_config_id: Option<&String>,
-    scorer_score_config_version: Option<i32>,
-    body: &ScorerTestRequestBody,
-) {
-    if let Some(score_config_id) = scorer_score_config_id
-        .cloned()
-        .or_else(|| score_config_entity_id_for_test(body))
-    {
-        scorer.produces_score_config_id = Some(score_config_id);
-    }
-    if let Some(score_config_version) =
-        scorer_score_config_version.or_else(|| score_config_version_for_test(body))
-    {
-        scorer.produces_score_config_version = Some(score_config_version);
-    }
-}
-
-fn score_config_entity_id_for_test(body: &ScorerTestRequestBody) -> Option<String> {
-    body.score_config
-        .as_ref()
-        .and_then(|score_config| score_config.entity_id.clone())
-        .filter(|entity_id| !entity_id.is_empty())
-}
-
-fn score_config_version_for_test(body: &ScorerTestRequestBody) -> Option<i32> {
-    body.score_config
-        .as_ref()
-        .and_then(|score_config| score_config.version)
-}
-
-fn params_to_test_value<T: serde::Serialize>(params: &T) -> Result<serde_json::Value, ScorerError> {
-    serde_json::to_value(params).map_err(|err| {
-        ScorerError::InvalidTestRequest(format!("Invalid scorer test params: {err}"))
-    })
-}
-
-fn merge_test_params(base: &mut serde_json::Value, overrides: serde_json::Value) {
-    if let Some(base) = base.as_object_mut()
-        && let Some(overrides) = overrides.as_object()
-    {
-        for (key, value) in overrides {
-            base.insert(key.clone(), value.clone());
-        }
-    } else {
-        *base = overrides;
-    }
-}
-
-fn score_config_info_for_test(score_config: &ScorerTestScoreConfig) -> ScoreConfigInfo {
-    ScoreConfigInfo {
-        score_config_entity_id: score_config
-            .entity_id
-            .clone()
-            .filter(|entity_id| !entity_id.is_empty()),
-        score_config_version: score_config.version.map(|version| version.to_string()),
-        score_config_name: score_config.name.clone(),
-        data_type: score_config.data_type,
-        numeric_range: score_config.numeric_range.clone(),
-        categories: score_config.categories.clone(),
-    }
+    scorer.produces_score_config_version = Some(score_config.version);
+    Ok(Some(ScoreConfigInfo::from(&score_config)))
 }
 
 async fn run_scorer_test(
@@ -571,8 +410,8 @@ async fn run_scorer_test(
 ) -> Result<ScorerTestResponseBody, ScorerError> {
     use std::collections::HashMap;
 
-    let scorer = scorer_for_test(org_id, body).await?;
-    let score_config_info = body.score_config.as_ref().map(score_config_info_for_test);
+    let mut scorer = scorer_for_test(org_id, body)?;
+    let score_config_info = score_config_info_for_test_scorer(org_id, &mut scorer).await?;
 
     let mut attrs: HashMap<String, serde_json::Value> = HashMap::new();
     if let Some(obj) = body.input_variables.as_object() {
@@ -682,7 +521,6 @@ mod tests {
             (ScorerError::ScorerTypeImmutable, 400),
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
-            (ScorerError::InvalidTestRequest("bad".to_string()), 400),
             (ScorerError::DuplicateName, 400),
             (ScorerError::InUseByEvalJob, 409),
         ];
@@ -700,21 +538,17 @@ mod tests {
     }
 
     #[test]
-    fn test_inline_scorer_uses_score_config_from_body() {
+    fn test_scorer_for_test_uses_create_payload_fields() {
         let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
             "name": "draft scorer",
             "scorer": {
                 "type": "llm_judge",
+                "producesScoreConfigId": "scfg-entity-1",
+                "producesScoreConfigVersion": 4,
                 "template": "Judge {{input}}",
                 "params": {
                     "provider_id": "p1"
                 }
-            },
-            "scoreConfig": {
-                "entityId": "scfg-entity-1",
-                "name": "quality",
-                "version": 4,
-                "dataType": "boolean"
             },
             "inputVariables": {
                 "input": "hello"
@@ -722,7 +556,7 @@ mod tests {
         }))
         .unwrap();
 
-        let scorer = scorer_from_inline_test_body("org1", &body).unwrap();
+        let scorer = scorer_for_test("org1", &body).unwrap();
         assert_eq!(scorer.entity_id, "test_scorer");
         assert_eq!(scorer.name, "draft scorer");
         assert_eq!(
@@ -730,25 +564,20 @@ mod tests {
             Some("scfg-entity-1")
         );
         assert_eq!(scorer.produces_score_config_version, Some(4));
-
-        let score_config_info = score_config_info_for_test(body.score_config.as_ref().unwrap());
-        assert_eq!(
-            score_config_info.score_config_entity_id.as_deref(),
-            Some("scfg-entity-1")
-        );
-        assert_eq!(score_config_info.score_config_version.as_deref(), Some("4"));
-        assert_eq!(
-            score_config_info.data_type,
-            infra::table::score_configs::ScoreConfigDataType::Boolean
-        );
+        assert_eq!(scorer.params["provider_id"], "p1");
     }
 
     #[test]
-    fn test_inline_scorer_requires_params_without_entity_id() {
+    fn test_scorer_for_test_rejects_empty_name() {
         let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+            "name": " ",
             "scorer": {
                 "type": "remote",
-                "template": "{\"input\": \"{{input}}\"}"
+                "template": "{\"input\": \"{{input}}\"}",
+                "params": {
+                    "endpoint": "http://localhost:8000/evaluate",
+                    "timeout_ms": 60000
+                }
             },
             "inputVariables": {
                 "input": "hello"
@@ -756,7 +585,7 @@ mod tests {
         }))
         .unwrap();
 
-        let err = scorer_from_inline_test_body("org1", &body).unwrap_err();
-        assert!(matches!(err, ScorerError::InvalidTestRequest(_)));
+        let err = scorer_for_test("org1", &body).unwrap_err();
+        assert!(matches!(err, ScorerError::MissingName));
     }
 }
