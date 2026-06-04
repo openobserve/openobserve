@@ -1057,11 +1057,11 @@
 
 .histogram-skeleton {
   // Scoped tokens — override per theme so shimmer always has contrast
-  --hsk-bar:     var(--color-grey-300); // #d4d4d4 light — clearly grey, visible shimmer
+  --hsk-bar:     var(--color-grey-200); // #e5e5e5 light — lighter skeleton bars
   --hsk-shimmer: rgba(255, 255, 255, 0.65);
 
   .body--dark & {
-    --hsk-bar:     var(--color-grey-700); // #404040 dark
+    --hsk-bar:     var(--color-grey-600); // #525252 dark — lighter than before
     --hsk-shimmer: rgba(255, 255, 255, 0.12);
   }
 
@@ -1112,24 +1112,23 @@
     overflow: hidden;
     position: relative;
 
-    // Single wave that floats across ALL bars at once
+    // Single shimmer beam that sweeps left → right across all bars at once
     &::after {
       content: "";
       position: absolute;
-      inset: 0;
-      // Gradient is 300% wide so the bright beam sweeps the full container
-      // without the invisible "dead zone" that a 100%-wide element creates
-      width: 300%;
+      top: 0;
       left: -100%;
+      width: 100%;
+      height: 100%;
       background: linear-gradient(
         90deg,
         transparent        0%,
-        transparent       38%,
+        transparent       20%,
         var(--hsk-shimmer) 50%,
-        transparent       62%,
+        transparent       80%,
         transparent       100%
       );
-      animation: histogram-bar-shimmer 1.8s ease-in-out infinite;
+      animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
       pointer-events: none;
     }
   }
@@ -1157,8 +1156,8 @@
 }
 
 @keyframes histogram-bar-shimmer {
-  0%   { transform: translateX(0%); }
-  100% { transform: translateX(66.67%); } // moves one container-width (1/3 of 300% element)
+  from { left: -100%; }
+  to   { left: 100%; }
 }
 
 .histogram-error {
