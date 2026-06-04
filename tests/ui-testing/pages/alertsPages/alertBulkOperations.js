@@ -168,22 +168,43 @@ export class AlertBulkOperations {
             await this.page.waitForTimeout(1000);
         }
         await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
-        try {
-            await moveBtn.click({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Move button click failed, retrying with force', { error: e.message });
-            await this.page.waitForTimeout(1000);
-            await moveBtn.click({ force: true, timeout: 5000 });
+        const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
+        const scopedFolderDropdown = moveDrawer.locator(this.locators.folderDropdown);
+
+        // Retry opening the drawer and wait for an interactive child control.
+        // Waiting only on the container visibility is flaky when the panel
+        // mounts with transitions or when the first click is dropped.
+        let drawerReady = false;
+        let lastOpenError;
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                if (attempt === 1) {
+                    await moveBtn.click({ timeout: 5000 });
+                } else {
+                    await moveBtn.click({ force: true, timeout: 5000 });
+                }
+
+                await moveDrawer.waitFor({ state: 'visible', timeout: 7000 });
+                await scopedFolderDropdown.waitFor({ state: 'visible', timeout: 7000 });
+                drawerReady = true;
+                break;
+            } catch (e) {
+                lastOpenError = e;
+                testLogger.warn('Move drawer did not become ready, retrying move action', {
+                    attempt,
+                    error: e.message,
+                });
+                await this.page.keyboard.press('Escape').catch(() => {});
+                await this.page.waitForTimeout(800);
+            }
         }
 
-        // Wait for the move drawer to open before interacting with its contents
-        const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
-        await moveDrawer.waitFor({ state: 'visible', timeout: 15000 });
+        if (!drawerReady) {
+            throw new Error(`Move drawer failed to open after retries: ${lastOpenError?.message || 'unknown error'}`);
+        }
 
-        // Handle folder selection — scope inside the drawer to avoid ambiguity
-        const folderDropdown = moveDrawer.locator(this.locators.folderDropdown);
-        await folderDropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await folderDropdown.click();
+        await scopedFolderDropdown.click();
         await this.page.waitForTimeout(2000);
 
         await this.commonActions.scrollAndFindOption(targetFolderName, 'folder');
