@@ -205,6 +205,12 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
+      - name: Regenerate query-agent expected values
+        run: |
+          cd ../test-data/query-agent
+          rye run python compute_counts.py
+        working-directory: tests/api-testing/
+
       - name: Run query agent tests
         run: |
           ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
