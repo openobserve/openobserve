@@ -15,250 +15,307 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage tw:pt-2.5">
+  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-2.5">
     <div class="tw:h-full tw:overflow-auto">
-      <div class="tw:px-2 tw:py-2 tw:h-full">
-        <!-- Hero Section -->
-        <div class="hero-section">
-          <div class="tw:flex tw:flex-col tw:flex-row tw:items-center tw:justify-between tw:gap-8">
-            <div class="tw:flex-1">
-              <img
-                :src="
-                  store.state.theme == 'dark'
-                    ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                    : getImageURL('images/common/openobserve_latest_light_2.svg')
-                "
-                class="logo"
-                width="220"
-              />
-              <p class="tagline tw:mt-4">{{ t("about.logoMsg") }}</p>
-              <div class="tw:flex tw:gap-3 tw:mt-6">
-                <div class="version-badge" :class="store.state.theme === 'dark' ? 'version-badge-dark' : 'version-badge-light'">
-                  <span>{{ store.state.zoConfig.version }}</span>
-                </div>
-                <div class="build-badge tw:capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
-                  <OIcon name="workspaces" size="sm" />
-                  <span>{{ store.state.zoConfig.build_type }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="stats-grid">
-              <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-                <OIcon name="code" size="lg" class="stat-icon" />
-                <div class="stat-label">{{ t("about.commit_lbl") }}</div>
-                <div class="stat-value tw:font-mono">{{ store.state.zoConfig.commit_hash }}</div>
-              </div>
-              <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-                <OIcon name="event" size="lg" class="stat-icon" />
-                <div class="stat-label">{{ t("about.build_lbl") }}</div>
-                <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
-              </div>
+      <div class="tw:flex tw:flex-col tw:gap-4">
+
+        <!-- ── Hero Banner ─────────────────────────────────────────── -->
+        <div class="tw:relative tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-4 tw:overflow-hidden">
+          <div class="tw:relative tw:z-1">
+            <img
+              :src="
+                store.state.theme == 'dark'
+                  ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                  : getImageURL('images/common/openobserve_latest_light_2.svg')
+              "
+              class="tw:block tw:max-w-55"
+              width="220"
+            />
+            <p class="tw:text-base tw:font-medium tw:mt-1 tw:mb-0" style="color: var(--o2-text-secondary)">
+              {{ t("about.logoMsg") }}
+            </p>
+
+            <!-- One-line meta bar -->
+            <div class="tw:inline-flex tw:items-center tw:flex-wrap tw:gap-2 tw:mt-5">
+              <!-- version -->
+              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-bold tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-positive) tw:border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
+                <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive) tw:shrink-0" />
+                {{ store.state.zoConfig.version }}
+              </span>
+              <!-- build type -->
+              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-semibold tw:capitalize tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))]">
+                <OIcon name="workspaces" size="sm" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+                {{ store.state.zoConfig.build_type }}
+              </span>
+              <!-- commit -->
+              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
+                <OIcon name="code" size="sm" class="tw:text-(--o2-info) tw:shrink-0" />
+                <span class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-wide tw:text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
+                <code class="tw:font-mono tw:text-sm tw:font-semibold tw:text-(--o2-text-heading)">{{ store.state.zoConfig.commit_hash }}</code>
+                <button
+                  @click="copyToClipboard(store.state.zoConfig.commit_hash)"
+                  class="tw:inline-flex tw:items-center tw:justify-center tw:p-0.5 tw:rounded tw:border-none tw:bg-transparent tw:cursor-pointer tw:text-(--o2-text-muted) tw:hover:text-(--o2-info) tw:transition-colors tw:duration-150"
+                  title="Copy commit hash"
+                >
+                  <OIcon name="content-copy" size="sm" />
+                </button>
+              </span>
+              <!-- built date -->
+              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
+                <OIcon name="event" size="sm" class="tw:text-(--o2-warning) tw:shrink-0" />
+                <span class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-wide tw:text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
+                {{ formatDate(store.state.zoConfig.build_date) }}
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- Features Grid -->
+        <!-- ── Info Cards Grid ─────────────────────────────────────── -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
+
           <!-- Open Source Libraries -->
-          <div class=" feature-card">
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <OIcon name="code" size="md" />
-                </div>
-                <h3 class="feature-title">{{ t("about.os_libraries") }}</h3>
+          <div class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:flex tw:flex-col tw:gap-y-2">
+            <div class="tw:flex tw:items-center tw:gap-3">
+              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+                <OIcon name="code" size="md" />
               </div>
-              <p class="feature-text">
-                {{ t("about.os_libraries_msg") }}
-              </p>
+                <h2 style="color: var(--o2-text-heading)">{{ t("about.os_libraries") }}</h2>
             </div>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <div class="tw:text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
+            <div class="tw:grid tw:grid-cols-4 tw:gap-2.5">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="link-badge"
+                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-                <OIcon name="settings" size="sm" class="tw:mr-1" />
-                Cargo.toml
+                <OIcon name="settings" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">Cargo.toml</span>
+                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Rust crates</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
               </a>
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="link-badge"
+                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-              <OIcon name="backpack" size="sm" class="tw:mr-1" />
-                package.json
+                <OIcon name="backpack" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">package.json</span>
+                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Node packages</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
               </a>
-              <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <OIcon name="javascript" size="md" class="tw:mr-1" />
-                npmjs.com
+              <a
+                href="https://npmjs.com"
+                target="_blank"
+                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+              >
+                <OIcon name="javascript" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">npmjs.com</span>
+                  <span class="tw:text-xs tw:text-(--o2-text-muted)">JS registry</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
               </a>
-              <a href="https://crates.io" target="_blank" class="link-badge">
-                <OIcon name="inventory-2" size="sm" class="tw:mr-1" />
-                crates.io
+              <a
+                href="https://crates.io"
+                target="_blank"
+                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+              >
+                <OIcon name="inventory-2" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
+                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">crates.io</span>
+                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Rust registry</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
               </a>
             </div>
           </div>
 
-          <!-- License Info -->
+          <!-- License Info (opensource or enterprise on-prem) -->
           <div
             v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-            class=" feature-card license-feature"
+            class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4"
           >
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <OIcon name="shield" size="md" />
-                </div>
-                <h3 class="feature-title">{{ t("about.license_info") }}</h3>
+            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
+              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
+                <OIcon name="shield" size="md" />
               </div>
-              <p v-if="store.state.zoConfig.build_type == 'opensource'" class="feature-text">
-                {{ t("about.license_info_os_msg") }} <a
-                  href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
-                  target="_blank"
-                  class="inline-link"
-                >GNU Affero General Public License (AGPL)</a>.
-              </p>
-              <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
-                {{ t("about.license_info_msg") }}
-              </p>
+              <h2 class="tw:text-lg tw:font-semibold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.license_info") }}</h2>
             </div>
-            <OBanner variant="info" icon="info" class="tw:mt-4">
+            <div v-if="store.state.zoConfig.build_type == 'opensource'" class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-4" style="color: var(--o2-text-secondary)">
+              {{ t("about.license_info_os_msg") }}
+              <a
+                href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
+                target="_blank"
+                class="tw:text-(--o2-text-link) tw:no-underline tw:font-medium tw:border-b tw:border-[color-mix(in_srgb,var(--o2-text-link)_35%,transparent)] tw:transition-colors tw:duration-200 tw:hover:border-(--o2-text-link)"
+              >GNU Affero General Public License (AGPL)</a>.
+            </div>
+            <div v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="tw:text-sm tw:leading-relaxed" style="color: var(--o2-text-secondary)">
+              {{ t("about.license_info_msg") }}
+            </div>
+            <OBanner variant="info" icon="info" class="tw:mt-2">
               {{ t("about.license_info_note") }}
             </OBanner>
           </div>
 
-          <!-- Community Card (if no license card) -->
-          <div
-            v-else
-            class=" feature-card"
-          >
-            <div class="tw:mb-4" style="min-height: 120px;">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <OIcon name="groups" size="md" />
-                </div>
-                <h3 class="feature-title">{{ t("about.community_lbl") }}</h3>
+          <!-- Community Card (fallback for cloud) -->
+          <div v-else class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4">
+            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
+              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+                <OIcon name="groups" size="md" />
               </div>
-              <p class="feature-text">
-                {{ t("about.community_msg") }}
-              </p>
+              <h3 class="tw:text-lg tw:font-semibold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.community_lbl") }}</h3>
             </div>
+            <p class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-4" style="color: var(--o2-text-secondary)">{{ t("about.community_msg") }}</p>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
-              <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-                <OIcon name="code" size="sm" class="tw:mr-1" />
+              <a
+                href="https://github.com/openobserve/openobserve"
+                target="_blank"
+                class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-3.5 tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:no-underline tw:text-sm tw:font-medium tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] tw:transition-all tw:duration-200"
+              >
+                <OIcon name="code" size="sm" />
                 GitHub
               </a>
-              <a href="https://openobserve.ai" target="_blank" class="link-badge">
-                <OIcon name="language" size="sm" class="tw:mr-1" />
+              <a
+                href="https://openobserve.ai"
+                target="_blank"
+                class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-3.5 tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:no-underline tw:text-sm tw:font-medium tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] tw:transition-all tw:duration-200"
+              >
+                <OIcon name="language" size="sm" />
                 Website
               </a>
             </div>
           </div>
         </div>
 
-        <!-- Enterprise License Details Section -->
-        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:mt-4">
-          <div class="feature-card">
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <OIcon name="workspace-premium" size="md" />
-                </div>
-                <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
+        <!-- ── Enterprise License Details ──────────────────────────── -->
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4">
+          <!-- Header: eyebrow + title + manage button -->
+          <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
+            <div class="tw:flex tw:items-start tw:gap-3">
+              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
+                <OIcon name="workspace-premium" size="md" />
               </div>
-              <OButton
-                variant="primary"
-                size="sm"
-                @click="navigateToLicense"
-              >{{ t('about.manage_license') }}</OButton>
+              <div>
+                <p class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-widest tw:m-0 tw:mb-1" style="color: var(--o2-primary-color)">License &amp; Usage</p>
+                <h2 class="tw:text-2xl tw:font-bold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.ent_lincese_detail_lbl") }}</h2>
+              </div>
+            </div>
+            <OButton variant="primary" size="sm" @click="navigateToLicense">
+              {{ t('about.manage_license') }}
+            </OButton>
+          </div>
+          <p class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-5 tw:ml-15" style="color: var(--o2-text-secondary)">{{ t("about.license_info_msg") }}</p>
+
+          <div v-if="loadingLicense" class="tw:text-center tw:py-8">
+            <OSpinner size="md" />
+            <div class="tw:mt-3 tw:text-sm tw:text-(--o2-text-muted)">{{ t("about.loading_license_info") }}</div>
+          </div>
+
+          <div v-else-if="!licenseData || !licenseData.license" class="tw:py-2">
+            <OBanner variant="warning" icon="warning">
+              <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
+              <p class="tw:text-sm tw:mb-2">{{ t("about.no_license_installed_msg") }}</p>
+              <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+                {{ t("about.installation_id_lbl") }}:
+                <code class="tw:px-2 tw:py-0.5 tw:rounded tw:font-mono tw:border tw:border-solid tw:border-(--o2-border-color) tw:bg-(--o2-code-bg) tw:select-all">
+                  {{ licenseData.installation_id }}
+                </code>
+              </div>
+            </OBanner>
+          </div>
+
+          <div v-else class="tw:grid tw:grid-cols-2 tw:gap-4">
+            <!-- License details table -->
+            <div class="tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
+              <table class="tw:w-full tw:border-collapse">
+                <tbody>
+                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
+                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.lincese_id_lbl") }}</td>
+                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5 tw:font-mono">
+                      <div class="tw:flex tw:items-center tw:gap-1.5">
+                        <span>{{ licenseData.license.license_id }}</span>
+                        <button
+                          @click="copyToClipboard(licenseData.license.license_id)"
+                          class="tw:inline-flex tw:items-center tw:justify-center tw:p-0.5 tw:rounded tw:border-none tw:bg-transparent tw:cursor-pointer tw:text-(--o2-text-muted) tw:hover:text-(--o2-primary-color) tw:transition-colors tw:duration-150"
+                          title="Copy license ID"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
+                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.status_lbl") }}</td>
+                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">
+                      <span
+                        class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-full tw:mr-1.5 tw:align-middle"
+                        :class="licenseData?.expired ? 'tw:bg-(--o2-negative)' : 'tw:bg-(--o2-positive)'"
+                      />
+                      <span :class="licenseData?.expired ? 'tw:text-red-500' : 'tw:text-green-600'">
+                        {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
+                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">Edition</td>
+                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ t("about.value_license_enterprise") }}</td>
+                  </tr>
+                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
+                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.create_at_lbl") }}</td>
+                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                  </tr>
+                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
+                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.expires_at_lbl") }}</td>
+                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <OSpinner size="md" />
-              <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
-            </div>
-
-            <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
-              <OBanner variant="warning" icon="warning">
-                <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
-                <p class="tw:text-sm tw:mb-2">
-                  {{ t("about.no_license_installed_msg") }}
-                </p>
-                <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:mb-2 tw:flex tw:items-center tw:flex-wrap tw:gap-1">
-                  {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-0.5 tw:rounded tw:font-mono tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-code-bg)] tw:select-all">{{ licenseData.installation_id }}</code>
+            <!-- Ingestion usage panel -->
+            <div class="tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))] tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-5">
+              <p class="tw:text-sm tw:font-semibold tw:m-0 tw:mb-1" style="color: var(--o2-text-heading)">{{ t("about.usage_limits") }}</p>
+              <p class="tw:text-xs tw:m-0 tw:mb-4" style="color: var(--o2-text-muted)">
+                {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
+                · limit {{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day
+              </p>
+              <div v-if="licenseData.ingestion_used !== undefined">
+                <div class="tw:flex tw:items-baseline tw:gap-2 tw:mb-3">
+                  <span
+                    class="tw:text-4xl tw:font-extrabold tw:text-(--o2-text-heading) tw:leading-none"
+                    :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''"
+                  >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
+                  <span class="tw:text-xs tw:text-(--o2-text-secondary)">of daily limit used today</span>
                 </div>
-              </OBanner>
-            </div>
-
-            <div v-else>
-              <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
-                <div>
-                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
-                    <tbody>
-                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.lincese_id_lbl") }}</td>
-                        <td class="tw:px-3 tw:py-2">{{ licenseData.license.license_id }}</td>
-                      </tr>
-                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.status_lbl") }}</td>
-                        <td class="tw:px-3 tw:py-2">
-                          <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
-                            {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                          </OBadge>
-                        </td>
-                      </tr>
-                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.create_at_lbl") }}</td>
-                        <td class="tw:px-3 tw:py-2">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
-                      </tr>
-                      <tr>
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.expires_at_lbl") }}</td>
-                        <td class="tw:px-3 tw:py-2">
-                          <div class="tw:flex tw:items-center tw:justify-start tw:gap-4">
-                            <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="tw:h-1.5 tw:rounded-full tw:bg-(--o2-border-color) tw:overflow-hidden tw:mb-1.5">
+                  <div
+                    class="tw:h-full tw:rounded-full tw:transition-[width] tw:duration-[400ms] tw:min-w-1"
+                    :class="licenseData.ingestion_used > 90 ? 'tw:bg-(--o2-negative)' : licenseData.ingestion_used > 70 ? 'tw:bg-(--o2-warning)' : 'tw:bg-(--o2-primary-color)'"
+                    :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
+                  />
                 </div>
-
-                <div>
-                  <table class="tw:w-full tw:border-collapse tw:border tw:border-solid tw:border-[var(--o2-border-color)] compact-table">
-                    <thead>
-                      <tr>
-                        <th colspan="2" class="tw:text-center tw:font-semibold tw:px-3 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.usage_limits") }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_type") }}</td>
-                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
-                      </tr>
-                      <tr class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.ingestion_limit") }}</td>
-                        <td class="tw:px-3 tw:py-2">{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
-                      </tr>
-                      <tr v-if="licenseData.ingestion_used !== undefined">
-                        <td class="tw:font-semibold tw:px-3 tw:py-2 tw:border-r tw:border-solid tw:border-[var(--o2-border-color)]">{{ t("about.today_usage") }}</td>
-                        <td class="tw:px-3 tw:py-2">
-                          <span :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500 tw:font-bold' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''">
-                            {{ licenseData.ingestion_used.toFixed(2) }}%
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="tw:flex tw:justify-between tw:text-xs tw:text-(--o2-text-muted) tw:mb-3.5">
+                  <span>{{ ((licenseData.ingestion_used / 100) * (licenseData.license.limits?.Ingestion?.value || 50)).toFixed(0) }} GB today</span>
+                  <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day</span>
                 </div>
+              </div>
+              <div class="tw:flex tw:items-start tw:gap-1.5 tw:text-xs tw:text-(--o2-positive) tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--o2-positive)_22%,transparent)] tw:rounded tw:py-2 tw:px-3">
+                <OIcon name="check-circle" size="sm" class="tw:shrink-0 tw:mt-0.5" />
+                {{ t("about.feature_comparision_plan_detail") }}
               </div>
             </div>
           </div>
         </div>
-        <!-- Feature Comparison Table -->
-        <div class="tw:mt-6 tw:mb-[20px]" v-if="config.isCloud === 'false'">
+
+        <!-- ── Feature Comparison ──────────────────────────────────── -->
+        <div v-if="config.isCloud === 'false'" class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:mb-5">
           <FeatureComparisonTable />
         </div>
+
       </div>
     </div>
   </div>
@@ -332,23 +389,24 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      //  We don't need to make license data call for cloud
-      if(config.isCloud == 'false' && config.isEnterprise == 'true'){
+      if (config.isCloud == 'false' && config.isEnterprise == 'true') {
         loadLicenseData();
       }
     });
 
-    const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({ message: "Copied to clipboard", variant: "success" });
+      });
+    };
 
-      // Find the meta org from the organizations list
+    const navigateToLicense = () => {
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
       const metaOrg = store.state.organizations?.find(
         (org: any) => org.identifier === metaOrgIdentifier
       );
 
       if (metaOrg) {
-        // Create the org option object so that it will be used to switch to meta org
         const metaOrgOption = {
           label: metaOrg.name,
           id: metaOrg.id,
@@ -357,28 +415,18 @@ export default defineComponent({
           ingest_threshold: metaOrg.ingest_threshold,
           search_threshold: metaOrg.search_threshold,
         };
-
-        // Set the selected organization using dispatch
         store.dispatch("setSelectedOrganization", metaOrgOption);
-
-        // Navigate to license page with the meta org identifier
         router.push({
           name: 'license',
           query: { org_identifier: metaOrgIdentifier }
         });
       } else {
-        // Show error notification when user doesn't have access to meta org
-          toast({
-            message: "You are not authorized to manage the license.",
-            variant: "error",
-          })
-        // router.push({
-        //   name: 'license',
-        //   query: { org_identifier: metaOrgIdentifier }
-        // });
+        toast({
+          message: "You are not authorized to manage the license.",
+          variant: "error",
+        });
       }
     };
-
 
     return {
       t,
@@ -391,272 +439,12 @@ export default defineComponent({
       loadingLicense,
       formatLicenseDate,
       navigateToLicense,
+      copyToClipboard,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.aboutPage {
-  // Hero Section
-  .hero-section {
-    padding: 0.1rem;
-    margin-bottom: 1rem;
-
-    .logo {
-      display: block;
-    }
-
-    .tagline {
-      font-size: 1.25rem;
-      font-weight: 500;
-      opacity: 0.85;
-      margin: 0;
-      line-height: 1.6;
-    }
-
-    .version-badge,
-    .build-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1.25rem;
-      border-radius: 0.375rem;
-      font-weight: 600;
-      font-size: 0.9375rem;
-      transition: all 0.3s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-      }
-    }
-
-    .version-badge-dark {
-      background: rgba(76, 175, 80, 0.2);
-      color: #81C784;
-      border: 1px solid rgba(76, 175, 80, 0.3);
-    }
-
-    .version-badge-light {
-      background: rgba(76, 175, 80, 0.12);
-      color: #2E7D32;
-      border: 1px solid rgba(76, 175, 80, 0.25);
-    }
-
-    .build-badge-dark {
-      background: rgba(33, 150, 243, 0.2);
-      color: #64B5F6;
-      border: 1px solid rgba(33, 150, 243, 0.3);
-    }
-
-    .build-badge-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-      border: 1px solid rgba(33, 150, 243, 0.25);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-
-      .stat-card {
-        padding: 1.75rem;
-        text-align: center;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-        border-radius: 0.375rem;
-        border: 1.5px solid;
-
-        &:hover {
-          transform: translateY(-4px);
-        }
-
-        .stat-icon {
-          margin-bottom: 1rem;
-        }
-
-        .stat-label {
-          font-size: 0.6875rem;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          font-weight: 700;
-          margin-bottom: 0.5rem;
-          opacity: 0.9;
-        }
-
-        .stat-value {
-          font-size: 1.125rem;
-          font-weight: 600;
-          letter-spacing: -0.01em;
-        }
-      }
-
-      .stat-card-commit-dark {
-        background: linear-gradient(135deg, rgba(156, 39, 176, 0.15) 0%, rgba(123, 31, 162, 0.1) 100%);
-        border-color: rgba(156, 39, 176, 0.3);
-        color: #CE93D8;
-
-        .stat-icon {
-          color: #BA68C8;
-        }
-      }
-
-      .stat-card-commit-light {
-        background: linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(123, 31, 162, 0.05) 100%);
-        border-color: rgba(156, 39, 176, 0.25);
-        color: #6A1B9A;
-
-        .stat-icon {
-          color: #8E24AA;
-        }
-      }
-
-      .stat-card-built-dark {
-        background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(251, 140, 0, 0.1) 100%);
-        border-color: rgba(255, 152, 0, 0.3);
-        color: #FFB74D;
-
-        .stat-icon {
-          color: #FFA726;
-        }
-      }
-
-      .stat-card-built-light {
-        background: linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(251, 140, 0, 0.05) 100%);
-        border-color: rgba(255, 152, 0, 0.25);
-        color: #E65100;
-
-        .stat-icon {
-          color: #F57C00;
-        }
-      }
-    }
-  }
-
-  // Feature Cards
-  .feature-card1 {
-    padding: 2rem;
-    transition: all 0.3s ease;
-    position: relative;
-    border: 1px solid;
-    border-radius: 0.375rem;
-
-    &:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-    }
-    border: 0.0625rem solid var(--o2-border-color);
-  }
-
-
-  .feature-card {
-    .icon-wrapper {
-      width: 56px;
-      height: 56px;
-      border-radius: 0.375rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .icon-wrapper-dark {
-      background: rgba(33, 150, 243, 0.18);
-      color: #64B5F6;
-    }
-
-    .icon-wrapper-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-    }
-
-    .feature-title {
-      font-size: 1.375rem;
-      font-weight: 600;
-      margin: 0;
-      letter-spacing: -0.02em;
-    }
-
-    .feature-text {
-      font-size: 0.9375rem;
-      line-height: 1.8;
-      opacity: 0.8;
-      margin-bottom: 0;
-    }
-
-    .link-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.625rem 1.125rem;
-      border-radius: 0.375rem;
-      background: rgba(33, 150, 243, 0.08);
-      color: var(--q-primary);
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 600;
-      transition: all 0.25s ease;
-      border: 1.5px solid rgba(33, 150, 243, 0.2);
-
-      &:hover {
-        background: rgba(33, 150, 243, 0.15);
-        border-color: rgba(33, 150, 243, 0.35);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
-      }
-    }
-
-    .external-link {
-      display: inline-flex;
-      align-items: center;
-      color: var(--q-primary);
-      text-decoration: none;
-      font-size: 0.875rem;
-      opacity: 0.8;
-      transition: all 0.2s ease;
-
-      &:hover {
-        opacity: 1;
-        text-decoration: underline;
-      }
-    }
-
-    .inline-link {
-      color: var(--q-primary);
-      text-decoration: none;
-      font-weight: 600;
-      border-bottom: 1px solid transparent;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-bottom-color: var(--q-primary);
-      }
-    }
-  }
-
-  // Compact table styles
-  .compact-table {
-    td, th {
-      padding: 8px 12px !important;
-      line-height: 1.2;
-    }
-  }
-
-  // Responsive
-  @media (max-width: 768px) {
-    .hero-section {
-      padding: 1.5rem;
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-        width: 100%;
-      }
-    }
-
-    .feature-card {
-      padding: 1.5rem;
-    }
-  }
-}
+/* intentionally empty */
 </style>
