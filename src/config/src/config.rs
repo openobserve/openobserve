@@ -914,7 +914,7 @@ pub struct Common {
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
     // Individual connection vars — alternative to ZO_META_POSTGRES_DSN for environments
     // where host and password must be injected separately (e.g. ECS/K8s secrets managers).
-    // Ignored when ZO_META_POSTGRES_DSN is set.
+    // Used to compose meta_postgres_dsn at startup; ignored when ZO_META_POSTGRES_DSN is set.
     #[env_config(name = "ZO_META_POSTGRES_HOST", default = "")]
     pub meta_postgres_host: String,
     #[env_config(name = "ZO_META_POSTGRES_PORT", default = 5432)]
@@ -2884,6 +2884,18 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                  ZO_META_POSTGRES_DBNAME"
             ));
         }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
     }
 
     if cfg.common.meta_store.starts_with("mysql") {
