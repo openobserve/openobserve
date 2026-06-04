@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle tw:p-0 tw:mt-1"
+        class="schema-field-toggle tw:p-0"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
           :key="opt.value"
           :value="opt.value"
-          size="sm"
+          size="xs"
           :data-test="
             opt.slot === 'all_fields_slot'
               ? `${dataTestPrefix}-all-fields-btn`
