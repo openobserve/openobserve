@@ -83,6 +83,22 @@ pub async fn create_checkout_session(
         Some(org) => org,
     };
 
+    let membership =
+        match o2_enterprise::enterprise::cloud::billing_group::list_billing_membership_of(&org_id)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("error listing billing group membership for org {org_id}");
+                return MetaHttpResponse::internal_error(format!(
+                    "error listing billing group membership : {e}"
+                ));
+            }
+        };
+    if membership.is_some() {
+        return MetaHttpResponse::bad_request("org is already part of a billing group");
+    }
+
     match o2_cloud_billings::create_checkout_session(
         &get_config().common.web_url,
         email,

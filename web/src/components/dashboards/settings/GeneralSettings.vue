@@ -18,11 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:flex-col tw:h-full">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
+    <OForm ref="formRef" :default-values="{ name: '' }" @submit="saveDashboardApi.execute()">
     <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
-        <OInput
+        <OFormInput
+          name="name"
           v-model="dashboardData.title"
           :label="t('dashboard.name') + ' *'"
           data-test="dashboard-general-setting-name"
+          :validators="[(val) => !String(val ?? '').trim() ? t('dashboard.nameRequired') : undefined]"
         />
         <OInput
           v-model="dashboardData.description"
@@ -63,19 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="dashboardData.title.trim() === ''"
             variant="primary"
             size="sm-action"
-            @click="saveDashboardApi.execute()"
+            @click="formRef?.submit()"
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
             >{{ t("dashboard.save") }}</OButton
           >
         </div>
       </div>
+    </OForm>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch, type Ref } from "vue";
+import { defineComponent, onMounted, ref, watch, nextTick, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { reactive } from "vue";
@@ -88,6 +92,8 @@ import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -97,6 +103,8 @@ export default defineComponent({
     OButton,
     OInput,
     OSwitch,
+    OForm,
+    OFormInput,
   },
   emits: ["save", "close"],
   setup(props, { emit }) {
@@ -110,6 +118,7 @@ export default defineComponent({
     } = useNotifications();
 
     const addDashboardForm: Ref<any> = ref(null);
+    const formRef = ref(null);
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
@@ -138,6 +147,10 @@ export default defineComponent({
       dashboardData.description = data.description;
       dashboardData.showDynamicFilters =
         data.variables?.showDynamicFilters ?? false;
+
+      // sync loaded title into OForm field state
+      await nextTick();
+      formRef.value?.form.setFieldValue('name', data.title);
 
       dateTimeValue.value = {
         startTime: data?.defaultDatetimeDuration?.startTime,
@@ -234,6 +247,7 @@ export default defineComponent({
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      formRef,
     };
   },
 });

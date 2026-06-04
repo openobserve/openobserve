@@ -72,7 +72,6 @@ document.body.appendChild(node);
 describe("Usage Component", () => {
   let wrapper: any = null;
   const mockBillingService = vi.mocked(BillingService);
-  let mockNotify: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,9 +88,6 @@ describe("Usage Component", () => {
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
 
-    // Mock quasar notify
-    mockNotify = vi.fn(() => vi.fn()); // Returns dismiss function
-
     wrapper = mount(Usage, {
       attachTo: "#app",
       global: {
@@ -101,10 +97,7 @@ describe("Usage Component", () => {
           $router: mockRouter,
         },
         mocks: {
-          $q: {
-            notify: mockNotify,
-          },
-          $t: (key: string) => key, // Mock translation function
+          $t: (key: string) => key,
         },
         stubs: {
           ChartRenderer: {
@@ -513,7 +506,8 @@ describe("Usage Component", () => {
     expect(mockBillingService.get_data_usage).toHaveBeenCalledWith(
       orgIdentifier,
       "30days",
-      "gb"
+      "gb",
+      undefined
     );
   });
 
@@ -677,4 +671,8 @@ describe("Usage Component", () => {
   it("should have access to router", () => {
     expect(wrapper.vm.router).toBeDefined();
   });
+
+  // The member-org selector now lives in Billing.vue (rendered beside this
+  // component) and shares the selection via inject; its formatting/search is
+  // covered in UsageMemberList.spec.ts.
 });

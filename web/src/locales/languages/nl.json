@@ -930,7 +930,8 @@
     "nameRequired": "Naam is verplicht",
     "subscription_type": "Soort abonnement",
     "proceed_subscription": "Ga verder met het abonnement",
-    "subscription_plan": "Abonnementsplan"
+    "subscription_plan": "Abonnementsplan",
+    "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}"
   },
   "template": {
     "header": "Sjablonen",
@@ -1805,7 +1806,105 @@
     "aiModePayAsYouGo": "Betaal terwijl je onderweg bent",
     "aiModeExhausted": "Uitgeput",
     "aiExhaustedMessage": "Schrijf je in om AI-functies te blijven gebruiken",
-    "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement"
+    "aiPaygMessage": "Gratis credits uitgeput — gebruik wordt gefactureerd op het abonnement",
+    "organizationGroup": {
+      "tabLabel": "Organisatiegroep",
+      "inviteOrgButton": "Organisatie uitnodigen",
+      "viewUsage": "Gebruik bekijken",
+      "statTotal": "Totaal aantal kinderorganisaties",
+      "statActive": "Actief",
+      "statPending": "Uitnodigingen in behandeling",
+      "statRejected": "Afgewezen",
+      "statusActive": "Actief",
+      "statusPending": "In afwachting",
+      "statusRejected": "Afgewezen",
+      "filterAll": "Alles",
+      "childOrgColumn": "Kinderorganisatie",
+      "dateColumn": "Datum",
+      "cancel": "Annuleer",
+      "invitedBy": "Uitgenodigd door",
+      "acceptedBy": "Geaccepteerd door",
+      "addedOnCreation": "Toegevoegd bij creatie",
+      "memberSince": "Lid sinds",
+      "noMembers": "Nog geen lidorganisaties",
+      "inviteTitle": "Een organisatie uitnodigen",
+      "inviteOrgIdLabel": "Identificatie van de organisatie",
+      "inviteOrgIdPlaceholder": "Voer de identificatiecode van de organisatie in",
+      "sendInvite": "Uitnodiging verzenden",
+      "inviteSent": "Uitnodiging succesvol verzonden",
+      "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",
+      "childHeadline": "Facturering beheerd door",
+      "childHeroSub": "Je verbruik wordt aan deze organisatie gefactureerd. Planwijzigingen en facturen worden afgehandeld door de moederorganisatie — hier hoeft u niets te beheren.",
+      "receivedInvitesTab": "Uitnodigingen in behandeling",
+      "noPendingInvites": "Geen uitnodigingen in behandeling",
+      "noPendingInvitesHint": "Je ziet hier uitnodigingen wanneer een andere organisatie je uitnodigt om lid te worden van hun factureringsgroep.",
+      "invitedByOn": "Uitgenodigd door {inviter}",
+      "inviteTabPrompt": "Nodig een andere organisatie uit om lid te worden van je factureringsgroep. Het gebruik ervan wordt aan deze organisatie gefactureerd.",
+      "emptyTitle": "Factureringsgroep starten",
+      "chipConsolidatedBill": "Eén geconsolideerd wetsvoorstel",
+      "chipLinkOrgs": "Meerdere organisaties koppelen",
+      "accept": "Aanvaarden",
+      "reject": "Weigeren",
+      "inviteAccepted": "Uitnodiging succesvol geaccepteerd",
+      "inviteRejected": "Uitnodiging succesvol afgewezen",
+      "plansManagedTitle": "Facturering beheerd door de moederorganisatie",
+      "plansManagedDescription": "De facturering van deze organisatie wordt beheerd door {payer}. Wijzigingen in het plan worden afgehandeld door de moederorganisatie.",
+      "chipPlanManaged": "Plan beheerd door de ouder",
+      "chipNoInvoices": "Geen afzonderlijke facturen",
+      "viewOrgGroup": "Organisatiegroep bekijken",
+      "usageMemberLabel": "Organisatie die lid is",
+      "usageAllMembers": "Huidige organisatie",
+      "currentOrgTitle": "Huidige Organisatie"
+    },
+    "billingGroup": {
+      "tabLabel": "Factureringsgroep",
+      "inviteOrgButton": "Organisatie uitnodigen",
+      "viewUsage": "Gebruik bekijken",
+      "statTotal": "Totaal aantal kinderorganisaties",
+      "statActive": "Actief",
+      "statPending": "Uitnodigingen in behandeling",
+      "statRejected": "Afgewezen",
+      "statusActive": "Actief",
+      "statusPending": "In afwachting",
+      "statusRejected": "Afgewezen",
+      "filterAll": "Alles",
+      "childOrgColumn": "Kinderorganisatie",
+      "orgColumn": "Organisatie",
+      "orgIdColumn": "Identificatie van de organisatie",
+      "actionsColumn": "Acties",
+      "dateColumn": "Datum",
+      "cancel": "Annuleer",
+      "invitedBy": "Uitgenodigd door",
+      "acceptedBy": "Geaccepteerd door",
+      "addedOnCreation": "Toegevoegd bij creatie",
+      "memberSince": "Lid sinds",
+      "noMembers": "Nog geen lidorganisaties",
+      "inviteTitle": "Een organisatie uitnodigen",
+      "inviteOrgIdLabel": "Identificatie van de organisatie",
+      "inviteOrgIdPlaceholder": "Voer de identificatiecode van de organisatie in",
+      "sendInvite": "Uitnodiging verzenden",
+      "inviteSent": "Uitnodiging succesvol verzonden",
+      "inviteSameOrg": "Een organisatie kan zichzelf niet uitnodigen",
+      "childHeadline": "Facturering beheerd door",
+      "childHeroSub": "Je verbruik wordt aan deze organisatie gefactureerd. Planwijzigingen en facturen worden afgehandeld door de moederorganisatie — hier hoeft u niets te beheren.",
+      "invitesPanelHint": "Deze organisaties hebben je uitgenodigd om lid te worden van hun factureringsgroep. Als u akkoord gaat, wordt het verbruik van deze organisatie aan hen gefactureerd.",
+      "inviteTabPrompt": "Nodig een andere organisatie uit om lid te worden van je factureringsgroep. Het gebruik ervan wordt aan deze organisatie gefactureerd.",
+      "emptyTitle": "Factureringsgroep starten",
+      "chipConsolidatedBill": "Eén geconsolideerd wetsvoorstel",
+      "chipLinkOrgs": "Meerdere organisaties koppelen",
+      "accept": "Aanvaarden",
+      "reject": "Weigeren",
+      "inviteAccepted": "Uitnodiging succesvol geaccepteerd",
+      "inviteRejected": "Uitnodiging succesvol afgewezen",
+      "plansManagedTitle": "Facturering beheerd door de moederorganisatie",
+      "plansManagedDescription": "De facturering van deze organisatie wordt beheerd door {payer}. Wijzigingen in het plan worden afgehandeld door de moederorganisatie.",
+      "chipPlanManaged": "Plan beheerd door de ouder",
+      "chipNoInvoices": "Geen afzonderlijke facturen",
+      "viewOrgGroup": "Organisatiegroep bekijken",
+      "usageMemberLabel": "Organisatie die lid is",
+      "usageAllMembers": "Huidige organisatie",
+      "currentOrgTitle": "Huidige Organisatie"
+    }
   },
   "message": {
     "ServerInternalError": "Fout: er is iets misgegaan. Interne serverfout.",
@@ -2349,7 +2448,16 @@
     "delete": "Verwijderen",
     "variable_guide_header": "Handleiding voor sjabloonvariabelen",
     "variable_usage_examples": "Voorbeelden van gebruik",
-    "body": "Lichaam"
+    "body": "Lichaam",
+    "clone": "Kloon",
+    "cloneTitle": "Sjabloon klonen",
+    "systemReadOnly": "Vooraf gebouwde sjabloon — verwijderen is uitgeschakeld. Kloon het om een aanpasbare kopie te maken.",
+    "prebuiltBadge": "Voorgebouwd",
+    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt bewerken, maar verwijderen is uitgeschakeld.",
+    "customBadge": "Op maat",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat"
   },
   "alert_destinations": {
     "header": "Bestemmingen",
@@ -2386,7 +2494,13 @@
     "custom": "Op maat",
     "separator": "Separator",
     "separator_placeholder": "Voer een scheidingsteken in (bijvoorbeeld |,\\n,\\ t, spatie)",
-    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)"
+    "separator_hint": "Scheidingstekenreeks om tussen records te gebruiken (spaties toegestaan)",
+    "filterAll": "Alles",
+    "filterPrebuilt": "Voorgebouwd",
+    "filterCustom": "Op maat",
+    "templateDefaultBadge": "Standaard",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Zoek naar een statistiek",
@@ -3901,19 +4015,23 @@
     "capabilities": {
       "query": {
         "title": "Een vraag schrijven",
-        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken."
+        "description": "SQL voor logboeken, traces, RUM of ProMQL voor statistieken.",
+        "prompt": "Help me een vraag te schrijven"
       },
       "incident": {
         "title": "Incidenten onderzoeken",
-        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”"
+        "description": "Oorzaak in logboeken, sporen, waarschuwingen — bijvoorbeeld „Waarom is gateway-5xx geactiveerd?”",
+        "prompt": "Help me incidenten te onderzoeken"
       },
       "dashboard": {
         "title": "Een dashboard bouwen",
-        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen."
+        "description": "Uit een onderwerp — bijvoorbeeld „K8s node health: CPU, memory, herstarts”. Creëert ook panelen.",
+        "prompt": "Help me een dashboard of paneel te bouwen"
       },
       "alert": {
         "title": "Een waarschuwing aanmaken",
-        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt."
+        "description": "Drempelwaarden of geplande waarschuwingen en VRL-pijplijnen die tijdens de looptijd worden gebruikt.",
+        "prompt": "Help me een waarschuwing of pipeline aan te maken"
       }
     },
     "suggestions": {

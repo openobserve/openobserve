@@ -63,7 +63,9 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
+    handler::http::request::search::{
+        Headers, error_utils::map_error_to_http_response, utils::SearchStreamGuard,
+    },
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
         self_reporting::report_request_usage_stats,
@@ -1504,11 +1506,23 @@ pub async fn search_multi_stream(
         top_level_query_fn,
     ));
 
+    // Cancel the running queries if the client disconnects before the search
+    // produces a terminal event (e.g. the browser tab is closed). Cancellation
+    // is keyed by the parent trace_id, which covers every `{trace_id}-q{n}`
+    // sub-query via prefix matching in the query manager.
+    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => v.to_chunks(),
+            Ok(v) => {
+                if matches!(v, StreamResponses::Done) {
+                    guard.mark_finished();
+                }
+                v.to_chunks()
+            }
             Err(err) => {
+                guard.mark_finished();
                 log::error!(
                     "[HTTP2_STREAM_MULTI trace_id {trace_id}] Error in multi-stream search: {err}"
                 );

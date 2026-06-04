@@ -108,6 +108,27 @@ fn load_prebuilt_config() -> PrebuiltDestinationsConfig {
     load_builtin_config()
 }
 
+/// Prefix that marks system-managed template names. The full reserved set is
+/// `prebuilt_<type>` where `<type>` is one of the registered prebuilt
+/// destination types — see `is_prebuilt_template_name` below.
+pub const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
+
+/// True only for template names the system actually manages: the name must be
+/// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
+/// (slack, opsgenie, servicenow, ...).
+///
+/// Lives next to `get_prebuilt_template` so the public API surface
+/// (`handler::http::models`), the service-layer guards
+/// (`service::alerts::templates`), and any future caller all derive the
+/// "is system template" answer from the same source of truth.
+///
+/// User-created templates whose names happen to start with `prebuilt_` but
+/// don't match a registered type stay freely editable and deletable.
+pub fn is_prebuilt_template_name(name: &str) -> bool {
+    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
+        .is_some_and(|t| get_prebuilt_template(t).is_some())
+}
+
 /// Get a specific prebuilt template by type (e.g., "slack", "teams", "email")
 pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
     let config = load_prebuilt_config();
@@ -317,7 +338,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"message": "Alert: {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -341,7 +362,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"short_description": "Alert: {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],

@@ -930,7 +930,8 @@
     "nameRequired": "Il nome è obbligatorio",
     "subscription_type": "Tipo di piano",
     "proceed_subscription": "Procedi alla sottoscrizione",
-    "subscription_plan": "Piano di abbonamento"
+    "subscription_plan": "Piano di abbonamento",
+    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}"
   },
   "template": {
     "header": "Modelli",
@@ -1805,7 +1806,105 @@
     "aiModePayAsYouGo": "Paga in base al tuo uso",
     "aiModeExhausted": "Esausto",
     "aiExhaustedMessage": "Abbonati per continuare a utilizzare le funzionalità AI",
-    "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento"
+    "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento",
+    "organizationGroup": {
+      "tabLabel": "Gruppo organizzativo",
+      "inviteOrgButton": "Invita l'organizzazione",
+      "viewUsage": "Visualizza utilizzo",
+      "statTotal": "Total Child Orgs",
+      "statActive": "Attivo",
+      "statPending": "Inviti in sospeso",
+      "statRejected": "Respinto",
+      "statusActive": "Attivo",
+      "statusPending": "In sospeso",
+      "statusRejected": "Respinto",
+      "filterAll": "Tutti",
+      "childOrgColumn": "Organizzazione infantile",
+      "dateColumn": "Data",
+      "cancel": "Annulla",
+      "invitedBy": "Invitato da",
+      "acceptedBy": "Accettato da",
+      "addedOnCreation": "Aggiunto alla creazione",
+      "memberSince": "Membro dal",
+      "noMembers": "Nessuna organizzazione membro ancora",
+      "inviteTitle": "Invita un'organizzazione",
+      "inviteOrgIdLabel": "Identificatore dell'organizzazione",
+      "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "sendInvite": "Invia invito",
+      "inviteSent": "Invito inviato con successo",
+      "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
+      "childHeadline": "Fatturazione gestita da",
+      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione madre, non c'è nulla da gestire qui.",
+      "receivedInvitesTab": "Inviti in sospeso",
+      "noPendingInvites": "Nessun invito in sospeso",
+      "noPendingInvitesHint": "Qui vedrai gli inviti quando un'altra organizzazione ti invita a far parte del suo gruppo di fatturazione.",
+      "invitedByOn": "Invitato da {inviter}",
+      "inviteTabPrompt": "Invita un'altra organizzazione a unirsi al tuo gruppo di fatturazione. Il loro utilizzo verrà fatturato a questa organizzazione.",
+      "emptyTitle": "Avvia gruppo di fatturazione",
+      "chipConsolidatedBill": "Una fattura consolidata",
+      "chipLinkOrgs": "Collega più organizzazioni",
+      "accept": "Accetta",
+      "reject": "Rifiuta",
+      "inviteAccepted": "Invito accettato con successo",
+      "inviteRejected": "Invito rifiutato con successo",
+      "plansManagedTitle": "Fatturazione gestita dall'organizzazione madre",
+      "plansManagedDescription": "La fatturazione di questa organizzazione è gestita da {payer}. Le modifiche al piano sono gestite dall'organizzazione madre.",
+      "chipPlanManaged": "Piano gestito dal genitore",
+      "chipNoInvoices": "Nessuna fattura separata",
+      "viewOrgGroup": "Visualizza il gruppo organizzativo",
+      "usageMemberLabel": "Organizzazione membro",
+      "usageAllMembers": "Organizzazione attuale",
+      "currentOrgTitle": "Organizzazione Attuale"
+    },
+    "billingGroup": {
+      "tabLabel": "Gruppo di fatturazione",
+      "inviteOrgButton": "Invita l'organizzazione",
+      "viewUsage": "Visualizza utilizzo",
+      "statTotal": "Total Child Orgs",
+      "statActive": "Attivo",
+      "statPending": "Inviti in sospeso",
+      "statRejected": "Respinto",
+      "statusActive": "Attivo",
+      "statusPending": "In sospeso",
+      "statusRejected": "Respinto",
+      "filterAll": "Tutti",
+      "childOrgColumn": "Organizzazione infantile",
+      "orgColumn": "Organizzazione",
+      "orgIdColumn": "Identificatore dell'organizzazione",
+      "actionsColumn": "Azioni",
+      "dateColumn": "Data",
+      "cancel": "Annulla",
+      "invitedBy": "Invitato da",
+      "acceptedBy": "Accettato da",
+      "addedOnCreation": "Aggiunto alla creazione",
+      "memberSince": "Membro dal",
+      "noMembers": "Nessuna organizzazione membro ancora",
+      "inviteTitle": "Invita un'organizzazione",
+      "inviteOrgIdLabel": "Identificatore dell'organizzazione",
+      "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "sendInvite": "Invia invito",
+      "inviteSent": "Invito inviato con successo",
+      "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
+      "childHeadline": "Fatturazione gestita da",
+      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione madre, non c'è nulla da gestire qui.",
+      "invitesPanelHint": "Queste organizzazioni ti hanno invitato a far parte del loro gruppo di fatturazione. Se accetti, l'utilizzo da parte di questa organizzazione verrà fatturato a loro.",
+      "inviteTabPrompt": "Invita un'altra organizzazione a unirsi al tuo gruppo di fatturazione. Il loro utilizzo verrà fatturato a questa organizzazione.",
+      "emptyTitle": "Avvia gruppo di fatturazione",
+      "chipConsolidatedBill": "Una fattura consolidata",
+      "chipLinkOrgs": "Collega più organizzazioni",
+      "accept": "Accetta",
+      "reject": "Rifiuta",
+      "inviteAccepted": "Invito accettato con successo",
+      "inviteRejected": "Invito rifiutato con successo",
+      "plansManagedTitle": "Fatturazione gestita dall'organizzazione madre",
+      "plansManagedDescription": "La fatturazione di questa organizzazione è gestita da {payer}. Le modifiche al piano sono gestite dall'organizzazione madre.",
+      "chipPlanManaged": "Piano gestito dal genitore",
+      "chipNoInvoices": "Nessuna fattura separata",
+      "viewOrgGroup": "Visualizza il gruppo organizzativo",
+      "usageMemberLabel": "Organizzazione membro",
+      "usageAllMembers": "Organizzazione attuale",
+      "currentOrgTitle": "Organizzazione Attuale"
+    }
   },
   "message": {
     "ServerInternalError": "Errore: qualcosa è andato storto. Errore interno del server.",
@@ -2349,7 +2448,16 @@
     "delete": "Elimina",
     "variable_guide_header": "Guida alle variabili dei modelli",
     "variable_usage_examples": "Esempi di utilizzo",
-    "body": "Corpo"
+    "body": "Corpo",
+    "clone": "Clona",
+    "cloneTitle": "Modello di clonazione",
+    "systemReadOnly": "Modello predefinito: l'eliminazione è disabilitata. Clonalo per creare una copia modificabile.",
+    "prebuiltBadge": "Precostruito",
+    "prebuiltBadgeHint": "Gestito dal sistema. È possibile modificare, ma l'eliminazione è disabilitata.",
+    "customBadge": "Personalizzato",
+    "filterAll": "Tutti",
+    "filterPrebuilt": "Precostruito",
+    "filterCustom": "Personalizzato"
   },
   "alert_destinations": {
     "header": "Destinazioni",
@@ -2386,7 +2494,13 @@
     "custom": "Personalizzato",
     "separator": "Separatore",
     "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
-    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
+    "filterAll": "Tutti",
+    "filterPrebuilt": "Precostruito",
+    "filterCustom": "Personalizzato",
+    "templateDefaultBadge": "Predefinito",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",
@@ -3899,19 +4013,23 @@
     "capabilities": {
       "query": {
         "title": "Scrivere una richiesta",
-        "description": "SQL per log, trace, RUM o ProMQL per le metriche."
+        "description": "SQL per log, trace, RUM o ProMQL per le metriche.",
+        "prompt": "Aiutami a scrivere una richiesta"
       },
       "incident": {
         "title": "Indagare sugli incidenti",
-        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»"
+        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»",
+        "prompt": "Aiutami a indagare sugli incidenti"
       },
       "dashboard": {
         "title": "Crea una dashboard",
-        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli."
+        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli.",
+        "prompt": "Aiutami a creare una dashboard o un pannello"
       },
       "alert": {
         "title": "Crea un avviso",
-        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento."
+        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento.",
+        "prompt": "Aiutami a creare un avviso o una pipeline"
       }
     },
     "suggestions": {

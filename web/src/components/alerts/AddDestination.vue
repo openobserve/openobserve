@@ -155,6 +155,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:mt-2 tw:text-gray-400">Loading destination data...</div>
             </div>
 
+            <!-- Template selector for prebuilt destinations -->
+            <div
+              v-if="
+                formData.destination_type &&
+                formData.destination_type !== 'custom'
+              "
+              class="tw:w-1/2 tw:py-1"
+            >
+              <OSelect
+                data-test="add-destination-prebuilt-template-select"
+                v-model="formData.template"
+                :label="t('alert_destinations.template')"
+                :options="prebuiltTemplateOptions"
+                labelKey="label"
+                valueKey="value"
+                tabindex="0"
+              />
+              <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
+                {{ t('alert_destinations.templateHelp', {
+                  type: getDestinationTypeName(formData.destination_type),
+                  name: defaultPrebuiltTemplateName,
+                }) }}
+              </div>
+            </div>
+
             <!-- Additional Settings for Prebuilt Destinations -->
             <div class="tw:w-full tw:mt-3">
               <div class="tw:font-bold tw:py-1">
@@ -918,11 +943,39 @@ const setupDestinationData = () => {
         }
       }
 
+      // For ServiceNow, username:password are in Basic auth Authorization header
+      if (
+        typeId === "servicenow" &&
+        props.destination.headers?.["Authorization"]
+      ) {
+        const authHeader = props.destination.headers["Authorization"];
+        if (authHeader.startsWith("Basic ")) {
+          try {
+            const decoded = atob(authHeader.replace("Basic ", ""));
+            const colonIndex = decoded.indexOf(":");
+            if (colonIndex > 0) {
+              credentials.username = decoded.substring(0, colonIndex);
+              credentials.password = decoded.substring(colonIndex + 1);
+            }
+          } catch {
+            // Can't decode — leave credential fields blank
+          }
+        }
+      }
+
       // Note: Non-sensitive fields (severity, priority, assignmentGroup, ccRecipients, subject, username, etc.)
       // are automatically restored from metadata via Step 1 (credential_ prefix removal)
       // Sensitive fields containing "password", "key", or "token" are NOT saved to metadata for security
 
       prebuiltCredentials.value = credentials;
+
+      // If the saved destination is using the standard prebuilt template,
+      // surface that as the "Default" option in the dropdown rather than
+      // the raw `prebuilt_<type>` name, so create and edit look the same.
+      const standardName = `prebuilt_${typeId}`;
+      if (formData.value.template === standardName) {
+        formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
+      }
     }
 
     if (Object.keys(formData.value?.headers || {}).length) {
@@ -954,6 +1007,54 @@ const getFormattedTemplates = computed(() =>
     })
     .map((template: any) => template.name),
 );
+
+// Name of the prebuilt template the backend will auto-link if no override is
+// chosen (e.g. "prebuilt_slack"). Shown as the dropdown's default option.
+const defaultPrebuiltTemplateName = computed(() => {
+  if (
+    !formData.value.destination_type ||
+    formData.value.destination_type === "custom"
+  ) {
+    return "";
+  }
+  return `prebuilt_${formData.value.destination_type}`;
+});
+
+// Sentinel for the "use the backend default" option. OSelect treats the
+// empty string as "no selection" and would show the placeholder instead
+// of the option label, so we need a distinct value and translate it back
+// to `undefined` when calling the create/update composable.
+const DEFAULT_TEMPLATE_SENTINEL = "__default__";
+
+// Template choices for a prebuilt destination: a "Default" option whose
+// value is the sentinel above, plus any user templates of the matching
+// kind (email vs http).
+const prebuiltTemplateOptions = computed(() => {
+  const isEmailType = formData.value.destination_type === "email";
+  // Exclude all prebuilt templates: the DEFAULT sentinel already represents
+  // the canonical prebuilt_<type> for this destination, and showing other
+  // prebuilt templates (e.g. prebuilt_servicenow on a Slack destination)
+  // would allow cross-type mismatches.
+  const matching = props.templates.filter((template: any) => {
+    if (template.isPrebuilt) return false;
+    if (isEmailType) return template.type === "email";
+    return template.type !== "email";
+  });
+
+  const defaultLabel = t('alert_destinations.templateDefaultOption', {
+    name: defaultPrebuiltTemplateName.value,
+  });
+
+  const options: { label: string; value: string }[] = [
+    { label: defaultLabel, value: DEFAULT_TEMPLATE_SENTINEL },
+  ];
+
+  matching.forEach((template: any) => {
+    options.push({ label: template.name, value: template.name });
+  });
+
+  return options;
+});
 
 const isValidDestination = computed(
   () =>
@@ -1009,8 +1110,10 @@ const selectDestinationType = (type: string) => {
     formData.value.url = "";
     formData.value.template = "";
   } else {
-    // Set up prebuilt type
+    // Set up prebuilt type — pre-select the "Default" option so the field
+    // shows something instead of an empty placeholder.
     formData.value.type = type === "email" ? "email" : "http";
+    formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
   }
 };
 
@@ -1068,6 +1171,13 @@ const saveDestination = async () => {
         }
       });
 
+      // The "Default" option (sentinel value) means "let the backend
+      // auto-link the prebuilt template"; any other value is a user-chosen
+      // custom template name.
+      const selected = formData.value.template?.trim();
+      const templateOverride =
+        selected && selected !== DEFAULT_TEMPLATE_SENTINEL ? selected : undefined;
+
       if (isUpdatingDestination.value) {
         // Update existing prebuilt destination
         await updateDestination(
@@ -1077,6 +1187,7 @@ const saveDestination = async () => {
           prebuiltCredentials.value,
           customHeaders, // custom headers
           formData.value.skip_tls_verify || false, // skipTlsVerify
+          templateOverride,
         );
       } else {
         // Create new prebuilt destination
@@ -1086,6 +1197,7 @@ const saveDestination = async () => {
           prebuiltCredentials.value,
           customHeaders, // custom headers
           formData.value.skip_tls_verify || false, // skipTlsVerify
+          templateOverride,
         );
       }
 
@@ -1170,7 +1282,7 @@ const saveDestination = async () => {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: `Destination saved successfully.`,
+          message: t('alert_destinations.saved'),
         });
       })
       .catch((err: any) => {
@@ -1200,7 +1312,7 @@ const saveDestination = async () => {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: `Destination saved successfully.`,
+          message: t('alert_destinations.saved'),
         });
       })
       .catch((err: any) => {

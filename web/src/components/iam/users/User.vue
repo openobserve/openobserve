@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
           <OSearchInput
               v-model="filterQuery"
-              class="tw:w-[12.5rem]"
+              style="width: 12.5rem"
               :placeholder="t('user.search')"
               data-test="iam-users-search-input"
             />
-          <div class="tw:w-1/2" v-if="config.isCloud == 'true'">
+          <div v-if="config.isCloud == 'true'">
             <member-invitation
               :key="currentUserRole"
               v-model:currentrole="currentUserRole"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="cancel" size="sm" />
             </OButton>
             <OButton
-              v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
+              v-if="row.enableEdit && row.status != 'pending'"
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
@@ -168,12 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <add-user
       v-model:open="showAddUserDialog"
-      v-if="config.isCloud == 'false'"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
       :roles="options"
       :customRoles="customRoles"
+      :isCloud="config.isCloud == 'true'"
       @updated="addMember"
     />
 
@@ -747,6 +747,12 @@ export default defineComponent({
       // Allow editing for root users only if the current user is root
       if (user.role?.toLowerCase() === "root") {
         return store.state.userInfo.email === user.email;
+      }
+      // Cloud: cannot edit self (same as delete behavior)
+      if (config.isCloud == "true") {
+        return (
+          store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
+        );
       }
       // Allow editing for all other users
       return true;
