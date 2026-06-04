@@ -124,10 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ payerName }}
                 <OTooltip side="bottom">
                   <template #content>
-                    <div v-if="membership?.payer_org_name">
+                    <div v-if="membership?.payer_org_name" class="tw:break-all">
                       {{ membership.payer_org_name }}
                     </div>
-                    <div class="tw:text-xs tw:opacity-70">
+                    <div class="tw:text-xs tw:opacity-70 tw:break-all">
                       {{ membership?.payer_org_id }}
                     </div>
                   </template>
@@ -890,8 +890,13 @@ export default defineComponent({
   }
   &__brand {
     color: var(--color-tabs-active-text);
-    word-break: break-word;
     cursor: pointer;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
   }
   &__sub {
     font-size: 0.95rem;
