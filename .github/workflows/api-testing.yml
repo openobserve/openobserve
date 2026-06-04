@@ -208,7 +208,7 @@ jobs:
       - name: Regenerate query-agent expected values
         run: |
           cd ../test-data/query-agent
-          rye run python compute_counts.py
+          ../../api-testing/.venv/bin/python compute_counts.py
         working-directory: tests/api-testing/
 
       - name: Run query agent tests
