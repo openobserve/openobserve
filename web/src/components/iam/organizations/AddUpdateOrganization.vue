@@ -49,6 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             maxlength="100"
           />
 
+          <OCheckbox
+            v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
+            v-model="makeBilledMember"
+            :label="t('organization.makeBilledMember', { org: currentOrgName })"
+            class="tw:mt-4"
+            data-test="org-make-billed-member"
+          />
+
           <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
             <OButton
               variant="secondary"
@@ -67,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import organizationService from "@/services/organizations";
@@ -88,7 +97,7 @@ let callOrganization: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, ODrawer, OInput },
+  components: { OButton, OCheckbox, ODrawer, OInput },
   props: {
     open: {
       type: Boolean,
@@ -149,6 +158,24 @@ export default defineComponent({
       { deep: true, immediate: true },
     );
 
+    const makeBilledMember = ref(false);
+    const currentOrgName = computed(
+      () =>
+        store.state.selectedOrganization?.name ||
+        store.state.selectedOrganization?.identifier ||
+        ""
+    );
+
+    // Only orgs listed in billing_group_allowed_orgs (comma-separated, from
+    // config) can act as a payer org, so the checkbox is shown only for them.
+    const canMakeBilledMember = computed(() => {
+      const allowed = (store.state.zoConfig?.billing_group_allowed_orgs || "")
+        .split(",")
+        .map((o: string) => o.trim())
+        .filter(Boolean);
+      return allowed.includes(store.state.selectedOrganization?.identifier);
+    });
+
     return {
       t,
       router,
@@ -162,6 +189,10 @@ export default defineComponent({
       track,
       isValidOrgName,
       nameErrorMessage,
+      config,
+      makeBilledMember,
+      currentOrgName,
+      canMakeBilledMember,
     };
   },
 
@@ -195,7 +226,12 @@ export default defineComponent({
         //if organizationId is not there we will create a new organization else we will update the existing organization
         if (!organizationId) {
           delete this.organizationData.id;
-          callOrganization = organizationService.create(this.organizationData);
+          const payload: any = { name: this.organizationData.name };
+          if (this.makeBilledMember && config.isCloud == "true") {
+            payload.make_billed_member_of =
+              this.store.state.selectedOrganization.identifier;
+          }
+          callOrganization = organizationService.create(payload);
         }
         else {
           callOrganization = organizationService.rename_organization(
