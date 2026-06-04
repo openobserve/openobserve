@@ -36,13 +36,14 @@ async function buildPanel(
     yField = "kubernetes_container_hash",
     xField = null,
     breakdownField = null,
+    stream = "e2e_automate",
   } = {}
 ) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardCreate.addPanel();
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
-  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.selectStream(stream);
   if (xField) {
     await pm.chartTypeSelector.searchAndAddField(xField, "x");
   }
@@ -1612,23 +1613,6 @@ test.describe("Multi-SQL Query Support", () => {
   test.describe(
     "Partial Error for Streams with Different max_query_range",
     () => {
-      // Serial mode: tests mutate shared stream settings; avoid race conditions
-      test.describe.configure({ mode: "default" });
-
-      // Ingest data into e2e_max_query_range for each test in this section
-      test.beforeEach(async ({ page }) => {
-        await ingestion(page, "e2e_max_query_range");
-      });
-
-      // Always reset both stream settings after each test in this section
-      test.afterEach(async ({ page }) => {
-        const pm = new PageManager(page);
-        await pm.dashboardMaxQueryRange.resetMaxQueryRange("e2e_automate");
-        await pm.dashboardMaxQueryRange.resetMaxQueryRange(
-          "e2e_max_query_range"
-        );
-      });
-
       test(
         "warning icon appears when the single-query stream range is exceeded (baseline)",
         { tag: ["@multiSQL", "@partialError", "@P0", "@smoke"] },
@@ -1638,19 +1622,22 @@ test.describe("Multi-SQL Query Support", () => {
           const mqr = pm.dashboardMaxQueryRange;
           const dashboardName = generateDashboardName();
 
+          // Dedicated stream for this test. A freshly-ingested stream has no
+          // persistent single-stream cache, so the query is a cache miss that
+          // forces do_partitioned_search to run and set function_error.
+          const stream = "e2e_max_query_range_first";
+          await ingestion(page, stream);
+
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
             yField: "kubernetes_container_hash",
+            stream,
           });
-          // Switch Q1 stream to e2e_max_query_range — it has no prior single-stream
-          // persistent cache (unlike e2e_automate which sections 12-14 have cached).
-          // A cache miss forces do_partitioned_search to run and set function_error.
-          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
           await pm.dashboardPanelActions.applyDashboardBtn();
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
           await msql.applyAndSave(pm);
 
-          await mqr.setMaxQueryRange(2, "e2e_max_query_range");
+          await mqr.setMaxQueryRange(2, stream);
 
           await waitForDateTimeButtonToBeEnabled(page);
           const searchDone = mqr.createSearchResponsePromise();
@@ -1676,14 +1663,21 @@ test.describe("Multi-SQL Query Support", () => {
           const mqr = pm.dashboardMaxQueryRange;
           const dashboardName = generateDashboardName();
 
-          // Build a 2-query panel: Q1=e2e_automate, Q2=e2e_max_query_range
+          // Dedicated streams for this test (parallel-safe isolation)
+          const streamA = "e2e_max_query_range_second";
+          const streamB = "e2e_max_query_range_third";
+          await ingestion(page, streamA);
+          await ingestion(page, streamB);
+
+          // Build a 2-query panel: Q1=streamA, Q2=streamB
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
             yField: "kubernetes_container_hash",
+            stream: streamA,
           });
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
-          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
           await pm.chartTypeSelector.searchAndAddField(
@@ -1695,8 +1689,8 @@ test.describe("Multi-SQL Query Support", () => {
           await msql.applyAndSave(pm);
           // Now on dashboard page
 
-          await mqr.setMaxQueryRange(2, "e2e_automate");
-          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+          await mqr.setMaxQueryRange(2, streamA);
+          await mqr.setMaxQueryRange(3, streamB);
 
           await waitForDateTimeButtonToBeEnabled(page);
           const allSearchDone = mqr.createSearchResponsePromise();
@@ -1734,14 +1728,21 @@ test.describe("Multi-SQL Query Support", () => {
           const mqr = pm.dashboardMaxQueryRange;
           const dashboardName = generateDashboardName();
 
+          // Dedicated streams for this test (parallel-safe isolation)
+          const streamA = "e2e_max_query_range_fourth";
+          const streamB = "e2e_max_query_range_fifth";
+          await ingestion(page, streamA);
+          await ingestion(page, streamB);
+
           // 2-query panel
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
             yField: "kubernetes_container_hash",
+            stream: streamA,
           });
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
-          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
           await pm.chartTypeSelector.searchAndAddField(
@@ -1752,9 +1753,9 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
           await msql.applyAndSave(pm);
 
-          // Only restrict e2e_automate (Q1); leave e2e_max_query_range unrestricted
-          await mqr.setMaxQueryRange(2, "e2e_automate");
-          await mqr.resetMaxQueryRange("e2e_max_query_range");
+          // Only restrict streamA (Q1); leave streamB (Q2) unrestricted
+          await mqr.setMaxQueryRange(2, streamA);
+          await mqr.resetMaxQueryRange(streamB);
 
           await waitForDateTimeButtonToBeEnabled(page);
           const searchDone = mqr.createSearchResponsePromise();
@@ -1788,13 +1789,20 @@ test.describe("Multi-SQL Query Support", () => {
           const mqr = pm.dashboardMaxQueryRange;
           const dashboardName = generateDashboardName();
 
+          // Dedicated streams for this test (parallel-safe isolation)
+          const streamA = "e2e_max_query_range_sixth";
+          const streamB = "e2e_max_query_range_seventh";
+          await ingestion(page, streamA);
+          await ingestion(page, streamB);
+
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
             yField: "kubernetes_container_hash",
+            stream: streamA,
           });
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
-          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
           await pm.chartTypeSelector.searchAndAddField(
@@ -1805,8 +1813,8 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
           await msql.applyAndSave(pm);
 
-          await mqr.setMaxQueryRange(2, "e2e_automate");
-          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+          await mqr.setMaxQueryRange(2, streamA);
+          await mqr.setMaxQueryRange(3, streamB);
 
           await waitForDateTimeButtonToBeEnabled(page);
           // 1-hour range is within both 2h and 3h limits
@@ -1833,13 +1841,20 @@ test.describe("Multi-SQL Query Support", () => {
           const dashboardName = generateDashboardName();
 
           // Build 2-query panel
+          // Dedicated streams for this test (parallel-safe isolation)
+          const streamA = "e2e_max_query_range_eighth";
+          const streamB = "e2e_max_query_range_ninth";
+          await ingestion(page, streamA);
+          await ingestion(page, streamB);
+
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
             yField: "kubernetes_container_hash",
+            stream: streamA,
           });
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
-          await pm.chartTypeSelector.selectStream("e2e_max_query_range");
+          await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
           await pm.chartTypeSelector.searchAndAddField(
@@ -1850,8 +1865,8 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
           await msql.applyAndSave(pm);
 
-          await mqr.setMaxQueryRange(2, "e2e_automate");
-          await mqr.setMaxQueryRange(3, "e2e_max_query_range");
+          await mqr.setMaxQueryRange(2, streamA);
+          await mqr.setMaxQueryRange(3, streamB);
 
           await waitForDateTimeButtonToBeEnabled(page);
           const searchDoneWide = mqr.createSearchResponsePromise();
