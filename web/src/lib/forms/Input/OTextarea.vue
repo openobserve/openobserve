@@ -154,7 +154,7 @@ const wrapperClasses = computed(() => [
           'tw:disabled:cursor-not-allowed',
           'tw:py-2 tw:px-3 tw:text-sm',
           fill ? 'tw:h-full tw:min-h-0 tw:resize-none' : 'tw:min-h-[80px]',
-          !fill && 'tw:resize-none',
+          !fill && (autogrow ? 'tw:resize-none' : 'tw:resize-y'),
         ]"
         @input="
           emit(
