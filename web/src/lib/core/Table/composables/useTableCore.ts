@@ -114,7 +114,7 @@ export function useTableCore<TData>(
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
         // Actions and row-index (#) columns must never be resizable.
-        enableResizing: (col.isAction || col.id === "#") ? false : (col.resizable ?? props.enableColumnResize ?? false),
+        enableResizing: (col.isAction || col.id === "actions" || col.id === "#") ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           align: col.meta?.align ?? "left",

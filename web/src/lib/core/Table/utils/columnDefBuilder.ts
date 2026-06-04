@@ -34,7 +34,7 @@ export function buildColumnDefs<TData>(
     enableSorting: col.sortable ?? false,
     enableColumnFilter: col.filterable ?? false,
     // Actions and row-index (#) columns must never be resizable.
-    enableResizing: (col.isAction || col.id === "#") ? false : (col.resizable ?? false),
+    enableResizing: (col.isAction || col.id === "actions" || col.id === "#") ? false : (col.resizable ?? false),
     meta: {
       align: col.meta?.align ?? "left",
       headerClass: col.meta?.headerClass ?? "",
