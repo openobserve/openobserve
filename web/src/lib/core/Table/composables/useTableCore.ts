@@ -113,7 +113,8 @@ export function useTableCore<TData>(
         maxSize: col.maxSize ?? 800,
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
-        enableResizing: col.resizable ?? props.enableColumnResize ?? false,
+        // Actions and row-index (#) columns must never be resizable.
+        enableResizing: (col.isAction || col.id === "#") ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           align: col.meta?.align ?? "left",
