@@ -989,6 +989,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
+                :has-expand-button="!showFunctionEditor"
                 :show-ai-icon="
                   config.isEnterprise == 'true' &&
                   store.state.zoConfig.ai_enabled
@@ -1047,6 +1048,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="searchObj.data.tempFunctionContent"
                       :nlp-mode="vrlEditorNlpMode"
                       :hide-nl-toggle="false"
+                      :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
                       :disable-ai-reason="
                         isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''

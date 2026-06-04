@@ -6,28 +6,29 @@
 <template>
   <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
+    <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
-      class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
+      :class="['ai-input-bar tw:h-[2.125rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
-      <div v-if="isGenerating" :class="aiBarStreamingClass">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+      <template v-if="isGenerating">
+        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px] tw:shrink-0" />
         <OSpinner variant="dots" size="xs" />
-        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <span class="tw:text-sm tw:flex-1 tw:truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="ai-stop-button"
+          class="ai-stop-button tw:shrink-0"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
-      </div>
+      </template>
       <!-- Normal input when not generating -->
-      <div v-else class="tw:flex tw:items-center tw:gap-2">
+      <template v-else>
         <OInput
           v-model="aiInputText"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
@@ -63,7 +64,7 @@
         >
           <OTooltip :content="t('common.close')" />
         </OButton>
-      </div>
+      </template>
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
@@ -156,6 +157,7 @@ interface Props {
   disableAiReason?: string;     // Tooltip reason when AI is disabled
   aiPlaceholder?: string;       // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
   aiTooltip?: string;           // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  hasExpandButton?: boolean;    // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
   dataTestPrefix?: string;
@@ -174,6 +176,7 @@ const props = withDefaults(defineProps<Props>(), {
   hideNlToggle: false,
   disableAi: false,
   disableAiReason: '',
+  hasExpandButton: false,
   dataTestPrefix: 'query-editor',
 });
 
@@ -239,8 +242,8 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => {
   return store.state.theme === 'dark'
-    ? 'ai-input-field ai-input-field--dark tw:flex-1'
-    : 'ai-input-field tw:flex-1';
+    ? 'ai-input-field ai-input-field--dark tw:flex-1 tw:my-px'
+    : 'ai-input-field tw:flex-1 tw:my-px';
 });
 
 // Computed: AI streaming bar class based on theme
@@ -759,11 +762,20 @@ defineExpose({
   border-bottom: 1px solid var(--o2-border-color);
 }
 
+.ai-input-field {
+  height: 1.75rem !important; /* tw:h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
+.ai-input-field :deep(.tw\:h-8) {
+  height: 1.75rem !important; /* h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
 .ai-input-field :deep(.q-field__control) {
   background: white;
   border-radius: 6px;
-  padding: 2px 8px;
-  min-height: 32px;
+  padding: 0 8px;
+  min-height: 18px;
+  height: 18px;
 }
 
 /* Remove focus border */
