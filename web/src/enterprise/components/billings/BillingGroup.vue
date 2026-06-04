@@ -782,7 +782,7 @@ export default defineComponent({
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    border: 1px dashed color-mix(in srgb, var(--o2-primary-color) 30%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--color-primary-600) 30%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -792,14 +792,14 @@ export default defineComponent({
     width: 68px;
     height: 68px;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--o2-primary-color) 10%, transparent);
-    border: 1.5px solid color-mix(in srgb, var(--o2-primary-color) 24%, transparent);
+    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--color-primary-600) 24%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
   }
   &__icon {
-    color: var(--o2-primary-color);
+    color: var(--color-primary-600);
     opacity: 0.85;
   }
   &__title {
@@ -874,9 +874,9 @@ export default defineComponent({
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 0.4px;
-    color: var(--o2-primary-color);
-    background: color-mix(in srgb, var(--o2-primary-color) 10%, transparent);
-    border: 1px solid color-mix(in srgb, var(--o2-primary-color) 25%, transparent);
+    color: var(--color-primary-600);
+    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-primary-600) 25%, transparent);
     padding: 4px 10px;
     border-radius: 20px;
     margin-bottom: 20px;
@@ -935,8 +935,8 @@ export default defineComponent({
     display: flex;
     align-items: center;
     justify-content: center;
-    background: color-mix(in srgb, var(--o2-primary-color) 10%, transparent);
-    color: var(--o2-primary-color);
+    background: color-mix(in srgb, var(--color-primary-600) 10%, transparent);
+    color: var(--color-primary-600);
   }
   &__content {
     flex: 1;
