@@ -5,7 +5,7 @@
 import { computed, ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
-import { dataTypeOf } from "../utils/evalEntity";
+import { dataTypeOf, entityId } from "../utils/evalEntity";
 import type { DateWindow } from "./useQualityData";
 
 export interface DetailKpi {
@@ -178,7 +178,10 @@ export function useQualityConfigDetail(
     isLoading.value = true;
     try {
       const { startUs, endUs } = dateWindow.value;
-      const configId = escapeSqlString(String(cfg.id));
+      // `score_config_id` on `_llm_scores` is the entity_id, not the
+      // per-version row id — join on entity_id so cross-version edits don't
+      // break the detail panel.
+      const configId = escapeSqlString(entityId(cfg));
       const type = dataTypeOf(cfg);
       const unhealthy = unhealthyExprFor(cfg);
 

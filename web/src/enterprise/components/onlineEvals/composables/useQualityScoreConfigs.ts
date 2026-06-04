@@ -116,11 +116,13 @@ function thresholdForConfig(config: ScoreConfig): ThresholdSql {
 /** Rich aggregate SQL with per-config unhealthy CASE. Fails at parse time if
  * any branch references a `value_*` column whose data_type has not yet been
  * written to `_llm_scores`. */
-/** The ID stored on score records under `score_config_id` is the row `id`
- * of the Score Config (per-version), not its `entity_id`. See backend
- * `prepared_scorers.rs`. */
+/** The ID stored on score records under `score_config_id` is the Score
+ * Config's stable `entity_id` (the per-row version is tracked in a separate
+ * `score_config_version` column on `_llm_scores`). Joining on `entity_id`
+ * survives every version bump and matches the cross-version identifier the
+ * rest of the UI keys on. */
 function joinId(config: ScoreConfig): string {
-  return String(config.id);
+  return entityId(config);
 }
 
 function buildRichAggSql(configs: ScoreConfig[]): string {
@@ -292,7 +294,7 @@ export function useQualityScoreConfigs(
     const denom = totalUniqueSpansAcrossConfigs.value;
     const out: ScoreConfigRow[] = scoreConfigs.value.map((config) => {
       const configId = entityId(config); // stable cross-version id for the row key
-      const lookup = joinId(config); // per-version id that matches score_config_id
+      const lookup = joinId(config); // entity_id — matches score_config_id on `_llm_scores`
       const agg = aggByConfig.value[lookup];
       const total = toNumber(agg?.total_scores) ?? 0;
       const uniqueSpans = toNumber(agg?.unique_spans) ?? 0;

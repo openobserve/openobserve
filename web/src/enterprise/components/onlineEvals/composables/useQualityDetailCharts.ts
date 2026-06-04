@@ -5,7 +5,7 @@
 import { ref, watch, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import type { ScoreConfig } from "@/services/online-evals.service";
-import { dataTypeOf } from "../utils/evalEntity";
+import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
 
 export interface TrendPoint {
@@ -177,7 +177,10 @@ export function useQualityDetailCharts(
     try {
       const { startUs, endUs } = dateWindow.value;
       const interval = chooseBucketInterval((endUs - startUs) / 1000);
-      const configId = escapeSqlString(String(cfg.id));
+      // `score_config_id` on `_llm_scores` is the entity_id, not the
+      // per-version row id — join on entity_id so trend/distribution chart
+      // queries survive version bumps.
+      const configId = escapeSqlString(entityId(cfg));
       const type = dataTypeOf(cfg);
       const where = `CAST(score_config_id AS VARCHAR) = '${configId}'`;
 
