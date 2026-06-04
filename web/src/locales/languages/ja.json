@@ -404,7 +404,18 @@
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
     "functionEditorLabel": "関数エディター",
-    "loadingStream": "ストリームをロード中..."
+    "loadingStream": "ストリームをロード中...",
+    "hideHistogram": "ヒストグラムを非表示",
+    "disableQuickMode": "クイックモードを無効にする",
+    "menuGroupSetOnce": "1 回設定",
+    "menuGroupSavedViews": "保存済みビュー",
+    "menuGroupTools": "ツール",
+    "menuGroupHistory": "歴史",
+    "menuGroupDownloads": "ダウンロード",
+    "menuGroupSchedule": "スケジュール",
+    "menuGroupInspect": "検査",
+    "validSql": "有効な SQL",
+    "invalidSql": "クエリが無効です"
   },
   "menu": {
     "home": "ホーム",
