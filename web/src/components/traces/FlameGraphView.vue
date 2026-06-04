@@ -24,6 +24,18 @@
             depth
           </div>
         </div>
+
+        <div class="tw:flex tw:items-center tw:space-x-3">
+          <label class="tw:flex tw:items-center tw:space-x-2 tw:text-xs tw:text-[var(--o2-text-secondary)]">
+            <input
+              v-model="showExclusiveTime"
+              type="checkbox"
+              class="tw:rounded tw:border-[var(--o2-border)]"
+              data-test="flame-graph-exclusive-time-toggle"
+            />
+            <span>Show Self Time</span>
+          </label>
+        </div>
       </div>
 
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
@@ -231,6 +243,7 @@ const cursorX = ref(0);
 const cursorTimeLabel = ref("");
 const sidebarVisible = ref(false);
 const sidebarActiveTab = ref("attributes");
+const showExclusiveTime = ref(false); // Toggle for dual bar view
 const {
   value: bottomPanelHeight,
   onMouseDown: startResize,
@@ -416,10 +429,44 @@ const chartOptions = computed(() => {
       },
       formatter: (params: any) => {
         const span = params.data.spanData as EnrichedSpan;
-        const percentage = (
+        const inclusivePercentage = (
           (span.durationMs / props.traceDuration) *
           100
         ).toFixed(2);
+        const exclusivePercentage = (
+          (span.exclusiveTimeMs / props.traceDuration) *
+          100
+        ).toFixed(2);
+
+        // Build time info section
+        let timeInfo = '';
+        if (showExclusiveTime.value) {
+          timeInfo = `
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span style="color: #cbd5e1;">Total:</span>
+              <span>${formatDuration(span.durationMs)} (${inclusivePercentage}%)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span style="color: #cbd5e1;">Self:</span>
+              <span>${formatDuration(span.exclusiveTimeMs)} (${exclusivePercentage}%)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span style="color: #cbd5e1;">Child overlap:</span>
+              <span>${formatDuration(span.childOverlapMs)}</span>
+            </div>
+          `;
+        } else {
+          timeInfo = `
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span style="color: #cbd5e1;">Duration:</span>
+              <span>${formatDuration(span.durationMs)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 16px;">
+              <span style="color: #cbd5e1;">% of trace:</span>
+              <span>${inclusivePercentage}%</span>
+            </div>
+          `;
+        }
 
         return `
           <div style="padding: 4px 0;">
@@ -429,14 +476,7 @@ const chartOptions = computed(() => {
                 <span style="color: #cbd5e1;">Service:</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">Duration:</span>
-                <span>${formatDuration(span.durationMs)}</span>
-              </div>
-              <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">% of trace:</span>
-                <span>${percentage}%</span>
-              </div>
+              ${timeInfo}
               ${span.hasError ? '<div style="color: #f87171; margin-top: 4px;">⚠ Has errors</div>' : ""}
             </div>
           </div>
@@ -481,50 +521,121 @@ const chartOptions = computed(() => {
           const x = point1[0];
           const y = depth * (BLOCK_HEIGHT + BLOCK_PADDING);
           const rectWidth = point2[0] - point1[0];
+          const span = data[params.dataIndex].spanData;
 
-          return {
-            type: "rect",
-            shape: {
-              x,
-              y,
-              width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
-              height: BLOCK_HEIGHT,
-              r: 2,
-            },
-            style: api.style({
-              fill: data[params.dataIndex].itemStyle.color,
-              stroke: data[params.dataIndex].itemStyle.borderColor,
-              lineWidth: data[params.dataIndex].itemStyle.borderWidth,
-            }),
-            emphasis: {
-              style: {
-                stroke: data[params.dataIndex].emphasis.itemStyle.borderColor,
-                lineWidth:
-                  data[params.dataIndex].emphasis.itemStyle.borderWidth,
-                shadowBlur:
-                  data[params.dataIndex].emphasis.itemStyle.shadowBlur,
-                shadowColor:
-                  data[params.dataIndex].emphasis.itemStyle.shadowColor,
-              },
-            },
-            textContent:
-              rectWidth > 40
-                ? {
-                    type: "text",
+          // Common styles
+          const baseColor = data[params.dataIndex].itemStyle.color;
+          const borderColor = data[params.dataIndex].itemStyle.borderColor;
+          const borderWidth = data[params.dataIndex].itemStyle.borderWidth;
+
+          if (showExclusiveTime.value) {
+            // Dual bar view: show both inclusive and exclusive time
+            const exclusivePercent = (span.exclusiveTimeMs / span.durationMs) * 100;
+            const exclusiveWidth = (rectWidth * exclusivePercent) / 100;
+
+            // Create a group with two rectangles
+            return {
+              type: "group",
+              children: [
+                // Background bar (inclusive time) - lighter color
+                {
+                  type: "rect",
+                  shape: {
+                    x,
+                    y,
+                    width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
+                    height: BLOCK_HEIGHT,
+                    r: 2,
+                  },
+                  style: {
+                    fill: baseColor + "40", // Add alpha for transparency
+                    stroke: borderColor,
+                    lineWidth: borderWidth,
+                  },
+                },
+                // Foreground bar (exclusive time) - normal color
+                {
+                  type: "rect",
+                  shape: {
+                    x,
+                    y,
+                    width: Math.max(exclusiveWidth, MIN_BLOCK_WIDTH),
+                    height: BLOCK_HEIGHT,
+                    r: 2,
+                  },
+                  style: {
+                    fill: baseColor,
+                    stroke: borderColor,
+                    lineWidth: borderWidth,
+                  },
+                  emphasis: {
                     style: {
-                      text: data[params.dataIndex].spanData.operationName,
-                      fill: "#ffffff",
-                      font: "11px Inter, sans-serif",
-                      overflow: "truncate",
-                      width: rectWidth - 8,
+                      stroke: data[params.dataIndex].emphasis.itemStyle.borderColor,
+                      lineWidth: data[params.dataIndex].emphasis.itemStyle.borderWidth,
+                      shadowBlur: data[params.dataIndex].emphasis.itemStyle.shadowBlur,
+                      shadowColor: data[params.dataIndex].emphasis.itemStyle.shadowColor,
                     },
-                  }
-                : null,
-            textConfig: {
-              position: "inside",
-              distance: 4,
-            },
-          };
+                  },
+                },
+                // Text label - only on the foreground bar
+                rectWidth > 40 ? {
+                  type: "text",
+                  style: {
+                    text: span.operationName,
+                    fill: "#ffffff",
+                    font: "11px Inter, sans-serif",
+                    overflow: "truncate",
+                    width: rectWidth - 8,
+                  },
+                  position: [x + 4, y + BLOCK_HEIGHT / 2],
+                  textAlign: "left",
+                  textVerticalAlign: "middle",
+                } : null,
+              ].filter(Boolean),
+            };
+          } else {
+            // Single bar view (inclusive time only)
+            return {
+              type: "rect",
+              shape: {
+                x,
+                y,
+                width: Math.max(rectWidth, MIN_BLOCK_WIDTH),
+                height: BLOCK_HEIGHT,
+                r: 2,
+              },
+              style: api.style({
+                fill: baseColor,
+                stroke: borderColor,
+                lineWidth: borderWidth,
+              }),
+              emphasis: {
+                style: {
+                  stroke: data[params.dataIndex].emphasis.itemStyle.borderColor,
+                  lineWidth: data[params.dataIndex].emphasis.itemStyle.borderWidth,
+                  shadowBlur: data[params.dataIndex].emphasis.itemStyle.shadowBlur,
+                  shadowColor: data[params.dataIndex].emphasis.itemStyle.shadowColor,
+                },
+              },
+              textContent:
+                rectWidth > 40
+                  ? {
+                      type: "text",
+                      style: {
+                        text: span.operationName,
+                        fill: "#ffffff",
+                        font: "11px Inter, sans-serif",
+                        overflow: "truncate",
+                        width: rectWidth - 8,
+                      },
+                    }
+                  : null,
+              textConfig: {
+                position: "inside",
+                distance: 4,
+              },
+            };
+          }
         },
         data,
       },

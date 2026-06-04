@@ -719,27 +719,49 @@ size="sm"
                   {{ t("traces.serviceMap") }}
                 </h3>
 
-                <!-- Pattern/Span View Toggle -->
-                <OToggleGroup
-                  :model-value="mapViewMode"
-                  @update:model-value="mapViewMode = $event"
-                  size="sm"
-                  class="tw:ml-auto"
-                  data-test="trace-map-view-toggle"
-                >
-                  <OToggleGroupItem value="pattern">
-                    <template #icon-left>
-                      <OIcon name="account-tree" size="xs" />
-                    </template>
-                    {{ t("traces.patternView") }}
-                  </OToggleGroupItem>
-                  <OToggleGroupItem value="span">
-                    <template #icon-left>
-                      <OIcon name="list" size="xs" />
-                    </template>
-                    {{ t("traces.spanView") }}
-                  </OToggleGroupItem>
-                </OToggleGroup>
+                <div class="tw:flex tw:items-center tw:space-x-3 tw:ml-auto">
+                  <!-- Time Visualization Toggle (for trace graph) -->
+                  <OToggleGroup
+                    :model-value="timeVisualizationMode"
+                    @update:model-value="timeVisualizationMode = $event"
+                    size="sm"
+                    data-test="trace-time-visualization-toggle"
+                  >
+                    <OToggleGroupItem value="inclusive">
+                      <template #icon-left>
+                        <OIcon name="schedule" size="xs" />
+                      </template>
+                      Total Time
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="exclusive">
+                      <template #icon-left>
+                        <OIcon name="timer" size="xs" />
+                      </template>
+                      Self Time
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+
+                  <!-- Pattern/Span View Toggle -->
+                  <OToggleGroup
+                    :model-value="mapViewMode"
+                    @update:model-value="mapViewMode = $event"
+                    size="sm"
+                    data-test="trace-map-view-toggle"
+                  >
+                    <OToggleGroupItem value="pattern">
+                      <template #icon-left>
+                        <OIcon name="account-tree" size="xs" />
+                      </template>
+                      {{ t("traces.patternView") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="span">
+                      <template #icon-left>
+                        <OIcon name="list" size="xs" />
+                      </template>
+                      {{ t("traces.spanView") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                </div>
               </div>
 
               <!-- Chart Container -->
@@ -1052,6 +1074,7 @@ export default defineComponent({
 
     // Pattern View - new functionality
     const mapViewMode = ref<'pattern' | 'span'>('pattern'); // Default to pattern view
+    const timeVisualizationMode = ref<'inclusive' | 'exclusive'>('inclusive'); // Default to inclusive (total) time view
     const consolidatedPatterns = ref(new Map());
     const isDarkMode = computed(() => store.state.theme === 'dark');
 
@@ -2887,6 +2910,7 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       mapViewMode,
+      timeVisualizationMode,
       activeVisual,
       traceVisuals,
       getImageURL,
@@ -2986,8 +3010,7 @@ export default defineComponent({
       traceEvaluationsViewRef,
       fetchEvalPipeline,
       fetchEvalData,
-      formatLargeNumber,
-      traceServiceMapChartOptions
+      formatLargeNumber
     };
   },
 });

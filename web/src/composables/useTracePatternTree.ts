@@ -43,7 +43,16 @@ export function useTracePatternTree(
     // Initialize service map and find relationships
     patternMap.forEach(pattern => {
       const services = pattern.pathSignature.split('→')
-      if (services.length === 2) {
+
+      if (services.length === 1) {
+        // Standalone service (single service trace or isolated service)
+        const serviceName = services[0]
+        if (!serviceMap.has(serviceName)) {
+          serviceMap.set(serviceName, { children: [], parents: [] })
+        }
+        // Standalone services have no relationships, just track them
+      } else if (services.length === 2) {
+        // Service relationship
         const [fromService, toService] = services
 
         // Initialize services in map if they don't exist
@@ -94,13 +103,27 @@ export function useTracePatternTree(
       })
 
       // Calculate aggregated metrics for this service
-      const totalCalls = serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0)
-      const avgDuration = serviceInfo.children.length > 0
-        ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) / Math.max(totalCalls, 1)
-        : 0
-      const avgErrorRate = serviceInfo.children.length > 0
-        ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.errorRate * p.metrics.count, 0) / Math.max(totalCalls, 1)
-        : 0
+      let totalCalls, avgDuration, avgErrorRate
+
+      if (serviceInfo.children.length > 0) {
+        // Service with relationships - aggregate from children
+        totalCalls = serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0)
+        avgDuration = serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) / Math.max(totalCalls, 1)
+        avgErrorRate = serviceInfo.children.reduce((sum, p) => sum + p.metrics.errorRate * p.metrics.count, 0) / Math.max(totalCalls, 1)
+      } else {
+        // Standalone service - get metrics from the service's own pattern
+        const standalonePattern = Array.from(patternMap.values()).find(p => p.pathSignature === serviceName)
+        if (standalonePattern) {
+          totalCalls = standalonePattern.metrics.count
+          avgDuration = standalonePattern.metrics.avg
+          avgErrorRate = standalonePattern.metrics.errorRate
+        } else {
+          // Fallback values
+          totalCalls = 0
+          avgDuration = 0
+          avgErrorRate = 0
+        }
+      }
 
       return {
         id: serviceName,

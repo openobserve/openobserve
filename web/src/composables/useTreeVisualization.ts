@@ -65,15 +65,15 @@ export function useTreeVisualization<T>(
       // ServiceGraph format: service name + request count
       return `{name|${node.name}}\n{requests|${formatNumber(node.value)} req}`
     } else {
-      // Pattern format: pattern name + duration (with avg for grouped patterns)
+      // Pattern format: pattern name + duration (with call count for grouped patterns)
       const count = node.metadata?.count || 1
-      const duration = node.metadata?.avg || node.value
+      const duration = Math.round((node.metadata?.avg || node.value) * 100) / 100
 
       if (count > 1) {
-        // Grouped pattern: show average with call count
-        return `{name|${node.name}}\n{duration|${duration}ms (avg) [${count} calls]}`
+        // Grouped pattern: show duration with call count
+        return `{name|${node.name}}\n{duration|${duration}ms [${count} calls]}`
       } else {
-        // Single pattern: show duration without avg label
+        // Single pattern: show duration only
         return `{name|${node.name}}\n{duration|${duration}ms}`
       }
     }

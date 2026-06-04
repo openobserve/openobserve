@@ -90,10 +90,17 @@ export interface EnrichedSpan extends Span {
 
   // Computed values
   color: string; // Service color from palette
-  durationMs: number; // Duration in milliseconds
+  durationMs: number; // Duration in milliseconds (inclusive time)
   durationPercent: number; // % of total trace duration
   startOffsetMs: number; // Offset from trace start (ms)
   startOffsetPercent: number; // % offset from trace start
+
+  // Time analysis metrics (for exclusive/inclusive time calculations)
+  inclusiveTimeMs: number; // Total duration including children (same as durationMs)
+  exclusiveTimeMs: number; // Self-time excluding overlapping children
+  childOverlapMs: number; // Total time covered by child spans
+  exclusiveTimePercent: number; // % of trace time spent in self
+  inclusiveTimePercent: number; // % of trace time spent total (same as durationPercent)
 
   // Display helpers
   serviceName: string; // Normalized service name

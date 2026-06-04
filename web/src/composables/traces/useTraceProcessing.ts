@@ -16,6 +16,11 @@ import {
   type ServiceBreakdown,
 } from "@/ts/interfaces/traces/trace.types";
 import { getServiceColor } from "@/utils/traces/traceColors";
+import {
+  calculateExclusiveTime,
+  calculateTimePercentage,
+  type TimeMetrics
+} from "@/utils/traces/timeCalculations";
 
 /**
  * Composable for trace data processing
@@ -44,6 +49,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         ? (node.startTimeUs - traceStartTimeUs) / 1000
         : node.startTimeMs || 0;
 
+      const durationMs = node.durationMs || 0;
+
       // Convert old format to EnrichedSpan
       const enrichedSpan: EnrichedSpan = {
         span_id: node.spanId || node.span_id,
@@ -65,7 +72,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isSelected: false,
         isOnCriticalPath: false,
         color: node.style?.color || "#9CA3AF",
-        durationMs: node.durationMs || 0,
+        durationMs,
         durationPercent: 0,
         startOffsetMs,
         startOffsetPercent: 0,
@@ -75,6 +82,12 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         kindIcon: getKindIcon(node.spanKind),
         hasError:
           node.spanStatus === SpanStatus.ERROR || node.spanStatus === "ERROR",
+        // Initialize exclusive time metrics (will be calculated later)
+        inclusiveTimeMs: durationMs,
+        exclusiveTimeMs: durationMs, // Initially assume no children
+        childOverlapMs: 0,
+        exclusiveTimePercent: 0,
+        inclusiveTimePercent: 0,
       };
 
       result.push(enrichedSpan);
@@ -86,6 +99,35 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
     };
 
     treeNodes.forEach((node) => traverse(node, currentDepth));
+
+    // Build parent-child relationships from the flattened spans
+    const spanMap = new Map<string, EnrichedSpan>();
+    const rootSpans: EnrichedSpan[] = [];
+
+    // Create a map of all spans
+    result.forEach((span) => {
+      spanMap.set(span.span_id, span);
+    });
+
+    // Build hierarchy
+    result.forEach((span) => {
+      if (span.parent_span_id && spanMap.has(span.parent_span_id)) {
+        const parent = spanMap.get(span.parent_span_id)!;
+        parent.children.push(span);
+        parent.hasChildren = true;
+      } else {
+        rootSpans.push(span);
+      }
+    });
+
+    // Calculate total trace duration for percentage calculations
+    const totalTraceDurationMs = result.length > 0
+      ? Math.max(...result.map(span => span.durationMs + span.startOffsetMs))
+      : 0;
+
+    // Calculate exclusive time metrics for all spans
+    calculateSpanExclusiveTimes(rootSpans, totalTraceDurationMs);
+
     return result;
   };
 
@@ -98,6 +140,31 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
       ("spanId" in data[0] || "spans" in data[0]) &&
       !("children" in data[0])
     );
+  };
+
+  /**
+   * Calculate exclusive time metrics for all spans in a tree structure
+   * Performs post-order traversal to calculate exclusive time bottom-up
+   */
+  const calculateSpanExclusiveTimes = (rootSpans: EnrichedSpan[], totalTraceDurationMs: number) => {
+    // Post-order traversal to calculate exclusive times
+    const calculateExclusiveTimeRecursive = (span: EnrichedSpan) => {
+      // First, calculate exclusive time for all children
+      span.children.forEach(calculateExclusiveTimeRecursive);
+
+      // Then calculate for this span using its direct children
+      const timeMetrics = calculateExclusiveTime(span, span.children);
+
+      // Update span with calculated metrics
+      span.inclusiveTimeMs = timeMetrics.inclusiveTimeMs;
+      span.exclusiveTimeMs = timeMetrics.exclusiveTimeMs;
+      span.childOverlapMs = timeMetrics.childOverlapMs;
+      span.exclusiveTimePercent = calculateTimePercentage(timeMetrics.exclusiveTimeMs, totalTraceDurationMs);
+      span.inclusiveTimePercent = calculateTimePercentage(timeMetrics.inclusiveTimeMs, totalTraceDurationMs);
+    };
+
+    // Process all root spans
+    rootSpans.forEach(calculateExclusiveTimeRecursive);
   };
 
   /**
@@ -114,6 +181,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
 
     // First pass: convert to enriched spans
     spanList.forEach((span) => {
+      const durationMs = span.duration / 1000; // Convert from microseconds to milliseconds
       const enriched: EnrichedSpan = {
         ...span,
         depth: 0,
@@ -122,7 +190,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isExpanded: true,
         isSelected: false,
         isOnCriticalPath: false,
-        durationMs: span.duration / 1000, // Convert from microseconds to milliseconds
+        durationMs,
         durationPercent: 0,
         startOffsetMs: (span.start_time - traceStartTime) / 1000000, // Convert from nanoseconds to milliseconds
         startOffsetPercent: 0,
@@ -131,6 +199,12 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         statusIcon: getStatusIcon(span.span_status),
         kindIcon: getKindIcon(span.span_kind),
         hasError: span.span_status === SpanStatus.ERROR,
+        // Initialize exclusive time metrics (will be calculated later)
+        inclusiveTimeMs: durationMs,
+        exclusiveTimeMs: durationMs, // Initially assume no children
+        childOverlapMs: 0,
+        exclusiveTimePercent: 0,
+        inclusiveTimePercent: 0,
       };
       spanMap.set(span.span_id, enriched);
     });
@@ -161,6 +235,14 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
     };
 
     rootSpans.forEach(sortChildren);
+
+    // Calculate total trace duration for percentage calculations
+    const totalTraceDurationMs = rootSpans.length > 0
+      ? Math.max(...rootSpans.map(span => span.durationMs + span.startOffsetMs))
+      : 0;
+
+    // Calculate exclusive time metrics for all spans
+    calculateSpanExclusiveTimes(rootSpans, totalTraceDurationMs);
 
     return rootSpans;
   };

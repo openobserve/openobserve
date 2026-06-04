@@ -160,6 +160,20 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
   const errors = metadata.errors || 0;
   const errorRate = metadata.errorRate || 0;
 
+  // Check for exclusive time metrics (if service has aggregated time data)
+  const avgDuration = metadata.avgDuration || 0;
+  const avgExclusive = metadata.avgExclusive || 0;
+  const selfTimeRatio = metadata.selfTimeRatio || 0;
+
+  const hasTimeMetrics = avgDuration > 0 || avgExclusive > 0;
+  const timeSection = hasTimeMetrics ? `
+    <div class="tooltip-section">
+      <div>Avg Duration: ${avgDuration.toFixed(1)}ms</div>
+      <div>Avg Self Time: ${avgExclusive.toFixed(1)}ms</div>
+      <div>Work Ratio: ${(selfTimeRatio * 100).toFixed(1)}%</div>
+    </div>
+  ` : '';
+
   return `
     <div class="tree-tooltip">
       <div class="tooltip-header">${metadata.serviceName || 'Unknown Service'}</div>
@@ -168,6 +182,7 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
         <div>Errors: ${formatNumber(errors)}</div>
         <div>Error Rate: ${errorRate.toFixed(1)}%</div>
       </div>
+      ${timeSection}
     </div>
   `;
 };
@@ -188,19 +203,40 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     p95 = 0,
     p99 = 0,
     errorRate = 0,
-    traceTimePercent = 0
+    traceTimePercent = 0,
+    // Exclusive time metrics (new)
+    avgExclusive = 0,
+    minExclusive = 0,
+    maxExclusive = 0,
+    exclusiveP75 = 0,
+    exclusiveP95 = 0,
+    exclusiveTimePercent = 0,
+    selfTimeRatio = 0
   } = metadata;
+
+  // Build exclusive time section if available
+  const hasExclusiveData = avgExclusive > 0 || exclusiveTimePercent > 0;
+  const exclusiveSection = hasExclusiveData ? `
+    <div class="tooltip-section">
+      <div class="section-title">Self Time (Exclusive)</div>
+      <div>Average: ${avgExclusive.toFixed(1)}ms (${exclusiveTimePercent.toFixed(1)}% of trace)</div>
+      <div>Min: ${minExclusive.toFixed(1)}ms | Max: ${maxExclusive.toFixed(1)}ms</div>
+      <div>P75: ${exclusiveP75.toFixed(1)}ms | P95: ${exclusiveP95.toFixed(1)}ms</div>
+      <div>Work Ratio: ${(selfTimeRatio * 100).toFixed(1)}% (exclusive/inclusive)</div>
+    </div>
+  ` : '';
 
   return `
     <div class="tree-tooltip">
       <div class="tooltip-header">${pathSignature}</div>
       <div class="tooltip-metrics">
         <div>Calls: ${count}</div>
-        <div>Average: ${avg}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
-        <div>Min: ${min}ms | Max: ${max}ms</div>
-        <div>P75: ${p75}ms | P95: ${p95}ms | P99: ${p99}ms</div>
+        <div>Total Time: ${avg.toFixed(1)}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
+        <div>Range: ${min.toFixed(1)}ms - ${max.toFixed(1)}ms</div>
+        <div>Percentiles: P75: ${p75.toFixed(1)}ms | P95: ${p95.toFixed(1)}ms | P99: ${p99.toFixed(1)}ms</div>
         <div>Error Rate: ${errorRate.toFixed(1)}%</div>
       </div>
+      ${exclusiveSection}
       <div class="tooltip-footer">Click to view individual spans</div>
     </div>
   `;

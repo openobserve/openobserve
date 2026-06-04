@@ -18,7 +18,8 @@
  */
 export interface SpanInstance {
   spanId: string
-  duration: number
+  duration: number          // Inclusive duration
+  exclusiveDuration: number // Exclusive duration (self-time)
   isError: boolean
   timestamp: number
   attributes: Record<string, any>
@@ -33,6 +34,7 @@ export interface CallPattern {
   pathSignature: string  // "cache-service→database-service"
   instances: SpanInstance[]
   metrics: {
+    // Inclusive time metrics (existing)
     count: number
     avg: number
     min: number
@@ -43,6 +45,15 @@ export interface CallPattern {
     totalDuration: number
     errorRate: number
     traceTimePercent: number // % of total trace duration
+
+    // Exclusive time metrics (service-level aggregations)
+    avgExclusive: number           // Average exclusive time across spans
+    minExclusive: number           // Minimum exclusive time
+    maxExclusive: number           // Maximum exclusive time
+    exclusiveP75: number           // 75th percentile exclusive time
+    exclusiveP95: number           // 95th percentile exclusive time
+    exclusiveTimePercent: number   // % of total trace time in service self-time
+    selfTimeRatio: number          // avgExclusive / avg (work ratio)
   }
   spanIds: string[] // for drill-down capability
 }
@@ -157,7 +168,15 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
           p99: 0,
           totalDuration: 0,
           errorRate: 0,
-          traceTimePercent: 0
+          traceTimePercent: 0,
+          // Initialize exclusive time metrics
+          avgExclusive: 0,
+          minExclusive: Infinity,
+          maxExclusive: 0,
+          exclusiveP75: 0,
+          exclusiveP95: 0,
+          exclusiveTimePercent: 0,
+          selfTimeRatio: 0
         },
         spanIds: []
       })
@@ -169,6 +188,7 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
     pattern.instances.push({
       spanId: path.leafSpan.span_id || path.leafSpan.spanId || '',
       duration: path.duration,
+      exclusiveDuration: path.leafSpan.exclusiveTimeMs || path.duration, // Use exclusive time if available
       isError: path.isError,
       timestamp: path.leafSpan.start_time || 0,
       attributes: path.leafSpan.attributes || {},
@@ -182,11 +202,17 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
   // Calculate aggregated metrics for each pattern
   patterns.forEach(pattern => {
     const durations = pattern.instances.map(instance => instance.duration)
+    const exclusiveDurations = pattern.instances.map(instance => instance.exclusiveDuration)
     const errorCount = pattern.instances.filter(instance => instance.isError).length
 
+    const avgInclusive = calculateAverage(durations)
+    const avgExclusive = calculateAverage(exclusiveDurations)
+    const totalExclusiveDuration = exclusiveDurations.reduce((sum, d) => sum + d, 0)
+
     pattern.metrics = {
+      // Inclusive time metrics (existing)
       count: pattern.instances.length,
-      avg: calculateAverage(durations),
+      avg: avgInclusive,
       min: Math.min(...durations),
       max: Math.max(...durations),
       p75: calculatePercentile(durations, 75),
@@ -196,7 +222,76 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
       errorRate: pattern.instances.length > 0 ? (errorCount / pattern.instances.length) * 100 : 0,
       traceTimePercent: totalTraceDuration > 0
         ? (durations.reduce((sum, d) => sum + d, 0) / totalTraceDuration) * 100
-        : 0
+        : 0,
+
+      // Exclusive time metrics (new)
+      avgExclusive,
+      minExclusive: exclusiveDurations.length > 0 ? Math.min(...exclusiveDurations) : 0,
+      maxExclusive: exclusiveDurations.length > 0 ? Math.max(...exclusiveDurations) : 0,
+      exclusiveP75: calculatePercentile(exclusiveDurations, 75),
+      exclusiveP95: calculatePercentile(exclusiveDurations, 95),
+      exclusiveTimePercent: totalTraceDuration > 0
+        ? (totalExclusiveDuration / totalTraceDuration) * 100
+        : 0,
+      selfTimeRatio: avgInclusive > 0 ? avgExclusive / avgInclusive : 0
+    }
+  })
+
+  // Handle standalone services (services not involved in any relationships)
+  const servicesInRelationships = new Set<string>()
+  patterns.forEach(pattern => {
+    const services = pattern.pathSignature.split('→')
+    services.forEach(service => servicesInRelationships.add(service))
+  })
+
+  // Add patterns for standalone services
+  allServices.forEach((serviceInfo, serviceName) => {
+    if (!servicesInRelationships.has(serviceName)) {
+      // This is a standalone service - create a pattern for it
+      const avgDuration = Math.round((serviceInfo.totalDuration / Math.max(serviceInfo.spans.length, 1)) * 100) / 100
+      const errorRate = (serviceInfo.errorCount / Math.max(serviceInfo.spans.length, 1)) * 100
+
+      // Calculate exclusive time metrics for standalone service
+      const exclusiveDurations = serviceInfo.spans.map(s => s.exclusiveTimeMs || s.durationMs || 0)
+      const totalExclusiveDuration = exclusiveDurations.reduce((sum, d) => sum + d, 0)
+      const avgExclusive = Math.round((totalExclusiveDuration / Math.max(serviceInfo.spans.length, 1)) * 100) / 100
+
+      patterns.set(serviceName, {
+        pathSignature: serviceName,
+        instances: serviceInfo.spans.map(span => ({
+          spanId: span.span_id || span.spanId || '',
+          duration: span.durationMs || 0,
+          exclusiveDuration: span.exclusiveTimeMs || span.durationMs || 0, // Use exclusive time if available
+          isError: isSpanError(span),
+          timestamp: span.start_time || 0,
+          attributes: span.attributes || {},
+          serviceName: span.serviceName || serviceName,
+          operationName: span.operationName || span.operation_name || ''
+        })),
+        metrics: {
+          // Inclusive time metrics (existing)
+          count: serviceInfo.spans.length,
+          avg: avgDuration,
+          min: Math.min(...serviceInfo.spans.map(s => s.durationMs || 0)),
+          max: Math.max(...serviceInfo.spans.map(s => s.durationMs || 0)),
+          p75: calculatePercentile(serviceInfo.spans.map(s => s.durationMs || 0), 75),
+          p95: calculatePercentile(serviceInfo.spans.map(s => s.durationMs || 0), 95),
+          p99: calculatePercentile(serviceInfo.spans.map(s => s.durationMs || 0), 99),
+          totalDuration: serviceInfo.totalDuration,
+          errorRate,
+          traceTimePercent: totalTraceDuration > 0 ? (serviceInfo.totalDuration / totalTraceDuration) * 100 : 100,
+
+          // Exclusive time metrics (new)
+          avgExclusive,
+          minExclusive: exclusiveDurations.length > 0 ? Math.min(...exclusiveDurations) : 0,
+          maxExclusive: exclusiveDurations.length > 0 ? Math.max(...exclusiveDurations) : 0,
+          exclusiveP75: calculatePercentile(exclusiveDurations, 75),
+          exclusiveP95: calculatePercentile(exclusiveDurations, 95),
+          exclusiveTimePercent: totalTraceDuration > 0 ? (totalExclusiveDuration / totalTraceDuration) * 100 : 100,
+          selfTimeRatio: avgDuration > 0 ? avgExclusive / avgDuration : 0
+        },
+        spanIds: serviceInfo.spans.map(span => span.span_id || span.spanId || '')
+      })
     }
   })
 
@@ -233,7 +328,8 @@ function isSpanError(span: any): boolean {
  */
 function calculateAverage(values: number[]): number {
   if (values.length === 0) return 0
-  return values.reduce((sum, val) => sum + val, 0) / values.length
+  const avg = values.reduce((sum, val) => sum + val, 0) / values.length
+  return Math.round(avg * 100) / 100 // Round to 2 decimal places
 }
 
 /**
