@@ -258,6 +258,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useAppBreadcrumb } from "@/composables/useAppBreadcrumb";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -296,6 +297,7 @@ export default defineComponent({
     const route = useRoute();
     const store = useStore();
     const { t } = useI18n();
+    const { publish, clear } = useAppBreadcrumb();
     const confirmDelete = ref(false);
     const toBeDeletedJob = ref({});
 
@@ -667,8 +669,16 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
-        if (value == true && !isLoading.value) {
-          fetchSearchHistory();
+        if (value) {
+          publish([
+            { label: (route.meta?.title as string) || "Logs", to: { name: "logs" } },
+            { label: t("search_scheduler_job.title"), current: true },
+          ]);
+          if (!isLoading.value) {
+            fetchSearchHistory();
+          }
+        } else {
+          clear();
         }
       },
     );
