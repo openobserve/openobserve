@@ -1007,12 +1007,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
-                :class="
-                  searchObj.data.editorValue == '' &&
-                  searchObj.meta.queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
                 language="sql"
                 :readOnly="
                   searchObj.meta.logsVisualizeToggle === 'build' &&
@@ -1058,12 +1052,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
                       class="monaco-editor"
-                      :class="
-                        searchObj.data.tempFunctionContent == '' &&
-                        searchObj.meta.functionEditorPlaceholderFlag
-                          ? 'empty-function'
-                          : ''
-                      "
                       @update:query="
                         searchObj.data.tempFunctionContent = $event
                       "

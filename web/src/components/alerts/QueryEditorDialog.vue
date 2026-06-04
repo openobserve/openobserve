@@ -146,7 +146,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                         :disable-ai="!streamName"
                         :disable-ai-reason="t('search.selectStreamForAI')"
-                        :class="(localTab === 'sql' ? localSqlQuery : localPromqlQuery) === '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
                         @update:query="handleQueryUpdate"
                         @language-change="handleLanguageChange"
                         @ask-ai="handleAskAI"
@@ -271,10 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :debounce-time="300"
                       editor-height="100%"
                       class="tw:w-full tw:h-full"
-                      :class="[
-                        vrlFunctionContent == '' && functionEditorPlaceholderFlag ? 'empty-function' : '',
-                        store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'
-                      ]"
+                      :class="store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'"
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"

@@ -839,11 +839,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :query="query"
                     :disable-ai="!selectedStreamName"
                     :disable-ai-reason="t('search.selectStreamForAI')"
-                    :class="
-                      query == '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
                     @update:query="updateQueryValue"
                     @run-query="runQuery"
                     editor-height="calc(100vh - 190px)"
