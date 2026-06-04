@@ -91,6 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   class="tw:ml-1 dashboard-query-visibility-icon"
                   @click.stop="toggleQueryVisibility(index)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
                   style="cursor: pointer"
                   size="sm"
                   :data-test="`dashboard-panel-query-tab-visibility-${index}`"

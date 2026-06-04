@@ -54,7 +54,6 @@ async function buildPanel(
   await pm.dashboardPanelActions.addPanelName(panelName);
   await pm.dashboardPanelActions.applyDashboardBtn();
   await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
-  await page.waitForTimeout(500);
 }
 
 /**
@@ -210,17 +209,21 @@ test.describe("Multi-SQL Query Support", () => {
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
 
       // Give each query a DISTINCT Y-axis field so switching tabs is actually
-      // verifiable (and so every query passes save validation — empty queries
-      // fail with "Query N: Add at least one field …").
-      // Q1 (index 0) already has y = kubernetes_container_hash from buildPanel.
+      // verifiable. Secondary query tabs (Q2+) start empty — only Q1 auto-gets
+      // histogram(_timestamp) on the x-axis — so each new query also needs an
+      // explicit x-field, otherwise save fails with "Query N: Add one fields
+      // for the X-Axis".
+      // Q1 (index 0) already has x=histogram(_timestamp) + y=kubernetes_container_hash.
       await msql.addQueryTab(1);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
       await msql.addQueryTab(2);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
       // Switching tabs must surface that query's own Y-axis field.
@@ -265,7 +268,8 @@ test.describe("Multi-SQL Query Support", () => {
       await expect(input0).toBeVisible({ timeout: 5000 });
       await input0.fill("Production");
       await input0.press("Enter");
-      await page.waitForTimeout(300);
+      // Rename commits and the inline input closes — deterministic signal.
+      await expect(input0).not.toBeVisible({ timeout: 5000 });
       await expect(label0).toContainText("Production");
 
       await msql.switchToQueryTab(1);
@@ -279,7 +283,10 @@ test.describe("Multi-SQL Query Support", () => {
       await expect(input1).not.toBeVisible();
       await expect(label1).toContainText("Query 2");
 
-      await msql.applyAndSave(pm);
+      // Q2 was added but intentionally left unconfigured (this test only verifies
+      // inline rename behavior), so it cannot pass save validation — discard
+      // instead of save before cleanup.
+      await msql.discardPanel();
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
@@ -301,7 +308,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.queryTabNameInput(0).waitFor({ state: "visible", timeout: 5000 });
       await msql.queryTabNameInput(0).fill("prod");
       await msql.queryTabNameInput(0).press("Enter");
-      await page.waitForTimeout(300);
+      await expect(msql.queryTabNameInput(0)).not.toBeVisible({ timeout: 5000 });
 
       // Rename Q2
       await msql.switchToQueryTab(1);
@@ -309,7 +316,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.queryTabNameInput(1).waitFor({ state: "visible", timeout: 5000 });
       await msql.queryTabNameInput(1).fill("staging");
       await msql.queryTabNameInput(1).press("Enter");
-      await page.waitForTimeout(300);
+      await expect(msql.queryTabNameInput(1)).not.toBeVisible({ timeout: 5000 });
 
       await msql.applyAndSave(pm);
       await reopenPanelConfig(page, pm);
@@ -350,9 +357,17 @@ test.describe("Multi-SQL Query Support", () => {
         "true",
       );
 
-      await pm.dashboardPanelActions.applyDashboardBtn();
-      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
-      await msql.applyAndSave(pm);
+      // Regression guard: clicking Q1's hide icon while Q2 is active must NOT
+      // switch the active tab — Q2 must remain active (the icon stops
+      // mousedown/pointerdown so it never activates Q1's tab).
+      await expect(msql.queryTab(1)).toHaveAttribute("data-state", "active", {
+        timeout: 5000,
+      });
+      await expect(msql.queryTab(0)).not.toHaveAttribute("data-state", "active");
+
+      // Q2 was added but left unconfigured (this test only verifies the eye-icon
+      // visibility behavior), so it cannot pass save validation — discard.
+      await msql.discardPanel();
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
@@ -564,7 +579,9 @@ test.describe("Multi-SQL Query Support", () => {
       await expect(msql.queryTab(0)).toBeVisible();
       await expect(msql.queryTab(1)).toBeVisible();
 
-      await msql.applyAndSave(pm);
+      // Q2 was added but left unconfigured (this test only verifies tab survival
+      // across chart-type switches), so it cannot pass save validation — discard.
+      await msql.discardPanel();
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
@@ -682,7 +699,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.queryTabNameInput(0).waitFor({ state: "visible", timeout: 5000 });
       await msql.queryTabNameInput(0).fill("Production");
       await msql.queryTabNameInput(0).press("Enter");
-      await page.waitForTimeout(300);
+      await expect(msql.queryTabNameInput(0)).not.toBeVisible({ timeout: 5000 });
 
       // Rename Q2 tab
       await msql.switchToQueryTab(1);
@@ -690,7 +707,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.queryTabNameInput(1).waitFor({ state: "visible", timeout: 5000 });
       await msql.queryTabNameInput(1).fill("Staging");
       await msql.queryTabNameInput(1).press("Enter");
-      await page.waitForTimeout(300);
+      await expect(msql.queryTabNameInput(1)).not.toBeVisible({ timeout: 5000 });
 
       // Apply to propagate the renamed tab names to metaData
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -732,7 +749,6 @@ test.describe("Multi-SQL Query Support", () => {
       // chart-execution error. The inline error panel must appear even though
       // we are currently viewing Q1 (not Q2).
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await page.waitForTimeout(3000);
 
       // DashboardErrors.vue renders two elements with data-test="dashboard-error":
       //   - the outer conditional wrapper (first)
@@ -749,6 +765,9 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.switchToQueryTab(0);
       await expect(errorWrapper).toBeVisible();
 
+      // Q2 is intentionally invalid (this test verifies the error surfaces), so
+      // the panel cannot be saved — discard to leave add_panel before cleanup.
+      await msql.discardPanel();
       await cleanupTestDashboard(page, pm, dashboardName);
     }
   );
@@ -1167,7 +1186,9 @@ test.describe("Multi-SQL Query Support", () => {
         // Q2 now has no x-field → excluded from check → warning gone
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 5000 });
 
-        await msql.applyAndSave(pm);
+        // Q2 deliberately has no x-field (invalid for a bar panel), so the panel
+        // cannot be saved — discard to leave add_panel before cleanup.
+        await msql.discardPanel();
         await cleanupTestDashboard(page, pm, dashboardName);
       }
     );
@@ -1199,7 +1220,9 @@ test.describe("Multi-SQL Query Support", () => {
         // Q2 has no x-field → excluded from inconsistency check → no warning
         await expect(xAliasWarning(page)).not.toBeVisible({ timeout: 3000 });
 
-        await msql.applyAndSave(pm);
+        // Q2 deliberately has only a y-field (invalid for a bar panel), so the
+        // panel cannot be saved — discard to leave add_panel before cleanup.
+        await msql.discardPanel();
         await cleanupTestDashboard(page, pm, dashboardName);
       }
     );

@@ -20,6 +20,7 @@ export default class DashboardMultiSQL {
     );
     this.customQueryBtn = page.locator('[data-test="dashboard-custom-query-type"]');
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    this.discardBtn = page.locator('[data-test="dashboard-panel-discard"]');
   }
 
   // ---------------------------------------------------------------------------
@@ -108,9 +109,25 @@ export default class DashboardMultiSQL {
     await this.addQueryBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.addQueryBtn.click();
     await this.queryTab(expectedTabIndex).waitFor({ state: "visible", timeout: 15000 });
-    // Allow Vue reactivity and sidebar to settle
-    await this.page.waitForTimeout(1500);
+    // The newly-added tab becomes the active tab synchronously (currentQueryIndex
+    // is set to the new index). Wait for that deterministic state instead of a
+    // fixed sleep, so the sidebar reflects the new query before it is configured.
+    await this.waitForActiveQueryTab(expectedTabIndex);
     testLogger.debug("Added query tab", { expectedTabIndex });
+  }
+
+  /**
+   * Wait until the query tab at the given index is the ACTIVE tab.
+   * Reka UI's TabsTrigger marks the active tab with data-state="active"
+   * (and aria-selected="true") on the same button that carries the data-test.
+   * This is the deterministic replacement for fixed "settle" sleeps.
+   * @param {number} index
+   * @param {number} timeout
+   */
+  async waitForActiveQueryTab(index, timeout = 15000) {
+    await this.page
+      .locator(`[data-test="dashboard-panel-query-tab-${index}"][data-state="active"]`)
+      .waitFor({ state: "visible", timeout });
   }
 
   /**
@@ -119,7 +136,9 @@ export default class DashboardMultiSQL {
    */
   async switchToQueryTab(index) {
     await this.queryTab(index).click();
-    await this.page.waitForTimeout(500);
+    // Wait for the clicked tab to actually become active (its fields/editor are
+    // rendered for that query) instead of a fixed sleep.
+    await this.waitForActiveQueryTab(index, 10000);
   }
 
   /**
@@ -151,7 +170,19 @@ export default class DashboardMultiSQL {
     await this.page.keyboard.press("Backspace");
     await this.page.keyboard.type(sql, { delay: 20 });
     await this.page.keyboard.press("Escape");
-    await this.page.waitForTimeout(2000); // allow Monaco debounce to sync
+    // Wait deterministically for Monaco to reflect the typed SQL (debounce flush)
+    // instead of a fixed sleep — mirrors the no-timeout VRL editor pattern.
+    const snippet = sql.trim().substring(0, 12);
+    if (snippet) {
+      await this.page.waitForFunction(
+        ({ sel, text }) => {
+          const el = document.querySelector(sel);
+          return !!el && (el.textContent || "").includes(text);
+        },
+        { sel: '[data-test="dashboard-panel-query-editor"]', text: snippet },
+        { timeout: 10000 },
+      );
+    }
   }
 
   /**
@@ -168,10 +199,12 @@ export default class DashboardMultiSQL {
       const firstTab = this.queryTab(0);
       if (await firstTab.isVisible().catch(() => false)) {
         await firstTab.click();
-        await this.page.waitForTimeout(500);
+        await this.waitForActiveQueryTab(0, 10000).catch(() => {});
       }
       await pm.dashboardPanelActions.applyDashboardBtn();
-      await this.page.waitForTimeout(2000);
+      // Wait for the apply/query cycle to finish (apply button re-enabled)
+      // instead of a fixed sleep before saving.
+      await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
       await pm.dashboardPanelActions.savePanel();
       // Wait for navigation away from add_panel page after save
       await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
@@ -179,7 +212,29 @@ export default class DashboardMultiSQL {
       }).catch(() => {
         testLogger.warn("applyAndSave: did not navigate away from add_panel within timeout");
       });
-      await this.page.waitForTimeout(1000);
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
+  }
+
+  /**
+   * Discard the current panel and return to the dashboard view page.
+   * Use this for teardown when the panel intentionally contains an
+   * incomplete/invalid query (which cannot pass save validation) or when the
+   * test does not need to persist the panel. Discarding an edited panel fires a
+   * native window.confirm — Playwright auto-dismisses dialogs by default, which
+   * would cancel navigation and leave the page on add_panel — so accept it.
+   */
+  async discardPanel() {
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      await this.discardBtn.waitFor({ state: "visible", timeout: 15000 });
+      await this.discardBtn.click();
+      // Discard navigates to the dashboard view page (/dashboards/view).
+      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
+        timeout: 30000,
+      });
     } finally {
       this.page.off("dialog", dialogHandler);
     }
@@ -193,7 +248,14 @@ export default class DashboardMultiSQL {
   async openQueryInspector() {
     await this.queryInspectorBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.queryInspectorBtn.click();
-    await this.page.waitForTimeout(1000);
+    // Wait for the inspector dialog to open (and its first query name to render)
+    // instead of a fixed sleep before reading page content.
+    await this.page
+      .locator('[data-test="query-inspector"]')
+      .waitFor({ state: "visible", timeout: 15000 });
+    await this.queryInspectorQueryName(0)
+      .waitFor({ state: "visible", timeout: 15000 })
+      .catch(() => {});
     return await this.page.content();
   }
 
