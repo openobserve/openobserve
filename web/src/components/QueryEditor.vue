@@ -81,14 +81,22 @@
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
-        @focus="emit('focus')"
-        @blur="emit('blur')"
+        @focus="() => { editorFocused.value = true; emit('focus') }"
+        @blur="() => { editorFocused.value = false; emit('blur') }"
         @nlpModeDetected="handleNlpModeDetected"
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
         @generation-success="handleGenerationSuccess"
         class="monaco-editor tw:w-full tw:h-full"
       />
+
+      <!-- Floating typewriter placeholder shown when editor is empty and unfocused -->
+      <span
+        v-if="showPlaceholder"
+        class="query-editor__placeholder"
+        :data-test="`${dataTestPrefix}-placeholder`"
+        aria-hidden="true"
+      >{{ placeholderText }}<span class="query-editor__caret" /></span>
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
@@ -108,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
@@ -260,7 +268,6 @@ const rootStyle = computed(() => {
   if (props.editorHeight === '100%') {
     return { height: '100%' };
   }
-  // For fixed/calc heights, apply to the root so it sizes correctly in any parent
   return { height: props.editorHeight };
 });
 
@@ -438,6 +445,91 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   emit('generation-success', { type, message });
 };
 
+// ───── Floating typewriter placeholder ─────
+const editorFocused = ref(false);
+const placeholderText = ref('');
+
+const placeholderPhrases = computed<string[]>(() => {
+  if (currentLanguage.value === 'vrl') {
+    return ["Write a VRL function (e.g. .status = to_int!(.status))"];
+  }
+  if (currentLanguage.value === 'promql') {
+    return ["Write a PromQL query (e.g. rate(http_requests_total[5m]))"];
+  }
+  return ["Write a SQL query (e.g. SELECT * FROM 'logs' WHERE status=500 LIMIT 100)"];
+});
+
+const showPlaceholder = computed(
+  () => !editorFocused.value && (!props.query || !props.query.trim()),
+);
+
+const createTypewriter = (
+  getPhrases: () => string[],
+  target: { value: string },
+  isActive: () => boolean,
+) => {
+  let phraseIdx = 0;
+  let charIdx = 0;
+  let mode: 'typing' | 'pausing' | 'deleting' = 'typing';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const tick = () => {
+    if (!isActive()) {
+      target.value = '';
+      timer = setTimeout(tick, 400);
+      return;
+    }
+    const phrases = getPhrases();
+    phraseIdx = phraseIdx % phrases.length;
+    const current = phrases[phraseIdx];
+    if (mode === 'typing') {
+      charIdx++;
+      target.value = current.slice(0, charIdx);
+      if (charIdx >= current.length) {
+        mode = 'pausing';
+        timer = setTimeout(() => {
+          mode = phrases.length > 1 ? 'deleting' : 'typing';
+          charIdx = phrases.length > 1 ? charIdx : 0;
+          tick();
+        }, 1800);
+        return;
+      }
+      timer = setTimeout(tick, 60);
+    } else if (mode === 'deleting') {
+      charIdx--;
+      target.value = current.slice(0, charIdx);
+      if (charIdx <= 0) {
+        phraseIdx = (phraseIdx + 1) % phrases.length;
+        mode = 'typing';
+      }
+      timer = setTimeout(tick, 30);
+    }
+  };
+
+  return {
+    start: () => { if (timer) return; tick(); },
+    stop: () => { if (timer) clearTimeout(timer); timer = null; },
+    restart: () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      phraseIdx = 0; charIdx = 0; mode = 'typing';
+      target.value = '';
+      tick();
+    },
+  };
+};
+
+const typewriter = createTypewriter(
+  () => placeholderPhrases.value,
+  placeholderText,
+  () => showPlaceholder.value,
+);
+
+watch(currentLanguage, () => { typewriter.restart(); });
+
+onMounted(() => { typewriter.start(); });
+onBeforeUnmount(() => { typewriter.stop(); });
+
 // Watch for language prop changes
 watch(() => props.defaultLanguage, (newLang) => {
   if (newLang && newLang !== currentLanguage.value) {
@@ -535,6 +627,7 @@ defineExpose({
 
   // Streaming response (for AI status display)
   streamingResponse: computed(() => editorRef.value?.streamingResponse),
+
 });
 </script>
 
@@ -551,11 +644,43 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
+/* Floating typewriter placeholder shown when the editor is empty and unfocused.
+   Font + left position match Monaco's actual render settings:
+   glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
+.query-editor__placeholder {
+  position: absolute;
+  top: 0;
+  left: 0.8rem;
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
+  font-size: 0.7875rem;
+  line-height: 1.375rem;
+  color: var(--o2-text-placeholder, var(--o2-text-muted));
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.query-editor__caret {
+  display: inline-block;
+  width: 0.0625rem;
+  height: 0.875rem;
+  margin-left: 0.125rem;
+  vertical-align: middle;
+  background: currentColor;
+  animation: query-editor-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes query-editor-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
 .ai-floating-button {
   position: absolute;
   top: 0.1875rem;
-  right: 1.375rem;
+  right: 2.375rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;
