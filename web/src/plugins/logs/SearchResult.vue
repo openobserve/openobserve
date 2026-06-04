@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="tw:flex tw:min-h-[28px] tw:pt-[0.375rem] tw:shrink-0">
+      <div class="tw:flex tw:items-center tw:py-0.5 tw:shrink-0 result-bar">
         <div
           class="tw:w-2/3 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
@@ -69,73 +69,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'histogram-unavailable-text-light'
             "
           >
-            <!-- {{ searchObj.data.histogram.errorMsg }} -->
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
-          <!-- Inspect Button -->
-          <OButton
-            v-if="
-              searchObj.data?.queryResults?.hits?.length > 0 &&
-              searchObj.data.lastSearchTraceId &&
-              config.isEnterprise == 'true' &&
-              config.isCloud == 'false' &&
-              store.state.zoConfig.search_inspector_enabled
-            "
-            variant="ghost-primary"
-            size="icon"
-            class="analyze-button inspect-button"
-            @click="openSearchJobInspector"
-            data-test="logs-inspect-button"
-          >
-            <OIcon name="troubleshoot" size="sm" />
-            <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
-          </OButton>
-          <!-- Volume Analysis Button -->
-          <OButton
-            v-if="
-              searchObj.data?.queryResults?.hits?.length > 0 &&
-              !searchObj.meta.sqlMode
-            "
-            variant="ghost-primary"
-            size="icon"
-            class="analyze-button"
-            @click="openVolumeAnalysisDashboard"
-            data-test="logs-analyze-dimensions-button"
-          >
-            <OIcon name="timeline" size="sm" />
-            <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
-          </OButton>
-          <ORefreshButton
-            :last-run-at="searchObj.meta.lastRunAt"
-            :loading="searchObj.loading || searchObj.loadingHistogram"
-            :disabled="searchObj.loading || searchObj.loadingHistogram"
-            @click="$emit('run-query')"
-            class="tw:ml-2"
-          />
         </div>
 
         <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
-          <!-- Wrap Content Button -->
-          <OButton
-            v-if="
-              searchObj.meta.logsVisualizeToggle === 'logs' ||
-              searchObj.meta.logsVisualizeToggle === 'patterns'
-            "
-            data-test="logs-search-result-wrap-table-content-btn"
-            variant="ghost"
-            size="icon"
-            class="wrap-content-btn"
-            :class="{
-              'wrap-content-btn--active': searchObj.meta.toggleSourceWrap,
-            }"
-            @click="
-              searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap
-            "
+          <!-- Refresh button in bordered container to match action button style -->
+          <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6">
+            <ORefreshButton
+              :last-run-at="searchObj.meta.lastRunAt"
+              :loading="searchObj.loading || searchObj.loadingHistogram"
+              :disabled="searchObj.loading || searchObj.loadingHistogram"
+              @click="$emit('run-query')"
+            />
+          </div>
+
+          <!-- OVERFLOW MENU (narrow container) -->
+          <ODropdown
+            v-if="(showWrapBtn || showInspectBtn || showAnalyzeBtn) && shouldMoveActionsToMenu"
+            side="bottom"
+            align="end"
           >
-            <OIcon name="wrap-text" size="sm" />
-            <OTooltip :content="t('search.messageWrapContent')" />
-          </OButton>
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="icon-chip"
+                data-test="logs-result-actions-menu-btn"
+              >
+                <OIcon name="more-horiz" size="sm" />
+                <OTooltip :content="t('search.moreActions')" />
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-if="showWrapBtn"
+              data-test="logs-result-wrap-menu-item"
+              @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+            >
+              <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
+              {{ t('search.messageWrapContent') }}
+              <template v-if="searchObj.meta.toggleSourceWrap" #icon-right>
+                <OIcon name="check" size="sm" />
+              </template>
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="showInspectBtn"
+              data-test="logs-inspect-button"
+              @select="openSearchJobInspector"
+            >
+              <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
+              {{ t('volumeInsights.searchInspectionsLabel') }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="showAnalyzeBtn"
+              data-test="logs-analyze-dimensions-button"
+              @select="openVolumeAnalysisDashboard"
+            >
+              <template #icon-left><OIcon name="timeline" size="sm" /></template>
+              {{ t('volumeInsights.analyzeTooltipLogs') }}
+            </ODropdownItem>
+          </ODropdown>
+
+          <!-- INLINE ACTION BUTTONS (wider container) -->
+          <div
+            v-if="(showInspectBtn || showAnalyzeBtn || showWrapBtn) && !shouldMoveActionsToMenu"
+            class="tw:inline-flex tw:items-center tw:gap-0.5"
+          >
+            <OButton
+              v-if="showInspectBtn"
+              variant="outline"
+              size="icon-chip"
+              @click="openSearchJobInspector"
+              data-test="logs-inspect-button"
+            >
+              <OIcon name="troubleshoot" size="sm" />
+              <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
+            </OButton>
+            <OButton
+              v-if="showAnalyzeBtn"
+              variant="outline"
+              size="icon-chip"
+              @click="openVolumeAnalysisDashboard"
+              data-test="logs-analyze-dimensions-button"
+            >
+              <OIcon name="timeline" size="sm" />
+              <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
+            </OButton>
+            <OButton
+              v-if="showWrapBtn"
+              variant="outline"
+              size="icon-chip"
+              :active="searchObj.meta.toggleSourceWrap"
+              @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+              data-test="logs-search-result-wrap-table-content-btn"
+            >
+              <OIcon name="wrap-text" size="sm" />
+              <OTooltip :content="t('search.messageWrapContent')" />
+            </OButton>
+          </div>
+
           <OSelect
             v-if="
               searchObj.meta.resultGrid.showPagination &&
@@ -172,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ?.length) || 0,
               )
             "
+            :max-pages="paginationMaxPages"
             class="paginator-section"
             @update:model-value="getPageData('pageChange')"
             data-test="logs-search-result-pagination"
@@ -571,6 +604,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -603,7 +638,9 @@ export default defineComponent({
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
     OIcon,
-},
+    ODropdown,
+    ODropdownItem,
+  },
   emits: [
     "update:scroll",
     "update:datetime",
@@ -827,7 +864,14 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
-    const searchListContainer = ref(null);
+    const searchListContainer = ref<HTMLElement | null>(null);
+
+    // Responsive: observe the outer container (reacts to splitter + window resize)
+    const containerWidth = ref(9999);
+    let containerResizeObserver: ResizeObserver | null = null;
+    // < 420px: show 3 page buttons instead of 5
+    const paginationMaxPages = computed(() => containerWidth.value < 420 ? 3 : 5);
+
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");
     const scrollPosition = ref(0);
@@ -1113,10 +1157,20 @@ export default defineComponent({
     onMounted(() => {
       reDrawChart();
       window.addEventListener("themeColorChanged", handleThemeColorChange);
+
+      // Observe the outer container so breakpoints respond to splitter + window resize
+      if (searchListContainer.value) {
+        containerWidth.value = searchListContainer.value.getBoundingClientRect().width;
+        containerResizeObserver = new ResizeObserver((entries) => {
+          containerWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        containerResizeObserver.observe(searchListContainer.value);
+      }
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
+      containerResizeObserver?.disconnect();
       // Clear any pending debounce timer
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -1665,6 +1719,8 @@ export default defineComponent({
       config,
       plotChart,
       searchObj,
+      containerWidth,
+      paginationMaxPages,
       patternsState,
       updatedLocalLogFilterField,
       byString,
@@ -1773,6 +1829,31 @@ export default defineComponent({
           ? this.histogramSelectionRange.end
           : this.searchObj.data.datetime.endTime,
       };
+    },
+    // Responsive: collapse action buttons to overflow menu when container is narrow
+    shouldMoveActionsToMenu() {
+      return this.containerWidth < 700;
+    },
+    showInspectBtn() {
+      return (
+        this.searchObj.data?.queryResults?.hits?.length > 0 &&
+        this.searchObj.data.lastSearchTraceId &&
+        this.config.isEnterprise == "true" &&
+        this.config.isCloud == "false" &&
+        this.store.state.zoConfig.search_inspector_enabled
+      );
+    },
+    showAnalyzeBtn() {
+      return (
+        this.searchObj.data?.queryResults?.hits?.length > 0 &&
+        !this.searchObj.meta.sqlMode
+      );
+    },
+    showWrapBtn() {
+      return (
+        this.searchObj.meta.logsVisualizeToggle === "logs" ||
+        this.searchObj.meta.logsVisualizeToggle === "patterns"
+      );
     },
   },
   watch: {
