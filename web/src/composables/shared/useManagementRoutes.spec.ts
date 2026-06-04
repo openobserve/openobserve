@@ -317,7 +317,7 @@ describe("useManagementRoutes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
         "query_management", "cipherKeys", "pipelineDestinations", 
-        "nodes", "domainManagement", "regexPatterns"
+        "llmProviders", "nodes", "domainManagement", "regexPatterns"
       ];
       
       enterpriseRoutes.forEach(routeName => {
@@ -341,7 +341,7 @@ describe("useManagementRoutes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
         "query_management", "cipherKeys", "pipelineDestinations", 
-        "nodes", "domainManagement", "regexPatterns"
+        "llmProviders", "nodes", "domainManagement", "regexPatterns"
       ];
       
       enterpriseRoutes.forEach(routeName => {
@@ -350,9 +350,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 15 children routes when enterprise is enabled", () => {
+    it("should have exactly 17 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(16); // 6 base + 10 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, storageSettings, nodes, domainManagement, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(17); // 6 base + 11 enterprise
     });
   });
 
@@ -420,16 +420,16 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 17 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 18 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(17); // 6 base + 10 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(18); // 6 base + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
         "query_management", "cipherKeys", "pipelineDestinations", 
-        "nodes", "domainManagement", "regexPatterns"
+        "llmProviders", "nodes", "domainManagement", "regexPatterns"
       ];
       
       enterpriseRoutes.forEach(routeName => {

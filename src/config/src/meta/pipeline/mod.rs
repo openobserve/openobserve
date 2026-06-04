@@ -18,7 +18,6 @@ use std::collections::{HashMap, HashSet};
 use anyhow::{Result, anyhow};
 use components::{DerivedStream, Edge, Node, NodeData, PipelineSource};
 use serde::{Deserialize, Serialize};
-use sqlx::{Decode, Error, FromRow, Row, Type};
 use utoipa::ToSchema;
 
 use crate::{
@@ -40,6 +39,27 @@ pub type PipelineExecDFS = (
     HashMap<String, VRLResultResolver>,
 );
 
+/// Distinguishes user-created pipelines from system-managed evaluation pipelines.
+///
+/// - `User` pipelines are visible in the Pipeline UI and subject to the "one realtime pipeline per
+///   stream" constraint.
+/// - `Evaluation` pipelines are hidden from the Pipeline UI, managed exclusively by the Online Eval
+///   subsystem, and any number can coexist with a user pipeline on the same stream.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, ToSchema)]
+pub enum PipelineKind {
+    #[serde(rename = "user")]
+    #[default]
+    User,
+    #[serde(rename = "evaluation")]
+    Evaluation,
+}
+
+impl MemorySize for PipelineKind {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<PipelineKind>()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Pipeline {
     #[serde(rename = "pipeline_id", default)]
@@ -55,6 +75,8 @@ pub struct Pipeline {
     pub description: String,
     #[serde(default)]
     pub source: PipelineSource,
+    #[serde(default)]
+    pub kind: PipelineKind,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
 }
@@ -65,13 +87,25 @@ impl MemorySize for Pipeline {
             + self.id.mem_size()
             + self.org.mem_size()
             + self.name.mem_size()
+            + self.description.mem_size()
             + self.source.mem_size()
+            + self.kind.mem_size()
             + self.nodes.mem_size()
             + self.edges.mem_size()
     }
 }
 
 impl Pipeline {
+    /// Returns true if this is a user-created pipeline.
+    pub fn is_user(&self) -> bool {
+        self.kind == PipelineKind::User
+    }
+
+    /// Returns true if this is a system-managed evaluation pipeline.
+    pub fn is_evaluation(&self) -> bool {
+        self.kind == PipelineKind::Evaluation
+    }
+
     pub fn get_cache_key(&self) -> String {
         match &self.source {
             PipelineSource::Realtime(stream_params) => {
@@ -317,14 +351,14 @@ impl Pipeline {
     }
 }
 
-impl<'r, R: Row> FromRow<'r, R> for Pipeline
+impl<'r, R: sqlx::Row> sqlx::FromRow<'r, R> for Pipeline
 where
     &'r ::std::primitive::str: ::sqlx::ColumnIndex<R>,
-    String: Type<R::Database> + Decode<'r, R::Database>,
-    i32: Type<R::Database> + Decode<'r, R::Database>,
-    bool: Type<R::Database> + Decode<'r, R::Database>,
+    String: sqlx::Type<R::Database> + sqlx::Decode<'r, R::Database>,
+    i32: sqlx::Type<R::Database> + sqlx::Decode<'r, R::Database>,
+    bool: sqlx::Type<R::Database> + sqlx::Decode<'r, R::Database>,
 {
-    fn from_row(row: &'r R) -> Result<Self, Error> {
+    fn from_row(row: &'r R) -> Result<Self, sqlx::Error> {
         let id: String = row.try_get("id")?;
         let version: i32 = row.try_get("version")?;
         let enabled: bool = row.try_get("enabled")?;
@@ -332,6 +366,13 @@ where
         let name: String = row.try_get("name")?;
         let description: String = row.try_get("description")?;
         let source_type: String = row.try_get("source_type")?;
+
+        // Backward-compat: default to User for rows without a `kind` column
+        let kind: PipelineKind = row
+            .try_get::<String, _>("kind")
+            .ok()
+            .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok())
+            .unwrap_or_default();
 
         let source = match source_type.as_str() {
             "realtime" => {
@@ -371,6 +412,7 @@ where
             name,
             description,
             source,
+            kind,
             nodes,
             edges,
         })
@@ -458,6 +500,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -494,6 +537,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -529,6 +573,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -557,6 +602,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![], // Empty nodes
             edges: vec![],
         };
@@ -580,6 +626,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -631,6 +678,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -700,6 +748,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -747,6 +796,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -798,6 +848,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![Node::new(
                 "1".to_string(),
                 NodeData::Stream(StreamParams::new(
@@ -841,6 +892,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -896,6 +948,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -941,6 +994,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -974,6 +1028,7 @@ mod tests {
             name: "test_pipeline".to_string(),
             description: "test description".to_string(),
             source: PipelineSource::Scheduled(derived_stream),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -998,6 +1053,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![Node::new(
                 "1".to_string(),
                 NodeData::RemoteStream(crate::meta::stream::RemoteStreamParams {
@@ -1045,6 +1101,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![node],
             edges: vec![],
         };
@@ -1077,6 +1134,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -1139,6 +1197,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -1194,6 +1253,7 @@ mod tests {
                 "test_stream",
                 StreamType::Logs,
             )),
+            kind: PipelineKind::User,
             nodes: vec![
                 Node::new(
                     "1".to_string(),
@@ -1284,6 +1344,7 @@ mod tests {
             name: "p".to_string(),
             description: String::new(),
             source: PipelineSource::Realtime(StreamParams::new("org", "src", StreamType::Logs)),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
@@ -1326,6 +1387,7 @@ mod tests {
             name: "p".to_string(),
             description: String::new(),
             source: PipelineSource::Realtime(StreamParams::new("org", "src", StreamType::Logs)),
+            kind: PipelineKind::User,
             nodes: vec![],
             edges: vec![],
         };
