@@ -252,6 +252,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div
+            v-else-if="
+              searchObj.meta.showHistogram &&
+              (searchObj.loadingHistogram || searchObj.loading)
+            "
+            class="histogram-skeleton"
+            data-test="logs-search-histogram-skeleton"
+          >
+            <!-- main row: y-axis labels + plot area -->
+            <div class="histogram-skeleton__main">
+              <div class="histogram-skeleton__y-axis">
+                <div class="histogram-skeleton__y-label" style="width: 1.75rem" />
+                <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
+                <div class="histogram-skeleton__y-label" style="width: 1rem" />
+              </div>
+              <div class="histogram-skeleton__plot">
+                <div class="histogram-skeleton__bars">
+                  <div
+                    v-for="h in skeletonBarHeights"
+                    :key="h.id"
+                    class="histogram-skeleton__bar"
+                    :style="{ height: h.pct + '%' }"
+                  />
+                </div>
+              </div>
+            </div>
+            <!-- x-axis labels row -->
+            <div class="histogram-skeleton__x-axis">
+              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label" />
+            </div>
+          </div>
+
+          <div
             class="histogram-empty"
             data-test="logs-search-no-data-histogram"
             v-else-if="
@@ -1567,6 +1599,14 @@ export default defineComponent({
       return searchObj.meta.showHistogram && searchObj.loadingHistogram == true;
     });
 
+    // 250 bars × 9px (7px bar + 2px gap) = 2250px — covers any viewport width.
+    // Heights cycle through a realistic uneven pattern so it looks like real log data.
+    const SKELETON_HEIGHTS = [45,72,58,88,62,42,78,52,73,38,68,83,48,68,44,92,62,38,72,56,32,82,48,64,38,88,68,44,78,52,40,95,55,70,30,85,65,50,75,42];
+    const skeletonBarHeights = Array.from({ length: 250 }, (_, i) => ({
+      id: i,
+      pct: SKELETON_HEIGHTS[i % SKELETON_HEIGHTS.length],
+    }));
+
     const sendToAiChat = (value: any, append: boolean = true) => {
       emit("sendToAiChat", value, append);
     };
@@ -1770,6 +1810,7 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       histogramLoader,
+      skeletonBarHeights,
       sendToAiChat,
       closeTable,
       getRowIndex,

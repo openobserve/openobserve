@@ -796,7 +796,7 @@ const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 const headers = computed(() => headerGroups.value.headers);
 
 // Skeleton loading helpers — mirrors OTable shimmer pattern
-const SKEL_ROW_COUNT = 12;
+const SKEL_ROW_COUNT = 30;
 const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
 const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
 // Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
