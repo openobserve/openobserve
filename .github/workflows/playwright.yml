@@ -171,6 +171,7 @@ jobs:
                 "org.spec.js",
                 "theme-management.spec.js",
                 "ingestion-config.spec.js",
+                "ingestionTokens.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
               ]
