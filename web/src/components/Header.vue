@@ -330,18 +330,18 @@ size="xs" class="warning" />{{
       <!-- SLACK COMMUNITY LINK -->
       <OButton
         variant="ghost"
-        size="icon-panel"
+        size="icon-toolbar"
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="tw:opacity-70 tw:size-6 tw:shrink-0" />
+        <component :is="slackIcon" class="tw:opacity-70 tw:size-5 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
       <!-- HELP MENU: Contains links to docs, API, and about page -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
-          <OButton variant="ghost" size="icon-panel" data-test="menu-link-help-item">
+          <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
             <OIcon name="help-outline" size="md" class="tw:opacity-70" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
@@ -387,7 +387,7 @@ size="xs" class="warning" />{{
       <!-- SETTINGS BUTTON -->
       <OButton
         variant="ghost"
-        size="icon-panel"
+        size="icon-toolbar"
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
@@ -404,7 +404,7 @@ size="xs" class="warning" />{{
         <template #trigger>
           <OButton
             variant="ghost"
-            size="icon-panel"
+            size="icon-toolbar"
             data-test="header-my-account-profile-icon"
           >
             <OIcon

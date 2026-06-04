@@ -134,7 +134,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     <TabsList as-child :loop="true">
       <div
         ref="tablistRef"
-        :class="['o-tabs tw:flex tw:flex-col tw:gap-1 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
+        :class="['o-tabs tw:flex tw:flex-col tw:gap-0.5 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
       >
         <slot />
       </div>

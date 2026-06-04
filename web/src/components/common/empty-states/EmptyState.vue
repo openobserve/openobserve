@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="tw:h-px tw:flex-1 tw:bg-border-default" />
           <span
-            class="tw:text-[0.6875rem] tw:font-semibold tw:uppercase tw:tracking-[0.12em] tw:text-text-secondary tw:whitespace-nowrap"
+            class="tw:text-[0.6875rem] tw:font-semibold tw:text-text-secondary tw:whitespace-nowrap"
             >{{ actionsLabel }}</span
           >
           <span class="tw:h-px tw:flex-1 tw:bg-border-default" />

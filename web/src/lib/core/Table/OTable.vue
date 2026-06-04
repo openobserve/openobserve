@@ -46,7 +46,10 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   error: null,
   dense: true,
   bordered: true,
-  frame: true,
+  // No outer box border on tables (design system): the app chrome already frames
+  // content, and CRUD listing tables sit flush to the edges. Row dividers (the
+  // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
+  frame: false,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -339,7 +342,9 @@ const {
   parentRef: scrollContainerRef,
   scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
   scrollMargin: props.scrollMargin ?? 0,
-  rowHeight: props.rowHeight ?? (props.dense ? 36 : 54),
+  // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
+  // virtualizer's measured height matches the actual rendered row height.
+  rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: 100,
 });
 

@@ -205,9 +205,10 @@ watch(
 // md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 // Height applied to the wrapper (so border is included in the box, matching OSelect).
 // The inner input fills the wrapper via h-full.
+// 34px control height per the design system (HANDOFF §11: input height 34px).
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
-  sm: "tw:h-8",
-  md: "tw:h-8",
+  sm: "tw:h-[2.125rem]",
+  md: "tw:h-[2.125rem]",
 };
 const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "tw:text-sm",

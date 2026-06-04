@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>O2 — Design System Spec Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{
+--iris-200:#F7F9FE;--iris-300:#EFF1FD;--iris-400:#E4E9FE;--iris-500:#D7DEFE;--iris-700:#B3BDF1;--iris-900:#6B76E3;--iris-1000:#6069D3;--iris-1100:#575FC5;--iris-1200:#282D5D;
+--g-0:#FFFFFF;--g-50:#FBFBFD;--g-100:#F5F6F9;--g-150:#EEF0F4;--g-200:#E6E8EE;--g-300:#DADCE4;--g-400:#B4B8C4;--g-500:#7C808E;--g-600:#5C606E;--g-700:#474A56;--g-800:#33363F;--g-900:#1B1D24;
+--ok:#1F8A5B;--warn:#B7791F;--danger:#D14343;--info:#2A6FDB;
+--primary:#575FC5;--text:#1B1D24;--text-2:#474A56;--text-3:#5C606E;--border:#E6E8EE;--border-soft:#EEF0F4;
+--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',-apple-system,sans-serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:var(--sans);color:var(--text);background:var(--g-100);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;}
+.mono{font-family:var(--mono);font-feature-settings:"tnum";letter-spacing:-.2px;}
+.page{max-width:1080px;margin:0 auto;padding:0 28px 80px;}
+header.cover{background:linear-gradient(150deg,var(--iris-1100),var(--iris-1200));color:#fff;padding:54px 28px 48px;margin-bottom:36px;}
+header.cover .inner{max-width:1080px;margin:0 auto;}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:26px;}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.16);display:grid;place-items:center;}
+.brand .logo svg{stroke:#fff;}
+.brand .wm{font-weight:700;font-size:18px;letter-spacing:-.3px;}
+header.cover h1{font-size:34px;font-weight:700;letter-spacing:-1px;margin:0 0 10px;}
+header.cover p{font-size:15px;color:rgba(255,255,255,.82);margin:0;max-width:620px;line-height:1.6;}
+.locked{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;}
+.locked .pill{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:600;}
+.locked .pill b{color:#fff;}
+.locked .pill span{color:rgba(255,255,255,.7);font-weight:400;}
+
+section{background:var(--g-0);border:1px solid var(--border);border-radius:14px;padding:26px 28px;margin-bottom:20px;box-shadow:0 1px 2px rgba(20,22,30,.04);}
+.eyebrow{font-size:12px;font-weight:600;color:var(--primary);margin:0 0 4px;}
+h2{font-size:21px;font-weight:700;letter-spacing:-.4px;margin:0 0 4px;}
+.sec-sub{color:var(--text-3);font-size:13.5px;margin:0 0 22px;}
+h3{font-size:14px;font-weight:600;color:var(--text-2);margin:24px 0 10px;}
+p{margin:0 0 12px;}
+.muted{color:var(--text-3);}
+
+/* token swatches */
+.ramp{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;margin-bottom:8px;}
+.sw{border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.sw .chip{height:54px;}
+.sw .meta{padding:7px 9px;}
+.sw .meta .n{font-size:11.5px;font-weight:600;}
+.sw .meta .h{font-size:10.5px;color:var(--text-3);}
+.semantic{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.semantic .s{display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:9px 11px;}
+.semantic .s .dot{width:24px;height:24px;border-radius:7px;flex:none;}
+.semantic .s .lbl{font-size:12px;}
+.semantic .s .lbl b{display:block;font-weight:600;}
+.semantic .s .lbl span{color:var(--text-3);font-size:11px;}
+
+/* type specimen */
+.specimen>div{padding:12px 0;border-bottom:1px solid var(--border-soft);display:flex;align-items:baseline;gap:18px;}
+.specimen>div:last-child{border-bottom:none;}
+.specimen .tag{width:150px;flex:none;font-size:11.5px;color:var(--text-3);}
+.weights{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.weights .w{border:1px solid var(--border);border-radius:10px;padding:14px;}
+.weights .w .num{font-size:13px;color:var(--text-3);margin-bottom:6px;}
+.weights .w .demo{font-size:18px;}
+
+/* gallery */
+.gallery{display:grid;gap:18px;}
+.shot{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--g-50);}
+.shot img{width:100%;display:block;border-bottom:1px solid var(--border);}
+.shot .cap{padding:11px 15px;}
+.shot .cap b{font-weight:600;font-size:13.5px;}
+.shot .cap p{margin:3px 0 0;font-size:12.5px;color:var(--text-3);}
+
+/* rules cards */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.card{border:1px solid var(--border);border-radius:11px;padding:15px 16px;}
+.card .h{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px;margin-bottom:6px;}
+.card .h .ico{width:26px;height:26px;border-radius:7px;background:var(--iris-300);color:var(--iris-1100);display:grid;place-items:center;flex:none;}
+.card p{font-size:12.5px;color:var(--text-3);margin:0;line-height:1.5;}
+
+table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 4px;}
+th{text-align:left;font-size:11.5px;font-weight:600;color:var(--text-3);padding:8px 10px;border-bottom:1px solid var(--border);}
+td{padding:8px 10px;border-bottom:1px solid var(--border-soft);vertical-align:top;}
+td.k{font-weight:600;white-space:nowrap;}
+code{font-family:var(--mono);font-size:12px;background:var(--g-100);padding:1px 6px;border-radius:5px;color:var(--iris-1100);}
+.note{display:flex;gap:10px;background:var(--iris-200);border:1px solid var(--iris-300);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--text-2);margin-top:14px;}
+.note svg{flex:none;color:var(--iris-1100);}
+.foot{text-align:center;color:var(--text-3);font-size:12px;padding:24px 0 0;}
+@media print{body{background:#fff;}section{break-inside:avoid;box-shadow:none;}header.cover{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+@media (max-width:720px){.cards{grid-template-columns:1fr;}.weights{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<header class="cover">
+  <div class="inner">
+    <div class="brand">
+      <div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16l3-4 3 2 4-6"/></svg></div>
+      <div class="wm">open<span style="color:#C8CEF6">observe</span></div>
+    </div>
+    <h1>Design system &amp; navigation spec</h1>
+    <p>Visual reference companion to <span class="mono" style="color:#fff">HANDOFF.md</span>. Locked decisions, tokens, type, table anatomy, and the IAM/Settings navigation model — as built in the reference prototype.</p>
+    <div class="locked">
+      <div class="pill"><b>Typeface</b><span>IBM Plex</span></div>
+      <div class="pill"><b>Header</b><span>Titled</span></div>
+      <div class="pill"><b>Chrome</b><span>Framed</span></div>
+      <div class="pill"><b>Density</b><span>Compact</span></div>
+      <div class="pill"><b>Casing</b><span>Sentence</span></div>
+      <div class="pill"><b>Surface</b><span>Combined</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+
+  <section>
+    <p class="eyebrow">Reference screens</p>
+    <h2>Visual references</h2>
+    <p class="sec-sub">Captured from the working prototype. Full interaction detail and exact CSS values live in <span class="mono">HANDOFF.md</span>.</p>
+    <div class="gallery">
+      <div class="shot"><img src="handoff-assets/01-dashboards.png" alt="Dashboards" /><div class="cap"><b>Flat list page — Dashboards</b><p>Framed chrome · titled header (tile + title + subtitle, tagline row 2) · in-content folder rail · data table with serial, fluid name column, and a minimal hover-revealed action column.</p></div></div>
+      <div class="shot"><img src="handoff-assets/02-iam-table.png" alt="IAM table" /><div class="cap"><b>Admin module — IAM</b><p>Grouped left rail (6+ sections) → one header with breadcrumb <span class="mono">IAM › Access control › Users</span> → full-width table. Search-only toolbar; primary CTA top-right.</p></div></div>
+      <div class="shot"><img src="handoff-assets/03-iam-drawer.png" alt="IAM drawer" /><div class="cap"><b>Record editing — drawer</b><p>Row click (or “+ New”) opens a right-side drawer with key/value fields and a Delete · Cancel · Save footer. Edit in the context of the list — no full-page hop.</p></div></div>
+      <div class="shot"><img src="handoff-assets/04-settings.png" alt="Settings" /><div class="cap"><b>Settings — identical pattern</b><p>Settings reuses the exact IAM shell: grouped rail → table → drawer, breadcrumb <span class="mono">Settings › Security › Cipher keys</span>. The two modules are mechanically the same.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Foundations</p>
+    <h2>Color tokens</h2>
+    <p class="sec-sub">Reference the semantic aliases in components — never a raw hex. The ramps below feed those aliases.</p>
+    <h3>Iris — brand / accent ramp</h3>
+    <div class="ramp" id="iris"></div>
+    <h3>Neutral — gray ramp</h3>
+    <div class="ramp" id="gray"></div>
+    <h3>Semantic — status</h3>
+    <div class="semantic" id="sem"></div>
+    <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16v-4M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg><div><b>Token rules:</b> primary names → <code>--text</code>; metadata / column heads / IDs / timestamps → <code>--text-3</code>. Outer & input borders → <code>--border</code>; row & section dividers → <code>--border-soft</code>. Selected rows use <code>--iris-300</code>, never <code>--primary</code> at full strength. One primary action per view.</div></div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Foundations</p>
+    <h2>Typography</h2>
+    <p class="sec-sub">IBM Plex Sans for UI · IBM Plex Mono for every identifier, count, timestamp and code string.</p>
+    <h3>The weight scale — weight signals hierarchy</h3>
+    <div class="weights">
+      <div class="w"><div class="num">700</div><div class="demo" style="font-weight:700">Title peak</div><p style="font-size:11.5px;color:var(--text-3);margin:6px 0 0">One per view. Never 800.</p></div>
+      <div class="w"><div class="num">600</div><div class="demo" style="font-weight:600">Nav · buttons</div><p style="font-size:11.5px;color:var(--text-3);margin:6px 0 0">Active nav, buttons, badges, labels.</p></div>
+      <div class="w"><div class="num">500</div><div class="demo" style="font-weight:500">Record names</div><p style="font-size:11.5px;color:var(--text-3);margin:6px 0 0">The name column. Calm, not loud.</p></div>
+      <div class="w"><div class="num">400</div><div class="demo" style="font-weight:400">Body &amp; meta</div><p style="font-size:11.5px;color:var(--text-3);margin:6px 0 0">Body, metadata, IDs, captions.</p></div>
+    </div>
+    <h3>Type scale (compact)</h3>
+    <div class="specimen">
+      <div><span class="tag">Page title · 17/700</span><span style="font-size:17px;font-weight:700;letter-spacing:-.35px">Dashboards</span></div>
+      <div><span class="tag">Drawer title · 18/700</span><span style="font-size:18px;font-weight:700;letter-spacing:-.4px">Platform Team</span></div>
+      <div><span class="tag">Section label · 11.5/600</span><span style="font-size:11.5px;font-weight:600;color:var(--text-3)">Account</span></div>
+      <div><span class="tag">Body / cell · 13/400</span><span style="font-size:13px">Create, organize and share dashboards.</span></div>
+      <div><span class="tag">Column head · 12/600</span><span style="font-size:12px;font-weight:600;color:var(--text-3)">Last active</span></div>
+      <div><span class="tag">Mono / ID · 13/400</span><span class="mono" style="font-size:13px;color:var(--text-3)">7479001291520746200</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Components</p>
+    <h2>Table anatomy</h2>
+    <p class="sec-sub">Fixed widths for bounded columns; one fluid name column absorbs slack. Sticky header, minimal action column.</p>
+    <table>
+      <thead><tr><th>Column</th><th>Width</th><th>Rule</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Checkbox</td><td><code>40px</code></td><td>Fits the 16px box + padding. Header holds select-all.</td></tr>
+        <tr><td class="k">Serial <span class="mono">#</span></td><td><code>48px</code></td><td>Tabular-nums, <code>--text-3</code>, zero-padded. Flat lists only.</td></tr>
+        <tr><td class="k">Name</td><td><b>auto / fluid</b></td><td>The one column with no fixed width. 500 weight.</td></tr>
+        <tr><td class="k">ID / hash</td><td>fit content</td><td><code>.mono</code>, <code>--text-3</code>, sized to known length.</td></tr>
+        <tr><td class="k">Enum (role/status)</td><td>~96–120px</td><td>Sized to the badge.</td></tr>
+        <tr><td class="k">Timestamp</td><td>~110–140px</td><td><code>--text-3</code>.</td></tr>
+        <tr><td class="k">Actions</td><td><code>90px</code>, right</td><td>Minimal. 1–3 icon verbs, <code>opacity .35</code> → <code>1</code> on row hover; overflow → <code>⋯</code>. Sticky-right when the table scrolls horizontally.</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16v-4M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg><div><b>Deciding a width:</b> measure the widest realistic value at 13px, add 28px (2×14 padding), round up. Keep total fixed widths under the viewport so the fluid name column always has room; <code>.tbl-wrap{overflow:auto}</code> is the safety valve. Header is <code>position:sticky;top:0</code>; rows are 38px (compact).</div></div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Navigation</p>
+    <h2>The one-header law &amp; breadcrumbs</h2>
+    <div class="cards">
+      <div class="card"><div class="h"><span class="ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="5" rx="1"/><rect x="3" y="12" width="18" height="8" rx="1"/></svg></span>One header per view</div><p>Row 1 = tile + title + subtitle + primary action. Row 2 = <b>exactly one</b> of {tabs · breadcrumb · tagline}. The header identifies the module and never mutates between tabs.</p></div>
+      <div class="card"><div class="h"><span class="ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span>Tabs vs rail</div><p>2–5 sibling sections → <b>tabs</b> in row 2. 6+ sections → <b>grouped left rail</b>. IAM (7) and Settings (16) both use the rail, so they behave identically.</p></div>
+      <div class="card"><div class="h"><span class="ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>Breadcrumbs</div><p>Only on an L3+ drill, always in header row 2. <span class="mono" style="font-size:11px">Module › Group › Record</span>. Crumbs back-navigate; collapse the middle to <code>…</code> past 4 levels (keep first + last two).</p></div>
+      <div class="card"><div class="h"><span class="ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M14 3v18"/></svg></span>Edit in a drawer</div><p>Admin records open in a right-side drawer (460 / 600px), Esc-dismiss, Delete · Cancel · Save footer. “+ New” opens the same drawer blank. Full-page only when the detail needs full width.</p></div>
+    </div>
+  </section>
+
+  <p class="foot">O2 design system · generated from the prototype reference build · pair with <span class="mono">HANDOFF.md</span> for exhaustive CSS values</p>
+</div>
+
+<script>
+const iris=[['200','#F7F9FE'],['300','#EFF1FD'],['400','#E4E9FE'],['500','#D7DEFE'],['700','#B3BDF1'],['900','#6B76E3'],['1000','#6069D3'],['1100','#575FC5'],['1200','#282D5D']];
+const gray=[['0','#FFFFFF'],['50','#FBFBFD'],['100','#F5F6F9'],['150','#EEF0F4'],['200','#E6E8EE'],['300','#DADCE4'],['400','#B4B8C4'],['600','#5C606E'],['700','#474A56'],['900','#1B1D24']];
+const sem=[['Primary','#575FC5','buttons · links'],['OK','#1F8A5B','healthy · active'],['Warn','#B7791F','degraded · pending'],['Danger','#D14343','errors · destructive'],['Info','#2A6FDB','informational']];
+const mk=(arr,pfx)=>arr.map(([n,h])=>`<div class="sw"><div class="chip" style="background:${h};${h==='#FFFFFF'||n==='50'||n==='100'?'box-shadow:inset 0 0 0 1px var(--border)':''}"></div><div class="meta"><div class="n">${pfx}-${n}</div><div class="h mono">${h}</div></div></div>`).join('');
+document.getElementById('iris').innerHTML=mk(iris,'iris');
+document.getElementById('gray').innerHTML=mk(gray,'g');
+document.getElementById('sem').innerHTML=sem.map(([n,h,d])=>`<div class="s"><div class="dot" style="background:${h}"></div><div class="lbl"><b>${n}</b><span>${d}</span></div></div>`).join('');
+</script>
+</body>
+</html>

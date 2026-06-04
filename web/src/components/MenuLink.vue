@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1.5 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-1 tw:transition-colors tw:duration-250"
         :class="'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'"
       >
         <OIcon
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[11px] tw:font-normal tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1.5 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-1 tw:transition-colors tw:duration-250"
         :class="isActive
           ? 'tw:bg-primary-200 tw:text-primary-700!'
           : 'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1.5 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-1 tw:transition-colors tw:duration-250"
         :class="[
           isActive ? 'tw:bg-primary-200 tw:text-primary-700!' : 'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'
         ]"

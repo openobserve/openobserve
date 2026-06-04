@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header tw:shrink-0 tw:h-12 tw:flex tw:items-center tw:justify-between tw:gap-4"
+    class="app-page-header tw:shrink-0 tw:h-16 tw:flex tw:items-center tw:justify-between tw:gap-4"
   >
-    <div class="tw:flex tw:items-center tw:gap-3 tw:min-w-0 tw:h-full tw:flex-1">
+    <div class="tw:flex tw:items-center tw:gap-3.25 tw:min-w-0 tw:h-full tw:flex-1">
       <slot name="title-prefix" />
 
       <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="back">
           <button
             type="button"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-8 tw:h-8 tw:rounded-lg tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
             :title="backLabel"
             :aria-label="backLabel"
             data-test="app-page-header-back"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Listing/index page: the module icon tile. -->
       <span
         v-else-if="icon"
-        class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-8 tw:h-8 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text"
+        class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:bg-tabs-active-bg tw:text-tabs-active-text"
         aria-hidden="true"
       >
         <OIcon :name="icon" size="md" />
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink">
         <h1
-          class="tw:text-base! tw:font-semibold! tw:leading-tight! tw:tracking-[-0.01em]! tw:text-text-primary tw:truncate tw:min-h-5"
+          class="tw:text-[1.0625rem]! tw:font-semibold! tw:leading-[1.15]! tw:tracking-[-0.02em]! tw:text-text-primary tw:truncate tw:min-h-5"
           :title="title"
         >
           <slot name="title">{{ title }}</slot>

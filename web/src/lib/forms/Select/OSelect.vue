@@ -1223,7 +1223,7 @@ const fieldWidthClass = computed(() => {
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
                           'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-bold',
-                          'tw:text-select-item-text tw:bg-select-content-bg tw:uppercase tw:tracking-wide',
+                          'tw:text-select-item-text tw:bg-select-content-bg',
                           'tw:select-none tw:pointer-events-none',
                         ]"
                       >

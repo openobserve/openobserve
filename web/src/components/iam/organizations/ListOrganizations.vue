@@ -146,7 +146,7 @@ export default defineComponent({
         accessorKey: "name",
         sortable: true,
         size: 500,
-        meta: { align: "left" },
+        meta: { align: "left", isName: true },
       },
       {
         id: "identifier",

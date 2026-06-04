@@ -181,7 +181,7 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     // Page background = a single, subtle primary tint (no gradient) so the muted
     // area around the white content card reads as one calm color — matching the
     // page chrome (surface-chrome = primary-100).
-    const bodyBg = hexToRgba(themeColor, 1.0); // 0.10 alpha — midpoint between primary-50 and primary-100
+    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop (was 0.10, read as too bright)
     document.body.style.setProperty('background', bodyBg, 'important');
 
     // Apply table header background color (80% theme color mixed with 20% white)

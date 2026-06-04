@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
+  <div class="card-container tw:bg-surface-base tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="tw:font-bold tw:px-2  tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
         <OTabs
           orientation="vertical"
+          dense
           v-model="activeFolderId"
           data-test="dashboards-folder-tabs"
       >
@@ -335,14 +336,12 @@ export default defineComponent({
     z-index: 10;
   }
 
-  &.folder-header-light {
-    background-color: white;
-  }
-
+  /* Inherit the rail's surface-panel bg so the folder rail reads as one calm
+     surface (matches the IAM/Settings SectionRail + prototype .l2). */
+  &.folder-header-light,
   &.folder-header-dark {
-    background-color: #1a1a1a;
+    background-color: transparent;
   }
-  border-radius: 0.625rem;
 }
 
 .folders-tabs {
@@ -370,26 +369,25 @@ export default defineComponent({
 
   .o-tabs {
     &--vertical {
-      margin: 5px;
+      margin: 0;
 
       .o-tab {
         justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
+        padding: 0 0.625rem;
         border-radius: 0.5rem;
-        text-transform: capitalize;
+        /* No forced capitalize — folder names render as authored. Weight 500
+           (record-name weight), not 600, so the list reads calm. Active state is
+           inherited from OTab vertical (tint bg + primary text) so the folder rail
+           matches the IAM/Settings rails exactly. */
+        font-weight: 500;
 
         &__content.tab_content {
           .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
-              font-weight: 600;
+              font-weight: 500;
             }
           }
-        }
-
-        &--active {
-          background-color: var(--o2-primary-btn-bg);
-          color: white;
         }
       }
     }

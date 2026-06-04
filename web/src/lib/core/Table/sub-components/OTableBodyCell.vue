@@ -54,6 +54,13 @@ const emit = defineEmits<{
 const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
+// Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
+// Only the default-rendered text path uses this; custom cells style their own.
+const defaultTextClass = computed(() => [
+  "tw:text-primary tw:text-sm",
+  meta.value?.isName ? "tw:font-medium" : "",
+]);
+
 const alignClass = computed(() => {
   if (align.value === "center") return "tw:text-center";
   if (align.value === "right") return "tw:text-right";
@@ -192,7 +199,13 @@ function handleClick() {
       'tw:transition-colors tw:duration-150',
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
       alignClass,
-      isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
+      // Minimal, hover-revealed action column (HANDOFF §8.3): icons sit muted at
+      // rest (opacity .35) and brighten to full on row hover, so the column reads
+      // as calm until you target a row. Applied centrally → every table's action
+      // column behaves identically.
+      isAction
+        ? 'tw:w-0 tw:whitespace-nowrap tw:opacity-[0.35] tw:group-hover/row:opacity-100 tw:transition-opacity'
+        : '',
       // Pinned (sticky) cells need an opaque bg ONLY when content can scroll
       // under them (horizontal-scroll mode). In that case mirror the row states
       // here so the pinned strip animates with the row: selected wins, else
@@ -268,10 +281,10 @@ function handleClick() {
         />
         <span
           v-else-if="highlightedHtml"
-          class="tw:text-primary tw:text-sm"
+          :class="defaultTextClass"
           v-html="highlightedHtml"
         />
-        <span v-else class="tw:text-primary tw:text-sm">
+        <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
       </div>
@@ -288,11 +301,11 @@ function handleClick() {
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
       <span
         v-else-if="highlightedHtml"
-        class="tw:text-primary tw:text-sm"
+        :class="defaultTextClass"
         v-html="highlightedHtml"
       />
       <!-- Default: plain text -->
-      <span v-else class="tw:text-primary tw:text-sm">
+      <span v-else :class="defaultTextClass">
         {{ displayValue }}
       </span>
     </template>
@@ -302,7 +315,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-default)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
+      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

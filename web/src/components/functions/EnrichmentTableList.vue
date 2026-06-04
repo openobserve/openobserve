@@ -300,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
+                    dot
                     :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
                   >
                     {{ job.status }}

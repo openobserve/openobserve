@@ -37,10 +37,16 @@
     --color-surface-overlay: var(--color-grey-800);
     --color-surface-subtle: var(--color-grey-800);
     --color-surface-subtle-hover: var(--color-grey-700);
+    /* App chrome — a quiet dark backdrop, just slightly lifted from the content
+       card (grey-950) so the card still reads as a distinct floating surface. */
+    --color-surface-chrome: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-grey-900));
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
     --color-border-strong: var(--color-grey-500);
+    /* Soft divider on the dark card — one step quieter than border-default so
+       row/section splits don't read as hard structural lines. */
+    --color-border-subtle: var(--color-grey-800);
 
     /* ---- Button overrides ---- */
 
@@ -314,6 +320,9 @@
     /* Skeleton */
     --color-skeleton-base: var(--color-grey-700);
     --color-skeleton-highlight: var(--color-grey-600);
+    --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
+    /* Datepicker inner border — quieter on dark surfaces */
+    --color-datepicker-inner-border: var(--color-grey-600);
 
     /* ProgressBar */
     --color-progress-bar-default: var(--color-primary-500);

@@ -55,7 +55,7 @@ const baseClasses = computed<string>(() => [
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
   'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
-  isVertical.value ? 'tw:rounded-md' : 'tw:rounded-t-md',
+  isVertical.value ? 'tw:rounded-lg' : 'tw:rounded-t-md',
   'tw:outline-none tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150',
   'tw:select-none',
   'tw:ring-offset-1 tw:ring-offset-surface-base',
@@ -69,18 +69,23 @@ const stateClasses = computed<string>(() => {
     ].join(' ')
   }
   if (isActive.value) {
+    // Horizontal tabs: underline-only (colored text + bottom border, no bg pill).
+    // Vertical tabs (side rail): tint bg + primary text, NO left bar — identical
+    // to SectionRail and the prototype .l2-link so every vertical nav matches.
     return [
-      'tw:text-tabs-active-text tw:cursor-pointer tw:bg-tabs-active-bg',
+      'tw:text-tabs-active-text tw:cursor-pointer',
       isVertical.value
-        ? 'tw:border-l-2 tw:border-tabs-indicator'
+        ? 'tw:bg-tabs-active-bg'
         : 'tw:border-b-2 tw:border-tabs-indicator',
     ].join(' ')
   }
   return [
     'tw:text-tabs-inactive-text tw:cursor-pointer',
-    'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg',
-    // Always render the border (transparent when inactive) to prevent layout shift on activation.
-    isVertical.value ? 'tw:border-l-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
+    isVertical.value
+      ? 'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg'
+      : 'tw:enabled:hover:text-tabs-hover-text',
+    // Horizontal keeps a transparent bottom border to avoid activation layout shift.
+    isVertical.value ? '' : 'tw:border-b-2 tw:border-transparent',
   ].join(' ')
 })
 

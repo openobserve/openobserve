@@ -365,7 +365,7 @@ export default defineComponent({
           accessorKey: "first_name",
           sortable: true,
           size: 150,
-          meta: { align: "left" },
+          meta: { align: "left", isName: true },
         },
         {
           id: "last_name",
@@ -373,7 +373,7 @@ export default defineComponent({
           accessorKey: "last_name",
           sortable: true,
           size: 150,
-          meta: { align: "left" },
+          meta: { align: "left", isName: true },
         },
       ];
 

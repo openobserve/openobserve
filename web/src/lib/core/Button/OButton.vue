@@ -220,7 +220,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
-  sm: "tw:h-8 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
+  // 34px control height per HANDOFF §11 — the workhorse compact button that
+  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
+  sm: "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-lg",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
     "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
@@ -231,7 +233,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "tw:h-6 tw:ps-2 tw:pe-1.5 tw:!text-[12px] tw:gap-1 tw:rounded tw:leading-none",
   "sm-action":
-    "tw:h-8 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
+    "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-lg",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
@@ -272,6 +274,7 @@ const classes = computed<string[]>(() => [
   // taller than a borderless ghost one of the same size.
   "tw:relative tw:box-border",
   "tw:whitespace-nowrap",
+  // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
   /* Unified focus glow — identical to OInput/OSelect: a 2px translucent primary

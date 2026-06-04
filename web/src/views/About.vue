@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="licenseData.ingestion_used !== undefined">
                 <div class="tw:flex tw:items-baseline tw:gap-2 tw:mb-3">
                   <span
-                    class="tw:text-4xl tw:font-extrabold tw:text-(--o2-text-heading) tw:leading-none"
+                    class="tw:text-4xl tw:font-bold tw:text-(--o2-text-heading) tw:leading-none"
                     :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''"
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
                   <span class="tw:text-xs tw:text-(--o2-text-secondary)">of daily limit used today</span>

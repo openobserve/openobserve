@@ -270,7 +270,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-10 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -289,9 +289,9 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
           'table-head',
-          dense ? 'tw:h-6' : 'tw:h-7',
+          dense ? 'tw:h-8' : 'tw:h-9',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           'tw:group',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
@@ -409,7 +409,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       />
       <th
         v-if="selectionMultiple"
-        class="tw:w-9 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:w-10 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -424,8 +424,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-primary tw:text-xs tw:select-none tw:relative`,
-          dense ? 'tw:h-6 tw:group' : 'tw:h-7 tw:group',
+          `${headerPaddingClass(header)} tw:text-left tw:font-semibold tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
+          dense ? 'tw:h-8 tw:group' : 'tw:h-9 tw:group',
           'tw:border-b tw:border-[var(--color-table-header-border)]',
           header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',

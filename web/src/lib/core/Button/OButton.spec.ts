@@ -147,7 +147,8 @@ describe("OButton", () => {
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:h-8");
+    // 34px control height per the design system (HANDOFF §11).
+    expect(wrapper.classes().join(" ")).toContain("tw:h-[2.125rem]");
   });
 
   it("applies lg size classes", () => {

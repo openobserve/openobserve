@@ -15,30 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col" data-test="iam-page">
-    <!-- Breadcrumb now lives in the top chrome bar (published from this shell).
-         Hub shows the cards; each section renders its own header in its content. -->
-    <template v-if="isHub">
-      <AppPageHeader
+  <!-- Grouped left rail (prototype admin model): the rail is always present;
+       the chosen section renders its own page (header + table) to the right.
+       Breadcrumb lives in the top chrome bar (published from this shell). -->
+  <PageLayout :sidebar-width="218" data-test="iam-page">
+    <template #sidebar>
+      <SectionRail
+        :groups="sectionGroups"
+        :active-key="activeSection"
         :title="t('menu.iam')"
-        icon="manage-accounts"
-        subtitle="Manage users, service accounts, roles, groups, and organization access."
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       />
-      <SectionHub :groups="sectionGroups" class="tw:flex-1 tw:min-h-0" />
     </template>
-    <section
-      v-else
-      class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto"
-    >
+    <section class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
       <RouterView />
     </section>
-  </div>
+  </PageLayout>
 </template>
 
 <script setup lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import SectionHub, {
+import PageLayout from "@/components/common/PageLayout.vue";
+import SectionRail from "@/components/common/SectionRail.vue";
+import {
   type SectionHubGroup,
   type SectionHubItem,
 } from "@/components/common/SectionHub.vue";
@@ -225,12 +222,22 @@ onActivated(() => publish(crumbs.value));
 onDeactivated(clear);
 onUnmounted(clear);
 
-// Guard: non-meta users can't use the quota section — bounce to users.
+// The rail is always shown, so the IAM root has no standalone landing — send it
+// to the first section (Users, always available). Also: non-meta users can't use
+// the quota section — bounce them to Users too.
 watch(
   () => route.name,
   (name) => {
-    if (name === "quota" && !isMetaOrg.value) {
-      router.push({ name: "users", query: orgQuery.value });
+    if (name === "iam") {
+      // .catch: in unit tests the mounted router may not register child routes;
+      // a rejected navigation must not surface as an unhandled error.
+      Promise.resolve(
+        router.replace({ name: "users", query: orgQuery.value }),
+      ).catch(() => {});
+    } else if (name === "quota" && !isMetaOrg.value) {
+      Promise.resolve(
+        router.push({ name: "users", query: orgQuery.value }),
+      ).catch(() => {});
     }
   },
   { immediate: true },

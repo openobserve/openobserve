@@ -15,58 +15,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col">
-    <!-- Breadcrumb now lives in the top chrome bar (published from this shell).
-         Hub shows the cards; each section renders its own header in its content. -->
-    <template v-if="isHub">
-      <AppPageHeader
+  <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
+       always present; the chosen section renders to the right. Breadcrumb lives in
+       the top chrome bar (published from this shell). -->
+  <PageLayout :sidebar-width="218">
+    <template #sidebar>
+      <SectionRail
+        :groups="sectionGroups"
+        :active-key="activeSection"
         :title="t('settings.header')"
-        icon="settings"
-        subtitle="Manage organization preferences, security, destinations, and operational settings."
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       />
-      <SectionHub :groups="sectionGroups" class="tw:flex-1 tw:min-h-0" />
     </template>
-    <!-- Form-style sections (general, org params, license, correlation, domain):
-         the shell owns a FULL-WIDTH header (so the header matches the hub and
-         every other page exactly), and only the CONTENT is centered in a reading
-         column at the same width as the hub. -->
-    <template v-else-if="isConstrainedSection">
+
+    <!-- Form-style sections (general, org params, license, domain): a section
+         header above a centered reading column. -->
+    <div
+      v-if="isConstrainedSection"
+      class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+    >
       <AppPageHeader
         :title="activeSectionItem?.label || ''"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
       />
       <ConstrainedPage size="lg" class="tw:flex-1 tw:min-h-0">
         <router-view title="" />
       </ConstrainedPage>
-    </template>
+    </div>
     <!-- Full-width section that keeps the shell-owned header (e.g. correlation). -->
-    <template v-else-if="isHeaderedSection">
+    <div
+      v-else-if="isHeaderedSection"
+      class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+    >
       <AppPageHeader
         :title="activeSectionItem?.label || ''"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
       />
       <section class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
         <router-view title="" />
       </section>
-    </template>
-    <section
-      v-else
-      class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto"
-    >
+    </div>
+    <!-- Table/list sections render their own AppPageHeader inside. -->
+    <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
       <router-view title="" />
     </section>
-  </div>
+  </PageLayout>
 </template>
 
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
-import SectionHub, {
+import PageLayout from "@/components/common/PageLayout.vue";
+import SectionRail from "@/components/common/SectionRail.vue";
+import {
   type SectionHubGroup,
   type SectionHubItem,
 } from "@/components/common/SectionHub.vue";
@@ -97,7 +101,8 @@ export default defineComponent({
   components: {
     AppPageHeader,
     ConstrainedPage,
-    SectionHub,
+    PageLayout,
+    SectionRail,
   },
   setup() {
     const { t } = useI18n();
@@ -160,9 +165,23 @@ export default defineComponent({
       HEADERED_FULLWIDTH_SECTIONS.has(activeSection.value),
     );
 
-    // Guard meta-only sections for non-meta users; the hub itself never redirects.
+    // The rail is always shown, so the Settings root has no standalone landing —
+    // send it to the first section (General). Also guard meta-only sections.
     const handleSettingsRouting = () => {
       const name = router.currentRoute.value.name;
+      if (name === "settings") {
+        // .catch: a rejected navigation (e.g. unit-test router without child
+        // routes) must not surface as an unhandled error.
+        Promise.resolve(
+          router.replace({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization?.identifier,
+            },
+          }),
+        ).catch(() => {});
+        return;
+      }
       const notMeta =
         store.state.zoConfig.meta_org &&
         (!isMetaOrg.value || config.isEnterprise === "false");

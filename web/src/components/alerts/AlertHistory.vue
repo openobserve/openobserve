@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     :variant="getStatusVariant(selectedRow.status)"
                     size="sm"
+                    dot
                   >
                     {{ selectedRow.status }}
                   </OBadge>

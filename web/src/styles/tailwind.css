@@ -1,10 +1,13 @@
 @import "tailwindcss" prefix(tw);
 @import "tw-animate-css";
-@import "../lib/styles/tokens/_base.scss";
-@import "../lib/styles/tokens/_semantic.scss";
-@import "../lib/styles/tokens/_component.scss";
-@import "../lib/styles/tokens/_sdr-fields.scss";
-@import "../lib/styles/tokens/_dark.scss";
+/* Design tokens are now sourced from the .css files (Tailwind-only direction;
+   SCSS being phased out). The _*.scss token files hold identical content and
+   remain as a one-line revert until this flip is build-verified. */
+@import "../lib/styles/tokens/base.css";
+@import "../lib/styles/tokens/semantic.css";
+@import "../lib/styles/tokens/component.css";
+@import "../lib/styles/tokens/sdr-fields.css";
+@import "../lib/styles/tokens/dark.css";
 
 @plugin "@tailwindcss/typography";
 

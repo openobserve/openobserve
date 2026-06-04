@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
+          <OBadge :variant="statusColor(row)" dot data-test="anomaly-detection-status-badge">
             {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"

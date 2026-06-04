@@ -59,13 +59,9 @@
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="tw:w-full tw:h-full tw:pt-1 tw:pl-2 tw:pb-2"
+          class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
         >
-          <div
-            class="tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
-          >
-            <slot name="sidebar" />
-          </div>
+          <slot name="sidebar" />
         </div>
       </template>
       <template #separator>
@@ -86,12 +82,8 @@
         </slot>
       </template>
       <template #after>
-        <div class="tw:w-full tw:h-full tw:pt-1 tw:pl-1 tw:pb-2 tw:pr-2">
-          <div
-            class="tw:h-full tw:flex tw:flex-col tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
-          >
-            <slot />
-          </div>
+        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+          <slot />
         </div>
       </template>
     </OSplitter>
@@ -99,16 +91,16 @@
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
     <div
       v-else-if="$slots.sidebar"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1 tw:gap-2"
+      class="tw:flex-1 tw:flex tw:min-h-0"
     >
       <aside
-        class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border tw:border-border-default tw:rounded-lg"
+        class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
       <section
-        class="tw:flex-1 tw:min-w-0 tw:h-full tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
+        class="tw:flex-1 tw:min-w-0 tw:h-full tw:overflow-hidden"
       >
         <slot />
       </section>
@@ -124,20 +116,11 @@
     </ConstrainedPage>
 
     <!-- ── Body: main only (no sidebar) ─────────────────────────── -->
+    <!-- Main content is flush: the app chrome (MainLayout) already provides the
+         single bordered "content card", so inner panels would just nest borders.
+         Sections inside separate with border-soft dividers, not boxed cards. -->
     <template v-else>
-      <!-- With bordered panel (default) -->
-      <div
-        v-if="mainPanel"
-        class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:px-2 tw:pb-2 tw:pt-1"
-      >
-        <div
-          class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:border tw:border-border-default tw:rounded-lg tw:overflow-hidden"
-        >
-          <slot />
-        </div>
-      </div>
-      <!-- Without bordered panel (full-bleed content) -->
-      <div v-else class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
+      <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden">
         <slot />
       </div>
     </template>

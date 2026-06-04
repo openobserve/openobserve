@@ -1295,7 +1295,7 @@ export default defineComponent({
 
     h4 {
       font-size: 18px;
-      font-weight: 800;
+      font-weight: 700;
       margin: 0 0 4px 0;
       color: rgba(0, 0, 0, 0.9);
       letter-spacing: -0.3px;

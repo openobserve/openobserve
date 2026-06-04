@@ -456,7 +456,7 @@ onMounted(() => {
 
   &__headline {
     font-size: 2.6rem;
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.6px;
     color: #111827;

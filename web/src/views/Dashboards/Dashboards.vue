@@ -105,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :frame="false"
             :default-columns="false"
-            :row-height="32"
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -144,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         role="radiogroup"
                         aria-label="Search scope"
-                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-stretch tw:my-1.5 tw:ps-1.5 tw:border-l tw:border-border-default"
+                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
                       >
                         <button
                           type="button"
@@ -153,8 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
                           :class="
                             !searchAcrossFolders
-                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary'
                           "
                           data-test="dashboard-search-scope-current"
                           title="Search only this folder"
@@ -170,8 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
                           :class="
                             searchAcrossFolders
-                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary'
                           "
                           data-test="dashboard-search-across-folders-toggle"
                           title="Search across all folders"
@@ -615,7 +614,7 @@ export default defineComponent({
           header: "#",
           accessorKey: "#",
           sortable: false,
-          size: 52,
+          size: 48,
           meta: { align: "left", headerClass: "tw:text-text-disabled" },
         },
         {

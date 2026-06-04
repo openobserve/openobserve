@@ -187,7 +187,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.groupName"),
     accessorKey: "group_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", autoWidth: true, isName: true },
   },
   {
     id: "actions",
