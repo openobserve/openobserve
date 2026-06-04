@@ -491,7 +491,22 @@
     "getStartedRUM": "Inizia con Real User Monitoring",
     "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
     "eventID": "ID evento",
-    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione."
+    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione.",
+    "traces": "Tracce",
+    "noCorrelatedTraces": "Nessuna traccia correlata trovata per questa sessione.",
+    "viewTraceDetails": "Visualizza i dettagli della traccia",
+    "routeChange": "Percorso",
+    "initialView": "Iniziale",
+    "failedToFetchTraces": "Recupero dei dati di traccia non riuscito. Per favore riprova.",
+    "traceNotFound": "Dettagli della traccia non trovati.",
+    "failedToFetchTraceDetails": "Caricamento dei dettagli della traccia non riuscito. Per favore riprova.",
+    "span": "ampiezza",
+    "spans": "ricopre",
+    "errorTraces": "tracce di errore",
+    "seekToMoment": "Cerca questo momento della sessione",
+    "timeInSession": "Durata della sessione",
+    "route": "Percorso",
+    "duration": "Durata"
   },
   "about": {
     "name": "Apri Observe",

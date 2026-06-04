@@ -491,7 +491,22 @@
     "getStartedRUM": "Commencez avec Real User Monitoring",
     "loadingErrorDetails": "Attendez, nous sommes en train de récupérer les détails de l'erreur.",
     "eventID": "ID de l'événement",
-    "loadingApplicationErrors": "Attendez, nous sommes en train de récupérer des erreurs d'application."
+    "loadingApplicationErrors": "Attendez, nous sommes en train de récupérer des erreurs d'application.",
+    "traces": "Des traces",
+    "noCorrelatedTraces": "Aucune trace corrélée n'a été trouvée pour cette session.",
+    "viewTraceDetails": "Afficher les détails de la trace",
+    "routeChange": "Parcours",
+    "initialView": "Initiale",
+    "failedToFetchTraces": "Impossible de récupérer les données de trace. Réessayez, s'il vous plaît.",
+    "traceNotFound": "Les détails de la trace sont introuvables.",
+    "failedToFetchTraceDetails": "Impossible de charger les détails de la trace. Veuillez réessayer.",
+    "span": "envergure",
+    "spans": "couvre",
+    "errorTraces": "traces d'erreurs",
+    "seekToMoment": "Recherchez ce moment de la session",
+    "timeInSession": "Durée de la session",
+    "route": "Parcours",
+    "duration": "Durée"
   },
   "about": {
     "name": "Ouvrez Observe",

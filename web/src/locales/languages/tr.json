@@ -491,7 +491,22 @@
     "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
     "eventID": "Olay Kimliği",
-    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz.",
+    "traces": "İzleri",
+    "noCorrelatedTraces": "Bu oturum için ilişkili iz bulunamadı.",
+    "viewTraceDetails": "İzleme Ayrıntılarını Görüntüle",
+    "routeChange": "Güzergah",
+    "initialView": "İlk",
+    "failedToFetchTraces": "İzleme verileri alınamadı. Lütfen tekrar deneyin.",
+    "traceNotFound": "İzleme ayrıntıları bulunamadı.",
+    "failedToFetchTraceDetails": "İzleme ayrıntıları yüklenemedi. Lütfen tekrar deneyin.",
+    "span": "kapsamak",
+    "spans": "açıklıklar",
+    "errorTraces": "hata izleri",
+    "seekToMoment": "Oturumda bu anı arayın",
+    "timeInSession": "Oturum Saati",
+    "route": "Güzergah",
+    "duration": "Süre"
   },
   "about": {
     "name": "Açık Gözlem",
