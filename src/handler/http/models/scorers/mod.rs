@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
+use crate::service::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct LlmJudgeScorerParams {
@@ -35,7 +37,7 @@ pub struct LlmJudgeScorerParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include_reasoning: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub extra_metadata_fields: Option<Vec<String>>,
+    pub extra_metadata_fields: Option<Vec<ExtraMetadataField>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -295,7 +297,7 @@ pub struct LlmJudgeOutputSchemaRequestBody {
     #[serde(default)]
     pub include_reasoning: Option<bool>,
     #[serde(default)]
-    pub extra_metadata_fields: Vec<String>,
+    pub extra_metadata_fields: Vec<ExtraMetadataField>,
 }
 
 /// Response body for a derived LLM Judge output schema preview.
@@ -649,7 +651,13 @@ mod tests {
                 "params": {
                     "provider_id": "p1",
                     "include_reasoning": true,
-                    "extra_metadata_fields": ["failure_mode"]
+                    "extra_metadata_fields": [
+                        {
+                            "name": "failure_mode",
+                            "type": "string",
+                            "description": "Reason the score is low"
+                        }
+                    ]
                 }
             }
         }))
@@ -658,7 +666,15 @@ mod tests {
         let scorer = infra::table::scorers::Scorer::from(body);
         assert_eq!(scorer.scorer_type, "llm_judge");
         assert!(scorer.output_schema.is_none());
-        assert_eq!(scorer.params["extra_metadata_fields"][0], "failure_mode");
+        assert_eq!(
+            scorer.params["extra_metadata_fields"][0]["name"],
+            "failure_mode"
+        );
+        assert_eq!(scorer.params["extra_metadata_fields"][0]["type"], "string");
+        assert_eq!(
+            scorer.params["extra_metadata_fields"][0]["description"],
+            "Reason the score is low"
+        );
     }
 
     #[test]

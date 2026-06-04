@@ -25,7 +25,7 @@ use infra::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::schema_derivation::{REASONING_FIELD, derive_output_schema};
+use super::schema_derivation::{ExtraMetadataField, REASONING_FIELD, derive_output_schema};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmJudgeOutput {
@@ -61,7 +61,7 @@ pub struct LlmJudgeParams {
     pub timeout_ms: Option<u64>,
     pub output_parsing: Option<String>,
     pub include_reasoning: Option<bool>,
-    pub extra_metadata_fields: Option<Vec<String>>,
+    pub extra_metadata_fields: Option<Vec<ExtraMetadataField>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -92,7 +92,7 @@ pub async fn run_llm_judge(
     scorer: &ScorerConfig,
     score_config: &ScoreConfigInfo,
     input_variables: &HashMap<String, Value>,
-    extra_metadata_fields: &[String],
+    extra_metadata_fields: &[ExtraMetadataField],
     include_reasoning: bool,
 ) -> Result<LlmJudgeOutput> {
     let system_prompt = evaluator_system_prompt();

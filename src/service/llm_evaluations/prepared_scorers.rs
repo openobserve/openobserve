@@ -24,7 +24,7 @@ use crate::service::llm_evaluations::{
     eval_jobs::executor_runtime::{SpanEvalContext, input_variables_with_context_defaults},
     evaluator_trace::{EvaluatorTrace, EvaluatorTraceInput, create_evaluator_trace},
     score_writer::{ScoreWriterInput, create_score},
-    scorers::{llm_judge, remote_client},
+    scorers::{llm_judge, remote_client, schema_derivation::ExtraMetadataField},
 };
 
 #[derive(Debug)]
@@ -92,7 +92,7 @@ pub struct PreparedLlmJudgeScorer {
     provider: infra::provider::PreparedProvider,
     scorer_cfg: llm_judge::ScorerConfig,
     score_cfg_info: llm_judge::ScoreConfigInfo,
-    extra_metadata_fields: Vec<String>,
+    extra_metadata_fields: Vec<ExtraMetadataField>,
     include_reasoning: bool,
 }
 
