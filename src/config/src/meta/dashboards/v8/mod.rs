@@ -1237,6 +1237,7 @@ mod tests {
             min: None,
             max: None,
             time_shift: None,
+            query_label: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));
@@ -1246,6 +1247,7 @@ mod tests {
         assert!(!json.contains("\"min\""));
         assert!(!json.contains("\"max\""));
         assert!(!json.contains("timeShift"));
+        assert!(!json.contains("query_label"));
     }
 
     #[test]
