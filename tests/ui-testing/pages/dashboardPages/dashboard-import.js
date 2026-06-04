@@ -348,7 +348,7 @@ export default class DashboardImport {
   async confirmFolderMoveDrawer() {
     await this.page
       .locator(
-        '[data-test="dashboard-folder-move-dialog"] [data-test="o-drawer-primary-btn"]'
+        '[data-test="dashboard-folder-move-dialog"] [data-test="o-dialog-primary-btn"]'
       )
       .click();
   }

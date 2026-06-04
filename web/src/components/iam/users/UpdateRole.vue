@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="update-role-dialog"
+  <ODialog data-test="update-role-dialog"
     :open="open"
-    :width="30"
+    size="sm"
     :title="t('user.editUser')"
     persistent
     @update:open="$emit('update:open', $event)"
   >
-    <div class="tw:p-4">
+    <div>
       <div>
         <OInput
           v-model="orgMemberData.first_name"
@@ -56,13 +56,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useI18n } from "vue-i18n";
@@ -84,7 +84,7 @@ let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton, ODrawer, OInput, OSelect },
+  components: { OButton, ODialog, OInput, OSelect },
   props: {
     open: {
       type: Boolean,

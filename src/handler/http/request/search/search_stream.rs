@@ -70,6 +70,7 @@ use crate::{
         extractors::Headers,
         request::search::{
             build_search_request_per_field, error_utils::map_error_to_http_response,
+            utils::SearchStreamGuard,
         },
     },
     service::search::{
@@ -575,10 +576,17 @@ pub async fn search_http2_stream(
         extract_patterns,
     ));
 
+    // Cancel the running query if the client disconnects before the search
+    // produces a terminal event (e.g. the browser tab is closed).
+    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
             Ok(mut v) => {
+                if matches!(v, StreamResponses::Done) {
+                    guard.mark_finished();
+                }
                 // Check if function error is only - query limit default error and only `ui`
                 if let StreamResponses::SearchResponse {
                     ref mut results, ..
@@ -601,6 +609,7 @@ pub async fn search_http2_stream(
                 v.to_chunks()
             }
             Err(err) => {
+                guard.mark_finished();
                 log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in search stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {
@@ -959,11 +968,21 @@ pub async fn values_http2_stream(
         extract_patterns,
     ));
 
+    // Cancel the running query if the client disconnects before the search
+    // produces a terminal event (e.g. the browser tab is closed).
+    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => v.to_chunks(),
+            Ok(v) => {
+                if matches!(v, config::meta::search::StreamResponses::Done) {
+                    guard.mark_finished();
+                }
+                v.to_chunks()
+            }
             Err(err) => {
+                guard.mark_finished();
                 log::error!("[HTTP2_STREAM trace_id {trace_id}] Error in values stream: {err}");
                 let err_res = match err {
                     infra::errors::Error::ErrorCode(ref code) => {

@@ -74,6 +74,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_model_pricing_migration = false;
     let mut need_anomaly_detection_migration = false;
     let mut need_online_eval_migration = false;
+    let mut need_billing_group_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -256,6 +257,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_31 = version_compare::Version::from("0.0.31").unwrap();
                 let v0_0_33 = version_compare::Version::from("0.0.33").unwrap();
                 let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
+                let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -321,7 +323,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     log::info!("[OFGA:Local] anomaly detection permissions migration needed");
                     need_anomaly_detection_migration = true;
                 }
-                if meta_version > v0_0_33 && existing_model_version < v0_0_34 {
+
+                if existing_model_version < v0_0_34 {
+                    log::info!("[OFGA:Local] billing group migration needed");
+                    need_billing_group_migration = true;
+                }
+                if existing_model_version < v0_0_35 {
                     log::info!("[OFGA:Local] online eval permissions migration needed");
                     need_online_eval_migration = true;
                 }
@@ -458,6 +465,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_ownership_all_org_tuple(org_name, "score_configs", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "scorers", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "eval_jobs", &mut tuples);
+                    }
+                    if need_billing_group_migration {
+                        get_ownership_all_org_tuple(org_name, "billing_group", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

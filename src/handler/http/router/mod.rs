@@ -1037,6 +1037,27 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/enable_org_storage",
                 put(organization::org::enable_org_storage),
+            )
+            .route(
+                "/{org_id}/billing_group/invites",
+                get(organization::billing_group::list_invites)
+                    .post(organization::billing_group::invite),
+            )
+            .route(
+                "/{org_id}/billing_group/invites/{token}/accept",
+                post(organization::billing_group::accept),
+            )
+            .route(
+                "/{org_id}/billing_group/invites/{token}/reject",
+                delete(organization::billing_group::reject),
+            )
+            .route(
+                "/{org_id}/billing_group/membership",
+                get(organization::billing_group::check_membership),
+            )
+            .route(
+                "/{org_id}/billing_group/members",
+                get(organization::billing_group::check_members),
             );
     }
 

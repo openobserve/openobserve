@@ -220,6 +220,8 @@ struct ConfigResponse<'a> {
     org_storage_providers: String,
     #[cfg(feature = "enterprise")]
     org_storage_region: String,
+    #[cfg(feature = "cloud")]
+    billing_group_allowed_orgs: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -391,6 +393,9 @@ pub async fn zo_config() -> impl IntoResponse {
         (10 * 60).min(cfg.common.usage_publish_interval)
     );
 
+    #[cfg(feature = "cloud")]
+    let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
+
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -478,6 +483,8 @@ pub async fn zo_config() -> impl IntoResponse {
         org_storage_providers,
         #[cfg(feature = "enterprise")]
         org_storage_region,
+        #[cfg(feature = "cloud")]
+        billing_group_allowed_orgs,
     })
 }
 

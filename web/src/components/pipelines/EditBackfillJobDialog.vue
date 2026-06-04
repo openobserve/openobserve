@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODialog
     v-model:open="show"
-    :width="30"
+    size="sm"
     title="Edit Backfill Job"
     secondary-button-label="Cancel"
     primary-button-label="Update Job"
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="edit-backfill-job-dialog"
   >
-    <div id="edit-backfill-form" class="tw:mx-5 tw:my-3">
+    <div id="edit-backfill-form">
           <!-- Time Range Section -->
           <div>
             <div class="tw:text-sm tw:font-medium tw:mb-2">
@@ -131,13 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ errorMessage }}
       </div>
     </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

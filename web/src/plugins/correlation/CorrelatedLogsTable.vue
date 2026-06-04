@@ -235,7 +235,7 @@ class="tw:mr-1" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -321,8 +321,12 @@ const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
+
+// Simple canvas context for width calculation
+let canvasContext: CanvasRenderingContext2D | null = null;
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -360,6 +364,7 @@ const saveColumnState = () => {
   }
 };
 
+
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
@@ -369,6 +374,14 @@ onMounted(async () => {
    defaultLogFields.value = _defaultLogFields;
   } catch {
     defaultLogFields.value = [];
+  }
+
+  // Initialize canvas for width calculation
+  try {
+    const canvas = document.createElement("canvas");
+    canvasContext = canvas.getContext("2d");
+  } catch (error) {
+    console.warn("Canvas not available, using default widths");
   }
 });
 
@@ -646,18 +659,47 @@ watch(defaultLogFields, (keyFields) => {
   initializeVisibleColumns(availableFields.value);
 });
 
-// Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out tw:hidden columns, respecting custom order
-  const visibleFields = orderedFields.value.filter((field) =>
+// Filter out tw:hidden columns, respecting custom order
+const visibleFields = computed(() => {
+  return orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );
+});
+
+// Memoized column widths - only recalculate when data or visible fields change
+const memoizedColumnWidths = computed(() => {
+  const widthMap: Record<string, number> = {};
+
+  // Only calculate if we have search results
+  if (!searchResults.value || searchResults.value.length === 0) {
+    return widthMap;
+  }
+
+  visibleFields.value.forEach((field) => {
+    widthMap[field] = getColumnWidth(field);
+  });
+
+  return widthMap;
+});
+
+const longTextFields = ["message", "body"];
+
+// Simple helper that uses memoized widths
+const getColumnWidthHelper = (field: string): number => {
+  // Use memoized width if available, otherwise fallback to default
+  return memoizedColumnWidths.value[field] || (longTextFields.includes(field) ? 400 : 150);
+};
+
+// Generate table columns dynamically from visible fields in custom order
+const tableColumns = computed<ColumnDef<any>[]>(() => {
+  // Use the computed visibleFields
+  const fields = visibleFields.value;
 
   // Check if only timestamp is visible - if so, add source column
   const hasOnlyTimestamp =
-    visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+    fields.length === 1 && fields[0] === "_timestamp";
 
-  const columns = visibleFields.map((field) => {
+  const columns = fields.map((field) => {
     // Special handling for timestamp column
     if (field === "_timestamp") {
       return {
@@ -706,7 +748,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         return byString(row, field);
       },
       cell: (info: any) => info.getValue(),
-      size: field === "message" ? 400 : 150,
+      size: getColumnWidthHelper(field),
       maxSize: window.innerWidth,
       meta: {
         closable: true,
@@ -739,10 +781,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
 
 // Determine if we're showing default columns (only timestamp + source)
 const showingDefaultColumns = computed(() => {
-  const visibleFields = availableFields.value.filter((field) =>
-    visibleColumns.value.has(field),
-  );
-  return visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
 });
 
 /**
@@ -1002,6 +1041,44 @@ const handleNestedCorrelation = (row: any) => {
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
+// Simple column width calculation for correlation data
+const getColumnWidth = (field: string): number => {
+  // Skip excluded columns - use defaults
+  if (field === "_timestamp" || field === "source") {
+    return longTextFields.includes(field) ? 400 : 150;
+  }
+
+  if (!canvasContext) {
+    return longTextFields.includes(field) ? 400 : 150;
+  }
+
+  try {
+    // Font of table header
+    canvasContext.font = "bold 14px sans-serif";
+    let max = canvasContext.measureText(field).width + 16;
+
+    // Font of the table content
+    canvasContext.font = "12px monospace";
+
+    // Use correlation searchResults
+    const hits = searchResults.value || [];
+    for (let i = 0; i < Math.min(5, hits.length); i++) {
+      const cellValue = hits[i]?.[field];
+      if (cellValue !== undefined && cellValue !== null && cellValue !== "") {
+        const width = canvasContext.measureText(String(cellValue)).width;
+        if (width > max) max = width;
+      }
+    }
+
+    max += 24; // padding
+    if (max > 800) return 800;
+    if (max < 150) return 150;
+    return max;
+  } catch {
+    return longTextFields.includes(field) ? 400 : 150;
+  }
+};
+
 // Lifecycle
 onMounted(() => {
   // Fetch logs on mount
@@ -1016,6 +1093,7 @@ watch(
   },
   { deep: true },
 );
+
 </script>
 
 <style lang="scss" scoped>

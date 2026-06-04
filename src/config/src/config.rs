@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 43;
+pub const DB_SCHEMA_VERSION: u64 = 44;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -3319,16 +3319,17 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
     }
-
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
     }
-
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if !cfg.compact.fast_mode && cfg.common.local_mode {
+        cfg.compact.fast_mode = true;
     }
 
     Ok(())

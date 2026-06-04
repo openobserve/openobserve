@@ -17,6 +17,7 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
@@ -89,6 +90,11 @@ const useEnvRoutes = () => {
           path: "invoice_history",
           name: "invoice_history",
           component: InvoiceHistory,
+        },
+        {
+          path: "billing_group",
+          name: "billing_group",
+          component: BillingGroup,
         },
       ],
     },

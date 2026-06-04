@@ -198,11 +198,84 @@ fn is_system_field(field: &str) -> bool {
         || field == ALL_VALUES_COL_NAME
 }
 
+/// Guard that cancels an in-flight streaming search when the HTTP response is
+/// dropped before the search finishes — i.e. the client disconnected (closed
+/// the browser tab, navigated away, network dropped).
+///
+/// The guard is moved into the response stream's closure so it shares the
+/// stream's lifetime. Call [`SearchStreamGuard::mark_finished`] once a terminal
+/// event (`Done` / `Error` / `Cancelled`) has been produced; otherwise its
+/// `Drop` assumes the stream was torn down early and cancels the query.
+///
+/// Cancellation is keyed by the parent `trace_id`; the query manager removes
+/// every internal sub-query sharing that prefix, so multi-stream searches are
+/// covered too. Cancellation requires the enterprise build — on the open-source
+/// build the guard only logs the disconnect.
+pub struct SearchStreamGuard {
+    org_id: String,
+    trace_id: String,
+    finished: bool,
+}
+
+impl SearchStreamGuard {
+    pub fn new(org_id: String, trace_id: String) -> Self {
+        Self {
+            org_id,
+            trace_id,
+            finished: false,
+        }
+    }
+
+    /// Mark the search as completed so `Drop` does not cancel it.
+    pub fn mark_finished(&mut self) {
+        self.finished = true;
+    }
+}
+
+impl Drop for SearchStreamGuard {
+    fn drop(&mut self) {
+        if self.finished {
+            return;
+        }
+        // The response stream was dropped before a terminal event was produced:
+        // the client is gone. Cancel the still-running query so we stop burning
+        // resources on results nobody will read.
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id = std::mem::take(&mut self.org_id);
+            let trace_id = std::mem::take(&mut self.trace_id);
+            log::info!(
+                "[trace_id {trace_id}] client disconnected before search finished, cancelling query"
+            );
+            tokio::spawn(async move {
+                super::query_manager::cancel_query_internal(&org_id, &trace_id).await;
+            });
+        }
+        #[cfg(not(feature = "enterprise"))]
+        log::debug!(
+            "[trace_id {}] client disconnected before search finished (org {}); \
+             query cancellation requires the enterprise build",
+            self.trace_id,
+            self.org_id
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use hashbrown::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_search_stream_guard_mark_finished() {
+        let mut guard = SearchStreamGuard::new("org".to_string(), "trace".to_string());
+        assert!(!guard.finished);
+        guard.mark_finished();
+        assert!(guard.finished);
+        // A finished guard must not attempt cancellation when dropped.
+        drop(guard);
+    }
 
     #[test]
     fn test_get_bool_from_request() {
