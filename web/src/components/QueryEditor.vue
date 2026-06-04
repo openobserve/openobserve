@@ -456,7 +456,10 @@ const placeholderPhrases = computed<string[]>(() => {
   if (currentLanguage.value === 'promql') {
     return ["Write a PromQL query (e.g. rate(http_requests_total[5m]))"];
   }
-  return ["Write a SQL query (e.g. SELECT * FROM 'logs' WHERE status=500 LIMIT 100)"];
+  return [
+    "Add filter conditions (e.g. level='error' AND status=500 AND method='GET')",
+    "Write a SQL query (e.g. SELECT * FROM 'logs' WHERE level='error' LIMIT 100)",
+  ];
 });
 
 const showPlaceholder = computed(
