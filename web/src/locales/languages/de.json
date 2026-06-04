@@ -517,9 +517,9 @@
     "ingestion_limit": "Verschluckungslimit",
     "today_usage": "Heutige Nutzung",
     "feature_comparision_ent_msg": "Sie verwenden OpenObserve Enterprise Edition mit Zugriff auf alle unten aufgeführten erweiterten Funktionen.",
-    "feature_comparision_plan_detail": "Ihr Plan: Die Enterprise Edition ist kostenlos für die Datenaufnahme von bis zu 200 GB/Tag (~6 TB/Monat).",
+    "feature_comparision_plan_detail": "Ihr Plan: Die Enterprise Edition ist kostenlos für die Datenaufnahme von bis zu 50 GB/Tag (~1.5 TB/Monat).",
     "feature_comparision_os_msg": "Sie verwenden derzeit OpenObserve Open Source Edition. Führen Sie ein Upgrade auf die Enterprise Edition durch, um die in der folgenden Vergleichstabelle aufgeführten erweiterten Funktionen freizuschalten.",
-    "feature_comparision_good_news": "Gute Nachrichten: OpenObserve Enterprise Edition ist völlig kostenlos für die Datenaufnahme von bis zu 200 GB/Tag (~6 TB/Monat).",
+    "feature_comparision_good_news": "Gute Nachrichten: OpenObserve Enterprise Edition ist völlig kostenlos für die Datenaufnahme von bis zu 50 GB/Tag (~1.5 TB/Monat).",
     "commit_lbl": "Festschreiben",
     "build_lbl": "Gebaut",
     "no_license_installed_lbl": "Keine Lizenz installiert",
@@ -574,14 +574,14 @@
     "value_support_enterprise": "Unternehmen",
     "value_support_cloud": "Wolke",
     "value_cost_free": "Kostenlos",
-    "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 200 GB/Tag aufgenommene Daten. Danach bezahlt",
+    "value_cost_enterprise": "Wenn es selbst gehostet wird, kostenlos für bis zu 50 GB/Tag aufgenommene Daten. Danach bezahlt",
     "value_cost_cloud": "14-tägige kostenlose Testversion. Danach bezahlt",
     "feature_comparison_lbl": "Vergleich der Funktionen",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Funktionen für Unternehmen",
         "offer_text": "Holen Sie sich alle Unternehmensfunktionen völlig kostenlos, wenn Sie OpenObserve selbst hosten",
-        "badge_text": "Kostenlos bis zu 200 GB/Tag",
+        "badge_text": "Kostenlos bis zu 50 GB/Tag",
         "features_title": "Funktionen von OpenObserve Cloud",
         "features_subtitle": "Alle Funktionen, die in Ihrem Cloud-Abonnement enthalten sind",
         "primary_button_text": "Jetzt herunterladen"
@@ -593,7 +593,7 @@
         "features_title": "Verfügbare Unternehmensfunktionen",
         "features_subtitle": "Holen Sie sich eine kostenlose Lizenz, um unbegrenzte Funktionen freizuschalten",
         "primary_button_text": "Holen Sie sich eine kostenlose Lizenz",
-        "license_note": "100 GB/Tag ohne Lizenz • 200 GB/Tag mit Lizenz"
+        "license_note": "50 GB/Tag ohne Lizenz • 50 GB/Tag mit Lizenz"
       },
       "enterprise_with_license": {
         "hero_title": "Ihre Enterprise Edition",
@@ -607,7 +607,7 @@
       "open_source": {
         "hero_title": "Holen Sie sich die Enterprise Edition",
         "offer_text": "Laden Sie alle Unternehmensfunktionen völlig kostenlos herunter und schalten Sie sie frei",
-        "badge_text": "Kostenlos bis zu 200 GB/Tag",
+        "badge_text": "Kostenlos bis zu 50 GB/Tag",
         "features_title": "Alle Unternehmensfunktionen freischalten",
         "features_subtitle": "Alles, was Sie für produktionsreife Observability benötigen",
         "primary_button_text": "Jetzt herunterladen"

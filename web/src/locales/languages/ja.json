@@ -517,9 +517,9 @@
     "ingestion_limit": "取り込み制限",
     "today_usage": "今日の使用状況",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
-    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 200 GB (最大 6 TB/月) のデータを無料で取り込むことができます。",
+    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 50 GB (最大 1.5 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
-    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大200 GB（最大6 TB/月）のデータインジェストが可能です。",
+    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大50 GB（最大1.5 TB/月）のデータインジェストが可能です。",
     "commit_lbl": "コミット",
     "build_lbl": "建設",
     "no_license_installed_lbl": "ライセンスがインストールされていません",
@@ -574,14 +574,14 @@
     "value_support_enterprise": "エンタープライズ",
     "value_support_cloud": "クラウド",
     "value_cost_free": "無料",
-    "value_cost_enterprise": "セルフホストの場合、1日あたり最大200 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
+    "value_cost_enterprise": "セルフホストの場合、1日あたり最大50 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
     "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。",
     "feature_comparison_lbl": "機能比較",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "エンタープライズ機能",
         "offer_text": "OpenObserveをセルフホストすると、すべてのエンタープライズ機能を完全に無料で利用できます",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "OpenObserve クラウドの機能",
         "features_subtitle": "クラウドサブスクリプションに含まれるすべての機能",
         "primary_button_text": "今すぐダウンロード"
@@ -593,7 +593,7 @@
         "features_title": "利用可能なエンタープライズ機能",
         "features_subtitle": "無償ライセンスを取得して、無限の機能をアンロックしましょう",
         "primary_button_text": "無料ライセンスを取得",
-        "license_note": "100 GB/日 (ライセンスなし) • 200 GB/日 (ライセンス契約の場合)"
+        "license_note": "50 GB/日 (ライセンスなし) • 50 GB/日 (ライセンス契約の場合)"
       },
       "enterprise_with_license": {
         "hero_title": "あなたのエンタープライズエディション",
@@ -607,7 +607,7 @@
       "open_source": {
         "hero_title": "エンタープライズエディションを入手",
         "offer_text": "すべてのエンタープライズ機能を完全無料でダウンロードしてロック解除",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "すべてのエンタープライズ機能をロック解除",
         "features_subtitle": "本番環境に対応したオブザーバビリティに必要なものすべて",
         "primary_button_text": "今すぐダウンロード"
