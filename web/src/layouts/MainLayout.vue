@@ -322,6 +322,14 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `online_evals_enabled` — controlled by
+    // `ZO_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // of whether the config response arrived before or after this component
+    // mounted.
+    const isOnlineEvalsEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.online_evals_enabled);
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -358,15 +366,6 @@ export default defineComponent({
         icon: "account-tree",
         link: "/traces",
         name: "traces",
-      },
-      {
-        title: t("menu.evals"),
-        icon: "check-circle-outline",
-        link: "/online-evals",
-        name: "onlineEvals",
-        // Gated only by the backend `ZO_ONLINE_EVALS_ENABLED` flag — the
-        // feature is available on OSS + Enterprise + Cloud equally.
-        hide: !store.state.zoConfig?.online_evals_enabled,
       },
       {
         title: t("menu.rum"),
@@ -561,9 +560,39 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
+    // Insert / remove the Evaluations menu entry based on the live config
+    // flag. Position: directly after Traces. Idempotent — safe to call from
+    // multiple lifecycle hooks.
+    const updateOnlineEvalsMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (link: any) => link.name === "onlineEvals",
+      );
+
+      if (isOnlineEvalsEnabled.value) {
+        if (existingIndex !== -1) return;
+        const tracesIndex = linksList.value.findIndex(
+          (link: any) => link.name === "traces",
+        );
+        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        linksList.value.splice(insertAt, 0, {
+          title: t("menu.evals"),
+          icon: "check-circle-outline",
+          link: "/online-evals",
+          name: "onlineEvals",
+        });
+      } else if (existingIndex !== -1) {
+        linksList.value.splice(existingIndex, 1);
+      }
+    };
+
+    // If `/config` resolves after this component mounted (or if the flag
+    // ever flips at runtime), keep the menu in sync.
+    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateOnlineEvalsMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
