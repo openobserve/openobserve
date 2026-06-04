@@ -335,7 +335,7 @@ fn wrap_partial_reduce(
     partial_reduce_enabled: bool,
     input: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {
-    if !partial_reduce_enabled || input.name() != "AggregateExec" {
+    if !partial_reduce_enabled {
         return Ok(input);
     }
     let Some(agg) = input.as_any().downcast_ref::<AggregateExec>() else {
@@ -359,18 +359,8 @@ fn wrap_partial_reduce(
             ))
         })
         .collect::<Result<_>>()?;
-    let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg
-        .group_expr()
-        .null_expr()
-        .iter()
-        .map(|(_, name)| {
-            let idx = partial_schema.index_of(name)?;
-            Ok((
-                Arc::new(PhysicalColumn::new(name, idx)) as Arc<dyn PhysicalExpr>,
-                name.clone(),
-            ))
-        })
-        .collect::<Result<_>>()?;
+    // null_expr entries are schema-independent NULL literals used by GROUPING SETS
+    let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg.group_expr().null_expr().to_vec();
     let new_group_by = PhysicalGroupBy::new(
         group_exprs,
         null_exprs,
@@ -384,7 +374,7 @@ fn wrap_partial_reduce(
         agg.aggr_expr().to_vec(),
         vec![None; agg.aggr_expr().len()],
         coalesce_partition_exec,
-        partial_schema,
+        agg.input_schema(),
     )?) as Arc<dyn ExecutionPlan>)
 }
 
@@ -613,6 +603,109 @@ mod tests {
             .expect("group expr should be a Column reference into partial output schema");
         assert_eq!(col_expr.name(), "a");
         assert_eq!(col_expr.index(), 0);
+        Ok(())
+    }
+
+    // Regression test: PartialReduce must carry the SCAN schema as input_schema, not the
+    // partial-aggregate output schema.  DataFusion uses input_schema during plan
+    // serialisation/deserialisation to reconstruct aggregate-expression argument types.
+    // If we used the partial output schema instead, a `max(_timestamp:Int64)` expression
+    // (column index 0 in the scan) would be resolved against index 0 of the partial output
+    // (which is the group-by key `client_ip:Utf8`), causing MinMaxBytesAccumulator(Utf8) to
+    // be created and then panic when fed Int64 state data.
+    #[test]
+    fn test_wrap_partial_reduce_input_schema_is_scan_schema() -> datafusion::common::Result<()> {
+        // Scan schema: [_timestamp:Int64 @ 0, client_ip:Utf8 @ 1]
+        // Group by client_ip (index 1), so partial output is [client_ip:Utf8, ...].
+        // After wrapping, result_agg.input_schema() must still be the SCAN schema.
+        let scan_schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("client_ip", DataType::Utf8, false),
+        ]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("client_ip", &scan_schema)?, "client_ip".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&scan_schema))),
+            Arc::clone(&scan_schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        // The critical invariant: input_schema must be the original scan schema so that
+        // aggregate expression argument types (e.g. _timestamp:Int64) are reconstructed
+        // correctly during plan serde on querier nodes.
+        assert_eq!(
+            result_agg.input_schema().as_ref(),
+            scan_schema.as_ref(),
+            "PartialReduce input_schema must be the scan schema, not the partial output schema"
+        );
+        Ok(())
+    }
+
+    // Regression test: null_exprs (GROUPING SETS placeholders) must be carried over
+    // unchanged.  The original code remapped them to Column refs, which would replace
+    // the NULL sentinel with the actual column value during ROLLUP/CUBE aggregation.
+    #[test]
+    fn test_wrap_partial_reduce_null_exprs_preserved_for_grouping_sets()
+    -> datafusion::common::Result<()> {
+        use datafusion::{
+            arrow::datatypes::DataType, common::ScalarValue, physical_expr::expressions::Literal,
+        };
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+            Field::new("b", DataType::Utf8, false),
+        ]));
+        // Simulate ROLLUP(a, b): null_expr entries are NULL literals (schema-independent).
+        let null_a: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(None)));
+        let null_b: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Utf8(None)));
+        let group_by = PhysicalGroupBy::new(
+            vec![
+                (col("a", &schema)?, "a".to_string()),
+                (col("b", &schema)?, "b".to_string()),
+            ],
+            vec![
+                (Arc::clone(&null_a), "a".to_string()),
+                (Arc::clone(&null_b), "b".to_string()),
+            ],
+            vec![
+                vec![false, false], // (a, b)
+                vec![false, true],  // (a)
+                vec![true, false],  // (b)
+            ],
+            true,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+
+        let null_exprs = result_agg.group_expr().null_expr();
+        assert_eq!(null_exprs.len(), 2);
+        // Both must still be Literal(NULL), NOT remapped to Column refs.
+        for (expr, _) in null_exprs {
+            assert!(
+                expr.as_any().is::<Literal>(),
+                "null_expr must remain a Literal, not be replaced with a Column ref"
+            );
+        }
         Ok(())
     }
 }
