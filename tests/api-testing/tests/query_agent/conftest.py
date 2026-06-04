@@ -129,7 +129,7 @@ def run_query(client, query, *, skip_fts_count=False):
         assert len(hits) < size, \
             f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
 
-        if len(hits) > 0:
+        if len(hits) > 0 and not expected.get("skip_column_check"):
             for col in expected.get("columns", []):
                 assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
 
