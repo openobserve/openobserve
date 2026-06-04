@@ -81,12 +81,20 @@
                 when the stream schema doesn't list a given field yet.
               -->
               <OCombobox
+                v-if="availableFields.length > 0"
                 ref="fieldComboboxRef"
                 v-model="newFieldName"
                 class="tw:flex-1"
                 :items="availableFieldOptions"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 @select="onFieldSelect"
+                data-test="cross-link-field-input"
+              />
+              <OInput
+                v-else
+                v-model="newFieldName"
+                class="tw:flex-1"
+                :placeholder="t('crossLinks.fieldInputPlaceholder')"
                 data-test="cross-link-field-input"
               />
               <OButton

@@ -181,7 +181,7 @@
             :key="index"
           >
             <div
-              style="display: flex; gap: 10px; margin-bottom: 10px"
+              style="display: flex; gap: 0.625rem; margin-bottom: 0.625rem; align-items: center"
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <OCombobox
@@ -198,10 +198,9 @@
               />
 
               <OIcon
-                class="tw:mr-1"
                 size="md"
                 name="close"
-                style="cursor: pointer; height: 54px; display: flex !important"
+                style="cursor: pointer; flex-shrink: 0"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
