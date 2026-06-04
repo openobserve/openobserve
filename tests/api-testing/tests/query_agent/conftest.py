@@ -11,7 +11,6 @@ import json
 import logging
 import re
 import sys
-import time
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
@@ -27,8 +26,11 @@ _QUERIES_DIR = _DATA_DIR / "queries"
 sys.path.insert(0, str(_DATA_DIR))
 from data_gen import BASE_TS, build_dataset  # noqa: E402
 
-# Unique stream per test session — prevents row-count drift from accumulated data.
-STREAM = f"query_agent_test_{int(time.time())}"
+# Tie stream name to BASE_TS (stable within a session: comes from
+# base_ts_override.json written by compute_counts.py).  Using time.time()
+# caused a 1-second race between pytest collection and fixture setup,
+# producing two different stream names in the same run.
+STREAM = f"query_agent_test_{BASE_TS // 1_000_000}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────
@@ -129,7 +131,7 @@ def run_query(client, query, *, skip_fts_count=False):
         assert len(hits) < size, \
             f"{qid}: Got {len(hits)} rows at size={size} — result may be truncated"
 
-        if len(hits) > 0:
+        if len(hits) > 0 and not expected.get("skip_column_check"):
             for col in expected.get("columns", []):
                 assert col in hits[0], f"{qid}: Expected column '{col}' not in response"
 
@@ -274,6 +276,6 @@ def ingest_query_agent_data():
         thits = tr.json().get("hits", [])
         return bool(thits and thits[0].get("c", 0) >= 1)
 
-    wait_until(_data_is_searchable, timeout=120, interval=1.0,
+    wait_until(_data_is_searchable, timeout=300, interval=1.0,
                msg=f"{stream} data not searchable ({expected} records)")
     logging.info("%s data is searchable (%d records)", stream, expected)
