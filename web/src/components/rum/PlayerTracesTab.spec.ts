@@ -709,6 +709,315 @@ describe("PlayerTracesTab", () => {
   });
 
   // =========================================================================
+  // Seek button and event emits
+  // =========================================================================
+
+  describe("seek button and event emits", () => {
+    it("should show seek button in detail header when trace has a start_time and startTime prop > 0", async () => {
+      // Default mount has startTime: 1000 and metadata with start_time: 1_000_000_000.
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not show seek button when startTime prop is 0", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks();
+      wrapper = mountComponent({ props: { startTime: 0 } });
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should emit event-emitted with trace-seek when seek button is clicked", async () => {
+      // startTime: 1000 ms, trace start_time: 1_000_000_000 ns → 1000 ms → offset = 0 ms
+      // The component emits when relativeTimeMs >= 0, so offset 0 still fires.
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      const seekBtn = wrapper.find('[data-test="rum-player-traces-tab-seek-btn"]');
+      expect(seekBtn.exists()).toBe(true);
+      await seekBtn.trigger("click");
+
+      const emitted = wrapper.emitted("event-emitted");
+      expect(emitted).toBeTruthy();
+      const seekEvents = (emitted as any[]).filter((args) => args[0] === "trace-seek");
+      expect(seekEvents.length).toBeGreaterThan(0);
+      expect(seekEvents[0][1]).toHaveProperty("relativeTime");
+    });
+
+    it("should emit event-emitted with trace-row-click when a row with start_time > 0 offset is clicked", async () => {
+      wrapper.unmount();
+
+      // startTime: 1000 ms, trace start_time: 2_000_000_000 ns → 2000 ms → offset = 1000 ms (> 0)
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ start_time: 2_000_000_000 })],
+      );
+      wrapper = mountComponent({ props: { startTime: 1000 } });
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      const emitted = wrapper.emitted("event-emitted");
+      expect(emitted).toBeTruthy();
+      const rowClickEvents = (emitted as any[]).filter(
+        (args) => args[0] === "trace-row-click",
+      );
+      expect(rowClickEvents.length).toBe(1);
+      expect(rowClickEvents[0][1]).toEqual({ relativeTime: 1000 });
+    });
+
+    it("should not emit trace-row-click when relativeTime is 0", async () => {
+      // startTime: 1000 ms, trace start_time: 1_000_000_000 ns → offset = 0 ms → no emit
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      const emitted = wrapper.emitted("event-emitted") ?? [];
+      const rowClickEvents = (emitted as any[]).filter(
+        (args) => args[0] === "trace-row-click",
+      );
+      expect(rowClickEvents.length).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // Detail header metadata chips
+  // =========================================================================
+
+  describe("detail header metadata chips", () => {
+    it("should show span count in detail header when spanCount is set", async () => {
+      wrapper.unmount();
+
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ spans: [7, 0] })], // spanCount = 7, errorCount = 0
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.text()).toContain("7");
+      expect(wrapper.text()).toContain("spans");
+    });
+
+    it("should use singular 'span' when spanCount is 1", async () => {
+      wrapper.unmount();
+
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ spans: [1, 0] })],
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      // Should contain "1 span" not "1 spans"
+      expect(wrapper.text()).toContain("1");
+      expect(wrapper.text()).toMatch(/\b1\s+span\b/);
+    });
+
+    it("should use singular 'Error' when errorCount is 1", async () => {
+      wrapper.unmount();
+
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ spans: [5, 1] })], // 1 error span
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      // rum.error = "Error" (singular), rum.errors = "Errors" (plural)
+      expect(wrapper.text()).toMatch(/\b1\s+Error\b/);
+    });
+
+    it("should show open-in-full-view button in detail header", async () => {
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-open-full-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not show error count chip when trace has no errors", async () => {
+      // Default metadata has spans: [5, 0] → errorCount = 0 → no error chip
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      // The error chip span has no data-test but its text contains "Error(s)".
+      // Verify the component renders without error badge content.
+      const detailText = wrapper.find('[data-test="trace-details"]');
+      expect(detailText.exists()).toBe(true);
+      // The error count span is only present when errorCount > 0
+      expect(wrapper.text()).not.toMatch(/\b0\s+Error/);
+    });
+  });
+
+  // =========================================================================
+  // Error count badge in list view
+  // =========================================================================
+
+  describe("error count badge in list view", () => {
+    it("should show error count badge when at least one trace has errors", async () => {
+      wrapper.unmount();
+
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [createTraceMetadata({ spans: [5, 3] })], // errorCount = 3
+      );
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const badge = wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toContain("1"); // 1 trace with errors
+    });
+
+    it("should not show error count badge when no traces have errors", () => {
+      // Default metadata has spans: [5, 0] → totalErrorCount = 0
+      expect(
+        wrapper.find('[data-test="rum-player-traces-tab-error-count-badge"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Formatting utilities — additional coverage
+  // =========================================================================
+
+  describe("formatting utilities — additional coverage", () => {
+    it("should return em-dash for formatTraceTimestamp when startTimeNs is 0", () => {
+      expect((wrapper.vm as any).formatTraceTimestamp(0)).toBe("—");
+    });
+
+    it("should return em-dash for formatTraceTimestamp when startTime prop is 0", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks();
+      wrapper = mountComponent({ props: { startTime: 0 } });
+      await flushPromises();
+
+      expect((wrapper.vm as any).formatTraceTimestamp(1_000_000_000)).toBe("—");
+    });
+
+    it("should return empty string for traceTimeOffset when startTime prop is 0", async () => {
+      wrapper.unmount();
+      setupSuccessfulMocks();
+      wrapper = mountComponent({ props: { startTime: 0 } });
+      await flushPromises();
+
+      expect((wrapper.vm as any).traceTimeOffset(1_000_000_000)).toBe("");
+    });
+
+    it("should format trace timestamp as MM:SS relative to session startTime", () => {
+      // startTime: 1000 ms, trace start_time = 1_061_000_000_000 ns = 1_061_000 ms → offset = 1_060_000 ms = 1060 s → 17:40
+      expect((wrapper.vm as any).formatTraceTimestamp(1_061_000_000_000)).toBe("17:40");
+    });
+
+    it("should return 0 for traceRelativeTimeMs when startTimeNs is 0", () => {
+      expect((wrapper.vm as any).traceRelativeTimeMs(0)).toBe(0);
+    });
+
+    it("should clamp traceRelativeTimeMs to 0 when trace starts before session", () => {
+      // startTime: 1000 ms, trace start_time = 500_000_000 ns = 500 ms → clamped to 0
+      expect((wrapper.vm as any).traceRelativeTimeMs(500_000_000)).toBe(0);
+    });
+
+    it("should return correct relative ms when trace starts after session", () => {
+      // startTime: 1000 ms, trace start_time = 3_000_000_000 ns = 3000 ms → offset = 2000 ms
+      expect((wrapper.vm as any).traceRelativeTimeMs(3_000_000_000)).toBe(2000);
+    });
+
+    it("should assign empty class for traceRowClass when errorCount is 0", () => {
+      expect(
+        (wrapper.vm as any).traceRowClass({ metadata: { errorCount: 0 } }),
+      ).toBe("");
+    });
+
+    it("should assign error class for traceRowClass when errorCount > 0", () => {
+      expect(
+        (wrapper.vm as any).traceRowClass({ metadata: { errorCount: 2 } }),
+      ).toBe("trace-row--error");
+    });
+  });
+
+  // =========================================================================
+  // openTraceDetail fallback time range
+  // =========================================================================
+
+  describe("openTraceDetail time range", () => {
+    it("should set time range from metadata when metadata has start_time and end_time", async () => {
+      // metadata: start_time=1_000_000_000 ns, end_time=1_005_000_000 ns
+      // selectedTraceStartTime = floor(1_000_000_000/1000) - 60_000_000 = 1_000_000 - 60_000_000 = -59_999_000
+      // selectedTraceEndTime   = ceil(1_005_000_000/1000) + 60_000_000 = 1_005_000 + 60_000_000 = 61_005_000
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      expect((wrapper.vm as any).selectedTraceStartTime).toBe(
+        Math.floor(1_000_000_000 / 1000) - 60_000_000,
+      );
+      expect((wrapper.vm as any).selectedTraceEndTime).toBe(
+        Math.ceil(1_005_000_000 / 1000) + 60_000_000,
+      );
+    });
+
+    it("should use fallback time range when trace metadata is missing start/end times", async () => {
+      wrapper.unmount();
+
+      // metadata without start_time / end_time → fallback path
+      setupSuccessfulMocks(
+        [createRumHit()],
+        [
+          createTraceMetadata({
+            start_time: undefined,
+            end_time: undefined,
+          }),
+        ],
+      );
+      wrapper = mountComponent({
+        props: { startTime: 1000, endTime: 2000 },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      // fallback: startTime * 1000 = 1_000_000, endTime * 1000 = 2_000_000
+      expect((wrapper.vm as any).selectedTraceStartTime).toBe(1_000_000);
+      expect((wrapper.vm as any).selectedTraceEndTime).toBe(2_000_000);
+    });
+
+    it("should reset selectedTraceStartTime and selectedTraceEndTime to 0 on closeTraceDetail", async () => {
+      await wrapper.find('[data-test="table-row-0"]').trigger("click");
+      await nextTick();
+
+      await wrapper
+        .find('[data-test="rum-player-traces-tab-back-btn"]')
+        .trigger("click");
+      await nextTick();
+
+      expect((wrapper.vm as any).selectedTraceStartTime).toBe(0);
+      expect((wrapper.vm as any).selectedTraceEndTime).toBe(0);
+    });
+  });
+
+  // =========================================================================
   // Accessibility
   // =========================================================================
 

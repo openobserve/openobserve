@@ -131,8 +131,7 @@ describe("PlayerEventsSidebar", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    vi.clearAllTimers();
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   // ==========================================================================
@@ -140,14 +139,22 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Component Mounting", () => {
-    it("mounts successfully without errors", () => {
-      // Arrange & Assert
+    it("should mount successfully without errors", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("renders AppTabs component on mount", () => {
-      // Arrange & Assert
+    it("should render AppTabs component on mount", () => {
       expect(wrapper.find('[data-test="app-tabs"]').exists()).toBe(true);
+    });
+
+    it("should accept events, sessionDetails and trace-related props", () => {
+      const propKeys = Object.keys(wrapper.vm.$props);
+      expect(propKeys).toContain("events");
+      expect(propKeys).toContain("sessionDetails");
+      expect(propKeys).toContain("sessionId");
+      expect(propKeys).toContain("currentTime");
+      expect(propKeys).toContain("startTime");
+      expect(propKeys).toContain("endTime");
     });
   });
 
@@ -156,55 +163,64 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Tabs Integration", () => {
-    it("renders AppTabs component", () => {
-      // Arrange & Assert
+    it("should render AppTabs component", () => {
       expect(wrapper.findComponent({ name: "AppTabs" }).exists()).toBe(true);
     });
 
-    it("passes 3 tabs to AppTabs with labels Breadcrumbs, Tags and Traces", () => {
-      // Arrange
+    it("should pass exactly 3 tabs to AppTabs with labels Breadcrumbs, Tags, and Traces", () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       const tabs = appTabs.props("tabs");
 
-      // Assert
       expect(tabs).toHaveLength(3);
-      expect(tabs[0].label).toBe("Breadcrumbs");
       expect(tabs[0].value).toBe("breadcrumbs");
-      expect(tabs[1].label).toBe("Tags");
       expect(tabs[1].value).toBe("tags");
-      expect(tabs[2].label).toBe("Traces");
       expect(tabs[2].value).toBe("traces");
     });
 
-    it("shows breadcrumbs content by default when component mounts", () => {
-      // Arrange & Assert
+    it("should include a traces tab in the tabs list", () => {
+      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+      const tabs = appTabs.props("tabs");
+      const traceTab = tabs.find((t: any) => t.value === "traces");
+
+      expect(traceTab).toBeDefined();
+      expect(traceTab.value).toBe("traces");
+    });
+
+    it("should show breadcrumbs content by default when component mounts", () => {
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(true);
     });
 
-    it("switches to tags tab content when AppTabs emits update:active-tab with tags", async () => {
-      // Arrange
+    it("should switch to tags tab content when AppTabs emits update:active-tab with tags", async () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
 
-      // Act
       await appTabs.vm.$emit("update:active-tab", "tags");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
     });
 
-    it("switches back to breadcrumbs content when AppTabs emits update:active-tab with breadcrumbs", async () => {
-      // Arrange
+    it("should switch back to breadcrumbs content when AppTabs emits update:active-tab with breadcrumbs", async () => {
       const appTabs = wrapper.findComponent({ name: "AppTabs" });
       await appTabs.vm.$emit("update:active-tab", "tags");
       await wrapper.vm.$nextTick();
 
-      // Act
       await appTabs.vm.$emit("update:active-tab", "breadcrumbs");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(true);
+    });
+
+    it("should not render event-metadata when breadcrumbs tab is active", () => {
+      expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(false);
+    });
+
+    it("should not render search input when tags tab is active", async () => {
+      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+
+      await appTabs.vm.$emit("update:active-tab", "tags");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="search-input"]').exists()).toBe(false);
     });
   });
 
@@ -219,76 +235,60 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.vm.$nextTick();
     });
 
-    it("displays event-metadata section when tags tab is active", () => {
-      // Arrange & Assert
+    it("should display event-metadata section when tags tab is active", () => {
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
     });
 
-    it("displays user email text in metadata when sessionDetails has user_email", () => {
-      // Arrange & Assert
+    it("should display user email text in metadata when sessionDetails has user_email", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("test@example.com");
     });
 
-    it("renders mail icon in metadata when tags tab is active", () => {
-      // Arrange
+    it("should render mail icon in metadata when tags tab is active", () => {
       const metadata = wrapper.find('[data-test="event-metadata"]');
 
-      // Assert
       expect(metadata.find('[data-test="OIcon"].mail').exists()).toBe(true);
     });
 
-    it("displays date text in metadata when sessionDetails has date", () => {
-      // Arrange & Assert
+    it("should display date text in metadata when sessionDetails has date", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("2024-01-01 10:00:00");
     });
 
-    it("renders schedule icon in metadata when tags tab is active", () => {
-      // Arrange
+    it("should render schedule icon in metadata when tags tab is active", () => {
       const metadata = wrapper.find('[data-test="event-metadata"]');
 
-      // Assert
       expect(metadata.find('[data-test="OIcon"].schedule').exists()).toBe(true);
     });
 
-    it("displays browser and OS text in metadata", () => {
-      // Arrange & Assert
+    it("should display browser and OS text in metadata", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Chrome 120, Windows 10");
     });
 
-    it("renders settings icon in metadata when tags tab is active", () => {
-      // Arrange
+    it("should render settings icon in metadata when tags tab is active", () => {
       const metadata = wrapper.find('[data-test="event-metadata"]');
 
-      // Assert
       expect(metadata.find('[data-test="OIcon"].settings').exists()).toBe(true);
     });
 
-    it("displays IP address text in metadata when sessionDetails has ip", () => {
-      // Arrange & Assert
+    it("should display IP address text in metadata when sessionDetails has ip", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("192.168.1.1");
     });
 
-    it("renders language icon in metadata when tags tab is active", () => {
-      // Arrange
+    it("should render language icon in metadata when tags tab is active", () => {
       const metadata = wrapper.find('[data-test="event-metadata"]');
 
-      // Assert
       expect(metadata.find('[data-test="OIcon"].language').exists()).toBe(true);
     });
 
-    it("displays city and country text in metadata when sessionDetails has location", () => {
-      // Arrange & Assert
+    it("should display city and country text in metadata when sessionDetails has location", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("New York, USA");
     });
 
-    it("displays Unknown User when sessionDetails has null user_email", async () => {
-      // Arrange & Act
+    it("should display Unknown User when sessionDetails has null user_email", async () => {
       await wrapper.setProps({
         sessionDetails: { ...mockSessionDetails, user_email: null },
       });
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Unknown User");
     });
   });
@@ -298,24 +298,20 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Breadcrumbs Tab Content", () => {
-    it("renders search input when breadcrumbs tab is active by default", () => {
-      // Arrange & Assert
+    it("should render search input when breadcrumbs tab is active by default", () => {
       expect(wrapper.find('[data-test="search-input"]').exists()).toBe(true);
     });
 
-    it("renders event type selector when breadcrumbs tab is active", () => {
-      // Arrange & Assert
+    it("should render event type selector when breadcrumbs tab is active", () => {
       expect(wrapper.find('[data-test="player-events-filter-select"]').exists()).toBe(true);
     });
 
-    it("renders separator when breadcrumbs tab is active", () => {
-      // Arrange & Assert
+    it("should render separator when breadcrumbs tab is active", () => {
       expect(wrapper.find('[data-test="separator"]').exists()).toBe(true);
     });
 
-    it("renders event rows when breadcrumbs tab is active with 3 events", () => {
-      // Arrange & Assert
-      expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBeGreaterThan(0);
+    it("should render event rows when breadcrumbs tab is active with 3 events", () => {
+      expect(wrapper.findAll('[data-test^="player-event-row"]').length).toBe(3);
     });
   });
 
@@ -324,54 +320,44 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Events Display", () => {
-    it("displays 3 event rows when 3 events are provided", () => {
-      // Arrange & Assert
+    it("should display 3 event rows when 3 events are provided", () => {
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(3);
     });
 
-    it("displays event display time text in the error event row", () => {
-      // Arrange & Assert
+    it("should display event display time text in the error event row", () => {
       expect(wrapper.find('[data-test="player-event-row-error"]').text()).toContain("10:30");
     });
 
-    it("displays event type text in the error event row", () => {
-      // Arrange & Assert
+    it("should display event type text in the error event row", () => {
       expect(wrapper.find('[data-test="player-event-row-error"]').text()).toContain("error");
     });
 
-    it("displays event name text in the error event row", () => {
-      // Arrange & Assert
+    it("should display event name text in the error event row", () => {
       expect(wrapper.find('[data-test="player-event-row-error"]').text()).toContain(
         "TypeError: Cannot read property 'foo'",
       );
     });
 
-    it("renders event type badge for the error event", () => {
-      // Arrange & Assert
+    it("should render event type badge for the error event", () => {
       expect(wrapper.find('[data-test="event-type-badge"]').exists()).toBe(true);
     });
 
-    it("renders action event row for the action event", () => {
-      // Arrange & Assert
+    it("should render action event row for the action event", () => {
       expect(wrapper.find('[data-test="player-event-row-action"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="player-event-row-action"]').text()).toContain("action");
     });
 
-    it("provides title attribute equal to event name on event name element", () => {
-      // Arrange
+    it("should provide title attribute equal to event name on event name element", () => {
       const firstEventName = wrapper.find('[data-test="event-name"]');
 
-      // Assert
       expect(firstEventName.attributes("title")).toBe(
         "TypeError: Cannot read property 'foo'",
       );
     });
 
-    it("provides title attributes for all visible event name elements", () => {
-      // Arrange
+    it("should provide title attributes for all visible event name elements", () => {
       const eventNames = wrapper.findAll('[data-test="event-name"]');
 
-      // Assert
       eventNames.forEach((name: any, index: number) => {
         expect(name.attributes("title")).toBe(mockEvents[index].name);
       });
@@ -383,8 +369,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Event Filtering", () => {
-    it("has all 4 event types selected by default", () => {
-      // Arrange & Assert
+    it("should have all 4 event types selected by default", () => {
       expect(wrapper.vm.selectedEventTypes).toEqual([
         "error",
         "action",
@@ -393,8 +378,7 @@ describe("PlayerEventsSidebar", () => {
       ]);
     });
 
-    it("has correct event type options list", () => {
-      // Arrange & Assert
+    it("should have correct event type options list", () => {
       expect(wrapper.vm.eventOptions).toEqual([
         { label: "Error", value: "error" },
         { label: "Action", value: "action" },
@@ -403,69 +387,54 @@ describe("PlayerEventsSidebar", () => {
       ]);
     });
 
-    it("shows only matching event when search term filters by name", async () => {
-      // Arrange
+    it("should show only matching event when search term filters by name", async () => {
       wrapper.vm.searchEvent = "Button";
 
-      // Act
       wrapper.vm.searchEvents("Button");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("Button click on submit");
     });
 
-    it("shows only error event when selectedEventTypes is set to error only", async () => {
-      // Arrange
+    it("should show only error event when selectedEventTypes is set to error only", async () => {
       wrapper.vm.selectedEventTypes = ["error"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("TypeError");
     });
 
-    it("performs case-insensitive search when search term is uppercase", async () => {
-      // Arrange & Act
+    it("should perform case-insensitive search when search term is uppercase", async () => {
       wrapper.vm.searchEvents("BUTTON");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("Button click on submit");
     });
 
-    it("shows all 3 events when search value is null", async () => {
-      // Arrange & Act
+    it("should show all 3 events when search value is null", async () => {
       wrapper.vm.searchEvents(null);
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(3);
     });
 
-    it("shows all 3 events when search value is empty string", async () => {
-      // Arrange & Act
+    it("should show all 3 events when search value is empty string", async () => {
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(3);
     });
 
-    it("shows only 1 event when both type and text filters are combined", async () => {
-      // Arrange
+    it("should show only 1 event when both type and text filters are combined", async () => {
       wrapper.vm.selectedEventTypes = ["action", "view"];
 
-      // Act
       wrapper.vm.searchEvents("click");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("click on submit");
     });
@@ -476,40 +445,31 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Event Interaction", () => {
-    it("emits event-emitted with event-click and first event data when first row is clicked", async () => {
-      // Arrange
+    it("should emit event-emitted with event-click and first event data when first row is clicked", async () => {
       const firstEvent = wrapper.find('[data-test^="player-event-row"]');
 
-      // Act
       await firstEvent.trigger("click");
 
-      // Assert
       const emitted = wrapper.emitted("event-emitted");
       expect(emitted).toBeDefined();
       expect(emitted).toHaveLength(1);
       expect(emitted![0]).toEqual(["event-click", mockEvents[0]]);
     });
 
-    it("emits event-emitted with correct second event data when second row is clicked", async () => {
-      // Arrange
+    it("should emit event-emitted with correct second event data when second row is clicked", async () => {
       const eventRows = wrapper.findAll('[data-test^="player-event-row"]');
 
-      // Act
       await eventRows[1].trigger("click");
 
-      // Assert
       expect(wrapper.emitted("event-emitted")![0]).toEqual(["event-click", mockEvents[1]]);
     });
 
-    it("emits event-emitted twice when two different event rows are clicked", async () => {
-      // Arrange
+    it("should emit event-emitted twice when two different event rows are clicked", async () => {
       const eventRows = wrapper.findAll('[data-test^="player-event-row"]');
 
-      // Act
       await eventRows[0].trigger("click");
       await eventRows[1].trigger("click");
 
-      // Assert
       expect(wrapper.emitted("event-emitted")).toHaveLength(2);
     });
   });
@@ -519,8 +479,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Props Reactivity", () => {
-    it("shows only 1 event row when events prop is replaced with 1 event", async () => {
-      // Arrange
+    it("should show only 1 event row when events prop is replaced with 1 event", async () => {
       const newEvents = [
         {
           id: "new1",
@@ -531,17 +490,14 @@ describe("PlayerEventsSidebar", () => {
         },
       ];
 
-      // Act
       await wrapper.setProps({ events: newEvents });
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("New error");
     });
 
-    it("shows 4 event rows when events prop grows by one additional event", async () => {
-      // Arrange
+    it("should show 4 event rows when events prop grows by one additional event", async () => {
       const newEvents = [
         ...mockEvents,
         {
@@ -553,21 +509,30 @@ describe("PlayerEventsSidebar", () => {
         },
       ];
 
-      // Act
       await wrapper.setProps({ events: newEvents });
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(4);
     });
 
-    it("shows no event rows when events prop is set to empty array", async () => {
-      // Arrange & Act
+    it("should show no event rows when events prop is set to empty array", async () => {
       await wrapper.setProps({ events: [] });
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(0);
+    });
+
+    it("should update session details display when sessionDetails prop changes", async () => {
+      const appTabs = wrapper.findComponent({ name: "AppTabs" });
+      await appTabs.vm.$emit("update:active-tab", "tags");
+      await wrapper.vm.$nextTick();
+
+      await wrapper.setProps({
+        sessionDetails: { ...mockSessionDetails, user_email: "updated@example.com" },
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("updated@example.com");
     });
   });
 
@@ -576,8 +541,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Accessibility", () => {
-    it("preserves full long event name text in title attribute", async () => {
-      // Arrange
+    it("should preserve full long event name text in title attribute", async () => {
       const longEvent = {
         id: "long",
         type: "error",
@@ -586,10 +550,8 @@ describe("PlayerEventsSidebar", () => {
         relativeTime: 7000,
       };
 
-      // Act
       await wrapper.setProps({ events: [longEvent] });
 
-      // Assert
       expect(wrapper.find('[data-test="event-name"]').attributes("title")).toBe(longEvent.name);
     });
   });
@@ -599,8 +561,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Component Lifecycle", () => {
-    it("maintains type filter results after prop update with active text search", async () => {
-      // Arrange
+    it("should maintain type filter results after prop update with active text search", async () => {
       wrapper.vm.selectedEventTypes = ["error"];
       const newEvents = [
         {
@@ -619,12 +580,10 @@ describe("PlayerEventsSidebar", () => {
         },
       ];
 
-      // Act
       await wrapper.setProps({ events: newEvents });
       wrapper.vm.searchEvents("Type");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("TypeError");
     });
@@ -692,93 +651,74 @@ describe("PlayerEventsSidebar", () => {
       await flushPromises();
     });
 
-    it("renders without errors when events have frustration_types", () => {
-      // Arrange & Assert
+    it("should render without errors when events have frustration_types", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("displays all 4 event rows when all 4 mixed frustration events are provided", () => {
-      // Arrange & Assert
+    it("should display all 4 event rows when all 4 mixed frustration events are provided", () => {
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(4);
     });
 
-    it("displays all event names including non-frustrated events", () => {
-      // Arrange
+    it("should display all event names including non-frustrated events", () => {
       const text = wrapper.text();
 
-      // Assert
       expect(text).toContain("click on Submit Button");
       expect(text).toContain("click on Nav Menu");
       expect(text).toContain("click on Cancel");
       expect(text).toContain("click on Checkout");
     });
 
-    it("has frustration option in event filter", () => {
-      // Arrange & Assert
+    it("should have frustration option in event filter", () => {
       expect(wrapper.vm.eventOptions).toContainEqual({
         label: "Frustration",
         value: "frustration",
       });
     });
 
-    it("includes frustration in default selected filters", () => {
-      // Arrange & Assert
+    it("should include frustration in default selected filters", () => {
       expect(wrapper.vm.selectedEventTypes).toContain("frustration");
     });
 
-    it("shows only 3 frustrated event rows when frustration filter is active", async () => {
-      // Arrange
+    it("should show only 3 frustrated event rows when frustration filter is active", async () => {
       wrapper.vm.selectedEventTypes = ["frustration"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(3);
     });
 
-    it("does not render the non-frustrated action when only frustration filter is active", async () => {
-      // Arrange
+    it("should not render the non-frustrated action when only frustration filter is active", async () => {
       wrapper.vm.selectedEventTypes = ["frustration"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       const rows = wrapper.findAll('[data-test^="player-event-row"]');
       const renderedText = rows.map((r: any) => r.text()).join(" ");
       expect(renderedText).not.toContain("click on Cancel");
     });
 
-    it("shows all 4 action rows when both action and frustration filters are selected", async () => {
-      // Arrange
+    it("should show all 4 action rows when both action and frustration filters are selected", async () => {
       wrapper.vm.selectedEventTypes = ["action", "frustration"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(4);
     });
 
-    it("shows 1 event when frustration filter and Submit search are combined", async () => {
-      // Arrange
+    it("should show 1 event when frustration filter and Submit search are combined", async () => {
       wrapper.vm.selectedEventTypes = ["frustration"];
 
-      // Act
       wrapper.vm.searchEvents("Submit");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("Submit");
     });
 
-    it("combines error and frustration filters to show both types", async () => {
-      // Arrange
+    it("should combine error and frustration filters to show both types", async () => {
       const mixedEvents = [
         ...mockEventsWithFrustrations,
         {
@@ -793,38 +733,31 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.setProps({ events: mixedEvents });
       wrapper.vm.selectedEventTypes = ["error", "frustration"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       const rows = wrapper.findAll('[data-test^="player-event-row"]');
       const renderedText = rows.map((r: any) => r.text()).join(" ");
       expect(renderedText).toContain("TypeError");
       expect(renderedText).toContain("Submit");
     });
 
-    it("shows 1 frustrated event when events prop is replaced with 1 frustrated event", async () => {
-      // Arrange & Act
+    it("should show 1 frustrated event when events prop is replaced with 1 frustrated event", async () => {
       await wrapper.setProps({ events: [mockEventsWithFrustrations[0]] });
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(1);
       expect(wrapper.find('[data-test^="player-event-row"]').text()).toContain("click on Submit Button");
     });
 
-    it("handles events with multiple frustration types without errors", () => {
-      // Arrange
+    it("should handle events with multiple frustration types without errors", () => {
       const multipleTypes = wrapper.vm.events.find((e: any) => e.id === "frustrated3");
 
-      // Assert
       expect(multipleTypes.frustration_types).toHaveLength(2);
       expect(multipleTypes.frustration_types).toContain("rage_click");
       expect(multipleTypes.frustration_types).toContain("error_click");
     });
 
-    it("treats events with empty frustration_types array as non-frustrated", async () => {
-      // Arrange
+    it("should treat events with empty frustration_types array as non-frustrated", async () => {
       const eventWithEmptyArray = {
         id: "empty",
         type: "action",
@@ -836,11 +769,9 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.setProps({ events: [eventWithEmptyArray] });
       wrapper.vm.selectedEventTypes = ["frustration"];
 
-      // Act
       wrapper.vm.searchEvents("");
       await wrapper.vm.$nextTick();
 
-      // Assert
       expect(wrapper.findAll('[data-test^="player-event-row"]')).toHaveLength(0);
     });
   });

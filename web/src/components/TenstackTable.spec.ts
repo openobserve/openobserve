@@ -666,6 +666,37 @@ describe("TenstackTable", () => {
     });
   });
 
+  // ── column resizer element ────────────────────────────────────────────────
+  describe("column resizer element", () => {
+    it("should render a resizer div inside each resizable column header", () => {
+      wrapper = mountTable();
+      const resizers = wrapper.findAll(".resizer");
+      // Both baseColumns have no explicit enableResizing=false so they get resizers
+      expect(resizers.length).toBeGreaterThan(0);
+    });
+
+    it("should give the resizer an always-visible border-color background", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).toContain("tw:bg-[var(--o2-border-color)]!");
+    });
+
+    it("should not carry a transparent background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:bg-transparent");
+    });
+
+    it("should not carry a hover-only background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:hover:bg-[var(--o2-border-color)]");
+    });
+  });
+
   // ── wrap prop ─────────────────────────────────────────────────────────────
   describe("wrap prop", () => {
     it("should mount without error when wrap=true", () => {

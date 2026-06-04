@@ -46,13 +46,6 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 
-// Mock clipboard API
-Object.assign(navigator, {
-  clipboard: {
-    writeText: vi.fn().mockResolvedValue(undefined),
-  },
-});
-
 // ---------------------------------------------------------------------------
 // ODrawer stub — replaces the migrated trace filters drawer
 // (q-dialog/q-card -> ODrawer with v-model:open). Renders default + footer
@@ -1140,6 +1133,27 @@ describe("TraceDetails", () => {
   });
 
   describe("Integration: Mode switching scenarios", () => {
+    it("should open a new window when handleExpandToFullView is called in standalone mode", () => {
+      // handleExpandToFullView has no mode guard — it opens in a new tab from any mode
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation();
+      const resolveRouterSpy = vi
+        .spyOn(router, "resolve")
+        .mockReturnValue({ href: "/mock-route" } as any);
+
+      wrapper.vm.handleExpandToFullView();
+
+      expect(resolveRouterSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traceDetails",
+          query: expect.objectContaining({ trace_id: "test-trace-id" }),
+        }),
+      );
+      expect(windowOpenSpy).toHaveBeenCalledWith("/mock-route", "_blank");
+
+      windowOpenSpy.mockRestore();
+      resolveRouterSpy.mockRestore();
+    });
+
     it("should handle transition from embedded to standalone via expand", async () => {
       const embeddedWrapper = mount(TraceDetails, {
         attachTo: "#app",
@@ -1293,6 +1307,7 @@ describe("TraceDetails", () => {
       expect(defaultWrapper.props("showShareButton")).toBe(true);
       expect(defaultWrapper.props("showCloseButton")).toBe(true);
       expect(defaultWrapper.props("showExpandButton")).toBe(false);
+      expect(defaultWrapper.props("hideSessionReplayButton")).toBe(false);
       expect(defaultWrapper.props("enableCorrelationLinks")).toBe(false);
 
       defaultWrapper.unmount();
@@ -1576,6 +1591,10 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.hasRumSessionId).toBe(true);
+      const replayBtn = wrapper.find(
+        '[data-test="trace-details-view-session-replay-btn"]',
+      );
+      expect(replayBtn.exists()).toBe(true);
     });
 
     it("should not show session replay button when no RUM session exists", async () => {
@@ -1584,6 +1603,56 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.hasRumSessionId).toBe(false);
+      const replayBtn = wrapper.find(
+        '[data-test="trace-details-view-session-replay-btn"]',
+      );
+      expect(replayBtn.exists()).toBe(false);
+    });
+
+    it("should hide session replay button when hideSessionReplayButton prop is true", async () => {
+      // The button v-if checks hasRumSessionId && !hideSessionReplayButton
+      const hiddenWrapper = mount(TraceDetails, {
+        attachTo: "#app",
+        props: {
+          hideSessionReplayButton: true,
+          spanListProp: [
+            {
+              ...tracesMockData.tracesDetails.traceSpans.hits[0],
+              rum_session_id: "session-hidden",
+            },
+          ],
+          mode: "embedded",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store },
+          stubs: {
+            "q-resize-observer": true,
+            ODrawer: ODrawerStub,
+            CodeQueryEditor: {
+              name: "CodeQueryEditor",
+              props: ["query", "language"],
+              emits: ["update:query"],
+              template: '<div data-test="trace-details-filters-code-editor" />',
+            },
+            "chart-renderer": {
+              template: '<div data-test="chart-renderer">Chart</div>',
+            },
+            "trace-tree": { template: "<div>Tree</div>" },
+            "trace-header": { template: "<div>Header</div>" },
+            "trace-details-sidebar": { template: "<div>Sidebar</div>" },
+          },
+        },
+      });
+
+      await flushPromises();
+
+      const replayBtn = hiddenWrapper.find(
+        '[data-test="trace-details-view-session-replay-btn"]',
+      );
+      expect(replayBtn.exists()).toBe(false);
+
+      hiddenWrapper.unmount();
     });
   });
 
