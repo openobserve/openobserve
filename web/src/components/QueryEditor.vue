@@ -9,7 +9,7 @@
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
-      :class="['ai-input-bar tw:h-[2.125rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
+      :class="['ai-input-bar tw:h-[2.25rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
