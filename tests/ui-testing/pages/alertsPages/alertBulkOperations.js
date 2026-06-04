@@ -186,7 +186,7 @@ export class AlertBulkOperations {
             await this.page.waitForTimeout(500);
         }
 
-        const moveDrawer = this.page.locator('[data-test="move-across-folders-dialog"]');
+        const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
         const scopedFolderDropdown = moveDrawer.locator(this.locators.folderDropdown);
 
         // Retry opening the drawer and wait for an interactive child control.
