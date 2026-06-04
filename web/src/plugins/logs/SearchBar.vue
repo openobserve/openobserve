@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
         >
           <OSwitch
-            :model-value="searchObj.meta.showHistogram"
+            v-model="searchObj.meta.showHistogram"
             size="md"
             @click.stop
           />
