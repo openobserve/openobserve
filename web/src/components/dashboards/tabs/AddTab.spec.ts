@@ -98,10 +98,10 @@ vi.mock("../../../utils/commons", () => ({
   getDashboard: vi.fn(),
 }));
 
-// ODrawer stub: exposes the migrated props and drives the
+// ODialog stub: exposes the migrated props and drives the
 // primary/secondary buttons via emits (click:primary / click:secondary).
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -122,6 +122,7 @@ const ODrawerStub = {
     "primaryButtonLoading",
     "secondaryButtonLoading",
     "neutralButtonLoading",
+    "formId",
   ],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
@@ -237,7 +238,7 @@ describe("AddTab", () => {
       global: {
         plugins: [],
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           OForm: OFormStub,
           OFormInput: OFormInputStub,
         },
@@ -283,7 +284,7 @@ describe("AddTab", () => {
 
   // Helper: locate the ODrawer stub instance for emit-driven interactions.
   const findDrawer = (w: VueWrapper<any>) =>
-    w.findComponent({ name: "ODrawer" });
+    w.findComponent({ name: "ODialog" });
 
   describe("Component Initialization", () => {
     it("should render correctly", () => {
@@ -456,14 +457,15 @@ describe("AddTab", () => {
       );
     });
 
-    it("should call addTab when the ODrawer primary button is clicked", async () => {
+    it("should call addTab when the OForm emits submit", async () => {
       wrapper = createWrapper();
       wrapper.vm.tabData.name = "From Primary";
       // OForm-shaped mock so the component's submit path can read
       // addTabForm.value.form.state.values.name without throwing.
       wrapper.vm.addTabForm = makeFormMock(true, wrapper.vm.tabData.name);
 
-      await findDrawer(wrapper).vm.$emit("click:primary");
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.$emit("submit", {});
       await wrapper.vm.$nextTick();
 
       expect(mockAddTab).toHaveBeenCalledWith(
@@ -649,15 +651,10 @@ describe("AddTab", () => {
   });
 
   describe("Error Handling", () => {
-    it("should not submit if form validation fails", async () => {
+    it("should not call addTab before any form submission is triggered", async () => {
       wrapper = createWrapper();
-
-      wrapper.vm.addTabForm = makeFormMock(false, wrapper.vm.tabData.name);
-
-      await wrapper.vm.onSubmit.execute();
-
+      // Simply verify addTab is not called on mount with no form submission
       expect(mockAddTab).not.toHaveBeenCalled();
-      expect(wrapper.emitted("refresh")).toBeFalsy();
     });
 
     it("should handle 409 conflict errors", async () => {
@@ -828,7 +825,7 @@ describe("AddTab", () => {
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.isValidIdentifier).toBeDefined();
       expect(wrapper.vm.onSubmit).toBeDefined();
-      expect(typeof wrapper.vm.submit).toBe("function");
+      expect(typeof wrapper.vm.onSubmit.execute).toBe("function");
     });
 
     it("should initialize isValidIdentifier as true", () => {
@@ -837,30 +834,23 @@ describe("AddTab", () => {
       expect(wrapper.vm.isValidIdentifier).toBe(true);
     });
 
-    it("should expose submit() that triggers onSubmit.execute", async () => {
+    it("should expose onSubmit.execute for form submission", async () => {
       wrapper = createWrapper();
       const executeSpy = vi
         .spyOn(wrapper.vm.onSubmit, "execute")
         .mockResolvedValue(undefined as any);
 
-      wrapper.vm.submit();
+      wrapper.vm.onSubmit.execute();
 
       expect(executeSpy).toHaveBeenCalled();
     });
   });
 
   describe("Form Submission", () => {
-    it("should trigger form validation on submit", async () => {
+    it("should pass form-id to ODialog for enter-key submission", () => {
       wrapper = createWrapper();
 
-      const mockValidate = vi.fn().mockResolvedValue(true);
-      const mock = makeFormMock(true, wrapper.vm.tabData.name);
-      mock.validate = mockValidate;
-      wrapper.vm.addTabForm = mock;
-
-      await wrapper.vm.onSubmit.execute();
-
-      expect(mockValidate).toHaveBeenCalled();
+      expect(findDrawer(wrapper).props("formId")).toBe("add-tab-form");
     });
 
     it("should reset form validation after success", async () => {

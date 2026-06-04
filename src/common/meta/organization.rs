@@ -53,6 +53,21 @@ impl MemorySize for Organization {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgCreateRequest {
+    #[serde(default)]
+    pub identifier: String,
+    #[serde(alias = "label")]
+    pub name: String,
+    #[serde(default)]
+    pub org_type: String,
+    #[serde(default)]
+    pub service_account: Option<String>,
+    // make this new org a billing group member of this org
+    #[serde(default)]
+    pub make_billed_member_of: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct ServiceAccountTokenInfo {
     pub email: String,
     /// Token is no longer returned directly for security reasons

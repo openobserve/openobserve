@@ -70,11 +70,11 @@ const i18n = createI18n({
   },
 });
 
-// Stub ODrawer so tests are deterministic (no Portal/Reka teleport) and so we
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
 // the component listens to.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   inheritAttrs: false,
   props: [
     "open",
@@ -100,7 +100,7 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
-      data-test="o-drawer-stub"
+      data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
@@ -113,12 +113,12 @@ const ODrawerStub = {
       <slot />
       <slot name="footer" />
       <button
-        data-test="o-drawer-stub-primary"
+        data-test="o-dialog-stub-primary"
         :disabled="primaryButtonDisabled"
         @click="$emit('click:primary')"
       >{{ primaryButtonLabel }}</button>
       <button
-        data-test="o-drawer-stub-secondary"
+        data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
       >{{ secondaryButtonLabel }}</button>
     </div>
@@ -157,7 +157,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       global: {
         plugins: [i18n],
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           SelectFolderDropdown: {
             name: "SelectFolderDropdown",
             template: '<div class="select-folder-dropdown"></div>',
@@ -222,7 +222,7 @@ describe("MoveDashboardToAnotherFolder", () => {
         global: {
           plugins: [i18n],
           stubs: {
-            ODrawer: ODrawerStub,
+            ODialog: ODialogStub,
             SelectFolderDropdown: true,
           },
         },
@@ -237,42 +237,42 @@ describe("MoveDashboardToAnotherFolder", () => {
   describe("ODrawer Prop Forwarding", () => {
     it("should render the ODrawer wrapper", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="o-drawer-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
     });
 
     it("should forward open prop to ODrawer", () => {
       wrapper = createWrapper({ open: true });
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(true);
     });
 
     it("should forward open=false to ODrawer when closed", () => {
       wrapper = createWrapper({ open: false });
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("open")).toBe(false);
     });
 
-    it("should use width 30 on ODrawer", () => {
+    it("should use size md on ODialog", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
-      expect(drawer.props("width")).toBe(30);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("md");
     });
 
     it("should pass 'Move Dashboard' title to ODrawer", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("title")).toBe("Move Dashboard");
     });
 
     it("should render i18n label on secondary (cancel) button", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
     });
 
     it("should render i18n label on primary (move) button", () => {
       wrapper = createWrapper();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonLabel")).toBe("Move");
     });
   });
@@ -303,7 +303,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should disable primary button when same folder is selected", () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonDisabled")).toBe(true);
     });
 
@@ -311,7 +311,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       wrapper.vm.selectedFolder = { label: "Test Folder 1", value: "folder1" };
       await wrapper.vm.$nextTick();
 
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonDisabled")).toBe(false);
     });
   });
@@ -354,7 +354,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should call onSubmit when ODrawer emits click:primary", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       const onSubmitSpy = vi.spyOn(wrapper.vm.onSubmit, "execute");
 
       await drawer.vm.$emit("click:primary");
@@ -479,7 +479,7 @@ describe("MoveDashboardToAnotherFolder", () => {
 
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       expect(drawer.props("primaryButtonLoading")).toBe(true);
       expect(wrapper.vm.onSubmit.isLoading.value).toBe(true);
@@ -494,7 +494,7 @@ describe("MoveDashboardToAnotherFolder", () => {
 
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       expect(drawer.props("primaryButtonLoading")).toBe(false);
       expect(wrapper.vm.onSubmit.isLoading.value).toBe(false);
@@ -507,7 +507,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should emit update:open=false when ODrawer emits click:secondary", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:secondary");
 
       expect(wrapper.emitted("update:open")).toBeTruthy();
@@ -515,7 +515,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should forward update:open from ODrawer", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("update:open", false);
 
       expect(wrapper.emitted("update:open")).toBeTruthy();
@@ -524,14 +524,14 @@ describe("MoveDashboardToAnotherFolder", () => {
 
     it("should call onSubmit.execute when ODrawer emits click:primary", async () => {
       const onSubmitSpy = vi.spyOn(wrapper.vm.onSubmit, "execute");
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
 
       expect(onSubmitSpy).toHaveBeenCalled();
     });
 
     it("should not emit update:open when click:primary is fired", async () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       await drawer.vm.$emit("click:primary");
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
@@ -650,7 +650,7 @@ describe("MoveDashboardToAnotherFolder", () => {
       // Default state: selectedFolder.value === activeFolderId
       expect(wrapper.vm.selectedFolder).toBeTruthy();
       expect(wrapper.vm.selectedFolder.value).toBe("default");
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("primaryButtonDisabled")).toBe(true);
     });
   });
