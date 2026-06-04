@@ -395,7 +395,6 @@ async function fetchTraceMetadata(traceIds: string[]) {
       {
         data: (_payload, response) => {
           const hits = response.content?.results?.hits || [];
-          console.log(hits);
           hits.forEach((hit: any) => {
             metadata[hit.trace_id] = {
               duration: hit.duration,
@@ -517,7 +516,6 @@ function openTraceDetail(view: any) {
   const fallbackEnd = (props.endTime || nowMs) * 1000;
 
   const meta = traceMetadata.value[view.traceId];
-  console.log(traceMetadata, view, meta);
   if (meta?.start_time && meta?.end_time) {
     const ONE_MINUTE_US = 60_000_000;
     selectedTraceStartTime.value = Math.floor(meta.start_time / 1000) - ONE_MINUTE_US;
