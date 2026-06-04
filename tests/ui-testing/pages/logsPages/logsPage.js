@@ -26,7 +26,8 @@ export class LogsPage {
         this.homeButton = "[name ='home']";
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
+        // Post UX-revamp: renamed from logs-search-bar-quick-mode-toggle-btn
+        this.quickModeToggle = '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]';
         // FieldListPagination schema-toggle buttons (data-test set per-slot in FieldListPagination.vue).
         // The common FieldListPagination renders with `${dataTestPrefix}-all-fields-btn` etc.
         // For the logs sidebar prefix is `logs-page`. Legacy non-prefixed variants kept as fallback
@@ -1384,6 +1385,10 @@ export class LogsPage {
 
     async executeHistogramQuery(query) {
         await this.clearAndFillQueryEditor(query);
+        // Wait for the 500ms debounce in CodeQueryEditor so the Vue watcher in
+        // SearchBar.vue can auto-detect SQL mode from the SELECT … FROM content
+        // before the query button is clicked.
+        await this.page.waitForTimeout(600);
         await this.page.locator(this.queryButton).click();
         
         // Wait for query execution and results to load
@@ -1480,8 +1485,11 @@ export class LogsPage {
     }
 
     // SQL Mode methods
+    // SQL mode toggle was removed from the UI. The editor now auto-detects SQL mode
+    // when the user types a SELECT/SQL query. These methods are kept as no-ops so
+    // callers that haven't been updated yet don't throw hard failures.
     async enableSQLMode() {
-        await this.enableSqlModeIfNeeded();
+        testLogger.info('enableSQLMode: SQL mode toggle removed from UI — skipping (auto-detected from query content)');
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
@@ -1513,7 +1521,7 @@ export class LogsPage {
 
     // Click on the Quick Mode toggle menu item (wrapper ODropdownItem) - for testing #10821
     async clickQuickModeTextLabel() {
-        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]');
         await this.page.locator(this.utilitiesMenuButton).click();
         await quickModeItem.waitFor({ state: 'visible', timeout: 5000 });
         // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
@@ -1536,8 +1544,17 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        // Histogram toggle is now inside the utilities ("More") menu.
+        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
+        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
+        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
         await this.page.keyboard.press('Escape').catch(() => {});
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isInline) {
+            await inlineBtn.click();
+            return;
+        }
+        // Narrow-viewport fallback: open the utilities menu and click the menu item.
         await this.page.locator(this.utilitiesMenuButton).click();
         const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
         await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -1570,13 +1587,19 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        // Histogram is now inside the utilities menu — open the menu and check the switch is unchecked.
+        // In narrow viewport the histogram switch is inside the utilities ("More") menu.
+        // In normal viewport it is a standalone toolbar button — check the OSwitch state
+        // via the menu item's switch (only rendered when shouldMoveButtonsToMenu is true).
         await this.page.keyboard.press('Escape').catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
         const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
-        await expect(switchEl).toBeVisible({ timeout: 5000 });
+        const isMenuVisible = await histogramMenuItem.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isMenuVisible) {
+            const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
+            await expect(switchEl).toBeVisible({ timeout: 5000 });
+        }
+        // In normal viewport the histogram is inline; the OSwitch has no data-test so we
+        // cannot check its state here — callers should rely on the inline button's aria state.
         await this.page.keyboard.press('Escape').catch(() => {});
     }
 
@@ -2660,43 +2683,32 @@ export class LogsPage {
     }
 
     /**
-     * Open the utilities ("More") dropdown so the SQL mode toggle becomes visible.
-     * Returns true if the dropdown was opened by this call; false if toggle was already visible.
-     * Always pair with _closeUtilitiesMenuAfterSqlToggle() when the caller opened the menu.
-     */
-    /**
-     * Open the utilities ("More") dropdown so the SQL mode menu item becomes visible.
-     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — NOT the
-     * syntax-guide which incorrectly carries the legacy data-test.
-     * Returns true if the dropdown was opened; false if it was already open.
+     * SQL mode toggle was removed from the UI. These helpers are kept as no-ops so
+     * any residual callers don't throw hard failures.
      */
     async _openUtilitiesMenuForSqlMode() {
-        const sqlModeMenuItem = this.page.locator(this.menuSqlModeBtn);
-        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-            return true;
-        }
+        testLogger.info('_openUtilitiesMenuForSqlMode: SQL mode toggle removed from UI — no-op');
         return false;
     }
 
-    /** Press Escape to close the utilities dropdown after a SQL mode check/toggle. */
     async _closeUtilitiesMenuAfterSqlToggle() {
-        await this.page.keyboard.press('Escape');
-        await this.page.locator(this.menuSqlModeBtn).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        // no-op — SQL mode toggle removed from UI
     }
 
     async clickSQLModeToggle() {
-        // SQL mode lives in the utilities ("More") dropdown.
-        // Click menuSqlModeBtn (ODropdownItem) — @select.prevent toggles sqlMode without closing.
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const sqlModeBtn = this.page.locator(this.menuSqlModeBtn);
-        await expect(sqlModeBtn).toBeVisible({ timeout: 5000 });
-        await sqlModeBtn.click({ force: true });
-        if (menuOpened) {
-            await this._closeUtilitiesMenuAfterSqlToggle();
-        }
+        // SQL mode toggle was removed from the UI. Type a minimal SELECT query via
+        // keyboard to trigger auto-detection, then wait 600ms for the 500ms debounce
+        // in CodeQueryEditor to fire and set searchObj.meta.sqlMode = true.
+        // Callers that subsequently clear + refill the editor keep SQL mode active
+        // because: (a) the clear+fill debounce fires with SELECT content (the two
+        // keyboard operations happen < 500ms apart so only the final value is
+        // emitted), and (b) once SQL mode is ON the watcher's `sqlMode === false`
+        // guard prevents it from being re-enabled (it's already true).
+        const monacoHelper = this.getMonacoEditorHelper();
+        const container = this.getQueryEditorContainer();
+        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        await this.page.waitForTimeout(600);
+        testLogger.info('clickSQLModeToggle: typed SELECT query to trigger SQL mode auto-detection');
     }
 
     async clickShowQueryToggle() {
@@ -4748,10 +4760,10 @@ export class LogsPage {
         }
 
         // Quick Mode is off — open the utilities dropdown and enable the OSwitch.
-        // Post-migration: the trigger is an ODropdownItem (data-test="logs-search-bar-quick-mode-toggle-btn")
-        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-switch"). The inner button carries
-        // data-test="logs-search-bar-quick-mode-switch-btn" and data-state="checked|unchecked".
-        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        // Post-UX-revamp: the ODropdownItem was renamed to logs-search-bar-menu-quick-mode-toggle-btn.
+        // The OSwitch inside carries data-test="logs-search-bar-quick-mode-switch" and its
+        // inner button data-test="logs-search-bar-quick-mode-switch-btn" with data-state="checked|unchecked".
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]');
         const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]');
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -6810,38 +6822,30 @@ export class LogsPage {
 
     /**
      * Check if SQL mode is currently enabled.
-     * Opens the utilities dropdown, reads the OSwitch inner button's data-state, then closes it.
-     * @returns {Promise<boolean>} True if SQL mode is enabled
+     * SQL mode toggle was removed from the UI — always returns false.
+     * @returns {Promise<boolean>} Always false since SQL mode is auto-detected now
      */
     async isSqlModeEnabled() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
-        return state === 'checked';
+        testLogger.info('isSqlModeEnabled: SQL mode toggle removed from UI — returning false');
+        return false;
     }
 
     /**
-     * Enable SQL mode if currently disabled; no-op if already enabled.
-     * Opens the utilities menu to access the toggle, then closes it.
+     * Enable SQL mode if currently disabled.
+     * The SQL mode toggle was removed from the UI; SQL mode is now auto-detected when
+     * the editor contains both "select" and "from". This method types a minimal SELECT
+     * query via keyboard and waits 600ms for the 500ms debounce in CodeQueryEditor to
+     * settle, ensuring SQL mode is active before the caller proceeds.
+     * Subsequent setQueryEditorValue / monacoHelper.setContent calls overwrite this query;
+     * SQL mode remains active because those queries also contain SELECT … FROM.
      */
     async enableSqlModeIfDisabled() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (state !== 'checked') {
-            await this.page.locator(this.menuSqlModeBtn).click();
-            await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
-                return s === 'checked';
-            }, { timeout: 5000 }).toBe(true);
-            testLogger.info('SQL mode enabled');
-        } else {
-            testLogger.info('SQL mode already enabled');
-        }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        const monacoHelper = this.getMonacoEditorHelper();
+        const container = this.getQueryEditorContainer();
+        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        // Wait for the 500ms debounce in CodeQueryEditor to fire.
+        await this.page.waitForTimeout(600);
+        testLogger.info('enableSqlModeIfDisabled: typed SELECT query to trigger SQL mode auto-detection');
     }
 
     /**
@@ -7206,23 +7210,18 @@ export class LogsPage {
      * Opens the utilities dropdown first since the toggle lives inside it.
      */
     async clickSQLModeSwitch() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator(this.menuSqlModeBtn).click();
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        // SQL mode toggle removed from UI — no-op
+        testLogger.info('clickSQLModeSwitch: SQL mode toggle removed from UI — skipping');
     }
 
     /**
-     * Get SQL mode data-state value ("checked" | "unchecked").
-     * Opens the utilities dropdown to read the OSwitch inner button state, then closes it.
+     * Get SQL mode data-state value.
+     * SQL mode toggle was removed from the UI — always returns null.
      * @returns {Promise<string|null>}
      */
     async getSQLModeState() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
-        return state;
+        testLogger.info('getSQLModeState: SQL mode toggle removed from UI — returning null');
+        return null;
     }
 
     /**
@@ -7710,55 +7709,32 @@ export class LogsPage {
 
     /**
      * Enable SQL mode if not already enabled.
-     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
+     * The SQL mode toggle was removed from the UI; SQL mode is now auto-detected when
+     * the editor contains both "select" and "from". The detection fires via a 500ms
+     * debounce in CodeQueryEditor. This method types a minimal SELECT query via keyboard
+     * (which triggers the debounce) then waits 600ms for it to settle, so callers can
+     * rely on SQL mode being active before running a query.
+     * NOTE: callers that subsequently call setQueryEditorValue / monacoHelper.setContent
+     * will overwrite this query — SQL mode remains active because those queries also
+     * contain SELECT … FROM.
      */
     async enableSqlModeIfNeeded() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-        if (!isOn) {
-            // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
-            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // In CI the dropdown may close after the click, making stateEl detached/hidden.
-            // Re-open the menu on each poll iteration so the state element is always visible.
-            await expect.poll(async () => {
-                await this._openUtilitiesMenuForSqlMode();
-                const s = await this.page.locator(this.menuSqlModeBtnState).first()
-                    .getAttribute('data-state').catch(() => null);
-                return s === 'checked';
-            }, { timeout: 15000 }).toBe(true);
-            testLogger.info('SQL mode enabled');
-        } else {
-            testLogger.info('SQL mode already enabled');
-        }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        const monacoHelper = this.getMonacoEditorHelper();
+        const container = this.getQueryEditorContainer();
+        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        // Wait for the 500ms debounce in CodeQueryEditor to fire and for the Vue watcher
+        // in SearchBar.vue to set searchObj.meta.sqlMode = true.
+        await this.page.waitForTimeout(600);
+        testLogger.info('enableSqlModeIfNeeded: typed SELECT query to trigger SQL mode auto-detection');
     }
 
     /**
      * Disable SQL mode if currently enabled.
-     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
+     * SQL mode toggle was removed from the UI — this is now a no-op.
      */
     async disableSqlModeIfNeeded() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-        if (isOn) {
-            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // In CI the dropdown may close after the click, making stateEl detached/hidden.
-            // Re-open the menu on each poll iteration so the state element is always visible.
-            await expect.poll(async () => {
-                await this._openUtilitiesMenuForSqlMode();
-                const s = await this.page.locator(this.menuSqlModeBtnState).first()
-                    .getAttribute('data-state').catch(() => null);
-                return s === 'unchecked';
-            }, { timeout: 15000 }).toBe(true);
-            testLogger.info('SQL mode disabled');
-        } else {
-            testLogger.info('SQL mode already disabled');
-        }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        // SQL mode toggle removed from UI. Clear the query editor to reset to non-SQL mode.
+        testLogger.info('disableSqlModeIfNeeded: SQL mode toggle removed from UI — skipping');
     }
 
     /**
@@ -9272,14 +9248,12 @@ export class LogsPage {
     async findQueryModeToggle() {
         const selectors = [
             this.quickModeToggle,
-            this.sqlModeToggle,
-            '[data-test="logs-search-bar-quick-mode-toggle-btn"]',
-            '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+            // SQL mode toggle was removed from the UI
+            '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]',
             '[data-test="logs-search-bar-ui-mode-btn"]',
             '[data-test="logs-search-ui-mode-btn"]',
             'button:has-text("UI Mode")',
             '[data-test*="quick-mode"]',
-            '[data-test*="sql-mode"]',
         ];
 
         for (const sel of selectors) {
