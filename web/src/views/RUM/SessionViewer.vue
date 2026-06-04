@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :limits="[200, 1400]"
         unit="px"
         class="tw:w-full tw:h-full"
-        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]! tw:hover:bg-[var(--o2-primary-color)]"
+        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]! tw:hover:bg-[var(--o2-theme-color)]"
       >
         <template #before>
           <VideoPlayer

@@ -294,9 +294,9 @@ const traceColumns = computed(() => [
     id: "route",
     header: t("rum.route"),
     accessorFn: (row: any) => shortRoute(row.route),
-    size: 200,
+    size: 400,
     minSize: 80,
-    maxSize: 600,
+    maxSize: 800,
     meta: { align: "left", slot: true },
   },
   {
