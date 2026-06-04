@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </ORouteTab>
                 <ORouteTab
-                  v-if="config.isEnterprise == 'true'"
+                  v-if="store.state.zoConfig?.online_evals_enabled"
                   data-test="llm-providers-tab"
                   name="llm_providers"
                   :to="{

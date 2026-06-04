@@ -364,7 +364,9 @@ export default defineComponent({
         icon: "check-circle-outline",
         link: "/online-evals",
         name: "onlineEvals",
-        hide: config.isEnterprise !== "true" && config.isCloud !== "true",
+        // Gated only by the backend `ZO_ONLINE_EVALS_ENABLED` flag — the
+        // feature is available on OSS + Enterprise + Cloud equally.
+        hide: !store.state.zoConfig?.online_evals_enabled,
       },
       {
         title: t("menu.rum"),
