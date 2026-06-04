@@ -59,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-logs-toggle"
             value="logs"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
           >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:shrink-0" />
@@ -69,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-visualize-toggle"
             :disabled="isVisualizeDisabled"
-            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : undefined"
+            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
             value="visualize"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
           >
@@ -83,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-build-toggle"
             value="build"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
           >
             <template #icon-left>
               <OIcon name="build" size="sm" class="tw:shrink-0" />
@@ -95,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-patterns-toggle"
             value="patterns"
             :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
           >
             <template #icon-left>
               <OIcon name="layers" size="sm" class="tw:shrink-0" />
@@ -942,7 +945,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
+    <div
+      ref="editorContainerRef"
+      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
+      :class="{ 'editor-fullscreen': isFocused }"
+      :style="editorFullscreenStyle"
+    >
+      <!-- Expand / collapse button — always top-right of the full editor area -->
+      <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        data-test="logs-query-editor-full_screen-btn"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleEditorFullscreen"
+        class="tw:absolute! tw:z-[51] tw:top-[0.1875rem] tw:right-[0.25rem] editor-expand-btn"
+      >
+        <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
+      </OButton>
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
       >
@@ -951,16 +970,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
+          separator-class="tw:w-px! tw:bg-[var(--o2-border-color)]"
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
-              :class="
-                searchObj.data.transformType &&
-                searchObj.meta.showTransformEditor
-                  ? 'tw:ml-[0.375rem]'
-                  : 'tw:ml-[0.375rem]'
-              "
+              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              :class="{
+                'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
+                'fn-editor-open': searchObj.data.transformType
+              }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <unified-query-editor
@@ -1017,7 +1035,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:rounded-l-none tw:border-l-0 tw:relative tw:h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -1087,31 +1105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
       </div>
-      <OButton
-        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
-        data-test="logs-query-editor-full_screen-btn"
-        :title="isFocused ? t('search.collapse') : t('search.expand')"
-        variant="ghost"
-        size="icon"
-        @click="isFocused = !isFocused"
-        class="tw:p-1 tw:absolute! tw:z-50 fullscreen-hover-btn"
-        :style="{
-          top:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '6.5rem'
-              : '3.5rem',
-          right:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '1.6rem'
-              : '4rem',
-        }"
-      />
     </div>
 
     <ODialog
@@ -1970,6 +1963,36 @@ export default defineComponent({
     const functionUpdateConfirm = ref(false);
 
     const isFocused = ref(false);
+    const editorContainerRef = ref<HTMLElement | null>(null);
+    const fullscreenRect = ref<{ left: number; width: number; top: number; startHeight: number } | null>(null);
+
+    const editorFullscreenStyle = computed(() => {
+      if (!isFocused.value || !fullscreenRect.value) return {};
+      const { left, width, top, startHeight } = fullscreenRect.value;
+      return {
+        position: 'fixed' as const,
+        left: `${left}px`,
+        width: `${width}px`,
+        top: `${top}px`,
+        height: `${Math.round(window.innerHeight * 0.8)}px`,
+        zIndex: 50,
+        '--qe-start-h': `${startHeight}px`,
+      };
+    });
+
+    const toggleEditorFullscreen = () => {
+      if (!isFocused.value) {
+        const el = editorContainerRef.value;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top, startHeight: rect.height };
+        }
+        isFocused.value = true;
+      } else {
+        isFocused.value = false;
+        fullscreenRect.value = null;
+      }
+    };
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -4710,6 +4733,9 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
+      editorContainerRef,
+      editorFullscreenStyle,
+      toggleEditorFullscreen,
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
@@ -5349,6 +5375,36 @@ html.dark .file-type label,
   :deep(.q-splitter__separator) {
     height: 100%;
   }
+}
+
+/* When function editor is open, move AI button flush to the right of the query panel */
+.fn-editor-open :deep(.ai-floating-button) {
+  right: 0.25rem;
+}
+
+/* Expand button border */
+.editor-expand-btn {
+  border: 1px solid var(--o2-border-color) !important;
+  border-radius: 0.375rem;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+}
+
+/* Fullscreen overlay */
+@keyframes editor-expand {
+  from { clip-path: inset(0 0 calc(100% - var(--qe-start-h, 3rem)) 0 round 0.375rem); }
+  to   { clip-path: inset(0 round 0.375rem); }
+}
+
+.editor-fullscreen {
+  background: var(--o2-body-primary-bg) !important;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
+  animation: editor-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  overflow: hidden !important;
 }
 
 .query-mode-toggle {
