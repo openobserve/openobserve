@@ -159,7 +159,8 @@ class TestProviders:
         resp = _api(self.s, self.base, self.org,
                      f"providers/{created['id']}/test", method="POST",
                      label="test provider")
-        assert "not yet implemented" in str(resp.json()).lower()
+        message = resp.json().get("message", "")
+        assert message
 
     def test_11_list_contains_created(self):
         name = f"lst-{self.rnd()}"
@@ -188,11 +189,11 @@ class TestScoreConfigs:
         self.base = base_url
         self.org = org_id
         self.rnd = random_string
-        self.names = []
+        self.ids = []
         yield
-        for name in self.names:
+        for entity_id in self.ids:
             try:
-                self.s.delete(f"{self.base}api/{self.org}/score_configs/{name}")
+                self.s.delete(f"{self.base}api/{self.org}/score_configs/{entity_id}")
             except Exception:
                 pass
 
@@ -208,7 +209,7 @@ class TestScoreConfigs:
         resp = _api(self.s, self.base, self.org, "score_configs",
                      method="POST", json_data=payload, label="create score config")
         data = resp.json()
-        self.names.append(data["name"])
+        self.ids.append(data["entityId"])
         return data
 
     def test_01_list_empty(self):
@@ -224,7 +225,7 @@ class TestScoreConfigs:
     def test_03_get(self):
         created = self._create(name=f"get-{self.rnd()}")
         resp = _api(self.s, self.base, self.org,
-                     f"score_configs/{created['name']}", label="get")
+                     f"score_configs/{created['entityId']}", label="get")
         _assert_ids_equal(resp.json()["id"], created["id"])
         assert resp.json()["version"] == 1
 
@@ -236,12 +237,11 @@ class TestScoreConfigs:
         created = self._create(name=f"ver-{self.rnd()}")
         assert created["version"] == 1
         resp = _api(self.s, self.base, self.org,
-                     f"score_configs/{created['name']}", method="PUT", json_data={
-                         "name": created["name"],
-                         "dataType": created["dataType"],
-                         "description": "v2",
-                         "numericRange": {"min": 10, "max": 90},
-                         "healthyThreshold": {"min": 80, "max": 100},
+                     f"score_configs/{created['entityId']}", method="PUT", json_data={
+                          "name": created["name"],
+                          "description": "v2",
+                          "numericRange": {"min": 10, "max": 90},
+                          "healthyThreshold": {"min": 80, "max": 100},
                      }, label="update score config")
         data = resp.json()
         assert data["version"] == 2
@@ -249,14 +249,14 @@ class TestScoreConfigs:
 
     def test_06_list_versions(self):
         created = self._create(name=f"verlist-{self.rnd()}")
-        _api(self.s, self.base, self.org, f"score_configs/{created['name']}",
+        _api(self.s, self.base, self.org, f"score_configs/{created['entityId']}",
              method="PUT", json_data={
-                 "name": created["name"], "dataType": created["dataType"],
+                 "name": created["name"],
                  "description": "v2", "numericRange": {"min": 0, "max": 50},
                  "healthyThreshold": {"min": 25, "max": 50},
              }, label="bump v2")
         resp = _api(self.s, self.base, self.org,
-                     f"score_configs/{created['name']}/versions",
+                     f"score_configs/{created['entityId']}/versions",
                      label="list versions")
         versions = resp.json().get("versions", [])
         assert len(versions) == 2
@@ -264,10 +264,10 @@ class TestScoreConfigs:
     def test_07_delete(self):
         """Soft-delete (deactivate) a score config."""
         created = self._create(name=f"del-{self.rnd()}")
-        _api(self.s, self.base, self.org, f"score_configs/{created['name']}",
+        _api(self.s, self.base, self.org, f"score_configs/{created['entityId']}",
              method="DELETE", label="delete score config")
-        self.names.remove(created["name"])
-        _api(self.s, self.base, self.org, f"score_configs/{created['name']}",
+        self.ids.remove(created["entityId"])
+        _api(self.s, self.base, self.org, f"score_configs/{created['entityId']}",
              expected_status=404, label="get deleted")
 
     def test_08_missing_name(self):
@@ -293,32 +293,67 @@ class TestScorers:
         self.base = base_url
         self.org = org_id
         self.rnd = random_string
-        self.names = []
+        self.ids = []
+        self.score_config = _api(self.s, self.base, self.org, "score_configs",
+                                 method="POST", json_data={
+                                     "name": f"scorer-sc-{self.rnd()}",
+                                     "dataType": "numeric",
+                                     "description": "Scorer test score config",
+                                     "numericRange": {"min": 0, "max": 100},
+                                     "healthyThreshold": {"min": 70, "max": 100},
+                                 }, label="create scorer score config").json()
         yield
-        for name in self.names:
+        for entity_id in self.ids:
             try:
-                self.s.delete(f"{self.base}api/{self.org}/scorers/{name}")
+                self.s.delete(f"{self.base}api/{self.org}/scorers/{entity_id}")
             except Exception:
                 pass
+        try:
+            self.s.delete(
+                f"{self.base}api/{self.org}/score_configs/{self.score_config['entityId']}"
+            )
+        except Exception:
+            pass
 
     def _create(self, name=None, **overrides):
+        scorer_type = overrides.pop("scorerType", "llm_judge")
+        if scorer_type == "remote":
+            scorer = {
+                "type": "remote",
+                "producesScoreConfigId": self.score_config["entityId"],
+                "template": '{"input": "{{input}}"}',
+                "params": {
+                    "endpoint": "http://127.0.0.1:1/evaluate",
+                    "http_method": "POST",
+                    "timeout_ms": 10,
+                    "max_retries": 0,
+                },
+            }
+        else:
+            scorer = {
+                "type": "llm_judge",
+                "producesScoreConfigId": self.score_config["entityId"],
+                "template": "Judge {{input}}",
+                "outputSchema": {
+                    "type": "object",
+                    "properties": {"value": {"type": "number"}},
+                },
+                "params": {"provider_id": "p1", "model": "gpt-4"},
+            }
+        for key in ["producesScoreConfigId", "producesScoreConfigVersion",
+                    "template", "outputSchema", "params"]:
+            if key in overrides:
+                scorer[key] = overrides.pop(key)
         payload = {
             "name": name or f"scorer-{self.rnd()}",
-            "scorerType": "llm_judge",
             "description": "LLM Judge scorer",
-            "producesScoreConfigId": "faithfulness",
-            "template": "Judge {{input}}",
-            "outputSchema": {
-                "type": "object",
-                "properties": {"value": {"type": "number"}},
-            },
-            "params": {"provider_id": "p1", "model": "gpt-4"},
+            "scorer": scorer,
         }
         payload.update(overrides)
         resp = _api(self.s, self.base, self.org, "scorers",
                      method="POST", json_data=payload, label="create scorer")
         data = resp.json()
-        self.names.append(data["name"])
+        self.ids.append(data["entityId"])
         return data
 
     def test_01_list_empty(self):
@@ -329,13 +364,13 @@ class TestScorers:
         data = self._create(name=f"crud-{self.rnd()}")
         assert data["name"].startswith("crud-")
         assert data["scorerType"] == "llm_judge"
-        assert data["producesScoreConfigId"] == "faithfulness"
+        assert data["producesScoreConfigId"] == self.score_config["entityId"]
         assert data["version"] == 1
 
     def test_03_get(self):
         created = self._create(name=f"get-{self.rnd()}")
         resp = _api(self.s, self.base, self.org,
-                     f"scorers/{created['name']}", label="get")
+                     f"scorers/{created['entityId']}", label="get")
         _assert_ids_equal(resp.json()["id"], created["id"])
         assert resp.json()["name"] == created["name"]
 
@@ -347,44 +382,48 @@ class TestScorers:
         created = self._create(name=f"upd-{self.rnd()}")
         assert created["version"] == 1
         resp = _api(self.s, self.base, self.org,
-                     f"scorers/{created['name']}", method="PUT", json_data={
-                         "name": created["name"],
-                         "description": "Updated scorer",
-                         "template": "Judge {{input}}",
-                         "outputSchema": created["outputSchema"],
-                         "params": {"provider_id": "p2", "model": "gpt-4-turbo"},
-                     }, label="update scorer")
+                     f"scorers/{created['entityId']}", method="PUT", json_data={
+                          "name": created["name"],
+                          "description": "Updated scorer",
+                          "scorer": {
+                              "type": "llm_judge",
+                              "template": "Judge {{input}}",
+                              "params": {"provider_id": "p2", "model": "gpt-4-turbo"},
+                          },
+                      }, label="update scorer")
         data = resp.json()
         assert data["version"] == 2
         assert data["scorerType"] == "llm_judge"        # immutable
-        assert data["producesScoreConfigId"] == "faithfulness"  # immutable
+        assert data["producesScoreConfigId"] == self.score_config["entityId"]  # immutable
 
     def test_06_list_versions(self):
         created = self._create(name=f"verlist-{self.rnd()}")
-        _api(self.s, self.base, self.org, f"scorers/{created['name']}",
+        _api(self.s, self.base, self.org, f"scorers/{created['entityId']}",
              method="PUT", json_data={
-                 "name": created["name"], "description": "v2",
-                 "template": "Judge {{input}}",
-                 "outputSchema": created["outputSchema"],
-                 "params": created["params"],
-             }, label="bump v2")
+                  "name": created["name"], "description": "v2",
+                  "scorer": {
+                      "type": "llm_judge",
+                      "template": "Judge {{input}}",
+                      "params": created["params"],
+                  },
+              }, label="bump v2")
         resp = _api(self.s, self.base, self.org,
-                     f"scorers/{created['name']}/versions",
+                     f"scorers/{created['entityId']}/versions",
                      label="list versions")
         versions = resp.json().get("versions", [])
         assert len(versions) == 2
     def test_07_delete(self):
         created = self._create(name=f"del-{self.rnd()}")
-        _api(self.s, self.base, self.org, f"scorers/{created['name']}",
+        _api(self.s, self.base, self.org, f"scorers/{created['entityId']}",
              method="DELETE", label="delete scorer")
-        self.names.remove(created["name"])
-        _api(self.s, self.base, self.org, f"scorers/{created['name']}",
+        self.ids.remove(created["entityId"])
+        _api(self.s, self.base, self.org, f"scorers/{created['entityId']}",
              expected_status=404, label="get deleted")
 
     def test_08_missing_name(self):
         _api(self.s, self.base, self.org, "scorers", method="POST",
-             json_data={"scorerType": "llm_judge", "template": "Judge {{input}}",
-                        "params": {}},
+             json_data={"scorer": {"type": "llm_judge", "template": "Judge {{input}}",
+                                   "params": {"provider_id": "p1"}}},
              expected_status=422, label="create missing name")
 
     def test_09_filter_by_scorer_type(self):
@@ -396,11 +435,25 @@ class TestScorers:
             assert s["scorerType"] == "llm_judge"
 
     def test_10_test_endpoint(self):
-        created = self._create(name=f"tst-{self.rnd()}")
         resp = _api(self.s, self.base, self.org,
-                     f"scorers/{created['name']}/test", method="POST",
+                     "scorers/test", method="POST", json_data={
+                         "name": f"tst-{self.rnd()}",
+                         "scorer": {
+                             "type": "remote",
+                             "template": '{"input": "{{input}}"}',
+                             "params": {
+                                 "endpoint": "http://127.0.0.1:1/evaluate",
+                                 "http_method": "POST",
+                                 "timeout_ms": 10,
+                                 "max_retries": 0,
+                             },
+                         },
+                         "inputVariables": {"input": "hello"},
+                     },
                      label="test scorer")
-        assert "not yet implemented" in str(resp.json()).lower()
+        data = resp.json()
+        assert data["success"] is False
+        assert data.get("error")
 
 
 # ---------------------------------------------------------------------------
@@ -677,22 +730,24 @@ class TestOnlineEvalEndToEnd:
             "description": "E2E score config",
             "categories": {"Good": 85, "Fair": 50, "Poor": 15},
         }, label="e2e: create score config").json()
-        self.ids["score_configs"].append(sc["name"])
+        self.ids["score_configs"].append(sc["entityId"])
         assert sc["dataType"] == "categorical"
         assert sc["version"] == 1
 
         # Scorer (llm_judge)
         scorer = _api(s, base, org, "scorers", method="POST", json_data={
             "name": f"e2e-scorer-{suffix}",
-            "scorerType": "llm_judge",
             "description": "E2E LLM Judge",
-            "producesScoreConfigId": "faithfulness",
-            "template": "Judge {{query}} and {{response}}",
-            "outputSchema": {"type": "object",
-                             "properties": {"value": {"type": "number"}}},
-            "params": {"provider_id": prov["id"], "model": "gpt-4o"},
+            "scorer": {
+                "type": "llm_judge",
+                "producesScoreConfigId": sc["entityId"],
+                "template": "Judge {{query}} and {{response}}",
+                "outputSchema": {"type": "object",
+                                 "properties": {"value": {"type": "number"}}},
+                "params": {"provider_id": prov["id"], "model": "gpt-4o"},
+            },
         }, label="e2e: create scorer").json()
-        self.ids["scorers"].append(scorer["name"])
+        self.ids["scorers"].append(scorer["entityId"])
         assert scorer["scorerType"] == "llm_judge"
         assert scorer["version"] == 1
 
@@ -704,7 +759,7 @@ class TestOnlineEvalEndToEnd:
             "streamType": "logs",
             "filterCondition": {"type": "condition", "field": "log",
                                 "operator": "exists"},
-            "scorers": [scorer["name"]],
+            "scorers": [scorer["entityId"]],
             "inputMapping": None,
             "samplingMode": "all",
             "samplingValue": None,
@@ -719,12 +774,14 @@ class TestOnlineEvalEndToEnd:
         suffix = self.rnd()
 
         # Minimal resources needed for activation
-        _api(s, base, org, "scorers", method="POST", json_data={
+        scorer = _api(s, base, org, "scorers", method="POST", json_data={
             "name": f"e2e-scr-{suffix}",
-            "scorerType": "llm_judge",
-            "template": "Judge {{input}}",
-            "params": {"provider_id": "p", "model": "gpt-4"},
-        }, label="e2e: create scorer")
+            "scorer": {
+                "type": "llm_judge",
+                "template": "Judge {{input}}",
+                "params": {"provider_id": "p", "model": "gpt-4"},
+            },
+        }, label="e2e: create scorer").json()
 
         job = _api(s, base, org, "eval_jobs", method="POST", json_data={
             "name": f"e2e-act-{suffix}",
@@ -732,12 +789,12 @@ class TestOnlineEvalEndToEnd:
             "streamType": "logs",
             "filterCondition": {"type": "condition", "field": "log",
                                 "operator": "exists"},
-            "scorers": [f"e2e-scr-{suffix}"],
+            "scorers": [scorer["entityId"]],
             "samplingMode": "all",
             "samplingValue": None,
         }, label="e2e: create job for activation").json()
         self.ids["jobs"].append(job["id"])
-        self.ids["scorers"].append(f"e2e-scr-{suffix}")
+        self.ids["scorers"].append(scorer["entityId"])
 
         act = _api(s, base, org, f"eval_jobs/{job['id']}/activate",
                     method="POST", label="e2e: activate").json()
