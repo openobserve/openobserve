@@ -404,7 +404,18 @@
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
     "functionEditorLabel": "Éditeur de fonctions",
-    "loadingStream": "Chargement du flux..."
+    "loadingStream": "Chargement du flux...",
+    "hideHistogram": "Masquer l'histogramme",
+    "disableQuickMode": "Désactiver le mode rapide",
+    "menuGroupSetOnce": "Réglez une fois",
+    "menuGroupSavedViews": "Vues enregistrées",
+    "menuGroupTools": "Outils",
+    "menuGroupHistory": "L'histoire",
+    "menuGroupDownloads": "Téléchargements",
+    "menuGroupSchedule": "Calendrier",
+    "menuGroupInspect": "Inspectez",
+    "validSql": "SQL valide",
+    "invalidSql": "Requête non valide"
   },
   "menu": {
     "home": "Accueil",
