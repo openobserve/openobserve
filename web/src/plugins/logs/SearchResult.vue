@@ -74,23 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:w-1/3 tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
-          <!-- Refresh button in bordered container to match action button style -->
-          <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6">
-            <ORefreshButton
-              :last-run-at="searchObj.meta.lastRunAt"
-              :loading="searchObj.loading || searchObj.loadingHistogram"
-              :disabled="searchObj.loading || searchObj.loadingHistogram"
-              @click="$emit('run-query')"
-            />
-          </div>
-
-          <!-- OVERFLOW MENU (narrow container) -->
-          <ODropdown
-            v-if="(showWrapBtn || showInspectBtn || showAnalyzeBtn) && shouldMoveActionsToMenu"
-            side="bottom"
-            align="end"
-          >
+        <div class="tw:flex-none tw:pr-2 pagination-block tw:flex tw:items-center tw:justify-end tw:gap-1">
+          <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
+          <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="outline"
@@ -101,6 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('search.moreActions')" />
               </OButton>
             </template>
+            <ODropdownItem
+              data-test="logs-result-refresh-menu-item"
+              @select="$emit('run-query')"
+            >
+              <template #icon-left><OIcon name="refresh" size="sm" /></template>
+              {{ t('common.refresh') }}
+            </ODropdownItem>
             <ODropdownItem
               v-if="showWrapBtn"
               data-test="logs-result-wrap-menu-item"
@@ -130,43 +123,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdown>
 
-          <!-- INLINE ACTION BUTTONS (wider container) -->
-          <div
-            v-if="(showInspectBtn || showAnalyzeBtn || showWrapBtn) && !shouldMoveActionsToMenu"
-            class="tw:inline-flex tw:items-center tw:gap-0.5"
-          >
-            <OButton
-              v-if="showInspectBtn"
-              variant="outline"
-              size="icon-chip"
-              @click="openSearchJobInspector"
-              data-test="logs-inspect-button"
+          <!-- INLINE BUTTONS (wider container) -->
+          <template v-else>
+            <!-- Refresh in bordered wrapper -->
+            <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6">
+              <ORefreshButton
+                :last-run-at="searchObj.meta.lastRunAt"
+                :loading="searchObj.loading || searchObj.loadingHistogram"
+                :disabled="searchObj.loading || searchObj.loadingHistogram"
+                @click="$emit('run-query')"
+              />
+            </div>
+            <!-- Action buttons -->
+            <div
+              v-if="showInspectBtn || showAnalyzeBtn || showWrapBtn"
+              class="tw:inline-flex tw:items-center tw:gap-0.5"
             >
-              <OIcon name="troubleshoot" size="sm" />
-              <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
-            </OButton>
-            <OButton
-              v-if="showAnalyzeBtn"
-              variant="outline"
-              size="icon-chip"
-              @click="openVolumeAnalysisDashboard"
-              data-test="logs-analyze-dimensions-button"
-            >
-              <OIcon name="timeline" size="sm" />
-              <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
-            </OButton>
-            <OButton
-              v-if="showWrapBtn"
-              variant="outline"
-              size="icon-chip"
-              :active="searchObj.meta.toggleSourceWrap"
-              @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
-              data-test="logs-search-result-wrap-table-content-btn"
-            >
-              <OIcon name="wrap-text" size="sm" />
-              <OTooltip :content="t('search.messageWrapContent')" />
-            </OButton>
-          </div>
+              <OButton
+                v-if="showInspectBtn"
+                variant="outline"
+                size="icon-chip"
+                @click="openSearchJobInspector"
+                data-test="logs-inspect-button"
+              >
+                <OIcon name="troubleshoot" size="sm" />
+                <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
+              </OButton>
+              <OButton
+                v-if="showAnalyzeBtn"
+                variant="outline"
+                size="icon-chip"
+                @click="openVolumeAnalysisDashboard"
+                data-test="logs-analyze-dimensions-button"
+              >
+                <OIcon name="timeline" size="sm" />
+                <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
+              </OButton>
+              <OButton
+                v-if="showWrapBtn"
+                variant="outline"
+                size="icon-chip"
+                :active="searchObj.meta.toggleSourceWrap"
+                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
+                data-test="logs-search-result-wrap-table-content-btn"
+              >
+                <OIcon name="wrap-text" size="sm" />
+                <OTooltip :content="t('search.messageWrapContent')" />
+              </OButton>
+            </div>
+          </template>
 
           <OSelect
             v-if="
@@ -883,8 +888,8 @@ export default defineComponent({
     // Responsive: observe the outer container (reacts to splitter + window resize)
     const containerWidth = ref(9999);
     let containerResizeObserver: ResizeObserver | null = null;
-    // < 420px: show 3 page buttons instead of 5
-    const paginationMaxPages = computed(() => containerWidth.value < 420 ? 3 : 5);
+    // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
+    const paginationMaxPages = computed(() => containerWidth.value < 700 ? 3 : 5);
 
     const noOfRecordsTitle = ref("");
     const patternSummaryText = ref("");
