@@ -207,9 +207,8 @@ jobs:
 
       - name: Regenerate query-agent expected values
         run: |
-          cd ../test-data/query-agent
-          ../../api-testing/.venv/bin/python compute_counts.py
-        working-directory: tests/api-testing/
+          cd ${{ github.workspace }}/tests/test-data/query-agent
+          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
 
       - name: Run query agent tests
         run: |
