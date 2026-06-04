@@ -19,7 +19,7 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
   md: "tw:h-9 tw:px-3 tw:text-sm",
   sm: "tw:h-7 tw:px-2.5 tw:text-sm",
-  xs: "tw:h-7 tw:px-1.5 tw:text-xs",
+  xs: "tw:h-3 tw:px-1.5 tw:text-xs",
 };
 
 // Icon size mirrors the toggle size — md = sm icon (16px), sm/xs = xs icon (12px)
@@ -37,7 +37,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
     The span wrapper intercepts hover so cursor-not-allowed and the tooltip
     remain visible even when the inner item is disabled.
   -->
-  <span :class="props.disabled ? 'tw:cursor-not-allowed' : 'tw:inline-flex'">
+  <span :class="props.disabled ? 'tw:cursor-not-allowed' : 'tw:contents'">
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
