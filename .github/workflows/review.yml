@@ -11,6 +11,9 @@ concurrency:
   group: review-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: true
 
+# Deny all GITHUB_TOKEN permissions by default; jobs use E2E_DEV_CI_TOKEN instead.
+permissions: {}
+
 jobs:
   # Security: Check if user is a member of argocd-dev team
   check-permission:
@@ -18,6 +21,7 @@ jobs:
       github.event.sender.type != 'Bot' &&
       contains(github.event.comment.body, '@review')
     runs-on: ubuntu-latest
+    permissions: {}
     outputs:
       authorized: ${{ steps.check.outputs.authorized }}
     steps:
@@ -65,6 +69,7 @@ jobs:
       github.event.sender.type != 'Bot' &&
       contains(github.event.comment.body, '@review')
     runs-on: ubuntu-latest
+    permissions: {}
     outputs:
       mode: ${{ steps.context.outputs.mode }}
       branch: ${{ steps.context.outputs.branch }}
@@ -129,6 +134,7 @@ jobs:
       github.event.sender.type != 'Bot' &&
       contains(github.event.comment.body, '@review')
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Dispatch Review Event to o2-enterprise
         uses: peter-evans/repository-dispatch@v4
