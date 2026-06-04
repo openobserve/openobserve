@@ -1009,6 +1009,12 @@ pub struct Common {
     )]
     pub feature_query_skip_wal: bool,
     #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
         help = "Enable shared memtable across multiple organizations"
