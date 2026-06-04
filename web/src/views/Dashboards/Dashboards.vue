@@ -256,6 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
             v-model:selected-ids="selectedIds"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
             style="width: 100%; height: 100%"
@@ -627,6 +630,8 @@ export default defineComponent({
           header: t("dashboard.name"),
           accessorKey: "name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -634,6 +639,8 @@ export default defineComponent({
           header: t("dashboard.identifier"),
           accessorKey: "identifier",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -641,6 +648,8 @@ export default defineComponent({
           header: t("dashboard.description"),
           accessorKey: "description",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -648,6 +657,8 @@ export default defineComponent({
           header: t("dashboard.owner"),
           accessorKey: "owner",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -655,6 +666,8 @@ export default defineComponent({
           header: t("dashboard.created"),
           accessorKey: "created",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -672,6 +685,8 @@ export default defineComponent({
           header: t("dashboard.folder"),
           accessorKey: "folder",
           sortable: true,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         });
       }

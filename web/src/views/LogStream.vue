@@ -112,6 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="streams-log-stream-list"
           width="100%"
           :style="
             logStream?.length
@@ -364,6 +367,8 @@ export default defineComponent({
         accessorKey: "name",
         header: t("logStream.name"),
         sortable: true,
+        resizable: true,
+        hideable: true,
         meta: { align: "left" },
       },
       {
@@ -371,6 +376,8 @@ export default defineComponent({
         accessorKey: "stream_type",
         header: t("logStream.type"),
         size: 30,
+        resizable: true,
+        hideable: true,
         meta: { align: "left" },
       },
       {
@@ -379,6 +386,8 @@ export default defineComponent({
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
         header: t("logStream.docNum"),
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 80,
         meta: { align: "left" },
       },
@@ -387,6 +396,8 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 50,
         meta: { align: "left" },
       },
@@ -395,6 +406,8 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 50,
         meta: { align: "left" },
       },
@@ -403,6 +416,8 @@ export default defineComponent({
         accessorFn: (row: any) => formatSizeFromMB(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 50,
         meta: { align: "left" },
       },
