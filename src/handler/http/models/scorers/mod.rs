@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::table::scorers::ScorerType;
+use infra::table::{score_configs::ScoreConfigDataType, scorers::ScorerType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -143,8 +143,12 @@ pub struct RemoteScorerUpdateRequest {
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LlmJudgeScorerTestRequest {
+    #[serde(default, alias = "produces_score_config_id")]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default, alias = "produces_score_config_version")]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
-    #[serde(default)]
+    #[serde(default, alias = "output_schema")]
     pub output_schema: Option<Value>,
     #[serde(default)]
     pub params: Option<LlmJudgeScorerParams>,
@@ -153,6 +157,10 @@ pub struct LlmJudgeScorerTestRequest {
 #[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RemoteScorerTestRequest {
+    #[serde(default, alias = "produces_score_config_id")]
+    pub produces_score_config_id: Option<String>,
+    #[serde(default, alias = "produces_score_config_version")]
+    pub produces_score_config_version: Option<i32>,
     pub template: String,
     #[serde(default)]
     pub params: Option<RemoteScorerParams>,
@@ -235,10 +243,45 @@ pub struct ListScorersQuery {
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScorerTestRequestBody {
+    /// Optional stable scorer entity id. When provided, existing scorer defaults are loaded before
+    /// applying overrides.
+    #[serde(default, alias = "entity_id")]
+    pub entity_id: Option<String>,
+    /// Optional scorer display name for inline tests.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Optional scorer description for inline tests.
+    #[serde(default)]
+    pub description: Option<String>,
     /// Scorer-specific test configuration overrides.
     pub scorer: ScorerTestConfig,
+    /// Optional inline score config used to derive the LLM Judge output schema.
+    #[serde(default, alias = "score_config")]
+    pub score_config: Option<ScorerTestScoreConfig>,
     /// Values for the variables referenced by the template.
+    #[serde(alias = "input_variables")]
     pub input_variables: Value,
+}
+
+/// Inline score config used when testing a scorer without a persisted score config lookup.
+#[derive(Clone, Debug, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScorerTestScoreConfig {
+    #[serde(default, alias = "entity_id")]
+    pub entity_id: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub version: Option<i32>,
+    #[schema(value_type = String)]
+    #[serde(alias = "data_type")]
+    pub data_type: ScoreConfigDataType,
+    #[serde(default, alias = "numeric_range")]
+    pub numeric_range: Option<Value>,
+    #[serde(default)]
+    pub categories: Option<Value>,
+    #[serde(default, alias = "healthy_threshold")]
+    pub healthy_threshold: Option<Value>,
 }
 
 /// Request body for previewing the derived LLM Judge output schema.
@@ -515,6 +558,84 @@ mod tests {
         assert_eq!(scorer.produces_score_config_version, Some(1));
         assert_eq!(scorer.template, "Judge {{input}}");
         assert_eq!(scorer.params["provider_id"], "p1");
+    }
+
+    #[test]
+    fn test_scorer_test_request_deserializes_inline_score_config_without_entity_id() {
+        let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "draft scorer",
+            "scorer": {
+                "type": "llm_judge",
+                "template": "Judge {{input}}",
+                "params": {
+                    "provider_id": "p1"
+                }
+            },
+            "score_config": {
+                "name": "quality",
+                "version": 2,
+                "data_type": "categorical",
+                "categories": ["good", "bad"]
+            },
+            "input_variables": {
+                "input": "hello"
+            }
+        }))
+        .unwrap();
+
+        assert!(body.entity_id.is_none());
+        assert_eq!(body.name.as_deref(), Some("draft scorer"));
+        assert_eq!(body.input_variables["input"], "hello");
+        let score_config = body.score_config.unwrap();
+        assert_eq!(score_config.data_type, ScoreConfigDataType::Categorical);
+        assert_eq!(score_config.version, Some(2));
+        assert_eq!(score_config.categories.unwrap()[0], "good");
+    }
+
+    #[test]
+    fn test_scorer_test_request_accepts_existing_score_config_response_shape() {
+        let body: ScorerTestRequestBody = serde_json::from_value(serde_json::json!({
+            "entityId": "scorer-entity-1",
+            "scorer": {
+                "type": "llm_judge",
+                "producesScoreConfigId": "scfg-entity-1",
+                "producesScoreConfigVersion": 3,
+                "template": "Judge {{input}}"
+            },
+            "scoreConfig": {
+                "id": "score-config-row-1",
+                "entityId": "scfg-entity-1",
+                "orgId": "org1",
+                "name": "quality",
+                "version": 3,
+                "dataType": "numeric",
+                "numericRange": {"min": 0, "max": 1},
+                "healthyThreshold": {"direction": "gte", "value": 0.7},
+                "isActive": true,
+                "createdAt": 1000,
+                "updatedAt": 2000
+            },
+            "inputVariables": {
+                "input": "hello"
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(body.entity_id.as_deref(), Some("scorer-entity-1"));
+        match body.scorer {
+            ScorerTestConfig::LlmJudge(scorer) => {
+                assert_eq!(
+                    scorer.produces_score_config_id.as_deref(),
+                    Some("scfg-entity-1")
+                );
+                assert_eq!(scorer.produces_score_config_version, Some(3));
+            }
+            ScorerTestConfig::Remote(_) => panic!("expected llm_judge scorer"),
+        }
+        let score_config = body.score_config.unwrap();
+        assert_eq!(score_config.entity_id.as_deref(), Some("scfg-entity-1"));
+        assert_eq!(score_config.data_type, ScoreConfigDataType::Numeric);
+        assert_eq!(score_config.numeric_range.unwrap()["max"], 1);
     }
 
     #[test]

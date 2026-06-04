@@ -24,6 +24,11 @@ pub struct ProviderStructuredOutputError {
     pub provider: &'static str,
     pub raw_response: String,
     pub parse_error: String,
+    pub prompt_tokens: Option<i64>,
+    pub completion_tokens: Option<i64>,
+    pub total_tokens: Option<i64>,
+    pub model_used: String,
+    pub latency_ms: i64,
 }
 
 impl fmt::Display for ProviderStructuredOutputError {
@@ -348,6 +353,11 @@ async fn call_openai(params: &ProviderCallParams) -> Result<ProviderCallResult> 
             provider: "OpenAI",
             raw_response: content.to_string(),
             parse_error: e.to_string(),
+            prompt_tokens: raw["usage"]["prompt_tokens"].as_i64(),
+            completion_tokens: raw["usage"]["completion_tokens"].as_i64(),
+            total_tokens: raw["usage"]["total_tokens"].as_i64(),
+            model_used: raw["model"].as_str().unwrap_or(&params.model).to_string(),
+            latency_ms: latency.as_millis() as i64,
         })?;
 
     Ok(ProviderCallResult {
@@ -416,6 +426,14 @@ async fn call_anthropic(params: &ProviderCallParams) -> Result<ProviderCallResul
             provider: "Anthropic",
             raw_response: content.to_string(),
             parse_error: e.to_string(),
+            prompt_tokens: raw["usage"]["input_tokens"].as_i64(),
+            completion_tokens: raw["usage"]["output_tokens"].as_i64(),
+            total_tokens: raw["usage"]["input_tokens"]
+                .as_i64()
+                .zip(raw["usage"]["output_tokens"].as_i64())
+                .map(|(p, c)| p + c),
+            model_used: raw["model"].as_str().unwrap_or(&params.model).to_string(),
+            latency_ms: latency.as_millis() as i64,
         })?;
 
     Ok(ProviderCallResult {
@@ -482,6 +500,11 @@ async fn call_ollama(params: &ProviderCallParams) -> Result<ProviderCallResult> 
             provider: "Ollama",
             raw_response: content.to_string(),
             parse_error: e.to_string(),
+            prompt_tokens: raw.get("prompt_eval_count").and_then(|v| v.as_i64()),
+            completion_tokens: raw.get("eval_count").and_then(|v| v.as_i64()),
+            total_tokens: None,
+            model_used: raw["model"].as_str().unwrap_or(&params.model).to_string(),
+            latency_ms: latency.as_millis() as i64,
         })?;
 
     Ok(ProviderCallResult {

@@ -22,7 +22,7 @@ use serde_json::Value;
 
 use crate::service::llm_evaluations::{
     eval_jobs::executor_runtime::{SpanEvalContext, input_variables_with_context_defaults},
-    evaluator_trace::{EvaluatorTraceInput, create_evaluator_trace},
+    evaluator_trace::{EvaluatorTrace, EvaluatorTraceInput, create_evaluator_trace},
     score_writer::{ScoreWriterInput, create_score},
     scorers::{llm_judge, remote_client},
 };
@@ -32,6 +32,14 @@ pub(crate) struct ScorerExecutionError {
     message: String,
     pub(crate) raw_response: Option<String>,
     pub(crate) scorer_input: Option<String>,
+    pub(crate) provider_id: Option<String>,
+    pub(crate) provider_name: Option<String>,
+    pub(crate) provider_type: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) prompt_tokens: Option<i64>,
+    pub(crate) completion_tokens: Option<i64>,
+    pub(crate) total_tokens: Option<i64>,
+    pub(crate) latency_ms: i64,
 }
 
 impl fmt::Display for ScorerExecutionError {
@@ -44,7 +52,7 @@ impl std::error::Error for ScorerExecutionError {}
 
 pub(crate) struct ScoreResult {
     pub(crate) score_json: Value,
-    pub(crate) trace_json: Value,
+    pub(crate) evaluator_trace: EvaluatorTrace,
 }
 
 pub(crate) enum PreparedScorer {
@@ -90,6 +98,14 @@ pub struct PreparedLlmJudgeScorer {
 
 impl PreparedLlmJudgeScorer {
     pub async fn prepare(org_id: &str, scorer: &infra::table::scorers::Scorer) -> Result<Self> {
+        Self::prepare_with_score_config_info(org_id, scorer, None).await
+    }
+
+    pub async fn prepare_with_score_config_info(
+        org_id: &str,
+        scorer: &infra::table::scorers::Scorer,
+        score_config_info: Option<llm_judge::ScoreConfigInfo>,
+    ) -> Result<Self> {
         use llm_judge::{LlmJudgeParams, ScoreConfigInfo, ScorerConfig};
 
         let params: LlmJudgeParams = serde_json::from_value(scorer.params.clone())
@@ -109,10 +125,16 @@ impl PreparedLlmJudgeScorer {
 
         let score_config_entity_id = scorer.produces_score_config_id.as_deref().unwrap_or("");
 
-        let score_config = if !score_config_entity_id.is_empty() {
-            lookup_score_config_for_scorer(org_id, scorer).await
+        let score_cfg_info = if let Some(score_config_info) = score_config_info {
+            score_config_info
+        } else if !score_config_entity_id.is_empty() {
+            lookup_score_config_for_scorer(org_id, scorer)
+                .await
+                .as_ref()
+                .map(ScoreConfigInfo::from)
+                .unwrap_or_default()
         } else {
-            None
+            ScoreConfigInfo::default()
         };
 
         let template = if scorer.template.trim().is_empty() {
@@ -133,11 +155,6 @@ impl PreparedLlmJudgeScorer {
         };
 
         let provider = infra::provider::PreparedProvider::parse((&provider).into())?;
-
-        let score_cfg_info = score_config
-            .as_ref()
-            .map(ScoreConfigInfo::from)
-            .unwrap_or_default();
 
         Ok(Self {
             scorer: scorer.clone(),
@@ -251,29 +268,51 @@ impl PreparedLlmJudgeScorer {
                     error_kind: None,
                     error_message: None,
                     skip_reason: None,
-                    prompt: None,
+                    prompt: Some(llm_output.prompt_messages),
                     response: Some(llm_output.raw_response),
                 });
 
                 Ok(Some(ScoreResult {
                     score_json: score.json,
-                    trace_json: trace.span_json,
+                    evaluator_trace: trace,
                 }))
             }
             Err(e) => {
                 let latency = start.elapsed();
-                let raw_response = e.chain().find_map(|cause| {
-                    cause
-                        .downcast_ref::<infra::provider::ProviderStructuredOutputError>()
-                        .map(|e| e.raw_response.clone())
+                let structured_error = e.chain().find_map(|cause| {
+                    cause.downcast_ref::<infra::provider::ProviderStructuredOutputError>()
                 });
+                let prompt_tokens = structured_error.and_then(|e| e.prompt_tokens);
+                let completion_tokens = structured_error.and_then(|e| e.completion_tokens);
+                let total_tokens = structured_error
+                    .and_then(|e| e.total_tokens)
+                    .or_else(|| prompt_tokens.zip(completion_tokens).map(|(p, c)| p + c));
+
                 Err(ScorerExecutionError {
                     message: format!(
                         "LLM Judge scorer failed: {e} (latency: {}ms)",
                         latency.as_millis()
                     ),
-                    raw_response,
-                    scorer_input: serde_json::to_string(&input_variables).ok(),
+                    raw_response: structured_error.map(|e| e.raw_response.clone()),
+                    scorer_input: Some(llm_judge::build_prompt_messages_json(
+                        &self.scorer_cfg,
+                        input_variables,
+                    )),
+                    provider_id: Some(self.provider.id.clone()),
+                    provider_name: Some(self.provider.name.clone()),
+                    provider_type: Some(self.provider.kind.as_str().to_string()),
+                    model: structured_error.map(|e| e.model_used.clone()).or_else(|| {
+                        Some(
+                            self.provider
+                                .model_or_default(self.scorer_cfg.params.model.as_deref()),
+                        )
+                    }),
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens,
+                    latency_ms: structured_error
+                        .map(|e| e.latency_ms)
+                        .unwrap_or(latency.as_millis() as i64),
                 }
                 .into())
             }
@@ -412,7 +451,7 @@ impl PreparedRemoteScorer {
 
                 Ok(Some(ScoreResult {
                     score_json: score.json,
-                    trace_json: trace.span_json,
+                    evaluator_trace: trace,
                 }))
             }
             Err(e) => {

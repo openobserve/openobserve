@@ -35,6 +35,7 @@ pub struct LlmJudgeOutput {
     pub reasoning: Option<String>,
     pub metadata: Option<Value>,
     pub raw_response: String,
+    pub prompt_messages: String,
     pub prompt_tokens: Option<i64>,
     pub completion_tokens: Option<i64>,
     pub total_tokens: Option<i64>,
@@ -94,10 +95,9 @@ pub async fn run_llm_judge(
     extra_metadata_fields: &[String],
     include_reasoning: bool,
 ) -> Result<LlmJudgeOutput> {
-    let system_prompt =
-        "You are an impartial LLM evaluator. Follow the instructions and output ONLY valid JSON."
-            .to_string();
+    let system_prompt = evaluator_system_prompt();
     let user_prompt = render_template(&scorer.template, input_variables);
+    let prompt_messages = prompt_messages_json(&system_prompt, &user_prompt);
     let output_schema = derive_output_schema(
         score_config.data_type,
         score_config.numeric_range.as_ref(),
@@ -139,12 +139,35 @@ pub async fn run_llm_judge(
         reasoning,
         metadata,
         raw_response: result.raw_response,
+        prompt_messages,
         prompt_tokens: result.prompt_tokens,
         completion_tokens: result.completion_tokens,
         total_tokens: result.total_tokens,
         model_used: result.model_used,
         latency_ms: latency.as_millis() as i64,
     })
+}
+
+pub(crate) fn build_prompt_messages_json(
+    scorer: &ScorerConfig,
+    input_variables: &HashMap<String, Value>,
+) -> String {
+    let system_prompt = evaluator_system_prompt();
+    let user_prompt = render_template(&scorer.template, input_variables);
+    prompt_messages_json(&system_prompt, &user_prompt)
+}
+
+fn evaluator_system_prompt() -> String {
+    "You are an impartial LLM evaluator. Follow the instructions and output ONLY valid JSON."
+        .to_string()
+}
+
+fn prompt_messages_json(system_prompt: &str, user_prompt: &str) -> String {
+    serde_json::json!([
+        { "role": "system", "content": system_prompt },
+        { "role": "user", "content": user_prompt }
+    ])
+    .to_string()
 }
 
 fn extract_metadata(value: &Value, metadata_fields: &[String]) -> Option<Value> {

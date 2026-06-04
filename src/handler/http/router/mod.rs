@@ -863,11 +863,11 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
         // Scorers (Online Eval Phase 2)
-        // NOTE: /{entity_id}/versions and /{entity_id}/test must precede /{entity_id}
+        // NOTE: static and nested routes must precede /{entity_id}
         .route("/{org_id}/scorers", get(scorers::list_scorers).post(scorers::create_scorer))
+        .route("/{org_id}/scorers/test", post(scorers::test_scorer))
         .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
         .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
-        .route("/{org_id}/scorers/{entity_id}/test", post(scorers::test_scorer))
         .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
 
         // Online Eval Jobs (Online Eval Phase 2)

@@ -13,18 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `_evaluator` stream — observability for LLM-Judge and Remote-Scorer calls.
+//! Online evaluator trace attribute contract.
 //!
-//! The `_evaluator` stream is an ordinary **traces** stream (StreamType::Traces).
 //! Each evaluator invocation or evaluation activity event is recorded as one
-//! synthetic OTLP-shaped span built directly as JSON by the executor runtime
-//! and self-ingested into [`EVALUATOR_STREAM`]. The stream schema is initialized
-//! explicitly before evaluator traces are written.
+//! internal OTLP span and exported to the org's `_evaluator` traces stream.
+//! This lets the normal OTLP LLM processor classify LLM-Judge spans and derive
+//! Gen-AI usage/cost fields.
 //!
-//! **Routing**: there is no clever OTel context propagation. The executor
-//! runtime simply calls the traces ingestion entry point with
-//! [`EVALUATOR_STREAM`] as the explicit stream name, in the job's org. Same
-//! pattern that `_usage`, `_triggers`, and `_metadata` use for their writes.
+//! **Routing**: evaluator trace IDs are intentionally separate from the target
+//! trace IDs. Target trace/span identity is emitted as evaluator metadata.
 //!
 //! This module is intentionally minimal — it only fixes the stream name and the
 //! standard attribute keys so callers, query tooling, and the Quality page agree
@@ -92,6 +89,18 @@ pub const ATTR_SKIP_REASON: &str = "skip_reason";
 // Optional payload (subject to truncation; off by default for size reasons)
 pub const ATTR_PROMPT: &str = "prompt";
 pub const ATTR_RESPONSE: &str = "response";
+
+// OTEL Gen-AI source keys emitted on LLM-Judge evaluator spans.
+pub const GEN_AI_OPERATION_NAME: &str = "gen_ai.operation.name";
+pub const GEN_AI_REQUEST_MODEL: &str = "gen_ai.request.model";
+pub const GEN_AI_RESPONSE_MODEL: &str = "gen_ai.response.model";
+pub const GEN_AI_PROVIDER_NAME: &str = "gen_ai.provider.name";
+pub const GEN_AI_SYSTEM: &str = "gen_ai.system";
+pub const GEN_AI_INPUT_MESSAGES: &str = "gen_ai.input.messages";
+pub const GEN_AI_OUTPUT_MESSAGES: &str = "gen_ai.output.messages";
+pub const GEN_AI_USAGE_INPUT_TOKENS: &str = "gen_ai.usage.input_tokens";
+pub const GEN_AI_USAGE_OUTPUT_TOKENS: &str = "gen_ai.usage.output_tokens";
+pub const GEN_AI_USAGE_TOTAL_TOKENS: &str = "gen_ai.usage.total_tokens";
 
 /// Status values written to [`ATTR_STATUS`].
 pub mod status {
