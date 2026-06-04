@@ -198,7 +198,7 @@
               />
 
               <OIcon
-                size="md"
+                size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
                 @click="() => drilldownData.data.variables.splice(index, 1)"
