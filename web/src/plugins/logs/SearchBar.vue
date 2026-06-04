@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-logs-toggle"
             value="logs"
-            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            size="sm"
             :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
           >
             <template #icon-left>
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isVisualizeDisabled"
             :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
             value="visualize"
-            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            size="sm"
           >
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             data-test="logs-build-toggle"
             value="build"
-            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            size="sm"
             :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
           >
             <template #icon-left>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="config.isEnterprise == 'true'"
             data-test="logs-patterns-toggle"
             value="patterns"
-            :size="toolbarToggleIconOnly ? 'xs' : 'sm'"
+            size="sm"
             :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
           >
             <template #icon-left>
