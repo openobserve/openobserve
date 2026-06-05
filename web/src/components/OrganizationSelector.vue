@@ -202,11 +202,19 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     <ODropdown v-model:open="open" side="bottom" align="end">
       <template #trigger>
         <OButton
-          variant="outline-primary"
+          variant="outline"
           size="sm-toolbar"
           data-test="navbar-organizations-select-trigger"
           class="tw:w-56"
+          :class="open ? 'tw:bg-button-outline-hover-bg' : ''"
         >
+          <template #icon-left>
+            <OIcon
+              name="domain"
+              size="sm"
+              class="tw:opacity-60 tw:shrink-0"
+            />
+          </template>
           <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{
             current?.label || ""
           }}</span>
@@ -214,7 +222,8 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             <OIcon
               name="arrow-drop-down"
               size="sm"
-              class="tw:opacity-70 tw:shrink-0"
+              class="tw:opacity-70 tw:shrink-0 tw:transition-transform"
+              :class="open ? 'tw:rotate-180' : ''"
             />
           </template>
         </OButton>

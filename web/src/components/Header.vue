@@ -196,21 +196,6 @@ size="xs" class="warning" />{{
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
       </OButton>
 
-      <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
-      <OButton
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        variant="ghost"
-        size="icon-toolbar"
-        @click="toggleAIChat"
-        data-test="menu-link-ai-item"
-        class="ai-hover-btn"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        @mouseenter="handleMouseEnter"
-        @mouseleave="handleMouseLeave"
-      >
-        <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
-      </OButton>
-
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
       <OrganizationSelector
         :organizations="organizations"
@@ -224,6 +209,25 @@ size="xs" class="warning" />{{
       <!-- <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" /> -->
 
       <div class="header-utility-icons tw:flex tw:items-center tw:gap-x-2">
+      <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
+           Leads the utility-icon cluster, set off by a separator from the
+           org selector so it reads as the primary action in this group. -->
+      <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+        <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
+        <OButton
+          variant="ghost"
+          size="icon-toolbar"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          class="ai-hover-btn"
+          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+          @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave"
+        >
+          <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
+        </OButton>
+      </template>
+
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
