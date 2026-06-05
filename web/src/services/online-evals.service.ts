@@ -127,6 +127,45 @@ export interface EvalJob {
   updated_at?: number;
 }
 
+export interface ScorerTestPayload {
+  name: string;
+  description?: string | null;
+  scorer: {
+    type: ScorerType;
+    producesScoreConfigId?: string;
+    producesScoreConfigVersion?: number;
+    template: string;
+    outputSchema?: any;
+    params: Record<string, any>;
+  };
+  inputVariables: Record<string, any>;
+}
+
+export interface ScorerTestResult {
+  success: boolean;
+  valueNumeric?: number;
+  value_numeric?: number;
+  valueCategorical?: string;
+  value_categorical?: string;
+  valueBoolean?: boolean;
+  value_boolean?: boolean;
+  reasoning?: string;
+  rawResponse?: string;
+  raw_response?: string;
+  modelUsed?: string;
+  model_used?: string;
+  latencyMs?: number;
+  latency_ms?: number;
+  promptTokens?: number;
+  prompt_tokens?: number;
+  completionTokens?: number;
+  completion_tokens?: number;
+  totalTokens?: number;
+  total_tokens?: number;
+  error?: string;
+  metadata?: any;
+}
+
 export interface EvalJobPayload {
   name: string;
   description?: string | null;
@@ -198,6 +237,8 @@ const onlineEvalsService = {
     delete: async (orgId: string, entityId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/scorers/${entityId}`);
     },
+    test: async (orgId: string, payload: ScorerTestPayload): Promise<ScorerTestResult> =>
+      (await http().post(`/api/${orgId}/scorers/test`, payload)).data,
   },
 
   jobs: {

@@ -302,7 +302,10 @@
         :variables="scorerTestVariables"
         :inputs="scorerTestInputs"
         :state="scorerTestState"
-        @run="runScorerTest"
+        :result="scorerTestResult"
+        :error-message="scorerTestError"
+        :can-run="canRunScorerTest"
+        @run="onRunScorerTest"
         @update:inputs="scorerTestInputs = $event"
       />
     </div>
@@ -385,11 +388,79 @@ const isSaving = ref(false);
 
 const {
   scorerTestInputs,
-  scorerTestScenario,
   scorerTestState,
   scorerTestVariables,
+  scorerTestResult,
+  scorerTestError,
   runScorerTest,
 } = useScorerTest(toRef(() => form.value.template));
+
+const canRunScorerTest = computed(() => {
+  if (!props.orgId) return false;
+  if (!form.value.name?.trim()) return false;
+  if (!form.value.template?.trim()) return false;
+  if (form.value.scorerType === "llm_judge") {
+    if (!form.value.providerId) return false;
+  } else if (form.value.scorerType === "remote") {
+    if (!form.value.remoteEndpoint?.trim()) return false;
+  }
+  if (scorerTestVariables.value.length === 0) return false;
+  return scorerTestVariables.value.every((variable) =>
+    String(scorerTestInputs.value[variable] ?? "").trim().length > 0,
+  );
+});
+
+function buildScorerTestPayload() {
+  const isLlmJudge = form.value.scorerType === "llm_judge";
+  const scoreConfigRef: Record<string, any> = {};
+  if (form.value.producesScoreConfigId) {
+    scoreConfigRef.producesScoreConfigId = form.value.producesScoreConfigId;
+    if (
+      form.value.pinScoreConfigVersion &&
+      form.value.producesScoreConfigVersion
+    ) {
+      scoreConfigRef.producesScoreConfigVersion = Number(
+        form.value.producesScoreConfigVersion,
+      );
+    }
+  }
+
+  const scorer = isLlmJudge
+    ? {
+        type: "llm_judge" as const,
+        ...scoreConfigRef,
+        template: form.value.template,
+        params: {
+          provider_id: form.value.providerId,
+          ...(form.value.model ? { model: form.value.model } : {}),
+          include_reasoning: true,
+        },
+      }
+    : {
+        type: "remote" as const,
+        ...scoreConfigRef,
+        template: form.value.template,
+        params: {
+          endpoint: form.value.remoteEndpoint,
+          http_method: "POST",
+          timeout_ms: 30000,
+        },
+      };
+
+  return {
+    name: form.value.name.trim(),
+    ...(form.value.description?.trim()
+      ? { description: form.value.description.trim() }
+      : {}),
+    scorer,
+    inputVariables: { ...scorerTestInputs.value },
+  };
+}
+
+function onRunScorerTest() {
+  if (!canRunScorerTest.value) return;
+  void runScorerTest(props.orgId, buildScorerTestPayload());
+}
 
 const titleText = computed(() => {
   const isRemote = form.value.scorerType === "remote";
