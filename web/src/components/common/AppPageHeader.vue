@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header tw:shrink-0 tw:h-16 tw:flex tw:items-center tw:justify-between tw:gap-4"
+    class="app-page-header tw:shrink-0 tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4"
   >
     <div class="tw:flex tw:items-center tw:gap-3.25 tw:min-w-0 tw:h-full tw:flex-1">
       <slot name="title-prefix" />
