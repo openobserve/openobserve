@@ -717,6 +717,45 @@ const columnMaxCap = computed(() => {
 
 const DEFAULT_LONG_TEXT_FIELDS = [];
 
+// Measures a field's content width and returns the capped size plus whether the
+// raw measurement exceeded maxCap (used to build the dynamic long-text list).
+const getColumnWidth = (
+  field: string,
+  maxCap: number,
+): { width: number; exceededCap: boolean } => {
+  if (field === "_timestamp" || field === "source") {
+    return { width: 150, exceededCap: false };
+  }
+
+  if (!canvasContext) {
+    return { width: 150, exceededCap: false };
+  }
+
+  try {
+    // Font of table header
+    canvasContext.font = "bold 14px sans-serif";
+    let max = canvasContext.measureText(field).width + 16;
+
+    // Font of the table content
+    canvasContext.font = "12px monospace";
+
+    const hits = searchResults.value || [];
+    for (let i = 0; i < Math.min(5, hits.length); i++) {
+      const cellValue = hits[i]?.[field];
+      if (cellValue !== undefined && cellValue !== null && cellValue !== "") {
+        const width = canvasContext.measureText(String(cellValue)).width;
+        if (width > max) max = width;
+      }
+    }
+
+    max += 24; // padding
+    const exceededCap = max > maxCap;
+    return { width: exceededCap ? maxCap : Math.max(150, max), exceededCap };
+  } catch {
+    return { width: 150, exceededCap: false };
+  }
+};
+
 // Single computed that measures all visible fields in one canvas pass.
 // Also builds the dynamic long-text list: any field whose raw measured width
 // exceeds maxCap is added to the set (on top of the static defaults).
@@ -1121,45 +1160,6 @@ const handleViewTrace = (log: any) => {
 const handleNestedCorrelation = (row: any) => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
-};
-
-// Measures a field's content width and returns the capped size plus whether the
-// raw measurement exceeded maxCap (used to build the dynamic long-text list).
-const getColumnWidth = (
-  field: string,
-  maxCap: number,
-): { width: number; exceededCap: boolean } => {
-  if (field === "_timestamp" || field === "source") {
-    return { width: 150, exceededCap: false };
-  }
-
-  if (!canvasContext) {
-    return { width: 150, exceededCap: false };
-  }
-
-  try {
-    // Font of table header
-    canvasContext.font = "bold 14px sans-serif";
-    let max = canvasContext.measureText(field).width + 16;
-
-    // Font of the table content
-    canvasContext.font = "12px monospace";
-
-    const hits = searchResults.value || [];
-    for (let i = 0; i < Math.min(5, hits.length); i++) {
-      const cellValue = hits[i]?.[field];
-      if (cellValue !== undefined && cellValue !== null && cellValue !== "") {
-        const width = canvasContext.measureText(String(cellValue)).width;
-        if (width > max) max = width;
-      }
-    }
-
-    max += 24; // padding
-    const exceededCap = max > maxCap;
-    return { width: exceededCap ? maxCap : Math.max(150, max), exceededCap };
-  } catch {
-    return { width: 150, exceededCap: false };
-  }
 };
 
 // Lifecycle

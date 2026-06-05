@@ -1039,16 +1039,29 @@ describe("CorrelatedLogsTable.vue", () => {
 
   describe("tableColumns last-column fill and clearance", () => {
     it("should expand last column to fill remaining space when it is a long-text field", async () => {
-      // "body" is in longTextFields; with containerWidth=1000, it should be expanded to fill
+      // vitest-canvas-mock sets measureText(text).width = text.length.
+      // To make "body" qualify as a long-text field, its cell value must be long enough that
+      // measureText(value).width + header_width + padding > maxCap.
+      // maxCap = containerWidth(1000) - TIMESTAMP_COL_WIDTH(225) - 30 = 745.
+      // header: measureText("body").width + 16 = 4 + 16 = 20.
+      // content: measureText(value).width must exceed 20, so we need value.length > 745 - 24 = 721.
+      // Using 800-char value: max = 800, +24 = 824 > 745 → exceededCap=true, width capped at 745.
+      // getColumnWidthHelper("body") = 745 (from memoizedColumnWidths).
+      // totalWidth = 225 (timestamp) + 745 (body) = 970.
+      // 970 < 1000, body is in longTextFields → fill: body.size = 745 + (1000 - 970) = 775.
+      // lastResizableCol = body → clearance: body.size = max(150, 775 - 20) = 755.
+      // columnMaxCap = 745. bodyCol.size (755) > 745 ✓, bodyCol.size (755) < 775 ✓.
+      const longBodyValue = "x".repeat(800);
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        searchResults: { value: [{ _timestamp: 1, body: "some long text" }] },
+        searchResults: { value: [{ _timestamp: 1, body: longBodyValue }] },
         hasResults: { value: true },
       });
 
       wrapper = createWrapper();
       await nextTick();
+      await flushPromises();
 
       wrapper.vm.containerWidth = 1000;
       wrapper.vm.visibleColumns = new Set(["_timestamp", "body"]);
@@ -1058,17 +1071,6 @@ describe("CorrelatedLogsTable.vue", () => {
       const bodyCol = columns.find((col: any) => col.name === "body");
 
       expect(bodyCol).toBeDefined();
-      // In jsdom, canvasContext is null.
-      // getColumnWidth("body", maxCap) returns Math.min(400, maxCap).
-      // visibleFields = ["_timestamp","body"], length=2, totalCols=3, columnMaxCap = 1000-225-30 = 745.
-      // Fallback width for body = Math.min(400, 745) = 400.
-      // totalWidth = 225 (timestamp) + 400 (body) = 625.
-      // 625 < 1000, and body is in longTextFields → fill: body.size = 400 + (1000 - 625) = 775.
-      // clearance: body is the last resizable col (enableResizing=true)? No — body is a regular field col.
-      // Wait: timestamp has enableResizing=false. body has enableResizing=true.
-      // lastResizableCol = body → body.size = Math.max(150, 775 - 12) = 763.
-      // columnMaxCap = 745. bodyCol.size (763) > columnMaxCap (745). ✓
-      // bodyCol.size (763) < 1000 - 225 (775). ✓
       expect(bodyCol.size).toBeGreaterThan(wrapper.vm.columnMaxCap);
       expect(bodyCol.size).toBeLessThan(1000 - 225);
     });
