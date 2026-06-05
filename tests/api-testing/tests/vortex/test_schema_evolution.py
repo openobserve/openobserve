@@ -69,9 +69,11 @@ class TestNewFieldAddition:
         # numeric/boolean fields (e.g. field_d=0, field_e=false may look empty).
         n = count_records(client, s, where="field_c='c'")
         assert n == 5, f"field_c should appear in 5 rows, got {n}"
-        n = count_records(client, s, where="field_d IS NOT NULL AND field_d != ''")
+        # field_d is int — non-null rows have values 0..4; use >= 0 so value 0 is included
+        n = count_records(client, s, where="field_d >= 0")
         assert n == 5, f"field_d should appear in 5 rows, got {n}"
-        n = count_records(client, s, where="field_e IS NOT NULL AND field_e != ''")
+        # field_e is Boolean — comparing to '' causes a type error; check the actual value
+        n = count_records(client, s, where="field_e = true")
         assert n == 5, f"field_e should appear in 5 rows, got {n}"
 
     def test_16_new_field_data_types(self, client):
