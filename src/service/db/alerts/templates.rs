@@ -171,8 +171,9 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
                 // Prebuilt templates live in DEFAULT_ORG and are read-only,
                 // so it is safe to surface them to every org including cloud.
                 // Custom templates in DEFAULT_ORG remain scoped to that org.
-                let is_prebuilt_from_default = k.starts_with(&format!("{DEFAULT_ORG}/"))
-                    && is_prebuilt_template_name(k.trim_start_matches(&format!("{DEFAULT_ORG}/")));
+                let is_prebuilt_from_default = k
+                    .strip_prefix(&format!("{DEFAULT_ORG}/"))
+                    .is_some_and(is_prebuilt_template_name);
                 (is_org_template || is_prebuilt_from_default).then_some(template)
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
