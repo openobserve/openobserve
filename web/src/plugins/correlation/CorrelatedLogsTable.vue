@@ -356,7 +356,12 @@ let isUpdatingFromTable = false; // Prevent recursive updates from table
 
 // Simple canvas context for width calculation
 let canvasContext: CanvasRenderingContext2D | null = null;
+
+// ResizeObserver for container-width tracking; isResizeObserverNeeded is set to false in
+// onBeforeUnmount so the async onMounted continuation skips observer setup if the component
+// has already been torn down.
 let resizeObserver: ResizeObserver | null = null;
+let isResizeObserverNeeded = true;
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -413,6 +418,9 @@ onMounted(async () => {
   } catch (error) {
     console.warn("Canvas not available, using default widths");
   }
+
+  // Guard: component may have unmounted while awaiting loadKeyFields above.
+  if (!isResizeObserverNeeded) return;
 
   // Track table container width for dynamic column cap
   const el = document.querySelector(".logs-table-container");
@@ -711,8 +719,8 @@ const visibleFields = computed(() => {
 const columnMaxCap = computed(() => {
   const totalCols = visibleFields.value.length + 1;
   return totalCols <= 2
-    ? containerWidth.value - TIMESTAMP_COL_WIDTH
-    : containerWidth.value - TIMESTAMP_COL_WIDTH - 30;
+    ? Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH)
+    : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
 });
 
 const DEFAULT_LONG_TEXT_FIELDS = [];
@@ -885,16 +893,14 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     lastCol &&
     longTextFields.value.includes(lastCol.name as string)
   ) {
-    lastCol.size = (lastCol.size ?? 150) + (containerWidth.value - totalWidth);
+    lastCol.size = Math.min(columnMaxCap.value, Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)));
   }
 
   // Always leave 12px clearance on the last resizable column so the resize
-  // handle stays visible and grabbable. The 20px accounts for a typical parent
-  // vertical scrollbar (~15px) that can overlap the table's right edge.
-  const RESIZE_HANDLE_CLEARANCE = 20;
+  // handle stays visible and grabbable.
   const lastResizableCol = [...columns].reverse().find((col: any) => col.enableResizing) as any;
   if (lastResizableCol) {
-    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - RESIZE_HANDLE_CLEARANCE);
+    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - 12);
   }
 
   return columns;
@@ -1169,6 +1175,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  isResizeObserverNeeded = false;
   resizeObserver?.disconnect();
 });
 

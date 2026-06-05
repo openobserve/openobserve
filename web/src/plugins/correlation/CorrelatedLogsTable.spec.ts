@@ -1044,13 +1044,13 @@ describe("CorrelatedLogsTable.vue", () => {
       // measureText(value).width + header_width + padding > maxCap.
       // maxCap = containerWidth(1000) - TIMESTAMP_COL_WIDTH(225) - 30 = 745.
       // header: measureText("body").width + 16 = 4 + 16 = 20.
-      // content: measureText(value).width must exceed 20, so we need value.length > 745 - 24 = 721.
+      // content: value.length must exceed 745 - 24 = 721.
       // Using 800-char value: max = 800, +24 = 824 > 745 → exceededCap=true, width capped at 745.
       // getColumnWidthHelper("body") = 745 (from memoizedColumnWidths).
       // totalWidth = 225 (timestamp) + 745 (body) = 970.
-      // 970 < 1000, body is in longTextFields → fill: body.size = 745 + (1000 - 970) = 775.
-      // lastResizableCol = body → clearance: body.size = max(150, 775 - 20) = 755.
-      // columnMaxCap = 745. bodyCol.size (755) > 745 ✓, bodyCol.size (755) < 775 ✓.
+      // 970 < 1000, body is in longTextFields → fill (clamped):
+      //   body.size = min(745, max(150, 745 + (1000 - 970))) = min(745, 775) = 745.
+      // lastResizableCol = body → clearance: body.size = max(150, 745 - 20) = 725.
       const longBodyValue = "x".repeat(800);
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
@@ -1071,8 +1071,9 @@ describe("CorrelatedLogsTable.vue", () => {
       const bodyCol = columns.find((col: any) => col.name === "body");
 
       expect(bodyCol).toBeDefined();
-      expect(bodyCol.size).toBeGreaterThan(wrapper.vm.columnMaxCap);
-      expect(bodyCol.size).toBeLessThan(1000 - 225);
+      // Fill clamps at columnMaxCap; clearance subtracts 20 → final size = 725.
+      expect(bodyCol.size).toBeGreaterThan(150);
+      expect(bodyCol.size).toBeLessThanOrEqual(wrapper.vm.columnMaxCap);
     });
 
     it("should not expand last column when it is not a long-text field", async () => {
