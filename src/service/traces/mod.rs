@@ -50,6 +50,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod inferred;
 pub mod otel;
 pub mod service_graph;
 
@@ -86,7 +87,15 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const BLOCK_FIELDS: [&str; 4] = ["_timestamp", "duration", "start_time", "end_time"];
+const BLOCK_FIELDS: [&str; 7] = [
+    "_timestamp",
+    "duration",
+    "start_time",
+    "end_time",
+    inferred::INFER_SERVICE_NAME,
+    inferred::INFER_SERVICE_TYPE,
+    inferred::INFER_SERVICE_SYSTEM,
+];
 // ref https://opentelemetry.io/docs/specs/otel/trace/api/#retrieving-the-traceid-and-spanid
 const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
@@ -474,6 +483,30 @@ pub async fn handle_otlp_request(
                     partial_success.rejected_spans += 1;
                     continue;
                 }
+                // Derive inferred service identity (uninstrumented dependencies
+                // like databases, queues, external APIs) from peer attributes of
+                // client/producer spans. Powers dotted "inferred service" nodes
+                // in trace views and the service graph.
+                if let Some(inferred_svc) = inferred::derive_inferred_service(span.kind, |key| {
+                    span_att_map
+                        .get(key)
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                }) {
+                    span_att_map.insert(
+                        inferred::INFER_SERVICE_NAME.to_string(),
+                        inferred_svc.name.into(),
+                    );
+                    span_att_map.insert(
+                        inferred::INFER_SERVICE_TYPE.to_string(),
+                        inferred_svc.service_type.into(),
+                    );
+                    if let Some(system) = inferred_svc.system {
+                        span_att_map
+                            .insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+                    }
+                }
+
                 let local_val = Span {
                     trace_id: trace_id.clone(),
                     span_id: span_id.clone(),
@@ -857,6 +890,34 @@ pub async fn ingest_json(
             }
         };
         normalize_llm_field_types(&mut record_val);
+
+        // Derive inferred service fields when absent (data from sources that
+        // did not run the OTLP-side derivation, e.g. older versions).
+        if !record_val.contains_key(inferred::INFER_SERVICE_NAME) {
+            let span_kind = match record_val.get("span_kind") {
+                Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
+                Some(v) => v.as_i64().unwrap_or(0) as i32,
+                None => 0,
+            };
+            if let Some(inferred_svc) = inferred::derive_inferred_service(span_kind, |key| {
+                record_val
+                    .get(key)
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+            }) {
+                record_val.insert(
+                    inferred::INFER_SERVICE_NAME.to_string(),
+                    inferred_svc.name.into(),
+                );
+                record_val.insert(
+                    inferred::INFER_SERVICE_TYPE.to_string(),
+                    inferred_svc.service_type.into(),
+                );
+                if let Some(system) = inferred_svc.system {
+                    record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
+                }
+            }
+        }
 
         // check if we have any LLM related attributes
         if !is_llm_stream && detect_llm_stream(|k| record_val.contains_key(k)) {
@@ -1539,11 +1600,14 @@ mod tests {
     #[test]
     fn test_block_fields() {
         let block_fields = &super::BLOCK_FIELDS;
-        assert_eq!(block_fields.len(), 4);
+        assert_eq!(block_fields.len(), 7);
         assert!(block_fields.contains(&"_timestamp"));
         assert!(block_fields.contains(&"duration"));
         assert!(block_fields.contains(&"start_time"));
         assert!(block_fields.contains(&"end_time"));
+        assert!(block_fields.contains(&"infer_service_name"));
+        assert!(block_fields.contains(&"infer_service_type"));
+        assert!(block_fields.contains(&"infer_service_system"));
     }
 
     // Test validation helper functions
