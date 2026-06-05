@@ -702,6 +702,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -2606,6 +2608,29 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // ── Keyboard shortcuts ──────────────────────────────────────────────
+    useShortcutScope("alerts");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "alerts",
+        description: "Create new alert",
+        handler: () => {
+          if (isInputFocused()) return;
+          addAlert();
+        },
+      },
+      {
+        key: "r",
+        scope: "alerts",
+        description: "Refresh alert list",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshAlerts();
+        },
+      },
+    ]);
 
     return {
       t,
