@@ -369,7 +369,7 @@ watch(internalOpen, (open) => {
             <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
-                class="tw:text-lg tw:font-bold tw:text-dialog-header-text tw:truncate tw:block"
+                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
               >
                 {{ title }}
               </span>

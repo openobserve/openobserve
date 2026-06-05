@@ -480,7 +480,9 @@ body.body--dark .ai-icon-button:hover {
   // form-label spec. Was hardcoded to 0.875rem (14px), a step larger than every
   // other label, which made form-field labels read as heavier/bolder.
   font-size: var(--text-sm);
-  font-weight: 600;
+  // Medium (500), not semibold — 600 read as too heavy/black on form labels.
+  // Unlayered, so this wins over the inline `tw:font-semibold` utility.
+  font-weight: 500;
   line-height: 1.25;
   color: #262626;
 }
@@ -493,12 +495,12 @@ body.body--dark .o-input-label {
 // visibly distinct from enabled ones without becoming unreadable.
 .o-input-label--disabled {
   color: #a3a3a3 !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
 }
 html.dark .o-input-label--disabled,
 body.body--dark .o-input-label--disabled {
   color: #c4c4c4 !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
 }
 
 
