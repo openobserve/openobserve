@@ -196,10 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       class="tw:text-gray-400 tw:shrink-0"
                     />
-                    <span>{{ computedName(row.name) }}</span>
+                    <span class="tw:truncate tw:min-w-0">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
-                    v-if="row.name?.length > 30"
+                    v-if="row.name"
                     :content="row.name"
                     content-class="alert-name-tooltip"
                   />
@@ -2375,12 +2375,6 @@ export default defineComponent({
         });
       }
     };
-    const computedName = (name: string) => {
-      if (!name) {
-        return "--";
-      }
-      return name.length > 30 ? name.substring(0, 30) + "..." : name;
-    };
     const computedOwner = (owner: string) => {
       if (!owner) {
         return "--";
@@ -2697,7 +2691,6 @@ export default defineComponent({
       openMenu,
       getAlertsFn,
       multipleExportAlert,
-      computedName,
       computedOwner,
       tabs,
       alertTabs,
