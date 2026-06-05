@@ -383,6 +383,8 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
@@ -2306,6 +2308,26 @@ watch(
     router.replace({ query });
   },
 );
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("traces");
+useShortcutsWithMac([
+  {
+    key: "ctrl+enter",
+    scope: "traces",
+    description: "Search traces",
+    handler: () => runQueryFn(),
+  },
+  {
+    key: "r",
+    scope: "traces",
+    description: "Refresh traces",
+    handler: () => {
+      if (isInputFocused()) return;
+      runQueryFn();
+    },
+  },
+]);
 </script>
 
 <style lang="scss" scoped></style>
