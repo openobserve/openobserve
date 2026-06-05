@@ -75,10 +75,6 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
-#[cfg(feature = "pyroscope")]
-use pyroscope::PyroscopeAgent;
-#[cfg(feature = "pyroscope")]
-use pyroscope_pprofrs::{PprofConfig, pprof_backend};
 use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
@@ -138,30 +134,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .parse::<SocketAddr>()?,
         )
         .init();
-
-    // setup pyroscope
-    #[cfg(feature = "pyroscope")]
-    let pyroscope_agent = if get_config().profiling.pyroscope_enabled {
-        let agent = PyroscopeAgent::builder(
-            &get_config().profiling.pyroscope_server_url,
-            &get_config().profiling.pyroscope_project_name,
-        )
-        .tags(
-            [
-                ("role", get_config().common.node_role.as_str()),
-                ("instance", get_config().common.instance_name.as_str()),
-                ("version", config::VERSION),
-            ]
-            .to_vec(),
-        )
-        .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
-        .build()
-        .expect("Failed to setup pyroscope agent");
-        let agent_running = agent.start().expect("Failed to start pyroscope agent");
-        Some(agent_running)
-    } else {
-        None
-    };
 
     let cfg = get_config();
 
@@ -499,14 +471,6 @@ async fn main() -> Result<(), anyhow::Error> {
         meta::telemetry::Telemetry::new()
             .send_track_event("OpenObserve - Server stopped", None, true, true)
             .await;
-    }
-
-    // stop pyroscope
-    #[cfg(feature = "pyroscope")]
-    if let Some(agent) = pyroscope_agent
-        && let Ok(agent_ready) = agent.stop()
-    {
-        agent_ready.shutdown();
     }
 
     log::info!("server stopped");
