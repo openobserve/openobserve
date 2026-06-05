@@ -70,16 +70,8 @@ const isDestructiveIcon = computed<boolean>(() =>
       :alt="label || ''"
       class="tw:size-full tw:object-contain"
     />
-    <!-- Registry icon. We ship Material Symbols at the LIGHT (100) weight for a
-         crisp, thin look; a hairline same-colour stroke on the glyph paths nudges
-         the perceived weight up toward ~200–300 (between too-thin-100 and
-         too-heavy-400). `non-scaling-stroke` keeps the 0.4px consistent across
-         icon sets despite differing viewBoxes (960 vs 24). -->
-    <component
-      v-else-if="iconComponent"
-      :is="iconComponent"
-      class="o2-icon-svg tw:size-full tw:[&_path]:stroke-[currentColor] tw:[&_path]:stroke-[0.8px] tw:[&_path]:[vector-effect:non-scaling-stroke]"
-    />
+    <!-- Registry icon (Material Symbols, regular weight — the main-branch look). -->
+    <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" />
     <slot />
   </span>
 </template>
