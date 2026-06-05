@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="full-height"
         v-model="splitterModel"
         :horizontal="true"
+        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
