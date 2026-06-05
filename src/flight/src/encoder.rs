@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use arrow::{
-    array::{Array, ArrayRef, AsArray, RecordBatch, RecordBatchOptions, StringViewBuilder},
+    array::RecordBatch,
+    compute::BatchCoalescer,
     ipc::{
         MessageHeader,
         writer::{CompressionContext, DictionaryTracker, IpcDataGenerator, IpcWriteOptions},
@@ -34,8 +33,12 @@ pub struct FlightDataEncoder {
     options: IpcWriteOptions,
     data_gen: IpcDataGenerator,
     dictionary_tracker: DictionaryTracker,
-    max_flight_data_size: usize,
     compression_context: CompressionContext,
+    /// Lazily initialised on the first `encode_batch` call; reused across calls
+    /// to avoid re-allocating per-column InProgressArray builders every time.
+    coalescer: Option<BatchCoalescer>,
+    /// Maximum bytes per FlightData message (0 = unlimited).
+    max_flight_data_size: usize,
 }
 
 impl FlightDataEncoder {
@@ -44,8 +47,9 @@ impl FlightDataEncoder {
             options,
             data_gen: IpcDataGenerator::default(),
             dictionary_tracker: DictionaryTracker::new(false),
-            max_flight_data_size,
             compression_context: CompressionContext::default(),
+            coalescer: None,
+            max_flight_data_size,
         }
     }
 
@@ -55,25 +59,57 @@ impl FlightDataEncoder {
     }
 
     /// Encode a RecordBatch to a Vec of FlightData
+    ///
+    /// Rows are accumulated inside the coalescer until a full 8192-row chunk is
+    /// ready. Call [`Self::finish`] when the input stream ends to flush the
+    /// remaining partial chunk.
+    ///
+    /// BatchCoalescer handles both coalescing/splitting and GC:
+    /// - top-level Utf8View/BinaryView: copies only the string bytes needed per chunk when the
+    ///   source array is sparse (actual_buffer > 2x used)
+    /// - nested Utf8View inside Struct/List: materialised via concat, so stale backing buffers are
+    ///   released naturally
+    /// - <https://github.com/openobserve/openobserve/issues/8280>
+    /// - <https://github.com/apache/datafusion/pull/11587>
     pub fn encode_batch(&mut self, batch: RecordBatch) -> Result<Vec<FlightData>> {
-        // refer to:
-        // https://github.com/openobserve/openobserve/issues/8280
-        // https://github.com/apache/datafusion/pull/11587
-        let batch = gc_string_view_batch(&batch);
-
-        let mut flight_data = Vec::new();
-        for batch in split_batch_for_grpc_response(batch, self.max_flight_data_size) {
-            let (encoded_dictionaries, encoded_batch) = self.data_gen.encode(
-                &batch,
-                &mut self.dictionary_tracker,
-                &self.options,
-                &mut self.compression_context,
-            )?;
-
-            flight_data.extend(encoded_dictionaries.into_iter().map(Into::into));
-            flight_data.push(encoded_batch.into());
+        if self.coalescer.is_none() {
+            self.coalescer = Some(BatchCoalescer::new(batch.schema(), 8192));
         }
 
+        let coalescer = self.coalescer.as_mut().unwrap();
+        coalescer.push_batch(batch)?;
+
+        self.drain_completed()
+    }
+
+    /// Flush any buffered rows and encode them as FlightData.
+    ///
+    /// Call this once after all batches have been pushed via [`Self::encode_batch`].
+    pub fn finish(&mut self) -> Result<Vec<FlightData>> {
+        let Some(coalescer) = self.coalescer.as_mut() else {
+            return Ok(vec![]);
+        };
+        coalescer.finish_buffered_batch()?;
+        self.drain_completed()
+    }
+
+    fn drain_completed(&mut self) -> Result<Vec<FlightData>> {
+        let Some(coalescer) = self.coalescer.as_mut() else {
+            return Ok(vec![]);
+        };
+        let mut flight_data = Vec::new();
+        while let Some(batch) = coalescer.next_completed_batch() {
+            for batch in split_batch_for_grpc_response(batch, self.max_flight_data_size) {
+                let (encoded_dictionaries, encoded_batch) = self.data_gen.encode(
+                    &batch,
+                    &mut self.dictionary_tracker,
+                    &self.options,
+                    &mut self.compression_context,
+                )?;
+                flight_data.extend(encoded_dictionaries.into_iter().map(Into::into));
+                flight_data.push(encoded_batch.into());
+            }
+        }
         Ok(flight_data)
     }
 
@@ -89,24 +125,14 @@ impl FlightDataEncoder {
     }
 }
 
-pub fn header_none() -> Bytes {
-    let mut builder: FlatBufferBuilder<'_> = FlatBufferBuilder::new();
-
-    let mut message = arrow::ipc::MessageBuilder::new(&mut builder);
-    message.add_version(arrow::ipc::MetadataVersion::V5);
-    message.add_header_type(MessageHeader::NONE);
-    message.add_bodyLength(0);
-
-    let data = message.finish();
-    builder.finish(data, None);
-
-    builder.finished_data().to_vec().into()
-}
-
 fn split_batch_for_grpc_response(
     batch: RecordBatch,
     max_flight_data_size: usize,
 ) -> Vec<RecordBatch> {
+    if max_flight_data_size == 0 {
+        return vec![batch];
+    }
+
     let size = batch
         .columns()
         .iter()
@@ -125,93 +151,26 @@ fn split_batch_for_grpc_response(
 
     let mut offset = 0;
     while offset < batch.num_rows() {
-        let length = (rows_per_batch).min(batch.num_rows() - offset);
+        let length = rows_per_batch.min(batch.num_rows() - offset);
         out.push(batch.slice(offset, length));
-
         offset += length;
     }
 
     out
 }
 
-/// refer to: https://github.com/apache/datafusion/pull/11587
-/// Heuristically compact `StringViewArray`s to reduce memory usage, if needed
-///
-/// Decides when to consolidate the StringView into a new buffer to reduce
-/// memory usage and improve string locality for better performance.
-///
-/// This differs from `StringViewArray::gc` because:
-/// 1. It may not compact the array depending on a heuristic.
-/// 2. It uses a precise block size to reduce the number of buffers to track.
-///
-/// # Heuristic
-///
-/// If the average size of each view is larger than 32 bytes, we compact the array.
-///
-/// `StringViewArray` include pointers to buffer that hold the underlying data.
-/// One of the great benefits of `StringViewArray` is that many operations
-/// (e.g., `filter`) can be done without copying the underlying data.
-///
-/// However, after a while (e.g., after `FilterExec` or `HashJoinExec`) the
-/// `StringViewArray` may only refer to a small portion of the buffer,
-/// significantly increasing memory usage.
-fn gc_string_view_batch(batch: &RecordBatch) -> RecordBatch {
-    let new_columns: Vec<ArrayRef> = batch
-        .columns()
-        .iter()
-        .map(|c| {
-            // Try to re-create the `StringViewArray` to prevent holding the underlying buffer too
-            // long.
-            let Some(s) = c.as_string_view_opt() else {
-                return Arc::clone(c);
-            };
+pub fn header_none() -> Bytes {
+    let mut builder: FlatBufferBuilder<'_> = FlatBufferBuilder::new();
 
-            // Fast path: if the data buffers are empty, we can return the original array
-            if s.data_buffers().is_empty() {
-                return Arc::clone(c);
-            }
+    let mut message = arrow::ipc::MessageBuilder::new(&mut builder);
+    message.add_version(arrow::ipc::MetadataVersion::V5);
+    message.add_header_type(MessageHeader::NONE);
+    message.add_bodyLength(0);
 
-            let ideal_buffer_size: usize = s
-                .views()
-                .iter()
-                .map(|v| {
-                    let len = (*v as u32) as usize;
-                    if len > 12 { len } else { 0 }
-                })
-                .sum();
+    let data = message.finish();
+    builder.finish(data, None);
 
-            // We don't use get_buffer_memory_size here, because gc is for the contents of the
-            // data buffers, not views and nulls.
-            let actual_buffer_size = s.data_buffers().iter().map(|b| b.capacity()).sum::<usize>();
-
-            // Re-creating the array copies data and can be time consuming.
-            // We only do it if the array is sparse
-            if actual_buffer_size > (ideal_buffer_size * 2) {
-                // We set the block size to `ideal_buffer_size` so that the new StringViewArray only
-                // has one buffer, which accelerate later concat_batches. See https://github.com/apache/arrow-rs/issues/6094 for more details.
-                let mut builder = StringViewBuilder::with_capacity(s.len());
-                if ideal_buffer_size > 0 {
-                    builder = builder.with_fixed_block_size(ideal_buffer_size as u32);
-                }
-
-                for v in s.iter() {
-                    builder.append_option(v);
-                }
-
-                let gc_string = builder.finish();
-
-                debug_assert!(gc_string.data_buffers().len() <= 1); // buffer count can be 0 if the `ideal_buffer_size` is 0
-
-                Arc::new(gc_string)
-            } else {
-                Arc::clone(c)
-            }
-        })
-        .collect();
-    let mut options = RecordBatchOptions::new();
-    options = options.with_row_count(Some(batch.num_rows()));
-    RecordBatch::try_new_with_options(batch.schema(), new_columns, &options)
-        .expect("Failed to re-create the gc'ed record batch")
+    builder.finished_data().to_vec().into()
 }
 
 #[cfg(test)]
@@ -273,9 +232,9 @@ mod tests {
     #[test]
     fn test_flight_data_encoder_new() {
         let options = IpcWriteOptions::default();
-        let max_size = 8192;
-        let encoder = FlightDataEncoder::new(options, max_size);
-        assert_eq!(encoder.max_flight_data_size, max_size);
+        let encoder = FlightDataEncoder::new(options, 8192);
+        assert!(encoder.coalescer.is_none());
+        assert_eq!(encoder.max_flight_data_size, 8192);
     }
 
     #[test]
@@ -297,7 +256,11 @@ mod tests {
         let mut encoder = FlightDataEncoder::new(options, 8192);
         let batch = create_test_record_batch();
 
-        let flight_data_vec = encoder.encode_batch(batch).unwrap();
+        // encode_batch accumulates; data is only emitted once a full chunk is
+        // ready or finish() is called at stream end.
+        let mid = encoder.encode_batch(batch).unwrap();
+        let end = encoder.finish().unwrap();
+        let flight_data_vec: Vec<_> = mid.into_iter().chain(end).collect();
 
         assert!(!flight_data_vec.is_empty());
         for flight_data in flight_data_vec {
@@ -339,6 +302,65 @@ mod tests {
         let message = arrow::ipc::root_as_message(&header).unwrap();
         assert_eq!(message.header_type(), arrow::ipc::MessageHeader::NONE);
         assert_eq!(message.bodyLength(), 0);
+    }
+
+    #[test]
+    fn test_encode_batch_coalesces() {
+        let options = IpcWriteOptions::default();
+        let mut encoder = FlightDataEncoder::new(options, 0);
+        let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
+        // 10000 rows: BatchCoalescer emits one 8192-row chunk during encode_batch,
+        // then finish() flushes the remaining 1808 rows → total 2 messages
+        let ids: Vec<i32> = (0..10000).collect();
+        let batch =
+            arrow::array::RecordBatch::try_new(schema, vec![Arc::new(Int32Array::from(ids))])
+                .unwrap();
+
+        let mut flight_data_vec = encoder.encode_batch(batch).unwrap();
+        flight_data_vec.extend(encoder.finish().unwrap());
+        assert!(
+            flight_data_vec.len() > 1,
+            "10000-row batch should be split into multiple FlightData messages"
+        );
+    }
+
+    #[test]
+    fn test_encode_batch_splits_large_batch() {
+        let schema = Arc::new(create_test_schema());
+        // 100 rows of string data; measure real size and set limit to half of it
+        let ids: Vec<i32> = (0..100).collect();
+        let names: Vec<Option<&str>> = (0..100)
+            .map(|i| if i % 10 == 0 { None } else { Some("hello") })
+            .collect();
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int32Array::from(ids)),
+                Arc::new(StringArray::from(names)),
+            ],
+        )
+        .unwrap();
+
+        let batch_size: usize = batch
+            .columns()
+            .iter()
+            .map(|col| {
+                col.to_data()
+                    .get_slice_memory_size()
+                    .unwrap_or_else(|_| col.get_buffer_memory_size())
+            })
+            .sum();
+        let max_flight_data_size = batch_size / 2;
+
+        let options = IpcWriteOptions::default();
+        let mut encoder = FlightDataEncoder::new(options, max_flight_data_size);
+
+        let mut flight_data_vec = encoder.encode_batch(batch).unwrap();
+        flight_data_vec.extend(encoder.finish().unwrap());
+        assert!(
+            flight_data_vec.len() > 1,
+            "batch exceeding max_flight_data_size ({max_flight_data_size} bytes) should split"
+        );
     }
 
     #[test]
