@@ -74,8 +74,6 @@ async function addAndConfigureSecondQuery(pm, { yField = "kubernetes_namespace_n
 
 /**
  * Enable the VRL editor for the currently active query tab and type a program.
- * Uses waitForFunction instead of waitForTimeout for Monaco debounce detection.
- * No page.waitForTimeout calls — compliant with the no-timeout policy.
  *
  * @param {import('@playwright/test').Page} page
  * @param {string} vrlProgram - VRL program to type (may be empty string for no-op)
@@ -110,6 +108,11 @@ async function enterVrlForActiveQuery(page, vrlProgram) {
     { sel: '[data-test="dashboard-vrl-function-editor"]', text: snippet },
     { timeout: 10000 }
   );
+
+  // Settle past the 500ms debounced write-back so the typed program is
+  // committed to the CURRENT query before the caller switches/adds tabs.
+  // See the function-level note above for why this fixed wait is unavoidable.
+  await page.waitForTimeout(700);
 }
 
 // ============================================================================
