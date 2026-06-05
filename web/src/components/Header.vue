@@ -129,10 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div><!-- end left side -->
 
-    <!-- CENTER: global breadcrumb — the page's "you are here", published by each
-         page (falls back to the route title). Takes the elastic middle so the
-         right-side controls shrink to content. -->
-    <ChromeBreadcrumb class="tw:flex-1 tw:min-w-0 tw:px-3" />
+    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
+    <div class="tw:flex-1 tw:min-w-0" />
 
     <!-- RIGHT SIDE: Controls -->
     <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
@@ -436,7 +434,6 @@ import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ChromeBreadcrumb from "@/components/common/ChromeBreadcrumb.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -450,7 +447,6 @@ export default defineComponent({
   components: {
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
-    ChromeBreadcrumb,
     OrganizationSelector,
     OButton,
     OIcon,
