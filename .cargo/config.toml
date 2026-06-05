@@ -9,6 +9,7 @@ linker = "aarch64-linux-gnu-gcc"
 rustflags = ["-C", "target-feature=+aes,+neon"]
 
 [target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-musl-gcc"
 rustflags = ["-C", "target-feature=+aes,+neon"]
 
 [target.aarch64-apple-darwin]
