@@ -393,7 +393,15 @@ pub async fn delete_report_bulk(
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(
-            id, &org_id, &_user_id, "reports", "DELETE", None, false, false, false,
+            id,
+            &org_id,
+            &_user_id,
+            "reports",
+            "DELETE",
+            Some(DEFAULT_FOLDER),
+            false,
+            true,
+            false,
         )
         .await
         {
@@ -755,6 +763,7 @@ pub async fn delete_report_v2(Path((org_id, report_id)): Path<(String, String)>)
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder ID (defaults to 'default')"),
     ),
     request_body(content = BulkDeleteRequest, description = "Report IDs (KSUIDs)"),
     responses(
@@ -767,15 +776,25 @@ pub async fn delete_report_v2(Path((org_id, report_id)): Path<(String, String)>)
 )]
 pub async fn delete_report_bulk_v2(
     Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<BulkDeleteRequest>,
 ) -> Response {
     let _user_id = user_email.user_id;
+    let _folder_id = get_folder(uri.query().unwrap_or(""));
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
         if !check_permissions(
-            id, &org_id, &_user_id, "reports", "DELETE", None, false, false, false,
+            id,
+            &org_id,
+            &_user_id,
+            "reports",
+            "DELETE",
+            Some(&_folder_id),
+            false,
+            true,
+            false,
         )
         .await
         {
@@ -884,6 +903,7 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Source folder ID (defaults to 'default')"),
     ),
     request_body(
         content = inline(MoveReportsRequestBody),
@@ -899,15 +919,25 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
 )]
 pub async fn move_reports(
     Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<MoveReportsRequestBody>,
 ) -> Response {
     let _user_id = user_email.user_id;
+    let _folder_id = get_folder(uri.query().unwrap_or(""));
 
     #[cfg(feature = "enterprise")]
     for id in &req.report_ids {
         if !check_permissions(
-            id, &org_id, &_user_id, "reports", "PUT", None, false, false, false,
+            id,
+            &org_id,
+            &_user_id,
+            "reports",
+            "PUT",
+            Some(&_folder_id),
+            false,
+            true,
+            false,
         )
         .await
         {
