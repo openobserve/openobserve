@@ -438,7 +438,8 @@
     "language": "Dil",
     "actions": "Eylemler",
     "incidents": "Olaylar",
-    "evals": "Evalar"
+    "evals": "Evalar",
+    "keyboardShortcuts": "Klavye Kısayolları"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",

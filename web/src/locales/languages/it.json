@@ -438,7 +438,8 @@
     "language": "Lingua",
     "actions": "Azioni",
     "incidents": "Incidenti",
-    "evals": "Valuta"
+    "evals": "Valuta",
+    "keyboardShortcuts": "Scelte rapide da tastiera"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",

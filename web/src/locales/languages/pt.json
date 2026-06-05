@@ -438,7 +438,8 @@
     "language": "Idioma",
     "actions": "Ações",
     "incidents": "Incidentes",
-    "evals": "Evals"
+    "evals": "Evals",
+    "keyboardShortcuts": "Atalhos de teclado"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",

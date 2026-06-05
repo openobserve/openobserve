@@ -438,7 +438,8 @@
     "language": "Langue",
     "actions": "Actions",
     "incidents": "Incidents",
-    "evals": "Evals"
+    "evals": "Evals",
+    "keyboardShortcuts": "Raccourcis clavier"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",

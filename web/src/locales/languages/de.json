@@ -438,7 +438,8 @@
     "language": "Sprache",
     "actions": "Aktionen",
     "incidents": "Vorfälle",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "keyboardShortcuts": "Tastenkürzel"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",

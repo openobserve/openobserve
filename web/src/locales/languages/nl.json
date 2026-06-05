@@ -438,7 +438,8 @@
     "language": "taal",
     "actions": "Acties",
     "incidents": "Incidenten",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "keyboardShortcuts": "Sneltoetsen"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",

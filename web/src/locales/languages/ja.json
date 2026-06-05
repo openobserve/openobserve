@@ -438,7 +438,8 @@
     "language": "言語",
     "actions": "アクション",
     "incidents": "インシデント",
-    "evals": "評価"
+    "evals": "評価",
+    "keyboardShortcuts": "キーボードショートカット"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",

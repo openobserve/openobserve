@@ -438,7 +438,8 @@
     "language": "언어",
     "actions": "액션",
     "incidents": "인시던트",
-    "evals": "평가"
+    "evals": "평가",
+    "keyboardShortcuts": "키보드 단축키"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
