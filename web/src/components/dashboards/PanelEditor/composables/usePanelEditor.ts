@@ -759,14 +759,12 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
       chartData.value = {};
     }
 
-    // Re-sync after watchers settle (e.g., VRL field list init adds
-    // properties reactively after the initial snapshot). Without this,
-    // isOutDated falsely shows "chart not up to date" on edit load.
-    setTimeout(() => {
-      chartData.value = JSON.parse(
-        JSON.stringify(dashboardPanelData.data),
-      );
-    }, 100);
+    // Re-sync the baseline after Vue flushes any load-time reactive updates to
+    // dashboardPanelData.data, so isOutDated doesn't falsely show "chart not up
+    // to date" on edit load.
+    nextTick(() => {
+      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+    });
   };
 
   // ============================================================================
