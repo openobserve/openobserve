@@ -373,6 +373,8 @@ import {
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -1811,6 +1813,44 @@ export default defineComponent({
         showJsonEditorDialog.value = false;
       }
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("dashboard");
+    useShortcutsWithMac([
+      {
+        key: "r",
+        scope: "dashboard",
+        description: "Refresh all panels",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshData();
+        },
+      },
+      {
+        key: "n",
+        scope: "dashboard",
+        description: "Add new panel",
+        handler: () => {
+          if (isInputFocused()) return;
+          addPanelData();
+        },
+      },
+      {
+        key: "ctrl+s",
+        scope: "dashboard",
+        description: "Save dashboard",
+        handler: () => savePanelLayout(null),
+      },
+      {
+        key: "f",
+        scope: "dashboard",
+        description: "Toggle fullscreen",
+        handler: () => {
+          if (isInputFocused()) return;
+          toggleFullscreen();
+        },
+      },
+    ]);
 
     return {
       currentDashboardData,

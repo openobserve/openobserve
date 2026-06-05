@@ -368,6 +368,7 @@ import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -863,6 +864,32 @@ export default defineComponent({
         config: props.data?.config || {},
       };
     });
+
+    // ── Panel hover keyboard shortcuts ────────────────────────────────────
+    // Direct keydown listener — avoids ShortcutManager conflicts when many
+    // panels are mounted at the same time. Only fires when this panel is hovered.
+    const handlePanelKeydown = (e: KeyboardEvent) => {
+      if (!isCurrentlyHoveredPanel.value) return;
+      if (isInputFocused()) return;
+      if (e.key === "v" || e.key === "V") {
+        e.preventDefault();
+        emit("onViewPanel", props.data.id);
+      } else if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        onEditPanel(props.data);
+      } else if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        onDuplicatePanel(props.data);
+      } else if (e.key === "Delete") {
+        e.preventDefault();
+        confirmDeletePanelDialog.value = true;
+      }
+    };
+
+    onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
+    onBeforeUnmount(() =>
+      window.removeEventListener("keydown", handlePanelKeydown),
+    );
 
     return {
       props,
