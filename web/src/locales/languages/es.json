@@ -4449,6 +4449,8 @@
       "functionsRefresh": "Actualizar lista",
       "reportsAdd": "Crear un nuevo informe",
       "reportsRefresh": "Actualizar lista"
-    }
+    },
+    "search": "Atajos de búsqueda...",
+    "noResults": "No se han encontrado atajos"
   }
 }

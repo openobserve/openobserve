@@ -4462,6 +4462,8 @@
       "functionsRefresh": "Listeyi yenileme",
       "reportsAdd": "Yeni rapor oluştur",
       "reportsRefresh": "Listeyi yenileme"
-    }
+    },
+    "search": "Kısayolları ara...",
+    "noResults": "Kısayol bulunamadı"
   }
 }

@@ -4451,6 +4451,8 @@
       "functionsRefresh": "Atualizar lista",
       "reportsAdd": "Criar novo relatório",
       "reportsRefresh": "Atualizar lista"
-    }
+    },
+    "search": "Atalhos de pesquisa...",
+    "noResults": "Nenhum atalho encontrado"
   }
 }

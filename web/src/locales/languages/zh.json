@@ -4455,6 +4455,8 @@
       "functionsRefresh": "刷新清单",
       "reportsAdd": "创建新报告",
       "reportsRefresh": "刷新清单"
-    }
+    },
+    "search": "搜索快捷方式...",
+    "noResults": "未找到快捷方式"
   }
 }

@@ -4451,6 +4451,8 @@
       "functionsRefresh": "リストを更新",
       "reportsAdd": "新しいレポートを作成",
       "reportsRefresh": "リストを更新"
-    }
+    },
+    "search": "ショートカットを検索...",
+    "noResults": "ショートカットが見つかりません"
   }
 }

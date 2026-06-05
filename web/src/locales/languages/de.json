@@ -4451,6 +4451,8 @@
       "functionsRefresh": "Liste aktualisieren",
       "reportsAdd": "Neuen Bericht erstellen",
       "reportsRefresh": "Liste aktualisieren"
-    }
+    },
+    "search": "Kurzbefehle suchen...",
+    "noResults": "Keine Abkürzungen gefunden"
   }
 }

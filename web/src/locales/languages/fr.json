@@ -4451,6 +4451,8 @@
       "functionsRefresh": "Actualiser la liste",
       "reportsAdd": "Créer un nouveau rapport",
       "reportsRefresh": "Actualiser la liste"
-    }
+    },
+    "search": "Raccourcis de recherche...",
+    "noResults": "Aucun raccourci n'a été trouvé"
   }
 }

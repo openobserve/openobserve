@@ -4462,6 +4462,8 @@
       "functionsRefresh": "목록 새로 고침",
       "reportsAdd": "새 보고서 생성",
       "reportsRefresh": "목록 새로 고침"
-    }
+    },
+    "search": "검색 단축키...",
+    "noResults": "단축키를 찾을 수 없습니다"
   }
 }

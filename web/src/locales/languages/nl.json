@@ -4462,6 +4462,8 @@
       "functionsRefresh": "Lijst verversen",
       "reportsAdd": "Maak een nieuw rapport",
       "reportsRefresh": "Lijst verversen"
-    }
+    },
+    "search": "Sneltoetsen zoeken...",
+    "noResults": "Geen sneltoetsen gevonden"
   }
 }
