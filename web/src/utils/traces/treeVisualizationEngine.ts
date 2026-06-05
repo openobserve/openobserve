@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from 'vuex'
-import { generateTracePatternTooltipContent } from './treeTooltipHelpers'
 
 /**
  * Tree node interface for tree visualization with coordinate support
@@ -243,39 +242,53 @@ export function createTreeVisualizationEngine() {
    * Find chart node at screen coordinates using ECharts hit detection
    */
   const findNodeAtPoint = (chart: any, point: [number, number], treeData: TreeNode[]): TreeNode | null => {
-    // Use ECharts coordinate conversion for accurate hit testing
-    const series = chart.getModel().getSeries()[0]
-    if (!series) return null
+    try {
+      // Use ECharts' built-in hit detection for accurate node detection
+      const zr = chart.getZr()
+      if (!zr || !zr.handler) return null
 
-    // Hit radius similar to Service Graph (20px for tree view)
-    const HIT_RADIUS = 20
-    let closestNode: TreeNode | null = null
-    let closestDistance = Infinity
+      // Get the element at the mouse position
+      const hoveredElements = zr.handler.findHover(point[0], point[1])
 
-    const searchNodes = (nodes: TreeNode[]) => {
-      nodes.forEach(node => {
-        // Get node screen position from ECharts
-        const nodePosition = chart.convertToPixel({ seriesIndex: 0 }, [node.x || 0, node.y || 0])
-        if (!nodePosition) return
+      if (!hoveredElements || !hoveredElements.target) return null
 
-        const distance = Math.sqrt(
-          Math.pow(point[0] - nodePosition[0], 2) +
-          Math.pow(point[1] - nodePosition[1], 2)
-        )
+      // Check if we hit a tree node symbol
+      const target = hoveredElements.target
+      const dataIndex = target.dataIndex
 
-        if (distance < HIT_RADIUS && distance < closestDistance) {
-          closestDistance = distance
-          closestNode = node
+      if (dataIndex === undefined || dataIndex === null) return null
+
+      // Find the corresponding tree node using the data index
+      return findNodeByIndex(treeData, dataIndex)
+    } catch (error) {
+      console.warn('Error in findNodeAtPoint:', error)
+      return null
+    }
+  }
+
+  /**
+   * Helper to find tree node by ECharts data index
+   * Traverses the tree data to find the node at the given index
+   */
+  const findNodeByIndex = (nodes: TreeNode[], targetIndex: number): TreeNode | null => {
+    let currentIndex = 0
+
+    const traverse = (nodeList: TreeNode[]): TreeNode | null => {
+      for (const node of nodeList) {
+        if (currentIndex === targetIndex) {
+          return node
         }
+        currentIndex++
 
-        if (node.children) {
-          searchNodes(node.children)
+        if (node.children && node.children.length > 0) {
+          const found = traverse(node.children)
+          if (found) return found
         }
-      })
+      }
+      return null
     }
 
-    searchNodes(treeData)
-    return closestNode
+    return traverse(nodes)
   }
 
   /**
@@ -311,24 +324,39 @@ export function createTreeVisualizationEngine() {
     let hideTimer: ReturnType<typeof setTimeout> | null = null
     let activeNodeId: string | null = null
 
-    // Positioning logic from Service Graph
+    // Positioning logic from Service Graph with proper dimension measurement
     const positionTooltip = (mouseX: number, mouseY: number) => {
       const cw = chartDom.clientWidth
       const ch = chartDom.clientHeight
       let left = mouseX + 15
       let top = mouseY + 15
 
-      tooltipEl.style.display = "block"
+      // Make visible but positioned off-screen to measure dimensions
+      tooltipEl.style.visibility = 'hidden'
+      tooltipEl.style.display = 'block'
+      tooltipEl.style.left = '0px'
+      tooltipEl.style.top = '0px'
 
-      if (left + tooltipEl.offsetWidth > cw) {
-        left = mouseX - tooltipEl.offsetWidth - 10
+      // Now we can get accurate dimensions
+      const tooltipWidth = tooltipEl.offsetWidth
+      const tooltipHeight = tooltipEl.offsetHeight
+
+      // Adjust position if tooltip would go off-screen
+      if (left + tooltipWidth > cw) {
+        left = mouseX - tooltipWidth - 10
       }
-      if (top + tooltipEl.offsetHeight > ch) {
-        top = mouseY - tooltipEl.offsetHeight - 10
+      if (top + tooltipHeight > ch) {
+        top = mouseY - tooltipHeight - 10
       }
 
+      // Ensure tooltip doesn't go negative
+      left = Math.max(5, left)
+      top = Math.max(5, top)
+
+      // Position and make visible
       tooltipEl.style.left = left + "px"
       tooltipEl.style.top = top + "px"
+      tooltipEl.style.visibility = 'visible'
     }
 
     const showNodeTooltip = (mouseX: number, mouseY: number, node: TreeNode) => {
@@ -342,11 +370,12 @@ export function createTreeVisualizationEngine() {
       activeNodeId = null
     }
 
-    // Mouse event handling with Service Graph timing
+    // Mouse event handling with Service Graph timing and proper timer management
     const onMouseMove = (e: any) => {
       const hoveredNode = findNodeAtPoint(chart, [e.offsetX, e.offsetY], data.treeData)
 
       if (hoveredNode && hoveredNode.id !== activeNodeId) {
+        // Clear any existing timer to prevent race conditions
         if (hideTimer) {
           clearTimeout(hideTimer)
           hideTimer = null
@@ -354,12 +383,14 @@ export function createTreeVisualizationEngine() {
         activeNodeId = hoveredNode.id
         showNodeTooltip(e.offsetX, e.offsetY, hoveredNode)
       } else if (!hoveredNode && activeNodeId) {
-        if (!hideTimer) {
-          hideTimer = setTimeout(() => {
-            hideTimer = null
-            hideTooltip()
-          }, 150)
+        // Always clear existing timer before setting new one
+        if (hideTimer) {
+          clearTimeout(hideTimer)
         }
+        hideTimer = setTimeout(() => {
+          hideTimer = null
+          hideTooltip()
+        }, 150)
       }
     }
 
@@ -389,6 +420,7 @@ export function createTreeVisualizationEngine() {
     generateEChartsOptions,
     setupTraceNodeTooltips,
     findNodeAtPoint, // Export for testing
+    findNodeByIndex, // Export helper for testing
     getHealthColor
   }
 }
