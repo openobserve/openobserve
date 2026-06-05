@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -21,6 +22,16 @@ import pytest
 
 from support.factories import search_payload
 from .conftest import SESSION_ID, count_records, flush_and_wait, ingest
+
+
+def _compact_timeout() -> float:
+    """Derive compaction wait timeout from ZO_COMPACT_INTERVAL_SECONDS env var.
+
+    CI sets ZO_COMPACT_INTERVAL_SECONDS=30; wait 3× interval + 15s buffer.
+    When unset (local dev), returns 30s so the test skips quickly.
+    """
+    interval = float(os.environ.get("ZO_COMPACT_INTERVAL_SECONDS", "0"))
+    return interval * 3 + 15 if interval > 0 else 30.0
 
 _BASE = f"vp_{SESSION_ID}"
 
@@ -140,8 +151,9 @@ class TestVortexFileSizeComparison:
             stats = entry.get("stats", {})
             return stats if float(stats.get("storage_size", 0)) > 0 else None
 
+        t = _compact_timeout()
         try:
-            stats = wait_until(_stats_ready, timeout=120, interval=5,
+            stats = wait_until(_stats_ready, timeout=t, interval=5,
                                msg="waiting for compaction to populate file size stats")
             logging.info(
                 "PERF scenario-76: stream=%s doc_num=%s file_num=%s "
@@ -154,7 +166,7 @@ class TestVortexFileSizeComparison:
             )
         except WaitTimeout:
             pytest.skip(
-                "compaction did not run within 120s — set ZO_COMPACT_INTERVAL "
+                f"compaction did not run within {t:.0f}s — set ZO_COMPACT_INTERVAL "
                 "short in enterprise CI to populate file size stats"
             )
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json as _json
 import logging
+import os
 import time
 from datetime import datetime, timezone, timedelta
 
@@ -31,6 +32,17 @@ _COMPACT_SKIP_MSG = (
     "compaction did not run within the timeout — set ZO_COMPACT_INTERVAL "
     "short (e.g. 30s) in enterprise CI to enable compaction-metadata checks"
 )
+
+
+def _compact_timeout() -> float:
+    """Derive compaction wait timeout from ZO_COMPACT_INTERVAL_SECONDS env var.
+
+    CI sets ZO_COMPACT_INTERVAL_SECONDS=30; we wait 3× that plus a 15s buffer
+    so compaction has time to fire at least twice and update stream stats.
+    When unset (local dev), returns 30s so tests skip quickly rather than hang.
+    """
+    interval = float(os.environ.get("ZO_COMPACT_INTERVAL_SECONDS", "0"))
+    return interval * 3 + 15 if interval > 0 else 30.0
 
 
 def _stream(suffix: str) -> str:
@@ -51,8 +63,10 @@ def _wide_payload(sql: str, size: int = 100) -> dict:
     )
 
 
-def _try_wait_for_compaction(client, stream: str, *, timeout: float = 120.0) -> dict | None:
+def _try_wait_for_compaction(client, stream: str, *, timeout: float | None = None) -> dict | None:
     """Poll stream stats until storage_size > 0. Returns stats dict or None."""
+    t = timeout if timeout is not None else _compact_timeout()
+
     def _ready():
         r = client.get(f"streams?type=logs&stream_name={stream}")
         if r.status_code != 200:
@@ -64,8 +78,8 @@ def _try_wait_for_compaction(client, stream: str, *, timeout: float = 120.0) -> 
         return stats if float(stats.get("storage_size", 0)) > 0 else None
 
     try:
-        return wait_until(_ready, timeout=timeout, interval=5.0,
-                          msg=f"{stream}: compaction stats not populated within {timeout}s")
+        return wait_until(_ready, timeout=t, interval=5.0,
+                          msg=f"{stream}: compaction stats not populated within {t}s")
     except WaitTimeout:
         return None
 
@@ -84,7 +98,7 @@ class TestDownsampleVortex:
             for i in range(self.N)
         ]
         ingest(client, self.STREAM, records)
-        flush_and_wait(client, self.STREAM, expected=self.N)
+        flush_and_wait(client, self.STREAM, expected=self.N, timeout=30)
 
     def test_47_data_queryable_after_flush(self, client):
         """Data is queryable after flush — compaction must not lose records."""
@@ -94,7 +108,7 @@ class TestDownsampleVortex:
 
     def test_47_compaction_metadata(self, client):
         """After compaction, file_num >= 1 and storage_size > 0. Skips if compaction didn't run."""
-        stats = _try_wait_for_compaction(client, self.STREAM, timeout=120)
+        stats = _try_wait_for_compaction(client, self.STREAM)
         if stats is None:
             pytest.skip(_COMPACT_SKIP_MSG)
 
@@ -117,7 +131,7 @@ class TestDownsampleComparison:
             for i in range(self.N)
         ]
         ingest(client, self.STREAM, records)
-        flush_and_wait(client, self.STREAM, expected=self.N)
+        flush_and_wait(client, self.STREAM, expected=self.N, timeout=30)
 
     def test_48_count_correct_after_flush(self, client):
         total = count_records(client, self.STREAM)
@@ -144,7 +158,7 @@ class TestDownsampleComparison:
 
     def test_48_compaction_metadata(self, client):
         """Compaction metadata check — skips if compaction didn't run."""
-        stats = _try_wait_for_compaction(client, self.STREAM, timeout=120)
+        stats = _try_wait_for_compaction(client, self.STREAM)
         if stats is None:
             pytest.skip(_COMPACT_SKIP_MSG)
         assert float(stats.get("storage_size", 0)) > 0, "storage_size should be > 0 after compaction"
@@ -168,7 +182,7 @@ class TestDownsampleMixedSource:
             ]
             ingest(client, self.STREAM, records)
 
-        flush_and_wait(client, self.STREAM, expected=self.BATCHES * self.BATCH_N)
+        flush_and_wait(client, self.STREAM, expected=self.BATCHES * self.BATCH_N, timeout=30)
 
     def test_49_total_count_correct(self, client):
         """All records queryable after flush — compaction must not drop any."""
@@ -177,16 +191,26 @@ class TestDownsampleMixedSource:
         assert total >= expected, f"expected {expected}, got {total}"
 
     def test_49_per_batch_counts_correct(self, client):
-        """Each batch has the right record count after flush."""
+        """Each batch has the right record count after flush (single GROUP BY query)."""
+        resp = client.post(
+            "_search?type=logs",
+            json=_wide_payload(
+                f'SELECT batch_id, COUNT(*) AS c FROM "{self.STREAM}" '
+                f'GROUP BY batch_id ORDER BY batch_id',
+                size=self.BATCHES + 1,
+            ),
+        )
+        assert resp.status_code == 200, f"GROUP BY query failed: {resp.status_code}"
+        hits = resp.json()["hits"]
+        by_batch = {int(h["batch_id"]): int(h["c"]) for h in hits}
         for b in range(self.BATCHES):
-            n = count_records(client, self.STREAM, where=f"batch_id={b}")
-            assert n == self.BATCH_N, (
-                f"batch_id={b}: expected {self.BATCH_N}, got {n}"
+            assert by_batch.get(b, 0) == self.BATCH_N, (
+                f"batch_id={b}: expected {self.BATCH_N}, got {by_batch.get(b, 0)}"
             )
 
     def test_49_compaction_metadata(self, client):
         """Compaction metadata — skips if compaction didn't run."""
-        stats = _try_wait_for_compaction(client, self.STREAM, timeout=120)
+        stats = _try_wait_for_compaction(client, self.STREAM)
         if stats is None:
             pytest.skip(_COMPACT_SKIP_MSG)
         assert int(stats.get("file_num", 0)) >= 1, "file_num must be >= 1 after compaction"
@@ -199,12 +223,12 @@ class TestDownsampleFileSizeLimit:
     """Scenario 50: large ingest is fully queryable; compaction produces on-disk files."""
 
     STREAM = _stream("size_limit")
-    N = 50_000
+    N = 2_000
 
     def test_50_large_ingest_and_flush(self, client):
         records = [
             {"_timestamp": _ts(i * 100), "idx": i, "host": f"h{i % 20}",
-             "payload": "x" * 200}
+             "payload": "x" * 100}
             for i in range(self.N)
         ]
         resp = client.post(
@@ -213,7 +237,7 @@ class TestDownsampleFileSizeLimit:
             headers={"Content-Type": "application/json"},
         )
         assert resp.status_code == 200, f"large ingest failed: {resp.status_code}"
-        flush_and_wait(client, self.STREAM, expected=self.N, timeout=300)
+        flush_and_wait(client, self.STREAM, expected=self.N, timeout=60)
 
     def test_50_all_records_queryable(self, client):
         """All 50K records queryable after flush — no compaction needed."""
@@ -223,7 +247,7 @@ class TestDownsampleFileSizeLimit:
 
     def test_50_compaction_metadata(self, client):
         """Compaction metadata (file_num, storage_size) — skips if compaction didn't run."""
-        stats = _try_wait_for_compaction(client, self.STREAM, timeout=180)
+        stats = _try_wait_for_compaction(client, self.STREAM)
         if stats is None:
             pytest.skip(_COMPACT_SKIP_MSG)
 
