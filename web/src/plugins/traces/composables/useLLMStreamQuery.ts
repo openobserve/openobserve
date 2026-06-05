@@ -65,6 +65,10 @@ export function useLLMStreamQuery() {
     sql: string,
     startTime: number,
     endTime: number,
+    /** Stream type to scope the search against. Defaults to `"traces"` for
+     * backwards compatibility with LLM Insights; pass `"logs"` for log streams
+     * (e.g. `_llm_scores`), `"metrics"` for metric streams, etc. */
+    pageType: "traces" | "logs" | "metrics" = "traces",
   ): Promise<any[]> {
     return new Promise((resolve, reject) => {
       const traceId = generateTraceContext().traceId;
@@ -94,7 +98,7 @@ export function useLLMStreamQuery() {
             ...(useBase64 ? { encoding: "base64" } : {}),
           },
           type: "search",
-          pageType: "traces",
+          pageType,
           searchType: "ui",
           traceId,
           org_id: store.state.selectedOrganization.identifier,

@@ -36,6 +36,7 @@ pub mod grpc;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod kv;
+pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
@@ -47,6 +48,7 @@ pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
 pub mod promql;
+pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;

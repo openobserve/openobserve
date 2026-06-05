@@ -188,7 +188,7 @@ const TraceDetailsSidebar = defineAsyncComponent(
 );
 
 // Props
-interface Props {
+export interface Props {
   spans: EnrichedSpan[];
   selectedSpanId?: string | null;
   traceDuration: number;
