@@ -31,40 +31,42 @@
       {{ t("shortcuts.noResults") }}
     </div>
 
-    <!-- Shortcut groups -->
-    <div
-      v-for="group in filteredRegistry"
-      :key="group.pageKey"
-      class="tw:mb-2"
-    >
-      <!-- Page section header -->
+    <!-- Shortcut groups — 2-column grid -->
+    <div class="tw:grid tw:grid-cols-2 tw:gap-4 tw:items-start">
       <div
-        class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:mb-0.5 tw:pb-0.5 tw:border-b tw:border-[var(--o2-border)]"
-        style="color: var(--o2-primary-color)"
+        v-for="group in filteredRegistry"
+        :key="group.pageKey"
+        class="tw:rounded-lg tw:border tw:border-[var(--o2-border)] tw:overflow-hidden"
       >
-        {{ t(group.pageKey) }}
-      </div>
-
-      <!-- Shortcut rows -->
-      <ul class="tw:list-none tw:p-0 tw:m-0">
-        <li
-          v-for="s in group.shortcuts"
-          :key="s.descriptionKey"
-          class="tw:flex tw:justify-between tw:items-center tw:py-1 tw:border-b tw:border-[var(--o2-border)] tw:gap-3"
+        <!-- Section header -->
+        <div
+          class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:px-3 tw:py-2 tw:border-b tw:border-[var(--o2-border)] tw:bg-[var(--o2-primary-background)]"
+          style="color: var(--o2-primary-color)"
         >
-          <span class="tw:text-[13px] tw:text-[var(--o2-text-primary)]">
-            {{ t(s.descriptionKey) }}
-          </span>
-          <div class="tw:flex tw:gap-1 tw:shrink-0">
-            <kbd
-              v-for="part in formatKey(s.key)"
-              :key="part"
-              class="tw:bg-[var(--o2-primary-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:px-1.5 tw:py-0.5 tw:font-mono tw:text-[12px] tw:text-[var(--o2-text-primary)] tw:whitespace-nowrap"
-              >{{ part }}</kbd
-            >
-          </div>
-        </li>
-      </ul>
+          {{ t(group.pageKey) }}
+        </div>
+
+        <!-- Shortcut rows -->
+        <ul class="tw:list-none tw:p-0 tw:m-0">
+          <li
+            v-for="s in group.shortcuts"
+            :key="s.descriptionKey"
+            class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1.5 tw:border-b tw:border-[var(--o2-border)] last:tw:border-b-0 tw:gap-3 tw:hover:bg-[var(--o2-primary-background)] tw:transition-colors"
+          >
+            <span class="tw:text-[12px] tw:text-[var(--o2-text-primary)]">
+              {{ t(s.descriptionKey) }}
+            </span>
+            <div class="tw:flex tw:gap-1 tw:shrink-0">
+              <kbd
+                v-for="part in formatKey(s.key)"
+                :key="part"
+                class="tw:bg-[var(--o2-card-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:px-1.5 tw:py-0.5 tw:font-mono tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap tw:shadow-sm"
+                >{{ part }}</kbd
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- Sticky footer -->
