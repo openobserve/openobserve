@@ -214,109 +214,11 @@ size="xs" class="warning" />{{
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select">
-        <ODropdown
-          v-model:open="orgMenuOpen"
-          side="bottom"
-          align="center"
-        >
-          <template #trigger>
-            <OButton
-              variant="outline-primary"
-              size="sm-toolbar"
-              data-test="navbar-organizations-select-trigger"
-              class="tw:w-56"
-            >
-              <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{ userClickedOrg?.label || "" }}</span>
-              <template #icon-right>
-                <OIcon name="arrow-drop-down" size="sm" class="tw:opacity-70 tw:shrink-0" />
-              </template>
-            </OButton>
-          </template>
-
-          <!-- Organization table with search functionality -->
-          <div data-test="organization-menu-list" class="tw:p-0">
-            <OTable
-              data-test="organization-menu-table"
-              :data="filteredOrganizations"
-              row-key="identifier"
-              :columns="[
-                {
-                  id: 'label',
-                  header: 'Organization',
-                  accessorKey: 'label',
-                  meta: { align: 'left' },
-                },
-              ]"
-              :show-header="false"
-              :show-global-filter="false"
-              pagination="client"
-              :page-size="rowsPerPage"
-              :page-size-options="[]"
-              class="org-table"
-              row-class="tw:cursor-pointer"
-              style="width: 470px; min-height: 420px; height: 420px"
-              @row-click="(row) => handleOrgSelection(row)"
-            >
-              <!-- Search input for filtering organizations -->
-              <template #top>
-                <div class="tw:w-full">
-                  <OSearchInput
-                    data-test="organization-search-input"
-                    v-model="searchQuery"
-                    clearable
-                    :debounce="1"
-                    autofocus
-                    placeholder="Search Organization"
-                  />
-                </div>
-              </template>
-
-              <!-- Organization list item — both a generic data-test (kept for
-                   legacy specs) and a per-identifier data-test so e2e can pick
-                   an exact org without text/role matching. -->
-              <template #cell-label="{ row, value }">
-                <div
-                  class="org-menu-item"
-                  data-test="organization-menu-item-label-item-label"
-                  :data-test-org-identifier="row.identifier"
-                  :class="{
-                    'org-menu-item--active':
-                      row.identifier === userClickedOrg?.identifier,
-                  }"
-                >
-                  {{
-                    row.label.length > 30
-                      ? row.label.substring(0, 30) +
-                        "... | " +
-                        row.identifier
-                      : row.label + " | " + row.identifier
-                  }}
-                  <OTooltip
-                    v-if="row.label.length > 30"
-                    side="bottom"
-                    align="start"
-                    :content="row.label"
-                  />
-                </div>
-              </template>
-
-              <!-- No data message -->
-              <template #empty>
-                <div
-                  data-test="organization-menu-no-data"
-                  class="tw:text-center tw:p-2 tw:w-full tw:flex tw:justify-center"
-                >
-                  No organizations found
-                </div>
-              </template>
-
-              <!-- Custom pagination: suppress left-side total count -->
-              <template #bottom></template>
-            </OTable>
-          </div>
-        </ODropdown>
-      </div>
+      <OrganizationSelector
+        :organizations="organizations"
+        :current="userClickedOrg"
+        @select="handleOrgSelection"
+      />
 
       <!-- Visual separator between org context and utility icons. Parent's
            gap-1 (4px) provides equal spacing on both sides via flex gap, so
@@ -531,13 +433,12 @@ import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ChromeBreadcrumb from "@/components/common/ChromeBreadcrumb.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -550,12 +451,11 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     ChromeBreadcrumb,
+    OrganizationSelector,
     OButton,
     OIcon,
     OTooltip,
-    OSearchInput,
     ODropdown,
-    OTable,
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
@@ -729,34 +629,8 @@ export default defineComponent({
       emit("update:isHovered", false);
     };
 
-    // Internal search state for the org table
-    const searchQuery = ref("");
-    const rowsPerPage = 10;
-    const orgMenuOpen = ref(false);
-
-    watch(orgMenuOpen, async (isOpen) => {
-      if (isOpen) {
-        await nextTick();
-        const input = document.querySelector(
-          '[data-test="organization-search-input"] input',
-        ) as HTMLInputElement | null;
-        input?.focus();
-      }
-    });
-
-    const filteredOrganizations = computed(() => {
-      if (!searchQuery.value) return props.organizations;
-      const q = searchQuery.value.toLowerCase();
-      return props.organizations.filter(
-        (org: any) =>
-          org.label?.toLowerCase().includes(q) ||
-          org.identifier?.toLowerCase().includes(q),
-      );
-    });
-
-    // Handle organization selection from the table
+    // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
-      orgMenuOpen.value = false;
       emit("update:selectedOrg", org);
       emit("updateOrganization");
     };
@@ -786,10 +660,6 @@ export default defineComponent({
       signout,
       handleMouseEnter,
       handleMouseLeave,
-      searchQuery,
-      rowsPerPage,
-      orgMenuOpen,
-      filteredOrganizations,
       handleOrgSelection,
       openEnterpriseDialog,
     };
