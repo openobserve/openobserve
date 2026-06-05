@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
        always present; the chosen section renders to the right. Breadcrumb lives in
        the top chrome bar (published from this shell). -->
-  <PageLayout :sidebar-width="218">
+  <PageLayout :sidebar-width="232">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"

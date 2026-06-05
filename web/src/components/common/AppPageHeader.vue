@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink">
         <h1
-          class="tw:text-[1.0625rem]! tw:font-semibold! tw:leading-[1.15]! tw:tracking-[-0.02em]! tw:text-text-primary tw:truncate tw:min-h-5"
+          class="tw:text-[1.0625rem]! tw:font-semibold! tw:leading-[1.45]! tw:tracking-[-0.02em]! tw:text-text-primary tw:truncate tw:min-h-6"
           :title="title"
         >
           <slot name="title">{{ title }}</slot>

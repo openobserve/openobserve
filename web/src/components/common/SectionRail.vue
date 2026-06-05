@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             class="tw:shrink-0"
           />
-          <span class="tw:leading-snug tw:wrap-break-word tw:min-w-0">{{ item.label }}</span>
+          <span class="tw:leading-snug tw:whitespace-nowrap tw:truncate tw:min-w-0">{{ item.label }}</span>
         </button>
       </div>
     </div>
