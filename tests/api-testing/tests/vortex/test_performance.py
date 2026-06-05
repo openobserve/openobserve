@@ -200,7 +200,9 @@ class TestManySmallFiles:
         for batch_idx in range(self.BATCHES):
             records = [
                 {
-                    "_timestamp": _ts(batch_idx * 1_000_000_000 + i * 1_000),
+                    # 1 s per batch, 1 ms per record — all 20 batches stay within
+                    # the +1 hour search window used by count_records.
+                    "_timestamp": _ts(batch_idx * 1_000_000 + i * 1_000),
                     "batch_idx": batch_idx,
                     "idx": i,
                     "host": f"h{i % 5}",
