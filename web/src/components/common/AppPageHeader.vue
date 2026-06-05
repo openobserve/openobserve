@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | subtitle | icon | breadcrumb | breadcrumbMaxInline | back
+  Props: title | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
   Slots: title-prefix | title | subtitle | actions | tabs | back
 -->
 <template>
@@ -51,8 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header tw:shrink-0 tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4"
+    class="app-page-header tw:shrink-0"
+    :class="
+      tabsBelow
+        ? 'tw:flex tw:flex-col'
+        : 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4'
+    "
   >
+    <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
+         (display:contents) so the title block + actions stay direct children of
+         the header — preserving the original single-row inline-tabs layout. -->
+    <div
+      :class="
+        tabsBelow
+          ? 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4'
+          : 'tw:contents'
+      "
+    >
     <div class="tw:flex tw:items-center tw:gap-3.25 tw:min-w-0 tw:h-full tw:flex-1">
       <slot name="title-prefix" />
 
@@ -108,9 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Module tabs (Level-2 nav), inline to the right of the title. -->
+      <!-- Module tabs (Level-2 nav), inline to the right of the title.
+           Two-row mode renders them as a full-width strip below instead. -->
       <div
-        v-if="hasTabs"
+        v-if="hasTabs && !tabsBelow"
         class="tw:flex tw:items-center tw:min-w-0 tw:flex-1 tw:h-full"
       >
         <slot name="tabs" />
@@ -122,6 +138,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:items-center tw:gap-2 tw:shrink-0"
     >
       <slot name="actions" />
+    </div>
+    </div>
+
+    <!-- Row 2: full-width section-tab strip (prototype's two-row header). The
+         active tab's underline sits just above the header's bottom divider. -->
+    <div
+      v-if="hasTabs && tabsBelow"
+      class="tw:flex tw:items-stretch tw:h-10"
+    >
+      <slot name="tabs" />
     </div>
   </header>
 </template>
@@ -152,6 +178,9 @@ const props = withDefaults(
     breadcrumbMaxInline?: number;
     /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
     back?: BackTarget;
+    /** Render the #tabs slot as a full-width strip below row 1 (prototype's
+     *  two-row header) instead of inline beside the title. */
+    tabsBelow?: boolean;
   }>(),
   {
     title: "",

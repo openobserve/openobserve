@@ -47,34 +47,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-full tw:h-full"
       >
         <template #toolbar>
-          <OToggleGroup
-            :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
-            data-test="pipeline-list-tabs"
-          >
-            <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-              {{ t("pipeline_list.tab_all") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-              <template #icon-left><OIcon name="schedule" size="sm" /></template>
-              {{ t("pipeline_list.tab_scheduled") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-              <template #icon-left><OIcon name="bolt" size="sm" /></template>
-              {{ t("pipeline_list.tab_realtime") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OInput
-            data-test="pipeline-list-search-input"
-            v-model="filterQuery"
-            class="tw:ml-2 tw:w-50"
-            :placeholder="t('pipeline.search')"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
+              data-test="pipeline-list-tabs"
+            >
+              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                {{ t("pipeline_list.tab_all") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                {{ t("pipeline_list.tab_scheduled") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
+                <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                {{ t("pipeline_list.tab_realtime") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="tw:flex-1 tw:min-w-0">
+              <OInput
+                data-test="pipeline-list-search-input"
+                v-model="filterQuery"
+                class="tw:w-full"
+                :placeholder="t('pipeline.search')"
+              >
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
+                </template>
+              </OInput>
+            </div>
+          </div>
         </template>
 
         <template #cell-actions="{ row }">

@@ -27,9 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing here — their content components have their own headers. -->
     <AppPageHeader
       v-if="showPipelineActions || isDetailView"
-      :title="showPipelineActions ? t('function.streamPipeline') : breadcrumbLabel"
+      :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
+      :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
       :icon="showPipelineActions ? 'lan' : undefined"
       :back="detailBack"
+      :tabs-below="showPipelineActions"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
       <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the

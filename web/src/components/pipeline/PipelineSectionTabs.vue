@@ -22,22 +22,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   This mirrors the breadcrumb section dropdown as faster inline navigation.
 -->
 <template>
-  <OToggleGroup
-    :model-value="activeSectionKey"
-    @update:model-value="navigateToSection"
+  <!-- Prototype-style section tabs: underline text tabs with an optional count
+       pill. Lives in an AppPageHeader #tabs slot (use :tabs-below for a full
+       second row). The active tab is derived from the route; clicking navigates. -->
+  <nav
+    class="tw:flex tw:items-stretch tw:gap-1 tw:h-full tw:overflow-x-auto"
     data-test="pipeline-section-tabs"
   >
-    <OToggleGroupItem
+    <button
       v-for="s in visibleSections"
       :key="s.key"
-      :value="s.key"
-      size="sm"
+      type="button"
       :data-test="`pipeline-section-tab-${s.key}`"
+      :aria-current="s.key === activeSectionKey ? 'page' : undefined"
+      class="tw:inline-flex tw:items-center tw:gap-1.5 tw:h-full tw:px-3 tw:text-sm tw:font-semibold tw:whitespace-nowrap tw:border-b-2 tw:transition-colors tw:outline-none tw:cursor-pointer tw:bg-transparent"
+      :class="
+        s.key === activeSectionKey
+          ? 'tw:text-primary-600 tw:border-primary-600'
+          : 'tw:text-tabs-inactive-text tw:border-transparent tw:hover:text-primary-600'
+      "
+      @click="navigateToSection(s.key)"
     >
-      <template #icon-left><OIcon :name="s.icon" size="sm" /></template>
+      <OIcon :name="s.icon" size="sm" />
       {{ s.label }}
-    </OToggleGroupItem>
-  </OToggleGroup>
+      <span
+        v-if="s.count != null"
+        class="tw:text-[11px] tw:font-bold tw:leading-none tw:px-1.5 tw:py-1 tw:rounded-full"
+        :class="
+          s.key === activeSectionKey
+            ? 'tw:bg-primary-100 tw:text-primary-700'
+            : 'tw:bg-surface-subtle tw:text-text-secondary'
+        "
+      >{{ s.count }}</span>
+    </button>
+  </nav>
 </template>
 
 <script setup lang="ts">
@@ -46,8 +64,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
@@ -84,6 +100,8 @@ interface Section {
   icon: string;
   to: RouteLocationRaw;
   visible: boolean;
+  /** Optional count pill shown after the label (omitted = no badge). */
+  count?: number;
 }
 
 const sections = computed<Section[]>(() => {
@@ -127,10 +145,9 @@ const visibleSections = computed(() =>
   sections.value.filter((s) => s.visible),
 );
 
-const navigateToSection = (key: string | number | (string | number)[]) => {
-  const next = String(key);
-  if (next === activeSectionKey.value) return;
-  const section = sections.value.find((s) => s.key === next);
+const navigateToSection = (key: string) => {
+  if (key === activeSectionKey.value) return;
+  const section = sections.value.find((s) => s.key === key);
   if (section) router.push(section.to);
 };
 </script>
