@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <PageLayout
     :key="store.state.selectedOrganization.identifier"
-    :sidebar-width="200"
+    :main-panel="false"
     :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
   >
     <!-- ── Page header (row 1) ──────────────────────────────────────
@@ -82,113 +82,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
     </template>
 
-    <!-- ── Folder rail ──────────────────────────────────────────── -->
-    <template #sidebar>
-      <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-2"
-        >
-          <h2
-            class="tw:text-sm! tw:font-semibold! tw:leading-tight! tw:text-text-primary"
-          >
-            {{ t("dashboard.folderLabel") }}
-          </h2>
-          <OButton
-            variant="ghost"
-            size="icon-sm"
-            icon-left="add"
-            @click.stop="addFolder"
-            data-test="dashboard-new-folder-btn"
-            title="Add Folder"
+    <!-- Folder rail + table — matches the Alerts/Reports layout. -->
+    <div class="tw:flex-1 tw:flex tw:min-h-0">
+      <!-- Left: shared folder list (same component as Alerts/Reports) -->
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
+        <div class="tw:h-full">
+          <FolderList
+            type="dashboards"
+            @update:activeFolderId="updateActiveFolderId"
           />
         </div>
-        <!-- Folder search -->
-        <div class="tw:px-3 tw:pb-2">
-          <OInput
-            v-model="folderSearchQuery"
-            data-test="folder-search"
-            placeholder="Search folders"
-            clearable
-            class="tw:w-full"
-          >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
-        </div>
-        <nav
-          class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pb-2 tw:flex tw:flex-col tw:gap-0.5"
-          data-test="dashboards-folder-tabs"
-        >
-          <div
-            v-for="(tab, index) in filteredFolders"
-            :key="tab.folderId"
-            class="tw:group/row tw:relative tw:rounded-md tw:transition-colors"
-            :class="
-              activeFolderId === tab.folderId
-                ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text tw:font-semibold'
-                : 'tw:text-tabs-inactive-text tw:hover:bg-tabs-hover-bg tw:hover:text-tabs-hover-text'
-            "
-            :data-test="`dashboard-folder-tab-${tab.folderId}`"
-            :data-test-folder-name="tab.name"
-          >
-            <button
-              type="button"
-              class="tw:flex tw:items-center tw:w-full tw:text-left tw:px-2 tw:py-1.5 tw:rounded-md tw:outline-none tw:transition-shadow tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
-              @click="activeFolderId = tab.folderId"
-              :data-test="`dashboard-folder-tab-name-${tab.name}`"
-            >
-              <span
-                class="tw:flex-1 tw:truncate tw:pr-5 tw:text-sm"
-                :title="tab.name"
-                :data-test="`dashboard-folder-name-${tab.name}`"
-                >{{ tab.name }}</span
-              >
-            </button>
-            <span
-              v-if="
-                index ||
-                (folderSearchQuery?.length > 0 &&
-                  index == 0 &&
-                  tab.folderId.toLowerCase() != 'default')
-              "
-              class="tw:absolute tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:invisible tw:group-hover/row:visible tw:has-[[data-state=open]]:visible"
-            >
-              <ODropdown side="bottom" align="end">
-                <template #trigger>
-                  <OButton
-                    size="icon-xs"
-                    variant="ghost"
-                    icon-left="more-vert"
-                    data-test="dashboard-more-icon"
-                  />
-                </template>
-                <ODropdownItem
-                  @select="editFolder(tab.folderId)"
-                  data-test="dashboard-edit-folder-icon"
-                >
-                  <template #icon-left>
-                    <OIcon name="edit" size="xs" />
-                  </template>
-                  Edit
-                </ODropdownItem>
-                <ODropdownItem
-                  variant="destructive"
-                  @select="showDeleteFolderDialogFn(tab.folderId)"
-                  data-test="dashboard-delete-folder-icon"
-                >
-                  <template #icon-left>
-                    <OIcon name="delete" size="xs" />
-                  </template>
-                  Delete
-                </ODropdownItem>
-              </ODropdown>
-            </span>
-          </div>
-        </nav>
-    </template>
-
-    <!-- ── Table + dialogs ──────────────────────────────────────── -->
-    <div class="tw:h-full tw:overflow-hidden">
+      </div>
+      <!-- Right: dashboards table -->
+      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
+        <div class="tw:h-full card-container">
           <OTable
             ref="oTableRef"
             :data="dashboards"
@@ -197,7 +104,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :frame="false"
             :default-columns="false"
-            :row-height="32"
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -205,6 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
             v-model:selected-ids="selectedIds"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
             style="width: 100%; height: 100%"
@@ -233,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         role="radiogroup"
                         aria-label="Search scope"
-                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-stretch tw:my-1.5 tw:ps-1.5 tw:border-l tw:border-border-default"
+                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
                       >
                         <button
                           type="button"
@@ -242,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
                           :class="
                             !searchAcrossFolders
-                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary'
                           "
                           data-test="dashboard-search-scope-current"
                           title="Search only this folder"
@@ -259,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
                           :class="
                             searchAcrossFolders
-                              ? 'tw:bg-tabs-active-bg tw:text-primary-600'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary tw:hover:bg-surface-subtle'
+                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
+                              : 'tw:text-text-secondary tw:hover:text-text-primary'
                           "
                           data-test="dashboard-search-across-folders-toggle"
                           title="Search across all folders"
@@ -287,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:font-medium tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary text-truncate tw:block"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -295,14 +204,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="tw:font-mono tw:text-xs tw:text-text-disabled"
+                class="tw:font-mono tw:text-xs tw:text-text-primary"
                 :title="value"
                 >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-secondary text-truncate tw:block"
+                class="tw:text-text-primary text-truncate tw:block"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -313,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
               >
                 <span
-                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.02em]"
+                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.02em]"
                   >{{ ownerInitials(value) }}</span
                 >
                 <span
@@ -322,15 +231,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ value }}</span
                 >
               </span>
-              <span v-else class="tw:text-text-disabled">—</span>
+              <span v-else class="tw:text-text-primary">—</span>
             </template>
             <template #cell-created="{ value }">
-              <span class="tw:text-text-secondary">{{ value }}</span>
+              <span class="tw:text-text-primary">{{ value }}</span>
             </template>
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -371,10 +280,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #empty>
-              <NoDashboards
-                @create="addDashboard"
-                @import="importDashboard"
-                @templates="showAddDashboardFromGitHub = true"
+              <OEmptyState
+                size="hero"
+                preset="no-dashboards"
+                :filtered="!!filterQuery"
+                @action="
+                  (id) =>
+                    id === 'clear-filters'
+                      ? (filterQuery = '')
+                      : id === 'import'
+                        ? importDashboard()
+                        : id === 'templates'
+                          ? (showAddDashboardFromGitHub = true)
+                          : addDashboard()
+                "
               />
             </template>
             <template #bottom>
@@ -384,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
                 >
-                  <span class="tw:font-medium tw:text-text-primary">{{
+                  <span class="tw:text-text-primary">{{
                     resultTotal || 0
                   }}</span>
                   <span class="tw:text-text-secondary">{{
@@ -396,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
                 >
                   <span
-                    class="tw:text-sm tw:font-medium tw:text-text-primary tw:mr-1"
+                    class="tw:text-sm tw:text-text-primary tw:mr-1"
                     >{{ selectedIds.length }} selected</span
                   >
                   <OButton
@@ -431,17 +350,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTable>
         </div>
+      </div>
+    </div>
 
-        <!-- add dashboard -->
-        <ODrawer
-          v-model:open="showAddDashboardDialog"
-            :width="30"
+          <!-- add dashboard -->
+          <ODialog
+            v-model:open="showAddDashboardDialog"
+            size="md"
             :title="t('dashboard.createdashboard')"
             data-test="dashboard-add-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-dashboard-form"
+            :primary-button-loading="addDashboardRef?.onSubmit?.isLoading?.value"
             @click:secondary="showAddDashboardDialog = false"
-            @click:primary="addDashboardRef?.submit()"
           >
             <AddDashboard
               ref="addDashboardRef"
@@ -449,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @updated="updateDashboardList"
               :activeFolderId="activeFolderId"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- add dashboard from GitHub gallery -->
           <AddDashboardFromGitHub
@@ -458,9 +380,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- add/edit folder -->
-          <ODrawer
+          <ODialog
             v-model:open="showAddFolderDialog"
-            :width="30"
+            size="sm"
             :title="
               isFolderEditMode
                 ? t('dashboard.updateFolder')
@@ -469,8 +391,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-folder-dialog"
             :secondary-button-label="t('dashboard.cancel')"
             :primary-button-label="t('dashboard.save')"
+            form-id="add-folder-dashboards-form"
             @click:secondary="showAddFolderDialog = false"
-            @click:primary="addFolderRef?.submit()"
           >
             <AddFolder
               ref="addFolderRef"
@@ -478,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :edit-mode="isFolderEditMode"
               :folder-id="selectedFolderToEdit ?? 'default'"
             />
-          </ODrawer>
+          </ODialog>
 
           <!-- move dashboard to another folder -->
           <MoveDashboardToAnotherFolder
@@ -525,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import PageLayout from "@/components/common/PageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -555,7 +477,7 @@ import {
   useAppBreadcrumb,
   type Crumb,
 } from "@/composables/useAppBreadcrumb";
-import NoDashboards from "@/components/common/empty-states/NoDashboards.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -570,6 +492,7 @@ import {
   moveModuleToAnotherFolder,
 } from "../../utils/commons.ts";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
 import { debounce, filter, forIn } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
@@ -596,14 +519,14 @@ export default defineComponent({
   components: {
     PageLayout,
     AppPageHeader,
-    NoDashboards,
+    OEmptyState,
     OButton,
     OIcon,
     ODropdown,
     ODropdownItem,
     OInput,
     OCheckbox,
-    ODrawer,
+    ODialog,
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
@@ -611,6 +534,7 @@ export default defineComponent({
     ConfirmDialog,
     AddFolder,
     MoveDashboardToAnotherFolder,
+    FolderList,
   },
   setup() {
     const store = useStore();
@@ -692,31 +616,34 @@ export default defineComponent({
           header: "#",
           accessorKey: "#",
           sortable: false,
-          size: 52,
-          meta: { align: "left", headerClass: "tw:text-text-disabled" },
+          size: 48,
+          meta: { align: "left" },
         },
         {
           id: "name",
           header: t("dashboard.name"),
           accessorKey: "name",
           sortable: true,
-          size: 340,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
-        {
-          id: "identifier",
-          header: t("dashboard.identifier"),
-          accessorKey: "identifier",
-          sortable: true,
-          size: 200,
-          meta: { align: "left" },
-        },
+        // {
+        //   id: "identifier",
+        //   header: t("dashboard.identifier"),
+        //   accessorKey: "identifier",
+        //   sortable: true,
+        //   resizable: true,
+        //   hideable: true,
+        //   meta: { align: "left" },
+        // },
         {
           id: "description",
           header: t("dashboard.description"),
           accessorKey: "description",
           sortable: true,
-          size: 280,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -724,7 +651,8 @@ export default defineComponent({
           header: t("dashboard.owner"),
           accessorKey: "owner",
           sortable: true,
-          size: 180,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -732,7 +660,8 @@ export default defineComponent({
           header: t("dashboard.created"),
           accessorKey: "created",
           sortable: true,
-          size: 150,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         },
         {
@@ -751,7 +680,8 @@ export default defineComponent({
           header: t("dashboard.folder"),
           accessorKey: "folder",
           sortable: true,
-          size: 160,
+          resizable: true,
+          hideable: true,
           meta: { align: "left" },
         });
       }
