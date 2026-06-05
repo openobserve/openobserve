@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
+        @open-shortcuts="openShortcutsList"
         @signout="signout"
       />
     </header>
@@ -137,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
     <PredefinedThemes />
+    <ShortcutCheatsheet v-model:open="showShortcuts" />
   </div>
 </template>
 
@@ -194,6 +196,7 @@ import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -216,6 +219,7 @@ export default defineComponent({
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
+    ShortcutCheatsheet,
     GetStarted,
     ODialog,
   },
@@ -1135,6 +1139,9 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const showShortcuts = ref(false);
+    const openShortcutsList = () => { showShortcuts.value = true; };
+
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
     useShortcutsWithMac([
       {
@@ -1189,6 +1196,8 @@ export default defineComponent({
       getConfig,
       setRumUser,
       openPredefinedThemes,
+      showShortcuts,
+      openShortcutsList,
       isPredefinedThemesOpen,
       handleMenuHover,
     };

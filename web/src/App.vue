@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
-  <ShortcutCheatsheet />
 </template>
 
 <script lang="ts">
@@ -31,10 +30,9 @@ import config from "@/aws-exports";
 import { applyThemeColors } from "@/utils/theme";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
-import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider, ShortcutCheatsheet },
+  components: { OToastProvider, ConfirmDialogProvider },
   setup() {
     const store = useStore();
     const router = useRouter();

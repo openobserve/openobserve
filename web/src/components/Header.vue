@@ -369,6 +369,15 @@ size="xs" class="warning" />{{
           </ODropdownItem>
           <ODropdownSeparator />
 
+          <!-- Keyboard shortcuts -->
+          <ODropdownItem
+            data-test="menu-link-shortcuts-item"
+            @select="openShortcuts"
+          >
+            {{ t("menu.keyboardShortcuts") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+
           <!-- About page link -->
           <ODropdownItem
             data-test="menu-link-about-item"
@@ -632,6 +641,7 @@ export default defineComponent({
     "navigateToDocs",
     "changeLanguage",
     "openPredefinedThemes",
+    "openShortcuts",
     "signout",
   ],
   setup(props, { emit }) {
@@ -709,6 +719,10 @@ export default defineComponent({
       emit("openPredefinedThemes");
     };
 
+    const openShortcuts = () => {
+      emit("openShortcuts");
+    };
+
     const signout = () => {
       emit("signout");
     };
@@ -776,6 +790,7 @@ export default defineComponent({
       navigateToDocs,
       changeLanguage,
       openPredefinedThemes,
+      openShortcuts,
       signout,
       handleMouseEnter,
       handleMouseLeave,

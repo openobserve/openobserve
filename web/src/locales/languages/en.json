@@ -444,7 +444,8 @@
     "report": "Reports",
     "pipeline": "Pipelines",
     "language": "Language",
-    "actions": "Actions"
+    "actions": "Actions",
+    "keyboardShortcuts": "Keyboard Shortcuts"
   },
   "rum": {
     "title": "Real User Monitoring",
