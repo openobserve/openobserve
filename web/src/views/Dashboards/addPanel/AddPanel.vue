@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5">
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full">
     <!-- Header Section (row-1 breadcrumb bar) -->
     <!-- Breadcrumb path lives in the chrome bar (published below). Row 1 carries
          the editable panel-name field (as the title) + the editor actions. -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-      class="tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
+      class="tw:px-4 tw:border-b tw:border-border-default"
     >
           <template #tabs>
             <OInput

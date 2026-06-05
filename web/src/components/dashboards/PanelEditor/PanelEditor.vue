@@ -15,14 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor tw:px-[0.625rem]! tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
+  <div class="panel-editor tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="tw:flex tw:flex-col scroll card-container tw:mr-[0.625rem]"
+          class="tw:flex tw:flex-col scroll card-container tw:bg-surface-panel! tw:border-r tw:border-border-default"
           style="
             overflow-y: auto;
+            overflow-x: hidden;
             height: 100%;
             min-width: 100px;
             max-width: 100px;
@@ -49,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -76,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="tw:flex tw:flex-col card-container"
+                class="tw:flex tw:flex-col card-container tw:bg-surface-panel!"
                 :style="fieldListContainerStyle"
               >
                 <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
@@ -124,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
                   <div
-                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1"
+                    class="tw:flex tw:justify-between tw:items-center"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
@@ -408,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"

@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position tw:h-full tw:pl-[0.625rem]">
+                <div class="relative-position tw:h-full tw:pl-[0.625rem] tw:border-r tw:border-border-default">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -330,7 +330,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-              class="tw:pb-2.5!"
             >
             </VisualizeLogsQuery>
           </div>
@@ -347,7 +346,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
               :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
-              class="tw:pb-2.5!"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"

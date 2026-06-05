@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
-    <div class="tw:text-base tw:font-bold tw:flex-shrink-0">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3">
+    <div class="tw:text-base tw:font-bold tw:flex-shrink-0 tw:my-3">
       {{ t("panel.fields") }}
     </div>
     <OFieldList

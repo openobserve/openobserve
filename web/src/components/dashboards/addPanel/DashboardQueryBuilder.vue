@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="tw:flex tw:mr-2 tw:my-1"
+              class="tw:flex tw:mr-2"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"

@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"

@@ -16,36 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="tw:p-0" style="width: 100px">
-      <ul class="chart-selection-list tw:flex tw:flex-wrap">
+    <div class="tw:p-2" style="width: 100px">
+      <ul class="chart-selection-list tw:grid tw:grid-cols-2 tw:gap-1.5">
         <li
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'dashboard-chart-border',
+            'tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border tw:transition-all tw:duration-150',
             selectedChartType === item.id
-              ? store.state.theme === 'dark'
-                ? 'tw:bg-gray-400'
-                : 'tw:bg-gray-200'
-              : '',
+              ? 'chart-tile-selected'
+              : 'chart-tile-default',
             isChartDisabled(item)
-              ? 'tw:opacity-50 tw:cursor-not-allowed'
+              ? 'tw:opacity-40 tw:cursor-not-allowed'
               : 'tw:cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
-          style="width: 50px"
+          style="height: 40px;"
           data-test="dashboard-addpanel-chart-selection-item"
           :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >
           <div
             :data-test="`selected-chart-${item.id}-item`"
             :data-selected="selectedChartType === item.id ? 'true' : 'false'"
-            class="tw:flex tw:flex-col tw:items-center tw:relative"
+            class="tw:flex tw:items-center tw:justify-center tw:relative tw:w-full tw:h-full"
           >
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="tw:mx-auto tw:my-2"
               style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
@@ -245,5 +242,20 @@ export default defineComponent({
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.chart-tile-default {
+  background-color: var(--color-surface-subtle);
+  border-color: var(--color-border-default);
+}
+
+.chart-tile-default:hover {
+  background-color: var(--color-select-item-hover-bg);
+  border-color: var(--color-border-strong);
+}
+
+.chart-tile-selected {
+  background-color: var(--color-select-item-selected-bg);
+  border-color: var(--color-border-strong);
 }
 </style>
