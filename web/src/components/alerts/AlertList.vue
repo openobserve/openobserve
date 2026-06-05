@@ -306,6 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <OButton
                       v-else
+                      :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
                       class="tw:ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
@@ -319,6 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="toggleAlertState(row)"
                     />
                     <OButton
+                      data-row-action="edit"
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
                       size="icon-sm"
@@ -327,6 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="editAlert(row)"
                     />
                     <OButton
+                      data-row-action="duplicate"
                       :title="t('alerts.clone')"
                       variant="ghost"
                       size="icon-sm"

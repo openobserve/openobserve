@@ -78,6 +78,7 @@ const columns: OTableColumnDef[] = [
       <div class="tw:flex tw:items-center tw:justify-center">
         <OButton
           :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
+          data-row-action="edit"
           variant="ghost"
           size="icon-sm"
           :title="t('common.edit')"
@@ -87,6 +88,7 @@ const columns: OTableColumnDef[] = [
         </OButton>
         <OButton
           :data-test="`iam-roles-delete-${row.role_name}-role-icon`"
+          data-row-action="delete"
           variant="ghost"
           size="icon-sm"
           :title="t('common.delete')"

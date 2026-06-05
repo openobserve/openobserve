@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="search"
                 :title="t('logStream.explore')"
                 data-test="log-stream-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="exploreStream({ row })"
@@ -147,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="description"
                 :title="t('logStream.schemaHeader')"
                 data-test="log-stream-schema-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 @click="listSchema({ row })"
@@ -155,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="delete"
                 :title="t('logStream.delete')"
                 data-test="log-stream-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 @click="confirmDeleteAction({ row })"

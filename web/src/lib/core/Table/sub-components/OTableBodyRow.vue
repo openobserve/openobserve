@@ -2,11 +2,12 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, watch, useSlots } from "vue";
+import { computed, inject, ref, onMounted, onBeforeUnmount, useSlots } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   row: Row<any>;
@@ -50,6 +51,8 @@ const emit = defineEmits<{
   "toggle-expansion": [row: any];
   "row-click": [row: any, event: MouseEvent];
   "row-dblclick": [row: any, event: MouseEvent];
+  "row-mouseenter": [row: any, event: MouseEvent];
+  "row-mouseleave": [row: any];
   "cell-click": [
     params: { columnId: string; row: any; value: any },
   ];
@@ -124,6 +127,49 @@ function onClick(event: MouseEvent) {
 function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
+
+// ── Row hover keyboard shortcuts ──────────────────────────────────
+// Same pattern as PanelContainer.vue — direct keydown on window, gated
+// by isHovered so only the currently hovered row responds.
+// Pages just need data-row-action="edit|delete|pause" on their action buttons.
+const isHovered = ref(false);
+
+const ROW_ACTION_KEYS: Record<string, string> = {
+  e: "edit",
+  d: "duplicate",
+  p: "pause",
+  r: "resume",
+  v: "view",
+  x: "export",
+};
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (!isHovered.value || isInputFocused()) return;
+
+  const action =
+    e.key === "Delete" || e.key === "Backspace"
+      ? "delete"
+      : ROW_ACTION_KEYS[e.key.toLowerCase()];
+
+  if (!action) return;
+
+  const btn = rowRef.value?.querySelector<HTMLElement>(
+    `[data-row-action='${action}']`,
+  );
+  if (btn) { e.preventDefault(); btn.click(); }
+};
+
+onMounted(() => window.addEventListener("keydown", handleKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", handleKeydown));
+
+function onRowMouseenter(e: MouseEvent) {
+  isHovered.value = true;
+  emit("row-mouseenter", props.row.original, e);
+}
+function onRowMouseleave() {
+  isHovered.value = false;
+  emit("row-mouseleave", props.row.original);
+}
 </script>
 
 <template>
@@ -131,7 +177,7 @@ function onDblclick(event: MouseEvent) {
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
     :class="[
-      'tw:transition-colors tw:duration-150',
+      'tw:transition-colors tw:duration-150 tw:group/row',
       clickable ? 'tw:cursor-pointer' : '',
       'tw:hover:bg-[var(--color-table-row-hover-bg)]',
       isRowSelected
@@ -145,6 +191,8 @@ function onDblclick(event: MouseEvent) {
     :style="{ height: 'var(--o2-table-row-height, 2.25rem)', ...rowStyle }"
     @click="onClick"
     @dblclick="onDblclick"
+    @mouseenter="onRowMouseenter"
+    @mouseleave="onRowMouseleave"
   >
     <!-- Status bar color indicator -->
     <td

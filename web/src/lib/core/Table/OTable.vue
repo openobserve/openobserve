@@ -609,6 +609,8 @@ defineExpose({
             emit('row-click', row, evt);
           }"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+          @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
+          @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
           @cell-click="(params: any) => emit('cell-click', params)"
         >
           <!-- Pass through named cell slots from parent (only for columns where parent provides a slot) -->

@@ -313,6 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   data-test="dashboard-duplicate"
+                  data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 />
                 <OButton
@@ -322,6 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   data-test="dashboard-delete"
+                  data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
               </div>

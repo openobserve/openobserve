@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
+              data-row-action="delete"
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -127,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
+              data-row-action="delete"
               @click="confirmRevokeAction(row)"
             >
               <OIcon name="cancel" size="sm" />
@@ -137,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
+              data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
@@ -158,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    
+
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
@@ -586,7 +589,7 @@ export default defineComponent({
               const invitedMembers: any = await getInvitedMembers();
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {

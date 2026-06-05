@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-actions="{ row }">
                 <OButton
                   :data-test="`ingestion-token-${row.name}-toggle`"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-sm"

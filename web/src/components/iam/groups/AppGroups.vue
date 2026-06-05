@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.edit')"
@@ -77,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.delete')"

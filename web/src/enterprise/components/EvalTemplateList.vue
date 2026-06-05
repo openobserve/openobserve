@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-center actions-container">
               <OButton
                 :data-test="`eval-template-list-${row.name}-edit-btn`"
+                data-row-action="edit"
                 icon-left="edit"
                 variant="ghost"
                 size="icon-sm"
@@ -103,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 :data-test="`eval-template-list-${row.name}-delete-btn`"
+                data-row-action="delete"
                 icon-left="delete"
                 variant="ghost-destructive"
                 size="icon-sm"

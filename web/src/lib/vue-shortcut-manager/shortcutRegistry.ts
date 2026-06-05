@@ -34,6 +34,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Table row (hover) ────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.tableRow",
+    shortcuts: [
+      { key: "e",   descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { key: "d",   descriptionKey: "shortcuts.actions.tableRowDuplicate" },
+      { key: "p",   descriptionKey: "shortcuts.actions.tableRowPause" },
+      { key: "r",   descriptionKey: "shortcuts.actions.tableRowResume" },
+      { key: "v",   descriptionKey: "shortcuts.actions.tableRowView" },
+      { key: "x",   descriptionKey: "shortcuts.actions.tableRowExport" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+    ],
+  },
+
   // ── Logs ────────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.logs",

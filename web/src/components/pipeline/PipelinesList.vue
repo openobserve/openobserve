@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -172,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center actions-container">
                 <OButton
                   :data-test="`pipeline-list-${row.name}-pause-start-action`"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
                   variant="ghost"
                   size="icon-sm"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
@@ -180,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   :data-test="`pipeline-list-${row.name}-view-pipeline`"
+                  data-row-action="view"
                   variant="ghost"
                   size="icon-sm"
                   :title="t('pipeline.view')"
@@ -193,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                  data-row-action="edit"
                   variant="ghost"
                   size="icon-sm"
                   @click.stop="editPipeline(row)"

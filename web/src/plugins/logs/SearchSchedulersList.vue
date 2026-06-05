@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div
    class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
   >
@@ -69,6 +69,7 @@
             <template #cell-actions="{ row }">
               <OButton
                 data-test="search-scheduler-cancel-btn"
+                data-row-action="pause"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="cancel"
@@ -82,6 +83,7 @@
 
               <OButton
                 data-test="search-scheduler-delete-btn"
+                data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
@@ -90,6 +92,7 @@
               />
               <OButton
                 data-test="search-scheduler-restart-btn"
+                data-row-action="resume"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="refresh"
@@ -102,6 +105,7 @@
               />
               <OButton
                 data-test="search-scheduler-explore-btn"
+                data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
                 icon-left="search"

@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButton
                 :data-test="`alert-list-${row.name}-update-alert`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.edit')"
@@ -93,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               /></OButton>
               <OButton
                 :data-test="`alert-list-${row.name}-delete-alert`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alerts.delete')"

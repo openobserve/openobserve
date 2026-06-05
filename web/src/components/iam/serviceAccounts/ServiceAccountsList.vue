@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-edit"
+                  data-row-action="edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
                   size="icon-sm"
@@ -118,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
+                  data-row-action="delete"
                   :title="t('serviceAccounts.delete')"
                   variant="ghost"
                   size="icon-sm"

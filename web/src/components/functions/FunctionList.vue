@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     :title="t('function.updateTitle')"
                     data-test="function-list-edit-function-btn"
+                    data-row-action="edit"
                     @click="showAddUpdateFn({ row })"
                     icon-left="edit"
                   />
@@ -87,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     :title="t('function.delete')"
                     data-test="function-list-delete-function-btn"
+                    data-row-action="delete"
                     @click="showDeleteDialogFn({ row })"
                     icon-left="delete"
                   />
@@ -95,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon-sm"
                     icon-left="account-tree"
                     :title="'Associated Pipelines'"
+                    data-row-action="view"
                     @click="getAssociatedPipelines({ row })"
                   />
                 </div>
@@ -560,7 +563,7 @@ export default defineComponent({
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
-    
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };

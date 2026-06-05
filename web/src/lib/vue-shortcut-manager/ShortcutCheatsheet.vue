@@ -176,6 +176,7 @@ const KEY_SYMBOLS: Record<string, string> = {
 function formatKey(key: string): string[] {
   return key.split("+").map((k) => {
     if (k === "ctrl" && isMac.value) return "⌘";
+    if ((k === "delete" || k === "del") && isMac.value) return "⌫";
     return KEY_SYMBOLS[k] ?? k.toUpperCase();
   });
 }

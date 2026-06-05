@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
               <OButton
                 data-test="destination-export"
+                data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
                 title="Export Destination"
@@ -190,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.edit')"
@@ -199,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"

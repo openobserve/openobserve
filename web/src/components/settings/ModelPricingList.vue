@@ -283,6 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 @click.stop="toggleEnabled(row, !row.enabled)"
                 data-test="model-pricing-toggle-btn"
+                :data-row-action="row.enabled ? 'pause' : 'resume'"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
               />
               <OButton
@@ -291,6 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionEdit')"
                 @click.stop="openEditor(row)"
                 data-test="model-pricing-edit-btn"
+                data-row-action="edit"
                 icon-left="edit"
               />
               <OButton
@@ -299,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDelete')"
                 @click.stop="confirmDelete(row)"
                 data-test="model-pricing-delete-btn"
+                data-row-action="delete"
                 icon-left="delete"
               />
               <OButton
@@ -307,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionDuplicate')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-duplicate-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
@@ -317,6 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('modelPricing.actionClone')"
                 @click.stop="duplicateModel(row)"
                 data-test="model-pricing-clone-btn"
+                data-row-action="duplicate"
                 icon-left="content-copy"
               />
             </template>
