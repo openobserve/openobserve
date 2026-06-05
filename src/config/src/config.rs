@@ -580,7 +580,6 @@ pub struct Config {
     pub s3: S3,
     pub sns: Sns,
     pub prom: Prometheus,
-    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -674,28 +673,6 @@ pub struct Smtp {
     pub smtp_from_email: String,
     #[env_config(name = "ZO_SMTP_ENCRYPTION", default = "")]
     pub smtp_encryption: String,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
-pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_ENABLED",
-        default = false,
-        help = "Enable pyroscope profiling with pyroscope-rs"
-    )]
-    pub pyroscope_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040",
-        help = "Pyroscope server URL"
-    )]
-    pub pyroscope_server_url: String,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
-        default = "openobserve",
-        help = "Pyroscope project name"
-    )]
-    pub pyroscope_project_name: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
