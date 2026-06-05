@@ -41,6 +41,7 @@
      there leaves the token undefined and the chrome falls through to the body
      tint.) */
   --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
+  --color-surface-chrome-deeper: var(--color-primary-50);
 
   /* Borders */
   --color-border-default: var(--color-grey-200);
@@ -76,7 +77,8 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle:       var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
-  --color-surface-chrome:       var(--color-surface-chrome);
+  --color-surface-chrome:        var(--color-surface-chrome);
+  --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
   /* Borders */
   --color-border-default: var(--color-border-default);

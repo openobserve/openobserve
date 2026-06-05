@@ -40,6 +40,7 @@
     /* App chrome — a quiet dark backdrop, just slightly lifted from the content
        card (grey-950) so the card still reads as a distinct floating surface. */
     --color-surface-chrome: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-grey-900));
+    --color-surface-chrome-deeper: color-mix(in srgb, var(--color-primary-500) 20%, var(--color-grey-950));
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
