@@ -2,12 +2,13 @@
   <ODialog
     v-model:open="open"
     :title="t('shortcuts.title')"
-    size="md"
+    size="sm"
+    :max-height="65"
     data-test="shortcut-cheatsheet-dialog"
   >
     <!-- Platform label -->
     <div
-      style="font-size: 11px; margin-bottom: 16px"
+      style="font-size: 11px; margin-bottom: 8px"
       class="tw:text-[var(--o2-text-secondary)]"
     >
       {{ isMac ? t("shortcuts.mac") : t("shortcuts.windowsLinux") }}
@@ -17,11 +18,11 @@
     <div
       v-for="group in SHORTCUT_REGISTRY"
       :key="group.pageKey"
-      class="tw:mb-5"
+      class="tw:mb-2"
     >
       <!-- Page section header -->
       <div
-        class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:mb-1.5 tw:pb-1 tw:border-b tw:border-[var(--o2-border)]"
+        class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:mb-0.5 tw:pb-0.5 tw:border-b tw:border-[var(--o2-border)]"
         style="color: var(--o2-primary-color)"
       >
         {{ t(group.pageKey) }}
@@ -32,7 +33,7 @@
         <li
           v-for="s in group.shortcuts"
           :key="s.descriptionKey"
-          class="tw:flex tw:justify-between tw:items-center tw:py-1.5 tw:border-b tw:border-[var(--o2-border)] tw:gap-3"
+          class="tw:flex tw:justify-between tw:items-center tw:py-1 tw:border-b tw:border-[var(--o2-border)] tw:gap-3"
         >
           <span class="tw:text-[13px] tw:text-[var(--o2-text-primary)]">
             {{ t(s.descriptionKey) }}
