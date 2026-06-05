@@ -204,6 +204,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
@@ -645,6 +647,31 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("functions");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "functions",
+        description: "shortcuts.actions.functionsAdd",
+        handler: () => { if (!isInputFocused()) showAddUpdateFn({}); },
+      },
+      {
+        key: "r",
+        scope: "functions",
+        description: "shortcuts.actions.functionsRefresh",
+        handler: () => { if (!isInputFocused()) getJSTransforms(); },
+      },
+      {
+        key: "/",
+        scope: "functions",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="functions-list-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
 
     return {
       t,

@@ -294,6 +294,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -838,6 +840,32 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("streams");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "streams",
+        description: "shortcuts.actions.streamsAdd",
+        handler: () => { if (!isInputFocused()) addStream(); },
+      },
+      {
+        key: "r",
+        scope: "streams",
+        description: "shortcuts.actions.streamsRefresh",
+        handler: () => { if (!isInputFocused()) getLogStream(true); },
+      },
+      {
+        key: "/",
+        scope: "streams",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="streams-search-stream-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
+
     return {
       t,
       router,

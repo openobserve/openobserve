@@ -497,6 +497,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -1218,6 +1220,37 @@ const onBackfillSuccess = (jobId: string) => {
   // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("pipelines");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "pipelines",
+    description: "shortcuts.actions.pipelinesAdd",
+    handler: () => { if (!isInputFocused()) routeToAddPipeline(); },
+  },
+  {
+    key: "i",
+    scope: "pipelines",
+    description: "shortcuts.actions.pipelinesImport",
+    handler: () => { if (!isInputFocused()) routeToImportPipeline(); },
+  },
+  {
+    key: "r",
+    scope: "pipelines",
+    description: "shortcuts.actions.pipelinesRefresh",
+    handler: () => { if (!isInputFocused()) getPipelines(); },
+  },
+  {
+    key: "/",
+    scope: "pipelines",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="pipeline-list-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 </script>
 <style lang="scss" scoped>
 .expanded-content {
