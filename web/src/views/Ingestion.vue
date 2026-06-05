@@ -105,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
     <!-- Tab bar: no bordered card — just a bottom separator like the header. -->
-    <div class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
-      <div class="tw:-mb-[0.15625rem]">
+    <div class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:-mt-2">
+      <div class="tw:-mb-0.75">
           <OTabs v-model="ingestTabType" horizontal align="left">
             <ORouteTab
               name="recommended"
