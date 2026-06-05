@@ -545,7 +545,7 @@ export default defineComponent({
           accessorKey: "role_name",
           sortable: true,
           cell: (info: any) => info.getValue(),
-          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+          meta: { align: "left" },
         },
         {
           id: "list",
