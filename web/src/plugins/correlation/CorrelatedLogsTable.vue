@@ -44,6 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
+          <!-- Wrap Content Button -->
+          <OButton
+            variant="ghost"
+            size="icon"
+            :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            data-test="correlated-logs-table-wrap-content-btn"
+            @click="wrapTableCells = !wrapTableCells"
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
+
           <!-- Column Visibility Dropdown -->
           <div class="tw:pr-4">
             <ODropdown
@@ -152,6 +164,19 @@ class="tw:mr-1" />
 
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
+      <!-- Wrap Content Button -->
+      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-3">
+        <OButton
+          variant="ghost"
+          size="icon"
+          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+          data-test="correlated-logs-table-wrap-content-btn"
+          @click="wrapTableCells = !wrapTableCells"
+        >
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
+      </div>
       <!-- Logs Table or Skeleton -->
       <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
         <!-- Actual Table (when data is loaded) -->
@@ -241,6 +266,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
@@ -313,6 +339,8 @@ const jsonPreviewStreamName = computed(() => {
   return '';
 });
 
+const TIMESTAMP_COL_WIDTH = 225;
+
 // Component state
 const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
@@ -321,12 +349,14 @@ const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+const containerWidth = ref(window.innerWidth);
 
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
 
 // Simple canvas context for width calculation
 let canvasContext: CanvasRenderingContext2D | null = null;
+let resizeObserver: ResizeObserver | null = null;
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -382,6 +412,15 @@ onMounted(async () => {
     canvasContext = canvas.getContext("2d");
   } catch (error) {
     console.warn("Canvas not available, using default widths");
+  }
+
+  // Track table container width for dynamic column cap
+  const el = document.querySelector(".logs-table-container");
+  if (el) {
+    resizeObserver = new ResizeObserver(([entry]) => {
+      containerWidth.value = entry.contentRect.width;
+    });
+    resizeObserver.observe(el);
   }
 });
 
@@ -666,7 +705,17 @@ const visibleFields = computed(() => {
   );
 });
 
-// Memoized column widths - only recalculate when data or visible fields change
+// Compute per-column max cap based on container width and number of visible columns.
+// totalCols includes timestamp (+1). With only 2 columns (timestamp + 1 other) the
+// other column can use all remaining width; with 3+ we reserve 20px for the scrollbar.
+const columnMaxCap = computed(() => {
+  const totalCols = visibleFields.value.length + 1;
+  return totalCols <= 2
+    ? containerWidth.value - TIMESTAMP_COL_WIDTH
+    : containerWidth.value - TIMESTAMP_COL_WIDTH - 30;
+});
+
+// Memoized column widths - only recalculate when data, visible fields, or container width changes
 const memoizedColumnWidths = computed(() => {
   const widthMap: Record<string, number> = {};
 
@@ -675,8 +724,9 @@ const memoizedColumnWidths = computed(() => {
     return widthMap;
   }
 
+  const maxCap = columnMaxCap.value;
   visibleFields.value.forEach((field) => {
-    widthMap[field] = getColumnWidth(field);
+    widthMap[field] = getColumnWidth(field, maxCap);
   });
 
   return widthMap;
@@ -726,7 +776,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
           }
           return value !== null && value !== undefined ? String(value) : "";
         },
-        size: 260,
+        size: TIMESTAMP_COL_WIDTH,
         meta: {
           closable: false,
           showWrap: false,
@@ -749,7 +799,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
       },
       cell: (info: any) => info.getValue(),
       size: getColumnWidthHelper(field),
-      maxSize: window.innerWidth,
+      maxSize: containerWidth.value,
       meta: {
         closable: true,
         showWrap: true,
@@ -774,6 +824,25 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         wrapContent: false,
       },
     } as any);
+  }
+
+  // Last-column fill: if total column widths leave unused horizontal space and the
+  // last column is a long-text field, expand it to fill the remaining width.
+  const totalWidth = columns.reduce((sum, col: any) => sum + (col.size ?? 150), 0);
+  const lastCol = columns[columns.length - 1] as any;
+  if (
+    totalWidth < containerWidth.value &&
+    lastCol &&
+    longTextFields.includes(lastCol.name as string)
+  ) {
+    lastCol.size = (lastCol.size ?? 150) + (containerWidth.value - totalWidth);
+  }
+
+  // Always leave 12px clearance on the last resizable column so the resize
+  // handle stays visible and grabbable at the container edge.
+  const lastResizableCol = [...columns].reverse().find((col: any) => col.enableResizing) as any;
+  if (lastResizableCol) {
+    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - 12);
   }
 
   return columns;
@@ -1042,14 +1111,14 @@ const handleNestedCorrelation = (row: any) => {
 };
 
 // Simple column width calculation for correlation data
-const getColumnWidth = (field: string): number => {
+const getColumnWidth = (field: string, maxCap: number): number => {
   // Skip excluded columns - use defaults
   if (field === "_timestamp" || field === "source") {
     return longTextFields.includes(field) ? 400 : 150;
   }
 
   if (!canvasContext) {
-    return longTextFields.includes(field) ? 400 : 150;
+    return longTextFields.includes(field) ? Math.min(400, maxCap) : 150;
   }
 
   try {
@@ -1071,11 +1140,11 @@ const getColumnWidth = (field: string): number => {
     }
 
     max += 24; // padding
-    if (max > 800) return 800;
+    if (max > maxCap) return maxCap;
     if (max < 150) return 150;
     return max;
   } catch {
-    return longTextFields.includes(field) ? 400 : 150;
+    return longTextFields.includes(field) ? Math.min(400, maxCap) : 150;
   }
 };
 
@@ -1083,6 +1152,10 @@ const getColumnWidth = (field: string): number => {
 onMounted(() => {
   // Fetch logs on mount
   fetchCorrelatedLogs();
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
 });
 
 // Watch for prop changes
@@ -1154,6 +1227,7 @@ watch(
 .tw\:overflow-auto {
   scroll-behavior: smooth;
 }
+
 
 // Column visibility list styling
 .column-visibility-list {
