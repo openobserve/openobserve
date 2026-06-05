@@ -326,6 +326,7 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
+import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -579,6 +580,20 @@ export default defineComponent({
       }
     };
 
+    // The fx toggle is PER QUERY: reflect the active query's flag whenever the
+    // tab changes (and on mount) so switching tabs shows that query's VRL state.
+    // Resolution rule is shared (see resolveQueryVrlEnabled).
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      (idx) => {
+        dashboardPanelData.layout.vrlFunctionToggle = resolveQueryVrlEnabled(
+          dashboardPanelData.data.queries[idx],
+          dashboardPanelData.data.config,
+        );
+      },
+      { immediate: true },
+    );
+
     // Keep the splitter in sync with the VRL toggle / query mode. Runs
     // immediately (so a panel reopened with the toggle already ON gets the 70/30
     // split instead of a stale 100/0 that hides the VRL editor) and on tab
@@ -754,28 +769,26 @@ export default defineComponent({
     };
 
     const onFunctionToggle = (value, event) => {
-      event.stopPropagation();
+      // OSwitch's @update:model-value calls this with only the value (no event),
+      // so guard it — otherwise this throws before the config flag is written.
+      event?.stopPropagation();
+
+      // The VRL toggle is PER QUERY. Persist it on the active query's config so
+      // the executor can gate query_fn for just that query — WITHOUT destroying
+      // the VRL text (toggling off keeps what was typed; it just isn't applied).
+      const idx = dashboardPanelData.layout.currentQueryIndex;
+      if (dashboardPanelData.data.queries[idx]?.config) {
+        dashboardPanelData.data.queries[idx].config.vrl_function_enabled = value;
+      }
 
       if (value) {
         // show function editor pane (avoid leaving a stale 100/0 split that
         // would render the VRL editor at zero width)
         if (!promqlMode.value) splitterModel.value = 70;
-      }
-
-      // if value is false
-      if (!value) {
-        // hide function editor
+      } else {
+        // hide function editor; keep the VRL text but clear the derived field
+        // list shown in the Fields panel since VRL is no longer applied.
         splitterModel.value = 100;
-
-        // The VRL toggle is global: turning it OFF disables VRL for EVERY query
-        // so no query_fn is sent for any of them. Clear each query's VRL text
-        // and its per-query VRL field cache (not just the active tab's).
-        dashboardPanelData.data.queries.forEach((query: any, idx: number) => {
-          query.vrlFunctionQuery = "";
-          if (dashboardPanelData.meta.queryFields[idx]) {
-            dashboardPanelData.meta.queryFields[idx].vrlFunctionFieldList = [];
-          }
-        });
         dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 

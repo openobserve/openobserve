@@ -229,6 +229,7 @@ import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -556,15 +557,14 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
-        // check if vrl function exists
-        if (
+        // Restore the VRL toggle for the active query (shared per-query
+        // resolution — see resolveQueryVrlEnabled).
+        dashboardPanelData.layout.vrlFunctionToggle = resolveQueryVrlEnabled(
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery
-        ) {
-          // enable vrl function editor
-          dashboardPanelData.layout.vrlFunctionToggle = true;
-        }
+          ],
+          dashboardPanelData.data.config,
+        );
 
         await nextTick();
         // Initialize PanelEditor's chartData after loading panel data

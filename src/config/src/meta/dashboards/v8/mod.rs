@@ -457,6 +457,11 @@ pub struct PanelConfig {
     panel_time_enabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     panel_time_range: Option<PanelTimeRange>,
+    // Legacy panel-level VRL enable flag. Retained for backward compatibility
+    // with dashboards saved while VRL was a global toggle; the per-query flag
+    // (QueryConfig.vrl_function_enabled) takes precedence going forward.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vrl_function_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -629,6 +634,11 @@ pub struct QueryConfig {
     time_shift: Option<Vec<TimeShift>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     query_label: Option<String>,
+    // Per-query VRL enable flag. Absent (None) on dashboards saved before this
+    // existed — treated as enabled so existing VRL keeps applying; only an
+    // explicit `false` disables the query's VRL function.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vrl_function_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
@@ -1238,6 +1248,7 @@ mod tests {
             max: None,
             time_shift: None,
             query_label: None,
+            vrl_function_enabled: None,
         };
         let json = serde_json::to_string(&qc).unwrap();
         assert!(!json.contains("step_value"));
@@ -1248,6 +1259,7 @@ mod tests {
         assert!(!json.contains("\"max\""));
         assert!(!json.contains("timeShift"));
         assert!(!json.contains("query_label"));
+        assert!(!json.contains("vrl_function_enabled"));
     }
 
     #[test]

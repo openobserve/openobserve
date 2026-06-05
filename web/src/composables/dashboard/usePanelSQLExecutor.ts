@@ -16,6 +16,7 @@
 import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
+import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import {
   detectChunkingDirection,
@@ -94,6 +95,13 @@ export const usePanelSQLExecutor = (ctx: {
 
   const { checkTimestampAlias } = logsUtils();
 
+  // Build the encoded query_fn for a query, honoring the per-query VRL gate
+  // (shared resolution — see resolveQueryVrlEnabled).
+  const buildQueryFn = (it: any) =>
+    resolveQueryVrlEnabled(it, panelSchema?.value?.config) && it?.vrlFunctionQuery
+      ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
+      : null;
+
   const getFallbackOrderByCol = () => {
     // from panelSchema, get first x axis field alias
     if (panelSchema?.value?.queries?.[0]?.fields?.x) {
@@ -111,9 +119,7 @@ export const usePanelSQLExecutor = (ctx: {
   ) => {
     return {
       sql: query,
-      query_fn: it.vrlFunctionQuery
-        ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
-        : null,
+      query_fn: buildQueryFn(it),
       // if i == 0 ? then do gap of 7 days
       start_time: startISOTimestamp,
       end_time: endISOTimestamp,
@@ -365,9 +371,7 @@ export const usePanelSQLExecutor = (ctx: {
               queryReq: {
                 query: {
                   sql: searchQueries,
-                  query_fn: it.vrlFunctionQuery
-                    ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
-                    : null,
+                  query_fn: buildQueryFn(it),
                   start_time: startISOTimestamp,
                   end_time: endISOTimestamp,
                   per_query_response: true,
@@ -830,9 +834,7 @@ export const usePanelSQLExecutor = (ctx: {
               endISOTimestamp,
               timeRangeGap.seconds,
             ),
-            query_fn: it.vrlFunctionQuery
-              ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
-              : null,
+            query_fn: buildQueryFn(it),
           });
 
           allMetadata.push({
@@ -882,9 +884,7 @@ export const usePanelSQLExecutor = (ctx: {
           sql: query,
           start_time: startISOTimestamp,
           end_time: endISOTimestamp,
-          query_fn: it.vrlFunctionQuery
-            ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
-            : null,
+          query_fn: buildQueryFn(it),
         });
 
         allMetadata.push({
