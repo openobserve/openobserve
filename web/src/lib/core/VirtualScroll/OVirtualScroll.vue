@@ -46,7 +46,7 @@ const itemsRef = computed(() => props.items);
 
 const dynamicRowHeightRef = computed(() => props.dynamicRowHeight);
 
-const { virtualItems, totalSize, visibleRange, scrollToIndex, scrollToTop, measure, measureElement } =
+const { virtualItems, totalSize, scrollMargin, visibleRange, scrollToIndex, scrollToTop, measure, measureElement } =
   useVirtualScroll({
     items: itemsRef,
     parentRef,
@@ -101,12 +101,16 @@ defineExpose({
     data-test="o2-virtual-scroll"
     :style="containerStyle"
   >
-    <!-- Spacer div that gives the scroll container the full virtual height -->
+    <!-- Spacer div that gives the scroll container the full virtual height.
+         Subtract scrollMargin so the spacer covers only the items themselves —
+         the header/histogram above this container already occupies that space. -->
     <div
       class="o2-virtual-scroll__content"
-      :style="{ height: `${totalSize}px`, position: 'relative' }"
+      :style="{ height: `${totalSize - scrollMargin}px`, position: 'relative' }"
     >
-      <!-- One wrapper per visible virtual item — absolutely positioned -->
+      <!-- One wrapper per visible virtual item — absolutely positioned.
+           vItem.start is relative to the scroll container top (includes scrollMargin),
+           so subtract scrollMargin to get the offset relative to this spacer. -->
       <div
         v-for="vItem in virtualItems"
         :key="String(vItem.key)"
@@ -116,7 +120,7 @@ defineExpose({
           top: 0,
           left: 0,
           width: '100%',
-          transform: `translateY(${vItem.start}px)`,
+          transform: `translateY(${vItem.start - scrollMargin}px)`,
         }"
         :ref="(node) => dynamicRowHeight && vItem && measureElement(node)"
       >
