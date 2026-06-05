@@ -18,7 +18,7 @@ use axum::{Json, extract::Path, http::StatusCode, response::Response};
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::{UserEmail, is_root_user}},
     handler::http::{
         extractors::Headers,
         models::destinations::Template,
@@ -73,9 +73,13 @@ impl From<TemplateError> for Response {
         ("x-o2-mcp" = json!({"description": "Create alert template", "category": "alerts"}))
     )
 )]
-pub async fn save_template(Path(org_id): Path<String>, Json(tmpl): Json<Template>) -> Response {
+pub async fn save_template(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(tmpl): Json<Template>,
+) -> Response {
     let tmpl = tmpl.into(&org_id);
-    match templates::save("", tmpl, true).await {
+    match templates::save("", tmpl, true, is_root_user(&user_email.user_id)).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Template saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
@@ -116,10 +120,11 @@ pub async fn save_template(Path(org_id): Path<String>, Json(tmpl): Json<Template
 )]
 pub async fn update_template(
     Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(tmpl): Json<Template>,
 ) -> Response {
     let tmpl = tmpl.into(&org_id);
-    match templates::save(&name, tmpl, false).await {
+    match templates::save(&name, tmpl, false, is_root_user(&user_email.user_id)).await {
         Ok(_) => MetaHttpResponse::ok("Template updated"),
         Err(e) => e.into(),
     }
@@ -252,8 +257,11 @@ pub async fn list_templates(
         ("x-o2-mcp" = json!({"description": "Delete alert template", "category": "alerts", "requires_confirmation": true}))
     )
 )]
-pub async fn delete_template(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match templates::delete(&org_id, &name).await {
+pub async fn delete_template(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    match templates::delete(&org_id, &name, is_root_user(&user_email.user_id)).await {
         Ok(_) => MetaHttpResponse::ok("Template deleted"),
         Err(e) => e.into(),
     }
@@ -290,14 +298,15 @@ pub async fn delete_template_bulk(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BulkDeleteRequest>,
 ) -> Response {
-    let _user_id = user_email.user_id;
+    let user_id = user_email.user_id;
+    let root = is_root_user(&user_id);
 
     #[cfg(feature = "enterprise")]
     for name in &req.ids {
         if !check_permissions(
             name,
             &org_id,
-            &_user_id,
+            &user_id,
             "templates",
             "DELETE",
             None,
@@ -316,7 +325,7 @@ pub async fn delete_template_bulk(
     let mut err = None;
 
     for name in req.ids {
-        match templates::delete(&org_id, &name).await {
+        match templates::delete(&org_id, &name, root).await {
             Ok(_) => {
                 successful.push(name);
             }
