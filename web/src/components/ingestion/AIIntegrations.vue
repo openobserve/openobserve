@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:h-full tw:gap-0">
-    <div class="tw:w-[200px] tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
+    <div class="tw:w-[200px] tw:flex tw:flex-col tw:border-r tw:border-border-default">
+      <div class="tw:flex-1 tw:min-h-0 tw:bg-surface-panel el-border-radius">
         <div class="tw:overflow-y-auto tw:h-full">
           <OTabs
             v-model="selectedCategory"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:w-[250px] tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
+      <div class="tw:flex-1 tw:min-h-0 tw:bg-surface-panel el-border-radius">
         <div class="tw:flex tw:flex-col tw:h-full">
           <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
           <OSearchInput

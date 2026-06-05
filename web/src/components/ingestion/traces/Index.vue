@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full">
+        <div class="tw:h-full tw:bg-surface-panel">
           <OTabs
             v-model="ingestiontabs"
             orientation="vertical"

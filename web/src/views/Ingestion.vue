@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('ingestion.header')"
       icon="data-plus-line"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="tw:shrink-0 tw:px-4"
     >
       <template #actions>
         <div class="tw:w-50 tw:flex-none">
@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- Tab bar: no bordered card — just a bottom separator like the header. -->
     <div class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+      <div class="tw:-mb-[0.15625rem]">
           <OTabs v-model="ingestTabType" horizontal align="left">
             <ORouteTab
               name="recommended"
@@ -221,8 +222,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('ingestion.otherLabel')"
             />
           </OTabs>
+      </div>
     </div>
-    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5">
+    <div class="tw:flex-1 tw:min-h-0">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
