@@ -1,6 +1,7 @@
 on:
-  push:
-    tags:
+  pull_request:
+    branches:
+      - main
       - "v*.*.*"
 name: Release
 env:
@@ -11,21 +12,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
-            features: "--features mimalloc"
-            file_name: openobserve-${{ github.ref_name }}-linux-amd64
-            file_ext: .tar.gz
-          - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
-            features: "--features mimalloc"
-            file_name: openobserve-${{ github.ref_name }}-linux-amd64-simd
-            file_ext: .tar.gz
-          - arch: x86_64-unknown-linux-musl
-            os: ubicloud-standard-8
-            features: "--features mimalloc"
-            file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
-            file_ext: .tar.gz
           - arch: aarch64-unknown-linux-musl
             os: ubicloud-standard-16-arm
             features: "--features mimalloc"
@@ -36,21 +22,6 @@ jobs:
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
-          - arch: x86_64-apple-darwin
-            os: macos-latest
-            features: "--features mimalloc"
-            file_name: openobserve-${{ github.ref_name }}-darwin-amd64
-            file_ext: .tar.gz
-          - arch: aarch64-apple-darwin
-            os: macos-latest
-            features: "--features mimalloc"
-            file_name: openobserve-${{ github.ref_name }}-darwin-arm64
-            file_ext: .tar.gz
-          - arch: x86_64-pc-windows-msvc
-            os: windows-2022-16-cores
-            features: ""
-            file_name: openobserve-${{ github.ref_name }}-windows-amd64
-            file_ext: .zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout sources
@@ -106,14 +77,7 @@ jobs:
         if: contains(matrix.arch, 'linux-gnu')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
-
-      - name: Install dependencies for linux-musl
-        if: contains(matrix.arch, 'linux-musl')
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
-          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+          sudo apt-get -y install libssl-dev pkg-config gcc g++ g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
