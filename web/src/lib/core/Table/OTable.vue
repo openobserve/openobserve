@@ -254,6 +254,16 @@ const {
   emit,
 );
 
+// ── Column resize reset ─────────────────────────────────────────
+const hasResizedColumns = computed(() =>
+  Object.keys(table.getState().columnSizing).length > 0,
+);
+
+function handleResetColumnSizes(): void {
+  table.resetColumnSizing?.();
+  persistence.saveColumnSizes({});
+}
+
 // ── Pagination ──────────────────────────────────────────────────
 const pagination = useTablePagination(table, {
   pagination: props.pagination,
@@ -492,8 +502,10 @@ defineExpose({
         v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
         :columns="props.columns"
         :column-visibility="internalColumnVisibility"
+        :has-resized-columns="props.enableColumnResize && hasResizedColumns"
         data-test="o2-table-column-toggle"
         @update:column-visibility="handleColumnVisibilityChange"
+        @reset:column-sizes="handleResetColumnSizes"
       />
     </div>
 
@@ -786,8 +798,10 @@ defineExpose({
           v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
           :columns="props.columns"
           :column-visibility="internalColumnVisibility"
+          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
           data-test="o2-table-column-toggle"
           @update:column-visibility="handleColumnVisibilityChange"
+          @reset:column-sizes="handleResetColumnSizes"
         />
         <slot
           v-if="slots.bottom"
