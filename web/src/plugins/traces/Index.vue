@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:border-r tw:border-border-default">
+                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"

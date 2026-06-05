@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col index-menu tw:p-[0.375rem]!">
+  <div class="tw:flex tw:flex-col index-menu tw:p-[0.375rem]! tw:bg-surface-panel!">
     <OSelect
       data-test="log-search-index-list-select-stream"
       :model-value="searchObj.data.stream.selectedStream?.value ?? null"
