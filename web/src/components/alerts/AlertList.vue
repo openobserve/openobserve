@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5"
+      class="tw:flex-1 tw:flex tw:min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
         <div class="tw:h-full">
           <FolderList
             type="alerts"

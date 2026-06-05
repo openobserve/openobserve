@@ -40,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
     <div
       data-test="report-list-splitter"
-      class="report-list-table tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5"
+      class="report-list-table tw:flex-1 tw:flex tw:min-h-0"
     >
       <!-- Left: folder list -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
         <div class="tw:h-full">
           <FolderList
             type="reports"

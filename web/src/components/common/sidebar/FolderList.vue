@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="card-container tw:bg-surface-base tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
+  <div class="tw:bg-surface-panel tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
         <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon"
               @click.stop="addFolder"
               data-test="dashboard-new-folder-btn"
@@ -33,8 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <OSeparator class="tw:h-[2px] tw:mb-1 tw:mt-[3px]" />
-
         <!-- Search Input -->
         <div class="tw:px-2 tw:py-1">
           <OSearchInput
