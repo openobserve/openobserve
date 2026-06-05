@@ -2,6 +2,8 @@
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed, getCurrentInstance, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
+import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
+import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
 import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
 
@@ -38,6 +40,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
+  persistColumns: false,
   loading: false,
   streaming: false,
   error: null,
@@ -55,6 +58,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   defaultColumns: true,
   footerTitle: "",
   showHeader: true,
+  fillHeight: true,
 });
 
 const emit = defineEmits<OTableEmits<TData>>();
@@ -161,6 +165,38 @@ function handleGlobalFilterChange(value: string) {
   }
 }
 
+// ── Column persistence ──────────────────────────────────────────
+const persistence = useTableColumnPersistence({
+  tableId: props.tableId,
+  enabled: props.persistColumns && !!props.tableId,
+});
+
+// Internal column visibility — merges the prop default with any persisted
+// overrides. Managed as a ref so OTableColumnToggle can mutate it without
+// requiring the parent to bind v-model:columnVisibility.
+const internalColumnVisibility = ref<Record<string, boolean>>({
+  ...(props.columnVisibility ?? {}),
+  ...(persistence.loadColumnVisibility() ?? {}),
+});
+
+// Keep in sync when the parent's prop changes (e.g. programmatic reset)
+watch(
+  () => props.columnVisibility,
+  (val) => {
+    if (!val) return;
+    internalColumnVisibility.value = {
+      ...val,
+      ...(persistence.isActive ? persistence.loadColumnVisibility() ?? {} : {}),
+    };
+  },
+);
+
+function handleColumnVisibilityChange(visibility: Record<string, boolean>): void {
+  internalColumnVisibility.value = visibility;
+  persistence.saveColumnVisibility(visibility);
+  emit("column-visibility-change", visibility);
+}
+
 // ── Tree mode ───────────────────────────────────────────────────
 const tree = useTableTree<TData>(
   {
@@ -203,8 +239,9 @@ const {
     enableColumnResize: props.enableColumnResize,
     enableColumnReorder: props.enableColumnReorder,
     enableColumnPin: props.enableColumnPin,
-    get columnVisibility() { return props.columnVisibility; },
+    get columnVisibility() { return internalColumnVisibility.value; },
     defaultColumns: props.defaultColumns,
+    initialColumnSizes: persistence.loadColumnSizes(),
     getSubRows: props.getSubRows,
     pagination: props.pagination,
     sorting: props.sorting,
@@ -213,6 +250,16 @@ const {
   },
   emit,
 );
+
+// ── Column resize reset ─────────────────────────────────────────
+const hasResizedColumns = computed(() =>
+  Object.keys(table.getState().columnSizing).length > 0,
+);
+
+function handleResetColumnSizes(): void {
+  table.resetColumnSizing?.();
+  persistence.saveColumnSizes({});
+}
 
 // ── Pagination ──────────────────────────────────────────────────
 const pagination = useTablePagination(table, {
@@ -237,6 +284,11 @@ const selection = useTableSelection(table, {
   selection: props.selection,
   get selectedIds() { return props.selectedIds; },
   rowKey: props.rowKey,
+  // Forward the per-row guard so "Select All" only toggles rows the caller
+  // marked selectable. Without this, parents that drop non-selectable rows
+  // from `selectedIds` can never reach a fully-selected state and the header
+  // checkbox stays stuck in "select" mode forever.
+  get isRowSelectable() { return props.isRowSelectable; },
 }, emit);
 
 // ── Expansion ───────────────────────────────────────────────────
@@ -273,7 +325,7 @@ const columnMgmt = useTableColumnManagement(
   {
     enableColumnResize: props.enableColumnResize,
     enableColumnReorder: props.enableColumnReorder,
-    get columnVisibility() { return props.columnVisibility; },
+    get columnVisibility() { return internalColumnVisibility.value; },
     columnOrder,
     columnIds,
     pinnedFirstColumn: undefined,
@@ -350,7 +402,7 @@ function handleScroll(event: Event) {
   }
 }
 
-// ── Debounced column size emission ─────────────────────────────
+// ── Debounced column size emission + persistence ────────────────
 let columnSizeTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   () => table.getState().columnSizing,
@@ -363,6 +415,7 @@ watch(
         idMap[col.id] = col.id;
       }
       emit("update:columnSizes", newSizes as Record<string, number>, idMap);
+      persistence.saveColumnSizes(newSizes as Record<string, number>);
     }, 500);
   },
   { deep: true },
@@ -380,6 +433,11 @@ defineExpose({
   resetColumnOrder: () => {
     columnOrder.value = props.columns.map((c) => c.id);
   },
+  resetPersistedColumns: () => {
+    persistence.clearPersistedState();
+    internalColumnVisibility.value = { ...(props.columnVisibility ?? {}) };
+    table.resetColumnSizing?.();
+  },
   scrollToTop: () => {
     if (scrollContainerRef.value) {
       scrollContainerRef.value.scrollTop = 0;
@@ -394,7 +452,7 @@ defineExpose({
 <template>
   <div
     data-test="o2-table-root"
-    class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+    :class="['tw:flex tw:flex-col tw:overflow-hidden', props.fillHeight ? 'tw:h-full' : 'tw:h-auto']"
   >
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
@@ -413,15 +471,12 @@ defineExpose({
       <slot name="toolbar" />
     </div>
     <!-- ── Built-in global search ─────────────────────────── -->
-    <!-- No distinct background — matches the #toolbar slot so a table's search
-         row looks identical whether it uses the built-in filter or a custom
-         toolbar (kept consistent across IAM / settings / streams / etc.). -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
       data-test="o2-table-global-filter"
     >
-      <div class="tw:relative tw:max-w-xs">
+      <div class="tw:relative tw:max-w-xs tw:flex-1">
         <OIcon
           name="search"
           size="sm"
@@ -436,7 +491,19 @@ defineExpose({
           @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
         />
       </div>
+
+      <!-- Column visibility toggle — inline with search bar -->
+      <OTableColumnToggle
+        v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
+        :columns="props.columns"
+        :column-visibility="internalColumnVisibility"
+        :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+        data-test="o2-table-column-toggle"
+        @update:column-visibility="handleColumnVisibilityChange"
+        @reset:column-sizes="handleResetColumnSizes"
+      />
     </div>
+
 
     <!-- ── Loading banner (shown when streaming with existing data) ──
          Only used for the streaming pattern now — when `loading=true`,
@@ -456,7 +523,7 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      class="tw:flex tw:flex-col tw:flex-1 tw:overflow-auto tw:min-h-0 tw:relative"
+      :class="['tw:flex tw:flex-col tw:overflow-auto tw:min-h-0 tw:relative', props.fillHeight ? 'tw:flex-1' : '']"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'
@@ -508,7 +575,10 @@ defineExpose({
           :sticky-col-totals="props.stickyColTotals"
           @toggle-all-rows="selection.toggleAllRows"
           @sort="sorting.handleSort"
-          @column-close="columnMgmt.closeColumn"
+          @column-close="(colId: string) => {
+            columnMgmt.closeColumn(colId);
+            persistence.saveColumnVisibility(internalColumnVisibility.value);
+          }"
           @update:column-order="(order: string[]) => { columnOrder = order; }"
           @drag-start="columnMgmt.onDragStart"
           @drag-end="columnMgmt.onDragEnd"
@@ -714,8 +784,22 @@ defineExpose({
     >
       <!-- OTablePagination authoritatively swaps the slot for a skeleton when
            its `loading` prop is true, so we can always pass the slot. -->
-      <template v-if="slots.bottom" #actions>
+      <template
+        v-if="slots.bottom || (props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction))"
+        #actions
+      >
+        <!-- Column visibility toggle in the footer left area -->
+        <OTableColumnToggle
+          v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
+          :columns="props.columns"
+          :column-visibility="internalColumnVisibility"
+          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+          data-test="o2-table-column-toggle"
+          @update:column-visibility="handleColumnVisibilityChange"
+          @reset:column-sizes="handleResetColumnSizes"
+        />
         <slot
+          v-if="slots.bottom"
           name="bottom"
           :current-page="pagination.currentPage.value"
           :page-size="pagination.pageSize.value"
