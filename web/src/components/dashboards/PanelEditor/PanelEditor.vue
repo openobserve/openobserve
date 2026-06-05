@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="mainContentAreaClass" :style="afterSlotStyle">
               <div :class="afterSlotInnerClass" :style="afterSlotInnerStyle">
                 <div
-                  class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full"
+                  class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full tw:mt-1"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->

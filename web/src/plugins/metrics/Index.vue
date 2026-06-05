@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5" data-test="metrics-page">
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full" data-test="metrics-page">
     <!-- Standard page header: title + icon + all query controls on ONE line
          (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
     <AppPageHeader
       :title="t('search.metrics')"
       icon="bar-chart"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2.5"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
         <syntax-guide-metrics />
