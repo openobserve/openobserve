@@ -533,9 +533,9 @@
     "ingestion_limit": "Inslimiet",
     "today_usage": "Het gebruik van vandaag",
     "feature_comparision_ent_msg": "U gebruikt OpenObserve Enterprise Edition met toegang tot alle geavanceerde functies die hieronder worden vermeld.",
-    "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 200 GB/dag (~6 TB per maand) aan gegevensinvoer.",
+    "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 50 GB/dag (~1.5 TB per maand) aan gegevensinvoer.",
     "feature_comparision_os_msg": "U gebruikt momenteel OpenObserve Open Source Edition. Upgrade naar Enterprise Edition om geavanceerde functies te ontgrendelen die in de vergelijkingstabel hieronder worden vermeld.",
-    "feature_comparision_good_news": "Goed nieuws: OpenObserve Enterprise Edition is volledig gratis voor maximaal 200 GB/dag (~6 TB/maand) aan gegevensinvoer.",
+    "feature_comparision_good_news": "Goed nieuws: OpenObserve Enterprise Edition is volledig gratis voor maximaal 50 GB/dag (~1.5 TB/maand) aan gegevensinvoer.",
     "commit_lbl": "Committeren",
     "build_lbl": "Gebouwd",
     "no_license_installed_lbl": "Geen licentie geïnstalleerd",
@@ -590,14 +590,14 @@
     "value_support_enterprise": "Onderneming",
     "value_support_cloud": "Wolk",
     "value_cost_free": "Gratis",
-    "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 200 GB aan data die per dag wordt opgenomen. Daarna betaald",
+    "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 50 GB aan data die per dag wordt opgenomen. Daarna betaald",
     "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald",
     "feature_comparison_lbl": "Vergelijking van functies",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise-functies",
         "offer_text": "Krijg alle zakelijke functies volledig gratis wanneer u OpenObserve zelf host",
-        "badge_text": "Gratis tot 200 GB per dag",
+        "badge_text": "Gratis tot 50 GB per dag",
         "features_title": "OpenObserve Cloud-functies",
         "features_subtitle": "Alle functies inbegrepen in je cloud-abonnement",
         "primary_button_text": "Nu downloaden"
@@ -609,7 +609,7 @@
         "features_title": "Beschikbare functies voor bedrijven",
         "features_subtitle": "Ontvang een gratis licentie om onbeperkte mogelijkheden te ontgrendelen",
         "primary_button_text": "Ontvang een gratis licentie",
-        "license_note": "100 GB/dag zonder licentie • 200 GB/dag met licentie"
+        "license_note": "50 GB/dag zonder licentie • 50 GB/dag met licentie"
       },
       "enterprise_with_license": {
         "hero_title": "Uw Enterprise-editie",
@@ -623,7 +623,7 @@
       "open_source": {
         "hero_title": "Koop de Enterprise-editie",
         "offer_text": "Download en ontgrendelt alle bedrijfsfuncties volledig gratis",
-        "badge_text": "Gratis tot 200 GB per dag",
+        "badge_text": "Gratis tot 50 GB per dag",
         "features_title": "Ontgrendelt alle bedrijfsfuncties",
         "features_subtitle": "Alles wat u nodig hebt voor een productieklare observatie",
         "primary_button_text": "Nu downloaden"
@@ -3189,7 +3189,8 @@
         "cost": "Kost",
         "spans": "Overspant"
       }
-    }
+    },
+    "openInFullView": "In volledige weergave openen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

@@ -1043,7 +1043,6 @@ jobs:
         check_changes,
         build_binary,
         ui_integration_tests,
-        merge_and_upload_reports,
       ]
     if: always()
     steps:
@@ -1058,7 +1057,6 @@ jobs:
 
           BUILD_OK=false
           UI_OK=false
-          MERGE_OK=false
 
           if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
             BUILD_OK=true
@@ -1068,17 +1066,12 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
-            MERGE_OK=true
-          fi
-
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
             echo "Playwright tests failed:"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
             exit 1
           fi
