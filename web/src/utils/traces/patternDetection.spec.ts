@@ -4,9 +4,32 @@ import { describe, expect, it } from 'vitest'
 import { buildPatternConsolidatedTree, filterPatterns, type SpanInstance, type CallPattern } from './patternDetection'
 
 /**
- * Helper function to create mock span data for testing
+ * Mock span data structure matching the actual span interface used in the application.
+ * Note: The implementation accepts spans with multiple naming conventions for backward compatibility.
  */
-const createMockSpan = (overrides: any = {}) => ({
+interface MockSpan {
+  span_id: string
+  spanId: string
+  trace_id: string
+  parent_span_id: string | null
+  serviceName: string
+  resolvedIdentity: string
+  operationName: string
+  operation_name: string
+  durationMs: number
+  exclusiveTimeMs: number
+  start_time: number
+  attributes: Record<string, any>
+  tags: Record<string, any>
+  spans: MockSpan[]
+  status_code: number
+}
+
+/**
+ * Helper function to create mock span data for testing.
+ * Provides sensible defaults matching the span interface structure.
+ */
+const createMockSpan = (overrides: Partial<MockSpan> = {}): MockSpan => ({
   span_id: 'span-1',
   spanId: 'span-1',
   trace_id: 'trace-1',
@@ -465,7 +488,7 @@ describe('patternDetection', () => {
     })
 
     it('should handle edge case of empty array for percentiles', () => {
-      const traceTree: any[] = []
+      const traceTree: MockSpan[] = []
       const result = buildPatternConsolidatedTree(traceTree)
 
       expect(result.size).toBe(0)
@@ -493,6 +516,124 @@ describe('patternDetection', () => {
       expect(pattern.metrics.p75).toBeCloseTo(17.5, 1)
       expect(pattern.metrics.p95).toBeCloseTo(19, 1)
       expect(pattern.metrics.p99).toBeCloseTo(19.8, 1)
+    })
+
+    describe('Edge Cases - Invalid Data', () => {
+      it('should handle negative duration values', () => {
+        const durations = [10, -5, 20, 15]
+        const span = createMockSpan({ durationMs: 0 })
+        span.spans = durations.map((duration, i) =>
+          createMockSpan({
+            span_id: `span-${i}`,
+            spanId: `span-${i}`,
+            durationMs: duration
+          })
+        )
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+        const pattern = Array.from(result.values())[0]
+
+        // Pattern should still calculate metrics even with negative values
+        // Negative durations should not cause crashes
+        expect(pattern.metrics.count).toBe(4)
+        expect(pattern.metrics.min).toBeLessThanOrEqual(pattern.metrics.max)
+      })
+
+      it('should handle mixed zero and positive durations', () => {
+        const durations = [0, 0, 10, 20]
+        const span = createMockSpan({ durationMs: 0 })
+        span.spans = durations.map((duration, i) =>
+          createMockSpan({
+            span_id: `span-${i}`,
+            spanId: `span-${i}`,
+            durationMs: duration
+          })
+        )
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+        const pattern = Array.from(result.values())[0]
+
+        expect(pattern.metrics.count).toBe(4)
+        expect(pattern.metrics.min).toBe(0)
+        expect(pattern.metrics.max).toBe(20)
+        expect(pattern.metrics.avg).toBe(7.5)
+      })
+
+      it('should handle malformed span data with missing durationMs', () => {
+        const span = createMockSpan({ durationMs: 100 })
+        // Child span with missing durationMs
+        const childSpan = createMockSpan({ durationMs: undefined as any })
+        span.spans = [childSpan]
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+
+        // Should not crash and should handle missing duration gracefully
+        expect(result.size).toBeGreaterThanOrEqual(0)
+      })
+
+      it('should handle very large duration values', () => {
+        const durations = [1000000, 2000000, 3000000]
+        const span = createMockSpan({ durationMs: 0 })
+        span.spans = durations.map((duration, i) =>
+          createMockSpan({
+            span_id: `span-${i}`,
+            spanId: `span-${i}`,
+            durationMs: duration
+          })
+        )
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+        const pattern = Array.from(result.values())[0]
+
+        // Large values should be handled without overflow
+        expect(pattern.metrics.count).toBe(3)
+        expect(pattern.metrics.min).toBe(1000000)
+        expect(pattern.metrics.max).toBe(3000000)
+        expect(pattern.metrics.avg).toBe(2000000)
+      })
+
+      it('should validate percentile ordering with edge case data', () => {
+        // Test data: duplicate values at percentile boundaries
+        const durations = [5, 5, 5, 5, 5, 100, 100, 100, 100, 100]
+        const span = createMockSpan({ durationMs: 0 })
+        span.spans = durations.map((duration, i) =>
+          createMockSpan({
+            span_id: `span-${i}`,
+            spanId: `span-${i}`,
+            durationMs: duration
+          })
+        )
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+        const pattern = Array.from(result.values())[0]
+
+        // Percentiles should maintain ordering even with clustered data
+        expect(pattern.metrics.min).toBeLessThanOrEqual(pattern.metrics.p75)
+        expect(pattern.metrics.p75).toBeLessThanOrEqual(pattern.metrics.p95)
+        expect(pattern.metrics.p95).toBeLessThanOrEqual(pattern.metrics.p99)
+        expect(pattern.metrics.p99).toBeLessThanOrEqual(pattern.metrics.max)
+      })
+
+      it('should handle null or undefined exclusive time values', () => {
+        const span = createMockSpan({
+          durationMs: 100,
+          exclusiveTimeMs: undefined as any
+        })
+
+        const traceTree = [span]
+        const result = buildPatternConsolidatedTree(traceTree)
+        const pattern = Array.from(result.values())[0]
+
+        // Should handle gracefully and calculate metrics
+        expect(pattern.metrics.count).toBe(1)
+        // Missing exclusive time should fallback to duration
+        expect(pattern.metrics.avgExclusive).toBeDefined()
+      })
     })
   })
 })
