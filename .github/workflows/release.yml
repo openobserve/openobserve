@@ -112,8 +112,11 @@ jobs:
         if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
-          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+          sudo apt-get -y install libssl-dev pkg-config musl-dev musl-tools
+          sudo ln -sf "$(which g++)" "/usr/bin/musl-g++"
+          echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
+          echo "CXX_aarch64_unknown_linux_musl=musl-g++" >> $GITHUB_ENV
+          echo "CFLAGS_aarch64_unknown_linux_musl=-U_FORTIFY_SOURCE" >> $GITHUB_ENV
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
