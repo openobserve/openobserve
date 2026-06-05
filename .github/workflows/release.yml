@@ -1,8 +1,8 @@
 on:
   pull_request:
     branches:
-      - main
-      - "v*.*.*"
+      - "main"
+      - "ci/armbuild"
 name: Release
 env:
   RUST_TOOLCHAIN: nightly-2026-05-20
