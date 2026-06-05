@@ -22,9 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the editable panel-name field (as the title) + the editor actions. -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack }"
+      :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
       class="tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
     >
-          <template #title>
+          <template #tabs>
             <OInput
               data-test="dashboard-panel-name"
               v-model="dashboardPanelData.data.title"
