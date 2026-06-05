@@ -495,6 +495,8 @@ import {
   saveLogsStreamType,
   restoreLogsStreamType,
 } from "@/utils/streamPersist";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageSearch",
@@ -3158,6 +3160,39 @@ export default defineComponent({
         updateColumnsTimeout.value = null;
       }
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("logs");
+    useShortcutsWithMac([
+      {
+        key: "r",
+        scope: "logs",
+        description: "Refresh / re-run search",
+        handler: () => {
+          if (isInputFocused()) return;
+          if (searchObj.loading) return;
+          searchObj.loading = true;
+          searchObj.runQuery = true;
+        },
+      },
+      {
+        key: "h",
+        scope: "logs",
+        description: "Toggle histogram",
+        handler: () => {
+          if (isInputFocused()) return;
+          searchObj.meta.showHistogram = !searchObj.meta.showHistogram;
+        },
+      },
+      {
+        key: "ctrl+/",
+        scope: "logs",
+        description: "Toggle fields sidebar",
+        handler: () => {
+          searchObj.meta.showFields = !searchObj.meta.showFields;
+        },
+      },
+    ]);
 
     return {
       t,
