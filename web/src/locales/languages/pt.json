@@ -437,7 +437,8 @@
     "pipeline": "Oleodutos",
     "language": "Idioma",
     "actions": "Ações",
-    "incidents": "Incidentes"
+    "incidents": "Incidentes",
+    "evals": "Evals"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -490,7 +491,22 @@
     "getStartedRUM": "Comece com o monitoramento real de usuários",
     "loadingErrorDetails": "Espere aí, estamos buscando os detalhes do erro.",
     "eventID": "ID do evento",
-    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos."
+    "loadingApplicationErrors": "Espere aí, estamos detectando erros de aplicativos.",
+    "traces": "Traços",
+    "noCorrelatedTraces": "Nenhum traço correlacionado foi encontrado para esta sessão.",
+    "viewTraceDetails": "Exibir detalhes do rastreamento",
+    "routeChange": "Rota",
+    "initialView": "Inicial",
+    "failedToFetchTraces": "Falha ao buscar dados de rastreamento. Por favor, tente novamente.",
+    "traceNotFound": "Detalhes do rastreamento não encontrados.",
+    "failedToFetchTraceDetails": "Falha ao carregar detalhes do rastreamento. Por favor, tente novamente.",
+    "span": "extensão",
+    "spans": "vãos",
+    "errorTraces": "traços de erro",
+    "seekToMoment": "Busque esse momento na sessão",
+    "timeInSession": "Hora da sessão",
+    "route": "Rota",
+    "duration": "Duração"
   },
   "about": {
     "name": "Abra o Observe",
@@ -517,9 +533,9 @@
     "ingestion_limit": "Limite de ingestão",
     "today_usage": "Uso atual",
     "feature_comparision_ent_msg": "Você está usando o OpenObserve Enterprise Edition com acesso a todos os recursos avançados listados abaixo.",
-    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 200 GB/dia (aproximadamente 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_plan_detail": "Seu plano: A Enterprise Edition é gratuita para até 50 GB/dia (aproximadamente 1.5 TB/mês) de ingestão de dados.",
     "feature_comparision_os_msg": "No momento, você está usando o OpenObserve Open Source Edition. Atualize para a Enterprise Edition para desbloquear os recursos avançados listados na tabela de comparação abaixo.",
-    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 200 GB/dia (~ 6 TB/mês) de ingestão de dados.",
+    "feature_comparision_good_news": "Boas notícias: o OpenObserve Enterprise Edition é totalmente gratuito para até 50 GB/dia (~ 1.5 TB/mês) de ingestão de dados.",
     "commit_lbl": "Comprometa-se",
     "build_lbl": "Construído",
     "no_license_installed_lbl": "Nenhuma licença instalada",
@@ -574,14 +590,14 @@
     "value_support_enterprise": "Empresarial",
     "value_support_cloud": "Nuvem",
     "value_cost_free": "Gratuito",
-    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 200 GB/dia de dados ingeridos. Pago depois disso",
+    "value_cost_enterprise": "Se for auto-hospedado, é gratuito para até 50 GB/dia de dados ingeridos. Pago depois disso",
     "value_cost_cloud": "Teste gratuito de 14 dias. Pago depois disso",
     "feature_comparison_lbl": "Comparação de recursos",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Características corporativas",
         "offer_text": "Obtenha todos os recursos corporativos totalmente gratuitos ao hospedar o OpenObserve por conta própria",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Recursos do OpenObserve Cloud",
         "features_subtitle": "Todos os recursos incluídos em sua assinatura de nuvem",
         "primary_button_text": "Faça o download agora"
@@ -593,7 +609,7 @@
         "features_title": "Recursos corporativos disponíveis",
         "features_subtitle": "Obtenha uma licença gratuita para desbloquear recursos ilimitados",
         "primary_button_text": "Obtenha uma licença gratuita",
-        "license_note": "100 GB/dia sem licença • 200 GB/dia com licença"
+        "license_note": "50 GB/dia sem licença • 50 GB/dia com licença"
       },
       "enterprise_with_license": {
         "hero_title": "Sua edição empresarial",
@@ -607,7 +623,7 @@
       "open_source": {
         "hero_title": "Obtenha a Enterprise Edition",
         "offer_text": "Baixe e desbloqueie todos os recursos corporativos de forma totalmente gratuita",
-        "badge_text": "Gratuito até 200 GB por dia",
+        "badge_text": "Gratuito até 50 GB por dia",
         "features_title": "Desbloqueie todos os recursos corporativos",
         "features_subtitle": "Tudo o que você precisa para uma observabilidade pronta para produção",
         "primary_button_text": "Faça o download agora"
@@ -3167,7 +3183,8 @@
         "cost": "Custo",
         "spans": "Vãos"
       }
-    }
+    },
+    "openInFullView": "Abrir à vista completa"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
@@ -4040,6 +4057,348 @@
       "one": "Mostre-me os erros da última hora...",
       "two": "Escreva VRL para analisar o JSON dos logs do nginx...",
       "three": "Crie um painel para a integridade do nó K8s..."
+    }
+  },
+  "onlineEvals": {
+    "title": "Avaliações",
+    "description": "Configure provedores de LLM, definições de pontuação, pontuadores e trabalhos de avaliação ao vivo.",
+    "loading": "Carregando a configuração de avaliação online...",
+    "loadError": "Falha ao carregar avaliações on-line",
+    "deletePrompt": "Excluir {name}?",
+    "deleted": "{label} excluído",
+    "deleteError": "Falha ao excluir {label}",
+    "saved": "{label} salvo",
+    "newButton": "Novo {label}",
+    "search": "Pesquisar {label}",
+    "refresh": "Atualizar",
+    "allStatuses": "Todos os status",
+    "noRowsFound": "Nenhum {label} encontrado",
+    "getStartedHint": "Crie um para começar a fazer uma avaliação on-line.",
+    "columns": {
+      "name": "Nome",
+      "status": "Status",
+      "updated": "Atualizado"
+    },
+    "actions": {
+      "edit": "Editar",
+      "delete": "Excluir"
+    },
+    "tabs": {
+      "jobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação",
+      "providers": "Provedores"
+    },
+    "singular": {
+      "jobs": "Trabalho de avaliação",
+      "scorers": "Marcador",
+      "scoreConfigs": "Configuração de pontuação",
+      "providers": "Provedor"
+    },
+    "secondaryColumn": {
+      "jobs": "Transmita",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo de dados",
+      "providers": "Provedor"
+    },
+    "jobStatus": {
+      "draft": "Esboço",
+      "active": "Ativo",
+      "paused": "Pausado",
+      "degraded": "Degradado",
+      "archived": "Arquivado"
+    },
+    "buttons": {
+      "cancel": "Cancelar",
+      "create": "Criar",
+      "save": "Salvar"
+    },
+    "scorerTypeDialog": {
+      "title": "Crie um novo marcador",
+      "intro": "Escolha o tipo de marcador. Escolha o que melhor se adequa à sua criação e execute-o.",
+      "llmJudgeTitle": "Juiz LLM",
+      "llmJudgeDescription": "Use um provedor configurado para avaliar semanticamente.",
+      "remoteTitle": "Remoto",
+      "remoteDescription": "Ligue para seu próprio endpoint HTTP para pontuar.",
+      "codeTitle": "Código",
+      "codeDescription": "Em breve."
+    },
+    "provider": {
+      "backTo": "Voltar para Provedores",
+      "createTitle": "Criar provedor LLM",
+      "editTitle": "Editar provedor LLM",
+      "subtitle": "Configure o endpoint do modelo usado pelos avaliadores do LLM.",
+      "sectionTitle": "Provedor",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Produção OpenAI",
+      "typeLabel": "Tipo de provedor",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Ponto final",
+      "endpointPlaceholder": "Endpoint personalizado opcional",
+      "defaultModelLabel": "Modelo padrão",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelos disponíveis",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Use como provedor padrão",
+      "authConfigLabel": "Configuração de autenticação JSON",
+      "saveError": "Falha ao salvar o provedor"
+    },
+    "scoreConfig": {
+      "createTitle": "Nova configuração de pontuação",
+      "editTitle": "Editar configuração de pontuação",
+      "subtitle": "As configurações de pontuação definem o tipo de pontuação, limites de saúde e categorias.",
+      "nameLabel": "Nome",
+      "dataTypeLabel": "Tipo de dados",
+      "descriptionLabel": "Descrição",
+      "numericRangeLabel": "Intervalo numérico JSON",
+      "categoriesLabel": "Categorias JSON",
+      "healthyThresholdLabel": "Limite saudável: JSON",
+      "dataTypes": {
+        "numeric": "Numérico",
+        "categorical": "Categórico",
+        "boolean": "boleano"
+      },
+      "saveError": "Falha ao salvar a configuração da pontuação"
+    },
+    "scorer": {
+      "backTo": "Voltar para Scorers",
+      "badgeRemote": "Remoto",
+      "badgeLlm": "Juiz LLM",
+      "createTitleRemote": "Criar marcador remoto",
+      "createTitleLlm": "Crie o Juiz Scorer do LLM",
+      "editTitleRemote": "Editar marcador remoto",
+      "editTitleLlm": "Editar LLM Judge Scorer",
+      "subtitleRemote": "Ligue para um endpoint HTTP que você hospeda. Nós renderizamos a solicitação; você retorna uma pontuação.",
+      "subtitleLlm": "Um modelo de linguagem avalia cada rastreamento usando a solicitação que você fornece.",
+      "identitySection": "Identidade",
+      "judgeSection": "Configuração do juiz",
+      "endpointSection": "Ponto final",
+      "nameLabel": "Nome",
+      "namePlaceholder": "juiz de fidelidade",
+      "producesScoreConfigLabel": "Produz configuração de pontuação",
+      "producesScoreConfigNone": "Nenhum",
+      "scoreConfigVersionLabel": "Versão de configuração de pontuação",
+      "latestSuffix": " (mais recente)",
+      "pinVersion": "Fixar versão selecionada",
+      "descriptionLabel": "Descrição",
+      "providerLabel": "Provedor",
+      "providerPlaceholder": "Selecione o provedor",
+      "modelLabel": "modelo",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Aviso do juiz",
+      "outputSchemaLabel": "Esquema de saída JSON",
+      "remoteEndpointLabel": "Endpoint remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Modelo de corpo da solicitação",
+      "saveError": "Falha ao salvar o marcador",
+      "versionsLoadError": "Falha ao carregar as versões de configuração da pontuação",
+      "testPanel": {
+        "title": "Teste este marcador",
+        "hint": "Teste seu marcador com dados de amostra antes de salvar. As execuções de teste não persistem.",
+        "emptyPrefix": "Adicione variáveis como ",
+        "emptySuffix": " ao modelo de pontuação para testar com campos de amostra.",
+        "runButton": "Execute o teste",
+        "scenarioSuccess": "Resposta simulada",
+        "scenarioAuth": "Erro de autenticação",
+        "scenarioSchema": "Incompatibilidade de esquema",
+        "stateIdle": "Faça um teste para ver o resultado aqui.",
+        "stateRunning": "Executando o teste de pontuação...",
+        "successHeader": "Sucesso",
+        "successScore": "pontuação: 0.92",
+        "successReasoning": "raciocínio: A resposta é apoiada pelo contexto fornecido.",
+        "authHeader": "Falha na autenticação",
+        "authHint": "Verifique as credenciais do provedor antes de salvar.",
+        "schemaHeader": "Incompatibilidade de esquema",
+        "schemaHint": "A resposta não correspondeu ao esquema de saída configurado.",
+        "valuePlaceholder": "Valor para {variable}"
+      }
+    },
+    "job": {
+      "backTo": "Voltar para Eval Jobs",
+      "createTitle": "Crie um trabalho de avaliação online",
+      "editTitle": "Editar trabalho de avaliação online",
+      "subtitle": "Escolha o comportamento do stream, dos marcadores, do mapeamento e da amostragem para esse trabalho de avaliação.",
+      "stepper": {
+        "target": "Alvo",
+        "scorers": "Marcadores",
+        "mapping": "Mapeamento",
+        "sampling": "Amostragem"
+      },
+      "targetSection": "Alvo",
+      "scorersSection": "Marcadores e mapeamento",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Monitor de fidelidade de produção",
+      "streamLabel": "Fluxo de entrada",
+      "streamPlaceholder": "padrão",
+      "streamTypeLabel": "Tipo de stream",
+      "streamTypePlaceholder": "rastros",
+      "descriptionLabel": "Descrição",
+      "samplingModeLabel": "Modo de amostragem",
+      "samplingValueLabel": "Valor de amostragem JSON",
+      "samplingModes": {
+        "rate": "Tarifa",
+        "all": "Todos",
+        "count": "Conde"
+      },
+      "scorerPicker": {
+        "title": "Marcadores",
+        "hint": "Selecione um ou mais marcadores para disputar cada período combinado.",
+        "meta": "{tipo} · v {versão}"
+      },
+      "filter": {
+        "title": "Condição do filtro",
+        "hint": "Somente intervalos que correspondam a essa condição entram na amostragem e na pontuação."
+      },
+      "inputMapping": {
+        "title": "Mapeamento de entrada",
+        "hint": "Mapeie os campos de abrangência em cada variável do modelo de pontuação.",
+        "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
+        "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
+        "variableCount": "variáveis {count}"
+      },
+      "preview": {
+        "title": "prévia",
+        "hint": "Use os campos à esquerda para definir a meta de avaliação da produção.",
+        "summaryTitle": "Resumo",
+        "summaryName": "Nome",
+        "summaryType": "Tipo",
+        "summaryStatus": "Status",
+        "statusEditing": "Editando",
+        "statusDraft": "Esboço",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecione pelo menos um marcador",
+      "saveError": "Falha ao salvar o trabalho de avaliação"
+    },
+    "quality": {
+      "scopeLabel": "Todas as dimensões de qualidade neste espaço de trabalho",
+      "timeRange": {
+        "label": "Intervalo de tempo",
+        "last1h": "Última 1 hora",
+        "last24h": "Últimas 24 horas",
+        "last7d": "Últimos 7 dias",
+        "last30d": "Últimos 30 dias"
+      },
+      "sourceStream": {
+        "label": "Fluxo de origem",
+        "all": "Todas as transmissões"
+      },
+      "refresh": "Atualizar",
+      "kpis": {
+        "evaluated": {
+          "title": "Traços avaliados",
+          "unit": "",
+          "hint": "IDs de rastreamento distintos em _llm_scores dentro da janela"
+        },
+        "qualityIssueRate": {
+          "title": "Taxa de emissão de qualidade",
+          "unit": "%",
+          "hint": "Traços avaliados com qualquer dimensão abaixo do limite"
+        },
+        "evaluationCost": {
+          "title": "Custo de avaliação",
+          "unit": "$",
+          "hint": "Soma do custo do marcador do LLM Judge na janela"
+        },
+        "jobSuccess": {
+          "title": "Sucesso no trabalho",
+          "unit": "%",
+          "hint": "Taxa de sucesso na execução do Online Eval Job"
+        },
+        "scorerFailures": {
+          "title": "Falhas no marcador",
+          "unit": "",
+          "hint": "Falha na invocação do marcador na janela"
+        },
+        "latencyP95": {
+          "title": "Latência p95",
+          "unit": "s",
+          "hint": "Latência p95 do Scorer-Call"
+        },
+        "vsPrev": "versus anterior",
+        "noData": "—"
+      },
+      "loading": "Carregando dados de qualidade...",
+      "detail": {
+        "loading": "Carregando detalhamento por configuração...",
+        "noData": "Ainda não há pontuações para essa configuração nesta janela.",
+        "drillTitle": "Perfure até traçar",
+        "splitByScorer": "Dividido por marcador",
+        "splitBySourceType": "Dividir por source_type",
+        "trendTitle": "Tendência",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Distribuição de pontuação",
+        "compositionTitle": "Composição ao longo do tempo",
+        "categoryDistributionTitle": "Distribuição de categorias",
+        "passRateTitle": "Taxa de aprovação ao longo do tempo",
+        "trueFalseTitle": "Verdadeiro versus falso",
+        "legendAvg": "Média",
+        "legendP95": "p95",
+        "legendThreshold": "limite {direção} {valor}",
+        "legendHealthy": "saudável",
+        "legendUnhealthy": "insalubre",
+        "kpis": {
+          "average": "Média",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Insalubre",
+          "healthy": "Saudável",
+          "coverage": "Cobertura"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Todas as configurações",
+        "empty": "Nenhuma configuração corresponde a esse filtro."
+      },
+      "overview": {
+        "title": "Visão geral das configurações de pontuação",
+        "countSuffix": "configurações {n}",
+        "searchPlaceholder": "Configurações de filtro...",
+        "loading": "Carregando agregados por configuração...",
+        "emptyNoConfigsTitle": "Ainda não há configurações de pontuação",
+        "emptyNoConfigsHint": "Defina sua primeira configuração de pontuação para começar a monitorar as dimensões de qualidade.",
+        "emptyWaitingTitle": "Esperando as primeiras pontuações chegarem",
+        "emptyWaitingHint": "Suas configurações de pontuação são declaradas, mas nenhuma pontuação foi gravada em _llm_scores nesta janela ainda.",
+        "waitingStepJob": "Ative um trabalho de avaliação on-line que produz pontuações para uma dessas configurações",
+        "waitingStepRange": "Amplie o intervalo de tempo — as pontuações do início de hoje ou desta semana podem não estar nesta janela",
+        "waitingStepRefresh": "Clique em Atualizar — as pontuações de um trabalho ativo aparecem em aproximadamente 1 minuto após a avaliação",
+        "waitingPrimaryCta": "Vagas de avaliação abertas",
+        "waitingRefreshCta": "Atualizar",
+        "noThreshold": "sem limite",
+        "columns": {
+          "scoreConfig": "Configuração de pontuação",
+          "type": "Tipo",
+          "totalScores": "Pontuações totais",
+          "coverage": "Cobertura",
+          "unhealthy": "Insalubre",
+          "trend": "Tendência",
+          "threshold": "Saudável se",
+          "updated": "Atualizado"
+        }
+      }
+    },
+    "deleteTitle": "Excluir {label}",
+    "deleteConfirmMessage": "Tem certeza de que deseja excluir “{name}”? Essa ação não pode ser desfeita."
+  },
+  "llmProviders": {
+    "tabLabel": "Provedores de LLM",
+    "title": "Provedores de LLM",
+    "subtitle": "Gerencie as conexões do provedor LLM usadas pelos pontuadores do LLM Judge.",
+    "newButton": "Novo provedor",
+    "searchPlaceholder": "Provedores de pesquisa",
+    "defaultBadge": "Padrão",
+    "loadError": "Falha ao carregar provedores de LLM",
+    "columns": {
+      "name": "Nome",
+      "type": "Tipo",
+      "endpoint": "Ponto final",
+      "defaultModel": "Modelo padrão",
+      "default": "Padrão"
+    },
+    "empty": {
+      "title": "Ainda não há fornecedores de LLM",
+      "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
     }
   }
 }

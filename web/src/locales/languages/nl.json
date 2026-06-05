@@ -437,7 +437,8 @@
     "pipeline": "Pijpleidingen",
     "language": "taal",
     "actions": "Acties",
-    "incidents": "Incidenten"
+    "incidents": "Incidenten",
+    "evals": "Evalen"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -490,7 +491,22 @@
     "getStartedRUM": "Ga aan de slag met Real User Monitoring",
     "loadingErrorDetails": "Wacht even, we halen foutgegevens op.",
     "eventID": "ID van het evenement",
-    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op."
+    "loadingApplicationErrors": "Wacht even, we halen toepassingsfouten op.",
+    "traces": "Sporen",
+    "noCorrelatedTraces": "Geen gecorreleerde sporen gevonden voor deze sessie.",
+    "viewTraceDetails": "Trace-details bekijken",
+    "routeChange": "Route",
+    "initialView": "Initieel",
+    "failedToFetchTraces": "Het ophalen van traceergegevens is mislukt. Probeer het opnieuw.",
+    "traceNotFound": "Traceergegevens niet gevonden.",
+    "failedToFetchTraceDetails": "Het laden van de traceringsgegevens is mislukt. Probeer het opnieuw.",
+    "span": "span",
+    "spans": "overspant",
+    "errorTraces": "foutsporen",
+    "seekToMoment": "Streef naar dit moment in de sessie",
+    "timeInSession": "Sessietijd",
+    "route": "Route",
+    "duration": "Duur"
   },
   "about": {
     "name": "OpenObserve",
@@ -517,9 +533,9 @@
     "ingestion_limit": "Inslimiet",
     "today_usage": "Het gebruik van vandaag",
     "feature_comparision_ent_msg": "U gebruikt OpenObserve Enterprise Edition met toegang tot alle geavanceerde functies die hieronder worden vermeld.",
-    "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 200 GB/dag (~6 TB per maand) aan gegevensinvoer.",
+    "feature_comparision_plan_detail": "Uw abonnement: Enterprise Edition is gratis voor maximaal 50 GB/dag (~1.5 TB per maand) aan gegevensinvoer.",
     "feature_comparision_os_msg": "U gebruikt momenteel OpenObserve Open Source Edition. Upgrade naar Enterprise Edition om geavanceerde functies te ontgrendelen die in de vergelijkingstabel hieronder worden vermeld.",
-    "feature_comparision_good_news": "Goed nieuws: OpenObserve Enterprise Edition is volledig gratis voor maximaal 200 GB/dag (~6 TB/maand) aan gegevensinvoer.",
+    "feature_comparision_good_news": "Goed nieuws: OpenObserve Enterprise Edition is volledig gratis voor maximaal 50 GB/dag (~1.5 TB/maand) aan gegevensinvoer.",
     "commit_lbl": "Committeren",
     "build_lbl": "Gebouwd",
     "no_license_installed_lbl": "Geen licentie geïnstalleerd",
@@ -574,14 +590,14 @@
     "value_support_enterprise": "Onderneming",
     "value_support_cloud": "Wolk",
     "value_cost_free": "Gratis",
-    "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 200 GB aan data die per dag wordt opgenomen. Daarna betaald",
+    "value_cost_enterprise": "Indien zelf gehost, gratis voor maximaal 50 GB aan data die per dag wordt opgenomen. Daarna betaald",
     "value_cost_cloud": "Gratis proefperiode van 14 dagen. Daarna betaald",
     "feature_comparison_lbl": "Vergelijking van functies",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise-functies",
         "offer_text": "Krijg alle zakelijke functies volledig gratis wanneer u OpenObserve zelf host",
-        "badge_text": "Gratis tot 200 GB per dag",
+        "badge_text": "Gratis tot 50 GB per dag",
         "features_title": "OpenObserve Cloud-functies",
         "features_subtitle": "Alle functies inbegrepen in je cloud-abonnement",
         "primary_button_text": "Nu downloaden"
@@ -593,7 +609,7 @@
         "features_title": "Beschikbare functies voor bedrijven",
         "features_subtitle": "Ontvang een gratis licentie om onbeperkte mogelijkheden te ontgrendelen",
         "primary_button_text": "Ontvang een gratis licentie",
-        "license_note": "100 GB/dag zonder licentie • 200 GB/dag met licentie"
+        "license_note": "50 GB/dag zonder licentie • 50 GB/dag met licentie"
       },
       "enterprise_with_license": {
         "hero_title": "Uw Enterprise-editie",
@@ -607,7 +623,7 @@
       "open_source": {
         "hero_title": "Koop de Enterprise-editie",
         "offer_text": "Download en ontgrendelt alle bedrijfsfuncties volledig gratis",
-        "badge_text": "Gratis tot 200 GB per dag",
+        "badge_text": "Gratis tot 50 GB per dag",
         "features_title": "Ontgrendelt alle bedrijfsfuncties",
         "features_subtitle": "Alles wat u nodig hebt voor een productieklare observatie",
         "primary_button_text": "Nu downloaden"
@@ -3180,7 +3196,8 @@
         "cost": "Kost",
         "spans": "Overspant"
       }
-    }
+    },
+    "openInFullView": "In volledige weergave openen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -4053,6 +4070,348 @@
       "one": "Laat me fouten zien van het afgelopen uur...",
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
+    }
+  },
+  "onlineEvals": {
+    "title": "Beoordelingen",
+    "description": "Configureer LLM-providers, scoredefinities, scorers en live evaluatietaken.",
+    "loading": "Configuratie voor online evaluatie wordt geladen...",
+    "loadError": "Het laden van online evaluaties is mislukt",
+    "deletePrompt": "{name} verwijderen?",
+    "deleted": "{label} verwijderd",
+    "deleteError": "Het verwijderen van {label} is mislukt",
+    "saved": "{label} opgeslagen",
+    "newButton": "Nieuw {label}",
+    "search": "Zoek {label}",
+    "refresh": "Vernieuwen",
+    "allStatuses": "Alle statussen",
+    "noRowsFound": "Geen {label} gevonden",
+    "getStartedHint": "Maak er een om te beginnen met de online evaluatie van de bedrading.",
+    "columns": {
+      "name": "Naam",
+      "status": "Status",
+      "updated": "Bijgewerkt"
+    },
+    "actions": {
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "tabs": {
+      "jobs": "Vacatures bij Eval",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score-configuraties",
+      "providers": "Aanbieders"
+    },
+    "singular": {
+      "jobs": "Job Eval",
+      "scorers": "Scorer",
+      "scoreConfigs": "Scoreconfiguratie",
+      "providers": "Aanbieder"
+    },
+    "secondaryColumn": {
+      "jobs": "Streamen",
+      "scorers": "Typ",
+      "scoreConfigs": "Gegevenstype",
+      "providers": "Aanbieder"
+    },
+    "jobStatus": {
+      "draft": "Ontwerp",
+      "active": "Actief",
+      "paused": "Gepauzeerd",
+      "degraded": "Gedegradeerd",
+      "archived": "Gearchiveerd"
+    },
+    "buttons": {
+      "cancel": "Annuleer",
+      "create": "Creëren",
+      "save": "Opslaan"
+    },
+    "scorerTypeDialog": {
+      "title": "Maak een nieuwe scorer",
+      "intro": "Kies het type scorer. Kies wat past bij de manier waarop je wilt schrijven en voer het uit.",
+      "llmJudgeTitle": "LLM-jurylid",
+      "llmJudgeDescription": "Gebruik een geconfigureerde provider om semantisch te evalueren.",
+      "remoteTitle": "Op afstand",
+      "remoteDescription": "Bel je eigen HTTP-eindpunt om te scoren.",
+      "codeTitle": "Code",
+      "codeDescription": "Binnenkort beschikbaar."
+    },
+    "provider": {
+      "backTo": "Terug naar Providers",
+      "createTitle": "LLM-provider aanmaken",
+      "editTitle": "LLM-provider bewerken",
+      "subtitle": "Configureer het modeleindpunt dat wordt gebruikt door LLM-juryscorers.",
+      "sectionTitle": "Aanbieder",
+      "nameLabel": "Naam",
+      "namePlaceholder": "Productie OpenAI",
+      "typeLabel": "Soort provider",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Eindpunt",
+      "endpointPlaceholder": "Optioneel aangepast eindpunt",
+      "defaultModelLabel": "Standaardmodel",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Beschikbare modellen",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Als standaardprovider gebruiken",
+      "authConfigLabel": "Auth-configuratie JSON",
+      "saveError": "Het opslaan van de provider is mislukt"
+    },
+    "scoreConfig": {
+      "createTitle": "Nieuwe scoreconfiguratie",
+      "editTitle": "Scoreconfiguratie bewerken",
+      "subtitle": "Scoreconfiguraties definiëren het scoretype, gezondheidsdrempels en categorieën.",
+      "nameLabel": "Naam",
+      "dataTypeLabel": "Gegevenstype",
+      "descriptionLabel": "Omschrijving",
+      "numericRangeLabel": "Numeriek bereik JSON",
+      "categoriesLabel": "Categorieën JSON",
+      "healthyThresholdLabel": "JSON met gezonde drempelwaarde",
+      "dataTypes": {
+        "numeric": "Numeriek",
+        "categorical": "Categorisch",
+        "boolean": "Booleaans"
+      },
+      "saveError": "Het opslaan van de scoreconfiguratie is mislukt"
+    },
+    "scorer": {
+      "backTo": "Terug naar Scorers",
+      "badgeRemote": "Op afstand",
+      "badgeLlm": "LLM-jurylid",
+      "createTitleRemote": "Remote Scorer aanmaken",
+      "createTitleLlm": "Creëer een LLM Judge Scorer",
+      "editTitleRemote": "Remote Scorer bewerken",
+      "editTitleLlm": "LLM Judge Scorer bewerken",
+      "subtitleRemote": "Roep een HTTP-eindpunt aan dat u host. Wij maken het verzoek; u geeft een score terug.",
+      "subtitleLlm": "Een taalmodel beoordeelt elk spoor aan de hand van de prompt die u geeft.",
+      "identitySection": "Identiteit",
+      "judgeSection": "Configuratie van de rechter",
+      "endpointSection": "Eindpunt",
+      "nameLabel": "Naam",
+      "namePlaceholder": "getrouwheid_rechter",
+      "producesScoreConfigLabel": "Produceert de scoreconfiguratie",
+      "producesScoreConfigNone": "Geen",
+      "scoreConfigVersionLabel": "Versie van de scoreconfiguratie",
+      "latestSuffix": " (laatste)",
+      "pinVersion": "Geselecteerde versie vastzetten",
+      "descriptionLabel": "Omschrijving",
+      "providerLabel": "Aanbieder",
+      "providerPlaceholder": "Selecteer een provider",
+      "modelLabel": "Model",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Prompt van de rechter",
+      "outputSchemaLabel": "Uitvoerschema JSON",
+      "remoteEndpointLabel": "Eindpunt op afstand",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Bodysjabloon aanvragen",
+      "saveError": "Het opslaan van de scorer is mislukt",
+      "versionsLoadError": "Kon de versies van de scoreconfiguratie niet laden",
+      "testPanel": {
+        "title": "Test deze scorer",
+        "hint": "Probeer je scorer uit met voorbeeldgegevens voordat je ze opslaat. De testruns worden niet voortgezet.",
+        "emptyPrefix": "Variabelen toevoegen zoals ",
+        "emptySuffix": " naar het scorersjabloon om te testen met voorbeeldvelden.",
+        "runButton": "Test uitvoeren",
+        "scenarioSuccess": "Schijnbare reactie",
+        "scenarioAuth": "Auth-fout",
+        "scenarioSchema": "Schema komt niet overeen",
+        "stateIdle": "Voer een test uit om het resultaat hier te zien.",
+        "stateRunning": "Scorertest voor hardlopen...",
+        "successHeader": "Succes",
+        "successScore": "score: 0.92",
+        "successReasoning": "redenering: Het antwoord wordt ondersteund door de aangeleverde context.",
+        "authHeader": "Authenticatie mislukt",
+        "authHint": "Controleer de inloggegevens van de provider voordat u deze opslaat.",
+        "schemaHeader": "Schema komt niet overeen",
+        "schemaHint": "Het antwoord kwam niet overeen met het geconfigureerde uitvoerschema.",
+        "valuePlaceholder": "Waarde voor {variable}"
+      }
+    },
+    "job": {
+      "backTo": "Terug naar Eval Jobs",
+      "createTitle": "Maak een online evaluatieopdracht",
+      "editTitle": "Online Eval-opdracht bewerken",
+      "subtitle": "Kies de stream, scorers, mapping en samplinggedrag voor deze evaluatietaak.",
+      "stepper": {
+        "target": "Doelwit",
+        "scorers": "Scorers",
+        "mapping": "In kaart brengen",
+        "sampling": "Bemonstering"
+      },
+      "targetSection": "Doelwit",
+      "scorersSection": "Scorers en kaarten",
+      "nameLabel": "Naam",
+      "namePlaceholder": "Monitor voor de getrouwheid van de productie",
+      "streamLabel": "Invoerstroom",
+      "streamPlaceholder": "standaard",
+      "streamTypeLabel": "Soort stream",
+      "streamTypePlaceholder": "sporen",
+      "descriptionLabel": "Omschrijving",
+      "samplingModeLabel": "Bemonsteringsmodus",
+      "samplingValueLabel": "Bemonsteringswaarde JSON",
+      "samplingModes": {
+        "rate": "Tarief",
+        "all": "Alles",
+        "count": "Tellen"
+      },
+      "scorerPicker": {
+        "title": "Scorers",
+        "hint": "Selecteer een of meer scorers om mee te doen voor elke gematchte reeks.",
+        "meta": "{type} · v {versie}"
+      },
+      "filter": {
+        "title": "Staat van het filter",
+        "hint": "Alleen overspanningen die aan deze voorwaarde voldoen, worden meegenomen in de steekproef en de score."
+      },
+      "inputMapping": {
+        "title": "Invoertoewijzing",
+        "hint": "Wijs spanvelden toe aan elke sjabloonvariabele voor de scorer.",
+        "selectScorers": "Selecteer scorers om hun mappings te configureren.",
+        "noVariables": "Deze scorer heeft geen sjabloonvariabelen om in kaart te brengen.",
+        "variableCount": "{count} variabelen"
+      },
+      "preview": {
+        "title": "voorsmaak",
+        "hint": "Gebruik de velden aan de linkerkant om het doel van de productie-evaluatie te definiëren.",
+        "summaryTitle": "Samenvatting",
+        "summaryName": "Naam",
+        "summaryType": "Typ",
+        "summaryStatus": "Status",
+        "statusEditing": "Bewerken",
+        "statusDraft": "Ontwerp",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Selecteer minstens één scorer",
+      "saveError": "Kon de evaluatietaak niet opslaan"
+    },
+    "quality": {
+      "scopeLabel": "Alle kwaliteitsdimensies in deze werkruimte",
+      "timeRange": {
+        "label": "Tijdbereik",
+        "last1h": "Afgelopen 1 uur",
+        "last24h": "Afgelopen 24 uur",
+        "last7d": "Afgelopen 7 dagen",
+        "last30d": "Afgelopen 30 dagen"
+      },
+      "sourceStream": {
+        "label": "Bronstream",
+        "all": "Alle streams"
+      },
+      "refresh": "Vernieuwen",
+      "kpis": {
+        "evaluated": {
+          "title": "Geëvalueerde sporen",
+          "unit": "",
+          "hint": "Verschillende trace-ID's in _llm_scores in het venster"
+        },
+        "qualityIssueRate": {
+          "title": "Uitgiftepercentage kwaliteit",
+          "unit": "%",
+          "hint": "Geëvalueerde sporen met elke dimensie onder de drempelwaarde"
+        },
+        "evaluationCost": {
+          "title": "Evaluatiekosten",
+          "unit": "$",
+          "hint": "De som van de kosten van de LLM Judge-scorer in het venster"
+        },
+        "jobSuccess": {
+          "title": "Succes op het werk",
+          "unit": "%",
+          "hint": "Succespercentage voor online Eval Job Run"
+        },
+        "scorerFailures": {
+          "title": "Mislukkingen van de scorer",
+          "unit": "",
+          "hint": "Mislukte aanroepen van de scorer in het venster"
+        },
+        "latencyP95": {
+          "title": "Latentie p95",
+          "unit": "s",
+          "hint": "Latentie van Scorer-call p95"
+        },
+        "vsPrev": "versus de vorige",
+        "noData": "—"
+      },
+      "loading": "Kwaliteitsgegevens worden geladen...",
+      "detail": {
+        "loading": "Uitsplitsing per configuratie wordt geladen...",
+        "noData": "Nog geen scores voor deze configuratie in dit venster.",
+        "drillTitle": "Tot in de sporen boren",
+        "splitByScorer": "Gesplitst per scorer",
+        "splitBySourceType": "Gesplitst op source_type",
+        "trendTitle": "Trend",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Scoreverdeling",
+        "compositionTitle": "Samenstelling in de loop van de tijd",
+        "categoryDistributionTitle": "Distributie van categorieën",
+        "passRateTitle": "Slagpercentage in de loop van de tijd",
+        "trueFalseTitle": "Waar versus onwaar",
+        "legendAvg": "Gem",
+        "legendP95": "p95",
+        "legendThreshold": "drempelwaarde {richting} {waarde}",
+        "legendHealthy": "gezond",
+        "legendUnhealthy": "ongezond",
+        "kpis": {
+          "average": "Gemiddeld",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Ongezond",
+          "healthy": "Gezond",
+          "coverage": "Dekking"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Alle configuraties",
+        "empty": "Er zijn geen configuraties die overeenkomen met dit filter."
+      },
+      "overview": {
+        "title": "Overzicht van Score Configs",
+        "countSuffix": "{n} configureert",
+        "searchPlaceholder": "Filterconfiguraties...",
+        "loading": "Aggregaten per configuratie worden geladen...",
+        "emptyNoConfigsTitle": "Nog geen Score-configuraties",
+        "emptyNoConfigsHint": "Definieer uw eerste scoreconfiguratie om te beginnen met het bijhouden van kwaliteitsdimensies.",
+        "emptyWaitingTitle": "Wachten tot de eerste scores binnen zijn",
+        "emptyWaitingHint": "Je scoreconfiguraties zijn gedeclareerd, maar er zijn nog geen scores naar _llm_scores geschreven in dit venster.",
+        "waitingStepJob": "Activeer een online evaluatietaak die scores oplevert voor een van deze configuraties",
+        "waitingStepRange": "Vergroot het tijdsbereik — scores van eerder vandaag of deze week vallen mogelijk niet binnen dit venster",
+        "waitingStepRefresh": "Klik op Vernieuwen — de scores van een actieve taak verschijnen binnen ~1 minuut na de evaluatie",
+        "waitingPrimaryCta": "Openstaande vacatures bij Eval",
+        "waitingRefreshCta": "Vernieuwen",
+        "noThreshold": "geen drempel",
+        "columns": {
+          "scoreConfig": "Scoreconfiguratie",
+          "type": "Typ",
+          "totalScores": "Totale scores",
+          "coverage": "Dekking",
+          "unhealthy": "Ongezond",
+          "trend": "Trend",
+          "threshold": "Gezond als",
+          "updated": "Bijgewerkt"
+        }
+      }
+    },
+    "deleteTitle": "{label} verwijderen",
+    "deleteConfirmMessage": "Weet je zeker dat je „{name}” wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt."
+  },
+  "llmProviders": {
+    "tabLabel": "LLM-aanbieders",
+    "title": "LLM-aanbieders",
+    "subtitle": "Beheer de LLM-providerverbindingen die worden gebruikt door LLM Judge-scorers.",
+    "newButton": "Nieuwe provider",
+    "searchPlaceholder": "Zoekaanbieders",
+    "defaultBadge": "Standaard",
+    "loadError": "Laden van LLM-providers is mislukt",
+    "columns": {
+      "name": "Naam",
+      "type": "Typ",
+      "endpoint": "Eindpunt",
+      "defaultModel": "Standaardmodel",
+      "default": "Standaard"
+    },
+    "empty": {
+      "title": "Nog geen LLM-aanbieders",
+      "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
     }
   }
 }

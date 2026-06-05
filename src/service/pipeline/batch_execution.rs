@@ -15,6 +15,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    hash::{Hash, Hasher},
     sync::LazyLock as Lazy,
 };
 
@@ -24,7 +25,7 @@ use chrono::Utc;
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{Pipeline, components::NodeData},
+        pipeline::{Pipeline, PipelineKind, components::NodeData},
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
@@ -62,6 +63,27 @@ struct BatchBuffer {
     records: Vec<json::Value>,
     total_bytes: usize,
     last_write: Instant,
+}
+
+fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f64) -> bool {
+    if sampling_rate >= 1.0 {
+        return true;
+    }
+    if sampling_rate <= 0.0 || sampling_rate.is_nan() {
+        return false;
+    }
+
+    let sample_key = record
+        .get("trace_id")
+        .and_then(|v| v.as_str())
+        .or_else(|| record.get("span_id").and_then(|v| v.as_str()))
+        .map(str::to_owned)
+        .unwrap_or_else(|| idx.to_string());
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    sample_key.hash(&mut hasher);
+    let bucket = hasher.finish() as f64 / u64::MAX as f64;
+    bucket < sampling_rate
 }
 
 #[cfg(feature = "enterprise")]
@@ -170,12 +192,13 @@ impl PipelineExt for Pipeline {
 
 #[derive(Debug, Clone)]
 pub struct ExecutablePipeline {
-    id: String,
+    pub id: String,
     name: String,
     source_node_id: String,
     sorted_nodes: Vec<String>,
     function_map: HashMap<String, CompiledFunctionRuntime>,
     node_map: HashMap<String, ExecutableNode>,
+    pub kind: PipelineKind,
 }
 
 impl MemorySize for ExecutablePipeline {
@@ -282,6 +305,7 @@ impl ExecutablePipeline {
             node_map,
             sorted_nodes,
             function_map,
+            kind: pipeline.kind.clone(),
         })
     }
 
@@ -1317,230 +1341,132 @@ async fn process_node(
                 );
             }
         }
-        #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
-            log::info!(
-                "[Pipeline]: LLM evaluation node {node_idx} starts processing (sampling_rate={})",
-                params.sampling_rate,
-            );
+            log::info!("[Pipeline]: LLM evaluation node {node_idx} starts processing");
 
-            // Collect all records from receiver (fast — just drains the channel)
-            let mut all_records = Vec::new();
-            while let Some(pipeline_item) = receiver.recv().await {
-                all_records.push(pipeline_item.record);
-                count += 1;
+            if let Err(e) =
+                crate::service::self_reporting::ensure_llm_scores_stream_initialized(&org_id).await
+            {
+                log::warn!(
+                    "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _llm_scores stream initialized for {org_id}: {e}"
+                );
             }
-
-            log::debug!(
-                "[Pipeline]: LLM evaluation node {node_idx} received {count} records from condition node"
-            );
-
-            // Pre-filter: keep only spans relevant to LLM evaluation before passing
-            // to the background eval task. This drops pure infra spans (HTTP, DB, Redis,
-            // cache) that will never be evaluated, reducing channel pressure and buffer
-            // task work without any risk to the real-time ingestion path.
-            //
-            // A span is relevant if it is one of:
-            //   (a) an LLM span  — has llm_input / llm.input / gen_ai.content.prompt
-            //   (b) a tool span  — has gen_ai.tool.name/gen_ai_tool_name or operation_name
-            //                      starting with "execute_tool " or "tool."
-            //   (c) a root span  — has no non-zero reference_parent_span_id or parent_span_id
-            //
-            // The buffer task applies an identical filter internally; this is an intentional
-            // early-exit that avoids serialising irrelevant spans into the mpsc channel at all.
-            let llm_span_identifier = params.llm_span_identifier.as_str();
-            let pre_filter_total = all_records.len();
-            let all_records: Vec<_> = all_records
-                .into_iter()
-                .filter(|r| {
-                    // (a) LLM span
-                    let is_llm = {
-                        let check = |field: &str| {
-                            r.get(field)
-                                .map(|v| {
-                                    !v.is_null()
-                                        && v.as_str().map(|s| !s.is_empty()).unwrap_or(false)
-                                })
-                                .unwrap_or(false)
-                        };
-                        check(llm_span_identifier)
-                            || check("llm_input")
-                            || check("llm.input")
-                            || check("gen_ai.content.prompt")
-                    };
-                    if is_llm {
-                        return true;
-                    }
-
-                    // (b) tool span
-                    let is_tool = r.get("gen_ai.tool.name").is_some()
-                        || r.get("gen_ai_tool_name").is_some()
-                        || r.get("operation_name")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.starts_with("execute_tool ") || s.starts_with("tool."))
-                            .unwrap_or(false);
-                    if is_tool {
-                        return true;
-                    }
-
-                    // (c) root span — no non-zero parent
-                    let has_real_parent = |field: &str| -> bool {
-                        r.get(field)
-                            .and_then(|v| v.as_str())
-                            .map(|s| !s.is_empty() && !s.chars().all(|c| c == '0'))
-                            .unwrap_or(false)
-                    };
-                    !has_real_parent("reference_parent_span_id")
-                        && !has_real_parent("parent_span_id")
-                })
-                .collect();
-
-            let pre_filter_kept = all_records.len();
-            if pre_filter_kept < pre_filter_total {
-                log::info!(
-                    "[Pipeline]: LLM evaluation node {node_idx} pre-filter: {pre_filter_kept}/{pre_filter_total} spans are LLM/tool/root (dropped {} infra spans)",
-                    pre_filter_total - pre_filter_kept,
+            if let Err(e) =
+                crate::service::self_reporting::ensure_evaluator_stream_initialized(&org_id).await
+            {
+                log::warn!(
+                    "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
                 );
             }
 
-            // Drop child_senders immediately — the eval background task will ingest
-            // results directly rather than sending through the leaf node. This allows
-            // the leaf node's channel to close and its task to return immediately.
-            drop(child_senders);
+            let scorer_refs = params.scorers.clone();
 
-            if !all_records.is_empty() {
-                // Spawn the LLM evaluation as a background task to avoid blocking
-                // the primary pipeline path (~10s for LLM judge).
-                //
-                // The eval node is retrieved from a global registry keyed by
-                // pipeline_id:node_id, so all pipeline executions share the same
-                // buffer task. This ensures spans from the same trace arriving in
-                // different ingestion batches are aggregated before evaluation.
-                let eval_config =
-                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationConfig {
-                        sampling_rate: params.sampling_rate,
-                        enable_llm_judge: true,
-                        llm_span_identifier: params.llm_span_identifier.clone(),
-                        eval_template: params.eval_template.clone(),
-                        ..Default::default()
-                    };
-                let params_name = params.name.clone();
-                let pl_name = pipeline_name.clone();
-                let org = org_id.clone();
-                let dest = _leaf_dest_stream
-                    .clone()
-                    .unwrap_or_else(|| StreamParams::new("", "llm_evaluations", StreamType::Logs));
-                let buffer_key = format!("{}:{}", pipeline_id, node.id);
+            let job_id = params.job_id.as_deref();
+            while let Some(item) = receiver.recv().await {
+                if let Some(mut ctx) =
+                    crate::service::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
+                        &org_id,
+                        job_id,
+                        &item.record,
+                    )
+                {
+                    let eval_run_id = config::ider::generate();
+                    ctx.eval_run_id = Some(eval_run_id.clone());
+                    ctx.sampling_rate = Some(params.sampling_rate);
+                    let sampled =
+                        should_sample_eval_record(&item.record, item.idx, params.sampling_rate);
+                    ctx.sampled = Some(sampled);
 
-                // Build ingestion context for the buffer task to self-ingest
-                // deferred evaluation results.
-                let ingestion_ctx =
-                    o2_enterprise::enterprise::pipeline::llm_evaluation_node::IngestionContext {
-                        org_id: org.clone(),
-                        stream_name: dest.stream_name.to_string(),
-                        stream_type: dest.stream_type.to_string(),
-                        ingestion_fn: std::sync::Arc::new(|req| {
-                            Box::pin(async move {
-                                crate::service::ingestion::ingestion_service::ingest(req)
-                                    .await
-                                    .map_err(|e| anyhow::anyhow!(e.to_string()))
-                            })
-                        }),
-                        #[cfg(feature = "cloud")]
-                        billing_fn: Some(std::sync::Arc::new(|org_id, trace_id| {
-                            Box::pin(async move {
-                                use crate::service::trial_quota::{
-                                    self, AiUsageContext, TrialQuotaFeature,
-                                };
-                                let ctx = AiUsageContext {
-                                    user_email: "system@openobserve.ai".to_string(),
-                                    trace_id,
-                                    ..Default::default()
-                                };
-                                let feature = TrialQuotaFeature::AiChat;
-                                match trial_quota::try_deduct(&org_id, feature).await {
-                                    Ok(_) => {
-                                        trial_quota::record_free_ai_usage(&org_id, &ctx, feature);
-                                        true
-                                    }
-                                    Err(_) => {
-                                        if trial_quota::org_has_active_subscription(&org_id).await {
-                                            trial_quota::record_billable_ai_usage(
-                                                &org_id, &ctx, feature,
-                                            );
-                                            true
-                                        } else {
-                                            false // quota exhausted, no subscription
-                                        }
-                                    }
-                                }
-                            })
-                        })),
-                        #[cfg(not(feature = "cloud"))]
-                        billing_fn: None,
-                        auth_fn: Some(std::sync::Arc::new(|org_id| {
-                            Box::pin(async move {
-                                match crate::service::organization::get_sre_agent_credentials(
-                                    &org_id,
+                    if !sampled {
+                        let skipped_trace =
+                            crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace(
+                                crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
+                                    org_id: ctx.org_id.clone(),
+                                    evaluator_trace_id: ctx.evaluator_trace_id.clone(),
+                                    target_span_id: ctx.span_id.clone(),
+                                    target_trace_id: ctx.trace_id.clone(),
+                                    target_stream: ctx.source_stream.clone(),
+                                    scorer_id: None,
+                                    scorer_version: None,
+                                    scorer_type: None,
+                                    job_id: ctx.job_id.clone(),
+                                    score_config_id: None,
+                                    score_config_version: None,
+                                    eval_run_id: Some(eval_run_id),
+                                    provider_id: None,
+                                    provider_name: None,
+                                    provider_type: None,
+                                    model: None,
+                                    latency_ms: 0,
+                                    prompt_tokens: None,
+                                    completion_tokens: None,
+                                    total_tokens: None,
+                                    sampling_rate: Some(params.sampling_rate),
+                                    sampled: Some(false),
+                                    status:
+                                        config::meta::self_reporting::evaluator::status::SKIPPED
+                                            .to_string(),
+                                    error_kind: None,
+                                    error_message: None,
+                                    skip_reason: Some("sampling".to_string()),
+                                    prompt: None,
+                                    response: None,
+                                },
+                            );
+                        crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                            &org_id,
+                            vec![skipped_trace],
+                            node_idx,
+                        )
+                        .await;
+                        count += 1;
+                        continue;
+                    }
+
+                    match crate::service::llm_evaluations::eval_jobs::executor_runtime::execute_scorers(
+                        &ctx,
+                        &scorer_refs,
+                    )
+                    .await
+                    {
+                        Ok(output) => {
+                            for score_record in output.scores {
+                                send_to_children(
+                                    &mut child_senders,
+                                    PipelineItem {
+                                        idx: item.idx,
+                                        record: score_record,
+                                        flattened: true,
+                                    },
+                                    "LlmEvaluationNode",
                                 )
-                                .await
-                                {
-                                    Ok((email, token)) => {
-                                        crate::common::utils::auth::build_basic_auth_header(
-                                            &email, &token,
-                                        )
-                                    }
-                                    Err(e) => {
-                                        log::warn!(
-                                            "[LLM-EVAL] Failed to get SA credentials for org={}: {e}",
-                                            org_id
-                                        );
-                                        String::new()
-                                    }
-                                }
-                            })
-                        })),
-                    };
-
-                tokio::spawn(async move {
-                    match o2_enterprise::enterprise::pipeline::llm_evaluation_node::LlmEvaluationNode::get_or_create(
-                        buffer_key,
-                        params_name,
-                        eval_config,
-                        ingestion_ctx,
-                    ).await {
-                        Ok(eval_node) => {
-                            use o2_enterprise::enterprise::pipeline::node::PipelineNode;
-                            if let Err(e) = eval_node.process(all_records).await {
-                                log::error!(
-                                    "[Pipeline] {pl_name}: LLM eval node {node_idx} processing failed: {e}"
+                                .await;
+                            }
+                            crate::service::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                                &org_id,
+                                output.evaluator_traces,
+                                node_idx,
+                            )
+                            .await;
+                            for err in &output.errors {
+                                log::warn!(
+                                    "[Pipeline]: LLM evaluation node {node_idx} scorer '{}' error: {}",
+                                    err.scorer_id,
+                                    err.error_message
                                 );
                             }
-                            // The shared buffer task accumulates spans by trace_id and
-                            // self-ingests eval results after the grace period expires.
                         }
                         Err(e) => {
                             log::error!(
-                                "[Pipeline] {pl_name}: Failed to get/create LLM eval node {node_idx}: {e}"
+                                "[Pipeline]: LLM evaluation node {node_idx} execution error: {e}"
                             );
                         }
                     }
-                });
-            }
-
-            log::debug!(
-                "[Pipeline]: LLM evaluation node {node_idx} task returning (eval runs in background)"
-            );
-        }
-        #[cfg(not(feature = "enterprise"))]
-        NodeData::LlmEvaluation(_) => {
-            // LLM evaluation is not supported in open source version, pass through
-            log::debug!("[Pipeline]: LLM evaluation node {node_idx} (passthrough in OSS)");
-            while let Some(pipeline_item) = receiver.recv().await {
-                send_to_children(&mut child_senders, pipeline_item, "LlmEvaluationNode").await;
+                }
                 count += 1;
             }
-            log::debug!(
+
+            log::info!(
                 "[Pipeline]: LLM evaluation node {node_idx} done processing {count} records"
             );
         }

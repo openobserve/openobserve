@@ -269,7 +269,7 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(cfg.usagePercentage).toBe(80);
     });
 
-    it("falls back to default quota (200) when zoConfig.ingestion_quota is undefined", () => {
+    it("falls back to default quota (50) when zoConfig.ingestion_quota is undefined", () => {
       mockStore = buildStore({
         zoConfig: {
           license_expiry: 0,
@@ -281,7 +281,7 @@ describe("EnterpriseUpgradeDialog", () => {
       const wrapper = createWrapper();
       const cfg = (wrapper.vm as any).dialogConfig;
       // Just assert that badgeText contains the fallback quota value
-      expect(cfg.badgeText).toContain("200");
+      expect(cfg.badgeText).toContain("50");
     });
 
     it("respects an explicit quota of 0 via nullish coalescing", () => {

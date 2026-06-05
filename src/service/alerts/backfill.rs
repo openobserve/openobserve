@@ -848,6 +848,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![source, dest],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         let result = get_destination_streams(&pipeline).unwrap();
@@ -869,6 +870,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         assert!(get_destination_streams(&pipeline).is_err());
@@ -901,6 +903,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![query],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         assert!(get_destination_streams(&pipeline).is_err());

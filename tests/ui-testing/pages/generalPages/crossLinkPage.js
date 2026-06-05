@@ -207,10 +207,10 @@ export class CrossLinkPage {
 
     async fillFieldInput(fieldName) {
         testLogger.debug('Filling field input', { fieldName });
-        // CrossLinkDialog renders the field-name capture as an OCombobox.
-        // OCombobox forwards the consumer data-test onto the inner <input> as
-        // `${parent}-input`, which is the real fillable target.
-        const inputField = this.page.locator('[data-test="cross-link-field-input-input"]');
+        // CrossLinkDialog renders OCombobox (streams, with suggestions) or OInput
+        // (org-level, no suggestions). OCombobox inner input uses the `-input` suffix;
+        // OInput uses `-field`. Match whichever is present.
+        const inputField = this.page.locator('[data-test="cross-link-field-input-input"], [data-test="cross-link-field-input-field"]');
         await inputField.waitFor({ state: 'visible', timeout: 10000 });
         await inputField.click();
         await inputField.fill(fieldName);
