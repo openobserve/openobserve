@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="() => runQuery(false)"
                 >{{ t("panel.apply") }}</OButton
               >
-              <OButtonGroup v-if="config.isEnterprise === 'true'">
+              <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
                 <OButton
                   :data-test="
                     searchRequestTraceIds.length > 0
@@ -124,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'primary'
                       "
                       size="icon-sm"
+                      class="tw:!h-[2.125rem]"
                       :disabled="searchRequestTraceIds.length > 0"
                       icon-left="keyboard-arrow-down"
                     />
