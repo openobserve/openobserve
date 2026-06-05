@@ -108,7 +108,7 @@ jobs:
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config gcc g++ g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
-      - name: Setup musl toolchain for arm64
+      - name: Setup musl toolchain for linux musl
         if: contains(matrix.arch, 'linux-musl')
         run: |
           sudo ln -sf "$(which g++)" /usr/bin/musl-g++
