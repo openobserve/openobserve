@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:font-medium tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary text-truncate tw:block"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
                 >
-                  <span class="tw:font-medium tw:text-text-primary">{{
+                  <span class="tw:text-text-primary">{{
                     resultTotal || 0
                   }}</span>
                   <span class="tw:text-text-secondary">{{
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
                 >
                   <span
-                    class="tw:text-sm tw:font-medium tw:text-text-primary tw:mr-1"
+                    class="tw:text-sm tw:text-text-primary tw:mr-1"
                     >{{ selectedIds.length }} selected</span
                   >
                   <OButton

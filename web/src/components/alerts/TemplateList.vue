@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+          <span class="tw:text-xs tw:text-text-primary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton

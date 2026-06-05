@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-title="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1">
-            <span class="tw:font-medium">
+            <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="dimension-badge"
               :class="getDimensionColorClass(key)"
             >
-              <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+              <span>{{ key }}</span>=<span>{{ value }}</span>
               <OTooltip :delay="300" :content="key + '=' + value" />
             </span>
             <span
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span class="tw:font-medium">{{ key }}</span>=<span>{{ value }}</span>
+                      <span>{{ key }}</span>=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>

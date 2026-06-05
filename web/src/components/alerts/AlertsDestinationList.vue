@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
             >
               <div style="width: 600px" class="tw:mt-6">
-                <div class="tw:text-base tw:font-medium">
+                <div class="tw:text-sm">
                   It looks like you haven't created any Templates yet. To create
                   an Alert, you'll need to have at least one Destination and one
                   Template in place

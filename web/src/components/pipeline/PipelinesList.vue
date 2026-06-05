@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
           >
             <div
-              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+              class="tw:flex tw:items-center tw:text-sm tw:mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>

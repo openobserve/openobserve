@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-template-text"
                         >
                           It looks like you haven't created any Templates yet.
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-destination-text"
                         >
                           It looks like you haven't created any Destinations

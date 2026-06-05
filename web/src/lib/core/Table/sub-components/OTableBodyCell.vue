@@ -57,8 +57,7 @@ const align = computed(() => meta.value?.align ?? "left");
 // Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
 // Only the default-rendered text path uses this; custom cells style their own.
 const defaultTextClass = computed(() => [
-  "tw:text-primary tw:text-sm",
-  meta.value?.isName ? "tw:font-medium" : "",
+  "tw:text-text-primary tw:text-sm",
 ]);
 
 const alignClass = computed(() => {
