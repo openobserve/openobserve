@@ -492,7 +492,7 @@ export default defineComponent({
           header: t("quota.moduleName"),
           accessorKey: "module_name",
           sortable: true,
-          meta: { align: "left" },
+          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",
@@ -545,7 +545,7 @@ export default defineComponent({
           accessorKey: "role_name",
           sortable: true,
           cell: (info: any) => info.getValue(),
-          meta: { align: "left" },
+          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",

@@ -206,6 +206,7 @@ export default defineComponent({
         header: t("ingestion.tokenNameLabel"),
         accessorKey: "name",
         sortable: true,
+        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
       },
       {
         id: "token",

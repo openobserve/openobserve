@@ -151,7 +151,7 @@ export default defineComponent({
         size: 36,
         minSize: 32,
         maxSize: 40,
-        meta: { align: "left", compactPadding: true },
+        meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
       },
       {
         id: "name",
