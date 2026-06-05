@@ -891,8 +891,25 @@ export default defineComponent({
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
     const paginationMaxPages = computed(() => containerWidth.value < 700 ? 3 : 5);
 
-    const noOfRecordsTitle = ref("");
-    const patternSummaryText = ref("");
+    const noOfRecordsTitle = computed<string>(
+      () => (searchObj.data.histogram.chartParams.title as string) || "",
+    );
+
+    const patternSummaryText = computed<string>(() => {
+      const stats = patternsState.value?.patterns?.statistics;
+      if (!stats) return "";
+      const patternsFound = stats.total_patterns_found || 0;
+      const logsAnalyzed = (stats.total_logs_analyzed || 0).toLocaleString();
+      const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
+      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+      const totalTimeMs = (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
+      return t("search.pattern_summary", {
+        totalEvents: totalEventsStr,
+        patternsFound,
+        logsAnalyzed,
+        totalTime: totalTimeMs,
+      });
+    });
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100];
     const disableMoreErrorDetails = ref(false);

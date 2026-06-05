@@ -36,7 +36,7 @@ const patterns = {
   }) => {
     const url = `/api/${org_identifier}/streams/${stream_name}/patterns/extract`;
 
-    return signal ? http().post(url, query, { signal }) : http().post(url, query);
+    return http().post(url, query, { signal });
   },
 };
 

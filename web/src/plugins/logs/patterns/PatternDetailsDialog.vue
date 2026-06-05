@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="modelValue"
     @update:open="$emit('update:modelValue', $event)"
     :width="90"
-    :title="t('search.patternDetailsTitle')"
-    :subTitle="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
   >
     <template #header>
       <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5 tw:overflow-hidden">
