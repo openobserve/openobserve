@@ -4811,5 +4811,43 @@
       "title": "No LLM Providers Yet",
       "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "mac": "Mac",
+    "windowsLinux": "Windows / Linux",
+    "toggleHint": "to toggle this panel",
+    "pages": {
+      "global": "Global",
+      "logs": "Logs",
+      "dashboards": "Dashboards",
+      "dashboardsPanel": "Dashboards — Panel (hover a panel)",
+      "metrics": "Metrics",
+      "traces": "Traces",
+      "alerts": "Alerts"
+    },
+    "actions": {
+      "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "closeDialog": "Close any dialog, drawer, or modal",
+      "logsRunQuery": "Run search query",
+      "logsRefresh": "Refresh / re-run search",
+      "logsToggleHistogram": "Toggle histogram",
+      "logsToggleSidebar": "Toggle fields sidebar",
+      "dashboardRefresh": "Refresh all panels",
+      "dashboardAddPanel": "Add new panel",
+      "dashboardSave": "Save dashboard",
+      "dashboardFullscreen": "Toggle fullscreen",
+      "panelView": "View panel fullscreen",
+      "panelEdit": "Edit panel",
+      "panelDuplicate": "Duplicate panel",
+      "panelDelete": "Delete panel",
+      "metricsRunQuery": "Run PromQL query",
+      "metricsRefresh": "Refresh",
+      "tracesSearch": "Search traces",
+      "tracesRefresh": "Refresh",
+      "alertsCreate": "Create new alert",
+      "alertsRefresh": "Refresh alert list",
+      "alertsClose": "Close alert detail drawer"
+    }
   }
 }

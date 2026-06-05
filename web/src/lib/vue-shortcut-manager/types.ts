@@ -6,6 +6,8 @@ export interface Shortcut {
   description?: string;
   scope?: string;
   whenFocused?: Ref<HTMLElement | null> | HTMLElement | null;
+  /** When true the shortcut fires but is omitted from the cheatsheet list */
+  hidden?: boolean;
 }
 
 export interface ShortcutManagerOptions {
