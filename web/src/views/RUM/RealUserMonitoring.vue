@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem]">
-        <div class="card-container tw:px-4 tw:pt-2">
+      <div v-if="showTabs" class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+        <div>
           <OTabs v-model="activeTab" align="left" dense @change="changeTab">
             <OTab
               v-for="tab in tabs"

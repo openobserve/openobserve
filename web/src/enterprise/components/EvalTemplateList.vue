@@ -34,12 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PipelineSectionTabs />
       </template>
       <template #actions>
-        <OSearchInput
-          data-test="eval-template-list-search-input"
-          v-model="filterQuery"
-          class="tw:w-[200px]"
-          :placeholder="t('evalTemplate.search')"
-        />
         <OButton
           data-test="eval-template-list-refresh-btn"
           variant="outline"
@@ -60,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
         <OTable
           :frame="false"
@@ -69,8 +63,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           :loading="isLoading"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
           :show-global-filter="false"
+          filter-mode="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
@@ -78,6 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           width="100%"
           class="tw:w-full tw:h-full"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                data-test="eval-template-list-search-input"
+                v-model="filterQuery"
+                class="tw:flex-1"
+                :placeholder="t('evalTemplate.search')"
+              />
+            </div>
+          </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
             <span class="eval-version-badge">v{{ row.version }}</span>

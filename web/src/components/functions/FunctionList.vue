@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <div class="card-container tw:h-full">
           <OTable
             :frame="false"
@@ -62,12 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:w-full tw:h-full"
           >
               <template #toolbar>
-                <OSearchInput
-                  data-test="functions-list-search-input"
-                  v-model="filterQuery"
-                  class="tw:w-64"
-                  :placeholder="t('function.search')"
-                />
+                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <OSearchInput
+                    data-test="functions-list-search-input"
+                    v-model="filterQuery"
+                    class="tw:flex-1"
+                    :placeholder="t('function.search')"
+                  />
+                </div>
               </template>
               <template #empty>
                 <OEmptyState
