@@ -2696,19 +2696,47 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        // SQL mode toggle was removed from the UI. Type a minimal SELECT query via
-        // keyboard to trigger auto-detection, then wait 600ms for the 500ms debounce
-        // in CodeQueryEditor to fire and set searchObj.meta.sqlMode = true.
-        // Callers that subsequently clear + refill the editor keep SQL mode active
-        // because: (a) the clear+fill debounce fires with SELECT content (the two
-        // keyboard operations happen < 500ms apart so only the final value is
-        // emitted), and (b) once SQL mode is ON the watcher's `sqlMode === false`
-        // guard prevents it from being re-enabled (it's already true).
+        // SQL mode toggle was removed from the UI. SQL mode is now auto-detected from
+        // SELECT...FROM in the query content. We read the current interesting fields and
+        // stream from the Vue component state to build the correct SELECT query, so that
+        // tests which add an interesting field before calling this method will see the
+        // field appear in the editor (e.g. SELECT _timestamp,kubernetes_pod_id FROM ...).
+        const appState = await this.page.evaluate(() => {
+            try {
+                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!el) return null;
+                let current = el;
+                while (current && current !== document.body) {
+                    const comp = current.__vueParentComponent;
+                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                        const s = comp.setupState.searchObj;
+                        return {
+                            fields: [...(s.data?.stream?.interestingFieldList || [])],
+                            stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+                        };
+                    }
+                    current = current.parentElement;
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        });
+
+        const timestamp = '_timestamp';
+        const fields = appState?.fields || [];
+        const stream = appState?.stream || 'e2e_automate';
+        // Build SELECT with timestamp first, then any interesting fields
+        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+        const sql = allFields.length > 1
+            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
+            : `SELECT * FROM "${stream}"`;
+
         const monacoHelper = this.getMonacoEditorHelper();
         const container = this.getQueryEditorContainer();
-        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        await monacoHelper.setContent(container, sql);
         await this.page.waitForTimeout(600);
-        testLogger.info('clickSQLModeToggle: typed SELECT query to trigger SQL mode auto-detection');
+        testLogger.info(`clickSQLModeToggle: set SQL="${sql.substring(0, 80)}"`);
     }
 
     async clickShowQueryToggle() {
@@ -6821,31 +6849,64 @@ export class LogsPage {
     }
 
     /**
-     * Check if SQL mode is currently enabled.
-     * SQL mode toggle was removed from the UI — always returns false.
-     * @returns {Promise<boolean>} Always false since SQL mode is auto-detected now
+     * SQL mode is auto-detected from query content: ON when the editor has SELECT...FROM.
+     * @returns {Promise<boolean>} True if the current query looks like SQL
      */
     async isSqlModeEnabled() {
-        testLogger.info('isSqlModeEnabled: SQL mode toggle removed from UI — returning false');
-        return false;
+        const text = await this.getQueryEditorText();
+        if (!text) return false;
+        const lower = text.toLowerCase().trim();
+        return lower.includes('select') && lower.includes('from');
     }
 
     /**
      * Enable SQL mode if currently disabled.
-     * The SQL mode toggle was removed from the UI; SQL mode is now auto-detected when
-     * the editor contains both "select" and "from". This method types a minimal SELECT
-     * query via keyboard and waits 600ms for the 500ms debounce in CodeQueryEditor to
-     * settle, ensuring SQL mode is active before the caller proceeds.
-     * Subsequent setQueryEditorValue / monacoHelper.setContent calls overwrite this query;
-     * SQL mode remains active because those queries also contain SELECT … FROM.
+     * Sets sqlMode=true via the Vue component state, then waits for reactivity to settle.
+     * Falls back to typing a SELECT query if Vue state access is unavailable.
      */
     async enableSqlModeIfDisabled() {
-        const monacoHelper = this.getMonacoEditorHelper();
-        const container = this.getQueryEditorContainer();
-        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
-        // Wait for the 500ms debounce in CodeQueryEditor to fire.
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            testLogger.info('enableSqlModeIfDisabled: SQL mode already on — skipping');
+            return;
+        }
+        const set = await this._setSqlModeViaVue(true);
+        if (!set) {
+            // Fallback: type a SELECT query to trigger auto-detection
+            const monacoHelper = this.getMonacoEditorHelper();
+            const container = this.getQueryEditorContainer();
+            await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        }
         await this.page.waitForTimeout(600);
-        testLogger.info('enableSqlModeIfDisabled: typed SELECT query to trigger SQL mode auto-detection');
+        testLogger.info('enableSqlModeIfDisabled: SQL mode enabled');
+    }
+
+    /**
+     * Set searchObj.meta.sqlMode via the Vue component state accessed from the browser context.
+     * Works by walking up the DOM from the query editor to find the component with searchObj.
+     * Triggers Vue reactivity (including the sqlMode watcher in build tab).
+     * @param {boolean} value - true to enable SQL mode, false to disable
+     * @returns {Promise<boolean>} true if the state was set successfully
+     */
+    async _setSqlModeViaVue(value) {
+        return await this.page.evaluate((sqlMode) => {
+            try {
+                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!el) return false;
+                let current = el;
+                while (current && current !== document.body) {
+                    const comp = current.__vueParentComponent;
+                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                        comp.setupState.searchObj.meta.sqlMode = sqlMode;
+                        return true;
+                    }
+                    current = current.parentElement;
+                }
+                return false;
+            } catch (e) {
+                return false;
+            }
+        }, value);
     }
 
     /**
@@ -7709,32 +7770,47 @@ export class LogsPage {
 
     /**
      * Enable SQL mode if not already enabled.
-     * The SQL mode toggle was removed from the UI; SQL mode is now auto-detected when
-     * the editor contains both "select" and "from". The detection fires via a 500ms
-     * debounce in CodeQueryEditor. This method types a minimal SELECT query via keyboard
-     * (which triggers the debounce) then waits 600ms for it to settle, so callers can
-     * rely on SQL mode being active before running a query.
-     * NOTE: callers that subsequently call setQueryEditorValue / monacoHelper.setContent
-     * will overwrite this query — SQL mode remains active because those queries also
-     * contain SELECT … FROM.
+     * Sets sqlMode=true via the Vue component state (triggers the sqlMode watcher in build
+     * tab or enables auto-detection on the logs tab). Falls back to typing SELECT * if Vue
+     * state access is unavailable.
      */
     async enableSqlModeIfNeeded() {
-        const monacoHelper = this.getMonacoEditorHelper();
-        const container = this.getQueryEditorContainer();
-        await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
-        // Wait for the 500ms debounce in CodeQueryEditor to fire and for the Vue watcher
-        // in SearchBar.vue to set searchObj.meta.sqlMode = true.
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
+            return;
+        }
+        const set = await this._setSqlModeViaVue(true);
+        if (!set) {
+            // Fallback: type a SELECT query to trigger auto-detection
+            const monacoHelper = this.getMonacoEditorHelper();
+            const container = this.getQueryEditorContainer();
+            await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+        }
         await this.page.waitForTimeout(600);
-        testLogger.info('enableSqlModeIfNeeded: typed SELECT query to trigger SQL mode auto-detection');
+        testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
 
     /**
      * Disable SQL mode if currently enabled.
-     * SQL mode toggle was removed from the UI — this is now a no-op.
+     * Sets sqlMode=false via the Vue component state (triggers the sqlMode watcher in build
+     * tab to show WHERE clause). Falls back to clearing the editor if Vue state is unavailable.
      */
     async disableSqlModeIfNeeded() {
-        // SQL mode toggle removed from UI. Clear the query editor to reset to non-SQL mode.
-        testLogger.info('disableSqlModeIfNeeded: SQL mode toggle removed from UI — skipping');
+        const isSQL = await this.isSqlModeEnabled();
+        if (!isSQL) {
+            testLogger.info('disableSqlModeIfNeeded: SQL mode already off — skipping');
+            return;
+        }
+        const set = await this._setSqlModeViaVue(false);
+        if (!set) {
+            // Fallback: clear the editor via keyboard so SQL auto-detection turns off
+            const monacoHelper = this.getMonacoEditorHelper();
+            const container = this.getQueryEditorContainer();
+            await monacoHelper.clear(container).catch(() => {});
+        }
+        await this.page.waitForTimeout(600);
+        testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
 
     /**
