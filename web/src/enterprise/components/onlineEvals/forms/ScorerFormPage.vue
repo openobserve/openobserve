@@ -238,17 +238,100 @@
             </div>
           </div>
 
-          <div class="scorer-field scorer-field--schema">
-            <label class="scorer-field__label">
-              {{ t("onlineEvals.scorer.outputSchemaLabel") }}
+          <div class="scorer-field scorer-field--extras">
+            <label class="scorer-extras__toggle">
+              <input
+                v-model="form.includeReasoning"
+                type="checkbox"
+                data-test="scorer-form-include-reasoning"
+              />
+              <span>
+                <strong>{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
+                <small>{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
+              </span>
             </label>
-            <OInput
-              v-model="form.outputSchema"
-              type="textarea"
-              size="sm"
-              :rows="6"
-              data-test="scorer-form-output-schema-input"
-            />
+
+            <div class="scorer-extras__head">
+              <div class="scorer-extras__head-text">
+                <strong>{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
+                <span class="scorer-extras__optional">
+                  {{ t("onlineEvals.scorer.extraFieldsOptional") }}
+                </span>
+                <small>{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
+              </div>
+            </div>
+
+            <div
+              v-if="form.extraMetadataFields.length"
+              class="scorer-extras__table"
+              data-test="scorer-form-extra-fields"
+            >
+              <div class="scorer-extras__row scorer-extras__row--head">
+                <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
+                <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
+                <span>{{ t("onlineEvals.scorer.extraFields.colDescription") }}</span>
+                <span aria-hidden="true" />
+              </div>
+              <div
+                v-for="(field, idx) in form.extraMetadataFields"
+                :key="idx"
+                class="scorer-extras__row"
+              >
+                <OInput
+                  v-model.trim="field.name"
+                  size="sm"
+                  :placeholder="t('onlineEvals.scorer.extraFields.namePlaceholder')"
+                  :class="{ 'has-error': field.name && extraFieldNameDuplicates.has(field.name) }"
+                  :data-test="`scorer-form-extra-field-name-${idx}`"
+                />
+                <OSelect
+                  v-model="field.type"
+                  size="sm"
+                  :options="extraFieldTypeOptions"
+                  :data-test="`scorer-form-extra-field-type-${idx}`"
+                />
+                <OInput
+                  v-model="field.description"
+                  size="sm"
+                  :placeholder="t('onlineEvals.scorer.extraFields.descriptionPlaceholder')"
+                  :data-test="`scorer-form-extra-field-description-${idx}`"
+                />
+                <button
+                  type="button"
+                  class="scorer-extras__remove"
+                  :aria-label="t('onlineEvals.buttons.remove')"
+                  :data-test="`scorer-form-extra-field-remove-${idx}`"
+                  @click="removeExtraField(idx)"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div class="scorer-extras__actions">
+              <button
+                type="button"
+                class="scorer-extras__add"
+                :disabled="form.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
+                data-test="scorer-form-extra-field-add"
+                @click="addExtraField"
+              >
+                {{ t("onlineEvals.scorer.extraFields.addButton") }}
+                <span class="scorer-extras__count">
+                  ({{ form.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
+                </span>
+              </button>
+
+              <button
+                type="button"
+                class="scorer-extras__preview"
+                data-test="scorer-form-preview-schema"
+                @click="previewOutputSchema"
+              >
+                {{ t("onlineEvals.scorer.extraFields.previewSchema") }}
+              </button>
+            </div>
+
           </div>
         </section>
 
@@ -330,6 +413,47 @@
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
+
+    <ODialog
+      v-model:open="schemaPreviewOpen"
+      data-test="scorer-form-schema-preview-dialog"
+      size="md"
+      :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
+    >
+      <p v-if="isLoadingSchemaPreview" class="scorer-schema-dialog__state">
+        {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
+      </p>
+      <p
+        v-else-if="schemaPreviewError"
+        class="scorer-schema-dialog__state scorer-schema-dialog__state--error"
+      >
+        {{ schemaPreviewError }}
+      </p>
+      <pre v-else class="scorer-schema-dialog__code">{{ schemaPreview }}</pre>
+
+      <template #footer>
+        <div class="scorer-schema-dialog__footer">
+          <OButton
+            data-test="scorer-form-schema-copy-btn"
+            variant="outline"
+            size="sm-action"
+            :icon-left="schemaJustCopied ? 'check' : 'content-copy'"
+            :disabled="!schemaPreview || isLoadingSchemaPreview"
+            @click="copySchemaToClipboard"
+          >
+            {{ copyButtonLabel }}
+          </OButton>
+          <OButton
+            data-test="scorer-form-schema-close-btn"
+            variant="primary"
+            size="sm-action"
+            @click="schemaPreviewOpen = false"
+          >
+            {{ t("onlineEvals.buttons.close") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </form>
 </template>
 
@@ -340,8 +464,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
+  type ExtraMetadataField,
   type Provider,
   type ScoreConfig,
   type Scorer,
@@ -354,12 +480,9 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import {
-  defaultOutputSchema,
   extractTemplateVariables,
   formatTemplateVariable,
-  parseOptionalJson,
   showError,
-  stringifyJson,
 } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
@@ -433,7 +556,10 @@ function buildScorerTestPayload() {
         params: {
           provider_id: form.value.providerId,
           ...(form.value.model ? { model: form.value.model } : {}),
-          include_reasoning: true,
+          include_reasoning: form.value.includeReasoning,
+          ...(cleanedExtraFields.value.length
+            ? { extra_metadata_fields: cleanedExtraFields.value }
+            : {}),
         },
       }
     : {
@@ -460,6 +586,109 @@ function buildScorerTestPayload() {
 function onRunScorerTest() {
   if (!canRunScorerTest.value) return;
   void runScorerTest(props.orgId, buildScorerTestPayload());
+}
+
+const MAX_EXTRA_FIELDS = 10;
+
+const extraFieldTypeOptions = computed(() => [
+  { label: t("onlineEvals.scorer.extraFields.typeString"), value: "string" },
+  { label: t("onlineEvals.scorer.extraFields.typeNumber"), value: "number" },
+  { label: t("onlineEvals.scorer.extraFields.typeBoolean"), value: "boolean" },
+]);
+
+const cleanedExtraFields = computed<ExtraMetadataField[]>(() =>
+  form.value.extraMetadataFields
+    .map((field) => ({
+      name: field.name.trim(),
+      type: field.type,
+      description: field.description?.trim() || undefined,
+    }))
+    .filter((field) => field.name.length > 0)
+    .map((field) => ({
+      name: field.name,
+      type: field.type,
+      ...(field.description ? { description: field.description } : {}),
+    })),
+);
+
+const extraFieldNameDuplicates = computed(() => {
+  const seen = new Map<string, number>();
+  for (const field of cleanedExtraFields.value) {
+    seen.set(field.name, (seen.get(field.name) ?? 0) + 1);
+  }
+  return new Set(
+    Array.from(seen.entries())
+      .filter(([, count]) => count > 1)
+      .map(([name]) => name),
+  );
+});
+
+function addExtraField() {
+  if (form.value.extraMetadataFields.length >= MAX_EXTRA_FIELDS) return;
+  form.value.extraMetadataFields.push({ name: "", type: "string", description: "" });
+}
+
+function removeExtraField(index: number) {
+  form.value.extraMetadataFields.splice(index, 1);
+}
+
+const schemaPreview = ref<string>("");
+const schemaPreviewError = ref<string | null>(null);
+const isLoadingSchemaPreview = ref(false);
+const schemaPreviewOpen = ref(false);
+const schemaJustCopied = ref(false);
+
+const copyButtonLabel = computed(() =>
+  schemaJustCopied.value
+    ? t("onlineEvals.scorer.extraFields.schemaCopied")
+    : t("onlineEvals.scorer.extraFields.schemaCopy"),
+);
+
+async function copySchemaToClipboard() {
+  if (!schemaPreview.value) return;
+  try {
+    await navigator.clipboard.writeText(schemaPreview.value);
+    schemaJustCopied.value = true;
+    window.setTimeout(() => {
+      schemaJustCopied.value = false;
+    }, 1500);
+  } catch {
+    toast({
+      variant: "error",
+      message: t("onlineEvals.scorer.extraFields.schemaCopyFailed"),
+    });
+  }
+}
+
+async function previewOutputSchema() {
+  if (!props.orgId) return;
+  schemaPreviewOpen.value = true;
+  isLoadingSchemaPreview.value = true;
+  schemaPreviewError.value = null;
+  schemaPreview.value = "";
+  try {
+    const data = await onlineEvalsService.scorers.previewLlmJudgeOutputSchema(
+      props.orgId,
+      {
+        ...(form.value.producesScoreConfigId
+          ? { producesScoreConfigId: form.value.producesScoreConfigId }
+          : {}),
+        ...(form.value.pinScoreConfigVersion && form.value.producesScoreConfigVersion
+          ? { producesScoreConfigVersion: Number(form.value.producesScoreConfigVersion) }
+          : {}),
+        includeReasoning: form.value.includeReasoning,
+        extraMetadataFields: cleanedExtraFields.value,
+      },
+    );
+    const schema = (data as any)?.outputSchema ?? (data as any)?.output_schema ?? data;
+    schemaPreview.value = JSON.stringify(schema, null, 2);
+  } catch (err: any) {
+    const body = err?.response?.data ?? {};
+    schemaPreviewError.value =
+      body.message || body.error || err?.message || "Failed to derive schema";
+  } finally {
+    isLoadingSchemaPreview.value = false;
+  }
 }
 
 const titleText = computed(() => {
@@ -555,10 +784,12 @@ function initForm(row: Scorer | null, scorerType: ScorerType) {
       model: "",
       remoteEndpoint: "",
       template: "Evaluate {{ input }} and {{ output }}.",
-      outputSchema: stringifyJson(defaultOutputSchema()),
+      includeReasoning: true,
+      extraMetadataFields: [] as ExtraMetadataField[],
     };
   }
   const rowScorerType = (valueOf(row, "scorerType", "scorer_type") || "llm_judge") as ScorerType;
+  const rawExtras = (row.params?.extra_metadata_fields ?? row.params?.extraMetadataFields ?? []) as any[];
   return {
     name: row.name,
     scorerType: rowScorerType,
@@ -576,9 +807,19 @@ function initForm(row: Scorer | null, scorerType: ScorerType) {
     model: String(row.params?.model || ""),
     remoteEndpoint: String(row.params?.endpoint || ""),
     template: row.template || "",
-    outputSchema: stringifyJson(
-      valueOf(row, "outputSchema", "output_schema") || defaultOutputSchema(),
-    ),
+    includeReasoning: row.params?.include_reasoning !== false,
+    extraMetadataFields: Array.isArray(rawExtras)
+      ? rawExtras
+          .filter((f) => f && typeof f === "object")
+          .map((f) => ({
+            name: String(f.name || ""),
+            type: (f.type === "number" || f.type === "boolean" ? f.type : "string") as
+              | "string"
+              | "number"
+              | "boolean",
+            description: String(f.description || ""),
+          }))
+      : [],
   };
 }
 
@@ -636,13 +877,13 @@ async function save() {
           type: "llm_judge",
           ...scoreConfigRef,
           template: form.value.template,
-          outputSchema:
-            parseOptionalJson(form.value.outputSchema, t("onlineEvals.scorer.outputSchemaLabel")) ||
-            defaultOutputSchema(),
           params: {
             provider_id: form.value.providerId,
             ...(form.value.model ? { model: form.value.model } : {}),
-            include_reasoning: true,
+            include_reasoning: form.value.includeReasoning,
+            ...(cleanedExtraFields.value.length
+              ? { extra_metadata_fields: cleanedExtraFields.value }
+              : {}),
           },
         }
       : {
@@ -954,6 +1195,168 @@ async function save() {
   font-size: 11px;
   background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
   color: var(--color-text-primary, currentColor);
+}
+
+.scorer-field--extras {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scorer-extras__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.scorer-extras__toggle strong {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-primary, currentColor);
+}
+
+.scorer-extras__toggle small {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.scorer-extras__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.scorer-extras__head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scorer-extras__head-text strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scorer-extras__head-text small {
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.scorer-extras__optional {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, var(--o2-text-muted));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scorer-extras__table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--color-border, var(--o2-border));
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--color-card-bg-solid, var(--o2-card-bg-solid));
+}
+
+.scorer-extras__row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 110px minmax(140px, 2fr) 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+.scorer-extras__row--head {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, var(--o2-text-muted));
+}
+
+.scorer-extras__row .has-error :deep(input) {
+  border-color: var(--o2-status-error-text);
+}
+
+.scorer-extras__remove {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.scorer-extras__remove:hover {
+  background: color-mix(in srgb, var(--o2-status-error-text) 12%, transparent);
+  color: var(--o2-status-error-text);
+}
+
+.scorer-extras__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scorer-extras__add,
+.scorer-extras__preview {
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--o2-primary-btn-bg);
+  cursor: pointer;
+}
+
+.scorer-extras__add:disabled {
+  color: var(--color-text-muted, var(--o2-text-muted));
+  cursor: not-allowed;
+}
+
+.scorer-extras__count {
+  font-weight: 400;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  margin-left: 4px;
+}
+
+.scorer-schema-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.scorer-schema-dialog__code {
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--color-card-bg-solid, var(--o2-card-bg-solid));
+  border: 1px solid var(--color-border, var(--o2-border));
+  font: 400 12px var(--o2-font-mono);
+  color: var(--color-text-primary, currentColor);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.scorer-schema-dialog__state {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+}
+
+.scorer-schema-dialog__state--error {
+  color: var(--o2-status-error-text);
 }
 
 @media (max-width: 1100px) {

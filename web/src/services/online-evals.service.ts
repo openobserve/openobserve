@@ -127,6 +127,24 @@ export interface EvalJob {
   updated_at?: number;
 }
 
+export interface ExtraMetadataField {
+  name: string;
+  type: "string" | "number" | "boolean";
+  description?: string;
+}
+
+export interface LlmJudgeSchemaPreviewPayload {
+  producesScoreConfigId?: string;
+  producesScoreConfigVersion?: number;
+  includeReasoning?: boolean;
+  extraMetadataFields: ExtraMetadataField[];
+}
+
+export interface LlmJudgeSchemaPreviewResult {
+  outputSchema: any;
+  output_schema?: any;
+}
+
 export interface ScorerTestPayload {
   name: string;
   description?: string | null;
@@ -239,6 +257,11 @@ const onlineEvalsService = {
     },
     test: async (orgId: string, payload: ScorerTestPayload): Promise<ScorerTestResult> =>
       (await http().post(`/api/${orgId}/scorers/test`, payload)).data,
+    previewLlmJudgeOutputSchema: async (
+      orgId: string,
+      payload: LlmJudgeSchemaPreviewPayload,
+    ): Promise<LlmJudgeSchemaPreviewResult> =>
+      (await http().post(`/api/${orgId}/scorers/llm_judge/output_schema`, payload)).data,
   },
 
   jobs: {
