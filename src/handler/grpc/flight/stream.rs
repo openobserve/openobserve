@@ -132,6 +132,12 @@ impl FlightEncoderStream {
         Ok(())
     }
 
+    fn finish_encoder(&mut self) -> Result<(), FlightError> {
+        let flight_data = self.encoder.finish()?;
+        self.queue.extend(flight_data);
+        Ok(())
+    }
+
     fn encode_custom_messages(&mut self) -> Result<(), FlightError> {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         for message in custom_messages.into_iter() {
@@ -144,7 +150,7 @@ impl FlightEncoderStream {
         Ok(())
     }
 
-    fn encode_custom_scan_stats(&mut self) -> Result<(), FlightError> {
+    fn encode_early_emit_messages(&mut self) -> Result<(), FlightError> {
         let custom_messages = std::mem::take(&mut self.custom_messages);
         let mut remainder_messages = Vec::new();
         for message in custom_messages.into_iter() {
@@ -203,17 +209,23 @@ impl Stream for FlightEncoderStream {
             let batch = ready!(self.inner.poll_next_unpin(cx));
 
             match batch {
-                None if self.custom_messages.is_empty() => {
-                    self.done = true;
-                    assert!(self.queue.is_empty());
-                    return Poll::Ready(None);
-                }
                 None => {
+                    // Flush remaining coalesced batches first, then send custom
+                    // messages (e.g. peak memory). Ordering: all data before stats.
+                    if let Err(e) = self.finish_encoder() {
+                        self.done = true;
+                        self.queue.clear();
+                        return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
+                    }
+                    // TODO: maybe we can embed custom messages into the last batch to avoid extra
+                    // FlightData at the end?
                     if let Err(e) = self.encode_custom_messages() {
                         self.done = true;
                         self.queue.clear();
                         return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
                     }
+                    self.done = true;
+                    // loop continues to drain queue before returning None
                 }
                 Some(Err(e)) => {
                     self.done = true;
@@ -227,9 +239,9 @@ impl Stream for FlightEncoderStream {
                     return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
                 }
                 Some(Ok(batch)) => {
-                    // before send the first batch, send the scan_stats first
+                    // before send the first batch, send the early emit messages first
                     if self.first_batch && !self.custom_messages.is_empty() {
-                        if let Err(e) = self.encode_custom_scan_stats() {
+                        if let Err(e) = self.encode_early_emit_messages() {
                             self.done = true;
                             self.queue.clear();
                             return Poll::Ready(Some(Err(tonic::Status::internal(e.to_string()))));
