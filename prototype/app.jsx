@@ -14,9 +14,9 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const PAGES = {
-  home: HomePage, dashboards: DashboardsPage, logs: LogsPage, traces: TracesPage,
+  home: HomePage, dashboards: DashboardsPage, logs: LogsExplorer, traces: TracesExplorer,
   settings: SettingsPage, iam: IamPage, datasources: IngestionPage, alerts: AlertsPage,
-  pipelines: PipelinesPage, metrics: MetricsPage,
+  pipelines: PipelinesPage, metrics: MetricsExplorer, rum: RumExplorer,
 };
 // modules without a dedicated page → graceful placeholder reusing the chrome
 function PlaceholderPage({ id }) {
