@@ -1103,7 +1103,7 @@ const selectDestinationType = (type: string) => {
     formData.value.template = "";
   } else {
     formData.value.type = type === "email" ? "email" : "http";
-    formData.value.template = `prebuilt_${type}`;
+    formData.value.template = defaultPrebuiltTemplateName.value;
   }
 };
 
