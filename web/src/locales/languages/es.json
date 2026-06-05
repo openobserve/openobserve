@@ -3176,7 +3176,8 @@
         "cost": "Coste",
         "spans": "Vanos"
       }
-    }
+    },
+    "openInFullView": "Abrir a la vista"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",

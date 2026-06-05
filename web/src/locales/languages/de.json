@@ -3178,7 +3178,8 @@
         "cost": "Kosten",
         "spans": "Spannweiten"
       }
-    }
+    },
+    "openInFullView": "In Vollansicht öffnen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

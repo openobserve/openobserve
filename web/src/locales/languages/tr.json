@@ -3189,7 +3189,8 @@
         "cost": "Maliyet",
         "spans": "Açıklıklar"
       }
-    }
+    },
+    "openInFullView": "Tam görünümde aç"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

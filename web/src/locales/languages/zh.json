@@ -3182,7 +3182,8 @@
         "cost": "成本",
         "spans": "跨度"
       }
-    }
+    },
+    "openInFullView": "以全视图打开"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

@@ -3187,7 +3187,8 @@
         "cost": "Costo",
         "spans": "Spaziate"
       }
-    }
+    },
+    "openInFullView": "Apri a piena vista"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

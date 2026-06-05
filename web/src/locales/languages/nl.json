@@ -3189,7 +3189,8 @@
         "cost": "Kost",
         "spans": "Overspant"
       }
-    }
+    },
+    "openInFullView": "In volledige weergave openen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

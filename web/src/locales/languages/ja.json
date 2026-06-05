@@ -3199,7 +3199,8 @@
         "cost": "費用",
         "spans": "スパン"
       }
-    }
+    },
+    "openInFullView": "フルビューで開く"
   },
   "actions": {
     "testAction": "アクションをテスト",

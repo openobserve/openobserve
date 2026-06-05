@@ -3189,7 +3189,8 @@
         "cost": "비용",
         "spans": "스팬"
       }
-    }
+    },
+    "openInFullView": "전체 화면으로 열기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
