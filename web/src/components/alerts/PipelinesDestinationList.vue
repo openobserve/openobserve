@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mx-2.5 tw:mt-2.5 tw:mb-2.5 tw:overflow-hidden">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-destinations-list-table"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:w-64"
+            class="tw:flex-1"
             :placeholder="t('pipeline_destinations.search')"
           />
         </template>

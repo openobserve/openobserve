@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mx-2.5 tw:mt-2.5 tw:mb-2.5 tw:overflow-hidden">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:w-64 no-border o2-search-input"
+            class="tw:flex-1"
             :placeholder="t('cipherKey.search')"
           />
         </template>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col" style="height: calc(100vh - 64px); overflow: hidden;">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
     <!-- Standard page header on top (full-width). The filter panel (left) + table
          (right) sit below in the splitter — the standard header + left + right model. -->
     <AppPageHeader
@@ -425,9 +425,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pt-2">
+        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
         <OTable
-          class="tw:flex-1 tw:min-h-0 tw:mx-4"
+          class="tw:flex-1 tw:min-h-0"
           ref="qTable"
           data-test="nodes-main-table"
           :data="visibleRows"
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               data-test="nodes-search-input"
               v-model="filterQuery"
-              class="tw:w-64 no-border o2-search-input"
+              class="tw:flex-1"
               :placeholder="t('nodes.search')"
             />
           </template>

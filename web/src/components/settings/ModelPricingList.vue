@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </AppPageHeader>
 
       <!-- List Table -->
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mx-2.5 tw:mt-2.5 tw:mb-2.5 tw:overflow-hidden">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         ref="qTableRef"
         :frame="false"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto tw:w-64 no-border o2-search-input"
+              class="tw:ml-auto tw:w-64"
               :placeholder="t('modelPricing.searchPlaceholder')"
             />
           </div>
