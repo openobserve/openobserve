@@ -1061,8 +1061,8 @@
   --hsk-shimmer: rgba(255, 255, 255, 0.65);
 
   .body--dark & {
-    --hsk-bar:     var(--color-grey-500); // #737373 dark — lighter
-    --hsk-shimmer: rgba(255, 255, 255, 0.12);
+    --hsk-bar:     var(--color-grey-700); // #404040 — subtle on dark bg
+    --hsk-shimmer: rgba(255, 255, 255, 0.06);
   }
 
   height: 6.25rem;
