@@ -779,6 +779,7 @@ size="sm"
                   class="tw:w-full tw:h-full tw:p-[0.625rem]"
                 >
                   <ChartRenderer
+                    ref="chartRendererRef"
                     data-test="trace-details-service-map-chart"
                     :data="traceServiceMapChartOptions"
                     class="trace-chart-height tw:h-full! tw:w-full!"
@@ -886,6 +887,7 @@ import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
 import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
+import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_UNSPECIFIED,
@@ -1058,6 +1060,13 @@ export default defineComponent({
     const store = useStore();
     const { getStreams, getStream } = useStreams();
 
+    // Chart renderer ref for tooltip integration
+    const chartRendererRef = ref<any>(null);
+
+    // Tooltip lifecycle management
+    let tooltipCleanup: (() => void) | null = null;
+    let pendingTooltipSetup: ReturnType<typeof setTimeout> | null = null;
+
     // AI copilot context provider for trace details page
     const setupContextProvider = () => {
       const provider = createTracesContextProvider(searchObj, store);
@@ -1086,6 +1095,14 @@ export default defineComponent({
       getNodeTooltip: getPatternNodeTooltip,
       getNodeErrorRate: getPatternNodeErrorRate
     } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+
+    /**
+     * Get tooltip content for pattern tree nodes
+     * Uses the new generateTracePatternTooltipContent helper
+     */
+    const getPatternNodeTooltip = (node: any): string => {
+      return generateTracePatternTooltipContent(node.metadata);
+    };
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
@@ -1557,6 +1574,42 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Setup tooltips when chart options change and mode is Pattern View
+    watch(
+      () => traceServiceMapChartOptions.value,
+      async () => {
+        // Cleanup existing tooltips
+        if (tooltipCleanup) {
+          tooltipCleanup();
+          tooltipCleanup = null;
+        }
+
+        if (pendingTooltipSetup) {
+          clearTimeout(pendingTooltipSetup);
+          pendingTooltipSetup = null;
+        }
+
+        // Only setup tooltips for Pattern View
+        if (mapViewMode.value !== 'pattern') return;
+
+        await nextTick();
+        // 300ms delay matches Service Graph tooltip setup timing
+        pendingTooltipSetup = setTimeout(() => {
+          pendingTooltipSetup = null;
+          const chart = chartRendererRef.value?.chart;
+          if (chart) {
+            const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+            tooltipCleanup = setupTraceNodeTooltips(chart, {
+              treeData: patternTreeData.value,
+              getNodeTooltip: getPatternNodeTooltip,
+              getNodeErrorRate: getPatternNodeErrorRate
+            });
+          }
+        }, 300);
+      },
+      { flush: 'post' }
+    );
+
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -1682,6 +1735,16 @@ export default defineComponent({
 
     onUnmounted(() => {
       cleanupContextProvider();
+
+      // Tooltip cleanup
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
     });
 
     // watch(
@@ -2909,6 +2972,7 @@ export default defineComponent({
       updateChart,
       traceServiceMap,
       traceServiceMapChartOptions,
+      chartRendererRef,
       mapViewMode,
       timeVisualizationMode,
       activeVisual,
