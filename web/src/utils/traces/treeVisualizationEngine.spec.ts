@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { createTreeVisualizationEngine, type TreeNode } from '@/utils/traces/treeVisualizationEngine'
+import { createTreeVisualizationEngine, type TreeNode } from './treeVisualizationEngine'
 
 // Mock useStore
 const mockStore = {
@@ -38,7 +38,12 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getDom: () => mockChartDom,
       getZr: () => ({
         on: vi.fn(),
-        off: vi.fn()
+        off: vi.fn(),
+        handler: {
+          findHover: vi.fn().mockReturnValue({
+            target: { dataIndex: 0 }
+          })
+        }
       }),
       convertToPixel: vi.fn().mockReturnValue([100, 200]),
       convertFromPixel: vi.fn().mockReturnValue([50, 100]),
@@ -110,8 +115,6 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       id: 'test-node',
       name: 'Test Node',
       value: 100,
-      x: 100,
-      y: 200,
       children: []
     }
 
@@ -122,6 +125,11 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeErrorRate: vi.fn().mockReturnValue(1.5)
     }
 
+    // Mock ECharts hit detection to return the test node (index 0)
+    mockChart.getZr().handler.findHover.mockReturnValue({
+      target: { dataIndex: 0 }
+    })
+
     const cleanup = setupTraceNodeTooltips(mockChart, mockData)
 
     // Simulate mousemove event that hits the test node
@@ -129,11 +137,9 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       call => call[0] === 'mousemove'
     )[1]
 
-    // Mock the node detection to return our test node
     const mockEvent = { offsetX: 100, offsetY: 200 }
     mouseMoveHandler(mockEvent)
 
-    const tooltipEl = mockChartDom.querySelector('[style*="position: absolute"]') as HTMLElement
     expect(mockData.getNodeTooltip).toHaveBeenCalledWith(testNode)
 
     cleanup()
@@ -170,8 +176,6 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       id: 'test-node',
       name: 'Test Node',
       value: 100,
-      x: 750, // Near right edge
-      y: 550, // Near bottom edge
       children: []
     }
 
@@ -181,6 +185,11 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeTooltip: vi.fn().mockReturnValue('<div>Edge Test</div>'),
       getNodeErrorRate: vi.fn()
     }
+
+    // Mock ECharts hit detection to return the test node
+    mockChart.getZr().handler.findHover.mockReturnValue({
+      target: { dataIndex: 0 }
+    })
 
     const cleanup = setupTraceNodeTooltips(mockChart, mockData)
 
@@ -235,14 +244,15 @@ describe('createTreeVisualizationEngine tooltip system', () => {
   })
 })
 
-describe('createTreeVisualizationEngine node detection', () => {
+describe('createTreeVisualizationEngine node detection with ECharts hit detection', () => {
   let mockChart: any
 
   beforeEach(() => {
     mockChart = {
-      convertToPixel: vi.fn(),
-      getModel: () => ({
-        getSeries: () => [{}] // Valid series
+      getZr: () => ({
+        handler: {
+          findHover: vi.fn()
+        }
       })
     }
   })
@@ -251,48 +261,47 @@ describe('createTreeVisualizationEngine node detection', () => {
     vi.clearAllMocks()
   })
 
-  it('should find closest node within hit radius', () => {
+  it('should find node using ECharts hit detection when target is found', () => {
     const engine = createTreeVisualizationEngine()
     const { findNodeAtPoint } = engine
 
-    mockChart.convertToPixel.mockReturnValue([105, 205]) // Close to target
+    // Mock ECharts hit detection to return dataIndex 0
+    mockChart.getZr().handler.findHover.mockReturnValue({
+      target: { dataIndex: 0 }
+    })
 
     const treeData = [
       {
         id: 'node1',
         name: 'Node 1',
         value: 100,
-        x: 100,
-        y: 200,
         children: []
       },
       {
         id: 'node2',
         name: 'Node 2',
         value: 150,
-        x: 300,
-        y: 400,
         children: []
       }
     ]
 
     const result = findNodeAtPoint(mockChart, [105, 205], treeData)
-    expect(result).toBe(treeData[0]) // Should find the closest node
+    expect(result).toBe(treeData[0]) // Should find the first node (index 0)
+    expect(mockChart.getZr().handler.findHover).toHaveBeenCalledWith(105, 205)
   })
 
-  it('should return null when no node is within hit radius', () => {
+  it('should return null when ECharts hit detection finds no target', () => {
     const engine = createTreeVisualizationEngine()
     const { findNodeAtPoint } = engine
 
-    mockChart.convertToPixel.mockReturnValue([500, 500]) // Far from any node
+    // Mock ECharts hit detection to return no target
+    mockChart.getZr().handler.findHover.mockReturnValue(null)
 
     const treeData = [
       {
         id: 'node1',
         name: 'Node 1',
         value: 100,
-        x: 100,
-        y: 200,
         children: []
       }
     ]
@@ -301,18 +310,41 @@ describe('createTreeVisualizationEngine node detection', () => {
     expect(result).toBeNull()
   })
 
-  it('should search nested children', () => {
+  it('should handle errors gracefully', () => {
     const engine = createTreeVisualizationEngine()
     const { findNodeAtPoint } = engine
 
-    mockChart.convertToPixel.mockReturnValue([155, 255]) // Close to child
+    // Mock ECharts hit detection to throw an error
+    mockChart.getZr().handler.findHover.mockImplementation(() => {
+      throw new Error('ECharts error')
+    })
+
+    const treeData = [
+      {
+        id: 'node1',
+        name: 'Node 1',
+        value: 100,
+        children: []
+      }
+    ]
+
+    const result = findNodeAtPoint(mockChart, [100, 100], treeData)
+    expect(result).toBeNull()
+  })
+
+  it('should find nested child node using data index', () => {
+    const engine = createTreeVisualizationEngine()
+    const { findNodeAtPoint } = engine
+
+    // Mock ECharts hit detection to return dataIndex 1 (the child node)
+    mockChart.getZr().handler.findHover.mockReturnValue({
+      target: { dataIndex: 1 }
+    })
 
     const childNode = {
       id: 'child',
       name: 'Child Node',
       value: 50,
-      x: 150,
-      y: 250,
       children: []
     }
 
@@ -321,13 +353,44 @@ describe('createTreeVisualizationEngine node detection', () => {
         id: 'parent',
         name: 'Parent Node',
         value: 100,
-        x: 100,
-        y: 200,
         children: [childNode]
       }
     ]
 
     const result = findNodeAtPoint(mockChart, [155, 255], treeData)
-    expect(result).toBe(childNode) // Should find the child node
+    expect(result).toBe(childNode) // Should find the child node at index 1
+  })
+
+  it('should test findNodeByIndex helper function', () => {
+    const engine = createTreeVisualizationEngine()
+    const { findNodeByIndex } = engine
+
+    const childNode = {
+      id: 'child',
+      name: 'Child Node',
+      value: 50,
+      children: []
+    }
+
+    const treeData = [
+      {
+        id: 'parent',
+        name: 'Parent Node',
+        value: 100,
+        children: [childNode]
+      }
+    ]
+
+    // Index 0 should be parent
+    const parentResult = findNodeByIndex(treeData, 0)
+    expect(parentResult?.id).toBe('parent')
+
+    // Index 1 should be child
+    const childResult = findNodeByIndex(treeData, 1)
+    expect(childResult?.id).toBe('child')
+
+    // Non-existent index should return null
+    const nullResult = findNodeByIndex(treeData, 5)
+    expect(nullResult).toBeNull()
   })
 })
