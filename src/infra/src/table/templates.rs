@@ -77,7 +77,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
         body: Set(template.body),
         title: Set(title),
     };
-    let model: Model = match get_model(client, &template.org_id, &template.name).await? {
+    let model: Model = match get_model_org_only(client, &template.org_id, &template.name).await? {
         Some(model) => {
             active.id = Set(model.id);
             active.update(client).await?.try_into_model()?
@@ -139,6 +139,20 @@ async fn get_model(
 ) -> Result<Option<Model>, sea_orm::DbErr> {
     Entity::find()
         .filter(Column::Org.eq(org_id).or(Column::Org.eq(DEFAULT_ORG)))
+        .filter(Column::Name.eq(name))
+        .one(db)
+        .await
+}
+
+// Like get_model but scoped strictly to org_id — no DEFAULT_ORG fallback.
+// Used by put() so writes never accidentally update a DEFAULT_ORG record.
+async fn get_model_org_only(
+    db: &DatabaseConnection,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<Model>, sea_orm::DbErr> {
+    Entity::find()
+        .filter(Column::Org.eq(org_id))
         .filter(Column::Name.eq(name))
         .one(db)
         .await

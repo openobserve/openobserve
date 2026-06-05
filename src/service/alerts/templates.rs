@@ -21,6 +21,8 @@ use config::meta::destinations::{Template, TemplateType};
 // callers in this module keep working without a long path.
 pub use config::prebuilt_loader::is_prebuilt_template_name;
 
+#[cfg(feature = "cloud")]
+use crate::common::infra::config::ALERTS_TEMPLATES;
 use crate::{
     common::{
         meta::{authz::Authz, organization::DEFAULT_ORG},
@@ -151,52 +153,46 @@ pub async fn ensure_org_prebuilt_templates(org_id: &str) -> Result<(), anyhow::E
         template.org_id = org_id.to_string();
         template.is_default = false;
 
-        match db::alerts::templates::get(org_id, &template.name).await {
+        // Check only the org-specific cache key — db::alerts::templates::get()
+        // falls back to DEFAULT_ORG, which would make every new org appear to
+        // already have the templates when it doesn't.
+        let cache_key = format!("{org_id}/{}", template.name);
+        if ALERTS_TEMPLATES.contains_key(&cache_key) {
+            log::debug!(
+                "[TEMPLATES] Prebuilt template '{}' already exists in org '{}'",
+                template.name,
+                org_id
+            );
+            continue;
+        }
+
+        match db::alerts::templates::set(template.clone()).await {
             Ok(_) => {
-                log::debug!(
-                    "[TEMPLATES] Prebuilt template '{}' already exists in org '{}'",
+                log::info!(
+                    "[TEMPLATES] Created prebuilt template '{}' for org '{}'",
                     template.name,
                     org_id
                 );
             }
-            Err(TemplateError::NotFound) => {
-                match db::alerts::templates::set(template.clone()).await {
-                    Ok(_) => {
-                        log::info!(
-                            "[TEMPLATES] Created prebuilt template '{}' for org '{}'",
-                            template.name,
-                            org_id
-                        );
-                    }
-                    Err(e) => {
-                        let msg = e.to_string();
-                        if msg.contains("UNIQUE constraint")
-                            || msg.contains("duplicate key")
-                            || msg.contains("Duplicate entry")
-                        {
-                            log::debug!(
-                                "[TEMPLATES] Prebuilt template '{}' for org '{}' already exists (concurrent creation)",
-                                template.name,
-                                org_id
-                            );
-                        } else {
-                            log::error!(
-                                "[TEMPLATES] Failed to create prebuilt template '{}' for org '{}': {}",
-                                template.name,
-                                org_id,
-                                msg
-                            );
-                        }
-                    }
-                }
-            }
             Err(e) => {
-                log::error!(
-                    "[TEMPLATES] Error checking prebuilt template '{}' for org '{}': {}",
-                    template.name,
-                    org_id,
-                    e
-                );
+                let msg = e.to_string();
+                if msg.contains("UNIQUE constraint")
+                    || msg.contains("duplicate key")
+                    || msg.contains("Duplicate entry")
+                {
+                    log::debug!(
+                        "[TEMPLATES] Prebuilt template '{}' for org '{}' already exists (concurrent creation)",
+                        template.name,
+                        org_id
+                    );
+                } else {
+                    log::error!(
+                        "[TEMPLATES] Failed to create prebuilt template '{}' for org '{}': {}",
+                        template.name,
+                        org_id,
+                        msg
+                    );
+                }
             }
         }
     }
