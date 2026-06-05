@@ -83,8 +83,16 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is inside the utilities ("More") menu.
+    // In normal viewport the histogram is a standalone toolbar button (inline).
+    // In narrow viewport it moves into the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      await inlineBtn.click();
+      return;
+    }
+    // Narrow-viewport fallback: open utilities menu and click the menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -92,8 +100,16 @@ export class LogsQueryPage {
   }
 
   async isHistogramOn() {
-    // Histogram is inside the utilities ("More") menu — open menu, read OSwitch state, close menu.
+    // In normal viewport the histogram is a standalone inline toolbar button.
+    // Check its OSwitch state directly without opening the More menu.
     await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      const switchChecked = inlineBtn.locator('[data-state="checked"]');
+      return (await switchChecked.count()) > 0;
+    }
+    // Narrow-viewport fallback: check state via the More menu item.
     await this.page.locator(this.utilitiesMenuButton).click();
     const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
     await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
@@ -110,65 +126,40 @@ export class LogsQueryPage {
     }
   }
 
-  /** Open the utilities dropdown so the SQL mode menu item becomes visible. Returns true if opened. */
+  /** SQL mode toggle was removed from the UI — no-op, always returns false. */
   async _openUtilitiesMenuForSqlMode() {
-    const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-    const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-    if (!isVisible) {
-      await this.page.locator(this.utilitiesMenuButton).click();
-      await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-      return true;
-    }
+    // SQL mode is now auto-detected from query content (SELECT...FROM = SQL ON, else OFF).
+    // There is no longer a dedicated SQL mode toggle button in the utilities menu.
     return false;
   }
 
   async isSQLModeOn() {
-    // Open the dropdown to read the OSwitch inner button's data-state, then close it.
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const state = await stateEl.getAttribute('data-state').catch(() => null);
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
-    return state === 'checked';
+    // SQL mode is auto-detected: if the Monaco editor contains SELECT...FROM, SQL mode is ON.
+    const text = await this.page.evaluate((selector) => {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      const editors = window.monaco?.editor?.getEditors?.() ?? [];
+      for (const ed of editors) {
+        const node = ed.getDomNode?.();
+        if (node && host.contains(node)) return ed.getValue();
+      }
+      return null;
+    }, '[data-test="logs-search-bar-query-editor"]');
+    if (!text) return false;
+    const lower = text.toLowerCase().trim();
+    return lower.includes('select') && lower.includes('from');
   }
 
   async ensureSQLMode() {
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-    if (!isOn) {
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
-      await expect.poll(async () => {
-        const s = await stateEl.getAttribute('data-state').catch(() => null);
-        return s === 'checked';
-      }, { timeout: 5000 }).toBe(true);
-    }
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need SQL mode should set a SELECT query via the editor after this call.
+    testLogger.info('ensureSQLMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async ensureFTSMode() {
-    const menuOpened = await this._openUtilitiesMenuForSqlMode();
-    const stateEl = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]').first();
-    await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-    if (isOn) {
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').click();
-      await expect.poll(async () => {
-        const s = await stateEl.getAttribute('data-state').catch(() => null);
-        return s === 'unchecked';
-      }, { timeout: 5000 }).toBe(true);
-    }
-    if (menuOpened) {
-      await this.page.keyboard.press('Escape');
-      await this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need FTS mode should set a non-SELECT query via the editor after this call.
+    testLogger.info('ensureFTSMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async _isAutoQueryEnabled() {
