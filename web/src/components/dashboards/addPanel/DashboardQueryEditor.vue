@@ -326,7 +326,7 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
-import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -580,24 +580,21 @@ export default defineComponent({
       }
     };
 
-    // The fx toggle is PER QUERY: reflect the active query's flag whenever the
-    // tab changes (and on mount) so switching tabs shows that query's VRL state.
-    // Resolution rule is shared (see resolveQueryVrlEnabled).
+    // The fx toggle is PER QUERY and derived from VRL presence: on tab change
+    // (and mount) it's ON iff the active query has a VRL function, OFF otherwise.
     watch(
       () => dashboardPanelData.layout.currentQueryIndex,
       (idx) => {
-        dashboardPanelData.layout.vrlFunctionToggle = resolveQueryVrlEnabled(
+        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
           dashboardPanelData.data.queries[idx],
-          dashboardPanelData.data.config,
         );
       },
       { immediate: true },
     );
 
-    // Keep the splitter in sync with the VRL toggle / query mode. Runs
-    // immediately (so a panel reopened with the toggle already ON gets the 70/30
-    // split instead of a stale 100/0 that hides the VRL editor) and on tab
-    // switch (currentQueryIndex), since the toggle is shared across queries.
+    // Keep the splitter in sync with the VRL toggle and query mode: 70/30 when
+    // the VRL editor is shown (SQL + toggle on), 100/0 otherwise. Runs on mount
+    // and on tab switch so the active query's state is reflected.
     watch(
       () => [
         promqlMode.value,
@@ -770,25 +767,24 @@ export default defineComponent({
 
     const onFunctionToggle = (value, event) => {
       // OSwitch's @update:model-value calls this with only the value (no event),
-      // so guard it — otherwise this throws before the config flag is written.
+      // so guard it.
       event?.stopPropagation();
 
-      // The VRL toggle is PER QUERY. Persist it on the active query's config so
-      // the executor can gate query_fn for just that query — WITHOUT destroying
-      // the VRL text (toggling off keeps what was typed; it just isn't applied).
       const idx = dashboardPanelData.layout.currentQueryIndex;
-      if (dashboardPanelData.data.queries[idx]?.config) {
-        dashboardPanelData.data.queries[idx].config.vrl_function_enabled = value;
-      }
 
       if (value) {
-        // show function editor pane (avoid leaving a stale 100/0 split that
-        // would render the VRL editor at zero width)
+        // On: show the function editor pane (70/30 split).
         if (!promqlMode.value) splitterModel.value = 70;
       } else {
-        // hide function editor; keep the VRL text but clear the derived field
-        // list shown in the Fields panel since VRL is no longer applied.
+        // Off: hide the editor and remove this query's VRL function and its
+        // derived field list, so VRL is no longer applied for this query.
         splitterModel.value = 100;
+        if (dashboardPanelData.data.queries[idx]) {
+          dashboardPanelData.data.queries[idx].vrlFunctionQuery = "";
+        }
+        if (dashboardPanelData.meta.queryFields[idx]) {
+          dashboardPanelData.meta.queryFields[idx].vrlFunctionFieldList = [];
+        }
         dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 

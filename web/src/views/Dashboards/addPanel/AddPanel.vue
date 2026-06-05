@@ -229,7 +229,7 @@ import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
+import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -557,13 +557,11 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
-        // Restore the VRL toggle for the active query (shared per-query
-        // resolution — see resolveQueryVrlEnabled).
-        dashboardPanelData.layout.vrlFunctionToggle = resolveQueryVrlEnabled(
+        // Set the VRL toggle for the active query: on iff it has a VRL function.
+        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ],
-          dashboardPanelData.data.config,
         );
 
         await nextTick();

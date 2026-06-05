@@ -16,7 +16,6 @@
 import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
-import { resolveQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import logsUtils from "@/composables/useLogs/logsUtils";
 import {
   detectChunkingDirection,
@@ -95,10 +94,9 @@ export const usePanelSQLExecutor = (ctx: {
 
   const { checkTimestampAlias } = logsUtils();
 
-  // Build the encoded query_fn for a query, honoring the per-query VRL gate
-  // (shared resolution — see resolveQueryVrlEnabled).
+  // Send the encoded VRL function only when the query has one; otherwise null.
   const buildQueryFn = (it: any) =>
-    resolveQueryVrlEnabled(it, panelSchema?.value?.config) && it?.vrlFunctionQuery
+    it?.vrlFunctionQuery && it.vrlFunctionQuery.trim()
       ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
       : null;
 

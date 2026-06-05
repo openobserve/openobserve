@@ -159,8 +159,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
-        // Per-query VRL enable flag (the fx toggle is per query).
-        vrl_function_enabled: false,
       },
     };
     dashboardPanelData.data.queries.push(newQuery);

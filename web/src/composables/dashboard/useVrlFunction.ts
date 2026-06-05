@@ -14,22 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Shared VRL-enable resolution for dashboard panels.
- *
- * The VRL function toggle is PER QUERY (query.config.vrl_function_enabled).
- * Resolution order, for backward compatibility:
- *   1. the per-query flag, if explicitly set (true/false)
- *   2. the legacy panel-level flag (config.vrl_function_enabled), if set
- *   3. otherwise derive from VRL presence — so dashboards saved before any flag
- *      existed keep applying their VRL, and a query with no VRL reads as "off".
- *
- * Used by the executor (to gate query_fn) and the editor (to drive the fx
- * toggle), so the rule lives in exactly one place.
+ * Whether VRL is enabled for a query — true iff the query has a non-empty VRL
+ * function. The editor fx toggle and query execution both rely on this single
+ * rule, so VRL presence is the source of truth (no separate flag).
  */
-export const resolveQueryVrlEnabled = (
-  query: any,
-  panelConfig?: any,
-): boolean =>
-  query?.config?.vrl_function_enabled ??
-  panelConfig?.vrl_function_enabled ??
-  !!query?.vrlFunctionQuery;
+export const isQueryVrlEnabled = (query: any): boolean =>
+  !!query?.vrlFunctionQuery && query.vrlFunctionQuery.trim() !== "";
