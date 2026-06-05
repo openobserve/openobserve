@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                as the only on-screen branding (no back affordance). -->
           <AppPageHeader
             :title="currentDashboardData.data?.title"
+            :subtitle="folderNameFromFolderId"
             :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
             :back="
               !isFullscreen && store.state.printMode !== true
