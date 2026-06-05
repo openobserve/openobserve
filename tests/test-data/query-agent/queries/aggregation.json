@@ -11,11 +11,11 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "6"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "6"
           ],
           [
@@ -807,12 +807,12 @@
             "0.0"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "33.33000183105469",
             "33.33000183105469"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "33.33000183105469",
             "33.33000183105469"
           ],
@@ -828,7 +828,1811 @@
         "start_offset": 1139000000,
         "end_offset": 1303000000
       }
+    },
+    {
+      "id": "Q157",
+      "sql": "SELECT SUM(errorcount) as errorcount, SUM(traffic) as traffic, SUM(traffic_android) as traffic_android, SUM(traffic_ios) as traffic_ios, SUM(error_android) as error_android, SUM(error_ios) as error_ios, error_code, service_owner, upstream_error_code, bestmessage, mobileerrorkey, operation, platform FROM (SELECT 0 as errorcount, sorter_model as operation, service_owner, CAST(COUNT(_timestamp) AS INT) AS traffic, CAST(COUNT(CASE WHEN service_owner LIKE '@warehouse-Android%' THEN 1 END) AS INT) AS traffic_android, CAST(COUNT(CASE WHEN service_owner NOT LIKE '@warehouse-Android%' THEN 1 END) AS INT) AS traffic_ios, CAST(COUNT(CASE WHEN service_owner LIKE '@warehouse-Android%' AND (upstream_error_code != '' OR error_code != '') THEN 1 END) AS INT) AS error_android, CAST(COUNT(CASE WHEN service_owner NOT LIKE '@warehouse-Android%' AND (upstream_error_code != '' OR error_code != '') THEN 1 END) AS INT) AS error_ios, MAX(COALESCE(exception_message, '')) AS bestmessage, COALESCE(CONCAT(trim(sorter_model), '-', trim(upstream_error_code), '-', trim(error_code)), 'nil') AS mobileerrorkey, CASE WHEN service_owner LIKE '@warehouse-Android%' THEN 'Android' ELSE 'iOS' END AS platform, MAX(CASE WHEN re_not_match(exception_message, 'Timeout error|Network failure|SSL error|Connection lost|Bad URL|Server error') THEN 1 ELSE 0 END) AS unexpectederror, upstream_error_code, error_code FROM \"{stream}\" WHERE re_match(service_owner, '@warehouse-(Android|iOS)-sort-v') GROUP BY operation, platform, upstream_error_code, error_code, service_owner HAVING traffic > 0 ORDER BY traffic DESC LIMIT 200) GROUP BY error_code, service_owner, upstream_error_code, bestmessage, mobileerrorkey, operation, platform",
+      "category": "aggregation",
+      "expected": {
+        "columns": [
+          "errorcount",
+          "traffic",
+          "traffic_android",
+          "traffic_ios",
+          "error_android",
+          "error_ios",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "bestmessage",
+          "mobileerrorkey",
+          "operation",
+          "platform"
+        ],
+        "results": [
+          [
+            "0",
+            "3",
+            "0",
+            "3",
+            "0",
+            "3",
+            "E002",
+            "@warehouse-iOS-sort-v2",
+            "UP-E002",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "SORT-A7-UP-E002-E002",
+            "SORT-A7",
+            "iOS"
+          ],
+          [
+            "0",
+            "3",
+            "3",
+            "0",
+            "3",
+            "0",
+            "E001",
+            "@warehouse-Android-sort-v1",
+            "UP-E001",
+            "NullPointerException at ConveyorController.handle()",
+            "SORT-X1-UP-E001-E001",
+            "SORT-X1",
+            "Android"
+          ]
+        ],
+        "results_mode": "rowsort"
+      },
+      "time_offset": {
+        "start_offset": 9359000000,
+        "end_offset": 9523000000
+      }
+    },
+    {
+      "id": "Q163",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, region_code\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'Access From Geo'\n  AND NOT regexp_like(resource_path, 'favicon|admin|config|test|bash|login|ssh|git', 'i')\nGROUP BY region_code\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 9719000000,
+        "end_offset": 9883000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q164",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, site_name\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'SQL Injection'\n  AND NOT regexp_like(resource_path, 'favicon|admin|config|test|bash|login|ssh|git', 'i')\nGROUP BY site_name\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 9779000000,
+        "end_offset": 9943000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "site_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q165",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, facility_zone\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'XSS Attempt'\n  AND NOT regexp_like(resource_path, 'favicon|\\.env|\\.git|admin|config', 'i')\nGROUP BY facility_zone\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 9839000000,
+        "end_offset": 10003000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "facility_zone"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q166",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, control_center\nFROM \"{stream}\"\nWHERE http_method = 'POST'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'CSRF Attempt'\n  AND NOT regexp_like(endpoint_path, 'favicon|admin|test|bash|passwd', 'i')\nGROUP BY control_center\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 9899000000,
+        "end_offset": 10063000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "control_center"
+        ],
+        "results": [
+          [
+            "3",
+            "9",
+            "CC-BETA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q167",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, region_code\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'Access From Geo'\n  AND NOT regexp_like(resource_path, 'favicon|admin|config|ssh|php|jsp', 'i')\nGROUP BY region_code\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 9959000000,
+        "end_offset": 10123000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q168",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, sorter_model\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'Path Traversal'\n  AND NOT regexp_like(resource_path, 'localhost|test|admin|config', 'i')\nGROUP BY sorter_model\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10019000000,
+        "end_offset": 10183000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "sorter_model"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q169",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, conveyor_lane\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'Access From Geo'\n  AND NOT regexp_like(resource_path, 'admin|config|login|ssh|key', 'i')\nGROUP BY conveyor_lane\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10079000000,
+        "end_offset": 10243000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "conveyor_lane"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q170",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, facility_zone\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'SQL Injection'\n  AND NOT regexp_like(endpoint_path, 'favicon|test|admin|passwd', 'i')\nGROUP BY facility_zone\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10139000000,
+        "end_offset": 10303000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "facility_zone"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q171",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, region_code\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'Access From Geo'\n  AND NOT regexp_like(resource_path, '127.0.0.1|localhost|test|admin|config|bash', 'i')\nGROUP BY region_code\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10199000000,
+        "end_offset": 10363000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q172",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, site_name\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'XSS Attempt'\n  AND NOT regexp_like(resource_path, 'favicon|admin|config|test|passwd', 'i')\nGROUP BY site_name\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10259000000,
+        "end_offset": 10423000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "site_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q173",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, facility_zone\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'Path Traversal'\n  AND NOT regexp_like(resource_path, 'admin|config|login|ssh|key|test|bash', 'i')\nGROUP BY facility_zone\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10319000000,
+        "end_offset": 10483000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "facility_zone"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q174",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, control_center\nFROM \"{stream}\"\nWHERE http_method = 'POST'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'CSRF Attempt'\n  AND NOT regexp_like(endpoint_path, 'favicon|test|admin|passwd|etc', 'i')\nGROUP BY control_center\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10379000000,
+        "end_offset": 10543000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "control_center"
+        ],
+        "results": [
+          [
+            "3",
+            "9",
+            "CC-BETA"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q175",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, sorter_model\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'Access From Geo'\n  AND NOT regexp_like(resource_path, 'admin|config|bash|login|ssh', 'i')\nGROUP BY sorter_model\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10439000000,
+        "end_offset": 10603000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "sorter_model"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q176",
+      "sql": "SELECT approx_distinct(source_ip) AS unique_count, COUNT(*) AS cnt, conveyor_lane\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND node_ip IS NOT NULL\n  AND issue_type != 'SQL Injection'\n  AND NOT regexp_like(resource_path, 'favicon|admin|config|test|ssh', 'i')\nGROUP BY conveyor_lane\nHAVING COUNT(*) >= approx_distinct(source_ip)\n  AND approx_distinct(source_ip) > 1\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10499000000,
+        "end_offset": 10663000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "conveyor_lane"
+        ],
+        "results": [
+          [
+            "2",
+            "6",
+            "LANE-A"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q177",
+      "sql": "SELECT approx_distinct(node_ip) AS unique_count, COUNT(*) AS cnt, region_code\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND source_ip IS NOT NULL\n  AND issue_type != 'XSS Attempt'\n  AND NOT regexp_like(resource_path, 'admin|config|login|test|bash', 'i')\nGROUP BY region_code\nHAVING COUNT(*) >= approx_distinct(node_ip)\n  AND approx_distinct(node_ip) > 2\nORDER BY unique_count DESC\nLIMIT 1000",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10559000000,
+        "end_offset": 10723000000
+      },
+      "expected": {
+        "columns": [
+          "unique_count",
+          "cnt",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q178",
+      "sql": "SELECT facility_zone, COUNT(_timestamp) AS cnt, conveyor_lane AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND facility_zone = 'ZONE-1')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, facility_zone, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 50\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10619000000,
+        "end_offset": 10783000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q179",
+      "sql": "SELECT control_center, COUNT(_timestamp) AS cnt, sorter_model AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND control_center = 'CC-ALPHA')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND response_code = 200\n  AND endpoint_path = '/api/v1/search'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, control_center, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10679000000,
+        "end_offset": 10843000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q180",
+      "sql": "SELECT facility_zone, COUNT(_timestamp) AS cnt, conveyor_lane AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND facility_zone = 'ZONE-2')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, facility_zone, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 50\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10739000000,
+        "end_offset": 10903000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q181",
+      "sql": "SELECT site_name, COUNT(_timestamp) AS cnt, facility_zone AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND site_name = 'DC-East')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, site_name, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10799000000,
+        "end_offset": 10963000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q182",
+      "sql": "SELECT region_code, COUNT(_timestamp) AS cnt, conveyor_lane AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND region_code = 'US')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/ip/10.0.0.1'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, region_code, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 50\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10859000000,
+        "end_offset": 11023000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q183",
+      "sql": "SELECT facility_zone, COUNT(_timestamp) AS cnt, conveyor_lane AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND facility_zone = 'ZONE-1')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND response_code = 200\n  AND endpoint_path = '/ip/10.0.0.1'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, facility_zone, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10919000000,
+        "end_offset": 11083000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q184",
+      "sql": "SELECT control_center, COUNT(_timestamp) AS cnt, sorter_model AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND control_center = 'CC-BETA')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/api/v1/search'\n  AND (client_agent NOT LIKE '%python%' AND client_agent NOT LIKE '%soastactp%'\n    AND client_agent NOT LIKE '%curl%')\nGROUP BY bucket, control_center, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 30\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10979000000,
+        "end_offset": 11143000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q185",
+      "sql": "SELECT conveyor_lane, COUNT(_timestamp) AS cnt, control_center AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND conveyor_lane = 'LANE-A')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, conveyor_lane, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 11039000000,
+        "end_offset": 11203000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q186",
+      "sql": "SELECT facility_zone, COUNT(_timestamp) AS cnt, region_code AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND facility_zone = 'ZONE-3')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/api/v1/search'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%o2tperformance%'\n    AND client_agent NOT LIKE '%python%')\nGROUP BY bucket, facility_zone, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 11099000000,
+        "end_offset": 11263000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q187",
+      "sql": "SELECT site_name, COUNT(_timestamp) AS cnt, conveyor_lane AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND site_name = 'DC-West')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, site_name, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 50\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 11159000000,
+        "end_offset": 11323000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q188",
+      "sql": "SELECT sorter_model, COUNT(_timestamp) AS cnt, facility_zone AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND sorter_model = 'SORT-X1')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/api/v1/search'\n  AND (client_agent NOT LIKE '%curl%' AND client_agent NOT LIKE '%python%'\n    AND client_agent NOT LIKE '%performancetesto2t%')\nGROUP BY bucket, sorter_model, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 1\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 30\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 11219000000,
+        "end_offset": 11383000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q189",
+      "sql": "SELECT facility_zone, COUNT(_timestamp) AS cnt, site_name AS bucket,\n  (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END) AS session_type\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND facility_zone = 'ZONE-4')\n  AND scan_category IS NULL\n  AND guard_mode = 'false'\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND response_code = 200\n  AND endpoint_path = '/swag/graphql'\n  AND (client_agent NOT LIKE '%soastactp%' AND client_agent NOT LIKE '%performancetesto2t%'\n    AND client_agent NOT LIKE '%o2tperformance%')\nGROUP BY bucket, facility_zone, (CASE WHEN tag_a = tag_b THEN 'new' ELSE 'old' END)\nHAVING cnt > 2\n  AND (COUNT(CASE WHEN tag_a = tag_b THEN 1 END) * 100.0 /\n    NULLIF((COUNT(CASE WHEN tag_a = tag_b THEN 1 END) + COUNT(CASE WHEN tag_a <> tag_b THEN 1 END)), 0)) > 40\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 11279000000,
+        "end_offset": 11443000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "bucket",
+          "session_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q299",
+      "sql": "SELECT facility_zone,\n  issue_type,\n  filter_result,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Mozilla%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'Access From Geo'\nGROUP BY facility_zone, issue_type, filter_result, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 17879000000,
+        "end_offset": 18043000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "issue_type",
+          "filter_result",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "timeout",
+            "allow",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "timeout",
+            "block",
+            "Go-http-client/2.0 conveyor-monitor",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "block",
+            "node-fetch/3.3.2 (tracking-service)",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "mismatch",
+            "allow",
+            "Python-urllib/3.11 warehouse-client",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "block",
+            "curl/7.88.1 (x86_64-pc-linux-gnu)",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "timeout",
+            "allow",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "jam",
+            "allow",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "allow",
+            "PostmanRuntime/7.35.0",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "jam",
+            "allow",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "mismatch",
+            "block",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q300",
+      "sql": "SELECT control_center,\n  issue_type,\n  filter_result,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Chrome%' OR endpoint_path LIKE '%orchestra%')\n  AND issue_type != 'SQL Injection'\nGROUP BY control_center, issue_type, filter_result, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 17939000000,
+        "end_offset": 18103000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "issue_type",
+          "filter_result",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q301",
+      "sql": "SELECT site_name,\n  issue_type,\n  http_method,\n  COALESCE(org_name, 'N/A') AS org_name_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Mozilla%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'Access From Geo'\nGROUP BY site_name, issue_type, http_method, org_name\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 17999000000,
+        "end_offset": 18163000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "issue_type",
+          "http_method",
+          "org_name_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-sin-08",
+            "jam",
+            "DELETE",
+            "warehouse-north",
+            "3"
+          ],
+          [
+            "site-mum-09",
+            "timeout",
+            "GET",
+            "warehouse-south",
+            "3"
+          ],
+          [
+            "site-ber-06",
+            "overflow",
+            "POST",
+            "warehouse-east",
+            "3"
+          ],
+          [
+            "site-tor-10",
+            "overflow",
+            "POST",
+            "warehouse-central",
+            "3"
+          ],
+          [
+            "site-tok-03",
+            "mismatch",
+            "PUT",
+            "warehouse-north",
+            "3"
+          ],
+          [
+            "site-sfo-05",
+            "timeout",
+            "GET",
+            "warehouse-central",
+            "3"
+          ],
+          [
+            "site-nyc-01",
+            "timeout",
+            "GET",
+            "warehouse-east",
+            "3"
+          ],
+          [
+            "site-lon-02",
+            "overflow",
+            "POST",
+            "warehouse-west",
+            "3"
+          ],
+          [
+            "site-syd-04",
+            "jam",
+            "DELETE",
+            "warehouse-south",
+            "2"
+          ],
+          [
+            "site-dub-07",
+            "mismatch",
+            "PUT",
+            "warehouse-west",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q302",
+      "sql": "SELECT sorter_model,\n  issue_type,\n  filter_result,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Firefox%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'XSS Attempt'\nGROUP BY sorter_model, issue_type, filter_result, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18059000000,
+        "end_offset": 18223000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "issue_type",
+          "filter_result",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "overflow",
+            "allow",
+            "PostmanRuntime/7.35.0",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "allow",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "block",
+            "Go-http-client/2.0 conveyor-monitor",
+            "3"
+          ],
+          [
+            "SORT-Q5",
+            "jam",
+            "allow",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "overflow",
+            "block",
+            "node-fetch/3.3.2 (tracking-service)",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "overflow",
+            "block",
+            "curl/7.88.1 (x86_64-pc-linux-gnu)",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "allow",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "3"
+          ],
+          [
+            "SORT-M3",
+            "mismatch",
+            "allow",
+            "Python-urllib/3.11 warehouse-client",
+            "3"
+          ],
+          [
+            "SORT-M3",
+            "mismatch",
+            "block",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "2"
+          ],
+          [
+            "SORT-Z9",
+            "jam",
+            "allow",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q303",
+      "sql": "SELECT region_code,\n  issue_type,\n  filter_result,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Mozilla%' OR endpoint_path LIKE '%swag%')\n  AND issue_type != 'Access From Geo'\nGROUP BY region_code, issue_type, filter_result, build_version\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18119000000,
+        "end_offset": 18283000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "issue_type",
+          "filter_result",
+          "build_version_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "timeout",
+            "allow",
+            "v1.0.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q304",
+      "sql": "SELECT conveyor_lane,\n  issue_type,\n  filter_result,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Safari%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'Path Traversal'\nGROUP BY conveyor_lane, issue_type, filter_result, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18179000000,
+        "end_offset": 18343000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "issue_type",
+          "filter_result",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "timeout",
+            "block",
+            "Go-http-client/2.0 conveyor-monitor",
+            "3"
+          ],
+          [
+            "LANE-B",
+            "overflow",
+            "block",
+            "curl/7.88.1 (x86_64-pc-linux-gnu)",
+            "3"
+          ],
+          [
+            "LANE-D",
+            "jam",
+            "allow",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "3"
+          ],
+          [
+            "LANE-B",
+            "overflow",
+            "block",
+            "node-fetch/3.3.2 (tracking-service)",
+            "3"
+          ],
+          [
+            "LANE-B",
+            "overflow",
+            "allow",
+            "PostmanRuntime/7.35.0",
+            "3"
+          ],
+          [
+            "LANE-A",
+            "timeout",
+            "allow",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "3"
+          ],
+          [
+            "LANE-A",
+            "timeout",
+            "allow",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "3"
+          ],
+          [
+            "LANE-C",
+            "mismatch",
+            "allow",
+            "Python-urllib/3.11 warehouse-client",
+            "3"
+          ],
+          [
+            "LANE-D",
+            "jam",
+            "allow",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "2"
+          ],
+          [
+            "LANE-C",
+            "mismatch",
+            "block",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q305",
+      "sql": "SELECT facility_zone,\n  issue_type,\n  site_name,\n  COALESCE(region_code, 'N/A') AS region_code_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Mozilla%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'CSRF Attempt'\nGROUP BY facility_zone, issue_type, site_name, region_code\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18239000000,
+        "end_offset": 18403000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "issue_type",
+          "site_name",
+          "region_code_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "timeout",
+            "site-nyc-01",
+            "US-EAST",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "site-ber-06",
+            "AP-EAST",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "timeout",
+            "site-sfo-05",
+            "AP-SOUTH",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "site-tor-10",
+            "AP-CENTRAL",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "overflow",
+            "site-lon-02",
+            "US-WEST",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "mismatch",
+            "site-tok-03",
+            "EU-WEST",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "jam",
+            "site-sin-08",
+            "US-CENTRAL",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "timeout",
+            "site-mum-09",
+            "EU-CENTRAL",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "mismatch",
+            "site-dub-07",
+            "SA-EAST",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "jam",
+            "site-syd-04",
+            "EU-NORTH",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q306",
+      "sql": "SELECT control_center,\n  issue_type,\n  region_code,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%python%' OR endpoint_path LIKE '%ip%')\n  AND issue_type != 'Access From Geo'\nGROUP BY control_center, issue_type, region_code, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18299000000,
+        "end_offset": 18463000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "issue_type",
+          "region_code",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q307",
+      "sql": "SELECT site_name,\n  issue_type,\n  filter_result,\n  COALESCE(client_agent, 'N/A') AS client_agent_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%Edge%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'Access From Geo'\nGROUP BY site_name, issue_type, filter_result, client_agent\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18359000000,
+        "end_offset": 18523000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "issue_type",
+          "filter_result",
+          "client_agent_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-sin-08",
+            "jam",
+            "allow",
+            "okhttp/4.12.0 (Android; sort-app)",
+            "3"
+          ],
+          [
+            "site-ber-06",
+            "overflow",
+            "allow",
+            "PostmanRuntime/7.35.0",
+            "3"
+          ],
+          [
+            "site-sfo-05",
+            "timeout",
+            "block",
+            "Go-http-client/2.0 conveyor-monitor",
+            "3"
+          ],
+          [
+            "site-tor-10",
+            "overflow",
+            "block",
+            "node-fetch/3.3.2 (tracking-service)",
+            "3"
+          ],
+          [
+            "site-nyc-01",
+            "timeout",
+            "allow",
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "3"
+          ],
+          [
+            "site-mum-09",
+            "timeout",
+            "allow",
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "3"
+          ],
+          [
+            "site-lon-02",
+            "overflow",
+            "block",
+            "curl/7.88.1 (x86_64-pc-linux-gnu)",
+            "3"
+          ],
+          [
+            "site-tok-03",
+            "mismatch",
+            "allow",
+            "Python-urllib/3.11 warehouse-client",
+            "3"
+          ],
+          [
+            "site-syd-04",
+            "jam",
+            "allow",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "2"
+          ],
+          [
+            "site-dub-07",
+            "mismatch",
+            "block",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q308",
+      "sql": "SELECT sorter_model,\n  issue_type,\n  http_method,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE (client_agent LIKE '%curl%' OR endpoint_path LIKE '%api%')\n  AND issue_type != 'SQL Injection'\nGROUP BY sorter_model, issue_type, http_method, build_version\nHAVING COUNT(*) > 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 18419000000,
+        "end_offset": 18583000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "issue_type",
+          "http_method",
+          "build_version_display",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-A7",
+            "overflow",
+            "POST",
+            "v3.2.0",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "overflow",
+            "POST",
+            "v3.0.1",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "GET",
+            "v1.0.0",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "overflow",
+            "POST",
+            "v1.1.2",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "GET",
+            "v2.2.0",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "GET",
+            "v2.0.8",
+            "3"
+          ],
+          [
+            "SORT-Q5",
+            "jam",
+            "DELETE",
+            "v1.0.5",
+            "3"
+          ],
+          [
+            "SORT-M3",
+            "mismatch",
+            "PUT",
+            "v2.0.0",
+            "3"
+          ],
+          [
+            "SORT-M3",
+            "mismatch",
+            "PUT",
+            "v3.1.0",
+            "2"
+          ],
+          [
+            "SORT-Z9",
+            "jam",
+            "DELETE",
+            "v2.1.3",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q331",
+      "sql": "SELECT SUM(payload_size) AS total_payload_size\nFROM \"{stream}\"\nWHERE record_type = 'Ingestion'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 19799000000,
+        "end_offset": 19963000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_payload_size"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q332",
+      "sql": "SELECT SUM(payload_size) AS total_payload_size\nFROM \"{stream}\"\nWHERE record_type = 'Search'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 19859000000,
+        "end_offset": 20023000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_payload_size"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q333",
+      "sql": "SELECT SUM(latency_ms) AS total_latency_ms\nFROM \"{stream}\"\nWHERE record_type = 'Search'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 19919000000,
+        "end_offset": 20083000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_latency_ms"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q334",
+      "sql": "SELECT SUM(payload_size) AS total_payload_size\nFROM \"{stream}\"\nWHERE http_method = 'GET'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 19979000000,
+        "end_offset": 20143000000
+      },
+      "expected": {
+        "columns": [
+          "total_payload_size"
+        ],
+        "results": [
+          [
+            "222720"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q335",
+      "sql": "SELECT SUM(load_factor) AS total_load_factor\nFROM \"{stream}\"\nWHERE record_type = 'Ingestion'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 20039000000,
+        "end_offset": 20203000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_load_factor"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q336",
+      "sql": "SELECT SUM(throughput_rate) AS total_throughput_rate\nFROM \"{stream}\"\nWHERE record_type = 'Search'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 20099000000,
+        "end_offset": 20263000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_throughput_rate"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q337",
+      "sql": "SELECT SUM(latency_ms) AS total_latency_ms\nFROM \"{stream}\"\nWHERE http_method = 'POST'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 20159000000,
+        "end_offset": 20323000000
+      },
+      "expected": {
+        "columns": [
+          "total_latency_ms"
+        ],
+        "results": [
+          [
+            "1881"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q338",
+      "sql": "SELECT SUM(payload_size) AS total_payload_size\nFROM \"{stream}\"\nWHERE site_name = 'DC-East'",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 20219000000,
+        "end_offset": 20383000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "total_payload_size"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q367",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, approx_distinct(source_ip) AS unique_ips\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\nGROUP BY facility_zone\nHAVING approx_distinct(source_ip) > 2\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 21959000000,
+        "end_offset": 22123000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "unique_ips"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q368",
+      "sql": "SELECT control_center, COUNT(*) AS cnt, approx_distinct(node_ip) AS unique_clients\nFROM \"{stream}\"\nWHERE http_method = 'GET'\nGROUP BY control_center\nHAVING approx_distinct(node_ip) > 2\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22019000000,
+        "end_offset": 22183000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt",
+          "unique_clients"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "9",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q369",
+      "sql": "SELECT site_name, COUNT(*) AS cnt, approx_distinct(source_ip) AS unique_ips\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\nGROUP BY site_name\nHAVING approx_distinct(source_ip) > 1\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22079000000,
+        "end_offset": 22243000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt",
+          "unique_ips"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q370",
+      "sql": "SELECT region_code, COUNT(*) AS cnt, approx_distinct(node_ip) AS unique_clients\nFROM \"{stream}\"\nWHERE http_method = 'POST'\nGROUP BY region_code\nHAVING approx_distinct(node_ip) > 1\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22139000000,
+        "end_offset": 22303000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt",
+          "unique_clients"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q371",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt, approx_distinct(source_ip) AS unique_ips\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\nGROUP BY conveyor_lane\nHAVING approx_distinct(source_ip) > 1\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22199000000,
+        "end_offset": 22363000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt",
+          "unique_ips"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q372",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt, approx_distinct(node_ip) AS unique_clients\nFROM \"{stream}\"\nWHERE http_method = 'GET'\nGROUP BY sorter_model\nHAVING approx_distinct(node_ip) > 2\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22259000000,
+        "end_offset": 22423000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt",
+          "unique_clients"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "9",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q373",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt, approx_distinct(source_ip) AS unique_ips\nFROM \"{stream}\"\nWHERE http_method = 'GET'\nGROUP BY facility_zone\nHAVING approx_distinct(source_ip) > 2\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22319000000,
+        "end_offset": 22483000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "unique_ips"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "9",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q374",
+      "sql": "SELECT control_center, COUNT(*) AS cnt, approx_distinct(node_ip) AS unique_clients\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\nGROUP BY control_center\nHAVING approx_distinct(node_ip) > 1\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22379000000,
+        "end_offset": 22543000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt",
+          "unique_clients"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q383",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%python%'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22919000000,
+        "end_offset": 23083000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q384",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','deleteitem','createcontract')\n  AND (scan_category IS NULL OR scan_category != 'bot')\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND LOWER(client_agent) NOT LIKE '%curl%'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 22979000000,
+        "end_offset": 23143000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q385",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%soastactp%'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23039000000,
+        "end_offset": 23203000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-nyc-01",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q386",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%performancetesto2t%'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23099000000,
+        "end_offset": 23263000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q387",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder','updatequantity')\n  AND (scan_category IS NULL OR scan_category != 'bot')\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND LOWER(client_agent) NOT LIKE '%o2tperformance%'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23159000000,
+        "end_offset": 23323000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q388",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','placeorder','createcontract')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%python%'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23219000000,
+        "end_offset": 23383000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q389",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','deleteitem')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND LOWER(client_agent) NOT LIKE '%curl%'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23279000000,
+        "end_offset": 23443000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q390",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder','createcontract','updatequantity')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%soastactp%'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23339000000,
+        "end_offset": 23503000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q391",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND (scan_category IS NULL OR scan_category != 'bot')\n  AND (auth_result IS NULL OR auth_result != 'timeout')\n  AND LOWER(client_agent) NOT LIKE '%performancetesto2t%'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23399000000,
+        "end_offset": 23563000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-nyc-01",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q392",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem','createcontract')\n  AND (scan_category IS NULL OR scan_category != 'scanner')\n  AND (auth_result IS NULL OR auth_result != 'invalid')\n  AND LOWER(client_agent) NOT LIKE '%python%'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 50",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 23459000000,
+        "end_offset": 23623000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
-  "last_query_id": 20
+  "last_query_id": 392
 }

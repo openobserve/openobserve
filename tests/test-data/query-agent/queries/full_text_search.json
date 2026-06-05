@@ -11,7 +11,7 @@
         ],
         "results": [
           [
-            "Q074 warehouse event record 9",
+            "Q074 warehouse event record 9 ACK batch batchIdList:Q074-9",
             "ZONE-2"
           ],
           [
@@ -19,7 +19,7 @@
             "ZONE-3"
           ],
           [
-            "Q075 warehouse event record 5",
+            "Q075 warehouse event record 5 error E005 traceback",
             "ZONE-2"
           ],
           [
@@ -39,15 +39,15 @@
             "ZONE-4"
           ],
           [
-            "Q076 warehouse event record 0",
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0",
             "ZONE-1"
           ],
           [
-            "Q075 warehouse event record 3",
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3",
             "ZONE-4"
           ],
           [
-            "Q074 warehouse event record 6",
+            "Q074 warehouse event record 6 ACK batch batchIdList:Q074-6",
             "ZONE-3"
           ]
         ],
@@ -69,7 +69,7 @@
         ],
         "results": [
           [
-            "Q075 warehouse event record 0",
+            "Q075 warehouse event record 0 ACK batch batchIdList:Q075-0",
             "PL-001"
           ],
           [
@@ -89,7 +89,7 @@
             "PL-001"
           ],
           [
-            "Q074 warehouse event record 5",
+            "Q074 warehouse event record 5 error E005 traceback",
             "PL-006"
           ],
           [
@@ -97,19 +97,19 @@
             "PL-003"
           ],
           [
-            "Q073 warehouse event record 9",
+            "Q073 warehouse event record 9 ACK batch batchIdList:Q073-9",
             "PL-002"
           ],
           [
-            "Q074 warehouse event record 6",
+            "Q074 warehouse event record 6 ACK batch batchIdList:Q074-6",
             "PL-007"
           ],
           [
-            "Q075 warehouse event record 3",
+            "Q075 warehouse event record 3 ACK batch batchIdList:Q075-3",
             "PL-004"
           ],
           [
-            "Q076 warehouse event record 0",
+            "Q076 warehouse event record 0 ACK batch batchIdList:Q076-0",
             "PL-001"
           ],
           [
@@ -129,7 +129,7 @@
             "PL-001"
           ],
           [
-            "Q075 warehouse event record 5",
+            "Q075 warehouse event record 5 error E005 traceback",
             "PL-006"
           ],
           [
@@ -137,19 +137,19 @@
             "PL-003"
           ],
           [
-            "Q074 warehouse event record 9",
+            "Q074 warehouse event record 9 ACK batch batchIdList:Q074-9",
             "PL-002"
           ],
           [
-            "Q075 warehouse event record 6",
+            "Q075 warehouse event record 6 ACK batch batchIdList:Q075-6",
             "PL-007"
           ],
           [
-            "Q076 warehouse event record 3",
+            "Q076 warehouse event record 3 ACK batch batchIdList:Q076-3",
             "PL-004"
           ],
           [
-            "Q077 warehouse event record 0",
+            "Q077 warehouse event record 0 ACK batch batchIdList:Q077-0",
             "PL-001"
           ],
           [
@@ -169,7 +169,7 @@
             "PL-001"
           ],
           [
-            "Q076 warehouse event record 5",
+            "Q076 warehouse event record 5 error E005 traceback",
             "PL-006"
           ],
           [
@@ -177,7 +177,7 @@
             "PL-003"
           ],
           [
-            "Q075 warehouse event record 9",
+            "Q075 warehouse event record 9 ACK batch batchIdList:Q075-9",
             "PL-002"
           ]
         ],
@@ -388,19 +388,19 @@
         ],
         "results": [
           [
-            "2026-06-03T05:12:00",
+            "2026-06-05T11:40:00",
             "10",
             "10",
             "100.0"
           ],
           [
-            "2026-06-03T05:13:00",
+            "2026-06-05T11:41:00",
             "10",
             "10",
             "100.0"
           ],
           [
-            "2026-06-03T05:14:00",
+            "2026-06-05T11:42:00",
             "8",
             "8",
             "100.0"
@@ -442,7 +442,7 @@
             "2"
           ],
           [
-            "Q083 warehouse event record 0",
+            "Q083 warehouse event record 0 ACK batch batchIdList:Q083-0",
             "PL-001",
             "ZONE-1",
             "SORT-X1",
@@ -463,7 +463,7 @@
             "5"
           ],
           [
-            "Q082 warehouse event record 0",
+            "Q082 warehouse event record 0 ACK batch batchIdList:Q082-0",
             "PL-001",
             "ZONE-1",
             "SORT-X1",
@@ -484,21 +484,21 @@
             "8"
           ],
           [
-            "Q081 warehouse event record 0",
+            "Q081 warehouse event record 0 ACK batch batchIdList:Q081-0",
             "PL-001",
             "ZONE-1",
             "SORT-X1",
             "9"
           ],
           [
-            "Q081 warehouse event record 9",
+            "Q081 warehouse event record 9 ACK batch batchIdList:Q081-9",
             "PL-002",
             "ZONE-2",
             "SORT-A7",
             "1"
           ],
           [
-            "Q082 warehouse event record 5",
+            "Q082 warehouse event record 5 error E005 traceback",
             "PL-006",
             "ZONE-2",
             "SORT-A7",
@@ -512,14 +512,14 @@
             "3"
           ],
           [
-            "Q080 warehouse event record 9",
+            "Q080 warehouse event record 9 ACK batch batchIdList:Q080-9",
             "PL-002",
             "ZONE-2",
             "SORT-A7",
             "4"
           ],
           [
-            "Q081 warehouse event record 5",
+            "Q081 warehouse event record 5 error E005 traceback",
             "PL-006",
             "ZONE-2",
             "SORT-A7",
@@ -533,14 +533,14 @@
             "6"
           ],
           [
-            "Q079 warehouse event record 9",
+            "Q079 warehouse event record 9 ACK batch batchIdList:Q079-9",
             "PL-002",
             "ZONE-2",
             "SORT-A7",
             "7"
           ],
           [
-            "Q080 warehouse event record 5",
+            "Q080 warehouse event record 5 error E005 traceback",
             "PL-006",
             "ZONE-2",
             "SORT-A7",
@@ -561,7 +561,7 @@
             "1"
           ],
           [
-            "Q081 warehouse event record 6",
+            "Q081 warehouse event record 6 ACK batch batchIdList:Q081-6",
             "PL-007",
             "ZONE-3",
             "SORT-M3",
@@ -575,7 +575,7 @@
             "3"
           ],
           [
-            "Q080 warehouse event record 6",
+            "Q080 warehouse event record 6 ACK batch batchIdList:Q080-6",
             "PL-007",
             "ZONE-3",
             "SORT-M3",
@@ -596,7 +596,7 @@
             "1"
           ],
           [
-            "Q082 warehouse event record 3",
+            "Q082 warehouse event record 3 ACK batch batchIdList:Q082-3",
             "PL-004",
             "ZONE-4",
             "SORT-Z9",
@@ -610,7 +610,7 @@
             "3"
           ],
           [
-            "Q081 warehouse event record 3",
+            "Q081 warehouse event record 3 ACK batch batchIdList:Q081-3",
             "PL-004",
             "ZONE-4",
             "SORT-Z9",
@@ -739,6 +739,229 @@
       "time_offset": {
         "start_offset": 4859000000,
         "end_offset": 5023000000
+      }
+    },
+    {
+      "id": "Q249",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|localhost|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|test|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login|test')\n  AND issue_type != 'Access From Geo'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 14879000000,
+        "end_offset": 15043000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q250",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|config|bash',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|go/|script|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|etc')\n  AND issue_type != 'SQL Injection'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 14939000000,
+        "end_offset": 15103000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q251",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(resource_path,\n    'admin|config|bash|login|ssh|key',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|go/|test|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login')\n  AND issue_type != 'XSS Attempt'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 14999000000,
+        "end_offset": 15163000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q252",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND NOT regexp_like(resource_path,\n    'localhost|test|admin|config|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|curl|test|script|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|test|etc|git')\n  AND issue_type != 'Access From Geo'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15059000000,
+        "end_offset": 15223000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "US-EAST",
+            "3"
+          ],
+          [
+            "AP-SOUTH",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q253",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|favicon|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|go/|test|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|ssh')\n  AND issue_type != 'Path Traversal'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15119000000,
+        "end_offset": 15283000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q254",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    'admin|config|login|ssh|key|test',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|test|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|test|passwd')\n  AND issue_type != 'Access From Geo'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15179000000,
+        "end_offset": 15343000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q255",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|passwd|etc',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'curl|go/|test|server|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'admin|config|login|ssh|key|bash')\n  AND issue_type != 'SQL Injection'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15239000000,
+        "end_offset": 15403000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q256",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'POST'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|localhost|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|server|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|bash')\n  AND issue_type != 'CSRF Attempt'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15299000000,
+        "end_offset": 15463000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q257",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    'admin|config|bash|login|ssh|key|test',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|go/|curl|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|test|etc')\n  AND issue_type != 'Access From Geo'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15359000000,
+        "end_offset": 15523000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q258",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(resource_path,\n    'localhost|test|admin|config|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|test|library|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login|ssh')\n  AND issue_type != 'XSS Attempt'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15419000000,
+        "end_offset": 15583000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q259",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|passwd|etc',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|curl|go/|test|library',\n    'i'\n  )\n  AND re_not_match(resource_path, 'admin|config|login|ssh|key|test')\n  AND issue_type != 'Path Traversal'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15479000000,
+        "end_offset": 15643000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q260",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|favicon|test|admin|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|server|script|go/',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|git')\n  AND issue_type != 'Access From Geo'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 100",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 15539000000,
+        "end_offset": 15703000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
       }
     }
   ],

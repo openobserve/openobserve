@@ -104,11 +104,54 @@
           "scan_attempts",
           "conveyor_segment",
           "cell_temp",
-          "build_signature"
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label"
         ],
         "results": [
           [
-            "Q021 warehouse event record 6",
+            "Q021 warehouse event record 6 ACK batch batchIdList:Q021-6",
             "stdout",
             "PL-007",
             "45.3",
@@ -126,10 +169,53 @@
             "1",
             "2",
             "24.8",
-            "BS-2026-C3"
+            "BS-2026-C3",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-007-2026 dispatched",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4",
+            "E007",
+            "@warehouse-Linux-scan-v3",
+            "UP-E007",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"load\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"unload\\\",\\\"startTime\\\":\\\"250\\\"}\"]",
+            "[\"cid-stu901\",\"status-warning\"]",
+            "CheckThreshold",
+            "10.12.1.202",
+            "192.168.2.21",
+            "prod",
+            "medium",
+            "api",
+            "SA-EAST",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "CheckThreshold",
+            "site-dub-07",
+            "/api/v1/health/check",
+            "PUT",
+            "503",
+            "inbound",
+            "denied",
+            "task-s9t0u1",
+            "ent-007-wh",
+            "capacity",
+            "mismatch",
+            "block",
+            "passive",
+            "merge",
+            "/logs/warehouse/access.log",
+            "3200",
+            "warehouse-west",
+            "true",
+            "v3.1.0",
+            "BIN-G7",
+            "256",
+            "pallet-mapper",
+            "rk-warehouse-007",
+            "tok-wh-klm789nop012",
+            "warehouse-scan"
           ],
           [
-            "Q022 warehouse event record 3",
+            "Q022 warehouse event record 3 ACK batch batchIdList:Q022-3",
             "stderr",
             "PL-004",
             "72.8",
@@ -147,10 +233,53 @@
             "1",
             "4",
             "30.1",
-            "BS-2025-D4"
+            "BS-2025-D4",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E004",
+            "@warehouse-Windows-sort-v1",
+            "UP-E004",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-jkl012\",\"status-ok\"]",
+            "ScanPallet",
+            "10.12.0.104",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "scheduler",
+            "EU-NORTH",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "ScanPallet",
+            "site-syd-04",
+            "/api/v2/sorter/scan",
+            "DELETE",
+            "400",
+            "inbound",
+            "pass",
+            "task-j0k1l2",
+            "ent-004-wh",
+            "latency",
+            "jam",
+            "allow",
+            "active",
+            "track",
+            "/logs/warehouse/error.log",
+            "1450",
+            "warehouse-south",
+            "false",
+            "v2.1.3",
+            "BIN-D4",
+            "4096",
+            "scan-hub",
+            "rk-warehouse-004",
+            "tok-wh-stu901vwx234",
+            "warehouse-merge"
           ],
           [
-            "Q022 warehouse event record 6",
+            "Q022 warehouse event record 6 ACK batch batchIdList:Q022-6",
             "stdout",
             "PL-007",
             "45.3",
@@ -168,10 +297,53 @@
             "1",
             "2",
             "24.8",
-            "BS-2026-C3"
+            "BS-2026-C3",
+            "batch MNO456 merged into pallet PL-005",
+            "ACK batch batchIdList:BT-007-2026 dispatched",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4",
+            "E007",
+            "@warehouse-Linux-scan-v3",
+            "UP-E007",
+            "NetworkException: connection to batch sync failed",
+            "{\"message\":{\"endpoint\":\"checkThreshold\",\"status\":\"warning\"}}",
+            "[\"{\\\"name\\\":\\\"load\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"unload\\\",\\\"startTime\\\":\\\"250\\\"}\"]",
+            "[\"cid-stu901\",\"status-warning\"]",
+            "CheckThreshold",
+            "10.12.1.202",
+            "192.168.2.21",
+            "prod",
+            "medium",
+            "api",
+            "SA-EAST",
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "CheckThreshold",
+            "site-dub-07",
+            "/api/v1/health/check",
+            "PUT",
+            "503",
+            "inbound",
+            "denied",
+            "task-s9t0u1",
+            "ent-007-wh",
+            "capacity",
+            "mismatch",
+            "block",
+            "passive",
+            "merge",
+            "/logs/warehouse/access.log",
+            "3200",
+            "warehouse-west",
+            "true",
+            "v3.1.0",
+            "BIN-G7",
+            "256",
+            "pallet-mapper",
+            "rk-warehouse-007",
+            "tok-wh-klm789nop012",
+            "warehouse-scan"
           ],
           [
-            "Q023 warehouse event record 3",
+            "Q023 warehouse event record 3 ACK batch batchIdList:Q023-3",
             "stderr",
             "PL-004",
             "72.8",
@@ -189,7 +361,50 @@
             "1",
             "4",
             "30.1",
-            "BS-2025-D4"
+            "BS-2025-D4",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E004",
+            "@warehouse-Windows-sort-v1",
+            "UP-E004",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-jkl012\",\"status-ok\"]",
+            "ScanPallet",
+            "10.12.0.104",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "scheduler",
+            "EU-NORTH",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "ScanPallet",
+            "site-syd-04",
+            "/api/v2/sorter/scan",
+            "DELETE",
+            "400",
+            "inbound",
+            "pass",
+            "task-j0k1l2",
+            "ent-004-wh",
+            "latency",
+            "jam",
+            "allow",
+            "active",
+            "track",
+            "/logs/warehouse/error.log",
+            "1450",
+            "warehouse-south",
+            "false",
+            "v2.1.3",
+            "BIN-D4",
+            "4096",
+            "scan-hub",
+            "rk-warehouse-004",
+            "tok-wh-stu901vwx234",
+            "warehouse-merge"
           ]
         ],
         "results_mode": "rowsort"
@@ -539,21 +754,21 @@
         ],
         "results": [
           [
-            "Q024 warehouse event record 9",
+            "Q024 warehouse event record 9 ACK batch batchIdList:Q024-9",
             "CC-BETA",
             "manual",
             "40.0",
             "OVERTEMP"
           ],
           [
-            "Q025 warehouse event record 9",
+            "Q025 warehouse event record 9 ACK batch batchIdList:Q025-9",
             "CC-BETA",
             "manual",
             "40.0",
             "OVERTEMP"
           ],
           [
-            "Q026 warehouse event record 9",
+            "Q026 warehouse event record 9 ACK batch batchIdList:Q026-9",
             "CC-BETA",
             "manual",
             "40.0",
@@ -602,14 +817,14 @@
             "WARM"
           ],
           [
-            "Q026 warehouse event record 3",
+            "Q026 warehouse event record 3 ACK batch batchIdList:Q026-3",
             "CC-DELTA",
             "auto",
             "30.1",
             "WARM"
           ],
           [
-            "Q027 warehouse event record 3",
+            "Q027 warehouse event record 3 ACK batch batchIdList:Q027-3",
             "CC-DELTA",
             "auto",
             "30.1",
@@ -658,21 +873,21 @@
             "NORMAL"
           ],
           [
-            "Q026 warehouse event record 0",
+            "Q026 warehouse event record 0 ACK batch batchIdList:Q026-0",
             "CC-ALPHA",
             "auto",
             "18.5",
             "NORMAL"
           ],
           [
-            "Q027 warehouse event record 0",
+            "Q027 warehouse event record 0 ACK batch batchIdList:Q027-0",
             "CC-ALPHA",
             "auto",
             "18.5",
             "NORMAL"
           ],
           [
-            "Q028 warehouse event record 0",
+            "Q028 warehouse event record 0 ACK batch batchIdList:Q028-0",
             "CC-ALPHA",
             "auto",
             "18.5",
@@ -1573,7 +1788,7 @@
         ],
         "results": [
           [
-            "Q035 warehouse event record 9",
+            "Q035 warehouse event record 9 ACK batch batchIdList:Q035-9",
             "ZONE-2",
             "stdout"
           ],
@@ -1583,7 +1798,7 @@
             "stdout"
           ],
           [
-            "Q036 warehouse event record 5",
+            "Q036 warehouse event record 5 error E005 traceback",
             "ZONE-2",
             "stdout"
           ],
@@ -1603,17 +1818,17 @@
             "stdout"
           ],
           [
-            "Q037 warehouse event record 0",
+            "Q037 warehouse event record 0 ACK batch batchIdList:Q037-0",
             "ZONE-1",
             "stdout"
           ],
           [
-            "Q035 warehouse event record 6",
+            "Q035 warehouse event record 6 ACK batch batchIdList:Q035-6",
             "ZONE-3",
             "stdout"
           ],
           [
-            "Q034 warehouse event record 9",
+            "Q034 warehouse event record 9 ACK batch batchIdList:Q034-9",
             "ZONE-2",
             "stdout"
           ],
@@ -1623,7 +1838,7 @@
             "stdout"
           ],
           [
-            "Q035 warehouse event record 5",
+            "Q035 warehouse event record 5 error E005 traceback",
             "ZONE-2",
             "stdout"
           ],
@@ -1643,7 +1858,7 @@
             "stdout"
           ],
           [
-            "Q036 warehouse event record 0",
+            "Q036 warehouse event record 0 ACK batch batchIdList:Q036-0",
             "ZONE-1",
             "stdout"
           ]
@@ -1653,6 +1868,1637 @@
       "time_offset": {
         "start_offset": 2039000000,
         "end_offset": 2203000000
+      }
+    },
+    {
+      "id": "Q261",
+      "sql": "SELECT node_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE node_ip IS NOT NULL\n  AND TRIM(CAST(node_ip AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\nGROUP BY node_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15599000000,
+        "end_offset": 15763000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "cnt"
+        ],
+        "results": [
+          [
+            "10.12.0.105",
+            "3"
+          ],
+          [
+            "10.12.1.204",
+            "3"
+          ],
+          [
+            "10.12.0.101",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q262",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE region_code IS NOT NULL\n  AND TRIM(CAST(region_code AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-2'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15659000000,
+        "end_offset": 15823000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "AP-EAST",
+            "3"
+          ],
+          [
+            "AP-CENTRAL",
+            "3"
+          ],
+          [
+            "US-WEST",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q263",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE site_name IS NOT NULL\n  AND TRIM(CAST(site_name AS VARCHAR)) <> ''\n  AND control_center = 'CC-ALPHA'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15719000000,
+        "end_offset": 15883000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-mum-09",
+            "3"
+          ],
+          [
+            "site-sfo-05",
+            "3"
+          ],
+          [
+            "site-nyc-01",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q264",
+      "sql": "SELECT client_agent, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE client_agent IS NOT NULL\n  AND TRIM(CAST(client_agent AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\nGROUP BY client_agent\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15779000000,
+        "end_offset": 15943000000
+      },
+      "expected": {
+        "columns": [
+          "client_agent",
+          "cnt"
+        ],
+        "results": [
+          [
+            "Go-http-client/2.0 conveyor-monitor",
+            "3"
+          ],
+          [
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "3"
+          ],
+          [
+            "Mozilla/5.0 WarehouseScanner/1.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q265",
+      "sql": "SELECT entity_id, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE entity_id IS NOT NULL\n  AND TRIM(CAST(entity_id AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-3'\nGROUP BY entity_id\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15839000000,
+        "end_offset": 16003000000
+      },
+      "expected": {
+        "columns": [
+          "entity_id",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ent-003-wh",
+            "3"
+          ],
+          [
+            "ent-007-wh",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q266",
+      "sql": "SELECT task_id, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE task_id IS NOT NULL\n  AND TRIM(CAST(task_id AS VARCHAR)) <> ''\n  AND site_name = 'DC-East'\nGROUP BY task_id\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15899000000,
+        "end_offset": 16063000000
+      },
+      "expected": {
+        "columns": [
+          "task_id",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q267",
+      "sql": "SELECT auth_token, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE auth_token IS NOT NULL\n  AND TRIM(CAST(auth_token AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-4'\nGROUP BY auth_token\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 15959000000,
+        "end_offset": 16123000000
+      },
+      "expected": {
+        "columns": [
+          "auth_token",
+          "cnt"
+        ],
+        "results": [
+          [
+            "tok-wh-qrs345tuv678",
+            "3"
+          ],
+          [
+            "tok-wh-stu901vwx234",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q268",
+      "sql": "SELECT operation_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE operation_name IS NOT NULL\n  AND TRIM(CAST(operation_name AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\nGROUP BY operation_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16019000000,
+        "end_offset": 16183000000
+      },
+      "expected": {
+        "columns": [
+          "operation_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "RerouteTrack",
+            "3"
+          ],
+          [
+            "SearchItems",
+            "3"
+          ],
+          [
+            "RetryScan",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q269",
+      "sql": "SELECT build_version, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE build_version IS NOT NULL\n  AND TRIM(CAST(build_version AS VARCHAR)) <> ''\n  AND control_center = 'CC-BETA'\nGROUP BY build_version\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16079000000,
+        "end_offset": 16243000000
+      },
+      "expected": {
+        "columns": [
+          "build_version",
+          "cnt"
+        ],
+        "results": [
+          [
+            "v1.1.2",
+            "3"
+          ],
+          [
+            "v3.2.0",
+            "3"
+          ],
+          [
+            "v3.0.1",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q270",
+      "sql": "SELECT endpoint_path, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE endpoint_path IS NOT NULL\n  AND TRIM(CAST(endpoint_path AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-2'\nGROUP BY endpoint_path\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16139000000,
+        "end_offset": 16303000000
+      },
+      "expected": {
+        "columns": [
+          "endpoint_path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "/api/v2/sorter/merge",
+            "3"
+          ],
+          [
+            "/api/v1/warehouse/update",
+            "3"
+          ],
+          [
+            "/api/v1/zone/sync",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q271",
+      "sql": "SELECT source_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE source_ip IS NOT NULL\n  AND TRIM(CAST(source_ip AS VARCHAR)) <> ''\n  AND site_name = 'DC-West'\nGROUP BY source_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16199000000,
+        "end_offset": 16363000000
+      },
+      "expected": {
+        "columns": [
+          "source_ip",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q272",
+      "sql": "SELECT bin_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE bin_code IS NOT NULL\n  AND TRIM(CAST(bin_code AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\nGROUP BY bin_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16259000000,
+        "end_offset": 16423000000
+      },
+      "expected": {
+        "columns": [
+          "bin_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "BIN-E5",
+            "3"
+          ],
+          [
+            "BIN-A1",
+            "3"
+          ],
+          [
+            "BIN-I9",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q273",
+      "sql": "SELECT org_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE org_name IS NOT NULL\n  AND TRIM(CAST(org_name AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-3'\nGROUP BY org_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16319000000,
+        "end_offset": 16483000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "warehouse-north",
+            "3"
+          ],
+          [
+            "warehouse-west",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q274",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE facility_zone IS NOT NULL\n  AND TRIM(CAST(facility_zone AS VARCHAR)) <> ''\n  AND region_code = 'US'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16379000000,
+        "end_offset": 16543000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q275",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE control_center IS NOT NULL\n  AND TRIM(CAST(control_center AS VARCHAR)) <> ''\n  AND site_name = 'DC-East'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16439000000,
+        "end_offset": 16603000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q276",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE sorter_model IS NOT NULL\n  AND TRIM(CAST(sorter_model AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16499000000,
+        "end_offset": 16663000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "9"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q277",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE conveyor_lane IS NOT NULL\n  AND TRIM(CAST(conveyor_lane AS VARCHAR)) <> ''\n  AND control_center = 'CC-ALPHA'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16559000000,
+        "end_offset": 16723000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt"
+        ],
+        "results": [
+          [
+            "LANE-A",
+            "9"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q278",
+      "sql": "SELECT node_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE node_ip IS NOT NULL\n  AND TRIM(CAST(node_ip AS VARCHAR)) <> ''\n  AND region_code = 'US'\nGROUP BY node_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16619000000,
+        "end_offset": 16783000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q279",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE site_name IS NOT NULL\n  AND TRIM(CAST(site_name AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-4'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16679000000,
+        "end_offset": 16843000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "site-sin-08",
+            "3"
+          ],
+          [
+            "site-syd-04",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q280",
+      "sql": "SELECT client_agent, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE client_agent IS NOT NULL\n  AND TRIM(CAST(client_agent AS VARCHAR)) <> ''\n  AND control_center = 'CC-BETA'\nGROUP BY client_agent\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16739000000,
+        "end_offset": 16903000000
+      },
+      "expected": {
+        "columns": [
+          "client_agent",
+          "cnt"
+        ],
+        "results": [
+          [
+            "node-fetch/3.3.2 (tracking-service)",
+            "3"
+          ],
+          [
+            "PostmanRuntime/7.35.0",
+            "3"
+          ],
+          [
+            "curl/7.88.1 (x86_64-pc-linux-gnu)",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q281",
+      "sql": "SELECT node_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE node_ip IS NOT NULL\n  AND TRIM(CAST(node_ip AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY node_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16799000000,
+        "end_offset": 16963000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q282",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE region_code IS NOT NULL\n  AND TRIM(CAST(region_code AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-2'\n  AND operation_name = 'UpdateItem'\n  AND site_name = 'DC-West'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16859000000,
+        "end_offset": 17023000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q283",
+      "sql": "SELECT client_agent, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE client_agent IS NOT NULL\n  AND TRIM(CAST(client_agent AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'PlaceOrder'\n  AND site_name = 'DC-East'\nGROUP BY client_agent\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16919000000,
+        "end_offset": 17083000000
+      },
+      "expected": {
+        "columns": [
+          "client_agent",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q284",
+      "sql": "SELECT entity_id, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE entity_id IS NOT NULL\n  AND TRIM(CAST(entity_id AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-3'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY entity_id\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 16979000000,
+        "end_offset": 17143000000
+      },
+      "expected": {
+        "columns": [
+          "entity_id",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q285",
+      "sql": "SELECT task_id, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE task_id IS NOT NULL\n  AND TRIM(CAST(task_id AS VARCHAR)) <> ''\n  AND site_name = 'DC-East'\n  AND operation_name = 'DeleteItem'\n  AND site_name = 'DC-East'\nGROUP BY task_id\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17039000000,
+        "end_offset": 17203000000
+      },
+      "expected": {
+        "columns": [
+          "task_id",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q286",
+      "sql": "SELECT auth_token, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE auth_token IS NOT NULL\n  AND TRIM(CAST(auth_token AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-4'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-West'\nGROUP BY auth_token\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17099000000,
+        "end_offset": 17263000000
+      },
+      "expected": {
+        "columns": [
+          "auth_token",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q287",
+      "sql": "SELECT operation_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE operation_name IS NOT NULL\n  AND TRIM(CAST(operation_name AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY operation_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17159000000,
+        "end_offset": 17323000000
+      },
+      "expected": {
+        "columns": [
+          "operation_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q288",
+      "sql": "SELECT node_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE node_ip IS NOT NULL\n  AND TRIM(CAST(node_ip AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'UpdateItem'\n  AND site_name = 'DC-West'\nGROUP BY node_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17219000000,
+        "end_offset": 17383000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q289",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE site_name IS NOT NULL\n  AND TRIM(CAST(site_name AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-2'\n  AND operation_name = 'PlaceOrder'\n  AND site_name = 'DC-East'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17279000000,
+        "end_offset": 17443000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q290",
+      "sql": "SELECT org_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE org_name IS NOT NULL\n  AND TRIM(CAST(org_name AS VARCHAR)) <> ''\n  AND control_center = 'CC-ALPHA'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY org_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17339000000,
+        "end_offset": 17503000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q291",
+      "sql": "SELECT build_version, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE build_version IS NOT NULL\n  AND TRIM(CAST(build_version AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'DeleteItem'\n  AND site_name = 'DC-West'\nGROUP BY build_version\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17399000000,
+        "end_offset": 17563000000
+      },
+      "expected": {
+        "columns": [
+          "build_version",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q292",
+      "sql": "SELECT source_ip, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE source_ip IS NOT NULL\n  AND TRIM(CAST(source_ip AS VARCHAR)) <> ''\n  AND site_name = 'DC-West'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY source_ip\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17459000000,
+        "end_offset": 17623000000
+      },
+      "expected": {
+        "columns": [
+          "source_ip",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q293",
+      "sql": "SELECT bin_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE bin_code IS NOT NULL\n  AND TRIM(CAST(bin_code AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-3'\n  AND operation_name = 'UpdateItem'\n  AND site_name = 'DC-East'\nGROUP BY bin_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17519000000,
+        "end_offset": 17683000000
+      },
+      "expected": {
+        "columns": [
+          "bin_code",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q294",
+      "sql": "SELECT endpoint_path, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE endpoint_path IS NOT NULL\n  AND TRIM(CAST(endpoint_path AS VARCHAR)) <> ''\n  AND facility_zone = 'ZONE-1'\n  AND operation_name = 'CreateContract'\n  AND site_name = 'DC-West'\nGROUP BY endpoint_path\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17579000000,
+        "end_offset": 17743000000
+      },
+      "expected": {
+        "columns": [
+          "endpoint_path",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q295",
+      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE sorter_model IS NOT NULL\n  AND TRIM(CAST(sorter_model AS VARCHAR)) <> ''\n  AND site_name = 'DC-East'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17639000000,
+        "end_offset": 17803000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q296",
+      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE conveyor_lane IS NOT NULL\n  AND TRIM(CAST(conveyor_lane AS VARCHAR)) <> ''\n  AND control_center = 'CC-BETA'\n  AND operation_name = 'PlaceOrder'\n  AND site_name = 'DC-West'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17699000000,
+        "end_offset": 17863000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q297",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE facility_zone IS NOT NULL\n  AND TRIM(CAST(facility_zone AS VARCHAR)) <> ''\n  AND region_code = 'US'\n  AND operation_name = 'SearchItems'\n  AND site_name = 'DC-East'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17759000000,
+        "end_offset": 17923000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q298",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE control_center IS NOT NULL\n  AND TRIM(CAST(control_center AS VARCHAR)) <> ''\n  AND site_name = 'DC-East'\n  AND operation_name = 'UpdateItem'\n  AND site_name = 'DC-East'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 17819000000,
+        "end_offset": 17983000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q309",
+      "sql": "SELECT record_type, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Search'\nGROUP BY record_type\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18479000000,
+        "end_offset": 18643000000
+      },
+      "expected": {
+        "columns": [
+          "record_type",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q310",
+      "sql": "SELECT response_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%api%'\nGROUP BY response_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18539000000,
+        "end_offset": 18703000000
+      },
+      "expected": {
+        "columns": [
+          "response_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "200",
+            "6"
+          ],
+          [
+            "201",
+            "3"
+          ],
+          [
+            "204",
+            "3"
+          ],
+          [
+            "403",
+            "3"
+          ],
+          [
+            "404",
+            "3"
+          ],
+          [
+            "500",
+            "3"
+          ],
+          [
+            "401",
+            "3"
+          ],
+          [
+            "400",
+            "2"
+          ],
+          [
+            "503",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q311",
+      "sql": "SELECT http_method, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Ingestion'\nGROUP BY http_method\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18599000000,
+        "end_offset": 18763000000
+      },
+      "expected": {
+        "columns": [
+          "http_method",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q312",
+      "sql": "SELECT query_source, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Search'\nGROUP BY query_source\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18659000000,
+        "end_offset": 18823000000
+      },
+      "expected": {
+        "columns": [
+          "query_source",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q313",
+      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%graphql%'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18719000000,
+        "end_offset": 18883000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q314",
+      "sql": "SELECT operation_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE response_code = 200\nGROUP BY operation_name\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18779000000,
+        "end_offset": 18943000000
+      },
+      "expected": {
+        "columns": [
+          "operation_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "SearchItems",
+            "3"
+          ],
+          [
+            "SyncZone",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q315",
+      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Ingestion'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18839000000,
+        "end_offset": 19003000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q316",
+      "sql": "SELECT build_version, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Search'\nGROUP BY build_version\nORDER BY cnt DESC\nLIMIT 5",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18899000000,
+        "end_offset": 19063000000
+      },
+      "expected": {
+        "columns": [
+          "build_version",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q317",
+      "sql": "SELECT filter_result, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'GET'\nGROUP BY filter_result\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 18959000000,
+        "end_offset": 19123000000
+      },
+      "expected": {
+        "columns": [
+          "filter_result",
+          "cnt"
+        ],
+        "results": [
+          [
+            "allow",
+            "6"
+          ],
+          [
+            "block",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q318",
+      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE record_type = 'Search'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19019000000,
+        "end_offset": 19183000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q319",
+      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%api%'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 5",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19079000000,
+        "end_offset": 19243000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "cnt"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "9"
+          ],
+          [
+            "CC-BETA",
+            "9"
+          ],
+          [
+            "CC-DELTA",
+            "5"
+          ],
+          [
+            "CC-GAMMA",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q320",
+      "sql": "SELECT issue_type, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\nGROUP BY issue_type\nORDER BY cnt DESC\nLIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19139000000,
+        "end_offset": 19303000000
+      },
+      "expected": {
+        "columns": [
+          "issue_type",
+          "cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q321",
+      "sql": "SELECT facility_zone, filter_result, region_code\nFROM \"{stream}\"\nWHERE control_center = 'CC-ALPHA'\nGROUP BY facility_zone, filter_result, region_code, site_name\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19199000000,
+        "end_offset": 19363000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "filter_result",
+          "region_code"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "block",
+            "AP-SOUTH"
+          ],
+          [
+            "ZONE-1",
+            "allow",
+            "EU-CENTRAL"
+          ],
+          [
+            "ZONE-1",
+            "allow",
+            "US-EAST"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q322",
+      "sql": "SELECT control_center, http_method, site_name\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-1'\nGROUP BY control_center, http_method, site_name, conveyor_lane\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19259000000,
+        "end_offset": 19423000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "http_method",
+          "site_name"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "GET",
+            "site-sfo-05"
+          ],
+          [
+            "CC-ALPHA",
+            "GET",
+            "site-mum-09"
+          ],
+          [
+            "CC-ALPHA",
+            "GET",
+            "site-nyc-01"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q323",
+      "sql": "SELECT site_name, operation_name, build_version\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-2'\nGROUP BY site_name, operation_name, build_version, sorter_model\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19319000000,
+        "end_offset": 19483000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "operation_name",
+          "build_version"
+        ],
+        "results": [
+          [
+            "site-ber-06",
+            "MergeBatch",
+            "v3.0.1"
+          ],
+          [
+            "site-tor-10",
+            "SyncZone",
+            "v3.2.0"
+          ],
+          [
+            "site-lon-02",
+            "UpdateBatch",
+            "v1.1.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q324",
+      "sql": "SELECT sorter_model, filter_result, issue_type\nFROM \"{stream}\"\nWHERE site_name = 'DC-East'\nGROUP BY sorter_model, filter_result, issue_type, control_center\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19379000000,
+        "end_offset": 19543000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "filter_result",
+          "issue_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q325",
+      "sql": "SELECT conveyor_lane, region_code, site_name\nFROM \"{stream}\"\nWHERE region_code = 'US'\nGROUP BY conveyor_lane, region_code, site_name, facility_zone\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19439000000,
+        "end_offset": 19603000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "region_code",
+          "site_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q326",
+      "sql": "SELECT region_code, record_type, query_source\nFROM \"{stream}\"\nWHERE record_type = 'Search'\nGROUP BY region_code, record_type, query_source, site_name\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19499000000,
+        "end_offset": 19663000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "record_type",
+          "query_source"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q327",
+      "sql": "SELECT facility_zone, http_method, response_code\nFROM \"{stream}\"\nWHERE http_method = 'GET'\nGROUP BY facility_zone, http_method, response_code, conveyor_lane\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19559000000,
+        "end_offset": 19723000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "http_method",
+          "response_code"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "GET",
+            "404"
+          ],
+          [
+            "ZONE-1",
+            "GET",
+            "403"
+          ],
+          [
+            "ZONE-1",
+            "GET",
+            "200"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q328",
+      "sql": "SELECT control_center, operation_name, build_version\nFROM \"{stream}\"\nWHERE control_center = 'CC-BETA'\nGROUP BY control_center, operation_name, build_version, sorter_model\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19619000000,
+        "end_offset": 19783000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "operation_name",
+          "build_version"
+        ],
+        "results": [
+          [
+            "CC-BETA",
+            "MergeBatch",
+            "v3.0.1"
+          ],
+          [
+            "CC-BETA",
+            "SyncZone",
+            "v3.2.0"
+          ],
+          [
+            "CC-BETA",
+            "UpdateBatch",
+            "v1.1.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q329",
+      "sql": "SELECT site_name, filter_result, region_code\nFROM \"{stream}\"\nWHERE site_name = 'DC-West'\nGROUP BY site_name, filter_result, region_code, facility_zone\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19679000000,
+        "end_offset": 19843000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "filter_result",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q330",
+      "sql": "SELECT sorter_model, issue_type, site_name\nFROM \"{stream}\"\nWHERE sorter_model = 'SORT-X1'\nGROUP BY sorter_model, issue_type, site_name, region_code\nLIMIT 100",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 19739000000,
+        "end_offset": 19903000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "issue_type",
+          "site_name"
+        ],
+        "results": [
+          [
+            "SORT-X1",
+            "timeout",
+            "site-nyc-01"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "site-mum-09"
+          ],
+          [
+            "SORT-X1",
+            "timeout",
+            "site-sfo-05"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q339",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, response_code\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%api%'\nGROUP BY response_code\nORDER BY response_code ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20279000000,
+        "end_offset": 20443000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "response_code"
+        ],
+        "results": [
+          [
+            "6",
+            "200"
+          ],
+          [
+            "3",
+            "201"
+          ],
+          [
+            "3",
+            "204"
+          ],
+          [
+            "2",
+            "400"
+          ],
+          [
+            "3",
+            "401"
+          ],
+          [
+            "3",
+            "403"
+          ],
+          [
+            "3",
+            "404"
+          ],
+          [
+            "3",
+            "500"
+          ],
+          [
+            "2",
+            "503"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q340",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, http_method\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%search%'\nGROUP BY http_method\nORDER BY http_method ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20339000000,
+        "end_offset": 20503000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "http_method"
+        ],
+        "results": [
+          [
+            "3",
+            "GET"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q341",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, site_name\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%graphql%'\nGROUP BY site_name\nORDER BY site_name ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20399000000,
+        "end_offset": 20563000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "site_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q342",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, facility_zone\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%api%'\nGROUP BY facility_zone\nORDER BY facility_zone ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20459000000,
+        "end_offset": 20623000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "facility_zone"
+        ],
+        "results": [
+          [
+            "9",
+            "ZONE-1"
+          ],
+          [
+            "9",
+            "ZONE-2"
+          ],
+          [
+            "5",
+            "ZONE-3"
+          ],
+          [
+            "5",
+            "ZONE-4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q343",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, filter_result\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%ip%'\nGROUP BY filter_result\nORDER BY filter_result ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20519000000,
+        "end_offset": 20683000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "filter_result"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q344",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, region_code\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%orchestra%'\nGROUP BY region_code\nORDER BY region_code ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20579000000,
+        "end_offset": 20743000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "region_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q345",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, record_type\nFROM \"{stream}\"\nWHERE resource_path LIKE '%api%'\nGROUP BY record_type\nORDER BY record_type ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20639000000,
+        "end_offset": 20803000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "record_type"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q346",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, operation_name\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%api%'\nGROUP BY operation_name\nORDER BY operation_name ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20699000000,
+        "end_offset": 20863000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "operation_name"
+        ],
+        "results": [
+          [
+            "3",
+            "ArchiveLog"
+          ],
+          [
+            "2",
+            "CheckThreshold"
+          ],
+          [
+            "3",
+            "DeleteRecord"
+          ],
+          [
+            "3",
+            "MergeBatch"
+          ],
+          [
+            "3",
+            "RerouteTrack"
+          ],
+          [
+            "3",
+            "RetryScan"
+          ],
+          [
+            "2",
+            "ScanPallet"
+          ],
+          [
+            "3",
+            "SearchItems"
+          ],
+          [
+            "3",
+            "SyncZone"
+          ],
+          [
+            "3",
+            "UpdateBatch"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q347",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, response_code\nFROM \"{stream}\"\nWHERE resource_path LIKE '%search%'\nGROUP BY response_code\nORDER BY response_code ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20759000000,
+        "end_offset": 20923000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "response_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q348",
+      "sql": "SELECT COUNT(_timestamp) AS cnt, build_version\nFROM \"{stream}\"\nWHERE endpoint_path LIKE '%swag%'\nGROUP BY build_version\nORDER BY build_version ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 20819000000,
+        "end_offset": 20983000000
+      },
+      "expected": {
+        "columns": [
+          "cnt",
+          "build_version"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
       }
     }
   ],

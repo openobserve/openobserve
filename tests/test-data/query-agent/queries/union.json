@@ -124,13 +124,8 @@
             "6"
           ],
           [
-            "SORT-Q5",
-            "manual",
-            "3"
-          ],
-          [
             "None",
-            "manual",
+            "hybrid",
             "3"
           ],
           [
@@ -140,6 +135,11 @@
           ],
           [
             "None",
+            "manual",
+            "3"
+          ],
+          [
+            "SORT-M3",
             "hybrid",
             "3"
           ],
@@ -149,8 +149,8 @@
             "3"
           ],
           [
-            "SORT-M3",
-            "hybrid",
+            "SORT-Q5",
+            "manual",
             "3"
           ]
         ],
@@ -171,10 +171,10 @@
         ],
         "results": [
           [
-            "Q127 warehouse event record 9"
+            "Q127 warehouse event record 9 ACK batch batchIdList:Q127-9"
           ],
           [
-            "Q128 warehouse event record 5"
+            "Q128 warehouse event record 5 error E005 traceback"
           ],
           [
             "Q127 warehouse event record 8"
@@ -183,16 +183,16 @@
             "Q128 warehouse event record 4"
           ],
           [
-            "Q129 warehouse event record 0"
+            "Q129 warehouse event record 0 ACK batch batchIdList:Q129-0"
           ],
           [
-            "Q128 warehouse event record 3"
+            "Q128 warehouse event record 3 ACK batch batchIdList:Q128-3"
           ],
           [
-            "Q126 warehouse event record 9"
+            "Q126 warehouse event record 9 ACK batch batchIdList:Q126-9"
           ],
           [
-            "Q127 warehouse event record 5"
+            "Q127 warehouse event record 5 error E005 traceback"
           ],
           [
             "Q126 warehouse event record 8"
@@ -829,7 +829,34 @@
         "start_offset": 7979000000,
         "end_offset": 8143000000
       }
+    },
+    {
+      "id": "Q158",
+      "sql": "SELECT '10-20' AS bucket, count(distinct array_extract(regexp_match(event_detail, 'track ([A-Za-z0-9-]+)'), 1)) AS itemcount FROM \"{stream}\" WHERE str_match_ignore_case(event_detail, 'sorter batch') AND app_label != 'tax-prod-b' AND CAST(array_extract(regexp_match(event_detail, 'segment ([0-9]+)'), 1) AS INT) BETWEEN 1 AND 5 UNION ALL SELECT '21-30' AS bucket, count(distinct array_extract(regexp_match(event_detail, 'track ([A-Za-z0-9-]+)'), 1)) AS itemcount FROM \"{stream}\" WHERE str_match_ignore_case(event_detail, 'sorter batch') AND app_label != 'tax-prod-b' AND CAST(array_extract(regexp_match(event_detail, 'segment ([0-9]+)'), 1) AS INT) BETWEEN 6 AND 10",
+      "category": "union",
+      "expected": {
+        "columns": [
+          "bucket",
+          "itemcount"
+        ],
+        "results": [
+          [
+            "10-20",
+            "0"
+          ],
+          [
+            "21-30",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 9419000000,
+        "end_offset": 9583000000
+      }
     }
   ],
-  "last_query_id": 134
+  "last_query_id": 158
 }

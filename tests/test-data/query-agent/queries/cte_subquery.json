@@ -53,13 +53,13 @@
             "66.66999816894531"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "5",
             "2",
             "40.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "5",
             "2",
             "40.0"
@@ -729,15 +729,15 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-2",
+            "LANE-A",
+            "ZONE-1",
             "9",
             "7.0",
             "2.0"
           ],
           [
-            "LANE-A",
-            "ZONE-1",
+            "LANE-B",
+            "ZONE-2",
             "9",
             "7.0",
             "2.0"
@@ -1496,24 +1496,24 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "9",
-            "373.3"
-          ],
-          [
             "ZONE-1",
             "9",
             "278.0"
           ],
           [
-            "ZONE-4",
-            "5",
-            "444.0"
+            "ZONE-2",
+            "9",
+            "373.3"
           ],
           [
             "ZONE-3",
             "5",
             "148.8"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "444.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1522,7 +1522,329 @@
         "start_offset": 3659000000,
         "end_offset": 3823000000
       }
+    },
+    {
+      "id": "Q156",
+      "sql": "WITH extracted AS (SELECT _timestamp, sorter_model, array_extract(regexp_match(event_detail, 'batch ([A-Z0-9]+)'), 1) AS batch_id, array_extract(regexp_match(event_detail, 'segment ([0-9]+)'), 1) AS segment_nbr, array_extract(regexp_match(event_detail, 'track ([A-Za-z0-9-]+)'), 1) AS track_id FROM \"{stream}\" WHERE event_detail LIKE '%sorter batch%'), with_batch_flag AS (SELECT _timestamp, batch_id, sorter_model, segment_nbr, track_id, CASE WHEN array_extract(regexp_match(track_id, '([A-Z]+)'), 1) = 'TRK' THEN 'batch' ELSE 'non batch' END AS is_batch, concat('srt', lpad(CAST(segment_nbr AS VARCHAR), 5, '0'), '#', track_id) AS sorterWithTrackId FROM extracted), recovered_status AS (SELECT wbf.batch_id, wbf.sorter_model, wbf.segment_nbr, wbf.track_id, wbf.is_batch, wbf.sorterWithTrackId, CASE WHEN ack.ack_detail IS NOT NULL AND ack.ack_detail != '' THEN 'received' ELSE 'notreceived' END AS ack_status FROM with_batch_flag wbf LEFT JOIN (SELECT ack_detail FROM \"{stream}\" WHERE ack_detail IS NOT NULL AND ack_detail != '' AND str_match_ignore_case(ack_detail, 'ACK batch')) ack ON ack.ack_detail LIKE concat('%batchIdList:%', wbf.batch_id, '%') WHERE wbf.is_batch = 'batch') SELECT array_agg('batch_id-' || batch_id || ', sorter_model-' || sorter_model || ', segment_nbr-' || segment_nbr || ', track_id-' || track_id || ', is_batch-' || is_batch || ', sorterWithTrackId-' || sorterWithTrackId || ', ack_status-' || ack_status) AS results, COUNT(*) AS event_count FROM recovered_status HAVING COUNT(*) > 0",
+      "category": "cte_subquery",
+      "expected": {
+        "columns": [
+          "results",
+          "event_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 9299000000,
+        "end_offset": 9463000000
+      }
+    },
+    {
+      "id": "Q160",
+      "sql": "SELECT dependency, statuscode FROM (SELECT array_extract(regexp_match(log_message, 'responseCode:\\\\W(?<statuscode>[^,]+)'), 1) AS statuscode, array_extract(regexp_match(log_message, 'name: [A-Z]+\\\\W(https:\\\\/\\\\/[a-zA-Z0-9.-]+\\\\/[a-zA-Z0-9\\\\/-]+)'), 1) AS dependency FROM \"{stream}\" WHERE str_match_ignore_case(log_message, 'service.api.warehouse.com')) GROUP BY dependency, statuscode",
+      "category": "cte_subquery",
+      "expected": {
+        "columns": [
+          "dependency",
+          "statuscode"
+        ],
+        "note": "Subquery in FROM with regexp named groups, str_match_ignore_case"
+      },
+      "time_offset": {
+        "start_offset": 9539000000,
+        "end_offset": 9703000000
+      }
+    },
+    {
+      "id": "Q190",
+      "sql": "SELECT facility_zone, conveyor_lane, SUM(cnt) AS total_cnt\nFROM (\n  SELECT facility_zone, entity_id AS conveyor_lane, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND facility_zone = 'ZONE-1')\n    AND endpoint_path LIKE '%api%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem'))\n    AND LOWER(client_agent) NOT LIKE '%soastactp%'\n  GROUP BY entity_id, facility_zone, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY facility_zone, conveyor_lane\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11339000000,
+        "end_offset": 11503000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "conveyor_lane",
+          "total_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "ent-001-wh",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q191",
+      "sql": "SELECT control_center, sorter_model, SUM(cnt) AS total_cnt\nFROM (\n  SELECT control_center, task_id AS sorter_model, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND control_center = 'CC-ALPHA')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (task_id IS NOT NULL AND task_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','createcontract'))\n    AND LOWER(client_agent) NOT LIKE '%python%'\n  GROUP BY task_id, control_center, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Gamma') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Gamma' OR region_code != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY control_center, sorter_model\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11399000000,
+        "end_offset": 11563000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "sorter_model",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q192",
+      "sql": "SELECT site_name, facility_zone, SUM(cnt) AS total_cnt\nFROM (\n  SELECT site_name, entity_id AS facility_zone, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND site_name = 'DC-East')\n    AND endpoint_path LIKE '%api%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem','updatequantity'))\n    AND LOWER(client_agent) NOT LIKE '%performancetesto2t%'\n  GROUP BY entity_id, site_name, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'CA' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'CA') AND COUNT(*) > 1)\n) sub\nGROUP BY site_name, facility_zone\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11459000000,
+        "end_offset": 11623000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "facility_zone",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q193",
+      "sql": "SELECT conveyor_lane, control_center, SUM(cnt) AS total_cnt\nFROM (\n  SELECT conveyor_lane, auth_token AS control_center, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND conveyor_lane = 'LANE-A')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (auth_token IS NOT NULL AND auth_token != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder'))\n    AND LOWER(client_agent) NOT LIKE '%curl%'\n  GROUP BY auth_token, conveyor_lane, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Beta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Beta' OR region_code != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY conveyor_lane, control_center\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11519000000,
+        "end_offset": 11683000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "control_center",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q194",
+      "sql": "SELECT facility_zone, region_code, SUM(cnt) AS total_cnt\nFROM (\n  SELECT facility_zone, entity_id AS region_code, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND facility_zone = 'ZONE-2')\n    AND endpoint_path LIKE '%api%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem','createcontract','updatequantity'))\n    AND LOWER(client_agent) NOT LIKE '%soastactp%'\n  GROUP BY entity_id, facility_zone, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY facility_zone, region_code\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11579000000,
+        "end_offset": 11743000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "region_code",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q195",
+      "sql": "SELECT control_center, site_name, SUM(cnt) AS total_cnt\nFROM (\n  SELECT control_center, task_id AS site_name, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND control_center = 'CC-BETA')\n    AND endpoint_path LIKE '%api%'\n    AND (task_id IS NOT NULL AND task_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem'))\n    AND LOWER(client_agent) NOT LIKE '%o2tperformance%'\n  GROUP BY task_id, control_center, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Gamma') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Gamma' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY control_center, site_name\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11639000000,
+        "end_offset": 11803000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "site_name",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q196",
+      "sql": "SELECT sorter_model, conveyor_lane, SUM(cnt) AS total_cnt\nFROM (\n  SELECT sorter_model, entity_id AS conveyor_lane, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND sorter_model = 'SORT-X1')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder'))\n    AND LOWER(client_agent) NOT LIKE '%python%'\n  GROUP BY entity_id, sorter_model, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Beta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Beta' OR region_code != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY sorter_model, conveyor_lane\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11699000000,
+        "end_offset": 11863000000
+      },
+      "expected": {
+        "columns": [
+          "sorter_model",
+          "conveyor_lane",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q197",
+      "sql": "SELECT facility_zone, control_center, SUM(cnt) AS total_cnt\nFROM (\n  SELECT facility_zone, bin_code AS control_center, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND facility_zone = 'ZONE-3')\n    AND endpoint_path LIKE '%api%'\n    AND (bin_code IS NOT NULL AND bin_code != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem'))\n    AND LOWER(client_agent) NOT LIKE '%soastactp%'\n  GROUP BY bin_code, facility_zone, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'MX' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'MX') AND COUNT(*) > 1)\n) sub\nGROUP BY facility_zone, control_center\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11759000000,
+        "end_offset": 11923000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "control_center",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q198",
+      "sql": "SELECT site_name, sorter_model, SUM(cnt) AS total_cnt\nFROM (\n  SELECT site_name, entity_id AS sorter_model, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND site_name = 'DC-West')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','createcontract','updatequantity'))\n    AND LOWER(client_agent) NOT LIKE '%performancetesto2t%'\n  GROUP BY entity_id, site_name, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Gamma') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Gamma' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY site_name, sorter_model\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11819000000,
+        "end_offset": 11983000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "sorter_model",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q199",
+      "sql": "SELECT region_code, facility_zone, SUM(cnt) AS total_cnt\nFROM (\n  SELECT region_code, auth_token AS facility_zone, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND region_code = 'US')\n    AND endpoint_path LIKE '%api%'\n    AND (auth_token IS NOT NULL AND auth_token != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem'))\n    AND LOWER(client_agent) NOT LIKE '%curl%'\n  GROUP BY auth_token, region_code, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'US' AND COUNT(*) > 2)\n    OR ((org_name = 'Org-Delta' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY region_code, facility_zone\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11879000000,
+        "end_offset": 12043000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "facility_zone",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q200",
+      "sql": "SELECT control_center, conveyor_lane, SUM(cnt) AS total_cnt\nFROM (\n  SELECT control_center, entity_id AS conveyor_lane, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND control_center = 'CC-ALPHA')\n    AND endpoint_path LIKE '%api%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder'))\n    AND LOWER(client_agent) NOT LIKE '%soastactp%'\n  GROUP BY entity_id, control_center, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Alpha') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Alpha' OR region_code != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY control_center, conveyor_lane\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11939000000,
+        "end_offset": 12103000000
+      },
+      "expected": {
+        "columns": [
+          "control_center",
+          "conveyor_lane",
+          "total_cnt"
+        ],
+        "results": [
+          [
+            "CC-ALPHA",
+            "ent-001-wh",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q201",
+      "sql": "SELECT facility_zone, site_name, SUM(cnt) AS total_cnt\nFROM (\n  SELECT facility_zone, task_id AS site_name, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND facility_zone = 'ZONE-4')\n    AND endpoint_path LIKE '%api%'\n    AND (task_id IS NOT NULL AND task_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem','updatequantity'))\n    AND LOWER(client_agent) NOT LIKE '%o2tperformance%'\n  GROUP BY task_id, facility_zone, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY facility_zone, site_name\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11999000000,
+        "end_offset": 12163000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "site_name",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q202",
+      "sql": "SELECT conveyor_lane, region_code, SUM(cnt) AS total_cnt\nFROM (\n  SELECT conveyor_lane, entity_id AS region_code, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND conveyor_lane = 'LANE-B')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','createcontract'))\n    AND LOWER(client_agent) NOT LIKE '%python%'\n  GROUP BY entity_id, conveyor_lane, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Beta') AND region_code = 'CA' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Beta' OR region_code != 'CA') AND COUNT(*) > 0)\n) sub\nGROUP BY conveyor_lane, region_code\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 12059000000,
+        "end_offset": 12223000000
+      },
+      "expected": {
+        "columns": [
+          "conveyor_lane",
+          "region_code",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q203",
+      "sql": "SELECT facility_zone, sorter_model, SUM(cnt) AS total_cnt\nFROM (\n  SELECT facility_zone, entity_id AS sorter_model, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND facility_zone = 'ZONE-1')\n    AND endpoint_path LIKE '%api%'\n    AND (entity_id IS NOT NULL AND entity_id != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem'))\n    AND LOWER(client_agent) NOT LIKE '%soastactp%'\n  GROUP BY entity_id, facility_zone, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Delta') AND region_code = 'US' AND COUNT(*) > 1)\n    OR ((org_name = 'Org-Delta' OR region_code != 'US') AND COUNT(*) > 1)\n) sub\nGROUP BY facility_zone, sorter_model\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 12119000000,
+        "end_offset": 12283000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "total_cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "ent-001-wh",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q204",
+      "sql": "SELECT site_name, control_center, SUM(cnt) AS total_cnt\nFROM (\n  SELECT site_name, auth_token AS control_center, COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND site_name = 'DC-East')\n    AND endpoint_path LIKE '%orchestra%'\n    AND (auth_token IS NOT NULL AND auth_token != 'null')\n    AND (LOWER(operation_name) IN ('searchitems','updateitem','placeorder'))\n    AND LOWER(client_agent) NOT LIKE '%performancetesto2t%'\n  GROUP BY auth_token, site_name, region_code, org_name\n  HAVING ((org_name IS NULL OR org_name != 'Org-Gamma') AND region_code = 'US' AND COUNT(*) > 2)\n    OR ((org_name = 'Org-Gamma' OR region_code != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY site_name, control_center\nORDER BY total_cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 12179000000,
+        "end_offset": 12343000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "control_center",
+          "total_cnt"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
     }
   ],
-  "last_query_id": 62
+  "last_query_id": 204
 }

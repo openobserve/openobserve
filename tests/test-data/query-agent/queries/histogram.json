@@ -64,73 +64,73 @@
         ],
         "results": [
           [
-            "2026-06-03T05:17:00",
+            "2026-06-05T11:45:00",
             "ZONE-1",
             "3",
             "355.0"
           ],
           [
-            "2026-06-03T05:17:00",
+            "2026-06-05T11:45:00",
             "ZONE-2",
             "3",
             "686.67"
           ],
           [
-            "2026-06-03T05:17:00",
+            "2026-06-05T11:45:00",
             "ZONE-3",
             "2",
             "385.0"
           ],
           [
-            "2026-06-03T05:17:00",
+            "2026-06-05T11:45:00",
             "ZONE-4",
             "2",
             "582.5"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "ZONE-1",
             "3",
             "355.0"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "ZONE-2",
             "3",
             "686.67"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "ZONE-3",
             "2",
             "385.0"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "ZONE-4",
             "2",
             "582.5"
           ],
           [
-            "2026-06-03T05:19:00",
+            "2026-06-05T11:47:00",
             "ZONE-1",
             "3",
             "355.0"
           ],
           [
-            "2026-06-03T05:19:00",
+            "2026-06-05T11:47:00",
             "ZONE-2",
             "3",
             "686.67"
           ],
           [
-            "2026-06-03T05:19:00",
+            "2026-06-05T11:47:00",
             "ZONE-3",
             "1",
             "480.0"
           ],
           [
-            "2026-06-03T05:19:00",
+            "2026-06-05T11:47:00",
             "ZONE-4",
             "1",
             "555.0"
@@ -157,42 +157,42 @@
         ],
         "results": [
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "2",
             "110",
             "25.5",
             "21.65"
           ],
           [
-            "2026-06-03T05:18:30",
+            "2026-06-05T11:46:30",
             "4",
             "1105",
             "25.1",
             "71.05"
           ],
           [
-            "2026-06-03T05:19:00",
+            "2026-06-05T11:47:00",
             "2",
             "110",
             "25.5",
             "21.65"
           ],
           [
-            "2026-06-03T05:19:30",
+            "2026-06-05T11:47:30",
             "4",
             "1105",
             "25.1",
             "71.05"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:48:00",
             "2",
             "110",
             "25.5",
             "21.65"
           ],
           [
-            "2026-06-03T05:20:30",
+            "2026-06-05T11:48:30",
             "2",
             "355",
             "22.75",
@@ -220,42 +220,42 @@
         ],
         "results": [
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "auto",
             "1",
             "3",
             "4"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "hybrid",
             "2",
             "0",
             "2"
           ],
           [
-            "2026-06-03T05:18:00",
+            "2026-06-05T11:46:00",
             "manual",
             "3",
             "1",
             "4"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:48:00",
             "auto",
             "1",
             "5",
             "6"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:48:00",
             "hybrid",
             "4",
             "0",
             "4"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:48:00",
             "manual",
             "6",
             "2",
@@ -283,39 +283,53 @@
         ],
         "results": [
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:45:00",
             "SORT-A7",
-            "9",
+            "6",
             "320.0",
             "900.0"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:45:00",
             "SORT-X1",
-            "9",
+            "6",
             "150.0",
             "725.0"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:45:00",
             "SORT-Z9",
             "2",
             "610.0",
             "610.0"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:45:00",
             "SORT-Q5",
-            "3",
+            "2",
             "555.0",
             "555.0"
           ],
           [
-            "2026-06-03T05:20:00",
+            "2026-06-05T11:45:00",
             "SORT-M3",
-            "5",
+            "4",
             "290.0",
             "480.0"
+          ],
+          [
+            "2026-06-05T11:50:00",
+            "SORT-A7",
+            "3",
+            "320.0",
+            "900.0"
+          ],
+          [
+            "2026-06-05T11:50:00",
+            "SORT-X1",
+            "3",
+            "150.0",
+            "725.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -371,19 +385,19 @@
         ],
         "results": [
           [
-            "2026-06-03T05:22:00",
+            "2026-06-05T11:50:00",
             "10",
             "8",
             "4"
           ],
           [
-            "2026-06-03T05:23:00",
+            "2026-06-05T11:51:00",
             "10",
             "8",
             "4"
           ],
           [
-            "2026-06-03T05:24:00",
+            "2026-06-05T11:52:00",
             "8",
             "6",
             "4"
@@ -410,115 +424,59 @@
         ],
         "results": [
           [
-            "2026-06-03T05:21:00",
+            "2026-06-05T11:51:00",
             "LANE-B",
             "manual",
-            "2",
+            "6",
             "3.5"
           ],
           [
-            "2026-06-03T05:21:00",
+            "2026-06-05T11:51:00",
             "LANE-A",
             "auto",
-            "2",
+            "6",
             "1.5"
           ],
           [
-            "2026-06-03T05:21:00",
+            "2026-06-05T11:51:00",
             "LANE-D",
             "manual",
-            "1",
+            "3",
             "3.0"
           ],
           [
-            "2026-06-03T05:21:00",
+            "2026-06-05T11:51:00",
+            "LANE-C",
+            "hybrid",
+            "3",
+            "3.0"
+          ],
+          [
+            "2026-06-05T11:51:00",
             "LANE-B",
             "hybrid",
-            "1",
+            "3",
             "4.0"
           ],
           [
-            "2026-06-03T05:21:00",
-            "LANE-C",
-            "hybrid",
-            "1",
-            "3.0"
-          ],
-          [
-            "2026-06-03T05:21:00",
-            "LANE-D",
-            "auto",
-            "1",
-            "1.0"
-          ],
-          [
-            "2026-06-03T05:21:00",
-            "LANE-C",
-            "auto",
-            "1",
-            "1.0"
-          ],
-          [
-            "2026-06-03T05:21:00",
+            "2026-06-05T11:51:00",
             "LANE-A",
             "manual",
-            "1",
+            "3",
             "2.0"
           ],
           [
-            "2026-06-03T05:24:00",
-            "LANE-A",
-            "auto",
-            "4",
-            "1.5"
-          ],
-          [
-            "2026-06-03T05:24:00",
-            "LANE-B",
-            "manual",
-            "4",
-            "3.5"
-          ],
-          [
-            "2026-06-03T05:24:00",
-            "LANE-A",
-            "manual",
-            "2",
-            "2.0"
-          ],
-          [
-            "2026-06-03T05:24:00",
+            "2026-06-05T11:51:00",
             "LANE-D",
-            "manual",
-            "2",
-            "3.0"
-          ],
-          [
-            "2026-06-03T05:24:00",
-            "LANE-B",
-            "hybrid",
-            "2",
-            "4.0"
-          ],
-          [
-            "2026-06-03T05:24:00",
-            "LANE-C",
-            "hybrid",
-            "2",
-            "3.0"
-          ],
-          [
-            "2026-06-03T05:24:00",
-            "LANE-C",
             "auto",
-            "1",
+            "2",
             "1.0"
           ],
           [
-            "2026-06-03T05:24:00",
-            "LANE-D",
+            "2026-06-05T11:51:00",
+            "LANE-C",
             "auto",
-            "1",
+            "2",
             "1.0"
           ]
         ],
@@ -542,7 +500,7 @@
         ],
         "results": [
           [
-            "2026-06-03T05:24:00",
+            "2026-06-05T11:52:00",
             "11",
             "9",
             "23.13"
@@ -568,67 +526,67 @@
         ],
         "results": [
           [
-            "2026-06-03T05:25:00",
+            "2026-06-05T11:53:00",
             "3",
             "1.4",
             "295.4"
           ],
           [
-            "2026-06-03T05:25:15",
+            "2026-06-05T11:53:15",
             "2",
             "1.9",
             "91.92"
           ],
           [
-            "2026-06-03T05:25:30",
+            "2026-06-05T11:53:30",
             "3",
             "2.667",
             "227.16"
           ],
           [
-            "2026-06-03T05:25:45",
+            "2026-06-05T11:53:45",
             "2",
             "1.4",
             "226.27"
           ],
           [
-            "2026-06-03T05:26:00",
+            "2026-06-05T11:54:00",
             "3",
             "1.4",
             "295.4"
           ],
           [
-            "2026-06-03T05:26:15",
+            "2026-06-05T11:54:15",
             "2",
             "1.9",
             "91.92"
           ],
           [
-            "2026-06-03T05:26:30",
+            "2026-06-05T11:54:30",
             "3",
             "2.667",
             "227.16"
           ],
           [
-            "2026-06-03T05:26:45",
+            "2026-06-05T11:54:45",
             "2",
             "1.4",
             "226.27"
           ],
           [
-            "2026-06-03T05:27:00",
+            "2026-06-05T11:55:00",
             "3",
             "1.4",
             "295.4"
           ],
           [
-            "2026-06-03T05:27:15",
+            "2026-06-05T11:55:15",
             "2",
             "1.9",
             "91.92"
           ],
           [
-            "2026-06-03T05:27:30",
+            "2026-06-05T11:55:30",
             "3",
             "2.667",
             "227.16"
@@ -639,6 +597,221 @@
       "time_offset": {
         "start_offset": 5519000000,
         "end_offset": 5683000000
+      }
+    },
+    {
+      "id": "Q239",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  facility_zone,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'SearchItems')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu') OR entity_id IS NULL))\n  AND (load_factor > 20)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY facility_zone, operation_name, build_version,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14279000000,
+        "end_offset": 14443000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "facility_zone",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q240",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  control_center,\n  COALESCE(site_name, 'N/A') AS site_name_display,\n  COALESCE(region_code, 'N/A') AS region_code_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'UpdateItem')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'invalid')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((task_id NOT IN ('ORD-003','ORD-005') OR task_id IS NULL))\n  AND (throughput_rate > 200)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY control_center, site_name, region_code,\n  (_timestamp - (_timestamp % 3600000000)), task_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14339000000,
+        "end_offset": 14503000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "control_center",
+          "site_name_display",
+          "region_code_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q241",
+      "sql": "SELECT (_timestamp - (_timestamp % 7200000000)) AS time_bucket,\n  site_name,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'PlaceOrder')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((auth_token NOT IN ('') OR auth_token IS NULL))\n  AND (load_factor > 30)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY site_name, operation_name, build_version,\n  (_timestamp - (_timestamp % 7200000000)), auth_token\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14399000000,
+        "end_offset": 14563000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "site_name",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q242",
+      "sql": "SELECT (_timestamp - (_timestamp % 1800000000)) AS time_bucket,\n  sorter_model,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(control_center, 'N/A') AS control_center_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'searchItems')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-yza','CID-mno') OR entity_id IS NULL))\n  AND (charge_remaining > 20)\n  AND (auth_result IS NULL OR auth_result NOT LIKE '%Allowlisted%')\nGROUP BY sorter_model, operation_name, control_center,\n  (_timestamp - (_timestamp % 1800000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14459000000,
+        "end_offset": 14623000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "sorter_model",
+          "operation_name_display",
+          "control_center_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q243",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  conveyor_lane,\n  COALESCE(region_code, 'N/A') AS region_code_display,\n  COALESCE(site_name, 'N/A') AS site_name_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'DeleteItem')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'invalid')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((task_id NOT IN ('ORD-001','ORD-004') OR task_id IS NULL))\n  AND (load_factor > 15)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY conveyor_lane, region_code, site_name,\n  (_timestamp - (_timestamp % 3600000000)), task_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14519000000,
+        "end_offset": 14683000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "conveyor_lane",
+          "region_code_display",
+          "site_name_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q244",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  region_code,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'CreateContract')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu','CID-yza') OR entity_id IS NULL))\n  AND (load_factor > 25)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY region_code, operation_name, build_version,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14579000000,
+        "end_offset": 14743000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "region_code",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q245",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  facility_zone,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (http_method = 'GET')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu') OR entity_id IS NULL))\n  AND (load_factor > 20)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY facility_zone, operation_name, build_version,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14639000000,
+        "end_offset": 14803000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "facility_zone",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [
+          [
+            "1780668000000000",
+            "ZONE-1",
+            "RerouteTrack",
+            "v2.2.0",
+            "3"
+          ],
+          [
+            "1780668000000000",
+            "ZONE-1",
+            "RetryScan",
+            "v2.0.8",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q246",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  control_center,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(site_name, 'N/A') AS site_name_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'UpdateQuantity')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu') OR entity_id IS NULL))\n  AND (load_factor > 10)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY control_center, operation_name, site_name,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14699000000,
+        "end_offset": 14863000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "control_center",
+          "operation_name_display",
+          "site_name_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q247",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  site_name,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'searchItems')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'invalid')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu') OR entity_id IS NULL))\n  AND (throughput_rate > 200)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY site_name, operation_name, build_version,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14759000000,
+        "end_offset": 14923000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "site_name",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q248",
+      "sql": "SELECT (_timestamp - (_timestamp % 3600000000)) AS time_bucket,\n  sorter_model,\n  COALESCE(operation_name, 'N/A') AS operation_name_display,\n  COALESCE(build_version, 'N/A') AS build_version_display,\n  COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE (operation_name = 'PlaceOrder')\n  AND (guard_mode <> 'true')\n  AND (auth_result <> 'timeout')\n  AND (guard_mode <> '')\n  AND (guard_mode IS NOT NULL)\n  AND ((entity_id NOT IN ('CID-ghi','CID-stu') OR entity_id IS NULL))\n  AND (load_factor > 20)\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nGROUP BY sorter_model, operation_name, build_version,\n  (_timestamp - (_timestamp % 3600000000)), entity_id\nHAVING (COUNT(*) > 0)\nORDER BY row_count DESC\nLIMIT 10",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 14819000000,
+        "end_offset": 14983000000
+      },
+      "expected": {
+        "columns": [
+          "time_bucket",
+          "sorter_model",
+          "operation_name_display",
+          "build_version_display",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
       }
     }
   ],
