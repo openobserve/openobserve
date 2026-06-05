@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="show"
             ref="dashboardChartsRef"
             :viewOnly="true"
+            :frame="false"
             :dashboardData="dashboardData || {}"
             :currentTimeObj="currentTimeObj"
             :allowAlertCreation="false"
