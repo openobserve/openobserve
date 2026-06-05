@@ -594,12 +594,12 @@ describe("AddStream", () => {
       // Simulate OInput emitting update:modelValue (as it does on user input)
       const oInputs = wrapper.findAllComponents({ name: "OInput" });
       expect(oInputs.length).toBeGreaterThanOrEqual(1);
-      await oInputs[0].vm.$emit("update:modelValue", "updated-name");
+      await oInputs[0].vm.$emit("update:modelValue", "updated_name");
       await flushPromises();
 
       // v-model setter should update streamInputs.name
-      expect(vm.streamInputs.name).toBe("updated-name");
-      // @update:model-value handler should clear the error
+      expect(vm.streamInputs.name).toBe("updated_name");
+      // @update:model-value handler validates and clears the error for a valid name
       expect(vm.nameError).toBe("");
     });
 
@@ -613,10 +613,10 @@ describe("AddStream", () => {
 
       const oInputs = wrapper.findAllComponents({ name: "OInput" });
       expect(oInputs.length).toBeGreaterThanOrEqual(1);
-      await oInputs[0].vm.$emit("update:modelValue", "pipeline-name");
+      await oInputs[0].vm.$emit("update:modelValue", "pipeline_name");
       await flushPromises();
 
-      expect(vm.streamInputs.name).toBe("pipeline-name");
+      expect(vm.streamInputs.name).toBe("pipeline_name");
       expect(vm.nameError).toBe("");
     });
 

@@ -273,7 +273,11 @@ const validateStream = () => {
   }
   // Fields are optional, but any field that has been added must pass the
   // name/data-type validation in the child before the stream can be saved.
-  if (fieldInputsRef.value && !fieldInputsRef.value.validate()) {
+  if (
+    fieldInputsRef.value &&
+    typeof fieldInputsRef.value.validate === "function" &&
+    !fieldInputsRef.value.validate()
+  ) {
     valid = false;
   }
   return valid;
