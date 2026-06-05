@@ -1,0 +1,13 @@
+{
+  "name": "openobserve-ai-review",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-agent AI code review system for OpenObserve PRs",
+  "type": "module",
+  "scripts": {
+    "review": "node run-review.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
