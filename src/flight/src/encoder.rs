@@ -110,7 +110,11 @@ fn split_batch_for_grpc_response(
     let size = batch
         .columns()
         .iter()
-        .map(|col| col.get_buffer_memory_size())
+        .map(|col| {
+            col.to_data()
+                .get_slice_memory_size()
+                .unwrap_or_else(|_| col.get_buffer_memory_size())
+        })
         .sum::<usize>();
 
     let n_batches = (size / max_flight_data_size
@@ -215,10 +219,13 @@ mod tests {
     use std::sync::Arc;
 
     use arrow::{
-        array::{Int32Array, StringArray},
+        array::{
+            ArrayRef, BinaryArray, Int32Array, ListArray, StringArray, StringViewArray, StructArray,
+        },
+        buffer::OffsetBuffer,
         ipc::writer::IpcWriteOptions,
     };
-    use arrow_schema::{DataType, Field, Schema};
+    use arrow_schema::{DataType, Field, Fields, Schema};
     use config::meta::search::ScanStats;
 
     use super::*;
@@ -399,7 +406,11 @@ mod tests {
         let size = batch
             .columns()
             .iter()
-            .map(|col| col.get_buffer_memory_size())
+            .map(|col| {
+                col.to_data()
+                    .get_slice_memory_size()
+                    .unwrap_or_else(|_| col.get_buffer_memory_size())
+            })
             .sum::<usize>();
 
         let max_size = size / 2; // Should create 2 batches
@@ -407,6 +418,149 @@ mod tests {
 
         // Should create at least 2 batches due to splitting
         assert!(batches.len() >= 2);
+    }
+
+    #[test]
+    fn test_split_batch_sliced_array_no_overestimate() {
+        // Simulate what aggregateExec does: create a large batch then slice a small
+        // portion of it. get_buffer_memory_size() on the slice returns the full
+        // backing-buffer size, which caused over-splitting. The fix uses
+        // get_slice_memory_size() to measure only the used portion.
+        let schema = Arc::new(create_test_schema());
+        let large_id = Arc::new(Int32Array::from((0..1000_i32).collect::<Vec<_>>()));
+        let large_name = Arc::new(StringArray::from(
+            (0..1000).map(|i| format!("name_{i}")).collect::<Vec<_>>(),
+        ));
+        let large_batch = RecordBatch::try_new(schema, vec![large_id, large_name]).unwrap();
+
+        // Slice to 5 rows — backing buffer still holds 1000 rows
+        let small_batch = large_batch.slice(0, 5);
+
+        // max_size large enough that 5 rows should never need splitting
+        let slice_size: usize = small_batch
+            .columns()
+            .iter()
+            .map(|col| {
+                col.to_data()
+                    .get_slice_memory_size()
+                    .unwrap_or_else(|_| col.get_buffer_memory_size())
+            })
+            .sum();
+        let max_size = slice_size + 1;
+
+        let batches = split_batch_for_grpc_response(small_batch, max_size);
+        assert_eq!(
+            batches.len(),
+            1,
+            "sliced batch should not be over-split due to backing-buffer overestimation"
+        );
+    }
+
+    fn assert_large_splits_slice_does_not(batch: RecordBatch, n_slice: usize) {
+        let measure = |b: &RecordBatch| -> usize {
+            b.columns()
+                .iter()
+                .map(|col| {
+                    col.to_data()
+                        .get_slice_memory_size()
+                        .unwrap_or_else(|_| col.get_buffer_memory_size())
+                })
+                .sum()
+        };
+
+        let small = batch.slice(0, n_slice);
+        let full_size = measure(&batch);
+        let slice_size = measure(&small);
+        assert!(
+            full_size > slice_size,
+            "pre-condition: full batch must be larger than slice"
+        );
+        let max_size = (slice_size + full_size) / 2;
+
+        let large_out = split_batch_for_grpc_response(batch.clone(), max_size);
+        assert!(large_out.len() > 1);
+        assert_eq!(
+            large_out.iter().map(|b| b.num_rows()).sum::<usize>(),
+            batch.num_rows()
+        );
+
+        let small_out = split_batch_for_grpc_response(small, max_size);
+        assert_eq!(small_out.len(), 1);
+    }
+
+    #[test]
+    fn test_split_batch_utf8() {
+        let schema = Arc::new(Schema::new(vec![Field::new("text", DataType::Utf8, true)]));
+        let strings: Vec<Option<String>> = (0..100).map(|i| Some(format!("word_{i:04}"))).collect();
+        let arr: ArrayRef = Arc::new(StringArray::from(
+            strings.iter().map(|s| s.as_deref()).collect::<Vec<_>>(),
+        ));
+        let batch = RecordBatch::try_new(schema, vec![arr]).unwrap();
+        assert_large_splits_slice_does_not(batch, 5);
+    }
+
+    #[test]
+    fn test_split_batch_utf8view() {
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "text",
+            DataType::Utf8View,
+            true,
+        )]));
+        let strings: Vec<Option<String>> = (0..100)
+            .map(|i| Some(format!("longer_string_{i:04}")))
+            .collect();
+        let arr: ArrayRef = Arc::new(StringViewArray::from(
+            strings.iter().map(|s| s.as_deref()).collect::<Vec<_>>(),
+        ));
+        let batch = RecordBatch::try_new(schema, vec![arr]).unwrap();
+        assert_large_splits_slice_does_not(batch, 5);
+    }
+
+    #[test]
+    fn test_split_batch_struct_with_binary() {
+        let bin_field = Field::new("payload", DataType::Binary, true);
+        let child_fields = Fields::from(vec![bin_field]);
+        let struct_field = Field::new("row", DataType::Struct(child_fields.clone()), true);
+        let schema = Arc::new(Schema::new(vec![struct_field]));
+
+        let bin_data: Vec<Option<&[u8]>> =
+            (0..100).map(|_| Some(b"binary_payload".as_ref())).collect();
+        let bin_col: ArrayRef = Arc::new(BinaryArray::from(bin_data));
+        let struct_col: ArrayRef = Arc::new(StructArray::new(child_fields, vec![bin_col], None));
+        let batch = RecordBatch::try_new(schema, vec![struct_col]).unwrap();
+        assert_large_splits_slice_does_not(batch, 5);
+    }
+
+    #[test]
+    fn test_split_batch_list_with_utf8view() {
+        let item_field = Arc::new(Field::new("item", DataType::Utf8View, true));
+        let list_field = Field::new("texts", DataType::List(Arc::clone(&item_field)), false);
+        let schema = Arc::new(Schema::new(vec![list_field]));
+
+        // 100 rows, 2 items each → 200 values
+        let values: ArrayRef = Arc::new(StringViewArray::from(
+            (0..200_usize).map(|i| format!("v{i}")).collect::<Vec<_>>(),
+        ));
+        let offsets = OffsetBuffer::from_lengths(std::iter::repeat(2).take(100));
+        let list_col: ArrayRef = Arc::new(ListArray::new(item_field, offsets, values, None));
+        let batch = RecordBatch::try_new(schema, vec![list_col]).unwrap();
+        assert_large_splits_slice_does_not(batch, 5);
+    }
+
+    #[test]
+    fn test_split_batch_list_with_utf8() {
+        let item_field = Arc::new(Field::new("item", DataType::Utf8, true));
+        let list_field = Field::new("words", DataType::List(Arc::clone(&item_field)), false);
+        let schema = Arc::new(Schema::new(vec![list_field]));
+
+        // 100 rows, 2 words each → 200 values
+        let values: ArrayRef = Arc::new(StringArray::from(
+            (0..200_usize).map(|i| format!("w{i}")).collect::<Vec<_>>(),
+        ));
+        let offsets = OffsetBuffer::from_lengths(std::iter::repeat(2).take(100));
+        let list_col: ArrayRef = Arc::new(ListArray::new(item_field, offsets, values, None));
+        let batch = RecordBatch::try_new(schema, vec![list_col]).unwrap();
+        assert_large_splits_slice_does_not(batch, 5);
     }
 
     #[test]

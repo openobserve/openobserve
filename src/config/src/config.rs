@@ -805,8 +805,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 32,
+        help = "Max grpc message size in MB, default is 32 MB"
     )]
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
