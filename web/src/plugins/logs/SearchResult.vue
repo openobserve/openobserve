@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Patterns List -->
           <PatternList
             :patterns="patternsState?.patterns?.patterns || []"
-            :loading="searchObj.loading"
+            :loading="patternsState?.loading"
             :totalLogsAnalyzed="
               patternsState?.patterns?.statistics?.total_logs_analyzed
             "
