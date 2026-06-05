@@ -704,6 +704,17 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     },
   );
 
+  // On query tab switch, restore the active query's VRL field list into the
+  // shared meta view from the per-query cache (meta.queryFields — the canonical
+  // source), so the Fields panel reflects the current query's VRL fields.
+  watch(
+    () => dashboardPanelData.layout.currentQueryIndex,
+    (idx) => {
+      dashboardPanelData.meta.stream.vrlFunctionFieldList =
+        dashboardPanelData.meta.queryFields?.[idx]?.vrlFunctionFieldList ?? [];
+    },
+  );
+
   // Watch loading state - update disable
   watch(variablesAndPanelsDataLoadingState, () => {
     const panelsValues = Object.values(

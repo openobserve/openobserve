@@ -1127,8 +1127,13 @@ export default defineComponent({
           // slot per panel query, default []) so the consumer's
           // Array.isArray(fieldList[0]) format check and forEach both see every
           // index even when a query returned no rows.
-          const totalQueries =
-            panelSchema.value?.queries?.length ?? data.value.length;
+          // Size the array to cover BOTH the panel's queries and the actual
+          // data results (data.value can have more entries than panel queries,
+          // e.g. time-shift expansion), so no query's fields are dropped.
+          const totalQueries = Math.max(
+            panelSchema.value?.queries?.length ?? 0,
+            data.value.length,
+          );
           const perQueryFields: string[][] = Array.from(
             { length: totalQueries },
             () => [],
