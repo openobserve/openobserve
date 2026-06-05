@@ -533,9 +533,9 @@
     "ingestion_limit": "Yutma Sınırı",
     "today_usage": "Bugünün Kullanımı",
     "feature_comparision_ent_msg": "Aşağıda listelenen tüm gelişmiş özelliklere erişebilen OpenObserve Enterprise Edition'ı kullanıyorsunuz.",
-    "feature_comparision_plan_detail": "Planınız: Enterprise Edition, 200 GB/güne (~ 6 TB/ay) kadar veri alımı için ücretsizdir.",
+    "feature_comparision_plan_detail": "Planınız: Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için ücretsizdir.",
     "feature_comparision_os_msg": "Şu anda OpenObserve Open Source Edition kullanıyorsunuz. Aşağıdaki karşılaştırma tablosunda listelenen gelişmiş özelliklerin kilidini açmak için Enterprise Edition'a yükseltin.",
-    "feature_comparision_good_news": "İyi haber: OpenObserve Enterprise Edition, 200 GB/güne (~ 6 TB/ay) kadar veri alımı için tamamen ücretsizdir.",
+    "feature_comparision_good_news": "İyi haber: OpenObserve Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için tamamen ücretsizdir.",
     "commit_lbl": "Taahhüt",
     "build_lbl": "Oluşturulmuş",
     "no_license_installed_lbl": "Yüklü Lisans Yok",
@@ -590,14 +590,14 @@
     "value_support_enterprise": "Kurumsal",
     "value_support_cloud": "Bulut",
     "value_cost_free": "Bedava",
-    "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 200 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
+    "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 50 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
     "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir",
     "feature_comparison_lbl": "Özellik Karşılaştırması",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Kurumsal Özellikler",
         "offer_text": "OpenObservere'i kendi kendinize barındırırken tüm kurumsal özellikleri tamamen ücretsiz edinin",
-        "badge_text": "200GB/güne kadar ücretsiz",
+        "badge_text": "50GB/güne kadar ücretsiz",
         "features_title": "OpenObserve Bulut Özellikleri",
         "features_subtitle": "Bulut aboneliğinize dahil olan tüm özellikler",
         "primary_button_text": "Şimdi İndirin"
@@ -605,11 +605,11 @@
       "enterprise_without_license": {
         "hero_title": "Kurumsal Özellikler",
         "offer_text": "OpenObserve dağıtımınızı en üst düzeye çıkarmak için ücretsiz bir lisans isteyin",
-        "badge_text": "{kota} GB/güne kadar ücretsiz",
+        "badge_text": "{quota} GB/güne kadar ücretsiz",
         "features_title": "Kullanılabilir Kurumsal Özellikler",
         "features_subtitle": "Sınırsız yeteneklerin kilidini açmak için ücretsiz bir lisans alın",
         "primary_button_text": "Ücretsiz Lisans Alın",
-        "license_note": "Lisanssız 100GB/gün • Lisanslı 200GB/gün"
+        "license_note": "Lisanssız 50GB/gün • Lisanslı 50GB/gün"
       },
       "enterprise_with_license": {
         "hero_title": "Kurumsal Sürümünüz",
@@ -623,7 +623,7 @@
       "open_source": {
         "hero_title": "Enterprise Edition'ı edinin",
         "offer_text": "Tüm kurumsal özellikleri tamamen ücretsiz indirin ve kilidini açın",
-        "badge_text": "200GB/güne kadar ücretsiz",
+        "badge_text": "50GB/güne kadar ücretsiz",
         "features_title": "Tüm Kurumsal Özelliklerin Kilidini Açın",
         "features_subtitle": "Üretime hazır gözlemlenebilirlik için ihtiyacınız olan her şey",
         "primary_button_text": "Şimdi İndirin"
@@ -3189,7 +3189,8 @@
         "cost": "Maliyet",
         "spans": "Açıklıklar"
       }
-    }
+    },
+    "openInFullView": "Tam görünümde aç"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
