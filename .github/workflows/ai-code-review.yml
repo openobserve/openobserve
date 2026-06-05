@@ -1,0 +1,88 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: string
+      force_full:
+        description: "Force full review tier (ignore risk assessment)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for skip marker
+        id: skip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "skip_review=false" >> "$GITHUB_OUTPUT"
+            echo "force_full=${{ github.event.inputs.force_full || 'false' }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check PR body and comments for skip markers
+          PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body' 2>/dev/null || echo "")
+          COMMENTS=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" --jq '.[].body' 2>/dev/null || echo "")
+
+          if echo "$PR_BODY$COMMENTS" | grep -qiE '\[skip (ai )?review\]|\[skip ci\]|break glass'; then
+            echo "Skip marker found. Skipping AI review."
+            echo "skip_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_review=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "force_full=false" >> "$GITHUB_OUTPUT"
+
+      - name: Run AI Code Review
+        if: steps.skip.outputs.skip_review == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          FORCE_FULL: ${{ steps.skip.outputs.force_full }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: node scripts/ai-review/run-review.mjs
+
+      - name: Log skip
+        if: steps.skip.outputs.skip_review == 'true'
+        run: echo "AI Code Review skipped due to skip marker or break glass"
