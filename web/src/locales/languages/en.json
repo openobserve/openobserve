@@ -4817,6 +4817,8 @@
     "mac": "Mac",
     "windowsLinux": "Windows / Linux",
     "toggleHint": "to toggle this panel",
+    "search": "Search shortcuts...",
+    "noResults": "No shortcuts found",
     "pages": {
       "global": "Global",
       "logs": "Logs",

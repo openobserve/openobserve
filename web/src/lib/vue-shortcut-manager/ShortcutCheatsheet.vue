@@ -1,22 +1,39 @@
+// Copyright 2026 OpenObserve Inc.
 <template>
   <ODialog
     v-model:open="open"
     :title="t('shortcuts.title')"
-    size="sm"
-    :max-height="65"
+    size="xl"
     data-test="shortcut-cheatsheet-dialog"
   >
-    <!-- Platform label -->
+    <!-- Search + platform label row -->
+    <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
+      <OSearchInput
+        v-model="search"
+        :placeholder="t('shortcuts.search')"
+        class="tw:flex-1"
+        data-test="shortcut-cheatsheet-search"
+      />
+      <span
+        style="font-size: 11px; white-space: nowrap"
+        class="tw:text-[var(--o2-text-secondary)]"
+      >
+        {{ isMac ? t("shortcuts.mac") : t("shortcuts.windowsLinux") }}
+      </span>
+    </div>
+
+    <!-- No results -->
     <div
-      style="font-size: 11px; margin-bottom: 8px"
-      class="tw:text-[var(--o2-text-secondary)]"
+      v-if="filteredRegistry.length === 0"
+      class="tw:text-center tw:py-8 tw:text-[13px] tw:text-[var(--o2-text-secondary)]"
+      data-test="shortcut-cheatsheet-no-results"
     >
-      {{ isMac ? t("shortcuts.mac") : t("shortcuts.windowsLinux") }}
+      {{ t("shortcuts.noResults") }}
     </div>
 
     <!-- Shortcut groups -->
     <div
-      v-for="group in SHORTCUT_REGISTRY"
+      v-for="group in filteredRegistry"
       :key="group.pageKey"
       class="tw:mb-2"
     >
@@ -50,7 +67,7 @@
       </ul>
     </div>
 
-    <!-- Sticky footer via ODialog's #footer slot -->
+    <!-- Sticky footer -->
     <template #footer>
       <div
         class="tw:text-[11px] tw:text-center tw:text-[var(--o2-text-secondary)]"
@@ -70,9 +87,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY } from "./shortcutRegistry";
 
@@ -93,13 +111,31 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-// Two-way binding
 const open = computed({
   get: () => props.open,
   set: (val) => emit("update:open", val),
 });
 
-// Keyboard shortcut to toggle
+const search = ref("");
+
+// Clear search when dialog closes
+watch(open, (val) => {
+  if (!val) search.value = "";
+});
+
+const filteredRegistry = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return SHORTCUT_REGISTRY;
+  return SHORTCUT_REGISTRY.flatMap((group) => {
+    const shortcuts = group.shortcuts.filter(
+      (s) =>
+        t(s.descriptionKey).toLowerCase().includes(q) ||
+        s.key.toLowerCase().includes(q),
+    );
+    return shortcuts.length ? [{ ...group, shortcuts }] : [];
+  });
+});
+
 useShortcut(
   props.toggleKey,
   () => {
