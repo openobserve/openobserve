@@ -100,9 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width="100%"
                 :show-global-filter="false"
                 :default-columns="false"
+                :enable-column-resize="true"
+                :persist-columns="true"
+                table-id="alerts-alert-list"
                 @row-click="triggerExpand"
               >
-                <!-- Toolbar: alert-type filter + search + folder scope. -->
+                <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
                 <template #toolbar>
                   <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
                     <OToggleGroup
@@ -126,30 +129,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("alerts.anomalyDetection") }}
                       </OToggleGroupItem>
                     </OToggleGroup>
-                    <OSearchInput
-                      v-model="dynamicQueryModel"
-                      :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-                      data-test="alert-list-search-input"
-                      @clear="clearSearchHistory"
-                      class="tw:ml-auto tw:w-50"
+                    <div class="tw:flex-1 tw:min-w-0">
+                      <OInput
+                        v-model="dynamicQueryModel"
+                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
+                        :clearable="searchAcrossFolders"
+                        @clear="clearSearchHistory"
+                        data-test="alert-list-search-input"
+                        class="tw:w-full"
+                      >
+                        <template #icon-left>
+                          <OIcon name="search" size="sm" />
+                        </template>
+                        <template #icon-right>
+                          <div
+                            role="radiogroup"
+                            aria-label="Search scope"
+                            class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
+                          >
+                            <button
+                              type="button"
+                              role="radio"
+                              :aria-checked="!searchAcrossFolders"
+                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                              :class="!searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                              data-test="alert-list-search-scope-current"
+                              title="Search only this folder"
+                              @click="searchAcrossFolders = false"
+                            >
+                              <OIcon name="folder-outline" size="xs" />
+                              <span class="tw:whitespace-nowrap">This folder</span>
+                            </button>
+                            <button
+                              type="button"
+                              role="radio"
+                              :aria-checked="searchAcrossFolders"
+                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                              :class="searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                              data-test="alert-list-search-across-folders-toggle"
+                              title="Search across all folders"
+                              @click="searchAcrossFolders = true"
+                            >
+                              <OIcon name="search" size="xs" />
+                              <span class="tw:whitespace-nowrap">All folders</span>
+                            </button>
+                          </div>
+                        </template>
+                      </OInput>
+                    </div>
+                    <OButton
+                      variant="outline"
+                      size="icon-sm"
+                      icon-left="refresh"
+                      :loading="loading"
+                      title="Reload alerts"
+                      data-test="alert-list-refresh-btn"
+                      @click="refreshAlerts"
                     />
-                    <OSwitch
-                      data-test="alert-list-search-across-folders-toggle"
-                      v-model="searchAcrossFolders"
-                      size="lg"
-                      class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
-                    >
-                      <template #label><span class="tw:whitespace-nowrap">{{ t('dashboard.allFolders') }}</span></template>
-                      <template #tooltip>
-                        <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" />
-                      </template>
-                    </OSwitch>
                   </div>
                 </template>
 
 
                 <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
@@ -168,10 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       class="tw:text-gray-400 tw:shrink-0"
                     />
-                    <span>{{ computedName(row.name) }}</span>
+                    <span class="tw:truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
-                    v-if="row.name?.length > 30"
+                    v-if="row.name"
                     :content="row.name"
                     content-class="alert-name-tooltip"
                   />
@@ -663,8 +705,6 @@ import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
@@ -703,8 +743,6 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OInput,
-    OSearchInput,
-    OSwitch,
     OTooltip,
     SelectFolderDropDown,
     AlertHistoryDrawer,
@@ -912,53 +950,9 @@ export default defineComponent({
 
     const filteredResults: Ref<any[]> = ref([]);
 
-    // ── Anomaly polling ──────────────────────────────────────────────────────
-    // Statuses that mean the anomaly job is done — no need to keep polling
-    const ANOMALY_TERMINAL_STATUSES = ["failed", "active", "completed"];
-
-    const hasNonTerminalAnomalyRows = computed(
-      () =>
-        activeTab.value === "anomalyDetection" &&
-        filteredResults.value.some(
-          (row: any) =>
-            row.type === "anomaly" &&
-            !ANOMALY_TERMINAL_STATUSES.includes(row.status),
-        ),
-    );
-
-    let anomalyPollingTimer: ReturnType<typeof setInterval> | null = null;
-
-    const stopAnomalyPolling = () => {
-      if (anomalyPollingTimer !== null) {
-        clearInterval(anomalyPollingTimer);
-        anomalyPollingTimer = null;
-      }
-    };
-
-    const startAnomalyPolling = () => {
-      if (anomalyPollingTimer !== null) return; // already running
-      anomalyPollingTimer = setInterval(async () => {
-        if (!hasNonTerminalAnomalyRows.value) {
-          stopAnomalyPolling();
-          return;
-        }
-        await getAlertsFn(store, activeFolderId.value);
-      }, 10000);
-    };
-
-    watch(hasNonTerminalAnomalyRows, (hasNonTerminal) => {
-      if (hasNonTerminal) {
-        startAnomalyPolling();
-      } else {
-        stopAnomalyPolling();
-      }
-    });
-    // ── End anomaly polling ──────────────────────────────────────────────────
-
     onBeforeUnmount(() => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("click", handleClickOutside, true);
-      stopAnomalyPolling();
     });
 
     const activeFolderToMove = ref("default");
@@ -1009,6 +1003,8 @@ export default defineComponent({
           accessorKey: "name",
           header: t("alerts.name"),
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 250,
           minSize: 200,
           meta: { align: "left" },
@@ -1019,6 +1015,8 @@ export default defineComponent({
           header: t("alerts.owner"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1031,6 +1029,8 @@ export default defineComponent({
                 header: t("alerts.period"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "center" },
               } as OTableColumnDef,
@@ -1045,6 +1045,8 @@ export default defineComponent({
                 header: t("alerts.frequency"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1056,6 +1058,8 @@ export default defineComponent({
           header: t("alerts.lastTriggered"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1065,6 +1069,8 @@ export default defineComponent({
           header: t("alerts.lastSatisfied"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1077,6 +1083,8 @@ export default defineComponent({
                 header: "Last Trained At",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1086,6 +1094,8 @@ export default defineComponent({
                 header: "Status",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 120,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1109,6 +1119,8 @@ export default defineComponent({
           header: "Folder",
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "center" },
         } as OTableColumnDef);
@@ -1439,6 +1451,15 @@ export default defineComponent({
         // "all" — show everything
         filteredResults.value = allAlerts.value;
       }
+    };
+
+    const refreshAlerts = async () => {
+      if (searchAcrossFolders.value && searchQuery.value) {
+        await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+      } else {
+        await getAlertsFn(store, activeFolderId.value);
+      }
+      filterAlertsByTab();
     };
 
     // onMounted(async () => {
@@ -2375,12 +2396,6 @@ export default defineComponent({
         });
       }
     };
-    const computedName = (name: string) => {
-      if (!name) {
-        return "--";
-      }
-      return name.length > 30 ? name.substring(0, 30) + "..." : name;
-    };
     const computedOwner = (owner: string) => {
       if (!owner) {
         return "--";
@@ -2708,7 +2723,6 @@ export default defineComponent({
       openMenu,
       getAlertsFn,
       multipleExportAlert,
-      computedName,
       computedOwner,
       tabs,
       alertTabs,
@@ -2728,6 +2742,7 @@ export default defineComponent({
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,
+      refreshAlerts,
     };
   },
 });

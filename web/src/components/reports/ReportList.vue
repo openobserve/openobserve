@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :persist-columns="true"
                 table-id="reports-report-list"
               >
-                <!-- Toolbar: Scheduled/Cached tabs + search + folder-scope toggle -->
+                <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
                 <template #toolbar>
                   <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
                     <div class="app-tabs-container">
@@ -92,27 +92,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
                       />
                     </div>
-                    <OSearchInput
-                      data-test="report-list-search-input"
-                      v-model="dynamicQueryModel"
-                      class="tw:ml-auto no-border o2-search-input tw:w-50"
-                      :placeholder="
-                        searchAcrossFolders
-                          ? t('dashboard.searchAcross')
-                          : t('reports.search')
-                      "
-                      @clear="clearSearch"
-                    />
-                    <div class="tw:whitespace-nowrap">
-                      <OTooltip :content="searchAcrossFolders ? t('dashboard.searchSelf') : t('dashboard.searchAll')" side="top">
-                        <OSwitch
-                          data-test="report-list-search-across-folders-toggle"
-                          v-model="searchAcrossFolders"
-                          :label="t('dashboard.allFolders') || 'All Folders'"
-                          class="tw:h-8 tw:px-2 tw:border tw:border-button-outline-border tw:rounded-md tw:flex tw:items-center tw:justify-center tw:whitespace-nowrap tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:bg-(--o2-hover-accent)"
-                        />
-                      </OTooltip>
+                    <div class="tw:flex-1 tw:min-w-0">
+                      <OInput
+                        v-model="dynamicQueryModel"
+                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')"
+                        :clearable="searchAcrossFolders"
+                        @clear="clearSearch"
+                        data-test="report-list-search-input"
+                        class="tw:w-full"
+                      >
+                        <template #icon-left>
+                          <OIcon name="search" size="sm" />
+                        </template>
+                        <template #icon-right>
+                          <div
+                            role="radiogroup"
+                            aria-label="Search scope"
+                            class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
+                          >
+                            <button
+                              type="button"
+                              role="radio"
+                              :aria-checked="!searchAcrossFolders"
+                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                              :class="!searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                              data-test="report-list-search-scope-current"
+                              title="Search only this folder"
+                              @click="searchAcrossFolders = false"
+                            >
+                              <OIcon name="folder-outline" size="xs" />
+                              <span class="tw:whitespace-nowrap">This folder</span>
+                            </button>
+                            <button
+                              type="button"
+                              role="radio"
+                              :aria-checked="searchAcrossFolders"
+                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
+                              :class="searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                              data-test="report-list-search-across-folders-toggle"
+                              title="Search across all folders"
+                              @click="searchAcrossFolders = true"
+                            >
+                              <OIcon name="search" size="xs" />
+                              <span class="tw:whitespace-nowrap">All folders</span>
+                            </button>
+                          </div>
+                        </template>
+                      </OInput>
                     </div>
+                    <OButton
+                      variant="outline"
+                      size="icon-sm"
+                      icon-left="refresh"
+                      :loading="isLoadingReports"
+                      title="Reload reports"
+                      data-test="report-list-refresh-btn"
+                      @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
+                    />
                   </div>
                 </template>
                 <template #empty>
@@ -289,9 +325,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
-import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
