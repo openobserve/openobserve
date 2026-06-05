@@ -476,7 +476,10 @@ body.body--dark .ai-icon-button:hover {
 // Form-field label — shared by OInput / OTextarea / OSelect / OCombobox /
 // OCheckbox / ORadio / OSwitch / OOptionGroup / OToggleGroup.
 .o-input-label {
-  font-size: 0.875rem;
+  // Match the design-system body size (--text-sm = 13px) and the prototype's
+  // form-label spec. Was hardcoded to 0.875rem (14px), a step larger than every
+  // other label, which made form-field labels read as heavier/bolder.
+  font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.25;
   color: #262626;
