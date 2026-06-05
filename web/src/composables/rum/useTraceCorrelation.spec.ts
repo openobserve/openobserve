@@ -139,24 +139,18 @@ describe("useTraceCorrelation", () => {
       expect(performanceData.value).toBeNull();
     });
 
-    it("should return computed refs", () => {
+    it("should expose all public API surface members", () => {
       const traceId = ref("test-trace-123");
-      const {
-        correlationData,
-        isLoading,
-        error,
-        hasBackendTrace,
-        backendSpanCount,
-        performanceData,
-      } = useTraceCorrelation(traceId);
+      const result = useTraceCorrelation(traceId);
 
-      // Check if they are computed/ref values
-      expect(correlationData.value).toBeDefined();
-      expect(isLoading.value).toBeDefined();
-      expect(error.value).toBeDefined();
-      expect(hasBackendTrace.value).toBeDefined();
-      expect(backendSpanCount.value).toBeDefined();
-      expect(performanceData.value).toBeDefined();
+      expect(typeof result.fetchCorrelation).toBe("function");
+      expect(typeof result.reset).toBe("function");
+      expect(result.correlationData.value).toBeNull();
+      expect(result.isLoading.value).toBe(false);
+      expect(result.error.value).toBeNull();
+      expect(result.hasBackendTrace.value).toBe(false);
+      expect(result.backendSpanCount.value).toBe(0);
+      expect(result.performanceData.value).toBeNull();
     });
   });
 
@@ -213,6 +207,21 @@ describe("useTraceCorrelation", () => {
         }),
         "RUM",
       );
+    });
+
+    it("should use _oo_trace_id column name in RUM SQL query", async () => {
+      const traceId = ref("trace-abc-999");
+
+      mockSuccessfulSearch([], []);
+
+      const { fetchCorrelation } = useTraceCorrelation(traceId);
+      await fetchCorrelation();
+
+      const firstCall = vi.mocked(searchService.search).mock.calls[0];
+      const sql: string = firstCall[0].query.query.sql;
+
+      expect(sql).toContain('"_oo_trace_id"');
+      expect(sql).toContain("trace-abc-999");
     });
 
     it("should fetch trace data after RUM data", async () => {

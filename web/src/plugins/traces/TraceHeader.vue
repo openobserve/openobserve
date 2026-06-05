@@ -34,15 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       Operation Name
       <div
-        class="resize-btn tw:bg-[var(--o2-primary)] tw:text-white tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+        class="resize-btn tw:bg-[var(--o2-primary)] tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
-        <OIcon name="drag-indicator" size="sm" />
+        <OIcon name="drag-indicator" size="sm"  />
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex relative-position trace-header-right"
+      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative trace-header-right"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -175,6 +175,7 @@ $traceChartHeight: 250px;
 
 .trace-tic-first {
   z-index: 5;
+  display: none;
 }
 
 .header-bg {

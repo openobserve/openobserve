@@ -437,7 +437,8 @@
     "pipeline": "파이프라인",
     "language": "언어",
     "actions": "액션",
-    "incidents": "인시던트"
+    "incidents": "인시던트",
+    "evals": "평가"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -490,7 +491,22 @@
     "getStartedRUM": "실제 사용자 모니터링 시작하기",
     "loadingErrorDetails": "잠시만요. 오류 세부 정보를 가져오는 중입니다.",
     "eventID": "이벤트 ID",
-    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다."
+    "loadingApplicationErrors": "잠시만요. 애플리케이션 오류가 발생하고 있습니다.",
+    "traces": "트레이스",
+    "noCorrelatedTraces": "이 세션에 대해 상관관계가 있는 추적을 찾을 수 없습니다.",
+    "viewTraceDetails": "트레이스 세부 정보 보기",
+    "routeChange": "노선",
+    "initialView": "이니셜",
+    "failedToFetchTraces": "추적 데이터를 가져오지 못했습니다.다시 시도해 주세요.",
+    "traceNotFound": "추적 세부 정보를 찾을 수 없습니다.",
+    "failedToFetchTraceDetails": "추적 세부 정보를 로드하지 못했습니다.다시 시도해 주세요.",
+    "span": "한 뼘",
+    "spans": "기간",
+    "errorTraces": "오류 추적",
+    "seekToMoment": "세션에서 이 순간을 찾아라",
+    "timeInSession": "세션 시간",
+    "route": "노선",
+    "duration": "지속"
   },
   "about": {
     "name": "오픈 옵저브",
@@ -517,9 +533,9 @@
     "ingestion_limit": "섭취 제한",
     "today_usage": "오늘의 사용",
     "feature_comparision_ent_msg": "아래 나열된 모든 고급 기능에 액세스할 수 있는 OpenObserve 엔터프라이즈 에디션을 사용하고 있습니다.",
-    "feature_comparision_plan_detail": "요금제: 엔터프라이즈 에디션은 하루 최대 200GB (~6TB/월) 의 데이터 통합에 대해 무료입니다.",
+    "feature_comparision_plan_detail": "요금제: 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 통합에 대해 무료입니다.",
     "feature_comparision_os_msg": "현재 OpenObserve 오픈 소스 에디션을 사용하고 있습니다.엔터프라이즈 에디션으로 업그레이드하여 아래 비교표에 나열된 고급 기능을 잠금 해제하세요.",
-    "feature_comparision_good_news": "좋은 소식: OpenObserve 엔터프라이즈 에디션은 하루 최대 200GB (~6TB/월) 의 데이터 수집을 완전히 무료로 제공합니다.",
+    "feature_comparision_good_news": "좋은 소식: OpenObserve 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 수집을 완전히 무료로 제공합니다.",
     "commit_lbl": "커밋",
     "build_lbl": "내장",
     "no_license_installed_lbl": "라이선스가 설치되지 않음",
@@ -574,14 +590,14 @@
     "value_support_enterprise": "엔터프라이즈",
     "value_support_cloud": "클라우드",
     "value_cost_free": "무료",
-    "value_cost_enterprise": "셀프 호스팅의 경우 하루 최대 200GB의 데이터를 무료로 수집할 수 있습니다.이후 유료",
+    "value_cost_enterprise": "셀프 호스팅의 경우 하루 최대 50GB의 데이터를 무료로 수집할 수 있습니다.이후 유료",
     "value_cost_cloud": "14일 무료 평가판.이후 유료",
     "feature_comparison_lbl": "기능 비교",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "엔터프라이즈 기능",
         "offer_text": "OpenObserve 자체 호스팅 시 모든 엔터프라이즈 기능을 완전히 무료로 이용할 수 있습니다.",
-        "badge_text": "하루 최대 200GB까지 무료",
+        "badge_text": "하루 최대 50GB까지 무료",
         "features_title": "오픈옵저브 클라우드 기능",
         "features_subtitle": "클라우드 구독에 포함된 모든 기능",
         "primary_button_text": "지금 다운로드"
@@ -589,11 +605,11 @@
       "enterprise_without_license": {
         "hero_title": "엔터프라이즈 기능",
         "offer_text": "무료 라이선스를 요청하여 OpenObserve 배포를 극대화하세요.",
-        "badge_text": "하루 최대 {할당량} GB까지 무료",
+        "badge_text": "하루 최대 {quota} GB까지 무료",
         "features_title": "사용 가능한 엔터프라이즈 기능",
         "features_subtitle": "무제한 기능을 잠금 해제할 수 있는 무료 라이선스 받기",
         "primary_button_text": "무료 라이선스 받기",
-        "license_note": "100GB/일 (라이선스 없음) • 200GB/일 (라이선스 포함)"
+        "license_note": "50GB/일 (라이선스 없음) • 50GB/일 (라이선스 포함)"
       },
       "enterprise_with_license": {
         "hero_title": "나만의 엔터프라이즈 에디션",
@@ -607,7 +623,7 @@
       "open_source": {
         "hero_title": "엔터프라이즈 에디션 받기",
         "offer_text": "모든 엔터프라이즈 기능을 완전 무료로 다운로드하고 잠금 해제하세요",
-        "badge_text": "하루 최대 200GB까지 무료",
+        "badge_text": "하루 최대 50GB까지 무료",
         "features_title": "모든 엔터프라이즈 기능 잠금 해제",
         "features_subtitle": "프로덕션에 바로 사용할 수 있는 옵저버빌리티에 필요한 모든 것",
         "primary_button_text": "지금 다운로드"
@@ -3173,7 +3189,8 @@
         "cost": "비용",
         "spans": "스팬"
       }
-    }
+    },
+    "openInFullView": "전체 화면으로 열기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
@@ -4167,6 +4184,348 @@
       "queries": "의문",
       "serviceAccounts": "서비스 계정",
       "invitations": "초대장"
+    }
+  },
+  "onlineEvals": {
+    "title": "평가",
+    "description": "LLM 제공자, 점수 정의, 채점자 및 실시간 평가 작업을 구성합니다.",
+    "loading": "온라인 평가 구성을 로드하는 중...",
+    "loadError": "온라인 평가를 로드하지 못했습니다.",
+    "deletePrompt": "{name} 을 (를) 삭제하시겠습니까?",
+    "deleted": "{라벨} 삭제됨",
+    "deleteError": "{label} 을 (를) 삭제하지 못했습니다.",
+    "saved": "{라벨} 저장됨",
+    "newButton": "새 {라벨}",
+    "search": "{라벨} 검색",
+    "refresh": "새로 고침",
+    "allStatuses": "모든 상태",
+    "noRowsFound": "{라벨} 을 (를) 찾을 수 없습니다.",
+    "getStartedHint": "하나를 생성하여 온라인 배선 평가를 시작하십시오.",
+    "columns": {
+      "name": "이름",
+      "status": "상태",
+      "updated": "업데이트됨"
+    },
+    "actions": {
+      "edit": "편집",
+      "delete": "삭제"
+    },
+    "tabs": {
+      "jobs": "평가 작업",
+      "scorers": "득점자",
+      "scoreConfigs": "스코어 구성",
+      "providers": "제공업체"
+    },
+    "singular": {
+      "jobs": "평가 작업",
+      "scorers": "득점자",
+      "scoreConfigs": "점수 구성",
+      "providers": "제공자"
+    },
+    "secondaryColumn": {
+      "jobs": "스트림",
+      "scorers": "타입",
+      "scoreConfigs": "데이터 유형",
+      "providers": "제공자"
+    },
+    "jobStatus": {
+      "draft": "초안",
+      "active": "액티브",
+      "paused": "일시 중지됨",
+      "degraded": "저하됨",
+      "archived": "보관됨"
+    },
+    "buttons": {
+      "cancel": "취소",
+      "create": "작성",
+      "save": "저장"
+    },
+    "scorerTypeDialog": {
+      "title": "새 채점자 생성",
+      "intro": "채점자 유형을 선택합니다.작성하려는 방식에 맞는 것을 골라 실행하세요.",
+      "llmJudgeTitle": "LLM 심사위원",
+      "llmJudgeDescription": "구성된 공급자를 사용하여 의미론적으로 평가합니다.",
+      "remoteTitle": "리모트",
+      "remoteDescription": "자체 HTTP 엔드포인트를 호출하여 점수를 매기세요.",
+      "codeTitle": "코드",
+      "codeDescription": "곧 출시될 예정입니다."
+    },
+    "provider": {
+      "backTo": "제공업체로 돌아가기",
+      "createTitle": "LLM 제공자 생성",
+      "editTitle": "LLM 제공자 편집",
+      "subtitle": "LLM 심사 위원 채점자가 사용하는 모델 엔드포인트를 구성합니다.",
+      "sectionTitle": "제공자",
+      "nameLabel": "이름",
+      "namePlaceholder": "프로덕션 오픈AI",
+      "typeLabel": "제공자 유형",
+      "typePlaceholder": "오페나이",
+      "endpointLabel": "끝점",
+      "endpointPlaceholder": "선택적 사용자 지정 엔드포인트",
+      "defaultModelLabel": "기본 모델",
+      "defaultModelPlaceholder": "gpt-4o-미니",
+      "availableModelsLabel": "사용 가능한 모델",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "기본 공급자로 사용",
+      "authConfigLabel": "인증 구성 JSON",
+      "saveError": "공급자를 저장하지 못했습니다."
+    },
+    "scoreConfig": {
+      "createTitle": "새 점수 구성",
+      "editTitle": "점수 구성 편집",
+      "subtitle": "점수 구성은 점수 유형, 상태 임계값 및 범주를 정의합니다.",
+      "nameLabel": "이름",
+      "dataTypeLabel": "데이터 유형",
+      "descriptionLabel": "설명",
+      "numericRangeLabel": "숫자 범위 JSON",
+      "categoriesLabel": "카테고리: JSON",
+      "healthyThresholdLabel": "정상 임계값 JSON",
+      "dataTypes": {
+        "numeric": "숫자",
+        "categorical": "범주형",
+        "boolean": "부울"
+      },
+      "saveError": "점수 구성을 저장하지 못했습니다."
+    },
+    "scorer": {
+      "backTo": "득점자로 돌아가기",
+      "badgeRemote": "리모트",
+      "badgeLlm": "LLM 심사위원",
+      "createTitleRemote": "원격 채점기 생성",
+      "createTitleLlm": "LLM 심사 위원 채점자 생성",
+      "editTitleRemote": "원격 채점기 편집",
+      "editTitleLlm": "LLM 심사 위원 채점자 편집",
+      "subtitleRemote": "호스팅하는 HTTP 엔드포인트를 호출합니다.요청을 렌더링하면 점수가 반환됩니다.",
+      "subtitleLlm": "언어 모델은 사용자가 제공한 프롬프트를 사용하여 각 추적을 판단합니다.",
+      "identitySection": "정체성",
+      "judgeSection": "심사위원 구성",
+      "endpointSection": "끝점",
+      "nameLabel": "이름",
+      "namePlaceholder": "충실도_판사",
+      "producesScoreConfigLabel": "점수 구성을 생성합니다.",
+      "producesScoreConfigNone": "없음",
+      "scoreConfigVersionLabel": "점수 구성 버전",
+      "latestSuffix": " (최신)",
+      "pinVersion": "선택한 버전 고정",
+      "descriptionLabel": "설명",
+      "providerLabel": "제공자",
+      "providerPlaceholder": "제공업체 선택",
+      "modelLabel": "모델",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "판사 프롬프트",
+      "outputSchemaLabel": "출력 스키마 JSON",
+      "remoteEndpointLabel": "원격 엔드포인트",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "본문 템플릿 요청",
+      "saveError": "채점자 저장 실패",
+      "versionsLoadError": "점수 구성 버전을 로드하지 못했습니다.",
+      "testPanel": {
+        "title": "이 채점자 테스트",
+        "hint": "저장하기 전에 샘플 데이터로 채점기를 사용해 보십시오.테스트 실행은 지속되지 않습니다.",
+        "emptyPrefix": "다음과 같은 변수 추가 ",
+        "emptySuffix": " 채점자 템플릿으로 이동하여 샘플 필드로 테스트합니다.",
+        "runButton": "테스트 실행",
+        "scenarioSuccess": "모의 응답",
+        "scenarioAuth": "인증 오류",
+        "scenarioSchema": "스키마 불일치",
+        "stateIdle": "테스트를 실행하여 여기에서 결과를 확인하세요.",
+        "stateRunning": "채점자 테스트 실행 중...",
+        "successHeader": "성공",
+        "successScore": "점수: 0.92",
+        "successReasoning": "추론: 답변은 제공된 컨텍스트에 의해 뒷받침됩니다.",
+        "authHeader": "인증 실패",
+        "authHint": "저장하기 전에 제공자 자격 증명을 확인하십시오.",
+        "schemaHeader": "스키마 불일치",
+        "schemaHint": "응답이 구성된 출력 스키마와 일치하지 않습니다.",
+        "valuePlaceholder": "{variable} 의 값"
+      }
+    },
+    "job": {
+      "backTo": "평가 작업으로 돌아가기",
+      "createTitle": "온라인 평가 작업 생성",
+      "editTitle": "온라인 평가 작업 편집",
+      "subtitle": "이 평가 작업에 사용할 스트림, 채점자, 매핑 및 샘플링 동작을 선택합니다.",
+      "stepper": {
+        "target": "타깃",
+        "scorers": "득점자",
+        "mapping": "지도 제작",
+        "sampling": "샘플링"
+      },
+      "targetSection": "타깃",
+      "scorersSection": "채점자 및 매핑",
+      "nameLabel": "이름",
+      "namePlaceholder": "프로덕션 충실도 모니터",
+      "streamLabel": "입력 스트림",
+      "streamPlaceholder": "기본값입니다",
+      "streamTypeLabel": "스트림 유형",
+      "streamTypePlaceholder": "추적",
+      "descriptionLabel": "설명",
+      "samplingModeLabel": "샘플링 모드",
+      "samplingValueLabel": "샘플링 값 JSON",
+      "samplingModes": {
+        "rate": "요율",
+        "all": "모두",
+        "count": "개수"
+      },
+      "scorerPicker": {
+        "title": "득점자",
+        "hint": "일치하는 모든 스팬에서 실행할 채점자를 하나 이상 선택합니다.",
+        "meta": "{유형} · v {버전}"
+      },
+      "filter": {
+        "title": "필터 조건",
+        "hint": "이 조건에 맞는 범위만 샘플링 및 채점을 입력합니다."
+      },
+      "inputMapping": {
+        "title": "입력 매핑",
+        "hint": "스팬 필드를 각 채점자 템플릿 변수에 매핑합니다.",
+        "selectScorers": "매핑을 구성할 채점자를 선택합니다.",
+        "noVariables": "이 채점기에는 매핑할 템플릿 변수가 없습니다.",
+        "variableCount": "{개수} 개 변수"
+      },
+      "preview": {
+        "title": "시사",
+        "hint": "왼쪽의 필드를 사용하여 생산 평가 대상을 정의합니다.",
+        "summaryTitle": "요약",
+        "summaryName": "이름",
+        "summaryType": "타입",
+        "summaryStatus": "상태",
+        "statusEditing": "편집",
+        "statusDraft": "초안",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "최소 한 명의 득점자 선택",
+      "saveError": "평가 작업을 저장하지 못했습니다."
+    },
+    "quality": {
+      "scopeLabel": "이 작업 공간의 모든 품질 치수",
+      "timeRange": {
+        "label": "시간 범위",
+        "last1h": "지난 1시간",
+        "last24h": "지난 24시간",
+        "last7d": "지난 7일",
+        "last30d": "지난 30일"
+      },
+      "sourceStream": {
+        "label": "소스 스트림",
+        "all": "모든 스트림"
+      },
+      "refresh": "새로 고침",
+      "kpis": {
+        "evaluated": {
+          "title": "평가된 트레이스",
+          "unit": "",
+          "hint": "윈도우 내 _llm_scores의 고유한 트레이스 ID"
+        },
+        "qualityIssueRate": {
+          "title": "품질 문제 발생률",
+          "unit": "%",
+          "hint": "모든 치수가 임계값 미만인 평가된 트레이스"
+        },
+        "evaluationCost": {
+          "title": "평가 비용",
+          "unit": "$",
+          "hint": "창의 LLM 심사 위원 채점자 비용 합계"
+        },
+        "jobSuccess": {
+          "title": "취업 성공",
+          "unit": "%",
+          "hint": "온라인 평가 작업 실행 성공률"
+        },
+        "scorerFailures": {
+          "title": "득점자 실패",
+          "unit": "",
+          "hint": "창에서 채점자 호출이 실패했습니다."
+        },
+        "latencyP95": {
+          "title": "레이턴시 p95",
+          "unit": "s",
+          "hint": "스코어-콜 p95 레이턴시"
+        },
+        "vsPrev": "vs 이전",
+        "noData": "—"
+      },
+      "loading": "품질 데이터 로드 중...",
+      "detail": {
+        "loading": "구성별 분석을 로드하는 중...",
+        "noData": "이 창에는 이 구성에 대한 점수가 아직 없습니다.",
+        "drillTitle": "드릴 투 트레이스",
+        "splitByScorer": "득점자별 분할",
+        "splitBySourceType": "소스_유형별 분할",
+        "trendTitle": "트렌드",
+        "trendSubtitle": "{구성 이름}, {버킷}",
+        "distributionTitle": "점수 분포",
+        "compositionTitle": "시간 경과에 따른 구성",
+        "categoryDistributionTitle": "카테고리 분포",
+        "passRateTitle": "시간 경과에 따른 합격률",
+        "trueFalseTitle": "진실 대 거짓",
+        "legendAvg": "평균",
+        "legendP95": "p95",
+        "legendThreshold": "임계값 {방향} {값}",
+        "legendHealthy": "건강한",
+        "legendUnhealthy": "건강에 해로운",
+        "kpis": {
+          "average": "평균",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "건강에 해로운",
+          "healthy": "건강한",
+          "coverage": "커버리지"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "모든 구성",
+        "empty": "이 필터와 일치하는 구성이 없습니다."
+      },
+      "overview": {
+        "title": "점수 구성 개요",
+        "countSuffix": "{n} 개의 구성",
+        "searchPlaceholder": "필터 구성...",
+        "loading": "구성별 애그리게이트 로드 중...",
+        "emptyNoConfigsTitle": "점수 구성이 아직 없습니다",
+        "emptyNoConfigsHint": "첫 번째 점수 구성을 정의하여 품질 측정기준 추적을 시작하세요.",
+        "emptyWaitingTitle": "첫 번째 점수가 나오기를 기다리는 중",
+        "emptyWaitingHint": "점수 구성이 선언되었지만 이 창의 _llm_scores에 아직 점수가 기록되지 않았습니다.",
+        "waitingStepJob": "이러한 구성 중 하나에 대한 점수를 산출하는 온라인 평가 작업을 활성화합니다.",
+        "waitingStepRange": "시간 범위를 넓히세요. 오늘 초나 이번 주의 점수는 이 창에 없을 수도 있습니다.",
+        "waitingStepRefresh": "새로 고침을 클릭합니다. 평가 후 약 1분 이내에 활성 작업의 점수가 표시됩니다.",
+        "waitingPrimaryCta": "공개 평가 채용공고",
+        "waitingRefreshCta": "새로 고침",
+        "noThreshold": "임계값 없음",
+        "columns": {
+          "scoreConfig": "점수 구성",
+          "type": "타입",
+          "totalScores": "총점",
+          "coverage": "커버리지",
+          "unhealthy": "건강에 해로운",
+          "trend": "트렌드",
+          "threshold": "건강한 경우",
+          "updated": "업데이트됨"
+        }
+      }
+    },
+    "deleteTitle": "{라벨} 삭제",
+    "deleteConfirmMessage": "정말로 “{name}”을 삭제하시겠습니까?이 작업은 취소할 수 없습니다."
+  },
+  "llmProviders": {
+    "tabLabel": "LLM 제공업체",
+    "title": "LLM 제공업체",
+    "subtitle": "LLM 심사 위원 채점자가 사용하는 LLM 공급자 연결을 관리합니다.",
+    "newButton": "새 제공자",
+    "searchPlaceholder": "검색 제공자",
+    "defaultBadge": "디폴트",
+    "loadError": "LLM 공급자를 로드하지 못했습니다.",
+    "columns": {
+      "name": "이름",
+      "type": "타입",
+      "endpoint": "끝점",
+      "defaultModel": "기본 모델",
+      "default": "디폴트"
+    },
+    "empty": {
+      "title": "LLM 공급자가 아직 없습니다",
+      "description": "LLM 제공자는 LLM 판사 채점자가 호출하는 언어 모델에 대한 연결 세부 정보 (엔드포인트+자격 증명) 를 저장합니다.하나를 추가하여 심사 기반 평가 실행을 시작하세요."
     }
   }
 }

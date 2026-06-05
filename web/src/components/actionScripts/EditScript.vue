@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :readonly="isEditingActionScript"
                         />
                       </div>
-                      <div class="tw:flex">
+                      <div class="tw:flex tw:pt-2.75">
                         <OSelect
                           data-test="add-action-script-timezone-select"
                           v-model="formData.timezone"

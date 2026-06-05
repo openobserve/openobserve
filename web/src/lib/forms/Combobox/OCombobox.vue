@@ -274,7 +274,7 @@ const hasInsideLabel = computed(
             >
               <span class="tw:flex-1 tw:wrap-break-word tw:whitespace-normal tw:min-w-0">{{ option.label }}</span>
               <ComboboxItemIndicator
-                class="tw:absolute tw:end-2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
+                class="tw:absolute tw:end-2 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

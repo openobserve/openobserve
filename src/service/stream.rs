@@ -984,22 +984,23 @@ pub async fn delete_stream(
 
     // delete associated feature resources, i.e. pipelines, alerts
     if del_related_feature_resources {
-        if let Some(pipeline) =
+        for pipeline in
             db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
-            && let Err(e) = db::pipeline::delete(&pipeline.id).await
         {
-            return Ok((
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
-                Json(MetaHttpResponse::error(
+            if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+                return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!(
-                        "Error: failed to delete the associated pipeline \"{}\": {e}",
-                        pipeline.name
-                    ),
-                )),
-            )
-                .into_response());
+                    [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                    Json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!(
+                            "Error: failed to delete the associated pipeline \"{}\": {e}",
+                            pipeline.name
+                        ),
+                    )),
+                )
+                    .into_response());
+            }
         }
 
         if let Ok(alerts) =

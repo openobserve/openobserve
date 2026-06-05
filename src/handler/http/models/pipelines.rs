@@ -18,6 +18,8 @@
 
 use std::collections::HashMap;
 
+#[cfg(test)]
+use config::meta::pipeline::PipelineKind;
 use config::meta::{
     pipeline::{
         Pipeline as meta_pipeline,
@@ -141,6 +143,7 @@ mod tests {
             source: PipelineSource::Scheduled(DerivedStream::default()),
             nodes: vec![],
             edges: vec![],
+            kind: PipelineKind::User,
         };
 
         let error_info = PipelineErrorInfo {
@@ -173,6 +176,7 @@ mod tests {
             source: PipelineSource::Realtime(StreamParams::default()),
             nodes: vec![],
             edges: vec![],
+            kind: PipelineKind::User,
         };
 
         let pipeline = Pipeline::from(meta_pipeline, None, None);
@@ -220,6 +224,7 @@ mod tests {
             source: PipelineSource::Scheduled(DerivedStream::default()),
             nodes: vec![],
             edges: vec![],
+            kind: PipelineKind::User,
         };
 
         let pipeline2 = meta_pipeline {
@@ -232,6 +237,7 @@ mod tests {
             source: PipelineSource::Realtime(StreamParams::default()),
             nodes: vec![],
             edges: vec![],
+            kind: PipelineKind::User,
         };
 
         let pipelines = vec![pipeline1, pipeline2];

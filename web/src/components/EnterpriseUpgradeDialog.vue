@@ -93,12 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
 
-            <!-- License Limit Note (only for Enterprise without license) -->
-            <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <OIcon name="info" size="xs" class="tw:mr-1" />
-              <span>{{ dialogConfig.licenseNoteText }}</span>
-            </div>
-
             <div class="hero-actions">
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
@@ -346,7 +340,7 @@ export default defineComponent({
 
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
-      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 200; // Use nullish coalescing to allow 0
+      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 50; // Use nullish coalescing to allow 0
 
       // Get usage percentage for circular indicator (this is already a percentage)
       const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;

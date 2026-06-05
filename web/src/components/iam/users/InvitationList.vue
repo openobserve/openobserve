@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="token"
           :loading="loading"
           pagination="client"
-          :page-size="25"
+          :page-size="20"
           sorting="client"
           :default-columns="false"
           :show-global-filter="false"
