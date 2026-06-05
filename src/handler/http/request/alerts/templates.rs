@@ -18,7 +18,10 @@ use axum::{Json, extract::Path, http::StatusCode, response::Response};
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::{UserEmail, is_root_user}},
+    common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::auth::{UserEmail, is_root_user},
+    },
     handler::http::{
         extractors::Headers,
         models::destinations::Template,
