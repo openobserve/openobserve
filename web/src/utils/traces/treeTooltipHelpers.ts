@@ -241,3 +241,55 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     </div>
   `;
 };
+
+/**
+ * Generate tooltip HTML content for trace pattern metrics
+ * Shows comprehensive duration metrics in single column format
+ */
+export const generateTracePatternTooltipContent = (metadata: any): string => {
+  if (!metadata) {
+    return `
+      <div class="tree-tooltip">
+        <div class="tooltip-header">Unknown Pattern</div>
+        <div class="tooltip-metrics">
+          <div>Calls: 1</div>
+          <div>Average: 0.0ms</div>
+          <div>Minimum: 0.0ms</div>
+          <div>Maximum: 0.0ms</div>
+          <div>P75: 0.0ms</div>
+          <div>P95: 0.0ms</div>
+          <div>P99: 0.0ms</div>
+          <div>Error Rate: 0.0%</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const {
+    pathSignature = 'Unknown Pattern',
+    count = 1,
+    avg = 0,
+    min = 0,
+    max = 0,
+    p75 = 0,
+    p95 = 0,
+    p99 = 0,
+    errorRate = 0,
+  } = metadata;
+
+  return `
+    <div class="tree-tooltip">
+      <div class="tooltip-header">${pathSignature}</div>
+      <div class="tooltip-metrics">
+        <div>Calls: ${count}</div>
+        <div>Average: ${avg.toFixed(1)}ms</div>
+        <div>Minimum: ${min.toFixed(1)}ms</div>
+        <div>Maximum: ${max.toFixed(1)}ms</div>
+        <div>P75: ${p75.toFixed(1)}ms</div>
+        <div>P95: ${p95.toFixed(1)}ms</div>
+        <div>P99: ${p99.toFixed(1)}ms</div>
+        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+      </div>
+    </div>
+  `;
+};
