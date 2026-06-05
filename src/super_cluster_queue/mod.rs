@@ -31,6 +31,7 @@ mod folders;
 mod incidents;
 mod kv;
 mod meta;
+mod org_ingestion_token;
 mod org_user;
 mod organization;
 mod pipelines;
@@ -128,6 +129,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_user_msg: user::process,
         on_meta_msg: meta::process,
         on_orgs_msg: organization::process,
+        on_org_ingestion_token_msg: org_ingestion_token::process,
     };
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
