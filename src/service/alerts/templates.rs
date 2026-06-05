@@ -174,7 +174,11 @@ pub async fn ensure_org_prebuilt_templates(org_id: &str) -> Result<(), anyhow::E
                             || msg.contains("duplicate key")
                             || msg.contains("Duplicate entry")
                         {
-                            // concurrent creation race — already exists, fine
+                            log::debug!(
+                                "[TEMPLATES] Prebuilt template '{}' for org '{}' already exists (concurrent creation)",
+                                template.name,
+                                org_id
+                            );
                         } else {
                             log::error!(
                                 "[TEMPLATES] Failed to create prebuilt template '{}' for org '{}': {}",
