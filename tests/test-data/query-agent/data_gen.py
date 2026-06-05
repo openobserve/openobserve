@@ -396,6 +396,182 @@ FIELD_POOL = {
         "warehouse-sync", "warehouse-sort", "warehouse-scan", "warehouse-track",
         "warehouse-merge", "warehouse-sync",
     ],
+
+    # --- Synthetic fields for Q393-Q417 (A/B testing + security/bot-detection) ---
+
+    "variant_tag": [
+        "control", "variant_a", "variant_b", "variant_c", "control",
+        "variant_a", "variant_b", "variant_c", "control", "variant_a",
+    ],
+
+    "cookie_id": [
+        "sess_abc123", "sess_def456", "ctl_xyz789", "var1_pqr012", "var2_mno345",
+        "sess_abc123", "var3_stu678", "ctl_vwx901", "sess_def456", "var1_yza234",
+    ],
+
+    "status_code": [
+        "200", "200", "200", "500", "404",
+        "200", "502", "200", "403", "200",
+    ],
+
+    "lcp_micros": [
+        1200000, 2500000, 1800000, 3200000, 900000,
+        1500000, 2800000, 2100000, 3400000, 1100000,
+    ],
+
+    "inp_micros": [
+        80000, 150000, 200000, 95000, 300000,
+        120000, 180000, 250000, 70000, 160000,
+    ],
+
+    "cls_score": [
+        0.05, 0.12, 0.08, 0.25, 0.03,
+        0.15, 0.10, 0.20, 0.30, 0.06,
+    ],
+
+    "device_type": [
+        "Mobile", "Computer", "Tablet", "Mobile", "Computer",
+        "Mobile", "Tablet", "Computer", "Mobile", "Computer",
+    ],
+
+    "page_slug": [
+        "itemPage", "searchPage", "cartPage", "itemPage", "checkoutPage",
+        "itemPage", "homePage", "itemPage", "searchPage", "itemPage",
+    ],
+
+    "action_category": [
+        "performanceMetric", "performanceMetric", "interaction", "navigation", "performanceMetric",
+        "interaction", "performanceMetric", "navigation", "performanceMetric", "performanceMetric",
+    ],
+
+    "action_subcategory": [
+        "vitalsLcp", "vitalsInp", "vitalsCls", "clickEvent", "vitalsLcp",
+        "vitalsInp", "vitalsCls", "pageView", "vitalsLcp", "vitalsInp",
+    ],
+
+    "page_url": [
+        "https://shop.example.com/item/1001",
+        "https://shop.example.com/item/1002",
+        "https://shop.example.com/search?q=test",
+        "https://shop.example.com/item/1003",
+        "https://shop.example.com/cart",
+        "https://shop.example.com/item/1004",
+        "https://shop.example.com/",
+        "https://shop.example.com/item/1005",
+        "https://shop.example.com/item/1006",
+        "https://shop.example.com/item/1007",
+    ],
+
+    "render_scope": [
+        "SSR", "CSR", "SSR", "SSR", "CSR",
+        "SSR", "CSR", "SSR", "SSR", "CSR",
+    ],
+
+    "os_platform": [
+        "Android 14", "iOS 17.4", "Android 13", "Mac OS X (iPhone)", "Windows 11",
+        "Android 14", "iOS 18.1", "Android 12", "Mac OS X (iPhone)", "Android 14",
+    ],
+
+    "attack_name": [
+        "SQL Injection (Param)", "XSS Reflected (Header)", "Path Traversal", "CSRF Attempt", "SSRF Probe",
+        "Command Injection", "XSS Stored (Body)", "File Inclusion", "Desync Attack", "Evasion Technique",
+    ],
+
+    # Named http_request instead of request_payload to avoid collision with the
+    # existing request_payload field (JSON message objects, lines 130-141 above).
+    "http_request": [
+        "GET /api/users?id=1",
+        "POST /api/order {\"item\":123}",
+        "GET /search?q=test",
+        "GET /favicon.ico",
+        "POST /admin/config",
+        "GET /api/products",
+        "PUT /api/cart/update",
+        "DELETE /api/session",
+        "GET /.env",
+        "POST /api/login {\"user\":\"admin\"}",
+    ],
+
+    "user_agent_str": [
+        "Mozilla/5.0 Chrome/120",
+        "curl/7.88.1",
+        "python-requests/2.31",
+        "Mozilla/5.0 Firefox/121",
+        "PostmanRuntime/7.35",
+        "Mozilla/5.0 Safari/17.2",
+        "axios/1.6.0",
+        "Go-http-client/2.0",
+        "Java/11.0.20",
+        "Mozilla/5.0 Edge/120",
+    ],
+
+    "uri_path": [
+        "/api/v1/data", "/swag/graphql", "/ip/192.168.1.1", "/admin/login", "/api/v2/search",
+        "/assets/js/app.js", "/swag/graphql", "/api/v1/users", "/health", "/ip/10.0.0.1",
+    ],
+
+    "geo_org": [
+        "Acme Corp", "GlobalTech Inc", "DigitalOcean LLC", "FastHost Ltd", "CloudServe GmbH",
+        "Acme Corp", "NetGuard AS", "HostPro Inc", "CloudServe GmbH", "DataCenter EU",
+    ],
+
+    "geo_country": [
+        "US", "DE", "UK", "US", "BR",
+        "US", "JP", "US", "IN", "US",
+    ],
+
+    "geo_user_type": [
+        "business", "hosting", "business", "business", "hosting",
+        "business", "education", "business", "hosting", "business",
+    ],
+
+    "risk_rules_list": [
+        '["rate_limit_exceeded","geo_anomaly"]',
+        '["torbot_ua_mismatch","cookie_reuse"]',
+        '["credential_stuffing","rapid_login"]',
+        '["session_hijack","ip_hop"]',
+        '["scraping_pattern","high_freq"]',
+        '["rate_limit_exceeded"]',
+        '["torbot_ua_mismatch"]',
+        '["cookie_reuse","session_hijack"]',
+        '["credential_stuffing"]',
+        '["scraping_pattern","ip_hop","rapid_login"]',
+    ],
+
+    "visitor_session_id": [
+        "sess_001", "sess_001", "sess_002", "sess_003", "sess_002",
+        "sess_001", "sess_004", "sess_003", "sess_005", "sess_001",
+    ],
+
+    "bot_flag": [
+        None, None, None, "suspicious", None,
+        None, "verified_bot", None, None, None,
+    ],
+
+    "passthrough_flag": [
+        "false", "false", "false", "true", "false",
+        "false", "false", "true", "false", "false",
+    ],
+
+    "order_ref": [
+        "ORD-001", "ORD-002", "ORD-001", "ORD-003", "ORD-004",
+        "ORD-005", "ORD-003", "ORD-006", "ORD-007", "ORD-008",
+    ],
+
+    "info_tag": [
+        None, None, "Allowlisted", None, None,
+        None, "Blocklisted", None, None, None,
+    ],
+
+    "graphql_operation": [
+        "updateItems", "placeOrder", "verifyPayment", "updateCart", "createAccount",
+        "updateItems", "getInventory", "placeOrder", "updateItems", "verifyPayment",
+    ],
+
+    "datacenter": [
+        "dc-east", "dc-west", "dc-east", "dc-central", "dc-west",
+        "dc-east", "dc-central", "dc-west", "dc-east", "dc-west",
+    ],
 }
 
 STREAM_VALUES = ["stdout", "stdout", "stdout", "stderr"]
@@ -422,7 +598,7 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=392):
+def build_dataset(num_queries=170):
     """Generate deterministic records for queries Q001-Q{num_queries}."""
     records = []
     for qi in range(1, num_queries + 1):

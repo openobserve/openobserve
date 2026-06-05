@@ -979,13 +979,6 @@
             "33.0"
           ],
           [
-            "ZONE-3",
-            "SORT-M3",
-            "404.0",
-            "51.24",
-            "0.0"
-          ],
-          [
             "ZONE-1",
             "SORT-X1",
             "355.0",
@@ -997,6 +990,13 @@
             "SORT-A7",
             "686.67",
             "75.53",
+            "0.0"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "404.0",
+            "51.24",
             "0.0"
           ],
           [
@@ -1112,7 +1112,7 @@
           ],
           [
             "3",
-            "updateBatch"
+            "syncZone"
           ],
           [
             "2",
@@ -1124,15 +1124,7 @@
           ],
           [
             "3",
-            "syncZone"
-          ],
-          [
-            "3",
-            "archiveLog"
-          ],
-          [
-            "3",
-            "mergeBatch"
+            "updateBatch"
           ],
           [
             "3",
@@ -1141,6 +1133,14 @@
           [
             "3",
             "rerouteTrack"
+          ],
+          [
+            "3",
+            "archiveLog"
+          ],
+          [
+            "3",
+            "mergeBatch"
           ]
         ],
         "results_mode": "rowsort"
@@ -1168,558 +1168,19 @@
       }
     },
     {
-      "id": "Q205",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-1'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
+      "id": "Q170",
+      "sql": "SELECT COALESCE(graphql_operation, 'N/A') AS graphql_operation FROM \"{stream}\" WHERE page_slug = 'itemPage'   AND lower(graphql_operation) IN ('updateitems', 'placeorder', 'verifypayment', 'updatecart')   AND status_code = '200'   AND (     array_has(cast_to_arr(risk_rules_list), 'rate_limit_exceeded')     OR array_has(cast_to_arr(risk_rules_list), 'credential_stuffing')     OR array_has(cast_to_arr(risk_rules_list), 'session_hijack')   )   AND (info_tag IS NULL OR info_tag NOT LIKE '%Allowlisted%') LIMIT 5",
       "category": "combined",
       "time_offset": {
-        "start_offset": 12239000000,
-        "end_offset": 12403000000
+        "start_offset": 10139000000,
+        "end_offset": 10303000000
       },
       "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q206",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE control_center = 'CC-ALPHA'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','deleteitem')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12299000000,
-        "end_offset": 12463000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q207",
-      "sql": "SELECT COALESCE(site_name, 'N/A') AS site_name_display\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-2'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder','createcontract')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names'))\n  AND (auth_result IS NULL OR auth_result NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12359000000,
-        "end_offset": 12523000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q208",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE sorter_model = 'SORT-X1'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12419000000,
-        "end_offset": 12583000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q209",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE site_name = 'DC-East'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','deleteitem')\n  AND response_code = 403\n  AND (array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12479000000,
-        "end_offset": 12643000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q210",
-      "sql": "SELECT COALESCE(control_center, 'N/A') AS control_center_display\nFROM \"{stream}\"\nWHERE conveyor_lane = 'LANE-A'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names'))\n  AND (auth_result IS NULL OR auth_result NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12539000000,
-        "end_offset": 12703000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q211",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-3'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder','deleteitem')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12599000000,
-        "end_offset": 12763000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q212",
-      "sql": "SELECT COALESCE(region_code, 'N/A') AS region_code_display\nFROM \"{stream}\"\nWHERE facility_zone = 'ZONE-4'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','createcontract')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12659000000,
-        "end_offset": 12823000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q213",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE site_name = 'DC-West'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND response_code = 500\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12719000000,
-        "end_offset": 12883000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q214",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE control_center = 'CC-BETA'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names'))\n  AND (auth_result IS NULL OR auth_result NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12779000000,
-        "end_offset": 12943000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q215",
-      "sql": "SELECT COALESCE(facility_zone, 'N/A') AS facility_zone_display\nFROM \"{stream}\"\nWHERE conveyor_lane = 'LANE-B'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','deleteitem')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false')\n    OR array_has(cast_to_arr(alert_tags), 'cookie.with.repeated.names'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12839000000,
-        "end_offset": 13003000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q216",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display\nFROM \"{stream}\"\nWHERE sorter_model = 'SORT-A7'\n  AND LOWER(operation_name) IN ('searchitems','updateitem','placeorder','updatequantity')\n  AND response_code = 200\n  AND (array_has(cast_to_arr(alert_tags), 'cookie.tbc.missing')\n    OR array_has(cast_to_arr(alert_tags), 'torbot.cookie.ua.false'))\n  AND (threat_flag IS NULL OR threat_flag NOT LIKE '%Allowlisted%')\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 12899000000,
-        "end_offset": 13063000000
-      },
-      "expected": {
-        "columns": [],
-        "note": "Generated from abtest_summary.sql pattern"
-      }
-    },
-    {
-      "id": "Q229",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p95_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p95_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p95_12h_1d'\n    ELSE '4_p95_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13679000000,
-        "end_offset": 13843000000
-      },
-      "expected": {
+        "skip_sqllogictest": true,
         "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
+          "graphql_operation"
         ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q230",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.50) AS p50\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p50_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p50_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p50_12h_1d'\n    ELSE '4_p50_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13739000000,
-        "end_offset": 13903000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p50"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q231",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.99) AS p99\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p99_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p99_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p99_12h_1d'\n    ELSE '4_p99_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13799000000,
-        "end_offset": 13963000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p99"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q232",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p95_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p95_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p95_12h_1d'\n    ELSE '4_p95_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(throughput_rate) AS throughput_rate\n  FROM \"{stream}\"\n  WHERE record_type = 'Ingestion'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13859000000,
-        "end_offset": 14023000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q233",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.90) AS p90\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p90_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p90_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p90_12h_1d'\n    ELSE '4_p90_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13919000000,
-        "end_offset": 14083000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p90"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q234",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(load_factor AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p95_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p95_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p95_12h_1d'\n    ELSE '4_p95_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(load_factor) AS load_factor\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 13979000000,
-        "end_offset": 14143000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q235",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.75) AS p75\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p75_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p75_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p75_12h_1d'\n    ELSE '4_p75_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 14039000000,
-        "end_offset": 14203000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p75"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q236",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_short'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_medium'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_long'\n    ELSE '4_very_long'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 14099000000,
-        "end_offset": 14263000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q237",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(charge_remaining AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p95_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p95_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p95_12h_1d'\n    ELSE '4_p95_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(charge_remaining) AS charge_remaining\n  FROM \"{stream}\"\n  WHERE record_type = 'Ingestion'\n    AND query_source IN ('ui','dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 14159000000,
-        "end_offset": 14323000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q238",
-      "sql": "SELECT duration_range, COUNT(*) AS query_count,\n  approx_percentile_cont(CAST(latency_ms AS FLOAT), 0.95) AS p95\nFROM (\n  SELECT CASE\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 240 THEN '1_p95_0h_4h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 240\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 720 THEN '2_p95_4h_12h'\n    WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) >= 720\n      AND ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 1440 THEN '3_p95_12h_1d'\n    ELSE '4_p95_gt_1d'\n  END AS duration_range,\n  COUNT(_timestamp) AS query_count,\n  query_source,\n  MAX(latency_ms) AS latency_ms\n  FROM \"{stream}\"\n  WHERE record_type = 'Search'\n    AND query_source IN ('dashboards')\n  GROUP BY query_source, _timestamp\n) GROUP BY duration_range\nORDER BY duration_range ASC",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 14219000000,
-        "end_offset": 14383000000
-      },
-      "expected": {
-        "columns": [
-          "duration_range",
-          "query_count",
-          "p95"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q349",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE operation_name IS NOT NULL\n  AND facility_zone = 'ZONE-1'\nGROUP BY operation_name\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 20879000000,
-        "end_offset": 21043000000
-      },
-      "expected": {
-        "columns": [
-          "operation_name_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "RetryScan",
-            "3"
-          ],
-          [
-            "RerouteTrack",
-            "3"
-          ],
-          [
-            "SearchItems",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q350",
-      "sql": "SELECT COALESCE(site_name, 'Unknown') AS site_name_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE site_name IS NOT NULL\n  AND control_center = 'CC-ALPHA'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 20939000000,
-        "end_offset": 21103000000
-      },
-      "expected": {
-        "columns": [
-          "site_name_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "site-sfo-05",
-            "3"
-          ],
-          [
-            "site-nyc-01",
-            "3"
-          ],
-          [
-            "site-mum-09",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q351",
-      "sql": "SELECT COALESCE(region_code, 'N/A') AS region_code_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE region_code IS NOT NULL\n  AND facility_zone = 'ZONE-2'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 20999000000,
-        "end_offset": 21163000000
-      },
-      "expected": {
-        "columns": [
-          "region_code_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "AP-EAST",
-            "3"
-          ],
-          [
-            "AP-CENTRAL",
-            "3"
-          ],
-          [
-            "US-WEST",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q352",
-      "sql": "SELECT COALESCE(build_version, 'Unknown') AS build_version_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE build_version IS NOT NULL\n  AND site_name = 'DC-East'\nGROUP BY build_version\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 21059000000,
-        "end_offset": 21223000000
-      },
-      "expected": {
-        "columns": [
-          "build_version_display",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q353",
-      "sql": "SELECT COALESCE(client_agent, 'N/A') AS client_agent_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE client_agent IS NOT NULL\n  AND facility_zone = 'ZONE-1'\nGROUP BY client_agent\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 21119000000,
-        "end_offset": 21283000000
-      },
-      "expected": {
-        "columns": [
-          "client_agent_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "Go-http-client/2.0 conveyor-monitor",
-            "3"
-          ],
-          [
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "3"
-          ],
-          [
-            "Alamofire/5.8.0 (iOS; scan-app)",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q354",
-      "sql": "SELECT COALESCE(scan_category, 'none') AS scan_category_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE scan_category IS NOT NULL\n  AND facility_zone = 'ZONE-3'\nGROUP BY scan_category\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 21179000000,
-        "end_offset": 21343000000
-      },
-      "expected": {
-        "columns": [
-          "scan_category_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "internal",
-            "3"
-          ],
-          [
-            "inbound",
-            "2"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q355",
-      "sql": "SELECT COALESCE(auth_result, 'none') AS auth_result_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE auth_result IS NOT NULL\n  AND control_center = 'CC-BETA'\nGROUP BY auth_result\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 21239000000,
-        "end_offset": 21403000000
-      },
-      "expected": {
-        "columns": [
-          "auth_result_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "fail",
-            "6"
-          ],
-          [
-            "pass",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q356",
-      "sql": "SELECT COALESCE(operation_name, 'N/A') AS operation_name_display, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE operation_name IS NOT NULL\n  AND sorter_model = 'SORT-X1'\nGROUP BY operation_name\nORDER BY cnt DESC\nLIMIT 10",
-      "category": "combined",
-      "time_offset": {
-        "start_offset": 21299000000,
-        "end_offset": 21463000000
-      },
-      "expected": {
-        "columns": [
-          "operation_name_display",
-          "cnt"
-        ],
-        "results": [
-          [
-            "RerouteTrack",
-            "3"
-          ],
-          [
-            "SearchItems",
-            "3"
-          ],
-          [
-            "RetryScan",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
+        "note": "array_has + cast_to_arr + COALESCE + lower() IN \u2014 OO-specific array functions, skip_sqllogictest"
       }
     }
   ],

@@ -1353,6 +1353,30 @@
         "start_offset": 6059000000,
         "end_offset": 6223000000
       }
+    },
+    {
+      "id": "Q167",
+      "sql": "SELECT duration_range, COUNT(*) AS query_count,   approx_percentile_cont(CAST(resp_time AS FLOAT), 0.95) AS p95 FROM (   SELECT     CASE       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 240 THEN '1. p95_0h_4h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 240 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 720 THEN '2. p95_4h_12h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 720 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 1440 THEN '3. p95_12h_1d'       ELSE '4. p95_gt_1d'     END AS duration_range,     COUNT(_timestamp) AS query_count,     action_category,     MAX(cls_score) AS resp_time   FROM \"{stream}\"   WHERE action_category IN ('performanceMetric', 'navigationTiming')   GROUP BY action_category, _timestamp ) GROUP BY duration_range ORDER BY duration_range ASC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 9959000000,
+        "end_offset": 10123000000
+      },
+      "expected": {
+        "columns": [
+          "duration_range",
+          "query_count",
+          "p95"
+        ],
+        "results": [
+          [
+            "1. p95_0h_4h",
+            "17",
+            "0.30000001192092896"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
   "last_query_id": 102

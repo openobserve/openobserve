@@ -114,29 +114,14 @@
         ],
         "results": [
           [
-            "SORT-A7",
-            "manual",
-            "6"
-          ],
-          [
             "SORT-X1",
             "auto",
             "6"
           ],
           [
-            "None",
-            "hybrid",
-            "3"
-          ],
-          [
             "SORT-A7",
-            "hybrid",
-            "3"
-          ],
-          [
-            "None",
             "manual",
-            "3"
+            "6"
           ],
           [
             "SORT-M3",
@@ -144,13 +129,28 @@
             "3"
           ],
           [
+            "None",
+            "hybrid",
+            "3"
+          ],
+          [
             "SORT-X1",
+            "manual",
+            "3"
+          ],
+          [
+            "None",
             "manual",
             "3"
           ],
           [
             "SORT-Q5",
             "manual",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "hybrid",
             "3"
           ]
         ],

@@ -742,223 +742,37 @@
       }
     },
     {
-      "id": "Q249",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|localhost|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|test|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login|test')\n  AND issue_type != 'Access From Geo'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 100",
+      "id": "Q163",
+      "sql": "SELECT approx_distinct(source_ip) AS ipc, COUNT(*) AS count, attack_name FROM \"{stream}\" WHERE filter_result = 'block'   AND issue_type != 'N/A'   AND attack_name NOT LIKE 'Malicious%'   AND geo_country = 'US'   AND NOT regexp_like(http_request, '127\\.0\\.0\\.1|192\\.168\\.|localhost|test|sleep', 'i')   AND NOT regexp_like(user_agent_str, 'nessus|sleep|test|python|script', 'i')   AND re_not_match(uri_path, 'favicon|etc|git|blocked|admin|config|bash|login')   AND re_not_match(user_agent_str, '127.0.0.1|nessus|sleep|test') GROUP BY attack_name HAVING COUNT(*) >= approx_distinct(source_ip)   AND approx_distinct(source_ip) > 1 ORDER BY ipc DESC LIMIT 50",
       "category": "full_text_search",
       "time_offset": {
-        "start_offset": 14879000000,
-        "end_offset": 15043000000
+        "start_offset": 9719000000,
+        "end_offset": 9883000000
       },
       "expected": {
         "columns": [
-          "facility_zone",
-          "cnt"
+          "ipc",
+          "count",
+          "attack_name"
         ],
         "results": [],
         "results_mode": "rowsort"
       }
     },
     {
-      "id": "Q250",
-      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|config|bash',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|go/|script|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|etc')\n  AND issue_type != 'SQL Injection'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 100",
+      "id": "Q164",
+      "sql": "SELECT page_slug, COUNT(_timestamp) as cnt, order_ref as \"key\", (CASE WHEN auth_result = filter_result THEN 'new' ELSE 'old' END) as \"session\" FROM \"{stream}\" WHERE (match_all('warehouse') AND page_slug = 'itemPage')   AND info_tag IS NULL   AND passthrough_flag = 'false'   AND status_code = '200'   AND graphql_operation = 'verifyPayment'   AND (user_agent_str NOT LIKE '%bot%' AND user_agent_str NOT LIKE '%test%') GROUP BY \"key\", page_slug, \"session\" HAVING (cnt > 1 AND \"session\" = 'new') ORDER BY cnt DESC",
       "category": "full_text_search",
       "time_offset": {
-        "start_offset": 14939000000,
-        "end_offset": 15103000000
+        "start_offset": 9779000000,
+        "end_offset": 9943000000
       },
       "expected": {
         "columns": [
-          "control_center",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q251",
-      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(resource_path,\n    'admin|config|bash|login|ssh|key',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|go/|test|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login')\n  AND issue_type != 'XSS Attempt'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 14999000000,
-        "end_offset": 15163000000
-      },
-      "expected": {
-        "columns": [
-          "site_name",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q252",
-      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND NOT regexp_like(resource_path,\n    'localhost|test|admin|config|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|curl|test|script|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|test|etc|git')\n  AND issue_type != 'Access From Geo'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15059000000,
-        "end_offset": 15223000000
-      },
-      "expected": {
-        "columns": [
-          "region_code",
-          "cnt"
-        ],
-        "results": [
-          [
-            "US-EAST",
-            "3"
-          ],
-          [
-            "AP-SOUTH",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q253",
-      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|favicon|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|go/|test|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|ssh')\n  AND issue_type != 'Path Traversal'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15119000000,
-        "end_offset": 15283000000
-      },
-      "expected": {
-        "columns": [
-          "conveyor_lane",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q254",
-      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    'admin|config|login|ssh|key|test',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|test|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|test|passwd')\n  AND issue_type != 'Access From Geo'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15179000000,
-        "end_offset": 15343000000
-      },
-      "expected": {
-        "columns": [
-          "sorter_model",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q255",
-      "sql": "SELECT facility_zone, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|passwd|etc',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'curl|go/|test|server|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'admin|config|login|ssh|key|bash')\n  AND issue_type != 'SQL Injection'\nGROUP BY facility_zone\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15239000000,
-        "end_offset": 15403000000
-      },
-      "expected": {
-        "columns": [
-          "facility_zone",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q256",
-      "sql": "SELECT control_center, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'POST'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|localhost|test|admin|config',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|curl|server|library',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|bash')\n  AND issue_type != 'CSRF Attempt'\nGROUP BY control_center\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15299000000,
-        "end_offset": 15463000000
-      },
-      "expected": {
-        "columns": [
-          "control_center",
-          "cnt"
-        ],
-        "results": [
-          [
-            "CC-BETA",
-            "3"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q257",
-      "sql": "SELECT site_name, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    'admin|config|bash|login|ssh|key|test',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|python|go/|curl|script',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|test|etc')\n  AND issue_type != 'Access From Geo'\nGROUP BY site_name\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15359000000,
-        "end_offset": 15523000000
-      },
-      "expected": {
-        "columns": [
-          "site_name",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q258",
-      "sql": "SELECT region_code, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'passed'\n  AND NOT regexp_like(resource_path,\n    'localhost|test|admin|config|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|test|library|server',\n    'i'\n  )\n  AND re_not_match(resource_path, 'favicon|admin|config|bash|login|ssh')\n  AND issue_type != 'XSS Attempt'\nGROUP BY region_code\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15419000000,
-        "end_offset": 15583000000
-      },
-      "expected": {
-        "columns": [
-          "region_code",
-          "cnt"
-        ],
-        "results": [],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q259",
-      "sql": "SELECT conveyor_lane, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE http_method = 'GET'\n  AND NOT regexp_like(endpoint_path,\n    'favicon|test|admin|passwd|etc',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'nessus|curl|go/|test|library',\n    'i'\n  )\n  AND re_not_match(resource_path, 'admin|config|login|ssh|key|test')\n  AND issue_type != 'Path Traversal'\nGROUP BY conveyor_lane\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15479000000,
-        "end_offset": 15643000000
-      },
-      "expected": {
-        "columns": [
-          "conveyor_lane",
-          "cnt"
-        ],
-        "results": [
-          [
-            "LANE-A",
-            "6"
-          ]
-        ],
-        "results_mode": "rowsort"
-      }
-    },
-    {
-      "id": "Q260",
-      "sql": "SELECT sorter_model, COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE filter_result = 'blocked'\n  AND NOT regexp_like(resource_path,\n    '127.0.0.1|favicon|test|admin|passwd',\n    'i'\n  )\n  AND NOT regexp_like(client_agent,\n    'python|curl|server|script|go/',\n    'i'\n  )\n  AND re_not_match(endpoint_path, 'favicon|admin|config|test|git')\n  AND issue_type != 'Access From Geo'\nGROUP BY sorter_model\nORDER BY cnt DESC\nLIMIT 100",
-      "category": "full_text_search",
-      "time_offset": {
-        "start_offset": 15539000000,
-        "end_offset": 15703000000
-      },
-      "expected": {
-        "columns": [
-          "sorter_model",
-          "cnt"
+          "page_slug",
+          "cnt",
+          "key",
+          "session"
         ],
         "results": [],
         "results_mode": "rowsort"
