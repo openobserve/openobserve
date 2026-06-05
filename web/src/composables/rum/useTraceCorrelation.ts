@@ -66,7 +66,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
       // Query RUM data for this trace ID
       const rumQuery = {
         query: {
-          sql: `select * from _rumdata where "_oo.trace_id" = '${traceId.value}' order by ${store.state.zoConfig.timestamp_column} desc`,
+          sql: `select * from _rumdata where "_oo_trace_id" = '${traceId.value}' order by ${store.state.zoConfig.timestamp_column} desc`,
           start_time: Date.now() * 1000 - 3600000000, // Last hour in microseconds
           end_time: Date.now() * 1000,
           from: 0,

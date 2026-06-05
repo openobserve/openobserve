@@ -58,10 +58,14 @@ vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
 
-// ODrawer stub: keeps slot content queryable, surfaces open state and
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
+
+// ODialog stub: keeps slot content queryable, surfaces open state and
 // proxies the migration emit so the parent's @update:open wiring is exercised.
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   props: [
     "open",
     "width",
@@ -113,7 +117,7 @@ const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
     global: {
       plugins: [i18n, router, store],
       stubs: {
-        ODrawer: ODrawerStub,
+        ODialog: ODialogStub,
         OButton: OButtonStub,
       },
     },
@@ -146,7 +150,7 @@ describe("AddUpdateOrganization", () => {
   it("forwards drawer update:open to parent", async () => {
     const wrapper = mountComp();
     await wrapper
-      .findComponent({ name: "ODrawer" })
+      .findComponent({ name: "ODialog" })
       .vm.$emit("update:open", false);
     expect(wrapper.emitted("update:open")).toBeTruthy();
     expect(wrapper.emitted("update:open")![0]).toEqual([false]);
@@ -154,7 +158,7 @@ describe("AddUpdateOrganization", () => {
 
   it("cancel button emits update:open false (replaces router.replace cancel)", async () => {
     const wrapper = mountComp();
-    await wrapper.findComponent({ name: "ODrawer" }).vm.$emit("click:secondary");
+    await wrapper.findComponent({ name: "ODialog" }).vm.$emit("click:secondary");
     expect(wrapper.emitted("update:open")).toBeTruthy();
     expect(wrapper.emitted("update:open")![0]).toEqual([false]);
   });
@@ -163,7 +167,7 @@ describe("AddUpdateOrganization", () => {
     const wrapper = mountComp();
     await flushPromises();
     expect(
-      wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled"),
+      wrapper.findComponent({ name: "ODialog" }).props("primaryButtonDisabled"),
     ).toBe(true);
   });
 
@@ -177,7 +181,7 @@ describe("AddUpdateOrganization", () => {
 
     // onSubmit is wired to ODrawer's @click:primary, not a <form> submit.
     await wrapper
-      .findComponent({ name: "ODrawer" })
+      .findComponent({ name: "ODialog" })
       .vm.$emit("click:primary");
     await flushPromises();
 
@@ -211,7 +215,7 @@ describe("AddUpdateOrganization", () => {
 
     // Trigger via ODrawer @click:primary (replaces the old <form> submit)
     await wrapper
-      .findComponent({ name: "ODrawer" })
+      .findComponent({ name: "ODialog" })
       .vm.$emit("click:primary");
     await flushPromises();
 
@@ -237,7 +241,7 @@ describe("AddUpdateOrganization", () => {
 
     // Trigger via ODrawer @click:primary
     await wrapper
-      .findComponent({ name: "ODrawer" })
+      .findComponent({ name: "ODialog" })
       .vm.$emit("click:primary");
     await flushPromises();
 
@@ -279,7 +283,7 @@ describe("AddUpdateOrganization.vue – billing group gating", () => {
     const w = mount(AddUpdateOrganization, {
       global: {
         plugins: [store, i18n, router],
-        stubs: { ODrawer: ODrawerStub, OButton: OButtonStub },
+        stubs: { ODialog: ODialogStub, OButton: OButtonStub },
       },
       props: { open: true, modelValue: { id: "", name: "" } },
     });

@@ -162,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('alerts.cancel')"
       :primary-button-label="t('alerts.save')"
       :primary-button-disabled="isSubmitting"
+      form-id="action-script-clone-form"
       @click:secondary="showForm = false"
-      @click:primary="submitForm"
     >
       <template #header-left>
         <div

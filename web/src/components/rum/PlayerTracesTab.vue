@@ -1,0 +1,579 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+    <!-- Loading state -->
+    <div
+      v-if="loading"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3"
+      data-test="rum-player-traces-tab-loading"
+    >
+      <OSpinner size="md" />
+      <small>{{ t("rum.loadingErrorDetails") }}</small>
+    </div>
+
+    <!-- Error state -->
+    <div
+      v-else-if="error"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-4 tw:p-4"
+      data-test="rum-player-traces-tab-error"
+    >
+      <OIcon name="error-outline" size="lg" class="tw:text-[var(--o2-status-error)]" />
+      <p class="tw:text-center">{{ error }}</p>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="fetchTraces"
+        data-test="rum-player-traces-tab-retry-btn"
+      >
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
+
+    <!-- Empty state -->
+    <div
+      v-else-if="correlatedViews.length === 0"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-3 tw:p-4"
+      data-test="rum-player-traces-tab-empty"
+    >
+      <OIcon name="info" size="lg" class="tw:text-[var(--o2-text-muted)]" />
+      <p class="tw:text-center tw:text-[var(--o2-text-secondary)]">
+        {{ t("rum.noCorrelatedTraces") }}
+      </p>
+    </div>
+
+    <!-- Detail view: embedded TraceDetails -->
+    <div
+      v-else-if="selectedTrace"
+      class="tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+    >
+      <!-- Trace detail header -->
+      <div class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]">
+        <OButton
+          variant="ghost"
+          size="xs"
+          @click="closeTraceDetail"
+          data-test="rum-player-traces-tab-back-btn"
+          aria-label="Back"
+        >
+          <OIcon name="arrow-back" size="sm" />
+        </OButton>
+        <code class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:truncate tw:min-w-0 tw:flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
+        <div class="tw:flex tw:items-center tw:gap-1.5 tw:flex-shrink-0">
+          <span
+            v-if="selectedTrace.metadata?.errorCount > 0"
+            class="tw:font-bold tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-status-error-bg)]! tw:text-[var(--o2-status-error-text)]!"
+          >
+            <OIcon name="error" size="xs" />
+            {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+          </span>
+          <button
+            v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap tw:cursor-pointer hover:tw:bg-[var(--o2-border-color)]"
+            :title="t('rum.seekToMoment')"
+            data-test="rum-player-traces-tab-seek-btn"
+            @click="seekToTrace(selectedTrace)"
+          >
+            <OIcon name="play-arrow" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ traceTimeOffset(selectedTrace.metadata.start_time) }}
+          </button>
+          <span
+            v-if="selectedTrace.metadata?.e2eDuration"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+          >
+            <OIcon name="timer" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
+          </span>
+          <span
+            v-if="selectedTrace.metadata?.spanCount"
+            class="tw:inline-flex tw:items-center tw:gap-1 tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.6875rem] tw:bg-[var(--o2-hover-accent)] tw:text-[var(--o2-text-body)] tw:whitespace-nowrap"
+          >
+            <OIcon name="lan" size="xs" class="tw:text-[var(--o2-text-secondary)]" />
+            {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
+          </span>
+          <OButton
+            variant="outline"
+            size="chip"
+            @click="traceDetailsRef?.handleExpandToFullView()"
+            data-test="rum-player-traces-tab-open-full-btn"
+            :aria-label="t('traces.openInFullView')"
+          >
+            <OIcon name="open-in-new" size="sm" />
+            <OTooltip :content="t('traces.openInFullView')" />
+          </OButton>
+        </div>
+      </div>
+      <div class="tw:flex-1 tw:overflow-hidden">
+        <TraceDetails
+          ref="traceDetailsRef"
+          mode="embedded"
+          :trace-id-prop="selectedTrace.traceId"
+          stream-name-prop="default"
+          :span-list-prop="[]"
+          :start-time-prop="selectedTraceStartTime"
+          :end-time-prop="selectedTraceEndTime"
+          :show-header="false"
+          :show-back-button="false"
+          :hide-session-replay-button="true"
+          :show-timeline="true"
+          :show-log-stream-selector="false"
+          :show-share-button="false"
+          :show-close-button="false"
+          :show-expand-button="true"
+          :enable-correlation-links="true"
+          :initial-timeline-expanded="false"
+          class="tw:h-full!"
+        />
+      </div>
+    </div>
+
+    <!-- List view -->
+    <div v-else class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:px-2">
+      <!-- Filter bar -->
+      <div class="tw:flex tw:items-center tw:pr-2 tw:py-1  tw:shrink-0 tw:min-h-[2rem]">
+        <OBadge
+          variant="default"
+          data-test="rum-player-traces-tab-count-badge"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OBadge>
+        <OBadge
+          v-if="totalErrorCount > 0"
+          variant="error"
+          data-test="rum-player-traces-tab-error-count-badge"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
+        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OBadge>
+      </div>
+
+      <!-- Traces table -->
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:rounded">
+        <TenstackTable
+          :rows="correlatedViews"
+          :columns="traceColumns"
+          :row-height="32"
+          :enable-row-expand="false"
+          :enable-text-highlight="false"
+          :enable-status-bar="false"
+          :default-columns="false"
+          :enable-column-reorder="true"
+          :enable-ai-context-button="false"
+          :row-class="traceRowClass"
+          data-test="rum-player-traces-tab-table"
+          @click:dataRow="handleTraceRowClick"
+        >
+          <template #cell-timestamp="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:whitespace-nowrap"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <span class="tw:text-xs tw:tabular-nums">
+                {{ formatTraceTimestamp(item.metadata?.start_time) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-route="{ item, cell }">
+            <div
+              class="tw:overflow-hidden"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <span
+                class="tw:truncate tw:font-mono tw:text-xs tw:block"
+                :title="item.route"
+              >
+                {{ shortRoute(item.route) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-duration="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:whitespace-nowrap"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <span class="tw:text-xs tw:tabular-nums">
+                {{ formatTimeWithSuffix(item.metadata?.e2eDuration * 1000) }}
+              </span>
+            </div>
+          </template>
+          <template #cell-status="{ item, cell }">
+            <div
+              class="tw:overflow-hidden tw:flex tw:items-center"
+              :style="{ width: cell.column.getSize() + 'px' }"
+            >
+              <TraceStatusCell :item="{ errors: item.metadata?.errorCount ?? 0 }" />
+            </div>
+          </template>
+        </TenstackTable>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, watch, onMounted, computed } from "vue";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import searchService from "@/services/search";
+import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
+import TenstackTable from "@/components/TenstackTable.vue";
+import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+
+const { t } = useI18n();
+const store = useStore();
+
+const props = defineProps({
+  sessionId: {
+    type: String,
+    required: true,
+  },
+  currentTime: {
+    type: Number,
+    default: 0,
+  },
+  startTime: {
+    type: Number,
+    default: 0,
+  },
+  endTime: {
+    type: Number,
+    default: 0,
+  },
+});
+
+const emit = defineEmits(["event-emitted"]);
+
+// ── State ───────────────────────────────────────────────────
+const loading = ref(false);
+const error = ref<string | null>(null);
+const correlatedViews = ref<any[]>([]);
+const selectedTrace = ref<any>(null);
+const selectedTraceStartTime = ref(0);
+const selectedTraceEndTime = ref(0);
+const traceDetailsRef = ref<any>(null);
+const traceMetadata = ref<Record<string, any>>({});
+const metadataLoading = ref(false);
+const metadataError = ref<string | null>(null);
+
+const totalErrorCount = computed(() =>
+  correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+);
+
+const {fetchQueryDataWithHttpStream} = useHttpStreaming();
+
+// ── Table column definitions ────────────────────────────────
+const traceColumns = computed(() => [
+  {
+    id: "timestamp",
+    header: t("rum.timestamp"),
+    accessorFn: (row: any) => row.metadata?.start_time ?? 0,
+    size: 100,
+    minSize: 100,
+    maxSize: 200,
+    meta: { align: "left", slot: true },
+  },
+  {
+    id: "route",
+    header: t("rum.route"),
+    accessorFn: (row: any) => shortRoute(row.route),
+    size: 400,
+    minSize: 80,
+    maxSize: 800,
+    meta: { align: "left", slot: true },
+  },
+  {
+    id: "duration",
+    header: t("rum.duration"),
+    accessorFn: (row: any) => row.metadata?.e2eDuration ?? 0,
+    size: 100,
+    minSize: 50,
+    maxSize: 200,
+    meta: { align: "right", slot: true },
+  },
+  {
+    id: "status",
+    header: t("common.status"),
+    accessorFn: (row: any) => row.metadata?.errorCount ?? 0,
+    size: 120,
+    minSize: 80,
+    maxSize: 180,
+    meta: { align: "left", slot: true },
+  },
+]);
+
+function traceRowClass(row: any): string {
+  return row.metadata?.errorCount > 0 ? "trace-row--error" : "";
+}
+
+// ── Formatting helpers ──────────────────────────────────────
+function shortRoute(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.pathname + u.search || "/";
+  } catch {
+    return url;
+  }
+}
+
+// Converts nanosecond trace timestamp to millisecond offset from session start,
+// matching SessionViewer's formatTimeDifference(event.date, session.start_time) pattern.
+function traceRelativeTimeMs(startTimeNs: number): number {
+  if (!props.startTime || !startTimeNs) return 0;
+  const startTimeMs = Math.floor(startTimeNs / 1_000_000);
+  return Math.max(0, startTimeMs - props.startTime);
+}
+
+function formatTraceTimestamp(startTimeNs: number): string {
+  if (!startTimeNs || !props.startTime) return "—";
+  const offsetMs = traceRelativeTimeMs(startTimeNs);
+  const totalSec = Math.floor(offsetMs / 1000);
+  const mm = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const ss = (totalSec % 60).toString().padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function traceTimeOffset(startTimeNs: number): string {
+  if (!props.startTime) return "";
+  const offsetMs = traceRelativeTimeMs(startTimeNs);
+  const totalSec = Math.floor(offsetMs / 1000);
+  const min = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const sec = (totalSec % 60).toString().padStart(2, "0");
+  return `${min}:${sec}`;
+}
+
+// ── Data fetching ───────────────────────────────────────────
+async function fetchTraceMetadata(traceIds: string[]) {
+  if (traceIds.length === 0) return {};
+
+  const orgId = store.state.selectedOrganization.identifier;
+  const nowMs = Date.now();
+  const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
+  const searchEndTime = (props.endTime || nowMs) * 1000;
+
+  // Build filter for multiple trace IDs
+  const safeTraceIds = traceIds.map(id => id.replace(/'/g, "''"));
+  const filter = safeTraceIds.length === 1
+    ? `trace_id='${safeTraceIds[0]}'`
+    : `trace_id IN (${safeTraceIds.map(id => `'${id}'`).join(',')})`;
+
+  return new Promise((resolve, reject) => {
+    const traceId = generateTraceContext().traceId;
+    const metadata: Record<string, any> = {};
+
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq: {
+          stream_name: "default",
+          filter,
+          start_time: searchStartTime,
+          end_time: searchEndTime,
+          from: 0,
+          size: 1000,
+        },
+        type: "traces",
+        traceId,
+        org_id: orgId,
+      },
+      {
+        data: (_payload, response) => {
+          const hits = response.content?.results?.hits || [];
+          hits.forEach((hit: any) => {
+            metadata[hit.trace_id] = {
+              duration: hit.duration,
+              spanCount: hit.spans?.[0] || 0,
+              errorCount: hit.spans?.[1] || 0,
+              serviceCount: hit.service_name?.length || 0,
+              rootService: hit.first_event?.service_name || 'unknown',
+              rootOperation: hit.first_event?.operation_name || 'unknown',
+              start_time: hit.start_time,
+              end_time: hit.end_time,
+            };
+          });
+        },
+        error: (_, error) => reject(error),
+        complete: () => resolve(metadata),
+        reset: () => {}
+      }
+    );
+  });
+}
+
+async function fetchTraces() {
+  if (!props.sessionId) return;
+
+  loading.value = true;
+  error.value = null;
+
+  try {
+    const orgId = store.state.selectedOrganization.identifier;
+    const nowMs = Date.now();
+    const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
+    const searchEndTime = (props.endTime || nowMs) * 1000;
+
+    const rumQuery = {
+      query: {
+        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, _oo_trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND _oo_trace_id IS NOT NULL AND action_id is not null GROUP BY _oo_trace_id ORDER BY _date ASC`,
+        start_time: searchStartTime,
+        end_time: searchEndTime,
+        from: 0,
+        size: 250,
+      },
+    };
+
+    const rumResponse = await searchService.search(
+      {
+        org_identifier: orgId,
+        query: rumQuery,
+        page_type: "logs",
+      },
+      "RUM",
+    );
+
+    const rumHits = rumResponse.data?.hits || [];
+
+    if (rumHits.length === 0) {
+      correlatedViews.value = [];
+      return;
+    }
+
+    // Deduplicate by trace_id, keep first occurrence for view context
+    const traceMap = new Map<string, any>();
+    for (const hit of rumHits) {
+      const traceId = hit._oo_trace_id;
+      if (!traceId || traceMap.has(traceId)) continue;
+      const viewUrl = hit._view_url || hit.view_url || "";
+      traceMap.set(traceId, {
+        traceId,
+        rumDate: hit._date || 0,
+        route: viewUrl,
+        label: viewUrl ? shortRoute(viewUrl).replace(/\/$/, "") || "/" : traceId,
+        kind: (hit._view_loading_type || hit.view_loading_type) === "initial_load" ? "load" : "route_change",
+        viewId: hit._view_id || hit.view_id || "",
+      });
+    }
+
+    const views = Array.from(traceMap.values());
+
+    // Fetch trace metadata for all trace IDs and filter to only those present in traces
+    let filteredViews = views;
+    if (views.length > 0) {
+      metadataLoading.value = true;
+      try {
+        const metadata = await fetchTraceMetadata(views.map(v => v.traceId));
+
+        // Only keep views whose trace_id exists in the traces stream, sorted by start time
+        filteredViews = views
+          .filter(view => metadata[view.traceId])
+          .map(view => {
+            const meta = metadata[view.traceId];
+            const e2eDuration = view.rumDate && meta.end_time
+              ? Math.max(0, Math.floor(meta.end_time / 1_000_000) - view.rumDate)
+              : 0;
+            return { ...view, metadata: { ...meta, e2eDuration: e2eDuration } };
+          })
+          .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));
+
+        traceMetadata.value = metadata;
+      } catch (err: any) {
+        metadataError.value = err?.message || 'Failed to fetch trace metadata';
+        console.warn('Trace metadata fetch failed:', err);
+      } finally {
+        metadataLoading.value = false;
+      }
+    }
+
+    correlatedViews.value = filteredViews;
+  } catch (err: any) {
+    error.value = err?.message || t("rum.failedToFetchTraces");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function openTraceDetail(view: any) {
+  selectedTrace.value = view;
+
+  const nowMs = Date.now();
+  const fallbackStart = (props.startTime || (nowMs - 86400000)) * 1000;
+  const fallbackEnd = (props.endTime || nowMs) * 1000;
+
+  const meta = traceMetadata.value[view.traceId];
+  if (meta?.start_time && meta?.end_time) {
+    const ONE_MINUTE_US = 60_000_000;
+    selectedTraceStartTime.value = Math.floor(meta.start_time / 1000) - ONE_MINUTE_US;
+    selectedTraceEndTime.value = Math.ceil(meta.end_time / 1000) + ONE_MINUTE_US;
+  } else {
+    selectedTraceStartTime.value = fallbackStart;
+    selectedTraceEndTime.value = fallbackEnd;
+  }
+}
+
+function closeTraceDetail() {
+  selectedTrace.value = null;
+  selectedTraceStartTime.value = 0;
+  selectedTraceEndTime.value = 0;
+}
+
+function handleTraceRowClick(view: any) {
+  openTraceDetail(view);
+  const relativeTimeMs = traceRelativeTimeMs(view.metadata?.start_time);
+  if (relativeTimeMs > 0) {
+    emit("event-emitted", "trace-row-click", { relativeTime: relativeTimeMs });
+  }
+}
+
+function seekToTrace(view: any) {
+  const relativeTimeMs = traceRelativeTimeMs(view.metadata?.start_time);
+  if (relativeTimeMs >= 0) {
+    emit("event-emitted", "trace-seek", { relativeTime: relativeTimeMs });
+  }
+}
+
+// ── Lifecycle ───────────────────────────────────────────────
+onMounted(() => {
+  fetchTraces();
+});
+
+watch(
+  () => props.sessionId,
+  () => {
+    correlatedViews.value = [];
+    selectedTrace.value = null;
+    closeTraceDetail();
+    fetchTraces();
+  },
+);
+</script>
+
+<style scoped lang="scss">
+.player-traces-tab {
+  height: 100%;
+  overflow: hidden;
+}
+
+:deep(.trace-details-content .card-container){
+  box-shadow: none
+}
+
+:deep(.trace-row--error td:first-child) {
+  border-left: 2px solid var(--o2-status-error);
+}
+</style>

@@ -22,10 +22,10 @@ export class CreateOrgPage {
         // ODrawer footer buttons exposed via o-drawer-{primary|secondary}-btn,
         // scoped under the dialog wrapper data-test for uniqueness.
         this.saveOrgButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-primary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-primary-btn"]'
         );
         this.cancelOrgButton = page.locator(
-            '[data-test="add-update-organization-dialog"] [data-test="o-drawer-secondary-btn"]'
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-secondary-btn"]'
         );
 
         // ── Search input ──────────────────────────────────────────────────

@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 44;
+pub const DB_SCHEMA_VERSION: u64 = 45;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1068,6 +1068,12 @@ pub struct Common {
     )]
     pub feature_query_skip_wal: bool,
     #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
         help = "Enable shared memtable across multiple organizations"
@@ -1373,6 +1379,12 @@ pub struct Common {
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
+    #[env_config(
+        name = "ZO_ONLINE_EVALS_ENABLED",
+        default = false,
+        help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
+    )]
+    pub online_evals_enabled: bool,
     #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",

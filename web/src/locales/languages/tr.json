@@ -437,7 +437,8 @@
     "pipeline": "Boru hatları",
     "language": "Dil",
     "actions": "Eylemler",
-    "incidents": "Olaylar"
+    "incidents": "Olaylar",
+    "evals": "Evalar"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -490,7 +491,22 @@
     "getStartedRUM": "Gerçek Kullanıcı İzleme'yi kullanmaya başlayın",
     "loadingErrorDetails": "Sıkı durun, hata ayrıntılarını getiriyoruz.",
     "eventID": "Olay Kimliği",
-    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz."
+    "loadingApplicationErrors": "Sıkı bekleyin, uygulama hatalarını getiriyoruz.",
+    "traces": "İzleri",
+    "noCorrelatedTraces": "Bu oturum için ilişkili iz bulunamadı.",
+    "viewTraceDetails": "İzleme Ayrıntılarını Görüntüle",
+    "routeChange": "Güzergah",
+    "initialView": "İlk",
+    "failedToFetchTraces": "İzleme verileri alınamadı. Lütfen tekrar deneyin.",
+    "traceNotFound": "İzleme ayrıntıları bulunamadı.",
+    "failedToFetchTraceDetails": "İzleme ayrıntıları yüklenemedi. Lütfen tekrar deneyin.",
+    "span": "kapsamak",
+    "spans": "açıklıklar",
+    "errorTraces": "hata izleri",
+    "seekToMoment": "Oturumda bu anı arayın",
+    "timeInSession": "Oturum Saati",
+    "route": "Güzergah",
+    "duration": "Süre"
   },
   "about": {
     "name": "Açık Gözlem",
@@ -517,9 +533,9 @@
     "ingestion_limit": "Yutma Sınırı",
     "today_usage": "Bugünün Kullanımı",
     "feature_comparision_ent_msg": "Aşağıda listelenen tüm gelişmiş özelliklere erişebilen OpenObserve Enterprise Edition'ı kullanıyorsunuz.",
-    "feature_comparision_plan_detail": "Planınız: Enterprise Edition, 200 GB/güne (~ 6 TB/ay) kadar veri alımı için ücretsizdir.",
+    "feature_comparision_plan_detail": "Planınız: Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için ücretsizdir.",
     "feature_comparision_os_msg": "Şu anda OpenObserve Open Source Edition kullanıyorsunuz. Aşağıdaki karşılaştırma tablosunda listelenen gelişmiş özelliklerin kilidini açmak için Enterprise Edition'a yükseltin.",
-    "feature_comparision_good_news": "İyi haber: OpenObserve Enterprise Edition, 200 GB/güne (~ 6 TB/ay) kadar veri alımı için tamamen ücretsizdir.",
+    "feature_comparision_good_news": "İyi haber: OpenObserve Enterprise Edition, 50 GB/güne (~ 1.5 TB/ay) kadar veri alımı için tamamen ücretsizdir.",
     "commit_lbl": "Taahhüt",
     "build_lbl": "Oluşturulmuş",
     "no_license_installed_lbl": "Yüklü Lisans Yok",
@@ -574,14 +590,14 @@
     "value_support_enterprise": "Kurumsal",
     "value_support_cloud": "Bulut",
     "value_cost_free": "Bedava",
-    "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 200 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
+    "value_cost_enterprise": "Kendi kendine barındırılıyorsa, 50 GB/güne kadar alınan veri için ücretsiz. Sonradan ödendi",
     "value_cost_cloud": "14 günlük ücretsiz deneme. Daha sonra ödenir",
     "feature_comparison_lbl": "Özellik Karşılaştırması",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Kurumsal Özellikler",
         "offer_text": "OpenObservere'i kendi kendinize barındırırken tüm kurumsal özellikleri tamamen ücretsiz edinin",
-        "badge_text": "200GB/güne kadar ücretsiz",
+        "badge_text": "50GB/güne kadar ücretsiz",
         "features_title": "OpenObserve Bulut Özellikleri",
         "features_subtitle": "Bulut aboneliğinize dahil olan tüm özellikler",
         "primary_button_text": "Şimdi İndirin"
@@ -589,11 +605,11 @@
       "enterprise_without_license": {
         "hero_title": "Kurumsal Özellikler",
         "offer_text": "OpenObserve dağıtımınızı en üst düzeye çıkarmak için ücretsiz bir lisans isteyin",
-        "badge_text": "{kota} GB/güne kadar ücretsiz",
+        "badge_text": "{quota} GB/güne kadar ücretsiz",
         "features_title": "Kullanılabilir Kurumsal Özellikler",
         "features_subtitle": "Sınırsız yeteneklerin kilidini açmak için ücretsiz bir lisans alın",
         "primary_button_text": "Ücretsiz Lisans Alın",
-        "license_note": "Lisanssız 100GB/gün • Lisanslı 200GB/gün"
+        "license_note": "Lisanssız 50GB/gün • Lisanslı 50GB/gün"
       },
       "enterprise_with_license": {
         "hero_title": "Kurumsal Sürümünüz",
@@ -607,7 +623,7 @@
       "open_source": {
         "hero_title": "Enterprise Edition'ı edinin",
         "offer_text": "Tüm kurumsal özellikleri tamamen ücretsiz indirin ve kilidini açın",
-        "badge_text": "200GB/güne kadar ücretsiz",
+        "badge_text": "50GB/güne kadar ücretsiz",
         "features_title": "Tüm Kurumsal Özelliklerin Kilidini Açın",
         "features_subtitle": "Üretime hazır gözlemlenebilirlik için ihtiyacınız olan her şey",
         "primary_button_text": "Şimdi İndirin"
@@ -3173,7 +3189,8 @@
         "cost": "Maliyet",
         "spans": "Açıklıklar"
       }
-    }
+    },
+    "openInFullView": "Tam görünümde aç"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -4046,6 +4063,348 @@
       "one": "Bana son saatteki hataları göster...",
       "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
       "three": "K8s düğüm sağlığı için bir gösterge tablosu oluşturun..."
+    }
+  },
+  "onlineEvals": {
+    "title": "Değerlendirmeler",
+    "description": "LLM sağlayıcılarını, puan tanımlarını, puanları ve canlı değerlendirme işlerini yapılandırın.",
+    "loading": "Çevrimiçi değerlendirme yapılandırması yükleniyor...",
+    "loadError": "Çevrimiçi değerlendirmeler yüklenemedi",
+    "deletePrompt": "{name} silmek mi?",
+    "deleted": "{label} silindi",
+    "deleteError": "{label} silinemedi",
+    "saved": "{label} kaydedildi",
+    "newButton": "Yeni {label}",
+    "search": "Arama {label}",
+    "refresh": "Yenile",
+    "allStatuses": "Tüm durumlar",
+    "noRowsFound": "{label} bulunamadı",
+    "getStartedHint": "Kablolama çevrimiçi değerlendirmesini başlatmak için bir tane oluşturun.",
+    "columns": {
+      "name": "İsim",
+      "status": "Durum",
+      "updated": "Güncellendi"
+    },
+    "actions": {
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "tabs": {
+      "jobs": "Eval İş İlanları",
+      "scorers": "Gol Sahipleri",
+      "scoreConfigs": "Puan Yapılandırmaları",
+      "providers": "Sağlayıcılar"
+    },
+    "singular": {
+      "jobs": "Değerlendirme İşi",
+      "scorers": "Golcü",
+      "scoreConfigs": "Puan Yapılandırması",
+      "providers": "Sağlayıcı"
+    },
+    "secondaryColumn": {
+      "jobs": "Akış",
+      "scorers": "Tür",
+      "scoreConfigs": "Veri türü",
+      "providers": "Sağlayıcı"
+    },
+    "jobStatus": {
+      "draft": "Taslak",
+      "active": "Aktif",
+      "paused": "Duraklatıldı",
+      "degraded": "Bozulmuş",
+      "archived": "Arşivlenmiş"
+    },
+    "buttons": {
+      "cancel": "İptal",
+      "create": "Oluştur",
+      "save": "Kaydet"
+    },
+    "scorerTypeDialog": {
+      "title": "Yeni bir Golcü Oluştur",
+      "intro": "Golcü türünü seçin. Nasıl yazmak istediğinize uygun olanı seçin ve çalıştırın.",
+      "llmJudgeTitle": "LLM Yargıcı",
+      "llmJudgeDescription": "Anlamsal olarak değerlendirmek için yapılandırılmış bir sağlayıcı kullanın.",
+      "remoteTitle": "Uzaktan",
+      "remoteDescription": "Puanlama için kendi HTTP uç noktanızı arayın.",
+      "codeTitle": "Kod",
+      "codeDescription": "Yakında geliyor."
+    },
+    "provider": {
+      "backTo": "Sağlayıcılara Geri Dön",
+      "createTitle": "LLM Sağlayıcısı Oluştur",
+      "editTitle": "LLM Sağlayıcısını Düzenle",
+      "subtitle": "LLM jüri puanları tarafından kullanılan model uç noktasını yapılandırın.",
+      "sectionTitle": "Sağlayıcı",
+      "nameLabel": "İsim",
+      "namePlaceholder": "Üretim OpenAI",
+      "typeLabel": "Sağlayıcı tipi",
+      "typePlaceholder": "open",
+      "endpointLabel": "Bitiş noktası",
+      "endpointPlaceholder": "İsteğe bağlı özel uç nokta",
+      "defaultModelLabel": "Varsayılan model",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Mevcut modeller",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Varsayılan sağlayıcı olarak kullan",
+      "authConfigLabel": "Yetkilendirme yapılandırması JSON",
+      "saveError": "Sağlayıcı kaydedilemedi"
+    },
+    "scoreConfig": {
+      "createTitle": "Yeni Puan Yapılandırması",
+      "editTitle": "Puan Yapılandırmasını Düzenle",
+      "subtitle": "Puan yapılandırmaları puan türünü, sağlık eşiklerini ve kategorileri tanımlar.",
+      "nameLabel": "İsim",
+      "dataTypeLabel": "Veri türü",
+      "descriptionLabel": "Açıklama",
+      "numericRangeLabel": "Sayısal aralık JSON",
+      "categoriesLabel": "Kategoriler JSON",
+      "healthyThresholdLabel": "Sağlıklı eşik JSON",
+      "dataTypes": {
+        "numeric": "Sayısal",
+        "categorical": "Kategorik",
+        "boolean": "Boole'ca"
+      },
+      "saveError": "Puan yapılandırması kaydedilemedi"
+    },
+    "scorer": {
+      "backTo": "Skorlar sayfasına geri dön",
+      "badgeRemote": "Uzaktan",
+      "badgeLlm": "LLM Yargıcı",
+      "createTitleRemote": "Uzaktan Kaydedici Oluştur",
+      "createTitleLlm": "LLM Jüri Puanı Oluşturun",
+      "editTitleRemote": "Uzaktan Kaydedici Düzenle",
+      "editTitleLlm": "LLM Hakem Puanını Düzenle",
+      "subtitleRemote": "Barındırdığınız bir HTTP uç noktasını arayın. İsteği yaparız; bir puan iade edersiniz.",
+      "subtitleLlm": "Bir dil modeli, sağladığınız komutu kullanarak her izi değerlendirir.",
+      "identitySection": "Kimlik",
+      "judgeSection": "Hakim yapılandırması",
+      "endpointSection": "Bitiş noktası",
+      "nameLabel": "İsim",
+      "namePlaceholder": "sadakat_yargıcı",
+      "producesScoreConfigLabel": "Puan yapılandırması üretir",
+      "producesScoreConfigNone": "Yok",
+      "scoreConfigVersionLabel": "Puan yapılandırma sürümü",
+      "latestSuffix": " (en son)",
+      "pinVersion": "Seçilen sürümü sabitleyin",
+      "descriptionLabel": "Açıklama",
+      "providerLabel": "Sağlayıcı",
+      "providerPlaceholder": "Sağlayıcı seçin",
+      "modelLabel": "Modeli",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Yargıç istemi",
+      "outputSchemaLabel": "Çıktı şeması JSON",
+      "remoteEndpointLabel": "Uzak uç nokta",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Gövde şablonu isteyin",
+      "saveError": "Gol oyuncusu kurtarılamadı",
+      "versionsLoadError": "Puan yapılandırma sürümleri yüklenemedi",
+      "testPanel": {
+        "title": "Bu golcüyü test et",
+        "hint": "Kaydetmeden önce puanınızı örnek verilerle deneyin. Test çalıştırmaları devam etmez.",
+        "emptyPrefix": "Gibi değişkenler ekleyin ",
+        "emptySuffix": " örnek alanlarla test etmek için puan şablonuna.",
+        "runButton": "Testi çalıştır",
+        "scenarioSuccess": "Sahte yanıt",
+        "scenarioAuth": "Kimlik doğrulama hatası",
+        "scenarioSchema": "Şema uyumsuzluğu",
+        "stateIdle": "Sonucu burada görmek için bir test yapın.",
+        "stateRunning": "Koşu gol testi...",
+        "successHeader": "Başarı",
+        "successScore": "puan: 0.92",
+        "successReasoning": "akıl yürütme: Cevap, sağlanan bağlam tarafından desteklenir.",
+        "authHeader": "Kimlik doğrulama başarısız oldu",
+        "authHint": "Kaydetmeden önce sağlayıcı kimlik bilgilerini kontrol edin.",
+        "schemaHeader": "Şema uyumsuzluğu",
+        "schemaHint": "Yanıt yapılandırılmış çıktı şemasıyla eşleşmedi.",
+        "valuePlaceholder": "{variable} için değer"
+      }
+    },
+    "job": {
+      "backTo": "Eval Jobs sayfasına geri dön",
+      "createTitle": "Çevrimiçi Değerlendirme İşi Oluştur",
+      "editTitle": "Çevrimiçi Değerlendirme İşini Düzenle",
+      "subtitle": "Bu değerlendirme işi için akış, puanlar, haritalama ve örnekleme davranışını seçin.",
+      "stepper": {
+        "target": "Hedef",
+        "scorers": "Gol Sahipleri",
+        "mapping": "Haritalama",
+        "sampling": "Örnekleme"
+      },
+      "targetSection": "Hedef",
+      "scorersSection": "Gol verenler ve haritalama",
+      "nameLabel": "İsim",
+      "namePlaceholder": "Üretim Sadakat Monitörü",
+      "streamLabel": "Giriş akışı",
+      "streamPlaceholder": "varsayılan",
+      "streamTypeLabel": "Akış türü",
+      "streamTypePlaceholder": "izleri",
+      "descriptionLabel": "Açıklama",
+      "samplingModeLabel": "Örnekleme modu",
+      "samplingValueLabel": "Örnekleme değeri JSON",
+      "samplingModes": {
+        "rate": "Oranı",
+        "all": "Hepsi",
+        "count": "Saymak"
+      },
+      "scorerPicker": {
+        "title": "Gol Sahipleri",
+        "hint": "Eşleşen her süre için koşmak için bir veya daha fazla oyuncu seçin.",
+        "meta": "{tür} · v {sürüm}"
+      },
+      "filter": {
+        "title": "Filtre koşulu",
+        "hint": "Yalnızca bu koşulla eşleşen açıklıklar örnekleme ve puanlamaya girer."
+      },
+      "inputMapping": {
+        "title": "Giriş eşleme",
+        "hint": "Her puan veren şablon değişkenine yayılma alanlarını eşleyin.",
+        "selectScorers": "Eşlemelerini yapılandırmak için puanları seçin.",
+        "noVariables": "Bu puanın eşlenecek şablon değişkenleri yoktur.",
+        "variableCount": "{count} değişkenler"
+      },
+      "preview": {
+        "title": "Önizleme",
+        "hint": "Üretim değerlendirme hedefini tanımlamak için soldaki alanları kullanın.",
+        "summaryTitle": "Özet",
+        "summaryName": "İsim",
+        "summaryType": "Tür",
+        "summaryStatus": "Durum",
+        "statusEditing": "Düzenleme",
+        "statusDraft": "Taslak",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "En az bir golcü seçin",
+      "saveError": "Eval işi kaydedilemedi"
+    },
+    "quality": {
+      "scopeLabel": "Bu çalışma alanındaki tüm kalite boyutları",
+      "timeRange": {
+        "label": "Zaman aralığı",
+        "last1h": "Son 1 saat",
+        "last24h": "Son 24 saat",
+        "last7d": "Son 7 gün",
+        "last30d": "Son 30 gün"
+      },
+      "sourceStream": {
+        "label": "Kaynak akışı",
+        "all": "Tüm yayınlar"
+      },
+      "refresh": "Yenile",
+      "kpis": {
+        "evaluated": {
+          "title": "Değerlendirilen İzler",
+          "unit": "",
+          "hint": "Penceredeki _llm_scores içindeki farklı izleme kimlikleri"
+        },
+        "qualityIssueRate": {
+          "title": "Kalite Sorun Oranı",
+          "unit": "%",
+          "hint": "Eşiğin altında herhangi bir boyuta sahip değerlendirilmiş izler"
+        },
+        "evaluationCost": {
+          "title": "Değerlendirme Maliyeti",
+          "unit": "$",
+          "hint": "Penceredeki LLM Jüri puanı maliyetinin toplamı"
+        },
+        "jobSuccess": {
+          "title": "İş Başarısı",
+          "unit": "%",
+          "hint": "Online Eval İş koşusu başarı oranı"
+        },
+        "scorerFailures": {
+          "title": "Golcü Başarısızlıkları",
+          "unit": "",
+          "hint": "Pencerede başarısız golcü çağrıları"
+        },
+        "latencyP95": {
+          "title": "Gecikme p95",
+          "unit": "s",
+          "hint": "Scorer-call p95 gecikmesi"
+        },
+        "vsPrev": "öncekine karşı",
+        "noData": "—"
+      },
+      "loading": "Kalite verileri yükleniyor...",
+      "detail": {
+        "loading": "Yapılandırma başına dökümü yükleniyor...",
+        "noData": "Bu pencerede bu yapılandırma için henüz puan yok.",
+        "drillTitle": "İzlere delin",
+        "splitByScorer": "Golcü tarafından bölünür",
+        "splitBySourceType": "Source_type ile bölün",
+        "trendTitle": "Eğilim",
+        "trendSubtitle": "{configName}, {kutu}",
+        "distributionTitle": "Puan dağılımı",
+        "compositionTitle": "Zamanla kompozisyon",
+        "categoryDistributionTitle": "Kategori dağılımı",
+        "passRateTitle": "Zaman içinde geçiş oranı",
+        "trueFalseTitle": "Doğru vs Yanlış",
+        "legendAvg": "Ort",
+        "legendP95": "p95",
+        "legendThreshold": "eşik {yön} {değer}",
+        "legendHealthy": "sağlıklı",
+        "legendUnhealthy": "sağlıksız",
+        "kpis": {
+          "average": "Ortalama",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Sağlıksız",
+          "healthy": "Sağlıklı",
+          "coverage": "Kapsam"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Tüm yapılandırmalar",
+        "empty": "Bu filtreyle eşleşen hiçbir yapılandırma yok."
+      },
+      "overview": {
+        "title": "Puan Yapılandırmalarına Genel Bakış",
+        "countSuffix": "{n} yapılandırmalar",
+        "searchPlaceholder": "Yapılandırmaları filtrele...",
+        "loading": "Yapılandırma başına toplamalar yükleniyor...",
+        "emptyNoConfigsTitle": "Henüz Puan Yapılandırması Yok",
+        "emptyNoConfigsHint": "Kalite boyutlarını izlemeye başlamak için ilk Skor Yapılandırmanızı tanımlayın.",
+        "emptyWaitingTitle": "İlk skorların inmesini bekliyorum",
+        "emptyWaitingHint": "Skor Yapılandırmalarınız bildirildi, ancak bu pencerede _llm_scores öğesine henüz puan yazılmadı.",
+        "waitingStepJob": "Bu yapılandırmalardan biri için puan üreten bir Çevrimiçi Değerlendirme İşini etkinleştirin",
+        "waitingStepRange": "Zaman aralığını genişletin - bugünün erken saatlerinde veya bu haftanın puanları bu pencerede olmayabilir",
+        "waitingStepRefresh": "Yenile'yi tıklayın — etkin bir işten alınan puanlar değerlendirmeden sonraki yaklaşık 1 dakika içinde görünür",
+        "waitingPrimaryCta": "Açık Eval İş İlanları",
+        "waitingRefreshCta": "Yenile",
+        "noThreshold": "eşik yok",
+        "columns": {
+          "scoreConfig": "Puan Yapılandırması",
+          "type": "Tür",
+          "totalScores": "Toplam Skorlar",
+          "coverage": "Kapsam",
+          "unhealthy": "Sağlıksız",
+          "trend": "Eğilim",
+          "threshold": "Sağlıklı ise",
+          "updated": "Güncellendi"
+        }
+      }
+    },
+    "deleteTitle": "{label} öğesini sil",
+    "deleteConfirmMessage": "“{name}” silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+  },
+  "llmProviders": {
+    "tabLabel": "LLM Sağlayıcıları",
+    "title": "LLM Sağlayıcıları",
+    "subtitle": "LLM Judge puanları tarafından kullanılan LLM sağlayıcı bağlantılarını yönetin.",
+    "newButton": "Yeni Sağlayıcı",
+    "searchPlaceholder": "Arama sağlayıcıları",
+    "defaultBadge": "Varsayılan",
+    "loadError": "LLM sağlayıcıları yüklenemedi",
+    "columns": {
+      "name": "İsim",
+      "type": "Tür",
+      "endpoint": "Bitiş noktası",
+      "defaultModel": "Varsayılan Model",
+      "default": "Varsayılan"
+    },
+    "empty": {
+      "title": "Henüz LLM Sağlayıcısı Yok",
+      "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
     }
   }
 }

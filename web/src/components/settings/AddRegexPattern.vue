@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :primary-button-label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
     :secondary-button-label="t('regex_patterns.cancel')"
     :primary-button-disabled="isFormEmpty || isSaving"
-    @click:primary="saveRegexPattern"
+    form-id="add-regex-pattern-form"
     @click:secondary="handleClose"
     data-test="add-regex-pattern-drawer"
   >
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <OForm
-          ref="formRef"
+          id="add-regex-pattern-form"
           :key="formKey"
           :default-values="{ name: regexPatternInputs.name, pattern: regexPatternInputs.pattern }"
           @submit="saveRegexPattern"
@@ -491,8 +491,6 @@ export default defineComponent({
     };
 
     const saveRegexPattern = async () => {
-      const isValid = await formRef.value?.validate();
-      if (!isValid) return;
       isSaving.value = true;
       //payload for create and update regex pattern
       // we need to send the name , pattern , description
@@ -600,7 +598,6 @@ export default defineComponent({
       inputContext,
       closeAddRegexPatternDialog,
       handleClose,
-      formRef,
       formKey,
     };
   },

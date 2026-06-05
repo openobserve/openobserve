@@ -47,24 +47,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
   </div>
   <!-- add folder -->
-  <ODrawer
+  <ODialog
     v-model:open="showAddFolderDialog"
     :title="t('common.addFolder')"
-    :width="20"
+    size="sm"
     data-test="dashboard-folder-move-dialog"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
-    :primary-button-disabled="isAddingFolder"
-    :primary-button-loading="isAddingFolder"
+    form-id="add-folder-dashboards-form"
     @click:secondary="showAddFolderDialog = false"
-    @click:primary="handleAddFolder"
   >
     <AddFolder
       ref="addFolderRef"
       @update:modelValue="updateFolderList"
       :edit-mode="false"
     />
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -73,13 +71,13 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODrawer, OSelect },
+  components: { AddFolder, OButton, ODialog, OSelect },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -98,17 +96,6 @@ export default defineComponent({
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
     const addFolderRef: any = ref(null);
-    const isAddingFolder = ref(false);
-
-    const handleAddFolder = async () => {
-      if (!addFolderRef.value || isAddingFolder.value) return;
-      isAddingFolder.value = true;
-      try {
-        await addFolderRef.value.submit();
-      } finally {
-        isAddingFolder.value = false;
-      }
-    };
 
     const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
@@ -168,8 +155,6 @@ export default defineComponent({
       updateFolderList,
       showAddFolderDialog,
       addFolderRef,
-      isAddingFolder,
-      handleAddFolder,
       computedStyle,
     };
   },

@@ -112,10 +112,14 @@ CREATE TABLE IF NOT EXISTS pipeline
                     stream_params.stream_name.as_str(),
                     stream_params.stream_type.as_str(),
                 );
+                let kind_str = match &pipeline.kind {
+                    config::meta::pipeline::PipelineKind::User => "user",
+                    config::meta::pipeline::PipelineKind::Evaluation => "evaluation",
+                };
                 sqlx::query(
                     r#"
-INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, stream_org, stream_name, stream_type, nodes, edges)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, stream_org, stream_name, stream_type, kind, nodes, edges)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     ON CONFLICT DO NOTHING;
                     "#,
                 )
@@ -129,6 +133,7 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
                 .bind(stream_org)
                 .bind(stream_name)
                 .bind(stream_type)
+                .bind(kind_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
                 .execute(&mut *tx)
@@ -141,10 +146,15 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
                         .expect("Serializing pipeline DerivedStream error"),
                 );
 
+                let kind_str = match &pipeline.kind {
+                    config::meta::pipeline::PipelineKind::User => "user",
+                    config::meta::pipeline::PipelineKind::Evaluation => "evaluation",
+                };
+
                 sqlx::query(
                     r#"
-INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, derived_stream, nodes, edges)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, derived_stream, kind, nodes, edges)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     ON CONFLICT DO NOTHING;
                     "#,
                 )
@@ -156,6 +166,7 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
                 .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(derived_stream_str)
+                .bind(kind_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
                 .execute(&mut *tx)
@@ -187,11 +198,15 @@ INSERT INTO pipeline (id, version, enabled, name, description, org, source_type,
                     stream_params.stream_name.as_str(),
                     stream_params.stream_type.as_str(),
                 );
+                let kind_str = match &pipeline.kind {
+                    config::meta::pipeline::PipelineKind::User => "user",
+                    config::meta::pipeline::PipelineKind::Evaluation => "evaluation",
+                };
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, stream_org = $7, stream_name = $8, stream_type = $9, nodes = $10, edges = $11
-    WHERE id = $12;
+    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, stream_org = $7, stream_name = $8, stream_type = $9, kind = $10, nodes = $11, edges = $12
+    WHERE id = $13;
                     "#,
                 )
                 .bind(pipeline.version)
@@ -203,6 +218,7 @@ UPDATE pipeline
                 .bind(stream_org)
                 .bind(stream_name)
                 .bind(stream_type)
+                .bind(kind_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
                 .bind(&pipeline.id)
@@ -216,11 +232,16 @@ UPDATE pipeline
                         .expect("Serializing pipeline DerivedStream error"),
                 );
 
+                let kind_str = match &pipeline.kind {
+                    config::meta::pipeline::PipelineKind::User => "user",
+                    config::meta::pipeline::PipelineKind::Evaluation => "evaluation",
+                };
+
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, derived_stream = $7, nodes = $8, edges = $9
-    WHERE id = $10;
+    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, derived_stream = $7, kind = $8, nodes = $9, edges = $10
+    WHERE id = $11;
                     "#,
                 )
                 .bind(pipeline.version)
@@ -230,6 +251,7 @@ UPDATE pipeline
                 .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(derived_stream_str)
+                .bind(kind_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
                 .bind(&pipeline.id)
@@ -250,20 +272,20 @@ UPDATE pipeline
         Ok(())
     }
 
-    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline> {
+    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
         let query = r#"
-SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5;
+SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5 ORDER BY kind ASC, id ASC;
         "#;
-        let pipeline = sqlx::query_as::<_, Pipeline>(query)
+        let pipelines = sqlx::query_as::<_, Pipeline>(query)
             .bind(stream_params.org_id.as_str())
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
-            .fetch_one(&pool)
+            .fetch_all(&pool)
             .await?;
-        Ok(pipeline)
+        Ok(pipelines)
     }
 
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
@@ -276,21 +298,22 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
             .map_err(|_| Error::from(DbError::KeyNotExists(pipeline_id.to_string())))
     }
 
-    async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline> {
+    async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Vec<Pipeline>> {
         let pool = CLIENT_RO.clone();
-        let similar_pipeline = match &pipeline.source {
+        let similar_pipelines = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
                 sqlx::query_as::<_, Pipeline>(
                     r#"
 SELECT * FROM pipeline
-    WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4;
+    WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4
+    ORDER BY kind ASC, id ASC;
                 "#,
                 )
                 .bind("realtime")
                 .bind(stream_params.org_id.as_str())
                 .bind(stream_params.stream_name.as_str())
                 .bind(stream_params.stream_type.as_str())
-                .fetch_one(&pool)
+                .fetch_all(&pool)
                 .await?
             }
             PipelineSource::Scheduled(_) => {
@@ -301,7 +324,7 @@ SELECT * FROM pipeline
             }
         };
 
-        Ok(similar_pipeline)
+        Ok(similar_pipelines)
     }
 
     async fn list(&self) -> Result<Vec<Pipeline>> {

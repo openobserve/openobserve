@@ -2370,6 +2370,7 @@ mod tests {
                 start_at: None,
                 delay: None,
             }),
+            kind: Default::default(),
             nodes: vec![
                 // Source node (query node for scheduled pipeline)
                 config::meta::pipeline::components::Node::new(
@@ -2623,6 +2624,7 @@ mod tests {
                 start_at: None,
                 delay: None,
             }),
+            kind: Default::default(),
             nodes: vec![
                 // Source node (query node for scheduled pipeline with non-existent stream)
                 config::meta::pipeline::components::Node::new(
@@ -2765,6 +2767,7 @@ mod tests {
                 start_at: None,
                 delay: Some(10), // 10 minutes delay
             }),
+            kind: Default::default(),
             nodes: vec![
                 // Source node (query node for scheduled pipeline)
                 config::meta::pipeline::components::Node::new(
@@ -2922,6 +2925,7 @@ mod tests {
                 start_at: None,
                 delay: Some(10), // 10 minutes delay
             }),
+            kind: Default::default(),
             nodes: vec![
                 // Source node (query node for scheduled pipeline)
                 config::meta::pipeline::components::Node::new(

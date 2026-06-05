@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-interface Props {
+export interface Props {
   spans: any[];
   selectedSpanId?: string;
 }

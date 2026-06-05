@@ -157,6 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             selection="multiple"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="pipelines-pipeline-list"
             v-model:selected-ids="selectedPipelineIds"
             :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
             :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
@@ -660,6 +663,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: 'auto',
     meta: { align: "left" },
   };
@@ -668,6 +673,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.stream_name"),
     accessorKey: "stream_name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const streamTypeColumn = {
@@ -675,6 +682,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.streamType"),
     accessorKey: "stream_type",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const frequencyColumn = {
@@ -682,6 +691,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.frequency"),
     accessorKey: "frequency",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const periodColumn = {
@@ -689,6 +700,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.period"),
     accessorKey: "period",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const cronColumn = {
@@ -696,6 +709,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.cron"),
     accessorKey: "cron",
     sortable: false,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const typeColumn = {
@@ -703,6 +718,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.type"),
     accessorKey: "type",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const scheduledStreamTypeColumn = {
@@ -710,6 +727,8 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.stream_type"),
     accessorKey: "stream_type",
     sortable: true,
+    resizable: true,
+    hideable: true,
     meta: { align: "left" },
   };
   const actionsColumn = {

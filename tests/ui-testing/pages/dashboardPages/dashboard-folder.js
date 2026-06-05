@@ -15,7 +15,7 @@ export default class DashboardFolder {
       '[data-test="dashboard-folder-add-name-field"]'
     );
     this.folderDialogSaveBtn = page.locator(
-      '[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]'
+      '[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]'
     );
     // More-icon and the post-menu actions live on the global page surface
     // (rendered into a Reka portal in the menu case). The folder-card scoped

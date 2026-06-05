@@ -23,7 +23,10 @@ mod destinations;
 mod distinct_values;
 mod domain_management;
 mod enrichment_table;
-mod eval_templates;
+mod eval_jobs;
+mod eval_providers;
+mod eval_score_configs;
+mod eval_scorers;
 mod folders;
 mod incidents;
 mod kv;
@@ -45,9 +48,10 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalTemplatesQueue,
-    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
-    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalJobsQueue,
+    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue,
+    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
+    SuperClusterQueueTrait, TemplatesQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -95,6 +99,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let pipelines_queue = PipelinesQueue {
         on_pipeline_msg: pipelines::process,
     };
+    let eval_providers_queue = EvalProvidersQueue {
+        on_eval_provider_msg: eval_providers::process,
+    };
+    let eval_score_configs_queue = EvalScoreConfigsQueue {
+        on_eval_score_config_msg: eval_score_configs::process,
+    };
+    let eval_scorers_queue = EvalScorersQueue {
+        on_eval_scorer_msg: eval_scorers::process,
+    };
+    let eval_jobs_queue = EvalJobsQueue {
+        on_eval_job_msg: eval_jobs::process,
+    };
     let folders_queue = FoldersQueue {
         on_folder_msg: folders::process,
     };
@@ -113,10 +129,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_meta_msg: meta::process,
         on_orgs_msg: organization::process,
     };
-    let eval_templates_queue = EvalTemplatesQueue {
-        on_eval_template_msg: eval_templates::process,
-    };
-
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
         Box::new(schema_queue),
@@ -124,13 +136,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(search_jobs_queue),
         Box::new(dashboards_queue),
         Box::new(pipelines_queue),
+        Box::new(eval_providers_queue),
+        Box::new(eval_score_configs_queue),
+        Box::new(eval_scorers_queue),
+        Box::new(eval_jobs_queue),
         Box::new(folders_queue),
         Box::new(templates_queue),
         Box::new(destinations_queue),
         Box::new(action_scripts_queue),
         Box::new(scheduler_queue),
         Box::new(org_users_queue),
-        Box::new(eval_templates_queue),
     ];
 
     for queue in queues {
