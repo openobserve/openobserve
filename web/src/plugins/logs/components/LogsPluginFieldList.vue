@@ -119,17 +119,64 @@
     <template #loading>
       <div
         data-test="logs-fieldlist-loading-skeleton"
-        class="tw:flex tw:flex-col"
+        class="tw:w-full tw:flex tw:flex-col"
       >
-        <div
-          v-for="i in 8"
-          :key="i"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]"
-        >
-          <OSkeleton
-            type="rect"
-            class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
-          />
+        <!-- Group 1 header -->
+        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
+          <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
+          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        </div>
+        <!-- Group 1 fields -->
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:flex-1" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:w-3/4" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:flex-1" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:w-4/5" />
+        </div>
+        <!-- Group 2 header -->
+        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+          <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
+          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        </div>
+        <!-- Group 2 field -->
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:w-2/3" />
+        </div>
+        <!-- Group 3 header -->
+        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+          <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
+          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        </div>
+        <!-- Group 3 fields -->
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:flex-1" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:w-4/5" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:flex-1" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+          <OSkeleton type="text" class="tw:w-3/4" />
+        </div>
+        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
           <OSkeleton type="text" class="tw:flex-1" />
         </div>
       </div>
