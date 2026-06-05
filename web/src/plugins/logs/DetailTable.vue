@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
+          class="tw:pr-3!"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />

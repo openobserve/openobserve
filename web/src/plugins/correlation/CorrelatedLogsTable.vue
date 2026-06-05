@@ -165,7 +165,7 @@ class="tw:mr-1" />
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Wrap Content Button -->
-      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-3">
+      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-2">
         <OButton
           variant="ghost"
           size="icon"
@@ -715,29 +715,40 @@ const columnMaxCap = computed(() => {
     : containerWidth.value - TIMESTAMP_COL_WIDTH - 30;
 });
 
-// Memoized column widths - only recalculate when data, visible fields, or container width changes
-const memoizedColumnWidths = computed(() => {
-  const widthMap: Record<string, number> = {};
+const DEFAULT_LONG_TEXT_FIELDS = [];
 
-  // Only calculate if we have search results
+// Single computed that measures all visible fields in one canvas pass.
+// Also builds the dynamic long-text list: any field whose raw measured width
+// exceeds maxCap is added to the set (on top of the static defaults).
+const memoizedData = computed(() => {
+  const widthMap: Record<string, number> = {};
+  const longText = new Set<string>(DEFAULT_LONG_TEXT_FIELDS);
+
   if (!searchResults.value || searchResults.value.length === 0) {
-    return widthMap;
+    return { widthMap, longTextFields: Array.from(longText) };
   }
 
   const maxCap = columnMaxCap.value;
   visibleFields.value.forEach((field) => {
-    widthMap[field] = getColumnWidth(field, maxCap);
+    const { width, exceededCap } = getColumnWidth(field, maxCap);
+    widthMap[field] = width;
+    if (exceededCap) longText.add(field);
   });
 
-  return widthMap;
+  return { widthMap, longTextFields: Array.from(longText) };
 });
 
-const longTextFields = ["message", "body"];
+const memoizedColumnWidths = computed(() => memoizedData.value.widthMap);
+
+// Dynamic long-text fields: static defaults + any field whose content exceeded maxCap
+const longTextFields = computed(() => memoizedData.value.longTextFields);
 
 // Simple helper that uses memoized widths
 const getColumnWidthHelper = (field: string): number => {
-  // Use memoized width if available, otherwise fallback to default
-  return memoizedColumnWidths.value[field] || (longTextFields.includes(field) ? 400 : 150);
+  return (
+    memoizedColumnWidths.value[field] ||
+    (longTextFields.value.includes(field) ? Math.min(400, columnMaxCap.value) : 150)
+  );
 };
 
 // Generate table columns dynamically from visible fields in custom order
@@ -833,16 +844,18 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
   if (
     totalWidth < containerWidth.value &&
     lastCol &&
-    longTextFields.includes(lastCol.name as string)
+    longTextFields.value.includes(lastCol.name as string)
   ) {
     lastCol.size = (lastCol.size ?? 150) + (containerWidth.value - totalWidth);
   }
 
   // Always leave 12px clearance on the last resizable column so the resize
-  // handle stays visible and grabbable at the container edge.
+  // handle stays visible and grabbable. The 20px accounts for a typical parent
+  // vertical scrollbar (~15px) that can overlap the table's right edge.
+  const RESIZE_HANDLE_CLEARANCE = 20;
   const lastResizableCol = [...columns].reverse().find((col: any) => col.enableResizing) as any;
   if (lastResizableCol) {
-    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - 12);
+    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - RESIZE_HANDLE_CLEARANCE);
   }
 
   return columns;
@@ -1110,15 +1123,18 @@ const handleNestedCorrelation = (row: any) => {
   console.log("[CorrelatedLogsTable] Nested correlation disabled");
 };
 
-// Simple column width calculation for correlation data
-const getColumnWidth = (field: string, maxCap: number): number => {
-  // Skip excluded columns - use defaults
+// Measures a field's content width and returns the capped size plus whether the
+// raw measurement exceeded maxCap (used to build the dynamic long-text list).
+const getColumnWidth = (
+  field: string,
+  maxCap: number,
+): { width: number; exceededCap: boolean } => {
   if (field === "_timestamp" || field === "source") {
-    return longTextFields.includes(field) ? 400 : 150;
+    return { width: 150, exceededCap: false };
   }
 
   if (!canvasContext) {
-    return longTextFields.includes(field) ? Math.min(400, maxCap) : 150;
+    return { width: 150, exceededCap: false };
   }
 
   try {
@@ -1129,7 +1145,6 @@ const getColumnWidth = (field: string, maxCap: number): number => {
     // Font of the table content
     canvasContext.font = "12px monospace";
 
-    // Use correlation searchResults
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {
       const cellValue = hits[i]?.[field];
@@ -1140,11 +1155,10 @@ const getColumnWidth = (field: string, maxCap: number): number => {
     }
 
     max += 24; // padding
-    if (max > maxCap) return maxCap;
-    if (max < 150) return 150;
-    return max;
+    const exceededCap = max > maxCap;
+    return { width: exceededCap ? maxCap : Math.max(150, max), exceededCap };
   } catch {
-    return longTextFields.includes(field) ? Math.min(400, maxCap) : 150;
+    return { width: 150, exceededCap: false };
   }
 };
 
