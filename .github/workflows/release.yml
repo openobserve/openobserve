@@ -102,21 +102,17 @@ jobs:
         run: |
           brew install protobuf coreutils boost
 
-      - name: Install dependencies for linux-gnu
-        if: contains(matrix.arch, 'linux-gnu')
+      - name: Install dependencies for linux
+        if: contains(matrix.arch, 'linux')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
+          sudo apt-get -y install libssl-dev pkg-config gcc g++ g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
-      - name: Install dependencies for linux-musl
+      - name: Setup musl toolchain for linux musl
         if: contains(matrix.arch, 'linux-musl')
         run: |
-          sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config musl-dev musl-tools
-          sudo ln -sf "$(which g++)" "/usr/bin/musl-g++"
-          echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV
-          echo "CXX_aarch64_unknown_linux_musl=musl-g++" >> $GITHUB_ENV
-          echo "CFLAGS_aarch64_unknown_linux_musl=-U_FORTIFY_SOURCE" >> $GITHUB_ENV
+          sudo ln -sf "$(which g++)" /usr/bin/musl-g++
+          sudo ln -sf "$(which g++)" /usr/bin/aarch64-linux-musl-g++
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -287,4 +283,3 @@ jobs:
         env:
           STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
           STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
-  
