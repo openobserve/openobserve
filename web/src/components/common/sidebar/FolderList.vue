@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <!-- Search Input -->
-        <div class="tw:px-2 tw:py-1">
+        <div class="tw:p-2">
           <OSearchInput
             v-model="searchQuery"
             data-test="folder-search"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="folders-tabs tw:flex-1 tw:overflow-y-auto">
+      <div class="folders-tabs tw:flex-1 tw:px-1 tw:overflow-y-auto">
         <OTabs
           orientation="vertical"
           dense
