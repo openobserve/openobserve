@@ -437,7 +437,8 @@
     "pipeline": "パイプライン",
     "language": "言語",
     "actions": "アクション",
-    "incidents": "インシデント"
+    "incidents": "インシデント",
+    "evals": "評価"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
@@ -490,7 +491,22 @@
     "getStartedRUM": "リアルユーザーモニタリングを始める",
     "loadingErrorDetails": "ちょっと待ってください。エラーの詳細を取得中です。",
     "eventID": "イベント ID",
-    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。"
+    "loadingApplicationErrors": "ちょっと待ってください。アプリケーションエラーを取得しています。",
+    "traces": "トレース",
+    "noCorrelatedTraces": "このセッションの相関トレースは見つかりませんでした。",
+    "viewTraceDetails": "トレースの詳細を表示",
+    "routeChange": "ルート",
+    "initialView": "初期",
+    "failedToFetchTraces": "トレースデータを取得できませんでした。もう一度試してください。",
+    "traceNotFound": "トレースの詳細が見つかりません。",
+    "failedToFetchTraceDetails": "トレースの詳細を読み込めませんでした。もう一度試してください。",
+    "span": "スパン",
+    "spans": "スパン",
+    "errorTraces": "エラートレース",
+    "seekToMoment": "セッションの今この瞬間を探して",
+    "timeInSession": "セッション時間",
+    "route": "ルート",
+    "duration": "所要時間"
   },
   "about": {
     "name": "OpenObserve",
@@ -517,9 +533,9 @@
     "ingestion_limit": "取り込み制限",
     "today_usage": "今日の使用状況",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
-    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 200 GB (最大 6 TB/月) のデータを無料で取り込むことができます。",
+    "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 50 GB (最大 1.5 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
-    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大200 GB（最大6 TB/月）のデータインジェストが可能です。",
+    "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大50 GB（最大1.5 TB/月）のデータインジェストが可能です。",
     "commit_lbl": "コミット",
     "build_lbl": "建設",
     "no_license_installed_lbl": "ライセンスがインストールされていません",
@@ -574,14 +590,14 @@
     "value_support_enterprise": "エンタープライズ",
     "value_support_cloud": "クラウド",
     "value_cost_free": "無料",
-    "value_cost_enterprise": "セルフホストの場合、1日あたり最大200 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
+    "value_cost_enterprise": "セルフホストの場合、1日あたり最大50 GBのデータを無料で取り込むことができます。それ以降は支払われます。",
     "value_cost_cloud": "14日間の無料トライアル。それ以降は支払われます。",
     "feature_comparison_lbl": "機能比較",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "エンタープライズ機能",
         "offer_text": "OpenObserveをセルフホストすると、すべてのエンタープライズ機能を完全に無料で利用できます",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "OpenObserve クラウドの機能",
         "features_subtitle": "クラウドサブスクリプションに含まれるすべての機能",
         "primary_button_text": "今すぐダウンロード"
@@ -593,7 +609,7 @@
         "features_title": "利用可能なエンタープライズ機能",
         "features_subtitle": "無償ライセンスを取得して、無限の機能をアンロックしましょう",
         "primary_button_text": "無料ライセンスを取得",
-        "license_note": "100 GB/日 (ライセンスなし) • 200 GB/日 (ライセンス契約の場合)"
+        "license_note": "50 GB/日 (ライセンスなし) • 50 GB/日 (ライセンス契約の場合)"
       },
       "enterprise_with_license": {
         "hero_title": "あなたのエンタープライズエディション",
@@ -607,7 +623,7 @@
       "open_source": {
         "hero_title": "エンタープライズエディションを入手",
         "offer_text": "すべてのエンタープライズ機能を完全無料でダウンロードしてロック解除",
-        "badge_text": "1 日あたり最大 200 GB まで無料",
+        "badge_text": "1 日あたり最大 50 GB まで無料",
         "features_title": "すべてのエンタープライズ機能をロック解除",
         "features_subtitle": "本番環境に対応したオブザーバビリティに必要なものすべて",
         "primary_button_text": "今すぐダウンロード"
@@ -947,7 +963,8 @@
     "nameRequired": "名前が必要です",
     "subscription_type": "プランタイプ",
     "proceed_subscription": "購読に進む",
-    "subscription_plan": "サブスクリプションプラン"
+    "subscription_plan": "サブスクリプションプラン",
+    "makeBilledMember": "この組織を {org} の請求メンバーにする"
   },
   "template": {
     "header": "テンプレート",
@@ -1824,7 +1841,105 @@
     "aiModePayAsYouGo": "従量課金制",
     "aiModeExhausted": "疲れ果てた",
     "aiExhaustedMessage": "購読して引き続き AI 機能を使用する",
-    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます"
+    "aiPaygMessage": "無料クレジットを使い切りました — 使用量はサブスクリプションに請求されます",
+    "organizationGroup": {
+      "tabLabel": "組織グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "receivedInvitesTab": "保留中の招待",
+      "noPendingInvites": "保留中の招待はありません",
+      "noPendingInvitesHint": "別の組織が請求グループへの参加を招待すると、ここに招待が表示されます。",
+      "invitedByOn": "{招待者} さんからの招待",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    },
+    "billingGroup": {
+      "tabLabel": "請求グループ",
+      "inviteOrgButton": "組織を招待",
+      "viewUsage": "使用状況を表示",
+      "statTotal": "子組織の総数",
+      "statActive": "アクティブ",
+      "statPending": "保留中の招待",
+      "statRejected": "拒否",
+      "statusActive": "アクティブ",
+      "statusPending": "保留中",
+      "statusRejected": "拒否",
+      "filterAll": "[すべて]",
+      "childOrgColumn": "児童団体",
+      "orgColumn": "組織",
+      "orgIdColumn": "組織識別子",
+      "actionsColumn": "[アクション]",
+      "dateColumn": "日付",
+      "cancel": "[キャンセル]",
+      "invitedBy": "招待者",
+      "acceptedBy": "承認者",
+      "addedOnCreation": "作成時に追加",
+      "memberSince": "以降のメンバー",
+      "noMembers": "メンバー組織はまだありません",
+      "inviteTitle": "組織を招待する",
+      "inviteOrgIdLabel": "組織識別子",
+      "inviteOrgIdPlaceholder": "組織識別子の入力",
+      "sendInvite": "招待を送信",
+      "inviteSent": "招待状は正常に送信されました",
+      "inviteSameOrg": "組織は自らを招待できない",
+      "childHeadline": "請求管理者",
+      "childHeroSub": "使用量はこの組織に請求されます。プランの変更と請求書は親組織によって処理されるため、ここで管理することは何もありません。",
+      "invitesPanelHint": "これらの組織は、あなたをその請求グループに参加するよう招待しています。同意すると、この組織の使用量が組織に請求されます。",
+      "inviteTabPrompt": "請求グループに別の組織を招待してください。その使用量はこの組織に請求されます。",
+      "emptyTitle": "請求グループを開始",
+      "chipConsolidatedBill": "一括請求",
+      "chipLinkOrgs": "複数の組織をリンク",
+      "accept": "承諾する",
+      "reject": "拒否",
+      "inviteAccepted": "招待は正常に受理されました",
+      "inviteRejected": "招待は正常に拒否されました",
+      "plansManagedTitle": "親組織による請求管理",
+      "plansManagedDescription": "この組織の請求は {payer} によって管理されています。プランの変更は親組織によって処理されます。",
+      "chipPlanManaged": "親が管理するプラン",
+      "chipNoInvoices": "個別の請求書は不要",
+      "viewOrgGroup": "組織グループを表示",
+      "usageMemberLabel": "メンバー組織",
+      "usageAllMembers": "現在の組織",
+      "currentOrgTitle": "現在の組織"
+    }
   },
   "message": {
     "ServerInternalError": "エラー:問題が発生しました。内部サーバーエラー。",
@@ -3084,7 +3199,8 @@
         "cost": "費用",
         "spans": "スパン"
       }
-    }
+    },
+    "openInFullView": "フルビューで開く"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -3936,6 +4052,348 @@
       "one": "過去 1 時間のエラーを表示...",
       "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
       "three": "K8s ノードの状態を示すダッシュボードを作成..."
+    }
+  },
+  "onlineEvals": {
+    "title": "評価",
+    "description": "LLM プロバイダー、スコア定義、スコアラー、ライブ評価ジョブを設定します。",
+    "loading": "オンライン評価設定をロード中...",
+    "loadError": "オンライン評価を読み込めませんでした",
+    "deletePrompt": "{name} を削除しますか?",
+    "deleted": "{ラベル} は削除されました",
+    "deleteError": "{label} を削除できませんでした",
+    "saved": "{label} が保存されました",
+    "newButton": "新規 {ラベル}",
+    "search": "検索 {ラベル}",
+    "refresh": "リフレッシュ",
+    "allStatuses": "すべてのステータス",
+    "noRowsFound": "{label} が見つかりません",
+    "getStartedHint": "作成してオンライン評価を開始してください.",
+    "columns": {
+      "name": "[名前]",
+      "status": "ステータス",
+      "updated": "更新済み"
+    },
+    "actions": {
+      "edit": "[編集]",
+      "delete": "[削除]"
+    },
+    "tabs": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成",
+      "providers": "プロバイダー"
+    },
+    "singular": {
+      "jobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア設定",
+      "providers": "プロバイダー"
+    },
+    "secondaryColumn": {
+      "jobs": "ストリーム",
+      "scorers": "タイプ",
+      "scoreConfigs": "データタイプ",
+      "providers": "プロバイダー"
+    },
+    "jobStatus": {
+      "draft": "ドラフト",
+      "active": "アクティブ",
+      "paused": "一時停止",
+      "degraded": "劣化しました",
+      "archived": "アーカイブ済み"
+    },
+    "buttons": {
+      "cancel": "[キャンセル]",
+      "create": "作成",
+      "save": "[保存]"
+    },
+    "scorerTypeDialog": {
+      "title": "新しいスコアラーを作成",
+      "intro": "スコアラータイプを選択します。オーサリングしたい方法に合うものを選んで実行してください。",
+      "llmJudgeTitle": "LLMジャッジ",
+      "llmJudgeDescription": "設定されたプロバイダーを使用してセマンティックに評価します。",
+      "remoteTitle": "リモート",
+      "remoteDescription": "独自の HTTP エンドポイントを呼び出してスコアリングを行います。",
+      "codeTitle": "コード",
+      "codeDescription": "近日公開予定。"
+    },
+    "provider": {
+      "backTo": "プロバイダーに戻る",
+      "createTitle": "LLM プロバイダーの作成",
+      "editTitle": "LLM プロバイダーの編集",
+      "subtitle": "LLM ジャッジスコアラーが使用するモデルエンドポイントを設定します。",
+      "sectionTitle": "プロバイダー",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクションオープンAI",
+      "typeLabel": "プロバイダーの種類",
+      "typePlaceholder": "オープンナイ",
+      "endpointLabel": "終点",
+      "endpointPlaceholder": "オプションのカスタムエンドポイント",
+      "defaultModelLabel": "デフォルトモデル",
+      "defaultModelPlaceholder": "GPT 4O-ミニ",
+      "availableModelsLabel": "ご利用可能なモデル",
+      "availableModelsPlaceholder": "GPT-4O-ミニ、GPT-4.1",
+      "useAsDefault": "デフォルトプロバイダーとして使用",
+      "authConfigLabel": "認証設定 JSON",
+      "saveError": "プロバイダを保存できませんでした"
+    },
+    "scoreConfig": {
+      "createTitle": "新しいスコア設定",
+      "editTitle": "スコア設定を編集",
+      "subtitle": "スコア設定は、スコアの種類、ヘルスしきい値、およびカテゴリを定義します。",
+      "nameLabel": "[名前]",
+      "dataTypeLabel": "データタイプ",
+      "descriptionLabel": "[説明]",
+      "numericRangeLabel": "数値範囲 JSON",
+      "categoriesLabel": "カテゴリー:JSON",
+      "healthyThresholdLabel": "ヘルシー閾値 JSON",
+      "dataTypes": {
+        "numeric": "数値",
+        "categorical": "カテゴリカル",
+        "boolean": "ブール値"
+      },
+      "saveError": "スコア設定を保存できませんでした"
+    },
+    "scorer": {
+      "backTo": "スコアラーに戻る",
+      "badgeRemote": "リモート",
+      "badgeLlm": "LLMジャッジ",
+      "createTitleRemote": "リモートスコアラーを作成",
+      "createTitleLlm": "LLM ジャッジスコアラーを作成",
+      "editTitleRemote": "リモートスコアラーの編集",
+      "editTitleLlm": "LLM ジャッジスコアラーの編集",
+      "subtitleRemote": "ホストしている HTTP エンドポイントを呼び出します。リクエストをレンダリングすると、スコアが返されます。",
+      "subtitleLlm": "言語モデルは、指定したプロンプトを使用して各トレースを判断します。",
+      "identitySection": "アイデンティティ",
+      "judgeSection": "ジャッジ構成",
+      "endpointSection": "終点",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "フェイスフルネス・ジャッジ",
+      "producesScoreConfigLabel": "スコアコンフィグを生成します",
+      "producesScoreConfigNone": "[なし]",
+      "scoreConfigVersionLabel": "スコア設定バージョン",
+      "latestSuffix": " (最新)",
+      "pinVersion": "選択したバージョンをピン留めする",
+      "descriptionLabel": "[説明]",
+      "providerLabel": "プロバイダー",
+      "providerPlaceholder": "プロバイダーを選択",
+      "modelLabel": "モデル",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "ジャッジプロンプト",
+      "outputSchemaLabel": "出力スキーマ JSON",
+      "remoteEndpointLabel": "リモートエンドポイント",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "リクエスト本文テンプレート",
+      "saveError": "スコアラーを保存できませんでした",
+      "versionsLoadError": "スコア設定バージョンを読み込めませんでした",
+      "testPanel": {
+        "title": "このスコアラーをテスト",
+        "hint": "保存する前に、サンプルデータでスコアラーを試してください。テストランは永続化されません。",
+        "emptyPrefix": "次のような変数を追加 ",
+        "emptySuffix": " スコアラーテンプレートを使用して、サンプルフィールドでテストします。",
+        "runButton": "テストを実行",
+        "scenarioSuccess": "模擬応答",
+        "scenarioAuth": "認証エラー",
+        "scenarioSchema": "スキーマのミスマッチ",
+        "stateIdle": "ここでテストを実行して結果を確認してください。",
+        "stateRunning": "スコアラーテストを実行中...",
+        "successHeader": "成功",
+        "successScore": "スコア:0.92",
+        "successReasoning": "推論：答えは提供されたコンテキストによってサポートされています。",
+        "authHeader": "認証に失敗しました",
+        "authHint": "保存する前にプロバイダの認証情報を確認してください。",
+        "schemaHeader": "スキーマのミスマッチ",
+        "schemaHint": "応答が設定された出力スキーマと一致しませんでした。",
+        "valuePlaceholder": "{variable} の値"
+      }
+    },
+    "job": {
+      "backTo": "評価ジョブに戻る",
+      "createTitle": "オンライン評価ジョブの作成",
+      "editTitle": "オンライン評価ジョブの編集",
+      "subtitle": "この評価ジョブのストリーム、スコアラー、マッピング、およびサンプリング動作を選択してください。",
+      "stepper": {
+        "target": "ターゲット",
+        "scorers": "スコアラー",
+        "mapping": "マッピング",
+        "sampling": "サンプリング"
+      },
+      "targetSection": "ターゲット",
+      "scorersSection": "スコアラーとマッピング",
+      "nameLabel": "[名前]",
+      "namePlaceholder": "プロダクション・フィフネス・モニター",
+      "streamLabel": "入力ストリーム",
+      "streamPlaceholder": "デフォルト",
+      "streamTypeLabel": "ストリームタイプ",
+      "streamTypePlaceholder": "トレース",
+      "descriptionLabel": "[説明]",
+      "samplingModeLabel": "サンプリングモード",
+      "samplingValueLabel": "サンプリング値 JSON",
+      "samplingModes": {
+        "rate": "レート",
+        "all": "[すべて]",
+        "count": "カウント"
+      },
+      "scorerPicker": {
+        "title": "スコアラー",
+        "hint": "マッチしたすべてのスパンで走るスコアラーを 1 人以上選択します。",
+        "meta": "{タイプ} · v {バージョン}"
+      },
+      "filter": {
+        "title": "フィルター条件",
+        "hint": "この条件に一致するスパンのみがサンプリングとスコアリングに入ります。"
+      },
+      "inputMapping": {
+        "title": "入力マッピング",
+        "hint": "スパンフィールドを各スコアラーテンプレート変数にマップします。",
+        "selectScorers": "スコアラーを選択してマッピングを設定します。",
+        "noVariables": "このスコアラーには、マップするテンプレート変数がありません。",
+        "variableCount": "{カウント} 変数"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "hint": "左側のフィールドを使用して、生産評価目標を定義します。",
+        "summaryTitle": "サマリー",
+        "summaryName": "[名前]",
+        "summaryType": "タイプ",
+        "summaryStatus": "ステータス",
+        "statusEditing": "編集",
+        "statusDraft": "ドラフト",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "スコアラーを少なくとも 1 人選択してください",
+      "saveError": "評価ジョブの保存に失敗しました"
+    },
+    "quality": {
+      "scopeLabel": "このワークスペースのすべての品質ディメンション",
+      "timeRange": {
+        "label": "時間範囲",
+        "last1h": "過去 1 時間",
+        "last24h": "過去 24 時間",
+        "last7d": "過去 7 日間",
+        "last30d": "過去 30 日間"
+      },
+      "sourceStream": {
+        "label": "ソースストリーム",
+        "all": "すべてのストリーム"
+      },
+      "refresh": "リフレッシュ",
+      "kpis": {
+        "evaluated": {
+          "title": "評価済みトレース",
+          "unit": "",
+          "hint": "ウィンドウ内の _llm_score 内の個別のトレース ID"
+        },
+        "qualityIssueRate": {
+          "title": "品質問題率",
+          "unit": "%",
+          "hint": "いずれかのディメンションがしきい値を下回っている評価済みトレース"
+        },
+        "evaluationCost": {
+          "title": "評価コスト",
+          "unit": "$",
+          "hint": "ウィンドウに表示される LLM ジャッジスコアラー費用の合計"
+        },
+        "jobSuccess": {
+          "title": "仕事の成功",
+          "unit": "%",
+          "hint": "オンライン評価ジョブの実行成功率"
+        },
+        "scorerFailures": {
+          "title": "スコアラーの失敗",
+          "unit": "",
+          "hint": "ウィンドウでのスコアラーの呼び出しが失敗しました"
+        },
+        "latencyP95": {
+          "title": "レイテンシー p95",
+          "unit": "s",
+          "hint": "スコアーコール p95 レイテンシー"
+        },
+        "vsPrev": "対前へ",
+        "noData": "—"
+      },
+      "loading": "品質データを読み込んでいます...",
+      "detail": {
+        "loading": "設定ごとの内訳を読み込んでいます...",
+        "noData": "このウィンドウには、この構成のスコアはまだありません。",
+        "drillTitle": "ドリル・トゥ・トレース",
+        "splitByScorer": "得点者による分割",
+        "splitBySourceType": "ソースタイプで分割",
+        "trendTitle": "トレンド",
+        "trendSubtitle": "{設定名}、{バケット}",
+        "distributionTitle": "スコア分布",
+        "compositionTitle": "時間の経過に伴う構成",
+        "categoryDistributionTitle": "カテゴリ分布",
+        "passRateTitle": "経時的な合格率",
+        "trueFalseTitle": "真と偽",
+        "legendAvg": "平均",
+        "legendP95": "95",
+        "legendThreshold": "しきい値 {方向} {値}",
+        "legendHealthy": "健康",
+        "legendUnhealthy": "不健全です",
+        "kpis": {
+          "average": "アベレージ",
+          "p50": "50",
+          "p95": "95",
+          "p50p95": "P50/P95",
+          "unhealthy": "不健康",
+          "healthy": "ヘルシー",
+          "coverage": "カバレッジ"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "すべての構成",
+        "empty": "このフィルターに一致する設定はありません。"
+      },
+      "overview": {
+        "title": "スコア設定の概要",
+        "countSuffix": "{n} コンフィグ",
+        "searchPlaceholder": "フィルター構成...",
+        "loading": "設定ごとのアグリゲートをロード中...",
+        "emptyNoConfigsTitle": "スコア設定はまだありません",
+        "emptyNoConfigsHint": "最初の Score Config を定義して、品質ディメンションのトラッキングを開始しましょう。",
+        "emptyWaitingTitle": "最初のスコアが出るのを待っています",
+        "emptyWaitingHint": "スコア設定は宣言されましたが、このウィンドウの _llm_scoresにはまだスコアが書き込まれていません。",
+        "waitingStepJob": "これらの構成のいずれかのスコアを生成するオンライン評価ジョブをアクティブにする",
+        "waitingStepRange": "時間範囲を広げてください。今日または今週の初めのスコアは、このウィンドウに表示されない場合があります",
+        "waitingStepRefresh": "[更新] をクリックします。アクティブなジョブのスコアは、評価から 1 分以内に表示されます。",
+        "waitingPrimaryCta": "評価ジョブを開く",
+        "waitingRefreshCta": "リフレッシュ",
+        "noThreshold": "敷居なし",
+        "columns": {
+          "scoreConfig": "スコア設定",
+          "type": "タイプ",
+          "totalScores": "合計得点",
+          "coverage": "カバレッジ",
+          "unhealthy": "不健康",
+          "trend": "トレンド",
+          "threshold": "もし健康なら",
+          "updated": "更新済み"
+        }
+      }
+    },
+    "deleteTitle": "{ラベル} を削除",
+    "deleteConfirmMessage": "「{name}」を削除してよろしいですか？このアクションは元に戻せません。"
+  },
+  "llmProviders": {
+    "tabLabel": "LLM プロバイダー",
+    "title": "LLM プロバイダー",
+    "subtitle": "LLM Judgeスコアラーが使用するLLMプロバイダー接続を管理します。",
+    "newButton": "新しいプロバイダー",
+    "searchPlaceholder": "検索プロバイダー",
+    "defaultBadge": "デフォルト",
+    "loadError": "LLM プロバイダーを読み込めませんでした",
+    "columns": {
+      "name": "[名前]",
+      "type": "タイプ",
+      "endpoint": "終点",
+      "defaultModel": "デフォルトモデル",
+      "default": "デフォルト"
+    },
+    "empty": {
+      "title": "LLM プロバイダーはまだありません",
+      "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
     }
   }
 }

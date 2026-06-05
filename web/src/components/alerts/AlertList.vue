@@ -169,12 +169,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 width="100%"
                 :show-global-filter="false"
                 :default-columns="false"
+                :enable-column-resize="true"
+                :persist-columns="true"
+                table-id="alerts-alert-list"
                 @row-click="triggerExpand"
               >
 
 
                 <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
                     <OIcon
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
@@ -193,10 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       class="tw:text-gray-400 tw:shrink-0"
                     />
-                    <span>{{ computedName(row.name) }}</span>
+                    <span class="tw:truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
-                    v-if="row.name?.length > 30"
+                    v-if="row.name"
                     :content="row.name"
                     content-class="alert-name-tooltip"
                   />
@@ -979,6 +982,8 @@ export default defineComponent({
           accessorKey: "name",
           header: t("alerts.name"),
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 250,
           minSize: 200,
           meta: { align: "left" },
@@ -989,6 +994,8 @@ export default defineComponent({
           header: t("alerts.owner"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1001,6 +1008,8 @@ export default defineComponent({
                 header: t("alerts.period"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "center" },
               } as OTableColumnDef,
@@ -1015,6 +1024,8 @@ export default defineComponent({
                 header: t("alerts.frequency"),
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1026,6 +1037,8 @@ export default defineComponent({
           header: t("alerts.lastTriggered"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1035,6 +1048,8 @@ export default defineComponent({
           header: t("alerts.lastSatisfied"),
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
@@ -1047,6 +1062,8 @@ export default defineComponent({
                 header: "Last Trained At",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 150,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1056,6 +1073,8 @@ export default defineComponent({
                 header: "Status",
                 cell: " ",
                 sortable: true,
+                resizable: true,
+                hideable: true,
                 size: 120,
                 meta: { align: "left" },
               } as OTableColumnDef,
@@ -1079,6 +1098,8 @@ export default defineComponent({
           header: "Folder",
           cell: " ",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "center" },
         } as OTableColumnDef);
@@ -2354,12 +2375,6 @@ export default defineComponent({
         });
       }
     };
-    const computedName = (name: string) => {
-      if (!name) {
-        return "--";
-      }
-      return name.length > 30 ? name.substring(0, 30) + "..." : name;
-    };
     const computedOwner = (owner: string) => {
       if (!owner) {
         return "--";
@@ -2676,7 +2691,6 @@ export default defineComponent({
       openMenu,
       getAlertsFn,
       multipleExportAlert,
-      computedName,
       computedOwner,
       tabs,
       alertTabs,

@@ -70,24 +70,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]!"
+      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]! tw:flex-1 tw:min-h-0"
     >
-      <div class="tw:w-3/4 tw:h-full">
-        <VideoPlayer
-          ref="videoPlayerRef"
-          :events="segmentEvents"
-          :segments="segments"
-          :is-loading="!!isLoading.length"
-        />
-      </div>
-      <div class="tw:w-1/4 tw:flex">
-        <OSeparator vertical class="tw:h-full" />
-        <PlayerEventsSidebar
-          :events="segmentEvents"
-          :sessionDetails="sessionDetails"
-          @event-emitted="handleSidebarEvent"
-        />
-      </div>
+      <OSplitter
+        v-model="splitterSize"
+        :limits="[200, 1400]"
+        unit="px"
+        class="tw:w-full tw:h-full"
+        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]! tw:hover:bg-[var(--o2-theme-color)]"
+      >
+        <template #before>
+          <VideoPlayer
+            ref="videoPlayerRef"
+            :events="segmentEvents"
+            :segments="segments"
+            :is-loading="!!isLoading.length"
+            class="tw:h-full"
+          />
+        </template>
+        <template #after>
+          <PlayerEventsSidebar
+            :events="segmentEvents"
+            :sessionDetails="sessionDetails"
+            :session-id="sessionId"
+            :current-time="currentTime"
+            :start-time="sessionState.data.selectedSession?.start_time || 0"
+            :end-time="sessionState.data.selectedSession?.end_time || 0"
+            @event-emitted="handleSidebarEvent"
+            class="tw:h-full"
+          />
+        </template>
+      </OSplitter>
     </div>
 
     <!-- Event Detail Drawer -->
@@ -114,7 +127,7 @@ import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
@@ -135,6 +148,7 @@ const defaultEvent = {
 };
 
 const sessionId = ref("1");
+const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
@@ -143,6 +157,7 @@ const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
+const splitterSize = ref(600);
 const errorCount = ref(10);
 const { performanceState } = usePerformance();
 

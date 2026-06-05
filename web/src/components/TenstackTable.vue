@@ -220,10 +220,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :class="[
                     'resizer',
-                    'tw:hover:bg-[var(--o2-border-color)]',
+                    'tw:bg-[var(--o2-border-color)]!',
                     header.column.getIsResizing() ? 'isResizing' : '',
                   ]"
-                  class="tw:right-0 tw:bg-transparent"
+                  class="tw:right-0 tw:absolute tw:w-1 tw:h-full tw:cursor-col-resize"
                 />
                 <div
                   v-if="!header.isPlaceholder"

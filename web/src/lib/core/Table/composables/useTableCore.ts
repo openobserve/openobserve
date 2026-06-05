@@ -39,14 +39,16 @@ export function useTableCore<TData>(
     sorting: string;
     rowHeight?: number;
     filterMode?: string;
+    /** Initial column sizes loaded from localStorage (for persistence) */
+    initialColumnSizes?: Record<string, number> | null;
   },
   emit: any,
 ) {
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
 
-  // Track column sizing
-  const columnSizing = ref<Record<string, number>>({});
+  // Track column sizing — seeded with persisted values when provided
+  const columnSizing = ref<Record<string, number>>(props.initialColumnSizes ?? {});
   const columnResizeMode = "onChange";
 
   // Track sorting state for client-side
@@ -111,7 +113,8 @@ export function useTableCore<TData>(
         maxSize: col.maxSize ?? 800,
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
-        enableResizing: col.resizable ?? props.enableColumnResize ?? false,
+        // Actions and row-index (#) columns must never be resizable.
+        enableResizing: (col.isAction || col.id === "actions" || col.id === "#") ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           align: col.meta?.align ?? "left",
@@ -187,6 +190,11 @@ export function useTableCore<TData>(
         typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
     },
+    onColumnSizingChange: (updater: any) => {
+      const old = columnSizing.value;
+      const next = typeof updater === "function" ? updater(old) : updater;
+      columnSizing.value = next;
+    },
     onColumnPinningChange: (updater: any) => {
       const old = columnPinning.value;
       const next =
@@ -209,7 +217,7 @@ export function useTableCore<TData>(
         return columnOrder.value.length ? columnOrder.value : undefined;
       },
       get columnSizing() {
-        return props.enableColumnResize ? undefined : undefined;
+        return props.enableColumnResize ? columnSizing.value : {};
       },
       get columnVisibility() {
         return props.columnVisibility ?? {};

@@ -3431,11 +3431,6 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const toggleAiChat = () => {
-      store.dispatch('setIsAiChatEnabled', !store.state.isAiChatEnabled);
-      window.dispatchEvent(new Event('resize'));
-    };
-
     useShortcuts([
       {
         key: 'escape',
@@ -3450,13 +3445,13 @@ export default defineComponent({
       },
       {
         key: 'ctrl+b',
-        description: 'Toggle AI chat',
-        handler: toggleAiChat,
+        description: 'Expand/collapse AI chat',
+        handler: toggleExpand,
       },
       {
         key: 'meta+b',
-        description: 'Toggle AI chat',
-        handler: toggleAiChat,
+        description: 'Expand/collapse AI chat',
+        handler: toggleExpand,
       },
     ]);
 

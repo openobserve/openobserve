@@ -15,7 +15,7 @@
 
 use axum::{extract::Path, response::Response};
 use config::meta::user::UserRole;
-use o2_enterprise::enterprise::cloud::billings;
+use o2_enterprise::enterprise::cloud::{billing_group, billings};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -107,6 +107,23 @@ pub async fn link_subscription(
     {
         return MetaHttpResponse::bad_request(
             "Only free tier organizations can be linked to Azure Marketplace",
+        );
+    }
+
+    let members = match billing_group::list_billing_group_members_of(&org_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "[AZURE SAAS] Error checking billing group members for {org_id}: {}",
+                e
+            );
+            return MetaHttpResponse::internal_error("Failed to check billing group members");
+        }
+    };
+
+    if !members.is_empty() {
+        return MetaHttpResponse::bad_request(
+            "Organizations with billing group members cannot be linked to Azure marketplace",
         );
     }
 

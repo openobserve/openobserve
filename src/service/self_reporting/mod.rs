@@ -42,14 +42,18 @@ use tokio::sync::oneshot;
 
 #[cfg(feature = "cloud")]
 pub mod cloud_events;
+mod evaluator_schema;
 mod ingestion;
+mod llm_scores_schema;
 mod queues;
 pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
+pub(crate) use evaluator_schema::ensure_evaluator_stream_initialized;
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
+pub(crate) use llm_scores_schema::ensure_llm_scores_stream_initialized;
 
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]

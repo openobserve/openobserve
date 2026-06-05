@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 43;
+pub const DB_SCHEMA_VERSION: u64 = 45;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -888,6 +888,12 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_ROUTE_MAX_RETRIES",
+        default = 2,
+        help = "Max number of other nodes the router will fail over to when a proxied request can't reach the selected node (e.g. during a restart/redeploy). 0 disables retry."
+    )]
+    pub max_retries: usize,
     #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
     pub dispatch_strategy: RouteDispatchStrategy,
 }
@@ -1074,6 +1080,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1380,6 +1392,12 @@ pub struct Common {
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
+    #[env_config(
+        name = "ZO_ONLINE_EVALS_ENABLED",
+        default = false,
+        help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
+    )]
+    pub online_evals_enabled: bool,
     #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
@@ -3341,16 +3359,17 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
     }
-
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
     }
-
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if !cfg.compact.fast_mode && cfg.common.local_mode {
+        cfg.compact.fast_mode = true;
     }
 
     Ok(())

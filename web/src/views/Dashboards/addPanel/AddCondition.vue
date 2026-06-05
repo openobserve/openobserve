@@ -58,7 +58,7 @@
                 <div>
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
-                      <div class="tw:flex column tw:gap-2">
+                      <div class="tw:flex tw:flex-col tw:gap-2">
                         <OSelect
                           v-model="condition.operator"
                           :options="operators"

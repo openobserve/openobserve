@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="move-dashboard-to-another-folder-dialog"
+  <ODialog data-test="move-dashboard-to-another-folder-dialog"
     :open="open"
-    :width="30"
+    size="md"
     title="Move Dashboard"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-  <div class="tw:px-3 tw:py-2" data-test="dashboard-folder-move-body">
+  <div data-test="dashboard-folder-move-body">
       <div class="tw:flex tw:flex-col tw:gap-3">
         <OInput
           :model-value="
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
   </div>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -60,12 +60,12 @@ import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown, ODrawer, OInput },
+  components: { SelectFolderDropdown, ODialog, OInput },
   props: {
     activeFolderId: {
       type: String,

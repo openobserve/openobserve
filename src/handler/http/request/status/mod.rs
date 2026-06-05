@@ -208,6 +208,7 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
+    online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
@@ -219,6 +220,8 @@ struct ConfigResponse<'a> {
     org_storage_providers: String,
     #[cfg(feature = "enterprise")]
     org_storage_region: String,
+    #[cfg(feature = "cloud")]
+    billing_group_allowed_orgs: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -390,6 +393,9 @@ pub async fn zo_config() -> impl IntoResponse {
         (10 * 60).min(cfg.common.usage_publish_interval)
     );
 
+    #[cfg(feature = "cloud")]
+    let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
+
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -465,6 +471,7 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
+        online_evals_enabled: cfg.common.online_evals_enabled,
         anomaly_detection_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
@@ -476,6 +483,8 @@ pub async fn zo_config() -> impl IntoResponse {
         org_storage_providers,
         #[cfg(feature = "enterprise")]
         org_storage_region,
+        #[cfg(feature = "cloud")]
+        billing_group_allowed_orgs,
     })
 }
 

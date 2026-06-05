@@ -12,12 +12,12 @@ vi.mock("../../utils/zincutils", () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — mirrors the migrated overlay surface.
+// ODialog stub — mirrors the migrated overlay surface.
 // Exposes migrated props/emits so tests can drive primary/secondary actions
 // and assert on title/labels/open without depending on real overlay markup.
 // ---------------------------------------------------------------------------
-const ODrawerStub = {
-  name: "ODrawer",
+const ODialogStub = {
+  name: "ODialog",
   template:
     "<div class='o-drawer-stub' :data-open='open' :data-title='title'>" +
     "<slot name='header' />" +
@@ -156,7 +156,7 @@ describe("PanelLayoutSettings.vue", () => {
       props: defaultProps,
       global: {
         plugins: [store, router, i18n],
-        stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+        stubs: { ODialog: ODialogStub, ...quasarStubs },
       },
     });
 
@@ -171,7 +171,7 @@ describe("PanelLayoutSettings.vue", () => {
       props: { layout, open: true },
       global: {
         plugins: [store, router, i18n],
-        stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+        stubs: { ODialog: ODialogStub, ...quasarStubs },
       },
     });
 
@@ -184,7 +184,7 @@ describe("PanelLayoutSettings.vue", () => {
       props: defaultProps,
       global: {
         plugins: [store, router, i18n],
-        stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+        stubs: { ODialog: ODialogStub, ...quasarStubs },
       },
     });
 
@@ -196,7 +196,7 @@ describe("PanelLayoutSettings.vue", () => {
       props: { layout: defaultProps.layout },
       global: {
         plugins: [store, router, i18n],
-        stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+        stubs: { ODialog: ODialogStub, ...quasarStubs },
       },
     });
 
@@ -209,7 +209,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
     });
@@ -246,7 +246,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
     });
@@ -324,7 +324,7 @@ describe("PanelLayoutSettings.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            ODrawer: ODrawerStub,
+            ODialog: ODialogStub,
             QForm: QFormStub,
             QInput: true,
             QIcon: true,
@@ -335,14 +335,14 @@ describe("PanelLayoutSettings.vue", () => {
 
     it("forwards open prop to ODrawer", () => {
       wrapper = mountWithDrawer({ open: true });
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
     });
 
     it("passes title and button labels to ODrawer", () => {
       wrapper = mountWithDrawer();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("title")).toBe("Panel Layout");
       expect(drawer.props("primaryButtonLabel")).toBe("Save");
       expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
@@ -351,7 +351,7 @@ describe("PanelLayoutSettings.vue", () => {
 
     it("re-emits update:open from ODrawer", async () => {
       wrapper = mountWithDrawer();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       await drawer.vm.$emit("update:open", false);
 
@@ -362,7 +362,7 @@ describe("PanelLayoutSettings.vue", () => {
 
     it("emits update:open with false when ODrawer emits click:secondary", async () => {
       wrapper = mountWithDrawer();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       await drawer.vm.$emit("click:secondary");
 
@@ -373,7 +373,7 @@ describe("PanelLayoutSettings.vue", () => {
 
     it("calls submitForm and triggers save:layout when ODrawer emits click:primary", async () => {
       wrapper = mountWithDrawer();
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       // QForm stub re-emits submit on form submit, which calls savePanelLayout
       await drawer.vm.$emit("click:primary");
@@ -390,7 +390,7 @@ describe("PanelLayoutSettings.vue", () => {
       // Set invalid height so submitForm sets an error instead of emitting save:layout
       wrapper.vm.updatedLayout.h = 0;
       wrapper.vm.heightError = "";
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
 
       expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
       await nextTick();
@@ -405,7 +405,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
     });
@@ -417,7 +417,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
 
@@ -435,12 +435,12 @@ describe("PanelLayoutSettings.vue", () => {
     });
 
     it("should expose panel layout title via ODrawer prop", () => {
-      const drawer = wrapper.findComponent(ODrawerStub);
+      const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("title")).toBe("Panel Layout");
     });
 
     it("should render the ODrawer overlay", () => {
-      expect(wrapper.findComponent(ODrawerStub).exists()).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
     });
 
     it("should still expose getImageURL helper on the instance", () => {
@@ -457,7 +457,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
     });
@@ -495,7 +495,7 @@ describe("PanelLayoutSettings.vue", () => {
         props: { layout: customLayout, open: true },
         global: {
           plugins: [store, router, i18n],
-          stubs: { ODrawer: ODrawerStub, ...quasarStubs },
+          stubs: { ODialog: ODialogStub, ...quasarStubs },
         },
       });
 

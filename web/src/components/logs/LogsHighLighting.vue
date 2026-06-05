@@ -46,7 +46,7 @@ import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 /**
  * Component Props Interface
  */
-interface Props {
+export interface Props {
   data: any;
   showBraces?: boolean;
   showQuotes?: boolean;

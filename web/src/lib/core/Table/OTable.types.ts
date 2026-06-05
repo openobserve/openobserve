@@ -185,6 +185,16 @@ export interface OTableProps<TData = any> {
   enableColumnPin?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
+  /**
+   * Persist column widths and visibility to localStorage.
+   * Requires `tableId` to be set. When both are present, column sizes and
+   * visibility survive page reloads. Off by default.
+   */
+  persistColumns?: boolean;
+
+  // ── Layout ──
+  /** When false, table shrinks to fit its content instead of filling the container height (default: true) */
+  fillHeight?: boolean;
 
   // ── Display ──
   loading?: boolean;
@@ -356,6 +366,8 @@ export interface OTableExposed<TData = any> {
   resetColumnSizes: () => void;
   /** Reset column order to default */
   resetColumnOrder: () => void;
+  /** Clear all persisted column state (sizes + visibility) for this tableId */
+  resetPersistedColumns: () => void;
   /** Scroll to top */
   scrollToTop: () => void;
   /** Get all currently visible rows as plain objects */

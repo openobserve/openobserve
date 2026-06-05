@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <ODrawer
+    <ODialog
       :open="open"
-      :width="20"
+      size="sm"
       :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
       secondary-button-label="Cancel"
       primary-button-label="Save"
+      form-id="add-folder-sidebar-form"
       :primary-button-loading="onSubmit.isLoading.value"
       data-test="dashboard-folder-dialog"
       @update:open="$emit('update:open', $event)"
       @click:secondary="$emit('update:open', false)"
-      @click:primary="submit()"
     >
-      <div class="tw:p-4">
-        <OForm ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
+      <div>
+        <OForm id="add-folder-sidebar-form" ref="addFolderForm" :default-values="{ name: folderData.name, description: folderData.description }" @submit="onSubmit.execute">
           <OFormInput
             name="name"
             :label="t('dashboard.nameOfVariable') + '*'"
@@ -43,12 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OForm>
       </div>
-    </ODrawer>
+    </ODialog>
   </template>
   
   <script lang="ts">
   import { defineComponent, ref, watch } from "vue";
-  import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+  import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
   import OForm from "@/lib/forms/Form/OForm.vue";
   import OFormInput from "@/lib/forms/Input/OFormInput.vue";
   import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   
   export default defineComponent({
     name: "CommonAddFolder",
-    components: { ODrawer, OForm, OFormInput },
+    components: { ODialog, OForm, OFormInput },
     props: {
       open: {
         type: Boolean,
@@ -137,11 +137,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       const { track } = useReo();
   
       const onSubmit = useLoading(async () => {
-        await addFolderForm.value.validate().then(async (valid: any) => {
-          if (!valid) {
-            return false;
-          }
-
           // Sync OForm-owned values back to local state
           const formVals = addFolderForm.value.form.state.values as { name: string; description: string };
           folderData.value.name = formVals.name ?? folderData.value.name;
@@ -192,11 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             button: "Save New Folder",
             page: "Folders",
           });
-        });
       });
   
-      const submit = () => onSubmit.execute();
-
       return {
         t,
         disableColor,
@@ -209,7 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         getImageURL,
         onSubmit,
         defaultValue,
-        submit,
       };
     },
   });

@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OSeparator class="tw:h-[1.875rem]! tw:w-[1px]" vertical />
             <ODropdown
-              v-if="store.state.zoConfig.auto_query_enabled && !isLoading"
+              v-if="store.state.zoConfig.auto_query_enabled"
               side="bottom"
               align="end"
             >
@@ -245,8 +245,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-xs"
+                  :disabled="isLoading"
                   :class="[
-                    'o2-color-primary',
+                    config.isEnterprise == 'true' && isLoading
+                      ? 'o2-color-cancel'
+                      : 'o2-color-primary',
                     'search-button-dropdown-enterprise-border-radius',
                   ]"
                 >
