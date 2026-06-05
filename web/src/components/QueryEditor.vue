@@ -82,8 +82,8 @@
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
-        @focus="() => { editorFocused.value = true; emit('focus') }"
-        @blur="() => { editorFocused.value = false; emit('blur') }"
+        @focus="handleEditorFocus"
+        @blur="handleEditorBlur"
         @nlpModeDetected="handleNlpModeDetected"
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
@@ -280,6 +280,16 @@ const rootStyle = computed(() => {
 // Handle query update from editor
 const handleQueryUpdate = (newQuery: string) => {
   emit('update:query', newQuery);
+};
+
+const handleEditorFocus = () => {
+  editorFocused.value = true;
+  emit('focus');
+};
+
+const handleEditorBlur = () => {
+  editorFocused.value = false;
+  emit('blur');
 };
 
 // Handle auto-detection from editor

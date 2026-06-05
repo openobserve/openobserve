@@ -26,7 +26,7 @@
     <div ref="scrollContainerRef" class="o-field-list__body" @scroll="onScroll">
       <!-- Loading state -->
       <div
-        v-if="loading && paginatedFields.length === 0"
+        v-if="loading"
         class="o-field-list__loading"
       >
         <slot name="loading" />
@@ -34,13 +34,14 @@
 
       <!-- Empty state -->
       <div
-        v-else-if="!loading && paginatedFields.length === 0"
+        v-else-if="paginatedFields.length === 0"
         class="o-field-list__empty"
       >
         <slot name="empty" />
       </div>
 
-      <!-- Field rows -->
+      <!-- Field rows (hidden while loading) -->
+      <template v-if="!loading">
       <template
         v-for="row in paginatedFields"
         :key="rowKey ? row[rowKey] : row.name"
@@ -109,6 +110,7 @@
           <slot name="expansion" :row="row" />
         </div>
       </template>
+      </template><!-- end v-if="!loading" -->
     </div>
 
     <!-- After-list slot (pagination, toggles, etc.) -->
@@ -398,7 +400,10 @@ defineExpose({ scrollToTop });
     min-height: 0;
   }
 
-  &__loading,
+  &__loading {
+    width: 100%;
+  }
+
   &__empty {
     display: flex;
     align-items: center;
