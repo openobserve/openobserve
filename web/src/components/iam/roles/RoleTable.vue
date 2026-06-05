@@ -6,6 +6,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -63,7 +64,7 @@ const columns: OTableColumnDef[] = [
     :loading="loading"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
-    :global-filter-placeholder="t('iam.searchRole')"
+    :show-global-filter="false"
     pagination="client"
     :page-size="20"
     :page-size-options="[20, 50, 100, 250, 500]"
@@ -76,6 +77,16 @@ const columns: OTableColumnDef[] = [
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
   >
+    <template #toolbar>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+        <OSearchInput
+          :model-value="globalFilter"
+          :placeholder="t('iam.searchRole')"
+          class="tw:flex-1"
+          @update:model-value="emit('update:globalFilter', $event)"
+        />
+      </div>
+    </template>
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="tw:flex tw:items-center tw:justify-center">

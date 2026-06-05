@@ -35,7 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:mx-2.5 tw:mt-2.5 tw:mb-2.5">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
         <OTable
           :frame="false"
           data-test="iam-groups-table-section"
@@ -45,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
-          :global-filter-placeholder="t('iam.searchGroup')"
+          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -56,6 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('iam.searchGroup')"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:justify-center">
               <OButton
@@ -95,6 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
         </OTable>
+      </div>
     </div>
     <AddGroup
       v-model:open="showAddGroup"
@@ -135,6 +146,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 

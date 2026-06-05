@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
+    <div class="tw:flex-1 tw:min-h-0 tw:pb-2.5">
       <div class="card-container tw:h-full">
       <OTable
         :frame="false"
