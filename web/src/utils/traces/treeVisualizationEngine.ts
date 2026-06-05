@@ -13,7 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { TreeNode } from '@/composables/useTreeVisualization'
+import { useStore } from 'vuex'
+import { generateTracePatternTooltipContent } from './treeTooltipHelpers'
+
+/**
+ * Tree node interface for tree visualization with coordinate support
+ */
+export interface TreeNode {
+  id: string
+  name: string
+  label?: string
+  value: number // Primary metric (requests/duration)
+  errorRate?: number
+  children?: TreeNode[]
+  metadata?: Record<string, any> // Context-specific data
+  x?: number // Node position for coordinate-based hit detection
+  y?: number // Node position for coordinate-based hit detection
+}
 
 /**
  * Configuration for tree visualization rendering
@@ -223,8 +239,156 @@ export function createTreeVisualizationEngine() {
     return isDarkMode ? "#10b981" : "#16a34a" // Green — healthy (more contrasting)
   }
 
+  /**
+   * Find chart node at screen coordinates using ECharts hit detection
+   */
+  const findNodeAtPoint = (chart: any, point: [number, number], treeData: TreeNode[]): TreeNode | null => {
+    // Use ECharts coordinate conversion for accurate hit testing
+    const series = chart.getModel().getSeries()[0]
+    if (!series) return null
+
+    // Hit radius similar to Service Graph (20px for tree view)
+    const HIT_RADIUS = 20
+    let closestNode: TreeNode | null = null
+    let closestDistance = Infinity
+
+    const searchNodes = (nodes: TreeNode[]) => {
+      nodes.forEach(node => {
+        // Get node screen position from ECharts
+        const nodePosition = chart.convertToPixel({ seriesIndex: 0 }, [node.x || 0, node.y || 0])
+        if (!nodePosition) return
+
+        const distance = Math.sqrt(
+          Math.pow(point[0] - nodePosition[0], 2) +
+          Math.pow(point[1] - nodePosition[1], 2)
+        )
+
+        if (distance < HIT_RADIUS && distance < closestDistance) {
+          closestDistance = distance
+          closestNode = node
+        }
+
+        if (node.children) {
+          searchNodes(node.children)
+        }
+      })
+    }
+
+    searchNodes(treeData)
+    return closestNode
+  }
+
+  /**
+   * Setup custom DOM tooltips for trace graph nodes
+   * Follows exact Service Graph tooltip patterns for consistency
+   */
+  const setupTraceNodeTooltips = (chart: any, data: TreeVisualizationData): (() => void) => {
+    const chartDom = chart.getDom()
+    const store = useStore()
+
+    // Create tooltip element with Service Graph styling
+    const tooltipEl = document.createElement("div")
+    const isDarkMode = store.state.theme === 'dark'
+
+    // Exact styling from Service Graph implementation
+    tooltipEl.style.cssText = `
+      position: absolute; pointer-events: none; z-index: 9999;
+      background: ${isDarkMode ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid ${isDarkMode ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
+      border-radius: 8px; padding: 9px 13px; font-size: 12px; line-height: 1.5;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      letter-spacing: 0.01em; white-space: nowrap; display: none;
+      color: ${isDarkMode ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)"};
+    `
+
+    if (!chartDom.style.position || chartDom.style.position === "static") {
+      chartDom.style.position = "relative"
+    }
+    chartDom.appendChild(tooltipEl)
+
+    let hideTimer: ReturnType<typeof setTimeout> | null = null
+    let activeNodeId: string | null = null
+
+    // Positioning logic from Service Graph
+    const positionTooltip = (mouseX: number, mouseY: number) => {
+      const cw = chartDom.clientWidth
+      const ch = chartDom.clientHeight
+      let left = mouseX + 15
+      let top = mouseY + 15
+
+      tooltipEl.style.display = "block"
+
+      if (left + tooltipEl.offsetWidth > cw) {
+        left = mouseX - tooltipEl.offsetWidth - 10
+      }
+      if (top + tooltipEl.offsetHeight > ch) {
+        top = mouseY - tooltipEl.offsetHeight - 10
+      }
+
+      tooltipEl.style.left = left + "px"
+      tooltipEl.style.top = top + "px"
+    }
+
+    const showNodeTooltip = (mouseX: number, mouseY: number, node: TreeNode) => {
+      const tooltipContent = data.getNodeTooltip(node)
+      tooltipEl.innerHTML = tooltipContent
+      positionTooltip(mouseX, mouseY)
+    }
+
+    const hideTooltip = () => {
+      tooltipEl.style.display = "none"
+      activeNodeId = null
+    }
+
+    // Mouse event handling with Service Graph timing
+    const onMouseMove = (e: any) => {
+      const hoveredNode = findNodeAtPoint(chart, [e.offsetX, e.offsetY], data.treeData)
+
+      if (hoveredNode && hoveredNode.id !== activeNodeId) {
+        if (hideTimer) {
+          clearTimeout(hideTimer)
+          hideTimer = null
+        }
+        activeNodeId = hoveredNode.id
+        showNodeTooltip(e.offsetX, e.offsetY, hoveredNode)
+      } else if (!hoveredNode && activeNodeId) {
+        if (!hideTimer) {
+          hideTimer = setTimeout(() => {
+            hideTimer = null
+            hideTooltip()
+          }, 150)
+        }
+      }
+    }
+
+    const onMouseLeave = () => {
+      if (hideTimer) {
+        clearTimeout(hideTimer)
+        hideTimer = null
+      }
+      hideTooltip()
+    }
+
+    // Register mouse events
+    const zr = chart.getZr()
+    zr.on("mousemove", onMouseMove)
+    zr.on("globalout", onMouseLeave)
+
+    // Cleanup function
+    return () => {
+      if (hideTimer) clearTimeout(hideTimer)
+      zr.off("mousemove", onMouseMove)
+      zr.off("globalout", onMouseLeave)
+      tooltipEl.remove()
+    }
+  }
+
   return {
     generateEChartsOptions,
+    setupTraceNodeTooltips,
+    findNodeAtPoint, // Export for testing
     getHealthColor
   }
 }
