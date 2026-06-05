@@ -856,6 +856,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -2639,6 +2641,34 @@ export default defineComponent({
       }
     };
 
+    // ── Keyboard shortcuts — span navigation ─────────────────────────────
+    useShortcutScope("trace-detail");
+    useShortcutsWithMac([
+      {
+        key: "j",
+        scope: "trace-detail",
+        description: "shortcuts.actions.traceNextSpan",
+        handler: () => {
+          if (isInputFocused()) return;
+          const list = spanList.value;
+          if (!list?.length) return;
+          const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+          if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
+        },
+      },
+      {
+        key: "k",
+        scope: "trace-detail",
+        description: "shortcuts.actions.tracePrevSpan",
+        handler: () => {
+          if (isInputFocused()) return;
+          const list = spanList.value;
+          if (!list?.length) return;
+          const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+          if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+        },
+      },
+    ]);
     return {
       router,
       t,

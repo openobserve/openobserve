@@ -28,8 +28,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
-      { key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
-      { key: "escape",  descriptionKey: "shortcuts.actions.closeDialog" },
+      { key: "shift+?",  descriptionKey: "shortcuts.actions.openCheatsheet" },
+      { key: "escape",   descriptionKey: "shortcuts.actions.closeDialog" },
+      { key: "ctrl+b",   descriptionKey: "shortcuts.actions.aiChatToggle" },
     ],
   },
 
@@ -41,6 +42,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "r",          descriptionKey: "shortcuts.actions.logsRefresh" },
       { key: "h",          descriptionKey: "shortcuts.actions.logsToggleHistogram" },
       { key: "ctrl+/",     descriptionKey: "shortcuts.actions.logsToggleSidebar" },
+      { key: "ctrl+h",     descriptionKey: "shortcuts.actions.logsSearchHistory" },
       { key: "/",          descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
@@ -72,10 +74,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.dashboardsPanel",
     shortcuts: [
-      { key: "v",           descriptionKey: "shortcuts.actions.panelView" },
-      { key: "e",           descriptionKey: "shortcuts.actions.panelEdit" },
-      { key: "d",           descriptionKey: "shortcuts.actions.panelDuplicate" },
-      { key: "del / ⌫",    descriptionKey: "shortcuts.actions.panelDelete" },
+      { key: "v",        descriptionKey: "shortcuts.actions.panelView" },
+      { key: "e",        descriptionKey: "shortcuts.actions.panelEdit" },
+      { key: "d",        descriptionKey: "shortcuts.actions.panelDuplicate" },
+      { key: "del / ⌫", descriptionKey: "shortcuts.actions.panelDelete" },
+    ],
+  },
+
+  // ── Panel Editor ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.panelEditor",
+    shortcuts: [
+      { key: "ctrl+enter", descriptionKey: "shortcuts.actions.panelEditorRun" },
+      { key: "ctrl+s",     descriptionKey: "shortcuts.actions.panelEditorSave" },
+      { key: "escape",     descriptionKey: "shortcuts.actions.panelEditorBack" },
     ],
   },
 
@@ -97,11 +109,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── Trace Detail ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.traceDetail",
+    shortcuts: [
+      { key: "j", descriptionKey: "shortcuts.actions.traceNextSpan" },
+      { key: "k", descriptionKey: "shortcuts.actions.tracePrevSpan" },
+    ],
+  },
+
   // ── Alerts ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.alerts",
     shortcuts: [
       { key: "n",      descriptionKey: "shortcuts.actions.alertsCreate" },
+      { key: "i",      descriptionKey: "shortcuts.actions.alertsImport" },
       { key: "r",      descriptionKey: "shortcuts.actions.alertsRefresh" },
       { key: "escape", descriptionKey: "shortcuts.actions.alertsClose" },
     ],
@@ -205,6 +227,22 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n", descriptionKey: "shortcuts.actions.iamServiceAccountsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.iamServiceAccountsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── IAM — Ingestion Tokens ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.ingestionTokens",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.ingestionTokensAdd" },
+    ],
+  },
+
+  // ── Running Queries ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.runningQueries",
+    shortcuts: [
+      { key: "r", descriptionKey: "shortcuts.actions.runningQueriesRefresh" },
     ],
   },
 ];

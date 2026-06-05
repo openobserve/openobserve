@@ -247,6 +247,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -1720,6 +1722,29 @@ export default defineComponent({
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("panel-editor");
+    useShortcutsWithMac([
+      {
+        key: "ctrl+enter",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorRun",
+        handler: () => runQuery(false),
+      },
+      {
+        key: "ctrl+s",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorSave",
+        handler: () => savePanelData.execute(),
+      },
+      {
+        key: "escape",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorBack",
+        handler: () => goBack(),
+      },
+    ]);
 
     return {
       t,

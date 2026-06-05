@@ -4834,7 +4834,11 @@
       "iamGroups": "IAM — Groups",
       "iamServiceAccounts": "IAM — Service Accounts",
       "alertDestinations": "Alerts — Destinations",
-      "alertTemplates": "Alerts — Templates"
+      "alertTemplates": "Alerts — Templates",
+      "panelEditor": "Panel Editor",
+      "traceDetail": "Trace Detail",
+      "runningQueries": "Running Queries",
+      "ingestionTokens": "IAM — Ingestion Tokens"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -4882,7 +4886,17 @@
       "alertDestinationsAdd": "Add new destination",
       "alertDestinationsRefresh": "Refresh list",
       "alertTemplatesAdd": "Add new template",
-      "alertTemplatesRefresh": "Refresh list"
+      "alertTemplatesRefresh": "Refresh list",
+      "logsSearchHistory": "Open search history",
+      "alertsImport": "Import alert",
+      "panelEditorRun": "Run / apply query",
+      "panelEditorSave": "Save panel",
+      "panelEditorBack": "Discard and go back",
+      "traceNextSpan": "Next span",
+      "tracePrevSpan": "Previous span",
+      "runningQueriesRefresh": "Refresh query list",
+      "ingestionTokensAdd": "Create new token",
+      "aiChatToggle": "Toggle AI chat"
     }
   }
 }

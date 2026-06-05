@@ -187,6 +187,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 interface Token {
   name: string;
@@ -332,6 +334,17 @@ export default defineComponent({
     onBeforeMount(() => {
       fetchTokens();
     });
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("ingestion-tokens");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "ingestion-tokens",
+        description: "shortcuts.actions.ingestionTokensAdd",
+        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+    ]);
 
     return {
       store,

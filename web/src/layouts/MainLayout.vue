@@ -192,6 +192,8 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useShortcut } from "@/lib/vue-shortcut-manager";
+import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1132,6 +1134,16 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    // ── Global shortcuts: AI Chat ─────────────────────────────────────────
+    useShortcutsWithMac([
+      {
+        key: "ctrl+b",
+        scope: "global",
+        description: "shortcuts.actions.aiChatToggle",
+        handler: () => toggleAIChat(),
+      },
+    ]);
 
     return {
       t,
