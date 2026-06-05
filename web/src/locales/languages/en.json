@@ -4896,7 +4896,8 @@
       "tracePrevSpan": "Previous span",
       "runningQueriesRefresh": "Refresh query list",
       "ingestionTokensAdd": "Create new token",
-      "aiChatToggle": "Toggle AI chat"
+      "aiChatToggle": "Toggle AI chat",
+      "dashboardEdit": "Enter / exit edit mode"
     }
   }
 }
