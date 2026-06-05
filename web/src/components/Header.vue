@@ -189,8 +189,8 @@ size="xs" class="warning" />{{
       >
         <OIcon
           name="warning"
-          size="md"
-          class="tw:opacity-70"
+          size="sm"
+          class="tw:opacity-60"
           :style="{ color: ingestionQuotaColor }"
         />
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
@@ -238,7 +238,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="tw:opacity-70 tw:size-5 tw:shrink-0" />
+        <component :is="slackIcon" class="tw:opacity-60 tw:size-4 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
@@ -246,7 +246,7 @@ size="xs" class="warning" />{{
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
-            <OIcon name="help-outline" size="md" class="tw:opacity-70" />
+            <OIcon name="help-outline" size="sm" class="tw:opacity-60" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
@@ -295,7 +295,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-settings-item"
         @click="router.push({ name: 'settings' })"
       >
-        <OIcon name="settings" size="md" class="tw:opacity-70" />
+        <OIcon name="settings" size="sm" class="tw:opacity-60" />
         <OTooltip side="top" align="center" :content="t('menu.settings')" />
       </OButton>
 
@@ -313,8 +313,8 @@ size="xs" class="warning" />{{
           >
             <OIcon
               :name="user.picture ? user.picture : 'person'"
-              size="md"
-              class="tw:opacity-70"
+              size="sm"
+              class="tw:opacity-60"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
