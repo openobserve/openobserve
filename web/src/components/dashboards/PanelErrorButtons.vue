@@ -30,7 +30,7 @@
       data-test="panel-max-duration-warning"
     >
       <OTooltip side="bottom" align="end" max-width="220px">
-        <template #content><div style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
+        <template #content><div data-test="panel-max-duration-warning-content" style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
       </OTooltip>
     </OButton>
     <OButton
