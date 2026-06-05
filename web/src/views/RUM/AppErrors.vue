@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-    <div class="tw:pb-[0.625rem]">
-      <div class="card-container">
+    <div>
+      <div class="card-container tw:border-b tw:border-border-default">
         <div
           class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
         >
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal="false"
     >
       <template #before>
-        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
+        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
