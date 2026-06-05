@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
-          :global-filter-placeholder="t('user.search')"
+          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -67,6 +67,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :default-columns="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('user.search')"
+                data-test="user-list-search-input"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
           <template #empty>
             <OEmptyState size="hero" preset="no-users" @action="addRoutePush({})" />
           </template>
@@ -231,6 +241,7 @@ import {
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -251,6 +262,7 @@ export default defineComponent({
     OIcon,
     ODialog,
     OEmptyState,
+    OSearchInput,
   },
   emits: [
     "updated:fields",
