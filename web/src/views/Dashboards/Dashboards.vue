@@ -204,14 +204,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="tw:font-mono tw:text-xs tw:text-text-disabled"
+                class="tw:font-mono tw:text-xs tw:text-text-primary"
                 :title="value"
                 >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-secondary text-truncate tw:block"
+                class="tw:text-text-primary text-truncate tw:block"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
               >
                 <span
-                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.02em]"
+                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.02em]"
                   >{{ ownerInitials(value) }}</span
                 >
                 <span
@@ -231,15 +231,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ value }}</span
                 >
               </span>
-              <span v-else class="tw:text-text-disabled">—</span>
+              <span v-else class="tw:text-text-primary">—</span>
             </template>
             <template #cell-created="{ value }">
-              <span class="tw:text-text-secondary">{{ value }}</span>
+              <span class="tw:text-text-primary">{{ value }}</span>
             </template>
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-secondary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -617,7 +617,7 @@ export default defineComponent({
           accessorKey: "#",
           sortable: false,
           size: 48,
-          meta: { align: "left", headerClass: "tw:text-text-disabled" },
+          meta: { align: "left" },
         },
         {
           id: "name",
@@ -628,15 +628,15 @@ export default defineComponent({
           hideable: true,
           meta: { align: "left" },
         },
-        {
-          id: "identifier",
-          header: t("dashboard.identifier"),
-          accessorKey: "identifier",
-          sortable: true,
-          resizable: true,
-          hideable: true,
-          meta: { align: "left" },
-        },
+        // {
+        //   id: "identifier",
+        //   header: t("dashboard.identifier"),
+        //   accessorKey: "identifier",
+        //   sortable: true,
+        //   resizable: true,
+        //   hideable: true,
+        //   meta: { align: "left" },
+        // },
         {
           id: "description",
           header: t("dashboard.description"),
