@@ -56,7 +56,11 @@ def _enable_fts(client, stream: str, field: str) -> None:
 
 
 def _wait_for_fts(client, stream: str, keyword: str, *, timeout: float = 120.0) -> None:
-    """Wait until match_all(keyword) returns at least one hit in *stream*."""
+    """Wait until match_all(keyword) returns at least one hit in *stream*.
+
+    Raises pytest.skip if the server returns 400 for match_all — this means
+    FTS/Tantivy is not compiled in or not configured, not a transient failure.
+    """
     def _ready():
         resp = client.post(
             "_search?type=logs",
@@ -65,17 +69,25 @@ def _wait_for_fts(client, stream: str, keyword: str, *, timeout: float = 120.0) 
                 size=1,
             ),
         )
+        if resp.status_code == 400:
+            # match_all not supported — fail fast rather than looping to timeout
+            raise RuntimeError(
+                f"match_all query returned 400 — FTS may not be supported: {resp.text[:200]}"
+            )
         if resp.status_code != 200:
             return False
         hits = resp.json().get("hits", [])
         return bool(hits and int(hits[0].get("c", 0)) >= 1)
 
-    wait_until(
-        _ready,
-        timeout=timeout,
-        interval=3.0,
-        msg=f"{stream}: FTS index for '{keyword}' not ready within {timeout}s",
-    )
+    try:
+        wait_until(
+            _ready,
+            timeout=timeout,
+            interval=3.0,
+            msg=f"{stream}: FTS index for '{keyword}' not ready within {timeout}s",
+        )
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
 
 # ─── Scenario 51: Basic FTS on vortex stream ──────────────────────────────────

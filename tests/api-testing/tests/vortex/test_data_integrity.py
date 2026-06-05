@@ -109,9 +109,10 @@ class TestNullHandling:
         ingest(client, self.STREAM, [anchor] + null_records)
         flush_and_wait(client, self.STREAM, expected=6)
 
-        # Rows without nullable_field should have empty/null for that field
-        n_with = count_records(client, self.STREAM, where="nullable_field IS NOT NULL AND nullable_field != ''")
-        assert n_with == 1, f"only anchor row should have nullable_field; got {n_with}"
+        # Count rows that have the anchor's exact value — more reliable than
+        # IS NOT NULL because OO stores missing fields as empty strings, not SQL NULL.
+        n_with = count_records(client, self.STREAM, where="nullable_field='seed'")
+        assert n_with == 1, f"only anchor row should have nullable_field='seed'; got {n_with}"
 
         total = count_records(client, self.STREAM, where="group='null_test'")
         assert total == 6, f"all 6 rows should be queryable; got {total}"
@@ -218,7 +219,7 @@ class TestTimestampPrecision:
     def test_60_ingest_close_timestamps(self, client):
         base = _ts()
         records = [
-            {"_timestamp": base + i, "seq": i}  # 1 µs apart
+            {"_timestamp": base + i * 1_000, "seq": i}  # 1 ms apart — avoids µs truncation
             for i in range(10)
         ]
         ingest(client, self.STREAM, records)

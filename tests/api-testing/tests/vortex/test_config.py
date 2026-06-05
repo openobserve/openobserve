@@ -89,14 +89,24 @@ class TestInvalidFormatFlag:
         if not os.path.isfile(binary):
             pytest.skip(f"ZO_BINARY_PATH={binary!r} does not exist")
 
-        env = {**os.environ, "ZO_FILE_FORMAT": "invalid_format_xyz"}
-        result = subprocess.run(
-            [binary, "--check-config"],
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env = {
+                **os.environ,
+                "ZO_FILE_FORMAT": "invalid_format_xyz",
+                # Provide required env vars so the binary fails on format
+                # validation, not on missing configuration.
+                "ZO_DATA_DIR": tmpdir,
+                "ZO_ROOT_USER_EMAIL": os.environ.get("ZO_ROOT_USER_EMAIL", "root@example.com"),
+                "ZO_ROOT_USER_PASSWORD": os.environ.get("ZO_ROOT_USER_PASSWORD", "Complexpass#123"),
+            }
+            result = subprocess.run(
+                [binary, "--check-config"],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
         assert result.returncode != 0, (
             "server should exit non-zero with invalid ZO_FILE_FORMAT, "
             f"but got returncode={result.returncode}"

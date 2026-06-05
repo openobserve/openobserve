@@ -76,6 +76,7 @@ class TestVortexThroughputAndLatency:
 
         assert resp.status_code == 200, f"ingest failed: {resp.status_code}"
         throughput = self.N / elapsed
+        assert throughput > 0, "throughput must be positive"
         logging.info(
             "PERF scenario-74: ingested %d records in %.2fs → %.0f records/sec",
             self.N, elapsed, throughput,

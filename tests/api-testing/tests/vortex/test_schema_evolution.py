@@ -65,9 +65,14 @@ class TestNewFieldAddition:
             n = count_records(client, s, where=f"{field} IS NOT NULL AND {field} != ''")
             assert n == 10, f"{field} should appear in all 10 rows, got {n}"
 
-        for field in ("field_c", "field_d", "field_e"):
-            n = count_records(client, s, where=f"{field} IS NOT NULL AND {field} != ''")
-            assert n == 5, f"{field} should appear in only 5 rows, got {n}"
+        # Use value-specific checks: IS NOT NULL AND != '' is unreliable for
+        # numeric/boolean fields (e.g. field_d=0, field_e=false may look empty).
+        n = count_records(client, s, where="field_c='c'")
+        assert n == 5, f"field_c should appear in 5 rows, got {n}"
+        n = count_records(client, s, where="field_d IS NOT NULL AND field_d != ''")
+        assert n == 5, f"field_d should appear in 5 rows, got {n}"
+        n = count_records(client, s, where="field_e IS NOT NULL AND field_e != ''")
+        assert n == 5, f"field_e should appear in 5 rows, got {n}"
 
     def test_16_new_field_data_types(self, client):
         """Scenario 16: new fields of type string, int, float, bool are all queryable."""
