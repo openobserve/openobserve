@@ -2562,6 +2562,10 @@ export default defineComponent({
       emit("searchdata");
     }, 2500);
 
+    const debouncedAutoRunPatterns = debounce(() => {
+      emit("extractPatterns");
+    }, 2500);
+
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
     // range that exceeds queryRangeRestrictionInHour. The clamp path calls
@@ -2683,6 +2687,20 @@ export default defineComponent({
           debouncedAutoRunAbsolute();
         } else {
           emit("searchdata");
+        }
+      }
+
+      // Patterns tab: re-run when auto-run is enabled (live or non-live)
+      if (
+        store.state.zoConfig.auto_query_enabled &&
+        searchObj.meta.logsVisualizeToggle === "patterns" &&
+        searchObj.loading == false &&
+        ignoreAutoTrigger == false
+      ) {
+        if (searchObj.meta.liveMode && value.valueType === "absolute") {
+          debouncedAutoRunPatterns();
+        } else {
+          emit("extractPatterns");
         }
       }
     };
