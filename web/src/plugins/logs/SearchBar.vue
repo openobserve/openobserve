@@ -747,8 +747,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div v-else class="tw:flex tw:items-center">
+              <!-- Cancel button for patterns tab -->
               <OButton
                 v-if="
+                  searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                  patternsState.loading
+                "
+                data-test="logs-search-bar-patterns-cancel-btn"
+                variant="ghost"
+                :title="t('search.cancel')"
+                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                @click="cancelPatterns"
+                >{{ t("search.cancel") }}</OButton
+              >
+              <!-- Cancel button for logs tab (enterprise only, trace-based) -->
+              <OButton
+                v-else-if="
                   config.isEnterprise == 'true' &&
                   (!!searchObj.data.searchRequestTraceIds.length ||
                     !!searchObj.data.searchWebSocketTraceIds.length) &&
@@ -797,6 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true ||
+                  patternsState.loading ||
                   isGeneratingSQL ||
                   (isNaturalLanguageDetected &&
                     !searchObj.meta.nlpMode &&
@@ -843,12 +858,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-xs"
                     :class="[
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                      config.isEnterprise == 'true' &&
-                      (!!searchObj.data.searchRequestTraceIds.length ||
-                        !!searchObj.data.searchWebSocketTraceIds.length) &&
-                      (searchObj.loading == true ||
-                        searchObj.loadingHistogram == true)
+                      (searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                        patternsState.loading) ||
+                      (!(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                        config.isEnterprise == 'true' &&
+                        (!!searchObj.data.searchRequestTraceIds.length ||
+                          !!searchObj.data.searchWebSocketTraceIds.length) &&
+                        (searchObj.loading == true ||
+                          searchObj.loadingHistogram == true))
                         ? 'o2-color-cancel'
                         : !(
                               isNaturalLanguageDetected &&
@@ -1629,6 +1646,7 @@ import {
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
+import usePatterns, { patternsState } from "@/composables/useLogs/usePatterns";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1917,6 +1935,7 @@ export default defineComponent({
       cancelQuery,
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
+    const { cancelPatterns } = usePatterns();
 
     const {
       refreshData,
@@ -4802,6 +4821,8 @@ export default defineComponent({
       toggleViewOptions,
       currentToggleOption,
       toggleLiveMode,
+      patternsState,
+      cancelPatterns,
     };
   },
   computed: {

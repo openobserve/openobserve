@@ -696,24 +696,6 @@ export default defineComponent({
     },
   },
   methods: {
-    formatPatternSummary(stats: any, totalEvents: number, histogramMs: number) {
-      const patternsFound = stats?.total_patterns_found || 0;
-      const logsAnalyzed = (stats?.total_logs_analyzed || 0).toLocaleString();
-      const totalEventsStr = totalEvents
-        ? totalEvents.toLocaleString()
-        : logsAnalyzed;
-
-      // Combine histogram time + pattern extraction time
-      const patternMs = stats?.extraction_time_ms || 0;
-      const totalTimeMs = histogramMs + patternMs;
-
-      return this.$t("search.pattern_summary", {
-        totalEvents: totalEventsStr,
-        patternsFound: patternsFound,
-        logsAnalyzed: logsAnalyzed,
-        totalTime: totalTimeMs,
-      });
-    },
     handleColumnSizesUpdate(newColSizes: any) {
       const prevColSizes =
         this.searchObj.data.resultGrid?.colSizes[
@@ -909,8 +891,25 @@ export default defineComponent({
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
     const paginationMaxPages = computed(() => containerWidth.value < 700 ? 3 : 5);
 
-    const noOfRecordsTitle = ref("");
-    const patternSummaryText = ref("");
+    const noOfRecordsTitle = computed<string>(
+      () => (searchObj.data.histogram.chartParams.title as string) || "",
+    );
+
+    const patternSummaryText = computed<string>(() => {
+      const stats = patternsState.value?.patterns?.statistics;
+      if (!stats) return "";
+      const patternsFound = stats.total_patterns_found || 0;
+      const logsAnalyzed = (stats.total_logs_analyzed || 0).toLocaleString();
+      const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
+      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : logsAnalyzed;
+      const totalTimeMs = (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
+      return t("search.pattern_summary", {
+        totalEvents: totalEventsStr,
+        patternsFound,
+        logsAnalyzed,
+        totalTime: totalTimeMs,
+      });
+    });
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100];
     const disableMoreErrorDetails = ref(false);
@@ -1664,6 +1663,15 @@ export default defineComponent({
       },
     );
 
+    watch(
+      () => patternsState.value.loading,
+      (loading, wasLoading) => {
+        if (wasLoading && !loading) {
+          searchObj.meta.lastRunAt = Date.now();
+        }
+      },
+    );
+
     watch(resetPlotChart, (newVal) => {
       if (newVal) {
         plotChart.value = {};
@@ -1854,12 +1862,6 @@ export default defineComponent({
     findFTSFields() {
       return this.searchObj.data.stream.selectedStreamFields;
     },
-    updateTitle() {
-      return this.searchObj.data.histogram.chartParams.title;
-    },
-    updatePatternSummary() {
-      return this.patternsState?.patterns?.statistics;
-    },
     reDrawChartData() {
       return this.searchObj.data.histogram;
     },
@@ -1908,26 +1910,6 @@ export default defineComponent({
     },
     findFTSFields() {
       this.extractFTSFields();
-    },
-    updateTitle() {
-      this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
-    },
-    updatePatternSummary() {
-      if (this.patternsState?.patterns?.statistics) {
-        // Reuse the same summary logic from PatternStatistics component
-        const stats = this.patternsState.patterns.statistics;
-        const totalEvents =
-          this.searchObj.data.queryResults?.total ||
-          stats.total_logs_analyzed ||
-          0;
-        const histogramMs = this.searchObj.data.queryResults?.took || 0;
-
-        this.patternSummaryText = this.formatPatternSummary(
-          stats,
-          totalEvents,
-          histogramMs,
-        );
-      }
     },
     reDrawChartData: {
       deep: true,
