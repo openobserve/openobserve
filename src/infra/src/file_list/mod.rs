@@ -118,7 +118,11 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date: &str,
     ) -> Result<Vec<FileKey>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -411,11 +415,11 @@ pub async fn query_for_bloom(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+pub async fn query_by_ids(ids: &[i64], time_range: Option<(i64, i64)>) -> Result<Vec<FileKey>> {
     if ids.is_empty() {
         return Ok(Vec::default());
     }
-    CLIENT.query_by_ids(ids).await
+    CLIENT.query_by_ids(ids, time_range).await
 }
 
 #[inline]

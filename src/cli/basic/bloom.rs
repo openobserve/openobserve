@@ -52,7 +52,7 @@ pub async fn inspect(file: &str) -> Result<(), anyhow::Error> {
     let name_by_id: HashMap<i64, String> = if all_ids.is_empty() {
         HashMap::new()
     } else {
-        match infra::file_list::query_by_ids(&all_ids).await {
+        match infra::file_list::query_by_ids(&all_ids, None).await {
             Ok(files) => files.into_iter().map(|f| (f.id, f.key)).collect(),
             Err(e) => {
                 eprintln!("warning: could not resolve file names from file_list: {e}");
