@@ -110,8 +110,9 @@ class TestFTSBasic:
     ]
 
     def test_51_ingest_and_enable_fts(self, client):
-        _enable_fts(client, self.STREAM, self.FIELD)
+        # Ingest first so the stream exists before applying the settings update.
         ingest(client, self.STREAM, self.RECORDS)
+        _enable_fts(client, self.STREAM, self.FIELD)
         flush_and_wait(client, self.STREAM, expected=len(self.RECORDS))
 
     def test_51_fts_matches_keyword(self, client):
@@ -169,6 +170,10 @@ class TestFTSRebuild:
     FIELD = "log"
 
     def test_52_fts_survives_multiple_flushes(self, client):
+        # Ingest at least one record first so the stream exists before settings update.
+        ingest(client, self.STREAM, [
+            {"_timestamp": _ts(0), "log": "phoenix init", "batch": -1}
+        ])
         _enable_fts(client, self.STREAM, self.FIELD)
 
         for batch in range(3):
@@ -180,7 +185,8 @@ class TestFTSRebuild:
             ]
             ingest(client, self.STREAM, records)
 
-        flush_and_wait(client, self.STREAM, expected=15)
+        # 1 init record + 3 batches × 5 = 16 total; FTS query only matches "phoenix"
+        flush_and_wait(client, self.STREAM, expected=16)
 
         try:
             _wait_for_fts(client, self.STREAM, "phoenix", timeout=120)
@@ -197,7 +203,8 @@ class TestFTSRebuild:
         assert resp.status_code == 200
         hits = resp.json()["hits"]
         total = int(hits[0].get("c", 0)) if hits else 0
-        assert total == 15, f"expected 15 phoenix hits across batches, got {total}"
+        # 15 batch records + 1 init record (also contains "phoenix") = 16
+        assert total == 16, f"expected 16 phoenix hits across batches, got {total}"
 
 
 # ─── Scenario 53: FTS on mixed-format stream ──────────────────────────────────
@@ -213,8 +220,6 @@ class TestFTSMixedFormats:
     FIELD = "content"
 
     def test_53_fts_across_multiple_batches(self, client):
-        _enable_fts(client, self.STREAM, self.FIELD)
-
         batch_a = [
             {"_timestamp": _ts(i * 1_000), "content": f"zeppelin airship log {i}", "src": "a"}
             for i in range(5)
@@ -224,7 +229,9 @@ class TestFTSMixedFormats:
             for i in range(5)
         ]
 
+        # Ingest batch_a first so the stream exists before applying FTS settings.
         ingest(client, self.STREAM, batch_a)
+        _enable_fts(client, self.STREAM, self.FIELD)
         ingest(client, self.STREAM, batch_b)
         flush_and_wait(client, self.STREAM, expected=10)
 
@@ -256,13 +263,13 @@ class TestFTSParallelRowOrder:
     FIELD = "text"
 
     def test_54_fts_result_order(self, client):
-        _enable_fts(client, self.STREAM, self.FIELD)
-
         records = [
             {"_timestamp": _ts(i * 1_000), "text": f"dragonfly signal {i}", "seq": i}
             for i in range(10)
         ]
+        # Ingest before enabling FTS so the stream exists when settings are applied.
         ingest(client, self.STREAM, records)
+        _enable_fts(client, self.STREAM, self.FIELD)
         flush_and_wait(client, self.STREAM, expected=10)
 
         try:
