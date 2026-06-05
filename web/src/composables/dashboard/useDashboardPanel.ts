@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
+import { reactive, computed, watch, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
@@ -975,9 +975,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     await importSqlParser();
   });
 
-  onUnmounted(async () => {
-    parser = null;
-  });
 
   const ensureParser = async () => {
     if (parser) return parser;
