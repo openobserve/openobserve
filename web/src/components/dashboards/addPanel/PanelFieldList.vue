@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel tw:border-r tw:border-border-default">
     <div class="tw:text-base tw:font-bold tw:flex-shrink-0 tw:my-3">
       {{ t("panel.fields") }}
     </div>
