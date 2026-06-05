@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         :show-global-filter="false"
       >
-        <template #empty><NoData /></template>
+        <template #empty><NoData :filtered="!!searchQuery" @action="searchQuery = ''" /></template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
           <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
-          <template #empty><NoData /></template>
+          <template #empty><NoData :filtered="!!searchQuery" @action="searchQuery = ''" /></template>
           <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}

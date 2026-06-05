@@ -434,7 +434,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <template v-else>
-                    <OEmptyState size="hero" preset="no-alerts" @action="showAddUpdateFn({})" />
+                    <OEmptyState
+                      size="hero"
+                      preset="no-alerts"
+                      :filtered="!!(filterQuery || searchQuery)"
+                      @action="
+                        (id) =>
+                          id === 'clear-filters'
+                            ? ((filterQuery = ''), (searchQuery = ''))
+                            : showAddUpdateFn({})
+                      "
+                    />
                   </template>
                 </template>
 

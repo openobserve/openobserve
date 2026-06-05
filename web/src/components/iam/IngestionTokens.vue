@@ -57,12 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <div class="tw:text-center tw:py-8">
-              <OIcon name="key" size="xl" />
-              <div class="tw:mt-2 tw:text-gray-500">
-                {{ t("ingestion.noTokensFound") }}
-              </div>
-            </div>
+            <NoData :filtered="!!filterQuery" @action="filterQuery = ''" />
           </template>
 
           <template #cell-name="{ row }">
@@ -177,6 +172,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
+import NoData from "@/components/shared/grid/NoData.vue";
 
 interface Token {
   name: string;
@@ -190,7 +186,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable, NoData },
   setup() {
     const store = useStore();
     const { t } = useI18n();

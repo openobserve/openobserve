@@ -283,13 +283,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-dashboards"
+                :filtered="!!filterQuery"
                 @action="
                   (id) =>
-                    id === 'import'
-                      ? importDashboard()
-                      : id === 'templates'
-                        ? (showAddDashboardFromGitHub = true)
-                        : addDashboard()
+                    id === 'clear-filters'
+                      ? (filterQuery = '')
+                      : id === 'import'
+                        ? importDashboard()
+                        : id === 'templates'
+                          ? (showAddDashboardFromGitHub = true)
+                          : addDashboard()
                 "
               />
             </template>

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #empty>
-          <NoData />
+          <NoData :filtered="!!userSearchKey" @action="userSearchKey = ''" />
         </template>
       </OTable>
     </div>

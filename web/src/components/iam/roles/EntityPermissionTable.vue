@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #empty>
-        <NoData />
+        <NoData :filtered="!!searchKey" @action="emits('update:searchKey', '')" />
       </template>
     </OTable>
   </div>
@@ -69,7 +69,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission"]);
+const emits = defineEmits(["updated:permission", "update:searchKey"]);
 
 const { t } = useI18n();
 

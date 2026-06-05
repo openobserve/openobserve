@@ -70,7 +70,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #empty>
-              <OEmptyState size="hero" preset="no-service-accounts" @action="addRoutePush({})" />
+              <OEmptyState
+                size="hero"
+                preset="no-service-accounts"
+                :filtered="!!filterQuery"
+                @action="
+                  (id) =>
+                    id === 'clear-filters'
+                      ? (filterQuery = '')
+                      : addRoutePush({})
+                "
+              />
             </template>
 
             <template #cell-email="{ row }">

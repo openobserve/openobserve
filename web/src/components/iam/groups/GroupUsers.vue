@@ -122,7 +122,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #empty>
-          <OEmptyState size="hero" preset="no-users" hide-action />
+          <OEmptyState
+            size="hero"
+            preset="no-users"
+            :filtered="!!userSearchKey"
+            :hide-action="!userSearchKey"
+            @action="(id) => id === 'clear-filters' ? (userSearchKey = '') : null"
+          />
         </template>
       </OTable>
     </div>

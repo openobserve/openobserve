@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <NoData />
+            <NoData :filtered="!!filterQuery" @action="filterQuery = ''" />
           </template>
           <template #bottom>
             <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>

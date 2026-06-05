@@ -112,7 +112,7 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #empty>
-      <NoData />
+      <NoData :filtered="!!globalFilter" @action="emit('update:globalFilter', '')" />
     </template>
 
     <template #bottom>

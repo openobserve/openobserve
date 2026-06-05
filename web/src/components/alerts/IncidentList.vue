@@ -151,7 +151,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Empty state -->
         <template #empty>
           <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
-            <OEmptyState size="hero" preset="no-incidents" hide-action />
+            <OEmptyState
+              size="hero"
+              preset="no-incidents"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' ? (searchQuery = '') : null"
+            />
           </div>
         </template>
 

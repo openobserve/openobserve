@@ -106,7 +106,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #empty>
-                  <OEmptyState size="hero" preset="no-reports" @action="() => createNewReport()" />
+                  <OEmptyState
+                    size="hero"
+                    preset="no-reports"
+                    :filtered="!!(filterQuery || searchQuery)"
+                    @action="
+                      (id) =>
+                        id === 'clear-filters'
+                          ? ((filterQuery = ''), (searchQuery = ''))
+                          : createNewReport()
+                    "
+                  />
                 </template>
 
                 <!-- Name column: badges for type/preview -->

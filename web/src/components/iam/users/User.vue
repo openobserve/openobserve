@@ -78,7 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <OEmptyState size="hero" preset="no-users" @action="addRoutePush({})" />
+            <OEmptyState
+              size="hero"
+              preset="no-users"
+              :filtered="!!filterQuery"
+              @action="
+                (id) =>
+                  id === 'clear-filters' ? (filterQuery = '') : addRoutePush({})
+              "
+            />
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
