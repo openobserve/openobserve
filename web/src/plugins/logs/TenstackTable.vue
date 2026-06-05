@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: totalSize + 'px',
+        minHeight: isFirefox ? undefined : totalSize + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -252,6 +252,7 @@ class="tw:mr-1" />
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
         class="tw:relative"
+        :style="isFirefox ? { minHeight: totalSize + 'px' } : {}"
       >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
@@ -261,7 +262,7 @@ class="tw:mr-1" />
               ]
             }`"
             :style="{
-              transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
+              transform: `translateY(${virtualRow.start}px)`,
               minWidth: '100%',
             }"
             :data-index="virtualRow.index"
@@ -866,8 +867,6 @@ const isFirefox = computed(() => {
   );
 });
 
-const baseOffset = isFirefox.value ? 20 : 0;
-
 // Cache for expanded row heights
 const expandedRowHeights = ref<{ [key: number]: number }>({});
 
@@ -911,6 +910,7 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 // +22 adds bottom padding so the last virtual row isn't clipped by the container
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 30);
+
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
