@@ -613,6 +613,17 @@ pub async fn create_org(
             })
             .await;
 
+            #[cfg(feature = "cloud")]
+            if let Err(e) =
+                crate::service::alerts::templates::ensure_org_prebuilt_templates(&org.identifier)
+                    .await
+            {
+                log::error!(
+                    "Failed to seed prebuilt templates for org '{}': {e}",
+                    org.identifier
+                );
+            }
+
             // if service account provided, and that SA is also SA in _meta,
             // send the info in response, else ignore
             let service_account_info = if let Some(sa) = org.service_account.as_ref() {
@@ -703,6 +714,17 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                     org.identifier
                 );
             }
+            #[cfg(feature = "cloud")]
+            if org_id != DEFAULT_ORG {
+                if let Err(e) =
+                    crate::service::alerts::templates::ensure_org_prebuilt_templates(org_id).await
+                {
+                    log::error!(
+                        "Failed to seed prebuilt templates for org '{}': {e}",
+                        org_id
+                    );
+                }
+            }
             Ok(org.clone())
         }
         Err(e) => {
@@ -739,6 +761,17 @@ pub async fn check_and_create_org_without_ofga(
                     "Failed to create default ingestion token for org '{}': {e}",
                     org.identifier
                 );
+            }
+            #[cfg(feature = "cloud")]
+            if org_id != DEFAULT_ORG {
+                if let Err(e) =
+                    crate::service::alerts::templates::ensure_org_prebuilt_templates(org_id).await
+                {
+                    log::error!(
+                        "Failed to seed prebuilt templates for org '{}': {e}",
+                        org_id
+                    );
+                }
             }
             Ok(org.clone())
         }

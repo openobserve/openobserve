@@ -125,6 +125,81 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
     Ok(())
 }
 
+/// Seeds all prebuilt templates into a specific org's namespace.
+/// Called at org creation time on cloud builds so each org gets isolated,
+/// independently-editable copies from day one.
+/// Idempotent — safe to call if templates already exist.
+#[cfg(feature = "cloud")]
+pub async fn ensure_org_prebuilt_templates(org_id: &str) -> Result<(), anyhow::Error> {
+    use config::prebuilt_loader::get_prebuilt_template;
+
+    let prebuilt_types = [
+        "slack",
+        "msteams",
+        "pagerduty",
+        "discord",
+        "webhook",
+        "opsgenie",
+        "servicenow",
+        "email",
+    ];
+
+    for prebuilt_type in prebuilt_types {
+        let Some(mut template) = get_prebuilt_template(prebuilt_type) else {
+            continue;
+        };
+        template.org_id = org_id.to_string();
+        template.is_default = false;
+
+        match db::alerts::templates::get(org_id, &template.name).await {
+            Ok(_) => {
+                log::debug!(
+                    "[TEMPLATES] Prebuilt template '{}' already exists in org '{}'",
+                    template.name,
+                    org_id
+                );
+            }
+            Err(TemplateError::NotFound) => {
+                match db::alerts::templates::set(template.clone()).await {
+                    Ok(_) => {
+                        log::info!(
+                            "[TEMPLATES] Created prebuilt template '{}' for org '{}'",
+                            template.name,
+                            org_id
+                        );
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        if msg.contains("UNIQUE constraint")
+                            || msg.contains("duplicate key")
+                            || msg.contains("Duplicate entry")
+                        {
+                            // concurrent creation race — already exists, fine
+                        } else {
+                            log::error!(
+                                "[TEMPLATES] Failed to create prebuilt template '{}' for org '{}': {}",
+                                template.name,
+                                org_id,
+                                msg
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[TEMPLATES] Error checking prebuilt template '{}' for org '{}': {}",
+                    template.name,
+                    org_id,
+                    e
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Ensures system prebuilt templates exist in the database.
 /// Creates templates in DEFAULT_ORG if they don't exist.
 /// Uses distributed lock to prevent race conditions in distributed mode.
