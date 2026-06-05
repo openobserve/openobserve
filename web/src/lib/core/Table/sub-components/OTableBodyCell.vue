@@ -117,20 +117,13 @@ const cellStyle = computed(() => {
     base.position = "sticky";
     base.left = `${pinOffset.value}px`;
     base.zIndex = 1;
-    // Edge shadow only matters when content can scroll under the pinned column.
-    // On a table that fits its width, the shadow just makes the pinned column
-    // read as a detached strip — so only draw it in horizontal-scroll mode.
-    if (horizontalScroll?.value) {
-      base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
-    }
+    base.boxShadow = "2px 0 4px -2px var(--color-border-default)";
   }
   if (isPinned.value === "right") {
     base.position = "sticky";
     base.right = `${pinOffset.value}px`;
     base.zIndex = 1;
-    if (horizontalScroll?.value) {
-      base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
-    }
+    base.boxShadow = "-2px 0 4px -2px var(--color-border-default)";
   }
   const extra = props.getCellStyle?.({
     columnId: props.cell.column.id,
@@ -194,29 +187,13 @@ function handleClick() {
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
       meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle',
-      // Match the row's hover/selected transition so a pinned cell's bg animates
-      // in sync with the rest of the row instead of snapping.
-      'tw:transition-colors tw:duration-150',
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
       alignClass,
-      // Minimal, hover-revealed action column (HANDOFF §8.3): icons sit muted at
-      // rest (opacity .35) and brighten to full on row hover, so the column reads
-      // as calm until you target a row. Applied centrally → every table's action
-      // column behaves identically.
-      isAction
-        ? 'tw:w-0 tw:whitespace-nowrap tw:opacity-[0.35] tw:group-hover/row:opacity-100 tw:transition-opacity'
-        : '',
-      // Pinned (sticky) cells need an opaque bg ONLY when content can scroll
-      // under them (horizontal-scroll mode). In that case mirror the row states
-      // here so the pinned strip animates with the row: selected wins, else
-      // cell-bg + hover tint. When the table fits (no horizontal scroll) we keep
-      // the pinned cell transparent so the row's single hover/selected background
-      // shows straight through it — otherwise the action column reads as a
-      // detached strip whose hover desyncs from the rest of the row.
-      isPinned && horizontalScroll?.value
+      isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
+       isPinned
         ? (rowSelected
-            ? 'tw:bg-[var(--color-table-row-selected-bg)]'
-            : 'tw:bg-[var(--color-table-cell-bg)] tw:group-hover/row:bg-[var(--color-table-row-hover-bg)]')
+            ? 'tw:bg-[var(--color-table-row-selected-bg)] tw:group-hover/row:bg-table-row-hover-bg tw:transition-colors tw:duration-150'
+            : 'tw:bg-[var(--color-table-cell-bg)] tw:group-hover/row:bg-[var(--color-table-row-hover-bg)] tw:transition-colors tw:duration-150')
         : '',
       wrap
         ? 'tw:break-words tw:whitespace-normal'
