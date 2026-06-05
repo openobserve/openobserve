@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:flex-1 tw:min-h-0 tw:pb-2.5">
+      <div class="card-container tw:h-full">
       <OTable
+        :frame="false"
         :key="activeTab"
         data-test="pipeline-list-table"
         :data="filteredPipelines"
@@ -198,7 +200,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <no-data />
+          <OEmptyState
+            size="hero"
+            preset="no-pipelines"
+            :filtered="!!filterQuery"
+            @action="
+              (id) =>
+                id === 'clear-filters'
+                  ? (filterQuery = '')
+                  : id === 'import'
+                    ? goToImportPipeline()
+                    : goToCreatePipeline()
+            "
+          />
         </template>
 
         <template #bottom="bottomProps">
@@ -206,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
           >
             <div
-              class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+              class="tw:flex tw:items-center tw:text-sm tw:mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -254,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
       </OTable>
+      </div>
     </div>
   </div>
 
@@ -374,6 +389,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 
 import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -645,8 +661,21 @@ onMounted(async () => {
   updateActiveTab();
 });
 
-const createPipeline = () => {
-  showCreatePipeline.value = true;
+// Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
+// stream-selection side panel).
+const goToCreatePipeline = () => {
+  router.push({
+    name: "createPipeline",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
+};
+
+// Empty-state "Import pipeline" → the dedicated import page.
+const goToImportPipeline = () => {
+  router.push({
+    name: "importPipeline",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const loading = ref(true);

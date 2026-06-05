@@ -15,93 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="min-height: inherit;">
-    <div>
-      <!-- Standard section header: title + description + Create action. -->
-      <AppPageHeader
-        :title="t('ingestion.tokenManagementTitle')"
-        :subtitle="t('ingestion.orgLevelExplanation')"
-        icon="key"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2.5"
-      >
-        <template #actions>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="add-ingestion-token"
-            @click="showCreateForm = true"
-          >
-            {{ t('ingestion.createTokenBtn') }}
-          </OButton>
-        </template>
-      </AppPageHeader>
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+    <!-- Standard section header: title + description + Create action. -->
+    <AppPageHeader
+      :title="t('ingestion.tokenManagementTitle')"
+      :subtitle="t('ingestion.orgLevelExplanation')"
+      icon="key"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="add-ingestion-token"
+          @click="showCreateForm = true"
+        >
+          {{ t('ingestion.createTokenBtn') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
 
-      <div>
-        <div class="tw:w-full tw:h-full">
-          <div
-            class="card-container"
-            style="height: calc(100vh - var(--navbar-height) - 92px)"
-          >
-            <OTable
-              :frame="false"
-              :data="tokens"
-              :columns="columns"
-              row-key="name"
-              :loading="loading"
-              :sticky-header="true"
-              :max-height="'calc(100vh - var(--navbar-height) - 92px)'"
-            >
-              <template #empty>
-                <div class="tw:text-center tw:py-8">
-                  <OIcon
-                    name="key"
-                    size="xl"
-                  />
-                  <div class="tw:mt-2 tw:text-gray-500">
-                    {{ t("ingestion.noTokensFound") }}
-                  </div>
-                </div>
-              </template>
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
+        <OTable
+          :frame="false"
+          :data="tokens"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          v-model:global-filter="filterQuery"
+          :show-global-filter="false"
+          filter-mode="client"
+        >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('ingestion.searchToken', 'Search tokens')"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
+          <template #empty>
+            <div class="tw:text-center tw:py-8">
+              <OIcon name="key" size="xl" />
+              <div class="tw:mt-2 tw:text-gray-500">
+                {{ t("ingestion.noTokensFound") }}
+              </div>
+            </div>
+          </template>
 
-              <template #cell-name="{ row }">
-                <span class="tw:font-medium">{{ row.name }}</span>
-              </template>
+          <template #cell-name="{ row }">
+            <span class="tw:font-medium">{{ row.name }}</span>
+          </template>
 
-              <template #cell-token="{ row }">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
-                  <code
-                    class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
-                    style="background: rgba(0,0,0,0.06);"
-                  >{{ row.token }}</code>
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="content-copy"
-                    class="tw:shrink-0"
-                    :title="t('ingestion.copyTokenBtn')"
-                    @click="copyToken(row.token)"
-                  />
-                </div>
-              </template>
+          <template #cell-token="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
+              <code
+                class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
+                style="background: rgba(0,0,0,0.06);"
+              >{{ row.token }}</code>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="content-copy"
+                class="tw:shrink-0"
+                :title="t('ingestion.copyTokenBtn')"
+                @click="copyToken(row.token)"
+              />
+            </div>
+          </template>
 
-              <template #cell-created_by="{ row }">
-                <span class="tw:text-gray-500">{{ row.created_by }}</span>
-              </template>
+          <template #cell-created_by="{ row }">
+            <span class="tw:text-gray-500">{{ row.created_by }}</span>
+          </template>
 
-              <template #cell-actions="{ row }">
-                <OButton
-                  :data-test="`ingestion-token-${row.name}-toggle`"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-sm"
-                  :title="row.enabled ? t('common.disable') : t('common.enable')"
-                  :disabled="loading"
-                  @click.stop="toggleEnabled(row.name, !row.enabled)"
-                />
-              </template>
-            </OTable>
-          </div>
-        </div>
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`ingestion-token-${row.name}-toggle`"
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+              size="icon-sm"
+              :title="row.enabled ? t('common.disable') : t('common.enable')"
+              :disabled="loading"
+              @click.stop="toggleEnabled(row.name, !row.enabled)"
+            />
+          </template>
+        </OTable>
       </div>
     </div>
 
@@ -168,6 +168,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -189,13 +190,14 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OIcon, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
   setup() {
     const store = useStore();
     const { t } = useI18n();
 
     const tokens = ref<Token[]>([]);
     const loading = ref(false);
+    const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
     const newTokenName = ref("");
@@ -327,6 +329,7 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      filterQuery,
       columns,
       showCreateForm,
       showRevealedDialog,
