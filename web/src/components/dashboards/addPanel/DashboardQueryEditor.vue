@@ -579,8 +579,16 @@ export default defineComponent({
       }
     };
 
+    // Keep the splitter in sync with the VRL toggle / query mode. Runs
+    // immediately (so a panel reopened with the toggle already ON gets the 70/30
+    // split instead of a stale 100/0 that hides the VRL editor) and on tab
+    // switch (currentQueryIndex), since the toggle is shared across queries.
     watch(
-      () => [promqlMode.value, dashboardPanelData.layout.vrlFunctionToggle],
+      () => [
+        promqlMode.value,
+        dashboardPanelData.layout.vrlFunctionToggle,
+        dashboardPanelData.layout.currentQueryIndex,
+      ],
       () => {
         if (promqlMode.value || !dashboardPanelData.layout.vrlFunctionToggle) {
           splitterModel.value = 100;
@@ -588,6 +596,7 @@ export default defineComponent({
           splitterModel.value = 70;
         }
       },
+      { immediate: true },
     );
 
     // SQL field + function keyword autocomplete.
@@ -747,21 +756,26 @@ export default defineComponent({
     const onFunctionToggle = (value, event) => {
       event.stopPropagation();
 
+      if (value) {
+        // show function editor pane (avoid leaving a stale 100/0 split that
+        // would render the VRL editor at zero width)
+        if (!promqlMode.value) splitterModel.value = 70;
+      }
+
       // if value is false
       if (!value) {
         // hide function editor
         splitterModel.value = 100;
 
-        // reset function query and clear VRL-derived fields
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].vrlFunctionQuery = "";
-        // Clear per-query VRL field cache in meta
-        const currentIdx = dashboardPanelData.layout.currentQueryIndex;
-        if (dashboardPanelData.meta.queryFields[currentIdx]) {
-          dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList =
-            [];
-        }
+        // The VRL toggle is global: turning it OFF disables VRL for EVERY query
+        // so no query_fn is sent for any of them. Clear each query's VRL text
+        // and its per-query VRL field cache (not just the active tab's).
+        dashboardPanelData.data.queries.forEach((query: any, idx: number) => {
+          query.vrlFunctionQuery = "";
+          if (dashboardPanelData.meta.queryFields[idx]) {
+            dashboardPanelData.meta.queryFields[idx].vrlFunctionFieldList = [];
+          }
+        });
         dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 
