@@ -648,6 +648,8 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcutScope("functions");
     useShortcutsWithMac([
@@ -672,7 +674,6 @@ export default defineComponent({
         },
       },
     ]);
-
     return {
       t,
       store,

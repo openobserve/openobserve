@@ -841,6 +841,8 @@ export default defineComponent({
       onChangeStreamFilter(tab);
     };
 
+
+
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcutScope("streams");
     useShortcutsWithMac([
@@ -865,7 +867,6 @@ export default defineComponent({
         },
       },
     ]);
-
     return {
       t,
       router,

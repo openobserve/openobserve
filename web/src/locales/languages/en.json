@@ -4828,7 +4828,13 @@
       "streams": "Streams",
       "pipelines": "Pipelines",
       "functions": "Functions",
-      "reports": "Reports"
+      "reports": "Reports",
+      "iamUsers": "IAM — Users",
+      "iamRoles": "IAM — Roles",
+      "iamGroups": "IAM — Groups",
+      "iamServiceAccounts": "IAM — Service Accounts",
+      "alertDestinations": "Alerts — Destinations",
+      "alertTemplates": "Alerts — Templates"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -4864,7 +4870,19 @@
       "functionsAdd": "Add new function",
       "functionsRefresh": "Refresh list",
       "reportsAdd": "Create new report",
-      "reportsRefresh": "Refresh list"
+      "reportsRefresh": "Refresh list",
+      "iamUsersAdd": "Add new user",
+      "iamUsersRefresh": "Refresh list",
+      "iamRolesAdd": "Add new role",
+      "iamRolesRefresh": "Refresh list",
+      "iamGroupsAdd": "Add new group",
+      "iamGroupsRefresh": "Refresh list",
+      "iamServiceAccountsAdd": "Add new service account",
+      "iamServiceAccountsRefresh": "Refresh list",
+      "alertDestinationsAdd": "Add new destination",
+      "alertDestinationsRefresh": "Refresh list",
+      "alertTemplatesAdd": "Add new template",
+      "alertTemplatesRefresh": "Refresh list"
     }
   }
 }

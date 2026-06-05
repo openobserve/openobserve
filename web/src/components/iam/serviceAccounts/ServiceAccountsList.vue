@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
             <OSearchInput
+                data-test="iam-service-accounts-search-input"
                 v-model="filterQuery"
                 class="tw:w-[12.5rem]"
                 :placeholder="t('serviceAccounts.search')"
@@ -265,6 +266,8 @@ import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OSearchInput, OTooltip, OTable, OBadge },
@@ -646,10 +649,36 @@ export default defineComponent({
 
     const confirmRefreshAction = (row: any) => {
       confirmRefresh.value = true;
-      toBeRefreshed.value = row;
+
+toBeRefreshed.value = row;
     };
 
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("iam-service-accounts");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.iamServiceAccountsAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        key: "r",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.iamServiceAccountsRefresh",
+        handler: () => { if (!isInputFocused()) getServiceAccountsUsers(); },
+      },
+      {
+        key: "/",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="iam-service-accounts-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       router,

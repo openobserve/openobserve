@@ -145,6 +145,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const showAddGroup = ref(false);
 
@@ -342,9 +344,33 @@ const bulkDeleteUserGroups = async () => {
         variant: "error",
       });
     }
-    confirmBulkDelete.value = false;
   }
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("iam-groups");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "iam-groups",
+    description: "shortcuts.actions.iamGroupsAdd",
+    handler: () => { if (!isInputFocused()) addGroup(); },
+  },
+  {
+    key: "r",
+    scope: "iam-groups",
+    description: "shortcuts.actions.iamGroupsRefresh",
+    handler: () => { if (!isInputFocused()) setupGroups(); },
+  },
+  {
+    key: "/",
+    scope: "iam-groups",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="iam-groups-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 
 </script>
 

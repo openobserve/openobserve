@@ -1309,6 +1309,8 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
+
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcutScope("dashboards-list");
     useShortcutsWithMac([
@@ -1339,7 +1341,6 @@ export default defineComponent({
         },
       },
     ]);
-
     return {
       t,
       oTableRef,

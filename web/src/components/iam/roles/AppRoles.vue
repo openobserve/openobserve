@@ -92,6 +92,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 
 
@@ -251,10 +253,33 @@ const bulkDeleteUserRoles = async () => {
         variant: "error",
       });
     }
-    confirmBulkDelete.value = false;
   }
 };
 
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("iam-roles");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "iam-roles",
+    description: "shortcuts.actions.iamRolesAdd",
+    handler: () => { if (!isInputFocused()) addRole(); },
+  },
+  {
+    key: "r",
+    scope: "iam-roles",
+    description: "shortcuts.actions.iamRolesRefresh",
+    handler: () => { if (!isInputFocused()) setupRoles(); },
+  },
+  {
+    key: "/",
+    scope: "iam-roles",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="iam-roles-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 
 </script>
 

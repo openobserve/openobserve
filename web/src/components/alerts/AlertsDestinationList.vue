@@ -283,6 +283,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 interface ConformDelete {
   visible: boolean;
@@ -751,10 +753,36 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("alert-destinations");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.alertDestinationsAdd",
+        handler: () => { if (!isInputFocused()) editDestination(null); },
+      },
+      {
+        key: "r",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.alertDestinationsRefresh",
+        handler: () => { if (!isInputFocused()) getDestinations(); },
+      },
+      {
+        key: "/",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="destination-list-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       showDestinationEditor,

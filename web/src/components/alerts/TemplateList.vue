@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
             <OSearchInput
+              data-test="template-list-search-input"
               v-model="filterQuery"
               class="tw:ml-auto"
               :placeholder="t('template.search')"
@@ -224,6 +225,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -579,6 +582,31 @@ const bulkDeleteTemplates = () => {
       }
     });
 };
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("alert-templates");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "alert-templates",
+    description: "shortcuts.actions.alertTemplatesAdd",
+    handler: () => { if (!isInputFocused()) editTemplate(null); },
+  },
+  {
+    key: "r",
+    scope: "alert-templates",
+    description: "shortcuts.actions.alertTemplatesRefresh",
+    handler: () => { if (!isInputFocused()) getTemplates(); },
+  },
+  {
+    key: "/",
+    scope: "alert-templates",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="template-list-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
+
 </script>
 <style lang="scss" scoped>
 // Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"

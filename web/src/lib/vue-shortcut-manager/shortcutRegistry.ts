@@ -17,8 +17,14 @@ export interface ShortcutGroup {
  * All labels are i18n keys — the cheatsheet resolves them via useI18n().
  * Independent of the live ShortcutManager so every shortcut is always visible
  * regardless of which page is currently mounted.
+ *
+ * To add a new shortcut:
+ *  1. Add the i18n key to en.json under shortcuts.pages / shortcuts.actions
+ *  2. Add a ShortcutGroup entry here
+ *  3. Register the handler in the relevant Vue component with useShortcutsWithMac()
  */
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
+  // ── Global ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
@@ -26,6 +32,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "escape",  descriptionKey: "shortcuts.actions.closeDialog" },
     ],
   },
+
+  // ── Logs ────────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.logs",
     shortcuts: [
@@ -36,6 +44,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "/",          descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Dashboards (list) ───────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.dashboardsList",
     shortcuts: [
@@ -45,25 +55,31 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Dashboard view ──────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.dashboards",
     shortcuts: [
-      { key: "e",       descriptionKey: "shortcuts.actions.dashboardAddPanel" },
-      { key: "n",       descriptionKey: "shortcuts.actions.dashboardAddPanel" },
-      { key: "r",       descriptionKey: "shortcuts.actions.dashboardRefresh" },
-      { key: "ctrl+s",  descriptionKey: "shortcuts.actions.dashboardSave" },
-      { key: "f",       descriptionKey: "shortcuts.actions.dashboardFullscreen" },
+      { key: "e",      descriptionKey: "shortcuts.actions.dashboardEdit" },
+      { key: "n",      descriptionKey: "shortcuts.actions.dashboardAddPanel" },
+      { key: "r",      descriptionKey: "shortcuts.actions.dashboardRefresh" },
+      { key: "ctrl+s", descriptionKey: "shortcuts.actions.dashboardSave" },
+      { key: "f",      descriptionKey: "shortcuts.actions.dashboardFullscreen" },
     ],
   },
+
+  // ── Dashboard panel (hover) ─────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.dashboardsPanel",
     shortcuts: [
-      { key: "v",               descriptionKey: "shortcuts.actions.panelView" },
-      { key: "e",               descriptionKey: "shortcuts.actions.panelEdit" },
-      { key: "d",               descriptionKey: "shortcuts.actions.panelDuplicate" },
-      { key: "delete / ⌫",     descriptionKey: "shortcuts.actions.panelDelete" },
+      { key: "v",           descriptionKey: "shortcuts.actions.panelView" },
+      { key: "e",           descriptionKey: "shortcuts.actions.panelEdit" },
+      { key: "d",           descriptionKey: "shortcuts.actions.panelDuplicate" },
+      { key: "del / ⌫",    descriptionKey: "shortcuts.actions.panelDelete" },
     ],
   },
+
+  // ── Metrics ─────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.metrics",
     shortcuts: [
@@ -71,6 +87,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "r",          descriptionKey: "shortcuts.actions.metricsRefresh" },
     ],
   },
+
+  // ── Traces ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.traces",
     shortcuts: [
@@ -78,6 +96,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "r",          descriptionKey: "shortcuts.actions.tracesRefresh" },
     ],
   },
+
+  // ── Alerts ──────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.alerts",
     shortcuts: [
@@ -86,6 +106,28 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "escape", descriptionKey: "shortcuts.actions.alertsClose" },
     ],
   },
+
+  // ── Alert Destinations ──────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertDestinations",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.alertDestinationsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.alertDestinationsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── Alert Templates ─────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.alertTemplates",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.alertTemplatesAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.alertTemplatesRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── Streams ─────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.streams",
     shortcuts: [
@@ -94,6 +136,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Pipelines ───────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.pipelines",
     shortcuts: [
@@ -103,6 +147,8 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Functions ───────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.functions",
     shortcuts: [
@@ -111,11 +157,53 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
+
+  // ── Reports ─────────────────────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.reports",
     shortcuts: [
       { key: "n", descriptionKey: "shortcuts.actions.reportsAdd" },
       { key: "r", descriptionKey: "shortcuts.actions.reportsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── IAM — Users ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamUsers",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.iamUsersAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.iamUsersRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── IAM — Roles ─────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamRoles",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── IAM — Groups ────────────────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamGroups",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+
+  // ── IAM — Service Accounts ──────────────────────────────────────────────
+  {
+    pageKey: "shortcuts.pages.iamServiceAccounts",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.iamServiceAccountsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.iamServiceAccountsRefresh" },
       { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },

@@ -247,6 +247,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -1180,10 +1182,36 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("iam-users");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "iam-users",
+        description: "shortcuts.actions.iamUsersAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        key: "r",
+        scope: "iam-users",
+        description: "shortcuts.actions.iamUsersRefresh",
+        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+      },
+      {
+        key: "/",
+        scope: "iam-users",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="iam-users-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       router,
