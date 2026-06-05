@@ -880,7 +880,8 @@ export default defineComponent({
       } else if (e.key === "d" || e.key === "D") {
         e.preventDefault();
         onDuplicatePanel(props.data);
-      } else if (e.key === "Delete") {
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        // Mac: physical Delete key fires Backspace; Fn+Delete fires Delete
         e.preventDefault();
         confirmDeletePanelDialog.value = true;
       }

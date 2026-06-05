@@ -511,7 +511,6 @@
     "failedToFetchTraceDetails": "Failed to load trace details. Please try again.",
     "seekToMoment": "Seek to this moment in the session",
     "timeInSession": "Session Time",
-    "timestamp": "Timestamp",
     "route": "Route",
     "duration": "Duration"
   },
@@ -4820,19 +4819,28 @@
     "pages": {
       "global": "Global",
       "logs": "Logs",
-      "dashboards": "Dashboards",
-      "dashboardsPanel": "Dashboards — Panel (hover a panel)",
+      "dashboardsList": "Dashboards",
+      "dashboards": "Dashboard View",
+      "dashboardsPanel": "Dashboard — Panel (hover a panel)",
       "metrics": "Metrics",
       "traces": "Traces",
-      "alerts": "Alerts"
+      "alerts": "Alerts",
+      "streams": "Streams",
+      "pipelines": "Pipelines",
+      "functions": "Functions",
+      "reports": "Reports"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
       "closeDialog": "Close any dialog, drawer, or modal",
+      "focusSearch": "Focus search bar",
       "logsRunQuery": "Run search query",
       "logsRefresh": "Refresh / re-run search",
       "logsToggleHistogram": "Toggle histogram",
       "logsToggleSidebar": "Toggle fields sidebar",
+      "dashboardsListAdd": "New dashboard",
+      "dashboardsListImport": "Import dashboard",
+      "dashboardsListRefresh": "Refresh list",
       "dashboardRefresh": "Refresh all panels",
       "dashboardAddPanel": "Add new panel",
       "dashboardSave": "Save dashboard",
@@ -4847,7 +4855,16 @@
       "tracesRefresh": "Refresh",
       "alertsCreate": "Create new alert",
       "alertsRefresh": "Refresh alert list",
-      "alertsClose": "Close alert detail drawer"
+      "alertsClose": "Close alert detail drawer",
+      "streamsAdd": "Add new stream",
+      "streamsRefresh": "Refresh list",
+      "pipelinesAdd": "Create new pipeline",
+      "pipelinesImport": "Import pipeline",
+      "pipelinesRefresh": "Refresh list",
+      "functionsAdd": "Add new function",
+      "functionsRefresh": "Refresh list",
+      "reportsAdd": "Create new report",
+      "reportsRefresh": "Refresh list"
     }
   }
 }

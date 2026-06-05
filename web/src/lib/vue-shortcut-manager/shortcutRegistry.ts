@@ -15,15 +15,15 @@ export interface ShortcutGroup {
 /**
  * Static registry of all keyboard shortcuts shown in the cheatsheet.
  * All labels are i18n keys — the cheatsheet resolves them via useI18n().
- * This is independent of the live ShortcutManager so every shortcut is always
- * visible regardless of which page is currently mounted.
+ * Independent of the live ShortcutManager so every shortcut is always visible
+ * regardless of which page is currently mounted.
  */
 export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
-      { key: "shift+?",  descriptionKey: "shortcuts.actions.openCheatsheet" },
-      { key: "escape",   descriptionKey: "shortcuts.actions.closeDialog" },
+      { key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
+      { key: "escape",  descriptionKey: "shortcuts.actions.closeDialog" },
     ],
   },
   {
@@ -33,13 +33,24 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "r",          descriptionKey: "shortcuts.actions.logsRefresh" },
       { key: "h",          descriptionKey: "shortcuts.actions.logsToggleHistogram" },
       { key: "ctrl+/",     descriptionKey: "shortcuts.actions.logsToggleSidebar" },
+      { key: "/",          descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+  {
+    pageKey: "shortcuts.pages.dashboardsList",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.dashboardsListAdd" },
+      { key: "i", descriptionKey: "shortcuts.actions.dashboardsListImport" },
+      { key: "r", descriptionKey: "shortcuts.actions.dashboardsListRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
   {
     pageKey: "shortcuts.pages.dashboards",
     shortcuts: [
-      { key: "r",       descriptionKey: "shortcuts.actions.dashboardRefresh" },
+      { key: "e",       descriptionKey: "shortcuts.actions.dashboardAddPanel" },
       { key: "n",       descriptionKey: "shortcuts.actions.dashboardAddPanel" },
+      { key: "r",       descriptionKey: "shortcuts.actions.dashboardRefresh" },
       { key: "ctrl+s",  descriptionKey: "shortcuts.actions.dashboardSave" },
       { key: "f",       descriptionKey: "shortcuts.actions.dashboardFullscreen" },
     ],
@@ -47,10 +58,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.dashboardsPanel",
     shortcuts: [
-      { key: "v",      descriptionKey: "shortcuts.actions.panelView" },
-      { key: "e",      descriptionKey: "shortcuts.actions.panelEdit" },
-      { key: "d",      descriptionKey: "shortcuts.actions.panelDuplicate" },
-      { key: "delete", descriptionKey: "shortcuts.actions.panelDelete" },
+      { key: "v",               descriptionKey: "shortcuts.actions.panelView" },
+      { key: "e",               descriptionKey: "shortcuts.actions.panelEdit" },
+      { key: "d",               descriptionKey: "shortcuts.actions.panelDuplicate" },
+      { key: "delete / ⌫",     descriptionKey: "shortcuts.actions.panelDelete" },
     ],
   },
   {
@@ -73,6 +84,39 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { key: "n",      descriptionKey: "shortcuts.actions.alertsCreate" },
       { key: "r",      descriptionKey: "shortcuts.actions.alertsRefresh" },
       { key: "escape", descriptionKey: "shortcuts.actions.alertsClose" },
+    ],
+  },
+  {
+    pageKey: "shortcuts.pages.streams",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.streamsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.streamsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+  {
+    pageKey: "shortcuts.pages.pipelines",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.pipelinesAdd" },
+      { key: "i", descriptionKey: "shortcuts.actions.pipelinesImport" },
+      { key: "r", descriptionKey: "shortcuts.actions.pipelinesRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+  {
+    pageKey: "shortcuts.pages.functions",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+    ],
+  },
+  {
+    pageKey: "shortcuts.pages.reports",
+    shortcuts: [
+      { key: "n", descriptionKey: "shortcuts.actions.reportsAdd" },
+      { key: "r", descriptionKey: "shortcuts.actions.reportsRefresh" },
+      { key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
     ],
   },
 ];

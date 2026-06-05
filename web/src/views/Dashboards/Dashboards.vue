@@ -521,6 +521,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -1306,6 +1308,37 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("dashboards-list");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "dashboards-list",
+        description: "shortcuts.actions.dashboardsListAdd",
+        handler: () => { if (!isInputFocused()) addDashboard(); },
+      },
+      {
+        key: "i",
+        scope: "dashboards-list",
+        description: "shortcuts.actions.dashboardsListImport",
+        handler: () => { if (!isInputFocused()) importDashboard(); },
+      },
+      {
+        key: "r",
+        scope: "dashboards-list",
+        description: "shortcuts.actions.dashboardsListRefresh",
+        handler: () => { if (!isInputFocused()) getDashboards(); },
+      },
+      {
+        key: "/",
+        scope: "dashboards-list",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="dashboard-search"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
 
     return {
       t,

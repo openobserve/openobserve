@@ -302,6 +302,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -744,6 +746,31 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   invalidateFolderCache(toFolder);
   await loadReports(activeFolderId.value);
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("reports");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "reports",
+    description: "shortcuts.actions.reportsAdd",
+    handler: () => { if (!isInputFocused()) createNewReport(); },
+  },
+  {
+    key: "r",
+    scope: "reports",
+    description: "shortcuts.actions.reportsRefresh",
+    handler: () => { if (!isInputFocused()) loadReports(activeFolderId.value); },
+  },
+  {
+    key: "/",
+    scope: "reports",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="report-list-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 </script>
 
 
