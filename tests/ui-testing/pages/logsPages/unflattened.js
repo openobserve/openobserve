@@ -121,20 +121,53 @@ class UnflattenedPage {
     }
 
     /**
-     * Toggle SQL mode via the utilities ("More") menu.
+     * Switch to SQL mode.
      *
-     * Post-menu-migration: the SQL mode switch was moved from the main search bar
-     * into the utilities dropdown, so the switch isn't in the DOM until the menu
-     * is opened. Open the menu, then click the inner switch button (auto-generated
-     * `-btn` suffix on the OSwitch parent data-test in SearchBar.vue).
+     * The SQL mode toggle button was removed from the UI — SQL mode is now
+     * auto-detected from query content (SELECT...FROM = SQL ON).
+     * This method reads the current interesting fields and selected stream from
+     * Vue component state, then writes a SELECT query into the Monaco editor so
+     * that the interesting fields appear in the editor (matching previous behavior).
      */
     async toggleSqlMode() {
-        const isAlreadyVisible = await this.sqlModeToggle.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isAlreadyVisible) {
-            await this.utilitiesMenuButton.click();
-            await this.sqlModeToggle.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await this.sqlModeToggle.click();
+        const appState = await this.page.evaluate(() => {
+            try {
+                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!el) return null;
+                let current = el;
+                while (current && current !== document.body) {
+                    const comp = current.__vueParentComponent;
+                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                        const s = comp.setupState.searchObj;
+                        return {
+                            fields: [...(s.data?.stream?.interestingFieldList || [])],
+                            stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+                        };
+                    }
+                    current = current.parentElement;
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        });
+
+        const timestamp = '_timestamp';
+        const fields = appState?.fields || [];
+        const stream = appState?.stream || 'e2e_automate';
+        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+        const sql = allFields.length > 1
+            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
+            : `SELECT * FROM "${stream}"`;
+
+        // Write the SQL into the Monaco editor via the .inputarea
+        await this.logsSearchBarQueryEditor.waitFor({ state: 'visible', timeout: 10000 });
+        await this.logsSearchBarQueryEditor.click();
+        const inputArea = this.logsSearchBarQueryEditor.locator('.inputarea');
+        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await inputArea.fill(sql);
+        await this.page.waitForTimeout(600);
     }
 
     async ensureStoreOriginalDataEnabled() {
