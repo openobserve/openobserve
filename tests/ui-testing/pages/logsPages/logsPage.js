@@ -2068,9 +2068,10 @@ export class LogsPage {
 
     async addRemoveInteresting() {
         const field = 'kubernetes_pod_name';
-        // After clickInterestingFields() a SELECT query is written to the editor, which
-        // triggers Vue reactivity and may reset the field-search filter. Re-apply the
-        // filter so the star button is visible, then click it to remove the field.
+        // After clickInterestingFields() the mode may have switched to SQL (clickSQLModeToggle
+        // writes a SELECT) causing Vue reactivity to reset the field-search filter.
+        // Re-apply the filter so the star button is visible, then use clickInterestingFieldButton
+        // which retries up to 5× and re-applies the filter on each attempt.
         await this.fillIndexFieldSearchInput(field);
         await this.clickInterestingFieldButton(field);
     }
@@ -2772,13 +2773,15 @@ export class LogsPage {
         // Behaves as a true toggle:
         //   SQL ON  → clear the editor (FTS mode, no SELECT)
         //   SQL OFF → write SELECT query with current interesting fields (SQL mode)
+        //
+        // Uses setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
+        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
+        // lands on another element.
         const isSQL = await this.isSqlModeEnabled();
         if (isSQL) {
             // Toggle OFF: clear editor so auto-detection sets sqlMode = false
-            const monacoHelper = this.getMonacoEditorHelper();
-            const container = this.getQueryEditorContainer();
-            await monacoHelper.clear(container);
-            await this.page.waitForTimeout(600);
+            await this.setQueryEditorContent('');
+            await this.page.waitForTimeout(300);
             testLogger.info('clickSQLModeToggle: toggled OFF (editor cleared)');
             return;
         }
@@ -2814,10 +2817,8 @@ export class LogsPage {
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
             : `SELECT * FROM "${stream}"`;
 
-        const monacoHelper = this.getMonacoEditorHelper();
-        const container = this.getQueryEditorContainer();
-        await monacoHelper.setContent(container, sql);
-        await this.page.waitForTimeout(600);
+        await this.setQueryEditorContent(sql);
+        await this.page.waitForTimeout(300);
         testLogger.info(`clickSQLModeToggle: toggled ON — set SQL="${sql.substring(0, 80)}"`);
     }
 
@@ -5082,16 +5083,13 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Monaco's addCommand(CtrlCmd | Enter) only fires when Monaco's OWN textarea
-        // (.inputarea) has focus. Pressing on the outer wrapper div bypasses Monaco's
-        // key listener. Click into the inputarea directly so all key events land there.
-        const inputarea = this.page.locator(this.queryEditor).locator('.inputarea');
-        await inputarea.waitFor({ state: 'visible', timeout: 10000 });
-        await inputarea.click();
+        // Monaco's view-line divs intercept pointer events, so clicking .inputarea directly
+        // fails. Use the Monaco API via clickQueryEditor() to reliably focus the editor.
+        await this.clickQueryEditor();
 
-        // Select all and delete via the focused inputarea so Monaco handles it.
-        await inputarea.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await inputarea.press("Backspace");
+        // Select all and delete via page keyboard so Monaco handles it.
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await this.page.keyboard.press("Backspace");
 
         // Wait for the debounce to propagate searchObj.data.query = "".
         // Without this pause, Ctrl+Enter fires before the store update, so the old
@@ -5102,9 +5100,10 @@ export class LogsPage {
         // blank input as a SQL query (which errors) rather than a FTS match_all.
         await this._setSqlModeViaVue(true);
 
-        // Fire Ctrl+Enter through the inputarea so Monaco's registered addCommand
-        // handler emits "run-query" → SearchBar's handleRunQueryFn runs the blank query.
-        await inputarea.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        // Re-focus the editor after Vue state update, then fire Ctrl+Enter so Monaco's
+        // registered addCommand handler emits "run-query".
+        await this.clickQueryEditor();
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
     }
 
     async expectBlankQueryError() {
@@ -7000,10 +6999,30 @@ export class LogsPage {
 
     /**
      * Enable SQL mode if currently disabled.
-     * Same logic as enableSqlModeIfNeeded — delegates to it.
+     * Uses a direct path: try Vue state mutation first, then fall back to setting
+     * a SELECT query in the editor. Avoids the strict expect.poll assertion in
+     * setQueryEditorContent (which can fail if the fullSQLMode watcher fires
+     * asynchronously and resets the editor after executeEdits).
      */
     async enableSqlModeIfDisabled() {
-        await this.enableSqlModeIfNeeded();
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            testLogger.info('enableSqlModeIfDisabled: SQL mode already on — skipping');
+            return;
+        }
+        const stream = await this._getSelectedStream();
+        const set = await this._setSqlModeViaVue(true);
+        if (!set) {
+            // Vue state inaccessible — write SELECT directly to trigger auto-detection
+            await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
+        }
+        await this.page.waitForTimeout(600);
+        // If the Vue watcher didn't auto-update the editor, force it now
+        if (!(await this.isSqlModeEnabled())) {
+            await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
+            await this.page.waitForTimeout(400);
+        }
+        testLogger.info('enableSqlModeIfDisabled: SQL mode enabled');
     }
 
     /**
@@ -7928,14 +7947,37 @@ export class LogsPage {
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
         // In that case fall back to writing SELECT directly so the editor reflects SQL mode.
-        // Use setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
-        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
-        // lands on another element after stream selection.
+        // In build mode the query editor is read-only (buildModeQueryEditorDisabled=true),
+        // so Monaco executeEdits is blocked by the readOnly flag. Instead, update
+        // searchObj.data.query directly via Vue state — CodeQueryEditor's props.query
+        // watcher then calls editorObj.getModel().setValue() which bypasses readOnly.
         const isSQLNow = await this.isSqlModeEnabled();
         if (!isSQLNow) {
             const stream = await this._getSelectedStream();
-            await this.setQueryEditorContent(`SELECT * FROM "${stream}"`);
-            await this.page.waitForTimeout(300);
+            const sql = `SELECT * FROM "${stream}"`;
+            const updatedViaState = await this.page.evaluate((q) => {
+                try {
+                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                    if (!el) return false;
+                    let cur = el;
+                    while (cur && cur !== document.body) {
+                        const comp = cur.__vueParentComponent;
+                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                            comp.setupState.searchObj.data.query = q;
+                            comp.setupState.searchObj.data.editorValue = q;
+                            return true;
+                        }
+                        cur = cur.parentElement;
+                    }
+                    return false;
+                } catch (e) { return false; }
+            }, sql);
+            if (!updatedViaState) {
+                // Fallback for non-build-mode where the editor is not read-only
+                await this.setQueryEditorContent(sql);
+            }
+            // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate
+            await this.page.waitForTimeout(500);
         }
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
@@ -7943,7 +7985,8 @@ export class LogsPage {
     /**
      * Disable SQL mode if currently enabled.
      * Sets sqlMode=false via the Vue component state (triggers the sqlMode watcher in build
-     * tab to show WHERE clause). Falls back to clearing the editor if Vue state is unavailable.
+     * tab to show WHERE clause). Falls back to direct state update if the editor is read-only
+     * (build tab auto mode) or the async watcher chain is too slow.
      */
     async disableSqlModeIfNeeded() {
         const isSQL = await this.isSqlModeEnabled();
@@ -7951,14 +7994,46 @@ export class LogsPage {
             testLogger.info('disableSqlModeIfNeeded: SQL mode already off — skipping');
             return;
         }
-        const set = await this._setSqlModeViaVue(false);
-        if (!set) {
-            // Fallback: clear the editor via keyboard so SQL auto-detection turns off
-            const monacoHelper = this.getMonacoEditorHelper();
-            const container = this.getQueryEditorContainer();
-            await monacoHelper.clear(container).catch(() => {});
-        }
+        // Set sqlMode=false via Vue state — in build mode this triggers the Index.vue
+        // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
+        // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
+        await this._setSqlModeViaVue(false);
         await this.page.waitForTimeout(600);
+
+        // Verify the editor was updated. The Vue watcher chain is async and involves an
+        // SQL-parser dynamic import, so it can exceed 600ms on first load or under CI load.
+        // If the editor still contains SELECT, fall back to the same pattern as
+        // enableSqlModeIfNeeded: set searchObj.data.query directly via Vue state so the
+        // QueryEditor prop watcher calls editorObj.getModel().setValue() which bypasses
+        // the Monaco readOnly flag (unlike keyboard shortcuts which do not).
+        const isStillSQL = await this.isSqlModeEnabled();
+        if (isStillSQL) {
+            testLogger.warn('disableSqlModeIfNeeded: Vue watcher did not update editor in time — using direct state fallback');
+            const updatedViaState = await this.page.evaluate(() => {
+                try {
+                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                    if (!el) return false;
+                    let cur = el;
+                    while (cur && cur !== document.body) {
+                        const comp = cur.__vueParentComponent;
+                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                            comp.setupState.searchObj.data.query = '';
+                            comp.setupState.searchObj.data.editorValue = '';
+                            return true;
+                        }
+                        cur = cur.parentElement;
+                    }
+                    return false;
+                } catch (e) { return false; }
+            });
+            if (!updatedViaState) {
+                // Absolute fallback: programmatic Monaco clear via executeEdits which
+                // bypasses the readOnly flag (unlike keyboard Ctrl+A + Backspace which fails
+                // silently on read-only editors in the build tab's auto mode).
+                await this.setQueryEditorContent('').catch(() => {});
+            }
+            await this.page.waitForTimeout(500);
+        }
         testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
 
