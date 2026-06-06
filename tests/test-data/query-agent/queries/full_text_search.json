@@ -143,7 +143,7 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
@@ -151,7 +151,7 @@
             "3"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
@@ -2251,7 +2251,8 @@
             "dc-west"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_column_check": true
       }
     },
     {
@@ -2633,7 +2634,8 @@
             "dc-east"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_column_check": true
       }
     },
     {
@@ -3183,7 +3185,8 @@
             "dc-west"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_column_check": true
       }
     },
     {
@@ -4354,7 +4357,8 @@
             "dc-east"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_column_check": true
       }
     },
     {

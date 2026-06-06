@@ -360,15 +360,15 @@
             "6"
           ],
           [
-            "CC-BETA",
-            "SORT-A7",
-            "manual",
-            "3"
-          ],
-          [
             "CC-GAMMA",
             "SORT-M3",
             "hybrid",
+            "3"
+          ],
+          [
+            "CC-BETA",
+            "SORT-A7",
+            "manual",
             "3"
           ],
           [
@@ -909,23 +909,16 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-1",
             "manual",
-            "SORT-ZONE-2",
+            "SORT-ZONE-1",
             "29",
             "3"
           ],
           [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "58",
-            "3"
-          ],
-          [
-            "ZONE-1",
+            "ZONE-2",
             "manual",
-            "SORT-ZONE-1",
+            "SORT-ZONE-2",
             "29",
             "3"
           ],
@@ -934,6 +927,13 @@
             "hybrid",
             "SORT-ZONE-3",
             "29",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "58",
             "3"
           ],
           [
@@ -965,11 +965,11 @@
         ],
         "results": [
           [
-            "DeleteRecord",
-            "DELETE",
+            "RerouteTrack",
+            "REROUT",
             "False",
             "3",
-            "230.0"
+            "89.0"
           ],
           [
             "UpdateBatch",
@@ -979,11 +979,11 @@
             "45.0"
           ],
           [
-            "RerouteTrack",
-            "REROUT",
+            "DeleteRecord",
+            "DELETE",
             "False",
             "3",
-            "89.0"
+            "230.0"
           ],
           [
             "SearchItems",
@@ -1021,11 +1021,11 @@
         ],
         "results": [
           [
-            "US-EAST-ZONE-1-AUT",
-            "3",
+            "AP-SOUTH-ZONE-1-MAN",
             "3",
             "0",
-            "50.0"
+            "0",
+            "88.0"
           ],
           [
             "EU-WEST-ZONE-3-HYB",
@@ -1035,18 +1035,18 @@
             "200.0"
           ],
           [
+            "US-EAST-ZONE-1-AUT",
+            "3",
+            "3",
+            "0",
+            "50.0"
+          ],
+          [
             "US-WEST-ZONE-2-MAN",
             "3",
             "0",
             "0",
             "120.0"
-          ],
-          [
-            "AP-SOUTH-ZONE-1-MAN",
-            "3",
-            "0",
-            "0",
-            "88.0"
           ],
           [
             "EU-NORTH-ZONE-4-AUT",
@@ -1420,16 +1420,16 @@
         ],
         "results": [
           [
+            "checkoutPage",
+            "E005"
+          ],
+          [
             "itemPage",
             "E001"
           ],
           [
             "searchPage",
             "E002"
-          ],
-          [
-            "checkoutPage",
-            "E005"
           ]
         ],
         "results_mode": "rowsort"
