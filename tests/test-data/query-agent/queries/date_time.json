@@ -518,24 +518,6 @@
         "results": [
           [
             "1780736700000000",
-            "ZONE-3",
-            "1",
-            "480.0",
-            "26.3",
-            "42.5",
-            "200"
-          ],
-          [
-            "1780736700000000",
-            "ZONE-1",
-            "1",
-            "725.0",
-            "35.7",
-            "75.3",
-            "88"
-          ],
-          [
-            "1780736700000000",
             "ZONE-2",
             "1",
             "320.0",
@@ -544,7 +526,7 @@
             "120"
           ],
           [
-            "1780736640000000",
+            "1780736700000000",
             "ZONE-3",
             "1",
             "480.0",
@@ -553,7 +535,7 @@
             "200"
           ],
           [
-            "1780736640000000",
+            "1780736700000000",
             "ZONE-1",
             "1",
             "725.0",
@@ -580,22 +562,22 @@
             "340"
           ],
           [
-            "1780736580000000",
-            "ZONE-1",
-            "1",
-            "725.0",
-            "35.7",
-            "75.3",
-            "88"
-          ],
-          [
-            "1780736580000000",
+            "1780736640000000",
             "ZONE-3",
             "1",
             "480.0",
             "26.3",
             "42.5",
             "200"
+          ],
+          [
+            "1780736640000000",
+            "ZONE-1",
+            "1",
+            "725.0",
+            "35.7",
+            "75.3",
+            "88"
           ],
           [
             "1780736580000000",
@@ -614,6 +596,24 @@
             "30.1",
             "58.0",
             "340"
+          ],
+          [
+            "1780736580000000",
+            "ZONE-1",
+            "1",
+            "725.0",
+            "35.7",
+            "75.3",
+            "88"
+          ],
+          [
+            "1780736580000000",
+            "ZONE-3",
+            "1",
+            "480.0",
+            "26.3",
+            "42.5",
+            "200"
           ]
         ],
         "results_mode": "rowsort"
@@ -790,16 +790,16 @@
         ],
         "results": [
           [
-            "performanceMetric",
-            "9",
-            "1780743180000000",
-            "1780743318000000"
-          ],
-          [
             "navigation",
             "2",
             "1780743234000000",
             "1780743294000000"
+          ],
+          [
+            "performanceMetric",
+            "9",
+            "1780743180000000",
+            "1780743318000000"
           ]
         ],
         "results_mode": "rowsort"
@@ -807,7 +807,7 @@
     },
     {
       "id": "Q299",
-      "sql": "SELECT _timestamp, concat(page_slug, '-', action_category) AS event_type, latency_ms, component_name FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 100 ORDER BY _timestamp DESC LIMIT 20",
+      "sql": "SELECT _timestamp, concat(page_slug, '-', action_category) AS event_type, latency_ms, component_name FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 79 ORDER BY _timestamp DESC LIMIT 20",
       "category": "date_time",
       "time_offset": {
         "start_offset": 17879000000,
@@ -819,7 +819,23 @@
           "latency_ms",
           "component_name"
         ],
-        "results": [],
+        "results": [
+          [
+            "checkoutPage-performanceMetric",
+            "89",
+            "track-router"
+          ],
+          [
+            "checkoutPage-performanceMetric",
+            "89",
+            "track-router"
+          ],
+          [
+            "checkoutPage-performanceMetric",
+            "89",
+            "track-router"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },

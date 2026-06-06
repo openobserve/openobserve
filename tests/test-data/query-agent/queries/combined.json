@@ -675,6 +675,13 @@
         ],
         "results": [
           [
+            "ZONE-3",
+            "SORT-M3",
+            "480.0",
+            "55.2",
+            "0.0"
+          ],
+          [
             "ZONE-1",
             "SORT-X1",
             "437.5",
@@ -693,13 +700,6 @@
             "SORT-Z9",
             "610.0",
             "72.8",
-            "0.0"
-          ],
-          [
-            "ZONE-3",
-            "SORT-M3",
-            "480.0",
-            "55.2",
             "0.0"
           ]
         ],
@@ -804,19 +804,19 @@
         "results": [
           [
             "3",
-            "updateBatch"
-          ],
-          [
-            "3",
             "deleteRecord"
           ],
           [
             "3",
-            "rerouteTrack"
+            "updateBatch"
           ],
           [
             "2",
             "scanPallet"
+          ],
+          [
+            "3",
+            "rerouteTrack"
           ]
         ],
         "results_mode": "rowsort"
@@ -931,18 +931,18 @@
             "3"
           ],
           [
-            "ZONE-3",
-            "3",
-            "480.0",
-            "0",
-            "0"
-          ],
-          [
             "ZONE-2",
             "3",
             "320.0",
             "0",
             "3"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "480.0",
+            "0",
+            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -950,7 +950,7 @@
     },
     {
       "id": "Q181",
-      "sql": "SELECT api_name,\n  json_get_str(request_payload, 'status') AS req_status,\n  COUNT(*) AS cnt,\n  AVG(latency_ms) AS avg_latency\nFROM \"{stream}\"\nWHERE json_get_str(request_payload, 'status') IS NOT NULL\n  AND json_get_str(request_payload, 'status') != ''\n  AND latency_ms > 0\nGROUP BY api_name, json_get_str(request_payload, 'status')\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "sql": "SELECT api_name,\n  json_get_str(request_payload, 'message.status') AS req_status,\n  COUNT(*) AS cnt,\n  AVG(latency_ms) AS avg_latency\nFROM \"{stream}\"\nWHERE json_get_str(request_payload, 'message.status') IS NOT NULL\n  AND json_get_str(request_payload, 'message.status') != ''\n  AND latency_ms > 0\nGROUP BY api_name, json_get_str(request_payload, 'message.status')\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
       "category": "combined",
       "time_offset": {
         "start_offset": 10799000000,
@@ -963,7 +963,38 @@
           "cnt",
           "avg_latency"
         ],
-        "results": [],
+        "results": [
+          [
+            "DeleteRecord",
+            "failed",
+            "3",
+            "230.0"
+          ],
+          [
+            "UpdateBatch",
+            "pending",
+            "3",
+            "45.0"
+          ],
+          [
+            "RerouteTrack",
+            "queued",
+            "3",
+            "89.0"
+          ],
+          [
+            "SearchItems",
+            "ok",
+            "3",
+            "12.0"
+          ],
+          [
+            "ScanPallet",
+            "ok",
+            "2",
+            "1450.0"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1080,16 +1111,16 @@
         ],
         "results": [
           [
-            "item_error",
-            "3"
-          ],
-          [
             "other",
             "9"
           ],
           [
             "item_click",
             "2"
+          ],
+          [
+            "item_error",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1112,16 +1143,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "5",
-            "2",
-            "2"
-          ],
-          [
             "checkoutPage",
             "3",
             "3",
             "0"
+          ],
+          [
+            "itemPage",
+            "5",
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1247,13 +1278,6 @@
         ],
         "results": [
           [
-            "track-router",
-            "checkoutPage",
-            "3",
-            "89.0",
-            "89"
-          ],
-          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1266,6 +1290,13 @@
             "3",
             "230.0",
             "230"
+          ],
+          [
+            "track-router",
+            "checkoutPage",
+            "3",
+            "89.0",
+            "89"
           ]
         ],
         "results_mode": "rowsort"
@@ -1287,11 +1318,6 @@
         ],
         "results": [
           [
-            "monitoring",
-            "3",
-            "1"
-          ],
-          [
             "purchase",
             "3",
             "1"
@@ -1304,6 +1330,11 @@
           [
             "other",
             "6",
+            "1"
+          ],
+          [
+            "monitoring",
+            "3",
             "1"
           ]
         ],
@@ -1326,17 +1357,17 @@
         ],
         "results": [
           [
+            "E005",
+            "3",
+            "1"
+          ],
+          [
             "E002",
             "3",
             "1"
           ],
           [
             "E001",
-            "3",
-            "1"
-          ],
-          [
-            "E005",
             "3",
             "1"
           ]
@@ -1387,12 +1418,6 @@
         ],
         "results": [
           [
-            "Tablet",
-            "3",
-            "0",
-            "230.0"
-          ],
-          [
             "Computer",
             "6",
             "3",
@@ -1403,6 +1428,12 @@
             "5",
             "2",
             "587.2"
+          ],
+          [
+            "Tablet",
+            "3",
+            "0",
+            "230.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1430,12 +1461,12 @@
           ],
           [
             "fast",
-            "error",
+            "success",
             "3"
           ],
           [
             "fast",
-            "success",
+            "error",
             "3"
           ],
           [
@@ -1454,7 +1485,7 @@
     },
     {
       "id": "Q262",
-      "sql": "SELECT action_subcategory, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category NOT IN ('interaction', 'navigation') AND error_code NOT IN ('E001', 'E003', 'E005') AND exception_message NOT LIKE '%Timeout%' GROUP BY action_subcategory HAVING COUNT(*) >= 2",
+      "sql": "SELECT action_subcategory, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category NOT IN ('interaction', 'navigation') AND error_code NOT IN ('E001', 'E003', 'E005') AND exception_message NOT LIKE '%NonexistentPattern%' GROUP BY action_subcategory HAVING COUNT(*) >= 2",
       "category": "combined",
       "time_offset": {
         "start_offset": 15659000000,
@@ -1465,7 +1496,12 @@
           "action_subcategory",
           "cnt"
         ],
-        "results": [],
+        "results": [
+          [
+            "vitalsInp",
+            "3"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1524,6 +1560,12 @@
         ],
         "results": [
           [
+            "cartPage",
+            "3",
+            "3",
+            "100.0"
+          ],
+          [
             "itemPage",
             "5",
             "5",
@@ -1531,12 +1573,6 @@
           ],
           [
             "searchPage",
-            "3",
-            "3",
-            "100.0"
-          ],
-          [
-            "cartPage",
             "3",
             "3",
             "100.0"
@@ -1617,6 +1653,11 @@
         ],
         "results": [
           [
+            "android",
+            "mobile",
+            "6"
+          ],
+          [
             "other",
             "desktop",
             "3"
@@ -1625,11 +1666,6 @@
             "ios",
             "desktop",
             "3"
-          ],
-          [
-            "android",
-            "mobile",
-            "6"
           ]
         ],
         "results_mode": "rowsort"

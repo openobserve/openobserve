@@ -59,13 +59,13 @@
             "50.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "3",
             "0",
             "0.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "3",
             "0",
             "0.0"
@@ -349,7 +349,7 @@
             "6",
             "437.5",
             "27.1",
-            "auto",
+            "manual",
             "3"
           ],
           [
@@ -1184,7 +1184,7 @@
     },
     {
       "id": "Q174",
-      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%Allowlisted%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
+      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%NonexistentPattern%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 10379000000,
@@ -1196,7 +1196,13 @@
           "visitor_session_id",
           "row_count"
         ],
-        "results": [],
+        "results": [
+          [
+            "verifyPayment",
+            "sess_002",
+            "3"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1453,17 +1459,17 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1001::performanceMetric",
-            "3",
-            "1"
-          ],
-          [
             "https://shop.example.com/cart::performanceMetric",
             "3",
             "1"
           ],
           [
             "https://shop.example.com/item/1002::performanceMetric",
+            "3",
+            "1"
+          ],
+          [
+            "https://shop.example.com/item/1001::performanceMetric",
             "3",
             "1"
           ]
@@ -1473,7 +1479,7 @@
     },
     {
       "id": "Q273",
-      "sql": "WITH filtered AS (SELECT * FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND action_category IN ('performanceMetric', 'navigation') AND page_slug = 'itemPage') SELECT action_category, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM filtered GROUP BY action_category",
+      "sql": "WITH filtered AS (SELECT * FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND action_category IN ('performanceMetric', 'navigation') AND page_slug = 'itemPage') SELECT action_category, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM filtered GROUP BY action_category",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16319000000,
@@ -1486,7 +1492,14 @@
           "users",
           "avg_latency"
         ],
-        "results": [],
+        "results": [
+          [
+            "navigation",
+            "2",
+            "1",
+            "1450.0"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1506,17 +1519,17 @@
         ],
         "results": [
           [
+            "NullPointerException at ConveyorController.handle()",
+            "3",
+            "1"
+          ],
+          [
             "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1"
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "3",
-            "1"
-          ],
-          [
-            "NullPointerException at ConveyorController.handle()",
             "3",
             "1"
           ]
@@ -1572,13 +1585,13 @@
             "3"
           ],
           [
-            "performanceMetric",
-            "checkoutPage",
+            "interaction",
+            "cartPage",
             "3"
           ],
           [
-            "interaction",
-            "cartPage",
+            "performanceMetric",
+            "checkoutPage",
             "3"
           ],
           [
@@ -1678,13 +1691,13 @@
         ],
         "results": [
           [
-            "sess_002",
-            "3",
+            "sess_001",
+            "6",
             "0"
           ],
           [
-            "sess_001",
-            "6",
+            "sess_002",
+            "3",
             "0"
           ],
           [
@@ -1739,7 +1752,7 @@
         "results": [
           [
             "fast",
-            "unknown",
+            "ok",
             "3"
           ],
           [
@@ -1749,7 +1762,7 @@
           ],
           [
             "fast",
-            "ok",
+            "unknown",
             "3"
           ],
           [
@@ -1836,17 +1849,17 @@
         ],
         "results": [
           [
-            "itemPage/performanceMetric",
-            "3",
-            "1"
-          ],
-          [
             "searchPage/performanceMetric",
             "3",
             "1"
           ],
           [
             "checkoutPage/performanceMetric",
+            "3",
+            "1"
+          ],
+          [
+            "itemPage/performanceMetric",
             "3",
             "1"
           ]
@@ -1894,8 +1907,8 @@
         ],
         "results": [
           [
-            "performanceMetric",
-            "checkoutPage",
+            "navigation",
+            "itemPage",
             "1"
           ],
           [
@@ -1914,8 +1927,8 @@
             "1"
           ],
           [
-            "navigation",
-            "itemPage",
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2001,12 +2014,6 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1450.0",
-            "2"
-          ],
-          [
             "cartPage",
             "3",
             "230.0",
@@ -2017,6 +2024,12 @@
             "3",
             "89.0",
             "3"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1450.0",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2024,7 +2037,7 @@
     },
     {
       "id": "Q291",
-      "sql": "WITH clean AS (SELECT * FROM \"{stream}\" WHERE org_name NOT IN ('warehouse-south', 'warehouse-central') AND error_code NOT IN ('E002', 'E004') AND action_category NOT IN ('interaction', 'navigation') AND build_version NOT IN ('v1.0.0')) SELECT page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM clean GROUP BY page_slug",
+      "sql": "WITH clean AS (SELECT * FROM \"{stream}\" WHERE org_name NOT IN ('warehouse-south', 'warehouse-central') AND error_code NOT IN ('E002', 'E004')  AND build_version NOT IN ('v1.0.0')) SELECT page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM clean GROUP BY page_slug",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17399000000,
@@ -2037,7 +2050,14 @@
           "users",
           "avg_latency"
         ],
-        "results": [],
+        "results": [
+          [
+            "cartPage",
+            "3",
+            "1",
+            "230.0"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },

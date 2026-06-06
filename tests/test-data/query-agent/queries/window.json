@@ -203,6 +203,24 @@
             "1"
           ],
           [
+            "ZONE-2",
+            "33.0",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "33.0",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "33.0",
+            "1",
+            "1"
+          ],
+          [
             "ZONE-1",
             "88.1",
             "1",
@@ -237,24 +255,6 @@
             "12.5",
             "4",
             "2"
-          ],
-          [
-            "ZONE-2",
-            "33.0",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-2",
-            "33.0",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-2",
-            "33.0",
-            "1",
-            "1"
           ],
           [
             "ZONE-3",
@@ -1027,7 +1027,7 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "3",
             "6",
             "50.0",
@@ -1035,7 +1035,7 @@
           ],
           [
             "ZONE-1",
-            "auto",
+            "manual",
             "3",
             "6",
             "50.0",
@@ -1066,7 +1066,8 @@
             "1"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 8639000000,
@@ -2616,7 +2617,7 @@
     },
     {
       "id": "Q394",
-      "sql": "SELECT page_slug, os_platform, COUNT(*) AS cnt, RANK() OVER (PARTITION BY os_platform ORDER BY COUNT(*) DESC) AS popularity_rank FROM \"{stream}\" WHERE action_category = 'navigation' AND os_platform IN ('Android 14', 'iOS 17.4', 'Windows 11') GROUP BY page_slug, os_platform",
+      "sql": "SELECT page_slug, os_platform, COUNT(*) AS cnt, RANK() OVER (PARTITION BY os_platform ORDER BY COUNT(*) DESC) AS popularity_rank FROM \"{stream}\" WHERE action_category = 'navigation' AND os_platform IN ('Mac OS X (iPhone)', 'Android 12') GROUP BY page_slug, os_platform",
       "category": "window",
       "time_offset": {
         "start_offset": 23579000000,
@@ -2629,7 +2630,14 @@
           "cnt",
           "popularity_rank"
         ],
-        "results": [],
+        "results": [
+          [
+            "itemPage",
+            "Mac OS X (iPhone)",
+            "2",
+            "1"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },

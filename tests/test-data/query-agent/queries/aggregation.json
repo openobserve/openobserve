@@ -170,15 +170,15 @@
         "results": [
           [
             "ZONE-1",
-            "auto",
-            "3",
-            "150.0"
-          ],
-          [
-            "ZONE-1",
             "manual",
             "3",
             "725.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "3",
+            "150.0"
           ],
           [
             "ZONE-2",
@@ -441,16 +441,16 @@
             "30.1"
           ],
           [
-            "ZONE-3",
-            "0",
-            "3",
-            "26.3"
-          ],
-          [
             "ZONE-2",
             "0",
             "3",
             "22.0"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "3",
+            "26.3"
           ]
         ],
         "results_mode": "rowsort"
@@ -728,6 +728,12 @@
             "0.7199"
           ],
           [
+            "BS-2026-B2",
+            "0.0",
+            "33.0",
+            "0.0"
+          ],
+          [
             "BS-2026-C3",
             "0.0",
             "55.2",
@@ -737,12 +743,6 @@
             "BS-2025-D4",
             "0.0",
             "72.8",
-            "0.0"
-          ],
-          [
-            "BS-2026-B2",
-            "0.0",
-            "33.0",
             "0.0"
           ]
         ],
@@ -912,6 +912,14 @@
             "3"
           ],
           [
+            "AP-SOUTH",
+            "3",
+            "0.0",
+            "2175.0",
+            "35.7",
+            "0"
+          ],
+          [
             "US-EAST",
             "3",
             "450.0",
@@ -925,14 +933,6 @@
             "0.0",
             "0.0",
             "26.3",
-            "0"
-          ],
-          [
-            "AP-SOUTH",
-            "3",
-            "0.0",
-            "2175.0",
-            "35.7",
             "0"
           ]
         ],
@@ -1134,7 +1134,7 @@
     },
     {
       "id": "Q207",
-      "sql": "SELECT component_name, COUNT(*) AS error_count, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message LIKE '%Exception%' GROUP BY component_name HAVING COUNT(*) > 1 AND COUNT(DISTINCT visitor_session_id) >= 2",
+      "sql": "SELECT component_name, COUNT(*) AS error_count, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message LIKE '%Exception%' GROUP BY component_name HAVING COUNT(*) >= 1 AND COUNT(DISTINCT visitor_session_id) >= 1",
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12359000000,
@@ -1146,7 +1146,23 @@
           "error_count",
           "users"
         ],
-        "results": [],
+        "results": [
+          [
+            "conveyor-driver",
+            "3",
+            "1"
+          ],
+          [
+            "sorter-engine",
+            "3",
+            "1"
+          ],
+          [
+            "track-router",
+            "3",
+            "1"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1166,12 +1182,12 @@
         ],
         "results": [
           [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "NullPointerException at ConveyorController.handle()",
             "3",
             "1"
           ],
           [
-            "NullPointerException at ConveyorController.handle()",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1"
           ],
@@ -1203,6 +1219,14 @@
         ],
         "results": [
           [
+            "checkoutPage",
+            "3",
+            "89",
+            "89",
+            "89.0",
+            "1"
+          ],
+          [
             "itemPage",
             "3",
             "12",
@@ -1216,14 +1240,6 @@
             "45",
             "45",
             "45.0",
-            "1"
-          ],
-          [
-            "checkoutPage",
-            "3",
-            "89",
-            "89",
-            "89.0",
             "1"
           ],
           [
@@ -1264,7 +1280,7 @@
     },
     {
       "id": "Q211",
-      "sql": "SELECT device_type, COUNT(*) AS event_count, COUNT(DISTINCT visitor_session_id) AS unique_users FROM \"{stream}\" WHERE org_name IN ('warehouse-east', 'warehouse-west') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND action_category = 'navigation' AND page_slug = 'itemPage' GROUP BY device_type",
+      "sql": "SELECT device_type, COUNT(*) AS event_count, COUNT(DISTINCT visitor_session_id) AS unique_users FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south', 'warehouse-central') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND action_category = 'navigation' AND page_slug = 'itemPage' GROUP BY device_type",
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12599000000,
@@ -1276,7 +1292,13 @@
           "event_count",
           "unique_users"
         ],
-        "results": [],
+        "results": [
+          [
+            "Mobile",
+            "2",
+            "1"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1429,15 +1451,15 @@
         ],
         "results": [
           [
-            "E001",
-            "3"
-          ],
-          [
             "E005",
             "3"
           ],
           [
             "E002",
+            "3"
+          ],
+          [
+            "E001",
             "3"
           ]
         ],
@@ -1479,16 +1501,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "E005"
-          ],
-          [
             "searchPage",
             "E002"
           ],
           [
             "itemPage",
             "E001"
+          ],
+          [
+            "checkoutPage",
+            "E005"
           ]
         ],
         "results_mode": "rowsort"
@@ -1598,7 +1620,7 @@
     },
     {
       "id": "Q223",
-      "sql": "SELECT page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'navigation' AND page_slug IN ('itemPage', 'cartPage', 'checkoutPage', 'searchPage') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND org_name = 'warehouse-east' AND build_version IS NOT NULL GROUP BY page_slug ORDER BY cnt DESC",
+      "sql": "SELECT page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'navigation' AND page_slug IN ('itemPage', 'cartPage', 'checkoutPage', 'searchPage') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND org_name = 'warehouse-south' AND build_version IS NOT NULL GROUP BY page_slug ORDER BY cnt DESC",
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13319000000,
@@ -1610,7 +1632,13 @@
           "cnt",
           "users"
         ],
-        "results": [],
+        "results": [
+          [
+            "itemPage",
+            "2",
+            "1"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },

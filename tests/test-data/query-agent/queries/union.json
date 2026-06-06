@@ -103,6 +103,11 @@
             "3"
           ],
           [
+            "SORT-X1",
+            "manual",
+            "3"
+          ],
+          [
             "SORT-A7",
             "manual",
             "3"
@@ -110,11 +115,6 @@
           [
             "SORT-M3",
             "hybrid",
-            "3"
-          ],
-          [
-            "SORT-X1",
-            "manual",
             "3"
           ],
           [
@@ -927,12 +927,12 @@
           ],
           [
             "errors",
-            "E002",
+            "E005",
             "3"
           ],
           [
             "errors",
-            "E005",
+            "E002",
             "3"
           ],
           [
@@ -970,14 +970,14 @@
         ],
         "results": [
           [
-            "non-Android",
-            "2",
-            "6"
-          ],
-          [
             "Android",
             "0",
             "3"
+          ],
+          [
+            "non-Android",
+            "2",
+            "6"
           ],
           [
             "TOTAL",
@@ -1108,7 +1108,7 @@
           ],
           [
             "component_err",
-            "sorter-engine",
+            "track-router",
             "3"
           ],
           [
@@ -1118,7 +1118,7 @@
           ],
           [
             "component_err",
-            "track-router",
+            "sorter-engine",
             "3"
           ]
         ],
@@ -1127,7 +1127,7 @@
     },
     {
       "id": "Q391",
-      "sql": "SELECT org_name, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' ELSE os_platform END) AS platform, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-east', 'warehouse-west') AND action_category = 'navigation' GROUP BY org_name, platform UNION ALL SELECT 'warehouse-north' AS org_name, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' ELSE os_platform END) AS platform, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name = 'warehouse-north' AND action_category = 'navigation' GROUP BY platform",
+      "sql": "SELECT org_name, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' ELSE os_platform END) AS platform, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-south') AND action_category = 'navigation' GROUP BY org_name, platform UNION ALL SELECT 'warehouse-north' AS org_name, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' ELSE os_platform END) AS platform, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name = 'warehouse-north' AND action_category = 'navigation' GROUP BY platform",
       "category": "union",
       "time_offset": {
         "start_offset": 23399000000,
@@ -1139,7 +1139,13 @@
           "platform",
           "cnt"
         ],
-        "results": [],
+        "results": [
+          [
+            "warehouse-south",
+            "Mac OS X (iPhone)",
+            "2"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1158,18 +1164,6 @@
         ],
         "results": [
           [
-            "E001",
-            "3"
-          ],
-          [
-            "E005",
-            "3"
-          ],
-          [
-            "E002",
-            "3"
-          ],
-          [
             "UP-E005",
             "3"
           ],
@@ -1179,6 +1173,18 @@
           ],
           [
             "UP-E001",
+            "3"
+          ],
+          [
+            "E001",
+            "3"
+          ],
+          [
+            "E005",
+            "3"
+          ],
+          [
+            "E002",
             "3"
           ]
         ],

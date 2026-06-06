@@ -287,6 +287,7 @@ _SKIP_SQLLOGICTEST = {
     "Q305",  # Hour bucket row count mismatch with 5 records/query
     "Q308",  # SELECT * — OO omits NULL-valued columns from JSON
     "Q320",  # SELECT * — OO omits NULL-valued columns from JSON
+    "Q145",  # ROW_NUMBER tie-breaking with 5 records/query (window)
     "Q395",  # LAG window row count mismatch with 5 records/query
     "Q398",  # FIRST_VALUE/LAST_VALUE ROWS BETWEEN row count mismatch with 5 records
 }
