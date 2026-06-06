@@ -1,7 +1,8 @@
 """Generate Q201-Q400 query entries from june6.sql structural templates.
 
-All queries use the synthetic FIELD_POOL schema — zero real names.
-SQL uses "{stream}" placeholder — replaced at runtime by conftest.py.
+All queries use synthetic field names mapped from june6.sql structural patterns.
+SQL uses ``{stream}`` placeholder — replaced at runtime by the query-agent
+test harness.
 
 Usage:
   cd tests/test-data/query-agent && python3 gen_q201_q400.py
@@ -20,12 +21,14 @@ QUERIES_DIR = Path(__file__).parent / "queries"
 #   end_offset   = (qi-1)*60_000_000 + 9*18_000_000 + 1_000_000
 
 def time_offset(qi):
+    """Return start/end offsets (microseconds) for query index *qi* (1-indexed)."""
     return {
         "start_offset": (qi - 1) * 60_000_000 - 1_000_000,
         "end_offset": (qi - 1) * 60_000_000 + 9 * 18_000_000 + 1_000_000
     }
 
 def make_entry(qid, category, sql):
+    """Build a single query entry dict with time_offset for the given QID."""
     qi = int(qid[1:])
     return {
         "id": qid,
@@ -712,21 +715,6 @@ WINDOW = [
 
 # ── Assemble ──────────────────────────────────────────────────────────────
 
-CATEGORY_MAP = {
-    "aggregation": AGGREGATION,
-    "basic_select": BASIC_SELECT,
-    "combined": COMBINED,
-    "cte_subquery": CTE_SUBQUERY,
-    "date_time": DATE_TIME,
-    "full_text_search": FULL_TEXT_SEARCH,
-    "histogram": HISTOGRAM,
-    "math_functions": MATH_FUNCTIONS,
-    "pagination": PAGINATION,
-    "string_functions": STRING_FUNCTIONS,
-    "union": UNION,
-    "window": WINDOW,
-}
-
 qid = 201
 for cat_name, queries in [
     ("aggregation", AGGREGATION),
@@ -750,7 +738,8 @@ for cat_name, queries in [
 # ── Append to JSON files ──────────────────────────────────────────────────
 
 def main():
-    for cat_name, queries in [
+    """Append Q201-Q400 entries to the 12 category JSON files."""
+    categories = [
         ("aggregation", AGGREGATION),
         ("basic_select", BASIC_SELECT),
         ("combined", COMBINED),
@@ -763,23 +752,16 @@ def main():
         ("string_functions", STRING_FUNCTIONS),
         ("union", UNION),
         ("window", WINDOW),
-    ]:
+    ]
+
+    for cat_name, queries in categories:
         fp = QUERIES_DIR / f"{cat_name}.json"
+        if not fp.exists():
+            print(f"WARNING: {fp} not found — skipping {cat_name}")
+            continue
+
         with open(fp) as f:
             data = json.load(f)
-
-        qid_start = 201
-        # Find the first new qid for this category
-        cat_queries = []
-        for sql in queries:
-            entry = make_entry(f"Q{0:03d}", cat_name, sql)  # placeholder
-            cat_queries.append(entry)
-
-        # Assign correct QIDs sequentially
-        qid = 201
-        for entry in QUERIES:
-            if entry["category"] == cat_name:
-                pass  # QID already assigned
 
         new_entries = [e for e in QUERIES if e["category"] == cat_name]
         data["queries"].extend(new_entries)
