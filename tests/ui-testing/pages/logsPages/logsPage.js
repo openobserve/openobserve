@@ -2035,13 +2035,23 @@ export class LogsPage {
         try {
             await this.waitForEditorValue(field);
             if (await editorHasField()) return;
-            // Field still not in editor — the first click likely didn't register.
-            // Re-clicking is safe because we've verified the field is NOT present
-            // (so the toggle couldn't have been turned on by the first click).
-            await this.clickInterestingFieldButton(field);
+            // Field not in editor yet. Two possible causes:
+            // 1. VQL/FTS mode — clicking the star marks the field as "interesting" in Vue state
+            //    but does NOT rewrite the text query. Enter SQL mode to produce a SELECT
+            //    that includes the field.
+            // 2. SQL mode but the SELECT rewrite was debounced and hasn't landed yet —
+            //    a second click is unnecessary (would remove the field) so skip it.
+            const isSQL = await this.isSqlModeEnabled();
+            if (!isSQL) {
+                // Switch to SQL mode via clickSQLModeToggle which reads interestingFieldList
+                // from Vue state and writes SELECT _timestamp,<field> FROM "<stream>".
+                await this.clickSQLModeToggle();
+                if (await editorHasField()) return;
+            }
+            // Final retry: the SELECT rewrite may still be in-flight.
             await this.waitForEditorValue(field);
             if (!(await editorHasField())) {
-                throw new Error(`Editor model never contained "${field}" after two click attempts`);
+                throw new Error(`Editor model never contained "${field}" after SQL mode toggle and wait`);
             }
         } catch (e) {
             throw e;
@@ -4969,34 +4979,29 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Click the Monaco editor wrapper, then wait for the inner inputarea (Monaco's
-        // hidden textarea) to be visible so keyboard events land in the editor.
-        await this.page.locator(this.queryEditor).click();
+        // Monaco's addCommand(CtrlCmd | Enter) only fires when Monaco's OWN textarea
+        // (.inputarea) has focus. Pressing on the outer wrapper div bypasses Monaco's
+        // key listener. Click into the inputarea directly so all key events land there.
         const inputarea = this.page.locator(this.queryEditor).locator('.inputarea');
-        await inputarea.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        await inputarea.waitFor({ state: 'visible', timeout: 10000 });
+        await inputarea.click();
 
-        // Select all and delete — this clears Monaco's content and triggers its
-        // onChange, which debounces the update to searchObj.data.query (100 ms).
-        await this.page.locator(this.queryEditor).press(
-            process.platform === "darwin" ? "Meta+A" : "Control+A"
-        );
-        await this.page.keyboard.press("Backspace");
+        // Select all and delete via the focused inputarea so Monaco handles it.
+        await inputarea.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await inputarea.press("Backspace");
 
-        // Wait for the 100 ms debounce to propagate searchObj.data.query = "".
+        // Wait for the debounce to propagate searchObj.data.query = "".
         // Without this pause, Ctrl+Enter fires before the store update, so the old
         // SELECT query is used and the run succeeds (no error banner).
         await this.page.waitForTimeout(300);
 
-        // Re-assert SQL mode after blanking — auto-detection resets sqlMode to false
-        // when the editor content is empty. Force it back so the backend receives a
-        // blank SQL query (not a blank FTS query) and returns the expected error.
+        // Re-assert SQL mode — setting sqlMode=true ensures the backend receives the
+        // blank input as a SQL query (which errors) rather than a FTS match_all.
         await this._setSqlModeViaVue(true);
 
-        // Run the blank query — Monaco's internal Ctrl+Enter keybinding emits
-        // "run-query" which propagates to SearchBar's handleRunQueryFn.
-        await this.page.locator(this.queryEditor).press(
-            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"
-        );
+        // Fire Ctrl+Enter through the inputarea so Monaco's registered addCommand
+        // handler emits "run-query" → SearchBar's handleRunQueryFn runs the blank query.
+        await inputarea.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
     }
 
     async expectBlankQueryError() {
@@ -6867,25 +6872,35 @@ export class LogsPage {
     }
 
     /**
+     * Read the currently selected stream name from Vue reactive state.
+     * Falls back to 'e2e_automate' if the state is unavailable.
+     * @returns {Promise<string>}
+     */
+    async _getSelectedStream() {
+        const stream = await this.page.evaluate(() => {
+            try {
+                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                if (!el) return null;
+                let cur = el;
+                while (cur && cur !== document.body) {
+                    const comp = cur.__vueParentComponent;
+                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                        return comp.setupState.searchObj.data?.stream?.selectedStream?.[0] || null;
+                    }
+                    cur = cur.parentElement;
+                }
+                return null;
+            } catch (e) { return null; }
+        });
+        return stream || 'e2e_automate';
+    }
+
+    /**
      * Enable SQL mode if currently disabled.
-     * Sets sqlMode=true via the Vue component state, then waits for reactivity to settle.
-     * Falls back to typing a SELECT query if Vue state access is unavailable.
+     * Same logic as enableSqlModeIfNeeded — delegates to it.
      */
     async enableSqlModeIfDisabled() {
-        const isSQL = await this.isSqlModeEnabled();
-        if (isSQL) {
-            testLogger.info('enableSqlModeIfDisabled: SQL mode already on — skipping');
-            return;
-        }
-        const set = await this._setSqlModeViaVue(true);
-        if (!set) {
-            // Fallback: type a SELECT query to trigger auto-detection
-            const monacoHelper = this.getMonacoEditorHelper();
-            const container = this.getQueryEditorContainer();
-            await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
-        }
-        await this.page.waitForTimeout(600);
-        testLogger.info('enableSqlModeIfDisabled: SQL mode enabled');
+        await this.enableSqlModeIfNeeded();
     }
 
     /**
@@ -7804,12 +7819,14 @@ export class LogsPage {
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
         // In that case fall back to writing SELECT directly so the editor reflects SQL mode.
+        // Use setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
+        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
+        // lands on another element after stream selection.
         const isSQLNow = await this.isSqlModeEnabled();
         if (!isSQLNow) {
-            const monacoHelper = this.getMonacoEditorHelper();
-            const container = this.getQueryEditorContainer();
-            await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
-            await this.page.waitForTimeout(600);
+            const stream = await this._getSelectedStream();
+            await this.setQueryEditorContent(`SELECT * FROM "${stream}"`);
+            await this.page.waitForTimeout(300);
         }
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
