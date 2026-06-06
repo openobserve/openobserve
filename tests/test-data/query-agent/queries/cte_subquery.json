@@ -864,14 +864,14 @@
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "0",
             "3",
             "0",
             "0.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "0",
             "3",
             "0",
@@ -1077,14 +1077,14 @@
             "372.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "72.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "168.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "72.0"
           ],
           [
             "ZONE-4",
@@ -1452,17 +1452,17 @@
         ],
         "results": [
           [
+            "https://shop.example.com/item/1001::performanceMetric",
+            "3",
+            "1"
+          ],
+          [
             "https://shop.example.com/cart::performanceMetric",
             "3",
             "1"
           ],
           [
             "https://shop.example.com/item/1002::performanceMetric",
-            "3",
-            "1"
-          ],
-          [
-            "https://shop.example.com/item/1001::performanceMetric",
             "3",
             "1"
           ]
@@ -1562,12 +1562,7 @@
         "results": [
           [
             "performanceMetric",
-            "itemPage",
-            "3"
-          ],
-          [
-            "performanceMetric",
-            "searchPage",
+            "checkoutPage",
             "3"
           ],
           [
@@ -1577,7 +1572,12 @@
           ],
           [
             "performanceMetric",
-            "checkoutPage",
+            "itemPage",
+            "3"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
             "3"
           ],
           [
@@ -1677,13 +1677,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "6",
+            "sess_002",
+            "3",
             "0"
           ],
           [
-            "sess_002",
-            "3",
+            "sess_001",
+            "6",
             "0"
           ],
           [
@@ -1784,11 +1784,11 @@
             "3"
           ],
           [
-            "E005",
+            "E002",
             "3"
           ],
           [
-            "E002",
+            "E005",
             "3"
           ]
         ],
@@ -1835,17 +1835,17 @@
         ],
         "results": [
           [
+            "checkoutPage/performanceMetric",
+            "3",
+            "1"
+          ],
+          [
             "itemPage/performanceMetric",
             "3",
             "1"
           ],
           [
             "searchPage/performanceMetric",
-            "3",
-            "1"
-          ],
-          [
-            "checkoutPage/performanceMetric",
             "3",
             "1"
           ]
@@ -1898,11 +1898,6 @@
             "1"
           ],
           [
-            "interaction",
-            "cartPage",
-            "1"
-          ],
-          [
             "performanceMetric",
             "itemPage",
             "1"
@@ -1910,6 +1905,11 @@
           [
             "performanceMetric",
             "searchPage",
+            "1"
+          ],
+          [
+            "interaction",
+            "cartPage",
             "1"
           ],
           [
@@ -1938,12 +1938,6 @@
         ],
         "results": [
           [
-            "NullPointerException at ConveyorController.handle()",
-            "3",
-            "1",
-            "3"
-          ],
-          [
             "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1",
@@ -1951,6 +1945,12 @@
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "3",
+            "1",
+            "3"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
             "3",
             "1",
             "3"
@@ -2061,12 +2061,12 @@
             "3"
           ],
           [
-            "https://shop.example.com/item/1001",
+            "https://shop.example.com/cart",
             "3",
             "3"
           ],
           [
-            "https://shop.example.com/cart",
+            "https://shop.example.com/item/1001",
             "3",
             "3"
           ]

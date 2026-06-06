@@ -98,18 +98,18 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "auto",
-            "3"
-          ],
-          [
-            "SORT-X1",
-            "manual",
-            "3"
-          ],
-          [
             "SORT-A7",
             "manual",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "manual",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "auto",
             "3"
           ],
           [
@@ -888,13 +888,13 @@
         "results": [
           [
             "mobile",
-            "navigation",
-            "2"
+            "performanceMetric",
+            "3"
           ],
           [
             "mobile",
-            "performanceMetric",
-            "3"
+            "navigation",
+            "2"
           ],
           [
             "desktop",
@@ -922,12 +922,12 @@
         "results": [
           [
             "errors",
-            "E001",
+            "E005",
             "3"
           ],
           [
             "errors",
-            "E005",
+            "E001",
             "3"
           ],
           [
@@ -1108,7 +1108,7 @@
           ],
           [
             "component_err",
-            "conveyor-driver",
+            "track-router",
             "3"
           ],
           [
@@ -1118,7 +1118,7 @@
           ],
           [
             "component_err",
-            "track-router",
+            "conveyor-driver",
             "3"
           ]
         ],
@@ -1158,7 +1158,11 @@
         ],
         "results": [
           [
-            "E005",
+            "UP-E005",
+            "3"
+          ],
+          [
+            "UP-E002",
             "3"
           ],
           [
@@ -1170,11 +1174,7 @@
             "3"
           ],
           [
-            "UP-E005",
-            "3"
-          ],
-          [
-            "UP-E002",
+            "E005",
             "3"
           ],
           [

@@ -909,17 +909,17 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "58",
-            "3"
-          ],
-          [
             "ZONE-2",
             "manual",
             "SORT-ZONE-2",
             "29",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "58",
             "3"
           ],
           [
@@ -965,11 +965,11 @@
         ],
         "results": [
           [
-            "DeleteRecord",
-            "DELETE",
+            "SearchItems",
+            "SEARCH",
             "False",
             "3",
-            "230.0"
+            "12.0"
           ],
           [
             "RerouteTrack",
@@ -986,11 +986,11 @@
             "45.0"
           ],
           [
-            "SearchItems",
-            "SEARCH",
+            "DeleteRecord",
+            "DELETE",
             "False",
             "3",
-            "12.0"
+            "230.0"
           ],
           [
             "ScanPallet",
@@ -1021,11 +1021,11 @@
         ],
         "results": [
           [
-            "AP-SOUTH-ZONE-1-MAN",
+            "US-EAST-ZONE-1-AUT",
+            "3",
             "3",
             "0",
-            "0",
-            "88.0"
+            "50.0"
           ],
           [
             "EU-WEST-ZONE-3-HYB",
@@ -1035,18 +1035,18 @@
             "200.0"
           ],
           [
-            "US-EAST-ZONE-1-AUT",
-            "3",
-            "3",
-            "0",
-            "50.0"
-          ],
-          [
             "US-WEST-ZONE-2-MAN",
             "3",
             "0",
             "0",
             "120.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-1-MAN",
+            "3",
+            "0",
+            "0",
+            "88.0"
           ],
           [
             "EU-NORTH-ZONE-4-AUT",
@@ -1420,12 +1420,12 @@
         ],
         "results": [
           [
-            "itemPage",
-            "E001"
-          ],
-          [
             "searchPage",
             "E002"
+          ],
+          [
+            "itemPage",
+            "E001"
           ],
           [
             "checkoutPage",

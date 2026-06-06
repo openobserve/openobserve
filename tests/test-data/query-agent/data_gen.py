@@ -19,7 +19,9 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
+    # Shift enough so all per-query windows (60s each) are in the past.
+    # 400 queries × 60s = 6.67h; 8h shift gives ~1.3h of headroom.
+    BASE_TS = int((_now - timedelta(hours=8)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     # --- Original 17 fields (warehouse/sorter themed) ---
