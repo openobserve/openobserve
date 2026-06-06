@@ -2578,6 +2578,9 @@ export class LogsPage {
         // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
         // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
         // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
+        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
+        // causes us to force-click the Cancel button instead of the Run button.
+        let buttonWasInCancelState = false;
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2587,13 +2590,33 @@ export class LogsPage {
                 return !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
             },
             this.queryButton,
-            { timeout: 15000 }
+            { timeout }
         ).catch(() => {
-            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, continuing');
+            buttonWasInCancelState = true;
+            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
 
-        // Click Run query
+        // Click Run query (or Cancel, if the prior search is still running)
         await btn.click({ force: true });
+
+        // If we had to force-click a Cancel button, we cancelled the in-flight search
+        // instead of starting a new one.  Wait for the Cancel to resolve, then click
+        // the Run button again to actually submit the intended query.
+        if (buttonWasInCancelState) {
+            testLogger.warn('runQueryAndWaitForResults: re-clicking Run to submit the intended query after cancel');
+            await this.page.waitForFunction(
+                (selector) => {
+                    const el = document.querySelector(selector);
+                    if (!el) return false;
+                    const text = (el.textContent || '').trim();
+                    const isDisabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
+                    return !isDisabled && !text.includes('Cancel');
+                },
+                this.queryButton,
+                { timeout: 15000 }
+            ).catch(() => {});
+            await btn.click({ force: true });
+        }
 
         // Wait for the button to enter loading/disabled state (query started)
         await this.page.waitForFunction(
@@ -2723,6 +2746,25 @@ export class LogsPage {
     }
 
     /**
+     * Wait until the log result table has at least one visible row at index 0.
+     * Useful as a data-readiness gate before asserting on specific cell content.
+     * Checks for any column in row 0 (not just "source") to be agnostic of column layout.
+     * @param {number} timeout - Max wait time in ms (default 15000)
+     * @returns {Promise<boolean>} true if a row appeared, false if timed out
+     */
+    async waitForTableHits(timeout = 15000) {
+        try {
+            await this.page.waitForFunction(
+                () => document.querySelector('[data-test^="log-table-column-0-"]') !== null,
+                { timeout },
+            );
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * SQL mode toggle was removed from the UI. These helpers are kept as no-ops so
      * any residual callers don't throw hard failures.
      */
@@ -2779,7 +2821,10 @@ export class LogsPage {
         const fields = appState?.fields || [];
         const stream = appState?.stream || 'e2e_automate';
         const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
-        const sql = allFields.length > 1
+        // Always build an explicit field list — never fall back to SELECT * when we
+        // have at least _timestamp, so assertions like "includes(_timestamp,field)"
+        // work even when interestingFieldList had only one user field.
+        const sql = allFields.length > 0
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
             : `SELECT * FROM "${stream}"`;
 
@@ -4140,6 +4185,42 @@ export class LogsPage {
         await btnLocator.click({ force: true });
     }
 
+    /**
+     * Idempotent version of clickInterestingFieldButton: only clicks if the field is
+     * NOT already marked as interesting.  Use this when the goal is to guarantee the
+     * field is in interestingFieldList, not to toggle it.  If the button's title
+     * already says "Remove from interesting fields" the field is already starred and
+     * we skip the click so we don't accidentally remove it.
+     */
+    async ensureFieldIsInteresting(field) {
+        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true).catch(() => false);
+            if (visible) {
+                const title = await btnLocator.getAttribute('title').catch(() => '');
+                if (title && title.toLowerCase().includes('remove')) {
+                    // Already interesting — nothing to do.
+                    return;
+                }
+                await btnLocator.click({ force: true });
+                return;
+            }
+            await inputLocator.fill('');
+            await inputLocator.click({ force: true });
+            await inputLocator.pressSequentially(field, { delay: 30 });
+            await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
+        }
+        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
+        const title = await btnLocator.getAttribute('title').catch(() => '');
+        if (title && title.toLowerCase().includes('remove')) {
+            return;
+        }
+        await btnLocator.click({ force: true });
+    }
+
     async expectInterestingFieldInEditor(field) {
         // Monaco tokenizes text across multiple <span> elements, so DOM-based getByText
         // with a regex can miss substrings that span token boundaries. Read the Monaco
@@ -4156,8 +4237,13 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        // Wait for Monaco editor to be available
+        // Wait for Monaco editor container to be visible
         await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for Monaco's .inputarea — only present after the editor is fully
+        // initialised (setupEditor() async load completes). This prevents the
+        // waitForFunction below from timing out on page reloads where window.monaco
+        // is not yet set when domcontentloaded fires.
+        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
@@ -5008,40 +5094,18 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Monaco's view-line divs intercept pointer events, so clicking .inputarea directly
-        // fails. Use the Monaco API via clickQueryEditor() to reliably focus the editor.
-        await this.clickQueryEditor();
+        // A truly blank SQL query is not achievable: the fullSQLMode watcher in Index.vue
+        // calls setQuery() whenever sqlMode transitions to true with an empty editor, which
+        // auto-generates "SELECT * FROM <stream>" — so Ctrl+Enter would run a valid query
+        // and return results instead of an error.
+        //
+        // Use an intentionally invalid SQL statement instead. setQuery() returns early when
+        // the current query already contains "select" (Index.vue line ~1397), so the watcher
+        // will not overwrite it. The backend receives malformed SQL and returns an error,
+        // which sets searchObj.data.errorMsg and shows the error banner.
+        await this.setQueryEditorContent('SELECT *');
+        await this.page.waitForTimeout(300);
 
-        // Select all and delete via page keyboard so Monaco handles it.
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.keyboard.press("Backspace");
-
-        // Wait for the 500ms debounce in CodeQueryEditor + SearchBar watcher to propagate.
-        // After this, searchObj.data.query = "" and sqlMode = false (cleared by watcher
-        // which detects empty editor with SQL mode on).
-        await this.page.waitForTimeout(500);
-
-        // Re-assert SQL mode so the backend receives the blank input as a SQL query
-        // (which errors) rather than a FTS match_all.
-        const set = await this._setSqlModeViaVue(true);
-        if (!set) {
-            // _setSqlModeViaVue failed — the Vue component tree may not be reachable.
-            // Fallback: write a SELECT query to trigger auto-detection, then clear it.
-            const stream = await this._getSelectedStream();
-            await this.setQueryEditorContent(`SELECT * FROM "${stream}"`);
-            await this.page.waitForTimeout(300);
-            await this.clickQueryEditor();
-            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-            await this.page.keyboard.press("Backspace");
-            await this.page.waitForTimeout(500);
-            // Force sqlMode=true now that auto-detection reset it again
-            await this._setSqlModeViaVue(true);
-        }
-
-        // Re-focus the editor after Vue state update and add a short stabilisation
-        // delay. Without this, page.keyboard.press fires before Monaco's inputarea
-        // is fully registered as the active element, so the run-query command may
-        // not fire.
         await this.clickQueryEditor();
         await this.page.waitForTimeout(100);
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
@@ -7925,25 +7989,44 @@ export class LogsPage {
         // In that case fall back to writing SELECT directly so the editor reflects SQL mode.
         // In build mode the query editor is read-only (buildModeQueryEditorDisabled=true),
         // so Monaco executeEdits is blocked by the readOnly flag. Instead, update
-        // searchObj.data.query directly via Vue state — CodeQueryEditor's props.query
-        // watcher then calls editorObj.getModel().setValue() which bypasses readOnly.
+        // searchObj.data.query directly via Vue state — use the same multi-anchor + comp.parent
+        // traversal as _setSqlModeViaVue to reliably reach the component hosting searchObj.
         const isSQLNow = await this.isSqlModeEnabled();
         if (!isSQLNow) {
             const stream = await this._getSelectedStream();
             const sql = `SELECT * FROM "${stream}"`;
             const updatedViaState = await this.page.evaluate((q) => {
-                try {
-                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                const setQuery = (el) => {
                     if (!el) return false;
                     let cur = el;
                     while (cur && cur !== document.body) {
                         const comp = cur.__vueParentComponent;
-                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                            comp.setupState.searchObj.data.query = q;
-                            comp.setupState.searchObj.data.editorValue = q;
-                            return true;
+                        if (comp) {
+                            if (comp.setupState && 'searchObj' in comp.setupState) {
+                                comp.setupState.searchObj.data.query = q;
+                                comp.setupState.searchObj.data.editorValue = q;
+                                return true;
+                            }
+                            if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
+                                comp.parent.setupState.searchObj.data.query = q;
+                                comp.parent.setupState.searchObj.data.editorValue = q;
+                                return true;
+                            }
                         }
                         cur = cur.parentElement;
+                    }
+                    return false;
+                };
+                try {
+                    const anchors = [
+                        '[data-test="logs-search-bar-refresh-btn"]',
+                        '[data-test="logs-search-bar-utilities-menu-btn"]',
+                        '[data-test="logs-search-bar-query-editor"]',
+                        '[data-test="logs-search-bar-date-time-dropdown"]',
+                    ];
+                    for (const selector of anchors) {
+                        const el = document.querySelector(selector);
+                        if (el && setQuery(el)) return true;
                     }
                     return false;
                 } catch (e) { return false; }
