@@ -675,13 +675,6 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "SORT-M3",
-            "480.0",
-            "55.2",
-            "0.0"
-          ],
-          [
             "ZONE-1",
             "SORT-X1",
             "437.5",
@@ -700,6 +693,13 @@
             "SORT-Z9",
             "610.0",
             "72.8",
+            "0.0"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "480.0",
+            "55.2",
             "0.0"
           ]
         ],
@@ -808,11 +808,11 @@
           ],
           [
             "3",
-            "deleteRecord"
+            "updateBatch"
           ],
           [
             "3",
-            "updateBatch"
+            "deleteRecord"
           ],
           [
             "3",
@@ -881,17 +881,6 @@
         ],
         "results": [
           [
-            "itemPage",
-            "SQL Injection (Param)",
-            "N/A",
-            "US",
-            "business",
-            "Mobile",
-            "Android 14",
-            "dc-east",
-            "3"
-          ],
-          [
             "cartPage",
             "Path Traversal",
             "Allowlisted",
@@ -899,6 +888,17 @@
             "business",
             "Tablet",
             "Android 13",
+            "dc-east",
+            "3"
+          ],
+          [
+            "itemPage",
+            "SQL Injection (Param)",
+            "N/A",
+            "US",
+            "business",
+            "Mobile",
+            "Android 14",
             "dc-east",
             "3"
           ]
@@ -965,6 +965,12 @@
         ],
         "results": [
           [
+            "DeleteRecord",
+            "failed",
+            "3",
+            "230.0"
+          ],
+          [
             "SearchItems",
             "ok",
             "3",
@@ -981,12 +987,6 @@
             "queued",
             "3",
             "89.0"
-          ],
-          [
-            "DeleteRecord",
-            "failed",
-            "3",
-            "230.0"
           ],
           [
             "ScanPallet",
@@ -1069,20 +1069,20 @@
             "2.5"
           ],
           [
-            "MED_LOAD",
-            "MED_TPUT",
-            "3",
-            "26.3",
-            "600",
-            "1.5"
-          ],
-          [
             "LOW_LOAD",
             "LOW_TPUT",
             "3",
             "18.5",
             "150",
             "0.5"
+          ],
+          [
+            "MED_LOAD",
+            "MED_TPUT",
+            "3",
+            "26.3",
+            "600",
+            "1.5"
           ],
           [
             "LOW_LOAD",
@@ -1102,7 +1102,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 14999000000,
-        "end_offset": 15163000000
+        "end_offset": 15073000000
       },
       "expected": {
         "columns": [
@@ -1111,16 +1111,16 @@
         ],
         "results": [
           [
-            "item_click",
-            "2"
-          ],
-          [
             "other",
-            "9"
+            "4"
           ],
           [
             "item_error",
-            "3"
+            "2"
+          ],
+          [
+            "item_click",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1132,7 +1132,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15059000000,
-        "end_offset": 15223000000
+        "end_offset": 15133000000
       },
       "expected": {
         "columns": [
@@ -1143,15 +1143,9 @@
         ],
         "results": [
           [
-            "itemPage",
-            "5",
-            "2",
-            "2"
-          ],
-          [
             "checkoutPage",
-            "3",
-            "3",
+            "2",
+            "2",
             "0"
           ]
         ],
@@ -1164,7 +1158,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15119000000,
-        "end_offset": 15283000000
+        "end_offset": 15193000000
       },
       "expected": {
         "columns": [
@@ -1177,7 +1171,7 @@
           [
             "Windows 11",
             "performanceMetric",
-            "3",
+            "2",
             "100.0"
           ]
         ],
@@ -1190,7 +1184,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15179000000,
-        "end_offset": 15343000000
+        "end_offset": 15253000000
       },
       "expected": {
         "columns": [
@@ -1201,27 +1195,27 @@
         "results": [
           [
             "https://shop.example.com/cart",
-            "3",
-            "1"
-          ],
-          [
-            "https://shop.example.com/item/1002",
-            "3",
+            "2",
             "1"
           ],
           [
             "https://shop.example.com/item/1001",
-            "3",
-            "1"
-          ],
-          [
-            "https://shop.example.com/search?q=test",
-            "3",
+            "2",
             "1"
           ],
           [
             "https://shop.example.com/item/1003",
-            "2",
+            "1",
+            "1"
+          ],
+          [
+            "https://shop.example.com/item/1002",
+            "1",
+            "1"
+          ],
+          [
+            "https://shop.example.com/search?q=test",
+            "1",
             "1"
           ]
         ],
@@ -1234,7 +1228,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15239000000,
-        "end_offset": 15403000000
+        "end_offset": 15313000000
       },
       "expected": {
         "columns": [
@@ -1247,13 +1241,13 @@
           [
             "SecurityException: u...",
             "E005",
-            "3",
+            "2",
             "1"
           ],
           [
             "NullPointerException...",
             "E001",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1266,7 +1260,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15299000000,
-        "end_offset": 15463000000
+        "end_offset": 15373000000
       },
       "expected": {
         "columns": [
@@ -1278,23 +1272,9 @@
         ],
         "results": [
           [
-            "scan-hub",
-            "itemPage",
-            "2",
-            "1450.0",
-            "1450"
-          ],
-          [
-            "zone-controller",
-            "cartPage",
-            "3",
-            "230.0",
-            "230"
-          ],
-          [
             "track-router",
             "checkoutPage",
-            "3",
+            "2",
             "89.0",
             "89"
           ]
@@ -1308,7 +1288,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15359000000,
-        "end_offset": 15523000000
+        "end_offset": 15433000000
       },
       "expected": {
         "columns": [
@@ -1319,21 +1299,21 @@
         "results": [
           [
             "other",
-            "6",
-            "1"
-          ],
-          [
-            "monitoring",
             "3",
             "1"
           ],
           [
             "purchase",
-            "3",
+            "1",
             "1"
           ],
           [
             "browse",
+            "1",
+            "1"
+          ],
+          [
+            "monitoring",
             "2",
             "1"
           ]
@@ -1347,7 +1327,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15419000000,
-        "end_offset": 15583000000
+        "end_offset": 15493000000
       },
       "expected": {
         "columns": [
@@ -1355,23 +1335,7 @@
           "cnt",
           "users"
         ],
-        "results": [
-          [
-            "E002",
-            "3",
-            "1"
-          ],
-          [
-            "E005",
-            "3",
-            "1"
-          ],
-          [
-            "E001",
-            "3",
-            "1"
-          ]
-        ],
+        "results": [],
         "results_mode": "rowsort"
       }
     },
@@ -1381,7 +1345,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15479000000,
-        "end_offset": 15643000000
+        "end_offset": 15553000000
       },
       "expected": {
         "columns": [
@@ -1395,7 +1359,7 @@
             "Android",
             "itemPage",
             "performanceMetric",
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1407,7 +1371,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15539000000,
-        "end_offset": 15703000000
+        "end_offset": 15613000000
       },
       "expected": {
         "columns": [
@@ -1419,21 +1383,15 @@
         "results": [
           [
             "Mobile",
-            "5",
-            "2",
-            "587.2"
+            "3",
+            "1",
+            "491.3333333333333"
           ],
           [
             "Tablet",
-            "3",
+            "1",
             "0",
             "230.0"
-          ],
-          [
-            "Computer",
-            "6",
-            "3",
-            "67.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1445,7 +1403,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15599000000,
-        "end_offset": 15763000000
+        "end_offset": 15673000000
       },
       "expected": {
         "columns": [
@@ -1457,27 +1415,27 @@
           [
             "fast",
             "success",
-            "3"
-          ],
-          [
-            "medium",
-            "other",
-            "3"
+            "2"
           ],
           [
             "fast",
             "error",
-            "3"
-          ],
-          [
-            "fast",
-            "other",
-            "3"
+            "2"
           ],
           [
             "timeout",
             "error",
-            "2"
+            "1"
+          ],
+          [
+            "medium",
+            "other",
+            "1"
+          ],
+          [
+            "fast",
+            "other",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1489,19 +1447,14 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15659000000,
-        "end_offset": 15823000000
+        "end_offset": 15733000000
       },
       "expected": {
         "columns": [
           "action_subcategory",
           "cnt"
         ],
-        "results": [
-          [
-            "vitalsInp",
-            "3"
-          ]
-        ],
+        "results": [],
         "results_mode": "rowsort"
       }
     },
@@ -1511,7 +1464,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15719000000,
-        "end_offset": 15883000000
+        "end_offset": 15793000000
       },
       "expected": {
         "columns": [
@@ -1524,20 +1477,20 @@
           [
             "track-router",
             "E005",
-            "3",
+            "2",
             "medium"
           ],
           [
             "sorter-engine",
             "E001",
-            "3",
+            "2",
             "medium"
           ],
           [
             "conveyor-driver",
             "E002",
-            "3",
-            "medium"
+            "1",
+            "low"
           ]
         ],
         "results_mode": "rowsort"
@@ -1549,7 +1502,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15779000000,
-        "end_offset": 15943000000
+        "end_offset": 15853000000
       },
       "expected": {
         "columns": [
@@ -1560,27 +1513,27 @@
         ],
         "results": [
           [
-            "cartPage",
-            "3",
-            "3",
-            "100.0"
-          ],
-          [
             "itemPage",
-            "5",
-            "5",
+            "3",
+            "3",
             "100.0"
           ],
           [
             "searchPage",
-            "3",
-            "3",
+            "1",
+            "1",
+            "100.0"
+          ],
+          [
+            "cartPage",
+            "1",
+            "1",
             "100.0"
           ],
           [
             "checkoutPage",
-            "3",
-            "3",
+            "2",
+            "2",
             "100.0"
           ]
         ],
@@ -1593,7 +1546,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15839000000,
-        "end_offset": 16003000000
+        "end_offset": 15913000000
       },
       "expected": {
         "columns": [
@@ -1606,31 +1559,31 @@
           [
             "dev",
             "current",
-            "3",
+            "1",
             "1"
           ],
           [
             "prod",
+            "current",
+            "1",
+            "1"
+          ],
+          [
+            "prod",
+            "legacy",
+            "2",
+            "1"
+          ],
+          [
+            "staging",
             "current",
             "2",
             "1"
           ],
           [
-            "prod",
-            "legacy",
-            "3",
-            "1"
-          ],
-          [
-            "staging",
-            "current",
-            "3",
-            "1"
-          ],
-          [
             "staging",
             "legacy",
-            "3",
+            "1",
             "1"
           ]
         ],
@@ -1643,7 +1596,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15899000000,
-        "end_offset": 16063000000
+        "end_offset": 15973000000
       },
       "expected": {
         "columns": [
@@ -1653,19 +1606,9 @@
         ],
         "results": [
           [
-            "other",
-            "desktop",
-            "3"
-          ],
-          [
-            "ios",
-            "desktop",
-            "3"
-          ],
-          [
             "android",
             "mobile",
-            "6"
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1677,7 +1620,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 15959000000,
-        "end_offset": 16123000000
+        "end_offset": 16033000000
       },
       "expected": {
         "columns": [
@@ -1689,17 +1632,17 @@
           [
             "scan",
             "performanceMetric",
-            "6"
+            "4"
           ],
           [
             "merge",
             "interaction",
-            "3"
+            "1"
           ],
           [
             "track",
             "navigation",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1711,7 +1654,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 16019000000,
-        "end_offset": 16183000000
+        "end_offset": 16093000000
       },
       "expected": {
         "columns": [
@@ -1723,19 +1666,19 @@
         "results": [
           [
             "warehouse-east",
-            "3",
-            "3",
+            "2",
+            "2",
             "100.0"
           ],
           [
-            "warehouse-west",
-            "3",
+            "warehouse-central",
+            "2",
             "0",
             "0.0"
           ],
           [
-            "warehouse-central",
-            "3",
+            "warehouse-west",
+            "1",
             "0",
             "0.0"
           ]
@@ -1749,7 +1692,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 16079000000,
-        "end_offset": 16243000000
+        "end_offset": 16153000000
       },
       "expected": {
         "columns": [
@@ -1764,8 +1707,8 @@
             "itemPage",
             "12",
             "1450",
-            "587.2",
-            "5"
+            "491.3333333333333",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1777,7 +1720,7 @@
       "category": "combined",
       "time_offset": {
         "start_offset": 16139000000,
-        "end_offset": 16303000000
+        "end_offset": 16213000000
       },
       "expected": {
         "columns": [
@@ -1791,7 +1734,7 @@
           [
             "performanceMetric",
             "itemPage",
-            "3",
+            "2",
             "1",
             "1"
           ]

@@ -83,11 +83,11 @@
             "6"
           ],
           [
-            "SORT-A7",
+            "SORT-M3",
             "3"
           ],
           [
-            "SORT-M3",
+            "SORT-A7",
             "3"
           ],
           [
@@ -441,16 +441,16 @@
             "30.1"
           ],
           [
-            "ZONE-2",
-            "0",
-            "3",
-            "22.0"
-          ],
-          [
             "ZONE-3",
             "0",
             "3",
             "26.3"
+          ],
+          [
+            "ZONE-2",
+            "0",
+            "3",
+            "22.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -690,15 +690,15 @@
             "0.0"
           ],
           [
-            "LANE-A",
-            "9",
-            "1.5",
-            "0.0"
-          ],
-          [
             "LANE-D",
             "2",
             "1.0",
+            "0.0"
+          ],
+          [
+            "LANE-A",
+            "9",
+            "1.5",
             "0.0"
           ]
         ],
@@ -728,6 +728,12 @@
             "0.7199"
           ],
           [
+            "BS-2026-B2",
+            "0.0",
+            "33.0",
+            "0.0"
+          ],
+          [
             "BS-2026-C3",
             "0.0",
             "55.2",
@@ -737,12 +743,6 @@
             "BS-2025-D4",
             "0.0",
             "72.8",
-            "0.0"
-          ],
-          [
-            "BS-2026-B2",
-            "0.0",
-            "33.0",
             "0.0"
           ]
         ],
@@ -904,6 +904,14 @@
         ],
         "results": [
           [
+            "US-WEST",
+            "3",
+            "0.0",
+            "960.0",
+            "None",
+            "3"
+          ],
+          [
             "US-EAST",
             "3",
             "450.0",
@@ -926,14 +934,6 @@
             "2175.0",
             "35.7",
             "0"
-          ],
-          [
-            "US-WEST",
-            "3",
-            "0.0",
-            "960.0",
-            "None",
-            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -991,7 +991,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 11999000000,
-        "end_offset": 12163000000
+        "end_offset": 12073000000
       },
       "expected": {
         "columns": [
@@ -1002,7 +1002,7 @@
         "results": [
           [
             "0",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1015,7 +1015,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12059000000,
-        "end_offset": 12223000000
+        "end_offset": 12133000000
       },
       "expected": {
         "columns": [
@@ -1026,7 +1026,7 @@
         "results": [
           [
             "0.0",
-            "11",
+            "6",
             "4"
           ]
         ],
@@ -1039,7 +1039,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12119000000,
-        "end_offset": 12283000000
+        "end_offset": 12193000000
       },
       "expected": {
         "columns": [
@@ -1050,7 +1050,7 @@
         "results": [
           [
             "performanceMetric",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1063,7 +1063,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12179000000,
-        "end_offset": 12343000000
+        "end_offset": 12253000000
       },
       "expected": {
         "columns": [
@@ -1083,7 +1083,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12239000000,
-        "end_offset": 12403000000
+        "end_offset": 12313000000
       },
       "expected": {
         "columns": [
@@ -1094,12 +1094,12 @@
         "results": [
           [
             "scan",
-            "6",
+            "4",
             "89.0"
           ],
           [
             "sort",
-            "3",
+            "1",
             "45.0"
           ]
         ],
@@ -1112,7 +1112,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12299000000,
-        "end_offset": 12463000000
+        "end_offset": 12373000000
       },
       "expected": {
         "columns": [
@@ -1124,7 +1124,7 @@
         "results": [
           [
             "Android 14",
-            "3",
+            "2",
             "0",
             "0"
           ]
@@ -1138,7 +1138,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12359000000,
-        "end_offset": 12523000000
+        "end_offset": 12433000000
       },
       "expected": {
         "columns": [
@@ -1149,17 +1149,17 @@
         "results": [
           [
             "track-router",
-            "3",
+            "2",
             "1"
           ],
           [
             "conveyor-driver",
-            "3",
+            "1",
             "1"
           ],
           [
             "sorter-engine",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1172,7 +1172,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12419000000,
-        "end_offset": 12583000000
+        "end_offset": 12493000000
       },
       "expected": {
         "columns": [
@@ -1182,18 +1182,18 @@
         ],
         "results": [
           [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "3",
+            "NullPointerException at ConveyorController.handle()",
+            "2",
             "1"
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "3",
+            "2",
             "1"
           ],
           [
-            "NullPointerException at ConveyorController.handle()",
-            "3",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "1",
             "1"
           ]
         ],
@@ -1206,7 +1206,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12479000000,
-        "end_offset": 12643000000
+        "end_offset": 12553000000
       },
       "expected": {
         "columns": [
@@ -1220,7 +1220,7 @@
         "results": [
           [
             "checkoutPage",
-            "3",
+            "2",
             "89",
             "89",
             "89.0",
@@ -1228,7 +1228,7 @@
           ],
           [
             "cartPage",
-            "3",
+            "1",
             "230",
             "230",
             "230.0",
@@ -1236,7 +1236,7 @@
           ],
           [
             "itemPage",
-            "3",
+            "2",
             "12",
             "12",
             "12.0",
@@ -1244,7 +1244,7 @@
           ],
           [
             "searchPage",
-            "3",
+            "1",
             "45",
             "45",
             "45.0",
@@ -1260,7 +1260,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12539000000,
-        "end_offset": 12703000000
+        "end_offset": 12613000000
       },
       "expected": {
         "columns": [
@@ -1271,7 +1271,7 @@
         "results": [
           [
             "/api/v2/sorter/scan",
-            "2",
+            "1",
             "1"
           ]
         ],
@@ -1284,7 +1284,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12599000000,
-        "end_offset": 12763000000
+        "end_offset": 12673000000
       },
       "expected": {
         "columns": [
@@ -1295,7 +1295,7 @@
         "results": [
           [
             "Mobile",
-            "2",
+            "1",
             "1"
           ]
         ],
@@ -1308,7 +1308,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12659000000,
-        "end_offset": 12823000000
+        "end_offset": 12733000000
       },
       "expected": {
         "columns": [
@@ -1319,10 +1319,10 @@
         ],
         "results": [
           [
-            "9",
-            "9",
+            "5",
+            "5",
             "0",
-            "9"
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1334,7 +1334,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12719000000,
-        "end_offset": 12883000000
+        "end_offset": 12793000000
       },
       "expected": {
         "columns": [
@@ -1345,10 +1345,10 @@
         ],
         "results": [
           [
-            "9",
-            "9",
+            "5",
+            "5",
             "0",
-            "9"
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1360,7 +1360,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12779000000,
-        "end_offset": 12943000000
+        "end_offset": 12853000000
       },
       "expected": {
         "columns": [
@@ -1371,17 +1371,17 @@
         "results": [
           [
             "track-router",
-            "3",
+            "2",
             "89.0"
           ],
           [
             "conveyor-driver",
-            "3",
+            "1",
             "45.0"
           ],
           [
             "sorter-engine",
-            "3",
+            "2",
             "12.0"
           ]
         ],
@@ -1394,7 +1394,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12839000000,
-        "end_offset": 13003000000
+        "end_offset": 12913000000
       },
       "expected": {
         "columns": [
@@ -1405,7 +1405,7 @@
         "results": [
           [
             "iOS",
-            "2",
+            "1",
             "1"
           ]
         ],
@@ -1418,7 +1418,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12899000000,
-        "end_offset": 13063000000
+        "end_offset": 12973000000
       },
       "expected": {
         "columns": [
@@ -1442,7 +1442,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 12959000000,
-        "end_offset": 13123000000
+        "end_offset": 13033000000
       },
       "expected": {
         "columns": [
@@ -1451,16 +1451,16 @@
         ],
         "results": [
           [
-            "E002",
-            "3"
+            "E001",
+            "2"
           ],
           [
             "E005",
-            "3"
+            "2"
           ],
           [
-            "E001",
-            "3"
+            "E002",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1472,7 +1472,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13019000000,
-        "end_offset": 13183000000
+        "end_offset": 13093000000
       },
       "expected": {
         "columns": [
@@ -1480,7 +1480,7 @@
         ],
         "results": [
           [
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1492,7 +1492,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13079000000,
-        "end_offset": 13243000000
+        "end_offset": 13153000000
       },
       "expected": {
         "columns": [
@@ -1505,12 +1505,12 @@
             "E005"
           ],
           [
-            "itemPage",
-            "E001"
-          ],
-          [
             "searchPage",
             "E002"
+          ],
+          [
+            "itemPage",
+            "E001"
           ]
         ],
         "results_mode": "rowsort"
@@ -1522,7 +1522,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13139000000,
-        "end_offset": 13303000000
+        "end_offset": 13213000000
       },
       "expected": {
         "columns": [
@@ -1533,12 +1533,12 @@
         "results": [
           [
             "vitalsLcp",
-            "3",
+            "2",
             "1"
           ],
           [
             "vitalsInp",
-            "3",
+            "1",
             "1"
           ]
         ],
@@ -1551,7 +1551,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13199000000,
-        "end_offset": 13363000000
+        "end_offset": 13273000000
       },
       "expected": {
         "columns": [
@@ -1561,8 +1561,8 @@
         ],
         "results": [
           [
-            "33.333333333333336",
-            "9",
+            "40.0",
+            "5",
             "3"
           ]
         ],
@@ -1575,7 +1575,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13259000000,
-        "end_offset": 13423000000
+        "end_offset": 13333000000
       },
       "expected": {
         "columns": [
@@ -1587,32 +1587,32 @@
         ],
         "results": [
           [
-            "medium",
-            "230",
-            "230",
-            "230.0",
-            "3"
-          ],
-          [
-            "low",
-            "1450",
-            "1450",
-            "1450.0",
-            "2"
-          ],
-          [
             "critical",
             "12",
             "89",
             "50.5",
-            "6"
+            "4"
           ],
           [
             "high",
             "45",
             "45",
             "45.0",
-            "3"
+            "1"
+          ],
+          [
+            "medium",
+            "230",
+            "230",
+            "230.0",
+            "1"
+          ],
+          [
+            "low",
+            "1450",
+            "1450",
+            "1450.0",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1624,7 +1624,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13319000000,
-        "end_offset": 13483000000
+        "end_offset": 13393000000
       },
       "expected": {
         "columns": [
@@ -1635,7 +1635,7 @@
         "results": [
           [
             "itemPage",
-            "2",
+            "1",
             "1"
           ]
         ],
@@ -1648,7 +1648,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13379000000,
-        "end_offset": 13543000000
+        "end_offset": 13453000000
       },
       "expected": {
         "columns": [
@@ -1659,13 +1659,13 @@
         "results": [
           [
             "itemPage",
-            "5",
-            "2"
+            "3",
+            "1"
           ],
           [
             "checkoutPage",
-            "3",
-            "3"
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1677,7 +1677,7 @@
       "category": "aggregation",
       "time_offset": {
         "start_offset": 13439000000,
-        "end_offset": 13603000000
+        "end_offset": 13513000000
       },
       "expected": {
         "columns": [
@@ -1688,13 +1688,13 @@
         "results": [
           [
             "Desktop",
-            "6",
-            "3"
+            "3",
+            "2"
           ],
           [
             "Mobile_Device",
-            "8",
-            "2"
+            "4",
+            "1"
           ]
         ],
         "results_mode": "rowsort"

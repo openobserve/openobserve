@@ -143,11 +143,11 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-2",
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "3"
           ],
           [
@@ -675,16 +675,16 @@
             "88.1"
           ],
           [
-            "ZONE-3",
-            "3",
-            "480.0",
-            "55.2"
-          ],
-          [
             "ZONE-2",
             "3",
             "320.0",
             "33.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "480.0",
+            "55.2"
           ],
           [
             "ZONE-4",
@@ -702,7 +702,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18299000000,
-        "end_offset": 18463000000
+        "end_offset": 18373000000
       },
       "expected": {
         "columns": [
@@ -711,11 +711,11 @@
         ],
         "results": [
           [
-            "3",
+            "2",
             "200"
           ],
           [
-            "3",
+            "2",
             "404"
           ]
         ],
@@ -728,7 +728,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18359000000,
-        "end_offset": 18523000000
+        "end_offset": 18433000000
       },
       "expected": {
         "columns": [
@@ -737,41 +737,6 @@
           "action_category"
         ],
         "results": [
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "E003",
-            "interaction"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "E002",
-            "performanceMetric"
-          ],
-          [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "E005",
-            "performanceMetric"
-          ],
-          [
-            "NullPointerException at ConveyorController.handle()",
-            "E001",
-            "performanceMetric"
-          ],
-          [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "E004",
-            "navigation"
-          ],
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "E003",
-            "interaction"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "E002",
-            "performanceMetric"
-          ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
             "E005",
@@ -817,7 +782,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18419000000,
-        "end_offset": 18583000000
+        "end_offset": 18493000000
       },
       "expected": {
         "columns": [
@@ -1280,374 +1245,6 @@
             "None",
             "createAccount",
             "dc-west"
-          ],
-          [
-            "Q309 warehouse event record 2",
-            "stdout",
-            "PL-003",
-            "55.2",
-            "42.5",
-            "480.0",
-            "SORT-M3",
-            "LANE-C",
-            "ZONE-3",
-            "CC-GAMMA",
-            "200",
-            "1.5",
-            "168",
-            "hybrid",
-            "500",
-            "3",
-            "3",
-            "26.3",
-            "BS-2026-C3",
-            "track TRK-abc-def diverted to LANE-B",
-            "ACK batch batchIdList:BT-003-2026 confirmed",
-            "INFO: batch sync completed, url=http://warehouse.local/sync",
-            "E003",
-            "@warehouse-Linux-sort-v3",
-            "UP-E003",
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "{\"message\":{\"endpoint\":\"deleteRecord\",\"status\":\"failed\"}}",
-            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
-            "[\"cid-ghi789\",\"status-failed\"]",
-            "DeleteRecord",
-            "10.12.0.103",
-            "192.168.1.12",
-            "dev",
-            "medium",
-            "api",
-            "EU-WEST",
-            "Python-urllib/3.11 warehouse-client",
-            "DeleteRecord",
-            "site-tok-03",
-            "/api/v1/warehouse/delete",
-            "PUT",
-            "204",
-            "internal",
-            "denied",
-            "task-g7h8i9",
-            "ent-003-wh",
-            "capacity",
-            "mismatch",
-            "allow",
-            "disabled",
-            "merge",
-            "/config/zone/ZONE-1.yaml",
-            "230",
-            "warehouse-north",
-            "false",
-            "v2.0.0",
-            "BIN-C3",
-            "2048",
-            "zone-controller",
-            "rk-warehouse-003",
-            "tok-wh-mno345pqr678",
-            "warehouse-track",
-            "variant_b",
-            "ctl_xyz789",
-            "200",
-            "1800000",
-            "200000",
-            "0.08",
-            "Tablet",
-            "cartPage",
-            "interaction",
-            "vitalsCls",
-            "https://shop.example.com/search?q=test",
-            "SSR",
-            "Android 13",
-            "Path Traversal",
-            "GET /search?q=test",
-            "python-requests/2.31",
-            "/ip/192.168.1.1",
-            "DigitalOcean LLC",
-            "UK",
-            "business",
-            "[\"credential_stuffing\",\"rapid_login\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-001",
-            "Allowlisted",
-            "verifyPayment",
-            "dc-east"
-          ],
-          [
-            "Q309 warehouse event record 3 ACK batch batchIdList:Q309-3",
-            "stderr",
-            "PL-004",
-            "72.8",
-            "58.0",
-            "610.0",
-            "SORT-Z9",
-            "LANE-D",
-            "ZONE-4",
-            "CC-DELTA",
-            "340",
-            "2.0",
-            "360",
-            "auto",
-            "750",
-            "1",
-            "4",
-            "30.1",
-            "BS-2025-D4",
-            "batch XYZ789 timed out at checkpoint 3",
-            "ACK batch batchIdList:BT-004-2026 validated",
-            "WARN: lane jam detected at conveyor_segment=3",
-            "E004",
-            "@warehouse-Windows-sort-v1",
-            "UP-E004",
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
-            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
-            "[\"cid-jkl012\",\"status-ok\"]",
-            "ScanPallet",
-            "10.12.0.104",
-            "192.168.1.13",
-            "prod",
-            "low",
-            "scheduler",
-            "EU-NORTH",
-            "Java/17.0.8 (OpenJDK; sorter-agent)",
-            "ScanPallet",
-            "site-syd-04",
-            "/api/v2/sorter/scan",
-            "DELETE",
-            "400",
-            "inbound",
-            "pass",
-            "task-j0k1l2",
-            "ent-004-wh",
-            "latency",
-            "jam",
-            "allow",
-            "active",
-            "track",
-            "/logs/warehouse/error.log",
-            "1450",
-            "warehouse-south",
-            "false",
-            "v2.1.3",
-            "BIN-D4",
-            "4096",
-            "scan-hub",
-            "rk-warehouse-004",
-            "tok-wh-stu901vwx234",
-            "warehouse-merge",
-            "variant_c",
-            "var1_pqr012",
-            "500",
-            "3200000",
-            "95000",
-            "0.25",
-            "Mobile",
-            "itemPage",
-            "navigation",
-            "clickEvent",
-            "https://shop.example.com/item/1003",
-            "SSR",
-            "Mac OS X (iPhone)",
-            "CSRF Attempt",
-            "GET /favicon.ico",
-            "Mozilla/5.0 Firefox/121",
-            "/admin/login",
-            "FastHost Ltd",
-            "US",
-            "business",
-            "[\"session_hijack\",\"ip_hop\"]",
-            "sess_003",
-            "suspicious",
-            "true",
-            "ORD-003",
-            "None",
-            "updateCart",
-            "dc-central"
-          ],
-          [
-            "Q309 warehouse event record 4",
-            "stdout",
-            "PL-005",
-            "88.1",
-            "75.3",
-            "725.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "88",
-            "2.5",
-            "720",
-            "manual",
-            "1000",
-            "2",
-            "5",
-            "35.7",
-            "BS-2026-A1",
-            "segment 17 weight threshold exceeded",
-            "ACK batch batchIdList:BT-005-2026 processed",
-            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
-            "E005",
-            "@warehouse-Android-scan-v2",
-            "UP-E005",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}",
-            "[\"{\\\"name\\\":\\\"precheck\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"execute\\\",\\\"startTime\\\":\\\"50\\\"}\", \"{\\\"name\\\":\\\"finalize\\\",\\\"startTime\\\":\\\"300\\\"}\"]",
-            "[\"cid-mno345\",\"status-retrying\"]",
-            "RerouteTrack",
-            "10.12.0.105",
-            "192.168.1.14",
-            "staging",
-            "critical",
-            "dashboard",
-            "AP-SOUTH",
-            "Go-http-client/2.0 conveyor-monitor",
-            "RerouteTrack",
-            "site-sfo-05",
-            "/api/v2/sorter/reroute",
-            "GET",
-            "404",
-            "outbound",
-            "pass",
-            "task-m3n4o5",
-            "ent-005-wh",
-            "security",
-            "timeout",
-            "block",
-            "passive",
-            "scan",
-            "/data/sorter/input.dat",
-            "89",
-            "warehouse-central",
-            "true",
-            "v2.2.0",
-            "BIN-E5",
-            "8192",
-            "track-router",
-            "rk-warehouse-005",
-            "tok-wh-yza567bcd890",
-            "warehouse-sync",
-            "control",
-            "var2_mno345",
-            "404",
-            "900000",
-            "300000",
-            "0.03",
-            "Computer",
-            "checkoutPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/cart",
-            "CSR",
-            "Windows 11",
-            "SSRF Probe",
-            "POST /admin/config",
-            "PostmanRuntime/7.35",
-            "/api/v2/search",
-            "CloudServe GmbH",
-            "BR",
-            "hosting",
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-004",
-            "None",
-            "createAccount",
-            "dc-west"
-          ],
-          [
-            "Q310 warehouse event record 2",
-            "stdout",
-            "PL-003",
-            "55.2",
-            "42.5",
-            "480.0",
-            "SORT-M3",
-            "LANE-C",
-            "ZONE-3",
-            "CC-GAMMA",
-            "200",
-            "1.5",
-            "168",
-            "hybrid",
-            "500",
-            "3",
-            "3",
-            "26.3",
-            "BS-2026-C3",
-            "track TRK-abc-def diverted to LANE-B",
-            "ACK batch batchIdList:BT-003-2026 confirmed",
-            "INFO: batch sync completed, url=http://warehouse.local/sync",
-            "E003",
-            "@warehouse-Linux-sort-v3",
-            "UP-E003",
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "{\"message\":{\"endpoint\":\"deleteRecord\",\"status\":\"failed\"}}",
-            "[\"{\\\"name\\\":\\\"boot\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"calibrate\\\",\\\"startTime\\\":\\\"100\\\"}\"]",
-            "[\"cid-ghi789\",\"status-failed\"]",
-            "DeleteRecord",
-            "10.12.0.103",
-            "192.168.1.12",
-            "dev",
-            "medium",
-            "api",
-            "EU-WEST",
-            "Python-urllib/3.11 warehouse-client",
-            "DeleteRecord",
-            "site-tok-03",
-            "/api/v1/warehouse/delete",
-            "PUT",
-            "204",
-            "internal",
-            "denied",
-            "task-g7h8i9",
-            "ent-003-wh",
-            "capacity",
-            "mismatch",
-            "allow",
-            "disabled",
-            "merge",
-            "/config/zone/ZONE-1.yaml",
-            "230",
-            "warehouse-north",
-            "false",
-            "v2.0.0",
-            "BIN-C3",
-            "2048",
-            "zone-controller",
-            "rk-warehouse-003",
-            "tok-wh-mno345pqr678",
-            "warehouse-track",
-            "variant_b",
-            "ctl_xyz789",
-            "200",
-            "1800000",
-            "200000",
-            "0.08",
-            "Tablet",
-            "cartPage",
-            "interaction",
-            "vitalsCls",
-            "https://shop.example.com/search?q=test",
-            "SSR",
-            "Android 13",
-            "Path Traversal",
-            "GET /search?q=test",
-            "python-requests/2.31",
-            "/ip/192.168.1.1",
-            "DigitalOcean LLC",
-            "UK",
-            "business",
-            "[\"credential_stuffing\",\"rapid_login\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-001",
-            "Allowlisted",
-            "verifyPayment",
-            "dc-east"
           ]
         ],
         "results_mode": "rowsort",
@@ -1661,7 +1258,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18479000000,
-        "end_offset": 18643000000
+        "end_offset": 18553000000
       },
       "expected": {
         "columns": [
@@ -1670,31 +1267,6 @@
           "exception_message"
         ],
         "results": [
-          [
-            "zone-controller",
-            "interaction",
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch"
-          ],
-          [
-            "conveyor-driver",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "sorter-engine",
-            "performanceMetric",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "zone-controller",
-            "interaction",
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch"
-          ],
-          [
-            "conveyor-driver",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
           [
             "sorter-engine",
             "performanceMetric",
@@ -1725,7 +1297,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18539000000,
-        "end_offset": 18703000000
+        "end_offset": 18613000000
       },
       "expected": {
         "columns": [
@@ -1748,21 +1320,6 @@
             "Android 14",
             "performanceMetric",
             "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "iOS 17.4",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "Android 14",
-            "performanceMetric",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "iOS 17.4",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
           ]
         ],
         "results_mode": "rowsort"
@@ -1774,7 +1331,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18599000000,
-        "end_offset": 18763000000
+        "end_offset": 18673000000
       },
       "expected": {
         "columns": [
@@ -1784,48 +1341,6 @@
           "event_detail"
         ],
         "results": [
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "UP-E003",
-            "E003",
-            "track TRK-abc-def diverted to LANE-B"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "UP-E002",
-            "E002",
-            "segment 42 scan completed with no defects"
-          ],
-          [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "UP-E005",
-            "E005",
-            "segment 17 weight threshold exceeded"
-          ],
-          [
-            "NullPointerException at ConveyorController.handle()",
-            "UP-E001",
-            "E001",
-            "batch ABC123 processed successfully"
-          ],
-          [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "UP-E004",
-            "E004",
-            "batch XYZ789 timed out at checkpoint 3"
-          ],
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "UP-E003",
-            "E003",
-            "track TRK-abc-def diverted to LANE-B"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "UP-E002",
-            "E002",
-            "segment 42 scan completed with no defects"
-          ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
             "UP-E005",
@@ -1878,7 +1393,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18659000000,
-        "end_offset": 18823000000
+        "end_offset": 18733000000
       },
       "expected": {
         "columns": [
@@ -2157,98 +1672,6 @@
             "None",
             "createAccount",
             "dc-west"
-          ],
-          [
-            "Q313 warehouse event record 4",
-            "stdout",
-            "PL-005",
-            "88.1",
-            "75.3",
-            "725.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "88",
-            "2.5",
-            "720",
-            "manual",
-            "1000",
-            "2",
-            "5",
-            "35.7",
-            "BS-2026-A1",
-            "segment 17 weight threshold exceeded",
-            "ACK batch batchIdList:BT-005-2026 processed",
-            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
-            "E005",
-            "@warehouse-Android-scan-v2",
-            "UP-E005",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}",
-            "[\"{\\\"name\\\":\\\"precheck\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"execute\\\",\\\"startTime\\\":\\\"50\\\"}\", \"{\\\"name\\\":\\\"finalize\\\",\\\"startTime\\\":\\\"300\\\"}\"]",
-            "[\"cid-mno345\",\"status-retrying\"]",
-            "RerouteTrack",
-            "10.12.0.105",
-            "192.168.1.14",
-            "staging",
-            "critical",
-            "dashboard",
-            "AP-SOUTH",
-            "Go-http-client/2.0 conveyor-monitor",
-            "RerouteTrack",
-            "site-sfo-05",
-            "/api/v2/sorter/reroute",
-            "GET",
-            "404",
-            "outbound",
-            "pass",
-            "task-m3n4o5",
-            "ent-005-wh",
-            "security",
-            "timeout",
-            "block",
-            "passive",
-            "scan",
-            "/data/sorter/input.dat",
-            "89",
-            "warehouse-central",
-            "true",
-            "v2.2.0",
-            "BIN-E5",
-            "8192",
-            "track-router",
-            "rk-warehouse-005",
-            "tok-wh-yza567bcd890",
-            "warehouse-sync",
-            "control",
-            "var2_mno345",
-            "404",
-            "900000",
-            "300000",
-            "0.03",
-            "Computer",
-            "checkoutPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/cart",
-            "CSR",
-            "Windows 11",
-            "SSRF Probe",
-            "POST /admin/config",
-            "PostmanRuntime/7.35",
-            "/api/v2/search",
-            "CloudServe GmbH",
-            "BR",
-            "hosting",
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-004",
-            "None",
-            "createAccount",
-            "dc-west"
           ]
         ],
         "results_mode": "rowsort",
@@ -2261,7 +1684,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18719000000,
-        "end_offset": 18883000000
+        "end_offset": 18793000000
       },
       "expected": {
         "columns": [
@@ -2540,98 +1963,6 @@
             "None",
             "updateItems",
             "dc-east"
-          ],
-          [
-            "Q315 warehouse event record 0 ACK batch batchIdList:Q315-0",
-            "stdout",
-            "PL-001",
-            "12.5",
-            "10.0",
-            "150.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "50",
-            "0.5",
-            "24",
-            "auto",
-            "100",
-            "1",
-            "1",
-            "18.5",
-            "BS-2026-A1",
-            "batch ABC123 processed successfully",
-            "ACK batch batchIdList:BT-001-2026 received",
-            "GET /api/v1/warehouse/status 200 OK",
-            "E001",
-            "@warehouse-Android-sort-v1",
-            "UP-E001",
-            "NullPointerException at ConveyorController.handle()",
-            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}",
-            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
-            "[\"cid-abc123\",\"status-ok\"]",
-            "SearchItems",
-            "10.12.0.101",
-            "192.168.1.10",
-            "prod",
-            "critical",
-            "dashboard",
-            "US-EAST",
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "SearchItems",
-            "site-nyc-01",
-            "/api/v1/warehouse/search",
-            "GET",
-            "200",
-            "inbound",
-            "pass",
-            "task-a1b2c3",
-            "ent-001-wh",
-            "latency",
-            "timeout",
-            "allow",
-            "active",
-            "scan",
-            "/logs/warehouse/app.log",
-            "12",
-            "warehouse-east",
-            "false",
-            "v1.0.0",
-            "BIN-A1",
-            "512",
-            "sorter-engine",
-            "rk-warehouse-001",
-            "tok-wh-abc123def456",
-            "warehouse-sort",
-            "control",
-            "sess_abc123",
-            "200",
-            "1200000",
-            "80000",
-            "0.05",
-            "Mobile",
-            "itemPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/item/1001",
-            "SSR",
-            "Android 14",
-            "SQL Injection (Param)",
-            "GET /api/users?id=1",
-            "Mozilla/5.0 Chrome/120",
-            "/api/v1/data",
-            "Acme Corp",
-            "US",
-            "business",
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "sess_001",
-            "None",
-            "false",
-            "ORD-001",
-            "None",
-            "updateItems",
-            "dc-east"
           ]
         ],
         "results_mode": "rowsort",
@@ -2644,7 +1975,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18779000000,
-        "end_offset": 18943000000
+        "end_offset": 18853000000
       },
       "expected": {
         "columns": [
@@ -2653,21 +1984,6 @@
           "visitor_session_id"
         ],
         "results": [
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "E003",
-            "sess_002"
-          ],
-          [
-            "NullPointerException at ConveyorController.handle()",
-            "E001",
-            "sess_001"
-          ],
-          [
-            "DataIntegrityException: pallet_id PL-002 checksum mismatch",
-            "E003",
-            "sess_002"
-          ],
           [
             "NullPointerException at ConveyorController.handle()",
             "E001",
@@ -2693,7 +2009,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18839000000,
-        "end_offset": 19003000000
+        "end_offset": 18913000000
       },
       "expected": {
         "columns": [
@@ -2702,16 +2018,6 @@
           "page_slug"
         ],
         "results": [
-          [
-            "Q317 warehouse event record 0 ACK batch batchIdList:Q317-0",
-            "performanceMetric",
-            "itemPage"
-          ],
-          [
-            "Q316 warehouse event record 3 ACK batch batchIdList:Q316-3",
-            "navigation",
-            "itemPage"
-          ],
           [
             "Q316 warehouse event record 0 ACK batch batchIdList:Q316-0",
             "performanceMetric",
@@ -2737,7 +2043,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18899000000,
-        "end_offset": 19063000000
+        "end_offset": 18973000000
       },
       "expected": {
         "columns": [
@@ -2746,21 +2052,6 @@
           "error_code"
         ],
         "results": [
-          [
-            "iOS 17.4",
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "E002"
-          ],
-          [
-            "Android 14",
-            "NullPointerException at ConveyorController.handle()",
-            "E001"
-          ],
-          [
-            "iOS 17.4",
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "E002"
-          ],
           [
             "Android 14",
             "NullPointerException at ConveyorController.handle()",
@@ -2786,7 +2077,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 18959000000,
-        "end_offset": 19123000000
+        "end_offset": 19033000000
       },
       "expected": {
         "columns": [
@@ -2795,12 +2086,12 @@
         ],
         "results": [
           [
-            "conveyor-driver",
-            "E002"
-          ],
-          [
             "sorter-engine",
             "E001"
+          ],
+          [
+            "conveyor-driver",
+            "E002"
           ]
         ],
         "results_mode": "rowsort"
@@ -2812,7 +2103,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19019000000,
-        "end_offset": 19183000000
+        "end_offset": 19093000000
       },
       "expected": {
         "columns": [
@@ -3091,98 +2382,6 @@
             "None",
             "createAccount",
             "dc-west"
-          ],
-          [
-            "Q319 warehouse event record 4",
-            "stdout",
-            "PL-005",
-            "88.1",
-            "75.3",
-            "725.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "88",
-            "2.5",
-            "720",
-            "manual",
-            "1000",
-            "2",
-            "5",
-            "35.7",
-            "BS-2026-A1",
-            "segment 17 weight threshold exceeded",
-            "ACK batch batchIdList:BT-005-2026 processed",
-            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
-            "E005",
-            "@warehouse-Android-scan-v2",
-            "UP-E005",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}",
-            "[\"{\\\"name\\\":\\\"precheck\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"execute\\\",\\\"startTime\\\":\\\"50\\\"}\", \"{\\\"name\\\":\\\"finalize\\\",\\\"startTime\\\":\\\"300\\\"}\"]",
-            "[\"cid-mno345\",\"status-retrying\"]",
-            "RerouteTrack",
-            "10.12.0.105",
-            "192.168.1.14",
-            "staging",
-            "critical",
-            "dashboard",
-            "AP-SOUTH",
-            "Go-http-client/2.0 conveyor-monitor",
-            "RerouteTrack",
-            "site-sfo-05",
-            "/api/v2/sorter/reroute",
-            "GET",
-            "404",
-            "outbound",
-            "pass",
-            "task-m3n4o5",
-            "ent-005-wh",
-            "security",
-            "timeout",
-            "block",
-            "passive",
-            "scan",
-            "/data/sorter/input.dat",
-            "89",
-            "warehouse-central",
-            "true",
-            "v2.2.0",
-            "BIN-E5",
-            "8192",
-            "track-router",
-            "rk-warehouse-005",
-            "tok-wh-yza567bcd890",
-            "warehouse-sync",
-            "control",
-            "var2_mno345",
-            "404",
-            "900000",
-            "300000",
-            "0.03",
-            "Computer",
-            "checkoutPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/cart",
-            "CSR",
-            "Windows 11",
-            "SSRF Probe",
-            "POST /admin/config",
-            "PostmanRuntime/7.35",
-            "/api/v2/search",
-            "CloudServe GmbH",
-            "BR",
-            "hosting",
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-004",
-            "None",
-            "createAccount",
-            "dc-west"
           ]
         ],
         "results_mode": "rowsort",
@@ -3195,7 +2394,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19079000000,
-        "end_offset": 19243000000
+        "end_offset": 19153000000
       },
       "expected": {
         "columns": [
@@ -3203,14 +2402,6 @@
           "action_category"
         ],
         "results": [
-          [
-            "Q321 warehouse event record 0 ACK batch batchIdList:Q321-0",
-            "performanceMetric"
-          ],
-          [
-            "Q320 warehouse event record 3 ACK batch batchIdList:Q320-3",
-            "navigation"
-          ],
           [
             "Q320 warehouse event record 0 ACK batch batchIdList:Q320-0",
             "performanceMetric"
@@ -3233,7 +2424,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19139000000,
-        "end_offset": 19303000000
+        "end_offset": 19213000000
       },
       "expected": {
         "columns": [
@@ -3696,190 +2887,6 @@
             "None",
             "updateItems",
             "dc-east"
-          ],
-          [
-            "Q321 warehouse event record 4",
-            "stdout",
-            "PL-005",
-            "88.1",
-            "75.3",
-            "725.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "88",
-            "2.5",
-            "720",
-            "manual",
-            "1000",
-            "2",
-            "5",
-            "35.7",
-            "BS-2026-A1",
-            "segment 17 weight threshold exceeded",
-            "ACK batch batchIdList:BT-005-2026 processed",
-            "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry",
-            "E005",
-            "@warehouse-Android-scan-v2",
-            "UP-E005",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}",
-            "[\"{\\\"name\\\":\\\"precheck\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"execute\\\",\\\"startTime\\\":\\\"50\\\"}\", \"{\\\"name\\\":\\\"finalize\\\",\\\"startTime\\\":\\\"300\\\"}\"]",
-            "[\"cid-mno345\",\"status-retrying\"]",
-            "RerouteTrack",
-            "10.12.0.105",
-            "192.168.1.14",
-            "staging",
-            "critical",
-            "dashboard",
-            "AP-SOUTH",
-            "Go-http-client/2.0 conveyor-monitor",
-            "RerouteTrack",
-            "site-sfo-05",
-            "/api/v2/sorter/reroute",
-            "GET",
-            "404",
-            "outbound",
-            "pass",
-            "task-m3n4o5",
-            "ent-005-wh",
-            "security",
-            "timeout",
-            "block",
-            "passive",
-            "scan",
-            "/data/sorter/input.dat",
-            "89",
-            "warehouse-central",
-            "true",
-            "v2.2.0",
-            "BIN-E5",
-            "8192",
-            "track-router",
-            "rk-warehouse-005",
-            "tok-wh-yza567bcd890",
-            "warehouse-sync",
-            "control",
-            "var2_mno345",
-            "404",
-            "900000",
-            "300000",
-            "0.03",
-            "Computer",
-            "checkoutPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/cart",
-            "CSR",
-            "Windows 11",
-            "SSRF Probe",
-            "POST /admin/config",
-            "PostmanRuntime/7.35",
-            "/api/v2/search",
-            "CloudServe GmbH",
-            "BR",
-            "hosting",
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "sess_002",
-            "None",
-            "false",
-            "ORD-004",
-            "None",
-            "createAccount",
-            "dc-west"
-          ],
-          [
-            "Q322 warehouse event record 0 ACK batch batchIdList:Q322-0",
-            "stdout",
-            "PL-001",
-            "12.5",
-            "10.0",
-            "150.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "50",
-            "0.5",
-            "24",
-            "auto",
-            "100",
-            "1",
-            "1",
-            "18.5",
-            "BS-2026-A1",
-            "batch ABC123 processed successfully",
-            "ACK batch batchIdList:BT-001-2026 received",
-            "GET /api/v1/warehouse/status 200 OK",
-            "E001",
-            "@warehouse-Android-sort-v1",
-            "UP-E001",
-            "NullPointerException at ConveyorController.handle()",
-            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}",
-            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
-            "[\"cid-abc123\",\"status-ok\"]",
-            "SearchItems",
-            "10.12.0.101",
-            "192.168.1.10",
-            "prod",
-            "critical",
-            "dashboard",
-            "US-EAST",
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "SearchItems",
-            "site-nyc-01",
-            "/api/v1/warehouse/search",
-            "GET",
-            "200",
-            "inbound",
-            "pass",
-            "task-a1b2c3",
-            "ent-001-wh",
-            "latency",
-            "timeout",
-            "allow",
-            "active",
-            "scan",
-            "/logs/warehouse/app.log",
-            "12",
-            "warehouse-east",
-            "false",
-            "v1.0.0",
-            "BIN-A1",
-            "512",
-            "sorter-engine",
-            "rk-warehouse-001",
-            "tok-wh-abc123def456",
-            "warehouse-sort",
-            "control",
-            "sess_abc123",
-            "200",
-            "1200000",
-            "80000",
-            "0.05",
-            "Mobile",
-            "itemPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/item/1001",
-            "SSR",
-            "Android 14",
-            "SQL Injection (Param)",
-            "GET /api/users?id=1",
-            "Mozilla/5.0 Chrome/120",
-            "/api/v1/data",
-            "Acme Corp",
-            "US",
-            "business",
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "sess_001",
-            "None",
-            "false",
-            "ORD-001",
-            "None",
-            "updateItems",
-            "dc-east"
           ]
         ],
         "results_mode": "rowsort",
@@ -3893,7 +2900,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19199000000,
-        "end_offset": 19363000000
+        "end_offset": 19273000000
       },
       "expected": {
         "columns": [
@@ -3901,18 +2908,6 @@
           "exception_message"
         ],
         "results": [
-          [
-            "conveyor-driver",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "sorter-engine",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "conveyor-driver",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
           [
             "sorter-engine",
             "NullPointerException at ConveyorController.handle()"
@@ -3935,7 +2930,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19259000000,
-        "end_offset": 19423000000
+        "end_offset": 19333000000
       },
       "expected": {
         "columns": [
@@ -3958,21 +2953,6 @@
             "Android 14",
             "performanceMetric",
             "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "iOS 17.4",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "Android 14",
-            "performanceMetric",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "iOS 17.4",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
           ]
         ],
         "results_mode": "rowsort"
@@ -3984,7 +2964,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19319000000,
-        "end_offset": 19483000000
+        "end_offset": 19393000000
       },
       "expected": {
         "columns": [
@@ -4080,98 +3060,6 @@
           "datacenter"
         ],
         "results": [
-          [
-            "Q325 warehouse event record 0 ACK batch batchIdList:Q325-0",
-            "stdout",
-            "PL-001",
-            "12.5",
-            "10.0",
-            "150.0",
-            "SORT-X1",
-            "LANE-A",
-            "ZONE-1",
-            "CC-ALPHA",
-            "50",
-            "0.5",
-            "24",
-            "auto",
-            "100",
-            "1",
-            "1",
-            "18.5",
-            "BS-2026-A1",
-            "batch ABC123 processed successfully",
-            "ACK batch batchIdList:BT-001-2026 received",
-            "GET /api/v1/warehouse/status 200 OK",
-            "E001",
-            "@warehouse-Android-sort-v1",
-            "UP-E001",
-            "NullPointerException at ConveyorController.handle()",
-            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}",
-            "[\"{\\\"name\\\":\\\"init\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"process\\\",\\\"startTime\\\":\\\"150\\\"}\"]",
-            "[\"cid-abc123\",\"status-ok\"]",
-            "SearchItems",
-            "10.12.0.101",
-            "192.168.1.10",
-            "prod",
-            "critical",
-            "dashboard",
-            "US-EAST",
-            "Mozilla/5.0 WarehouseScanner/1.0",
-            "SearchItems",
-            "site-nyc-01",
-            "/api/v1/warehouse/search",
-            "GET",
-            "200",
-            "inbound",
-            "pass",
-            "task-a1b2c3",
-            "ent-001-wh",
-            "latency",
-            "timeout",
-            "allow",
-            "active",
-            "scan",
-            "/logs/warehouse/app.log",
-            "12",
-            "warehouse-east",
-            "false",
-            "v1.0.0",
-            "BIN-A1",
-            "512",
-            "sorter-engine",
-            "rk-warehouse-001",
-            "tok-wh-abc123def456",
-            "warehouse-sort",
-            "control",
-            "sess_abc123",
-            "200",
-            "1200000",
-            "80000",
-            "0.05",
-            "Mobile",
-            "itemPage",
-            "performanceMetric",
-            "vitalsLcp",
-            "https://shop.example.com/item/1001",
-            "SSR",
-            "Android 14",
-            "SQL Injection (Param)",
-            "GET /api/users?id=1",
-            "Mozilla/5.0 Chrome/120",
-            "/api/v1/data",
-            "Acme Corp",
-            "US",
-            "business",
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "sess_001",
-            "None",
-            "false",
-            "ORD-001",
-            "None",
-            "updateItems",
-            "dc-east"
-          ],
           [
             "Q324 warehouse event record 0 ACK batch batchIdList:Q324-0",
             "stdout",
@@ -4367,7 +3255,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19379000000,
-        "end_offset": 19543000000
+        "end_offset": 19453000000
       },
       "expected": {
         "columns": [
@@ -4376,16 +3264,6 @@
           "error_code"
         ],
         "results": [
-          [
-            "sess_001",
-            "NullPointerException at ConveyorController.handle()",
-            "E001"
-          ],
-          [
-            "sess_003",
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
-            "E004"
-          ],
           [
             "sess_001",
             "NullPointerException at ConveyorController.handle()",
@@ -4411,7 +3289,7 @@
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19439000000,
-        "end_offset": 19603000000
+        "end_offset": 19513000000
       },
       "expected": {
         "columns": [
@@ -4437,22 +3315,6 @@
           ],
           [
             "abc123",
-            "performanceMetric"
-          ],
-          [
-            "def456",
-            "performanceMetric"
-          ],
-          [
-            "mno345",
-            "performanceMetric"
-          ],
-          [
-            "abc123",
-            "performanceMetric"
-          ],
-          [
-            "def456",
             "performanceMetric"
           ]
         ],

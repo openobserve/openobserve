@@ -59,13 +59,13 @@
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "3",
             "0",
             "0.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "3",
             "0",
             "0.0"
@@ -349,7 +349,7 @@
             "6",
             "437.5",
             "27.1",
-            "auto",
+            "manual",
             "3"
           ],
           [
@@ -1423,7 +1423,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16199000000,
-        "end_offset": 16363000000
+        "end_offset": 16273000000
       },
       "expected": {
         "columns": [
@@ -1435,9 +1435,9 @@
         "results": [
           [
             "Android",
-            "3",
+            "2",
             "1",
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1449,7 +1449,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16259000000,
-        "end_offset": 16423000000
+        "end_offset": 16333000000
       },
       "expected": {
         "columns": [
@@ -1459,18 +1459,18 @@
         ],
         "results": [
           [
+            "https://shop.example.com/item/1001::performanceMetric",
+            "2",
+            "1"
+          ],
+          [
             "https://shop.example.com/cart::performanceMetric",
-            "3",
+            "2",
             "1"
           ],
           [
             "https://shop.example.com/item/1002::performanceMetric",
-            "3",
-            "1"
-          ],
-          [
-            "https://shop.example.com/item/1001::performanceMetric",
-            "3",
+            "1",
             "1"
           ]
         ],
@@ -1483,7 +1483,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16319000000,
-        "end_offset": 16483000000
+        "end_offset": 16393000000
       },
       "expected": {
         "columns": [
@@ -1495,7 +1495,7 @@
         "results": [
           [
             "navigation",
-            "2",
+            "1",
             "1",
             "1450.0"
           ]
@@ -1509,7 +1509,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16379000000,
-        "end_offset": 16543000000
+        "end_offset": 16453000000
       },
       "expected": {
         "columns": [
@@ -1519,18 +1519,18 @@
         ],
         "results": [
           [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "3",
+            "NullPointerException at ConveyorController.handle()",
+            "2",
             "1"
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "3",
+            "2",
             "1"
           ],
           [
-            "NullPointerException at ConveyorController.handle()",
-            "3",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "1",
             "1"
           ]
         ],
@@ -1543,7 +1543,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16439000000,
-        "end_offset": 16603000000
+        "end_offset": 16513000000
       },
       "expected": {
         "columns": [
@@ -1565,7 +1565,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16499000000,
-        "end_offset": 16663000000
+        "end_offset": 16573000000
       },
       "expected": {
         "columns": [
@@ -1575,29 +1575,29 @@
         ],
         "results": [
           [
-            "interaction",
-            "cartPage",
-            "3"
+            "performanceMetric",
+            "itemPage",
+            "2"
           ],
           [
             "performanceMetric",
             "checkoutPage",
-            "3"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
-            "3"
-          ],
-          [
-            "performanceMetric",
-            "searchPage",
-            "3"
+            "2"
           ],
           [
             "navigation",
             "itemPage",
-            "2"
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "interaction",
+            "cartPage",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1609,7 +1609,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16559000000,
-        "end_offset": 16723000000
+        "end_offset": 16633000000
       },
       "expected": {
         "columns": [
@@ -1619,7 +1619,7 @@
         "results": [
           [
             "exception",
-            "9"
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1631,7 +1631,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16619000000,
-        "end_offset": 16783000000
+        "end_offset": 16693000000
       },
       "expected": {
         "columns": [
@@ -1643,7 +1643,7 @@
         "results": [
           [
             "https://shop.example.com/item/1003",
-            "2",
+            "1",
             "1",
             "1450.0"
           ]
@@ -1657,7 +1657,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16679000000,
-        "end_offset": 16843000000
+        "end_offset": 16753000000
       },
       "expected": {
         "columns": [
@@ -1668,7 +1668,7 @@
         "results": [
           [
             "sorter-engine",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1681,7 +1681,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16739000000,
-        "end_offset": 16903000000
+        "end_offset": 16813000000
       },
       "expected": {
         "columns": [
@@ -1692,18 +1692,18 @@
         "results": [
           [
             "sess_002",
-            "3",
+            "2",
             "0"
           ],
           [
             "sess_001",
-            "6",
+            "3",
             "0"
           ],
           [
             "sess_003",
             "0",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1715,7 +1715,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16799000000,
-        "end_offset": 16963000000
+        "end_offset": 16873000000
       },
       "expected": {
         "columns": [
@@ -1728,7 +1728,7 @@
           [
             "Android",
             "itemPage",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -1741,7 +1741,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16859000000,
-        "end_offset": 17023000000
+        "end_offset": 16933000000
       },
       "expected": {
         "columns": [
@@ -1752,28 +1752,28 @@
         "results": [
           [
             "fast",
-            "unknown",
-            "3"
+            "ok",
+            "2"
           ],
           [
             "fast",
             "client_error",
-            "3"
+            "2"
           ],
           [
             "fast",
-            "ok",
-            "3"
+            "unknown",
+            "1"
           ],
           [
             "normal",
             "unknown",
-            "3"
+            "1"
           ],
           [
             "degraded",
             "client_error",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1785,7 +1785,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16919000000,
-        "end_offset": 17083000000
+        "end_offset": 16993000000
       },
       "expected": {
         "columns": [
@@ -1794,16 +1794,16 @@
         ],
         "results": [
           [
-            "E001",
-            "3"
+            "E005",
+            "2"
           ],
           [
-            "E005",
-            "3"
+            "E001",
+            "2"
           ],
           [
             "E002",
-            "3"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1815,7 +1815,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 16979000000,
-        "end_offset": 17143000000
+        "end_offset": 17053000000
       },
       "expected": {
         "columns": [
@@ -1827,7 +1827,7 @@
           [
             "itemPage",
             "performanceMetric",
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1839,7 +1839,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17039000000,
-        "end_offset": 17203000000
+        "end_offset": 17113000000
       },
       "expected": {
         "columns": [
@@ -1849,18 +1849,18 @@
         ],
         "results": [
           [
-            "searchPage/performanceMetric",
-            "3",
+            "itemPage/performanceMetric",
+            "2",
             "1"
           ],
           [
             "checkoutPage/performanceMetric",
-            "3",
+            "2",
             "1"
           ],
           [
-            "itemPage/performanceMetric",
-            "3",
+            "searchPage/performanceMetric",
+            "1",
             "1"
           ]
         ],
@@ -1873,7 +1873,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17099000000,
-        "end_offset": 17263000000
+        "end_offset": 17173000000
       },
       "expected": {
         "columns": [
@@ -1884,8 +1884,8 @@
         "results": [
           [
             "itemPage",
-            "2",
-            "3"
+            "1",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1897,7 +1897,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17159000000,
-        "end_offset": 17323000000
+        "end_offset": 17233000000
       },
       "expected": {
         "columns": [
@@ -1941,7 +1941,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17219000000,
-        "end_offset": 17383000000
+        "end_offset": 17293000000
       },
       "expected": {
         "columns": [
@@ -1953,21 +1953,21 @@
         "results": [
           [
             "NullPointerException at ConveyorController.handle()",
-            "3",
+            "2",
             "1",
-            "3"
+            "2"
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "3",
+            "2",
             "1",
-            "3"
+            "2"
           ],
           [
             "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "3",
             "1",
-            "3"
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1979,7 +1979,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17279000000,
-        "end_offset": 17443000000
+        "end_offset": 17353000000
       },
       "expected": {
         "columns": [
@@ -1990,7 +1990,7 @@
         "results": [
           [
             "Android",
-            "3",
+            "2",
             "100.0"
           ]
         ],
@@ -2003,7 +2003,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17339000000,
-        "end_offset": 17503000000
+        "end_offset": 17413000000
       },
       "expected": {
         "columns": [
@@ -2014,20 +2014,20 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "3",
-            "89.0",
-            "3"
+            "itemPage",
+            "1",
+            "1450.0",
+            "1"
           ],
           [
-            "itemPage",
+            "checkoutPage",
             "2",
-            "1450.0",
+            "89.0",
             "2"
           ],
           [
             "cartPage",
-            "3",
+            "1",
             "230.0",
             "0"
           ]
@@ -2041,7 +2041,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17399000000,
-        "end_offset": 17563000000
+        "end_offset": 17473000000
       },
       "expected": {
         "columns": [
@@ -2053,7 +2053,7 @@
         "results": [
           [
             "cartPage",
-            "3",
+            "1",
             "1",
             "230.0"
           ]
@@ -2067,7 +2067,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17459000000,
-        "end_offset": 17623000000
+        "end_offset": 17533000000
       },
       "expected": {
         "columns": [
@@ -2078,18 +2078,18 @@
         "results": [
           [
             "https://shop.example.com/cart",
-            "3",
-            "3"
-          ],
-          [
-            "https://shop.example.com/item/1002",
-            "3",
-            "3"
+            "2",
+            "2"
           ],
           [
             "https://shop.example.com/item/1001",
-            "3",
-            "3"
+            "2",
+            "2"
+          ],
+          [
+            "https://shop.example.com/item/1002",
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -2101,7 +2101,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17519000000,
-        "end_offset": 17683000000
+        "end_offset": 17593000000
       },
       "expected": {
         "columns": [
@@ -2111,11 +2111,11 @@
         "results": [
           [
             "track-router",
-            "3"
+            "2"
           ],
           [
             "sorter-engine",
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2127,7 +2127,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17579000000,
-        "end_offset": 17743000000
+        "end_offset": 17653000000
       },
       "expected": {
         "columns": [
@@ -2138,7 +2138,7 @@
         "results": [
           [
             "E001",
-            "3",
+            "2",
             "1"
           ]
         ],
@@ -2151,7 +2151,7 @@
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 17639000000,
-        "end_offset": 17803000000
+        "end_offset": 17713000000
       },
       "expected": {
         "columns": [
@@ -2162,13 +2162,8 @@
         "results": [
           [
             "itemPage",
-            "5",
-            "587.2"
-          ],
-          [
-            "cartPage",
             "3",
-            "230.0"
+            "491.3333333333333"
           ]
         ],
         "results_mode": "rowsort"

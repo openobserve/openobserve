@@ -910,9 +910,9 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "SORT-ZONE-1",
-            "29",
+            "58",
             "3"
           ],
           [
@@ -923,17 +923,17 @@
             "3"
           ],
           [
-            "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
+            "ZONE-1",
+            "manual",
+            "SORT-ZONE-1",
             "29",
             "3"
           ],
           [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "58",
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
             "3"
           ],
           [
@@ -979,18 +979,18 @@
             "45.0"
           ],
           [
-            "DeleteRecord",
-            "DELETE",
-            "False",
-            "3",
-            "230.0"
-          ],
-          [
             "SearchItems",
             "SEARCH",
             "False",
             "3",
             "12.0"
+          ],
+          [
+            "DeleteRecord",
+            "DELETE",
+            "False",
+            "3",
+            "230.0"
           ],
           [
             "ScanPallet",
@@ -1065,7 +1065,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 21899000000,
-        "end_offset": 22063000000
+        "end_offset": 21973000000
       },
       "expected": {
         "columns": [
@@ -1092,22 +1092,6 @@
           [
             "performanceMetric-vitalsLcp :: NullPointerException at ConveyorController.handle()",
             "sess_001"
-          ],
-          [
-            "performanceMetric-vitalsInp :: TimeoutException: lane LANE-A did not respond within 5000ms",
-            "sess_001"
-          ],
-          [
-            "performanceMetric-vitalsLcp :: SecurityException: unauthorized access to control_center CC-ALPHA",
-            "sess_002"
-          ],
-          [
-            "performanceMetric-vitalsLcp :: NullPointerException at ConveyorController.handle()",
-            "sess_001"
-          ],
-          [
-            "performanceMetric-vitalsInp :: TimeoutException: lane LANE-A did not respond within 5000ms",
-            "sess_001"
           ]
         ],
         "results_mode": "rowsort"
@@ -1119,7 +1103,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 21959000000,
-        "end_offset": 22123000000
+        "end_offset": 22033000000
       },
       "expected": {
         "columns": [
@@ -1146,22 +1130,6 @@
           [
             "NullPointerException at ConveyorController.handle()",
             "https://shop.example.com/item/1001"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "https://shop.example.com/item/1002"
-          ],
-          [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "https://shop.example.com/cart"
-          ],
-          [
-            "NullPointerException at ConveyorController.handle()",
-            "https://shop.example.com/item/1001"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "https://shop.example.com/item/1002"
           ]
         ],
         "results_mode": "rowsort"
@@ -1173,7 +1141,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22019000000,
-        "end_offset": 22183000000
+        "end_offset": 22093000000
       },
       "expected": {
         "columns": [
@@ -1206,26 +1174,6 @@
             "E001",
             "nullpointerexception at conveyorcontroller.handle()",
             "performanceMetric"
-          ],
-          [
-            "E002",
-            "timeoutexception: lane lane-a did not respond within 5000ms",
-            "performanceMetric"
-          ],
-          [
-            "E005",
-            "securityexception: unauthorized access to control_center cc-alpha",
-            "performanceMetric"
-          ],
-          [
-            "E001",
-            "nullpointerexception at conveyorcontroller.handle()",
-            "performanceMetric"
-          ],
-          [
-            "E002",
-            "timeoutexception: lane lane-a did not respond within 5000ms",
-            "performanceMetric"
           ]
         ],
         "results_mode": "rowsort"
@@ -1237,7 +1185,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22079000000,
-        "end_offset": 22243000000
+        "end_offset": 22153000000
       },
       "expected": {
         "columns": [
@@ -1264,22 +1212,6 @@
           [
             "NullPointerException at Convey...",
             "E001"
-          ],
-          [
-            "TimeoutException: lane LANE-A ...",
-            "E002"
-          ],
-          [
-            "SecurityException: unauthorize...",
-            "E005"
-          ],
-          [
-            "NullPointerException at Convey...",
-            "E001"
-          ],
-          [
-            "TimeoutException: lane LANE-A ...",
-            "E002"
           ]
         ],
         "results_mode": "rowsort"
@@ -1291,7 +1223,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22139000000,
-        "end_offset": 22303000000
+        "end_offset": 22213000000
       },
       "expected": {
         "columns": [
@@ -1301,11 +1233,11 @@
         "results": [
           [
             "itemPage/performanceMetric",
-            "3"
+            "2"
           ],
           [
             "itemPage/navigation",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1317,7 +1249,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22199000000,
-        "end_offset": 22363000000
+        "end_offset": 22273000000
       },
       "expected": {
         "columns": [
@@ -1325,14 +1257,6 @@
           "error_code"
         ],
         "results": [
-          [
-            "performanceMetric",
-            "E005"
-          ],
-          [
-            "performanceMetric",
-            "E001"
-          ],
           [
             "performanceMetric",
             "E005"
@@ -1359,7 +1283,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22259000000,
-        "end_offset": 22423000000
+        "end_offset": 22333000000
       },
       "expected": {
         "columns": [
@@ -1367,10 +1291,6 @@
           "short_msg"
         ],
         "results": [
-          [
-            "sorter",
-            "NullPointerERR at ConveyorController.handle()"
-          ],
           [
             "sorter",
             "NullPointerERR at ConveyorController.handle()"
@@ -1389,7 +1309,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22319000000,
-        "end_offset": 22483000000
+        "end_offset": 22393000000
       },
       "expected": {
         "columns": [
@@ -1399,7 +1319,7 @@
         "results": [
           [
             "long_msg",
-            "9"
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1411,7 +1331,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22379000000,
-        "end_offset": 22543000000
+        "end_offset": 22453000000
       },
       "expected": {
         "columns": [
@@ -1420,16 +1340,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "E005"
-          ],
-          [
             "itemPage",
             "E001"
           ],
           [
             "searchPage",
             "E002"
+          ],
+          [
+            "checkoutPage",
+            "E005"
           ]
         ],
         "results_mode": "rowsort"
@@ -1441,7 +1361,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22439000000,
-        "end_offset": 22603000000
+        "end_offset": 22513000000
       },
       "expected": {
         "columns": [
@@ -1449,10 +1369,6 @@
           "visitor_session_id"
         ],
         "results": [
-          [
-            "https://shop.example.com/item/1001 | NullPointerException at ConveyorController.handle()",
-            "sess_001"
-          ],
           [
             "https://shop.example.com/item/1001 | NullPointerException at ConveyorController.handle()",
             "sess_001"
@@ -1471,7 +1387,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22499000000,
-        "end_offset": 22663000000
+        "end_offset": 22573000000
       },
       "expected": {
         "columns": [
@@ -1498,22 +1414,6 @@
           [
             "PERFORMANCEMETRIC:e001",
             "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "PERFORMANCEMETRIC:e002",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "PERFORMANCEMETRIC:e005",
-            "SecurityException: unauthorized access to control_center CC-ALPHA"
-          ],
-          [
-            "PERFORMANCEMETRIC:e001",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "PERFORMANCEMETRIC:e002",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
           ]
         ],
         "results_mode": "rowsort"
@@ -1525,7 +1425,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22559000000,
-        "end_offset": 22723000000
+        "end_offset": 22633000000
       },
       "expected": {
         "columns": [
@@ -1552,22 +1452,6 @@
           [
             "NullPointerException at C... [E001]",
             "performanceMetric"
-          ],
-          [
-            "TimeoutException: lane LA... [E002]",
-            "performanceMetric"
-          ],
-          [
-            "SecurityException: unauth... [E005]",
-            "performanceMetric"
-          ],
-          [
-            "NullPointerException at C... [E001]",
-            "performanceMetric"
-          ],
-          [
-            "TimeoutException: lane LA... [E002]",
-            "performanceMetric"
           ]
         ],
         "results_mode": "rowsort"
@@ -1579,19 +1463,13 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22619000000,
-        "end_offset": 22783000000
+        "end_offset": 22693000000
       },
       "expected": {
         "columns": [
           "exception_message"
         ],
         "results": [
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
           [
             "TimeoutException: lane LANE-A did not respond within 5000ms"
           ]
@@ -1605,7 +1483,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22679000000,
-        "end_offset": 22843000000
+        "end_offset": 22753000000
       },
       "expected": {
         "columns": [
@@ -1613,10 +1491,6 @@
           "latency_ms"
         ],
         "results": [
-          [
-            "itemPage -> navigation -> clickEvent",
-            "1450"
-          ],
           [
             "itemPage -> navigation -> clickEvent",
             "1450"
@@ -1631,7 +1505,7 @@
       "category": "string_functions",
       "time_offset": {
         "start_offset": 22739000000,
-        "end_offset": 22903000000
+        "end_offset": 22813000000
       },
       "expected": {
         "columns": [
@@ -1640,11 +1514,6 @@
           "action_category"
         ],
         "results": [
-          [
-            "https://shop.example.com/item/1001?GET",
-            "sess_001",
-            "performanceMetric"
-          ],
           [
             "https://shop.example.com/item/1001?GET",
             "sess_001",

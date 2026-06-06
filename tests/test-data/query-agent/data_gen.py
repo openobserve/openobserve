@@ -601,7 +601,11 @@ def make_record(ts, idx, qid):
 
 
 def build_dataset(num_queries=400):
-    """Generate deterministic records for queries Q001-Q{num_queries}."""
+    """Generate deterministic records for queries Q001-Q{num_queries}.
+
+    Each query gets 5 records spaced 18 seconds apart within its own
+    non-overlapping 60-second time window.
+    """
     records = []
     for qi in range(1, num_queries + 1):
         qid = f"Q{qi:03d}"

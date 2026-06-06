@@ -16,15 +16,15 @@ QUERIES_DIR = Path(__file__).parent / "queries"
 # ── Time offset formula ────────────────────────────────────────────────────
 # For query index qi (1-indexed, qi = int(qid[1:])):
 #   base = BASE_TS + (qi-1) * 60_000_000
-#   10 records at ts = base + i * 18_000_000  (i=0..9)
+#   5 records at ts = base + i * 18_000_000  (i=0..4)
 #   start_offset = (qi-1)*60_000_000 - 1_000_000
-#   end_offset   = (qi-1)*60_000_000 + 9*18_000_000 + 1_000_000
+#   end_offset   = (qi-1)*60_000_000 + 4*18_000_000 + 1_000_000
 
 def time_offset(qi):
     """Return start/end offsets (microseconds) for query index *qi* (1-indexed)."""
     return {
         "start_offset": (qi - 1) * 60_000_000 - 1_000_000,
-        "end_offset": (qi - 1) * 60_000_000 + 9 * 18_000_000 + 1_000_000
+        "end_offset": (qi - 1) * 60_000_000 + 4 * 18_000_000 + 1_000_000
     }
 
 def make_entry(qid, category, sql):

@@ -406,17 +406,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
+            "ZONE-2",
             "3",
-            "480.0",
+            "320.0",
             "0.0",
             "0.0",
             "0.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "3",
-            "320.0",
+            "480.0",
             "0.0",
             "0.0",
             "0.0"
@@ -1060,7 +1060,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 20999000000,
-        "end_offset": 21163000000
+        "end_offset": 21073000000
       },
       "expected": {
         "columns": [
@@ -1070,9 +1070,9 @@
         ],
         "results": [
           [
-            "33.333333333333336",
+            "40.0",
             "0.0",
-            "9"
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1084,7 +1084,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21059000000,
-        "end_offset": 21223000000
+        "end_offset": 21133000000
       },
       "expected": {
         "columns": [
@@ -1094,12 +1094,6 @@
           "min_latency"
         ],
         "results": [
-          [
-            "checkoutPage",
-            "89.0",
-            "89",
-            "89"
-          ],
           [
             "itemPage",
             "12.0",
@@ -1111,6 +1105,12 @@
             "45.0",
             "45",
             "45"
+          ],
+          [
+            "checkoutPage",
+            "89.0",
+            "89",
+            "89"
           ]
         ],
         "results_mode": "rowsort"
@@ -1122,7 +1122,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21119000000,
-        "end_offset": 21283000000
+        "end_offset": 21193000000
       },
       "expected": {
         "columns": [
@@ -1133,8 +1133,8 @@
         "results": [
           [
             "77",
-            "48.666666666666664",
-            "9"
+            "49.4",
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1146,7 +1146,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21179000000,
-        "end_offset": 21343000000
+        "end_offset": 21253000000
       },
       "expected": {
         "columns": [
@@ -1156,9 +1156,9 @@
         ],
         "results": [
           [
-            "31.541859312489635",
-            "48.666666666666664",
-            "9"
+            "34.50565171098787",
+            "49.4",
+            "5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1170,7 +1170,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21239000000,
-        "end_offset": 21403000000
+        "end_offset": 21313000000
       },
       "expected": {
         "columns": [
@@ -1190,7 +1190,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21299000000,
-        "end_offset": 21463000000
+        "end_offset": 21373000000
       },
       "expected": {
         "columns": [
@@ -1200,24 +1200,24 @@
         ],
         "results": [
           [
-            "500.0",
-            "600.0",
-            "5"
-          ],
-          [
             "0.0",
             "100.0",
-            "3"
+            "2"
           ],
           [
             "200.0",
             "300.0",
+            "1"
+          ],
+          [
+            "400.0",
+            "500.0",
             "3"
           ],
           [
             "0.0",
             "100.0",
-            "3"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1229,7 +1229,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21359000000,
-        "end_offset": 21523000000
+        "end_offset": 21433000000
       },
       "expected": {
         "columns": [
@@ -1241,17 +1241,17 @@
           [
             "track-router",
             "100.0",
-            "3"
+            "2"
           ],
           [
             "conveyor-driver",
             "0.0",
-            "3"
+            "1"
           ],
           [
             "sorter-engine",
             "0.0",
-            "3"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1263,7 +1263,7 @@
       "category": "math_functions",
       "time_offset": {
         "start_offset": 21419000000,
-        "end_offset": 21583000000
+        "end_offset": 21493000000
       },
       "expected": {
         "columns": [
@@ -1275,11 +1275,11 @@
         ],
         "results": [
           [
-            "9",
-            "438.0",
-            "30270.0",
-            "48.666666666666664",
-            "994.8888888888891"
+            "5",
+            "247.0",
+            "18155.0",
+            "49.4",
+            "1190.6400000000003"
           ]
         ],
         "results_mode": "rowsort"

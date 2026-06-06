@@ -31,36 +31,6 @@
             "1"
           ],
           [
-            "SORT-Z9",
-            "610.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "610.0",
-            "2",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "2",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "3",
-            "1"
-          ],
-          [
             "SORT-X1",
             "725.0",
             "1",
@@ -95,6 +65,36 @@
             "150.0",
             "6",
             "2"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "2",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "2",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "3",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1027,7 +1027,7 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "3",
             "6",
             "50.0",
@@ -1035,7 +1035,7 @@
           ],
           [
             "ZONE-1",
-            "auto",
+            "manual",
             "3",
             "6",
             "50.0",
@@ -2579,7 +2579,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23519000000,
-        "end_offset": 23683000000
+        "end_offset": 23593000000
       },
       "expected": {
         "columns": [
@@ -2603,13 +2603,6 @@
             "itemPage",
             "NullPointerException at ConveyorController.handle()",
             "2"
-          ],
-          [
-            "sess_001",
-            "performanceMetric",
-            "itemPage",
-            "NullPointerException at ConveyorController.handle()",
-            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -2621,7 +2614,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23579000000,
-        "end_offset": 23743000000
+        "end_offset": 23653000000
       },
       "expected": {
         "columns": [
@@ -2634,7 +2627,7 @@
           [
             "itemPage",
             "Mac OS X (iPhone)",
-            "2",
+            "1",
             "1"
           ]
         ],
@@ -2647,7 +2640,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23639000000,
-        "end_offset": 23803000000
+        "end_offset": 23713000000
       },
       "expected": {
         "columns": [
@@ -2668,12 +2661,6 @@
             "12",
             "12",
             "0"
-          ],
-          [
-            "performanceMetric",
-            "12",
-            "12",
-            "0"
           ]
         ],
         "results_mode": "rowsort",
@@ -2687,7 +2674,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23699000000,
-        "end_offset": 23863000000
+        "end_offset": 23773000000
       },
       "expected": {
         "columns": [
@@ -2698,13 +2685,6 @@
           "rn"
         ],
         "results": [
-          [
-            "sess_001",
-            "performanceMetric",
-            "itemPage",
-            "E001",
-            "3"
-          ],
           [
             "sess_001",
             "performanceMetric",
@@ -2729,7 +2709,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23759000000,
-        "end_offset": 23923000000
+        "end_offset": 23833000000
       },
       "expected": {
         "columns": [
@@ -2742,11 +2722,6 @@
             "itemPage",
             "1",
             "1"
-          ],
-          [
-            "itemPage",
-            "1",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2758,7 +2733,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23819000000,
-        "end_offset": 23983000000
+        "end_offset": 23893000000
       },
       "expected": {
         "columns": [
@@ -2783,7 +2758,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23879000000,
-        "end_offset": 24043000000
+        "end_offset": 23953000000
       },
       "expected": {
         "columns": [
@@ -2793,18 +2768,18 @@
         ],
         "results": [
           [
-            "E005",
-            "3",
+            "E001",
+            "2",
             "1"
           ],
           [
-            "E001",
+            "E005",
             "2",
-            "2"
+            "1"
           ],
           [
             "E002",
-            "2",
+            "1",
             "2"
           ]
         ],
@@ -2817,7 +2792,7 @@
       "category": "window",
       "time_offset": {
         "start_offset": 23939000000,
-        "end_offset": 24103000000
+        "end_offset": 24013000000
       },
       "expected": {
         "columns": [

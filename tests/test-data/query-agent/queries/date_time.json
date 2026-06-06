@@ -518,15 +518,6 @@
         "results": [
           [
             "1780736700000000",
-            "ZONE-3",
-            "1",
-            "480.0",
-            "26.3",
-            "42.5",
-            "200"
-          ],
-          [
-            "1780736700000000",
             "ZONE-2",
             "1",
             "320.0",
@@ -536,15 +527,6 @@
           ],
           [
             "1780736700000000",
-            "ZONE-1",
-            "1",
-            "725.0",
-            "35.7",
-            "75.3",
-            "88"
-          ],
-          [
-            "1780736640000000",
             "ZONE-3",
             "1",
             "480.0",
@@ -553,7 +535,7 @@
             "200"
           ],
           [
-            "1780736640000000",
+            "1780736700000000",
             "ZONE-1",
             "1",
             "725.0",
@@ -572,15 +554,6 @@
           ],
           [
             "1780736640000000",
-            "ZONE-2",
-            "1",
-            "320.0",
-            "22.0",
-            "25.0",
-            "120"
-          ],
-          [
-            "1780736580000000",
             "ZONE-3",
             "1",
             "480.0",
@@ -589,6 +562,24 @@
             "200"
           ],
           [
+            "1780736640000000",
+            "ZONE-1",
+            "1",
+            "725.0",
+            "35.7",
+            "75.3",
+            "88"
+          ],
+          [
+            "1780736640000000",
+            "ZONE-2",
+            "1",
+            "320.0",
+            "22.0",
+            "25.0",
+            "120"
+          ],
+          [
             "1780736580000000",
             "ZONE-2",
             "1",
@@ -596,6 +587,15 @@
             "22.0",
             "25.0",
             "120"
+          ],
+          [
+            "1780736580000000",
+            "ZONE-4",
+            "1",
+            "610.0",
+            "30.1",
+            "58.0",
+            "340"
           ],
           [
             "1780736580000000",
@@ -608,12 +608,12 @@
           ],
           [
             "1780736580000000",
-            "ZONE-4",
+            "ZONE-3",
             "1",
-            "610.0",
-            "30.1",
-            "58.0",
-            "340"
+            "480.0",
+            "26.3",
+            "42.5",
+            "200"
           ]
         ],
         "results_mode": "rowsort"
@@ -643,15 +643,15 @@
           ],
           [
             "first_minute",
-            "ZONE-3",
-            "3",
-            "480.0"
-          ],
-          [
-            "first_minute",
             "ZONE-2",
             "3",
             "320.0"
+          ],
+          [
+            "first_minute",
+            "ZONE-3",
+            "3",
+            "480.0"
           ],
           [
             "first_minute",
@@ -669,7 +669,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17699000000,
-        "end_offset": 17863000000
+        "end_offset": 17773000000
       },
       "expected": {
         "columns": [
@@ -714,34 +714,6 @@
             "sess_001",
             "performanceMetric",
             "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "1780742778000000",
-            "1780743198000000",
-            "sess_001",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
-          ],
-          [
-            "1780742832000000",
-            "1780743252000000",
-            "sess_002",
-            "performanceMetric",
-            "SecurityException: unauthorized access to control_center CC-ALPHA"
-          ],
-          [
-            "1780742820000000",
-            "1780743240000000",
-            "sess_001",
-            "performanceMetric",
-            "NullPointerException at ConveyorController.handle()"
-          ],
-          [
-            "1780742838000000",
-            "1780743258000000",
-            "sess_001",
-            "performanceMetric",
-            "TimeoutException: lane LANE-A did not respond within 5000ms"
           ]
         ],
         "results_mode": "rowsort"
@@ -753,7 +725,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17759000000,
-        "end_offset": 17923000000
+        "end_offset": 17833000000
       },
       "expected": {
         "columns": [
@@ -763,10 +735,6 @@
         "results": [
           [
             "1780743120000000",
-            "1"
-          ],
-          [
-            "1780743180000000",
             "1"
           ]
         ],
@@ -779,7 +747,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17819000000,
-        "end_offset": 17983000000
+        "end_offset": 17893000000
       },
       "expected": {
         "columns": [
@@ -791,15 +759,15 @@
         "results": [
           [
             "performanceMetric",
-            "9",
+            "5",
             "1780743180000000",
-            "1780743318000000"
+            "1780743252000000"
           ],
           [
             "navigation",
-            "2",
+            "1",
             "1780743234000000",
-            "1780743294000000"
+            "1780743234000000"
           ]
         ],
         "results_mode": "rowsort"
@@ -811,7 +779,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17879000000,
-        "end_offset": 18043000000
+        "end_offset": 17953000000
       },
       "expected": {
         "columns": [
@@ -820,11 +788,6 @@
           "component_name"
         ],
         "results": [
-          [
-            "checkoutPage-performanceMetric",
-            "89",
-            "track-router"
-          ],
           [
             "checkoutPage-performanceMetric",
             "89",
@@ -845,7 +808,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17939000000,
-        "end_offset": 18103000000
+        "end_offset": 18013000000
       },
       "expected": {
         "columns": [
@@ -856,11 +819,6 @@
         "results": [
           [
             "1780743240000000",
-            "iOS",
-            "1"
-          ],
-          [
-            "1780743360000000",
             "iOS",
             "1"
           ]
@@ -874,7 +832,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 17999000000,
-        "end_offset": 18163000000
+        "end_offset": 18073000000
       },
       "expected": {
         "columns": [
@@ -907,26 +865,6 @@
             "1780743432000000.0",
             "1",
             "1"
-          ],
-          [
-            "1780743438000000.0",
-            "1",
-            "1"
-          ],
-          [
-            "1780743480000000.0",
-            "1",
-            "1"
-          ],
-          [
-            "1780743492000000.0",
-            "1",
-            "1"
-          ],
-          [
-            "1780743498000000.0",
-            "1",
-            "1"
           ]
         ],
         "results_mode": "rowsort",
@@ -939,7 +877,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 18059000000,
-        "end_offset": 18223000000
+        "end_offset": 18133000000
       },
       "expected": {
         "columns": [
@@ -962,34 +900,10 @@
             "89"
           ],
           [
-            "sess_002",
-            "performanceMetric",
-            "checkoutPage",
-            "89"
-          ],
-          [
             "sess_001",
             "performanceMetric",
             "searchPage",
             "45"
-          ],
-          [
-            "sess_001",
-            "performanceMetric",
-            "searchPage",
-            "45"
-          ],
-          [
-            "sess_001",
-            "performanceMetric",
-            "searchPage",
-            "45"
-          ],
-          [
-            "sess_001",
-            "performanceMetric",
-            "itemPage",
-            "12"
           ],
           [
             "sess_001",
@@ -1013,7 +927,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 18119000000,
-        "end_offset": 18283000000
+        "end_offset": 18193000000
       },
       "expected": {
         "columns": [
@@ -1023,30 +937,6 @@
           "latency_ms"
         ],
         "results": [
-          [
-            "https://shop.example.com/item/1002",
-            "performanceMetric",
-            "201",
-            "45"
-          ],
-          [
-            "https://shop.example.com/cart",
-            "performanceMetric",
-            "404",
-            "89"
-          ],
-          [
-            "https://shop.example.com/item/1001",
-            "performanceMetric",
-            "200",
-            "12"
-          ],
-          [
-            "https://shop.example.com/item/1002",
-            "performanceMetric",
-            "201",
-            "45"
-          ],
           [
             "https://shop.example.com/cart",
             "performanceMetric",
@@ -1087,7 +977,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 18179000000,
-        "end_offset": 18343000000
+        "end_offset": 18253000000
       },
       "expected": {
         "columns": [
@@ -1120,30 +1010,6 @@
             "performanceMetric",
             "itemPage",
             "E001"
-          ],
-          [
-            "Android 13",
-            "interaction",
-            "cartPage",
-            "E003"
-          ],
-          [
-            "Mac OS X (iPhone)",
-            "navigation",
-            "itemPage",
-            "E004"
-          ],
-          [
-            "Android 14",
-            "performanceMetric",
-            "itemPage",
-            "E001"
-          ],
-          [
-            "Android 13",
-            "interaction",
-            "cartPage",
-            "E003"
           ]
         ],
         "results_mode": "rowsort"
@@ -1155,7 +1021,7 @@
       "category": "date_time",
       "time_offset": {
         "start_offset": 18239000000,
-        "end_offset": 18403000000
+        "end_offset": 18313000000
       },
       "expected": {
         "columns": [
@@ -1166,11 +1032,6 @@
         "results": [
           [
             "1780743654000000.0",
-            "itemPage",
-            "1"
-          ],
-          [
-            "1780743714000000.0",
             "itemPage",
             "1"
           ]
