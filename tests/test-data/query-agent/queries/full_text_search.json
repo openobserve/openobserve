@@ -777,6 +777,25 @@
         "results": [],
         "results_mode": "rowsort"
       }
+    },
+    {
+      "id": "Q172",
+      "sql": "SELECT page_slug, COUNT(_timestamp) as cnt, order_ref as \"key\",\n  (CASE WHEN auth_result = filter_result THEN 'new' ELSE 'old' END) as \"session\"\nFROM \"{stream}\"\nWHERE (match_all('warehouse') AND page_slug = 'itemPage')\n  AND bot_flag IS NULL\n  AND passthrough_flag = 'false'\n  AND (info_tag IS NULL OR info_tag != 'Allowlisted')\n  AND ((order_ref IS NULL OR order_ref != 'ORD-001') AND (order_ref IS NULL OR order_ref != 'ORD-002'))\n  AND (user_agent_str IS NULL OR user_agent_str != 'curl/7.88.1')\n  AND status_code = '200'\n  AND graphql_operation = 'verifyPayment'\n  AND (user_agent_str NOT LIKE '%bot%' AND user_agent_str NOT LIKE '%test%' AND user_agent_str NOT LIKE '%curl%')\nGROUP BY \"key\", page_slug, \"session\"\nHAVING (cnt > 1 AND \"session\" = 'new')\nORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 10259000000,
+        "end_offset": 10423000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt",
+          "key",
+          "session"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
     }
   ],
   "last_query_id": 82

@@ -53,13 +53,13 @@
             "66.66999816894531"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "5",
             "2",
             "40.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "5",
             "2",
             "40.0"
@@ -1506,14 +1506,14 @@
             "278.0"
           ],
           [
-            "ZONE-4",
-            "5",
-            "444.0"
-          ],
-          [
             "ZONE-3",
             "5",
             "148.8"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "444.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1583,6 +1583,53 @@
             "3"
           ]
         ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q173",
+      "sql": "SELECT page_slug, \"key\", SUM(cnt) AS cnt\nFROM (\n  SELECT page_slug, visitor_session_id AS \"key\", COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND page_slug = 'itemPage')\n    AND uri_path LIKE '%api%'\n    AND (visitor_session_id IS NOT NULL AND visitor_session_id != 'null')\n    AND (lower(graphql_operation) IN (\n      'updateitems','placeorder','verifypayment','updatecart','createaccount',\n      'getinventory','createcontract','createcreditcard','createdeliveryaddress',\n      'updatequantity','movesfltocart'\n    ))\n    AND lower(user_agent_str) NOT LIKE '%bot%'\n    AND lower(user_agent_str) NOT LIKE '%test%'\n    AND lower(user_agent_str) NOT LIKE '%curl%'\n  GROUP BY \"key\", page_slug, geo_country, geo_user_type\n  HAVING ((geo_user_type IS NULL OR geo_user_type != 'hosting') AND geo_country = 'US' AND COUNT(*) > 1)\n    OR ((geo_user_type = 'hosting' OR geo_country != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY page_slug, \"key\"\nORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10319000000,
+        "end_offset": 10483000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "key",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "sess_003",
+            "3"
+          ],
+          [
+            "itemPage",
+            "sess_001",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q174",
+      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%Allowlisted%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10379000000,
+        "end_offset": 10543000000
+      },
+      "expected": {
+        "columns": [
+          "graphql_operation",
+          "visitor_session_id",
+          "row_count"
+        ],
+        "results": [],
         "results_mode": "rowsort"
       }
     }

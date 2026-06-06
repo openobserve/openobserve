@@ -222,16 +222,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "9",
-            "355.0",
-            "SORT-X1"
-          ],
-          [
             "ZONE-2",
             "9",
             "686.67",
             "SORT-A7"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "355.0",
+            "SORT-X1"
           ],
           [
             "ZONE-3",
@@ -1111,10 +1111,6 @@
             "scanPallet"
           ],
           [
-            "3",
-            "syncZone"
-          ],
-          [
             "2",
             "checkThreshold"
           ],
@@ -1128,11 +1124,7 @@
           ],
           [
             "3",
-            "retryScan"
-          ],
-          [
-            "3",
-            "rerouteTrack"
+            "syncZone"
           ],
           [
             "3",
@@ -1141,6 +1133,14 @@
           [
             "3",
             "mergeBatch"
+          ],
+          [
+            "3",
+            "retryScan"
+          ],
+          [
+            "3",
+            "rerouteTrack"
           ]
         ],
         "results_mode": "rowsort"
@@ -1181,6 +1181,86 @@
           "graphql_operation"
         ],
         "note": "array_has + cast_to_arr + COALESCE + lower() IN \u2014 OO-specific array functions, skip_sqllogictest"
+      }
+    },
+    {
+      "id": "Q171",
+      "sql": "SELECT page_slug,\n  attack_name,\n  COALESCE(info_tag, 'N/A') AS info_tag,\n  geo_country,\n  geo_user_type,\n  device_type,\n  os_platform,\n  datacenter,\n  COUNT(*) AS blockcount\nFROM \"{stream}\"\nWHERE (user_agent_str LIKE '%Chrome%' OR os_platform LIKE '%Android%')\n  AND issue_type != 'N/A'\nGROUP BY page_slug, attack_name, info_tag, geo_country, geo_user_type, device_type, os_platform, datacenter\nHAVING COUNT(*) > 1\nORDER BY blockcount DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 10199000000,
+        "end_offset": 10363000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "attack_name",
+          "info_tag",
+          "geo_country",
+          "geo_user_type",
+          "device_type",
+          "os_platform",
+          "datacenter",
+          "blockcount"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "Evasion Technique",
+            "N/A",
+            "US",
+            "business",
+            "Computer",
+            "Android 14",
+            "dc-west",
+            "3"
+          ],
+          [
+            "itemPage",
+            "File Inclusion",
+            "N/A",
+            "US",
+            "business",
+            "Computer",
+            "Android 12",
+            "dc-west",
+            "3"
+          ],
+          [
+            "cartPage",
+            "Path Traversal",
+            "Allowlisted",
+            "UK",
+            "business",
+            "Tablet",
+            "Android 13",
+            "dc-east",
+            "3"
+          ],
+          [
+            "itemPage",
+            "Command Injection",
+            "N/A",
+            "US",
+            "business",
+            "Mobile",
+            "Android 14",
+            "dc-east",
+            "3"
+          ],
+          [
+            "itemPage",
+            "SQL Injection (Param)",
+            "N/A",
+            "US",
+            "business",
+            "Mobile",
+            "Android 14",
+            "dc-east",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],
