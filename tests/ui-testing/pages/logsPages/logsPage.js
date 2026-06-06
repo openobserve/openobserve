@@ -2647,6 +2647,37 @@ export class LogsPage {
             { timeout }
         );
 
+        // Wait for field-schema extraction (loadingStream) to settle so that
+        // updateGridColumns() has had time to set up resultGrid.columns before
+        // the caller starts querying for table cells. loadingStream is set to false
+        // at the end of extractFields() which runs inside processPostPaginationData —
+        // a floating async promise that may still be in-flight when the Run Query
+        // button becomes enabled (searchObj.loading = false).
+        await this.page.waitForFunction(
+            (selector) => {
+                const el = document.querySelector(selector);
+                if (!el) return true; // can't reach Vue state, proceed
+                let cur = el;
+                while (cur && cur !== document.body) {
+                    const comp = cur.__vueParentComponent;
+                    if (comp) {
+                        if (comp.setupState && 'searchObj' in comp.setupState) {
+                            return comp.setupState.searchObj.loadingStream !== true;
+                        }
+                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
+                            return comp.parent.setupState.searchObj.loadingStream !== true;
+                        }
+                    }
+                    cur = cur.parentElement;
+                }
+                return true; // Vue state not found, proceed
+            },
+            this.queryButton,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('runQueryAndWaitForResults: loadingStream check timed out, proceeding');
+        });
+
         testLogger.info('Query execution complete - Run query button ready');
     }
 
