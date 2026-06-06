@@ -92,7 +92,7 @@ def _replace_str_match_ignore_case(sql: str) -> str:
     """Replace str_match_ignore_case(field, 'pat') with lower(field) LIKE '%pat%'."""
     return re.sub(
         r"str_match_ignore_case\((\w+),\s*'([^']*)'\)",
-        r"lower(\1) LIKE '%\2%'",
+        lambda m: f"lower({m.group(1)}) LIKE '%{m.group(2).lower()}%'",
         sql,
         flags=re.IGNORECASE,
     )

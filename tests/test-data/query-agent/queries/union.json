@@ -125,6 +125,11 @@
           ],
           [
             "None",
+            "manual",
+            "3"
+          ],
+          [
+            "SORT-A7",
             "hybrid",
             "3"
           ],
@@ -134,23 +139,18 @@
             "3"
           ],
           [
-            "None",
-            "manual",
-            "3"
-          ],
-          [
-            "SORT-X1",
-            "manual",
-            "3"
-          ],
-          [
             "SORT-M3",
             "hybrid",
             "3"
           ],
           [
-            "SORT-A7",
+            "None",
             "hybrid",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "manual",
             "3"
           ]
         ],
@@ -855,6 +855,158 @@
       "time_offset": {
         "start_offset": 9419000000,
         "end_offset": 9583000000
+      }
+    },
+    {
+      "id": "Q197",
+      "sql": "SELECT facility_zone, 'auto_ops' AS category, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_tput\nFROM \"{stream}\"\nWHERE operation_mode = 'auto' AND load_factor > 20.0\nGROUP BY facility_zone\nUNION\nSELECT facility_zone, 'manual_ops' AS category, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_tput\nFROM \"{stream}\"\nWHERE operation_mode = 'manual' AND load_factor > 20.0\nGROUP BY facility_zone\nUNION\nSELECT facility_zone, 'hybrid_ops' AS category, COUNT(*) AS cnt, AVG(throughput_rate) AS avg_tput\nFROM \"{stream}\"\nWHERE operation_mode = 'hybrid' AND load_factor > 20.0\nGROUP BY facility_zone\nORDER BY category, avg_tput DESC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 11759000000,
+        "end_offset": 11923000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "category",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "auto_ops",
+            "2",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "auto_ops",
+            "2",
+            "290.0"
+          ],
+          [
+            "ZONE-1",
+            "auto_ops",
+            "3",
+            "190.0"
+          ],
+          [
+            "ZONE-2",
+            "hybrid_ops",
+            "3",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid_ops",
+            "3",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "manual_ops",
+            "3",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "manual_ops",
+            "6",
+            "610.0"
+          ],
+          [
+            "ZONE-4",
+            "manual_ops",
+            "3",
+            "555.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q198",
+      "sql": "SELECT region_code, facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM \"{stream}\"\nWHERE load_factor >= 50.0 AND throughput_rate >= 300.0\nGROUP BY region_code, facility_zone\nUNION ALL\nSELECT region_code, facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM \"{stream}\"\nWHERE load_factor < 50.0 AND throughput_rate < 300.0\nGROUP BY region_code, facility_zone\nORDER BY avg_throughput DESC\nLIMIT 20",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 11819000000,
+        "end_offset": 11983000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "max_load"
+        ],
+        "results": [
+          [
+            "AP-CENTRAL",
+            "ZONE-2",
+            "3",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "AP-EAST",
+            "ZONE-2",
+            "3",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "AP-SOUTH",
+            "ZONE-1",
+            "3",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "EU-NORTH",
+            "ZONE-4",
+            "2",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "US-CENTRAL",
+            "ZONE-4",
+            "3",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "EU-WEST",
+            "ZONE-3",
+            "3",
+            "480.0",
+            "55.2"
+          ],
+          [
+            "SA-EAST",
+            "ZONE-3",
+            "2",
+            "290.0",
+            "45.3"
+          ],
+          [
+            "EU-CENTRAL",
+            "ZONE-1",
+            "3",
+            "190.0",
+            "21.4"
+          ],
+          [
+            "US-EAST",
+            "ZONE-1",
+            "3",
+            "150.0",
+            "12.5"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

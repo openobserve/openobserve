@@ -598,7 +598,7 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=174):
+def build_dataset(num_queries=200):
     """Generate deterministic records for queries Q001-Q{num_queries}."""
     records = []
     for qi in range(1, num_queries + 1):

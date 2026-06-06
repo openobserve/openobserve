@@ -2047,6 +2047,229 @@
         ],
         "results_mode": "rowsort"
       }
+    },
+    {
+      "id": "Q178",
+      "sql": "SELECT _timestamp, log, facility_zone, operation_mode,\n  throughput_rate, load_factor, charge_remaining, cell_temp,\n  item_count, defect_limit, package_size\nFROM \"{stream}\"\nWHERE (facility_zone = 'ZONE-1' OR facility_zone = 'ZONE-2')\n  AND (operation_mode = 'auto' OR (operation_mode = 'hybrid' AND load_factor > 50.0))\n  AND throughput_rate > 100.0\n  AND charge_remaining IS NOT NULL\n  AND ((cell_temp >= 20.0 AND cell_temp <= 35.0) OR operation_mode = 'manual')\n  AND defect_limit < 3.0\nORDER BY _timestamp DESC, throughput_rate DESC\nLIMIT 15",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 10619000000,
+        "end_offset": 10783000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "operation_mode",
+          "throughput_rate",
+          "load_factor",
+          "charge_remaining",
+          "cell_temp",
+          "item_count",
+          "defect_limit",
+          "package_size"
+        ],
+        "results": [
+          [
+            "Q178 warehouse event record 8",
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "21.4",
+            "33.3",
+            "32.5",
+            "60",
+            "2.8",
+            "850"
+          ],
+          [
+            "Q177 warehouse event record 8",
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "21.4",
+            "33.3",
+            "32.5",
+            "60",
+            "2.8",
+            "850"
+          ],
+          [
+            "Q176 warehouse event record 8",
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "21.4",
+            "33.3",
+            "32.5",
+            "60",
+            "2.8",
+            "850"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q179",
+      "sql": "SELECT _timestamp, facility_zone, load_factor, throughput_rate,\n  CASE\n    WHEN load_factor >= 80.0 AND cell_temp >= 30.0 THEN 'CRITICAL'\n    WHEN load_factor >= 50.0 AND cell_temp >= 25.0 THEN 'WARNING'\n    WHEN load_factor >= 20.0 THEN 'NORMAL'\n    WHEN charge_remaining < 20.0 THEN 'LOW_CHARGE'\n    ELSE 'IDLE'\n  END AS status_level,\n  CASE\n    WHEN throughput_rate >= 500.0 THEN 'HIGH'\n    WHEN throughput_rate >= 200.0 THEN 'MEDIUM'\n    ELSE 'LOW'\n  END AS throughput_tier\nFROM \"{stream}\"\nWHERE facility_zone != 'ZONE-4'\nORDER BY load_factor DESC, _timestamp DESC\nLIMIT 20",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 10679000000,
+        "end_offset": 10843000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "load_factor",
+          "throughput_rate",
+          "status_level",
+          "throughput_tier"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "99.0",
+            "900.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-2",
+            "99.0",
+            "900.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-2",
+            "99.0",
+            "900.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-2",
+            "94.6",
+            "840.0",
+            "NORMAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-2",
+            "94.6",
+            "840.0",
+            "NORMAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-2",
+            "94.6",
+            "840.0",
+            "NORMAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-1",
+            "88.1",
+            "725.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-1",
+            "88.1",
+            "725.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-1",
+            "88.1",
+            "725.0",
+            "CRITICAL",
+            "HIGH"
+          ],
+          [
+            "ZONE-3",
+            "55.2",
+            "480.0",
+            "WARNING",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-3",
+            "55.2",
+            "480.0",
+            "WARNING",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-3",
+            "55.2",
+            "480.0",
+            "WARNING",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-3",
+            "45.3",
+            "290.0",
+            "NORMAL",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-3",
+            "45.3",
+            "290.0",
+            "NORMAL",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-2",
+            "33.0",
+            "320.0",
+            "NORMAL",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-2",
+            "33.0",
+            "320.0",
+            "NORMAL",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-2",
+            "33.0",
+            "320.0",
+            "NORMAL",
+            "MEDIUM"
+          ],
+          [
+            "ZONE-1",
+            "21.4",
+            "190.0",
+            "NORMAL",
+            "LOW"
+          ],
+          [
+            "ZONE-1",
+            "21.4",
+            "190.0",
+            "NORMAL",
+            "LOW"
+          ],
+          [
+            "ZONE-1",
+            "21.4",
+            "190.0",
+            "NORMAL",
+            "LOW"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
   "last_query_id": 35

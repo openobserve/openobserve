@@ -13,72 +13,6 @@
         ],
         "results": [
           [
-            "SORT-Z9",
-            "610.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "610.0",
-            "2",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "900.0",
-            "2",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "900.0",
-            "3",
-            "1"
-          ],
-          [
-            "SORT-A7",
-            "840.0",
-            "4",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "840.0",
-            "5",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "840.0",
-            "6",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "7",
-            "3"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "8",
-            "3"
-          ],
-          [
-            "SORT-A7",
-            "320.0",
-            "9",
-            "3"
-          ],
-          [
             "SORT-M3",
             "480.0",
             "1",
@@ -107,6 +41,18 @@
             "290.0",
             "5",
             "2"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "2",
+            "1"
           ],
           [
             "SORT-X1",
@@ -179,6 +125,60 @@
             "555.0",
             "3",
             "1"
+          ],
+          [
+            "SORT-A7",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "900.0",
+            "2",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "900.0",
+            "3",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "840.0",
+            "4",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "840.0",
+            "5",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "840.0",
+            "6",
+            "2"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "7",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "8",
+            "3"
+          ],
+          [
+            "SORT-A7",
+            "320.0",
+            "9",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -385,36 +385,6 @@
             "3"
           ],
           [
-            "ZONE-4",
-            "72.8",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "72.8",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "67.9",
-            "3",
-            "2"
-          ],
-          [
-            "ZONE-4",
-            "67.9",
-            "3",
-            "2"
-          ],
-          [
-            "ZONE-4",
-            "67.9",
-            "3",
-            "2"
-          ],
-          [
             "ZONE-2",
             "99.0",
             "1",
@@ -496,6 +466,36 @@
             "ZONE-3",
             "45.3",
             "4",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "72.8",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "72.8",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "67.9",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "67.9",
+            "3",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "67.9",
+            "3",
             "2"
           ]
         ],
@@ -1925,7 +1925,7 @@
             "850",
             "0.6667",
             "0.375",
-            "2"
+            "3"
           ],
           [
             "LANE-A",
@@ -1939,14 +1939,7 @@
             "850",
             "0.6667",
             "0.375",
-            "3"
-          ],
-          [
-            "LANE-A",
-            "1000",
-            "1.0",
-            "0.75",
-            "3"
+            "2"
           ],
           [
             "LANE-A",
@@ -1963,6 +1956,20 @@
             "4"
           ],
           [
+            "LANE-A",
+            "1000",
+            "1.0",
+            "0.75",
+            "3"
+          ],
+          [
+            "LANE-B",
+            "200",
+            "0.3333",
+            "0.0",
+            "1"
+          ],
+          [
             "LANE-B",
             "200",
             "0.3333",
@@ -1978,10 +1985,10 @@
           ],
           [
             "LANE-B",
-            "200",
-            "0.3333",
-            "0.0",
-            "1"
+            "250",
+            "0.6667",
+            "0.375",
+            "3"
           ],
           [
             "LANE-B",
@@ -1999,20 +2006,6 @@
           ],
           [
             "LANE-B",
-            "250",
-            "0.6667",
-            "0.375",
-            "3"
-          ],
-          [
-            "LANE-B",
-            "1200",
-            "1.0",
-            "0.75",
-            "3"
-          ],
-          [
-            "LANE-B",
             "1200",
             "1.0",
             "0.75",
@@ -2024,6 +2017,13 @@
             "1.0",
             "0.75",
             "4"
+          ],
+          [
+            "LANE-B",
+            "1200",
+            "1.0",
+            "0.75",
+            "3"
           ],
           [
             "LANE-C",
@@ -2131,37 +2131,37 @@
             "PL-008",
             "BS-2025-D4",
             "500",
-            "9999"
-          ],
-          [
-            "PL-008",
-            "BS-2025-D4",
-            "500",
-            "9999"
-          ],
-          [
-            "PL-008",
-            "BS-2025-D4",
-            "500",
             "500"
           ],
           [
-            "PL-001",
-            "BS-2026-A1",
-            "24",
-            "90"
+            "PL-008",
+            "BS-2025-D4",
+            "500",
+            "9999"
           ],
           [
-            "PL-001",
-            "BS-2026-A1",
-            "24",
-            "90"
+            "PL-008",
+            "BS-2025-D4",
+            "500",
+            "9999"
           ],
           [
             "PL-001",
             "BS-2026-A1",
             "24",
             "24"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "24",
+            "90"
+          ],
+          [
+            "PL-001",
+            "BS-2026-A1",
+            "24",
+            "90"
           ],
           [
             "PL-001",
@@ -2221,37 +2221,37 @@
             "PL-002",
             "BS-2026-B2",
             "72",
-            "1000"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "72",
-            "1000"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "72",
             "72"
           ],
           [
             "PL-002",
             "BS-2026-B2",
-            "1000",
-            "9999"
+            "72",
+            "1000"
           ],
           [
             "PL-002",
             "BS-2026-B2",
-            "1000",
-            "9999"
+            "72",
+            "1000"
           ],
           [
             "PL-002",
             "BS-2026-B2",
             "1000",
             "1000"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "1000",
+            "9999"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "1000",
+            "9999"
           ],
           [
             "PL-007",
@@ -4171,6 +4171,346 @@
       "time_offset": {
         "start_offset": 9239000000,
         "end_offset": 9403000000
+      }
+    },
+    {
+      "id": "Q199",
+      "sql": "SELECT _timestamp, facility_zone, operation_mode, throughput_rate,\n  ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY throughput_rate DESC) AS rn_by_zone,\n  RANK() OVER (PARTITION BY operation_mode ORDER BY load_factor DESC) AS rank_by_mode,\n  DENSE_RANK() OVER (ORDER BY cell_temp DESC) AS dense_rank_temp,\n  AVG(throughput_rate) OVER (PARTITION BY facility_zone) AS zone_avg_tput,\n  MAX(load_factor) OVER (PARTITION BY operation_mode) AS mode_max_load,\n  SUM(item_count) OVER (PARTITION BY facility_zone ORDER BY _timestamp\n    ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS rolling_item_sum\nFROM \"{stream}\"\nWHERE load_factor > 10.0\n  AND throughput_rate >= 100.0\nORDER BY facility_zone, rn_by_zone\nLIMIT 20",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 11879000000,
+        "end_offset": 12043000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "throughput_rate",
+          "rn_by_zone",
+          "rank_by_mode",
+          "dense_rank_temp",
+          "zone_avg_tput",
+          "mode_max_load",
+          "rolling_item_sum"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "725.0",
+            "1",
+            "4",
+            "2",
+            "380.625",
+            "99.0",
+            "248"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "725.0",
+            "2",
+            "4",
+            "2",
+            "380.625",
+            "99.0",
+            "346"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "725.0",
+            "3",
+            "4",
+            "2",
+            "380.625",
+            "99.0",
+            "296"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "4",
+            "5",
+            "3",
+            "380.625",
+            "72.8",
+            "336"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "5",
+            "5",
+            "3",
+            "380.625",
+            "72.8",
+            "346"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "190.0",
+            "6",
+            "5",
+            "3",
+            "380.625",
+            "72.8",
+            "208"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "150.0",
+            "7",
+            "8",
+            "10",
+            "380.625",
+            "72.8",
+            "198"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "150.0",
+            "8",
+            "8",
+            "10",
+            "380.625",
+            "72.8",
+            "346"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "1",
+            "1",
+            "1",
+            "732.5",
+            "99.0",
+            "1050"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "2",
+            "1",
+            "1",
+            "732.5",
+            "99.0",
+            "1430"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "900.0",
+            "3",
+            "1",
+            "1",
+            "732.5",
+            "99.0",
+            "1155"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "840.0",
+            "4",
+            "1",
+            "9",
+            "732.5",
+            "94.6",
+            "895"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "840.0",
+            "5",
+            "1",
+            "9",
+            "732.5",
+            "94.6",
+            "1430"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "840.0",
+            "6",
+            "1",
+            "9",
+            "732.5",
+            "94.6",
+            "1310"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "320.0",
+            "7",
+            "10",
+            "8",
+            "732.5",
+            "99.0",
+            "775"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "320.0",
+            "8",
+            "10",
+            "8",
+            "732.5",
+            "99.0",
+            "1430"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "480.0",
+            "1",
+            "4",
+            "6",
+            "385.0",
+            "94.6",
+            "810"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "480.0",
+            "2",
+            "4",
+            "6",
+            "385.0",
+            "94.6",
+            "1220"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "290.0",
+            "3",
+            "3",
+            "7",
+            "385.0",
+            "72.8",
+            "1220"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "290.0",
+            "4",
+            "3",
+            "7",
+            "385.0",
+            "72.8",
+            "1020"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q200",
+      "sql": "WITH ranked AS (\n  SELECT _timestamp, facility_zone, operation_mode,\n    throughput_rate, load_factor, cell_temp, item_count,\n    ROW_NUMBER() OVER (\n      PARTITION BY facility_zone, operation_mode\n      ORDER BY throughput_rate DESC, load_factor DESC\n    ) AS rn,\n    AVG(throughput_rate) OVER (\n      PARTITION BY facility_zone\n    ) AS zone_avg_tput,\n    load_factor - LAG(load_factor, 1) OVER (\n      PARTITION BY facility_zone\n      ORDER BY _timestamp\n    ) AS load_delta\n  FROM \"{stream}\"\n  WHERE load_factor > 10.0\n)\nSELECT facility_zone, operation_mode,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_delta) AS max_load_delta,\n  AVG(zone_avg_tput) AS overall_zone_avg,\n  SUM(CASE WHEN load_delta > 0 THEN 1 ELSE 0 END) AS load_increases\nFROM ranked\nWHERE rn <= 5\nGROUP BY facility_zone, operation_mode\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 11939000000,
+        "end_offset": 12103000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "avg_throughput",
+          "max_load_delta",
+          "overall_zone_avg",
+          "load_increases"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "hybrid",
+            "2",
+            "840.0",
+            "61.599999999999994",
+            "783.3333333333334",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "4",
+            "755.0",
+            "4.400000000000006",
+            "783.3333333333334",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "2",
+            "725.0",
+            "75.6",
+            "361.6666666666667",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "1",
+            "610.0",
+            "4.8999999999999915",
+            "568.75",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "3",
+            "555.0",
+            "0.0",
+            "568.75",
+            "0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "480.0",
+            "None",
+            "353.3333333333333",
+            "0"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "2",
+            "290.0",
+            "0.0",
+            "353.3333333333333",
+            "0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "4",
+            "180.0",
+            "0.0",
+            "361.6666666666667",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

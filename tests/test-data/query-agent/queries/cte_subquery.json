@@ -53,13 +53,13 @@
             "66.66999816894531"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "5",
             "2",
             "40.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "5",
             "2",
             "40.0"
@@ -1506,14 +1506,14 @@
             "278.0"
           ],
           [
-            "ZONE-3",
-            "5",
-            "148.8"
-          ],
-          [
             "ZONE-4",
             "5",
             "444.0"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "148.8"
           ]
         ],
         "results_mode": "rowsort"
@@ -1603,13 +1603,13 @@
         "results": [
           [
             "itemPage",
-            "sess_003",
+            "sess_001",
             "3"
           ],
           [
             "itemPage",
-            "sess_001",
-            "2"
+            "sess_003",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1630,6 +1630,317 @@
           "row_count"
         ],
         "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q184",
+      "sql": "WITH base AS (\n  SELECT _timestamp, facility_zone, sorter_model,\n    operation_mode, throughput_rate, load_factor, cell_temp\n  FROM \"{stream}\"\n  WHERE load_factor > 10.0\n    AND throughput_rate >= 100.0\n),\naggregated AS (\n  SELECT facility_zone, sorter_model, operation_mode,\n    COUNT(*) AS cnt,\n    AVG(throughput_rate) AS avg_throughput,\n    MAX(load_factor) AS max_load,\n    MIN(cell_temp) AS min_temp\n  FROM base\n  GROUP BY facility_zone, sorter_model, operation_mode\n  HAVING COUNT(*) >= 1\n)\nSELECT a.facility_zone, a.sorter_model, a.operation_mode,\n  a.cnt, a.avg_throughput, a.max_load, a.min_temp\nFROM aggregated a\nORDER BY a.avg_throughput DESC, a.cnt DESC\nLIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10979000000,
+        "end_offset": 11143000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "operation_mode",
+          "cnt",
+          "avg_throughput",
+          "max_load",
+          "min_temp"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "hybrid",
+            "3",
+            "840.0",
+            "94.6",
+            "19.2"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "manual",
+            "3",
+            "725.0",
+            "88.1",
+            "35.7"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "manual",
+            "6",
+            "610.0",
+            "99.0",
+            "22.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "auto",
+            "2",
+            "610.0",
+            "72.8",
+            "30.1"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5",
+            "manual",
+            "3",
+            "555.0",
+            "67.9",
+            "28.9"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "hybrid",
+            "3",
+            "480.0",
+            "55.2",
+            "26.3"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "auto",
+            "2",
+            "290.0",
+            "45.3",
+            "24.8"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "auto",
+            "6",
+            "170.0",
+            "21.4",
+            "18.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q185",
+      "sql": "WITH ranked AS (\n  SELECT _timestamp, facility_zone, operation_mode,\n    throughput_rate, load_factor,\n    ROW_NUMBER() OVER (\n      PARTITION BY facility_zone\n      ORDER BY throughput_rate DESC\n    ) AS rn\n  FROM \"{stream}\"\n  WHERE load_factor > 20.0\n)\nSELECT facility_zone, operation_mode,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM ranked\nWHERE rn <= 5\nGROUP BY facility_zone, operation_mode\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11039000000,
+        "end_offset": 11203000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "avg_throughput",
+          "max_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "manual",
+            "3",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "2",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "3",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "3",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "3",
+            "480.0",
+            "55.2"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "2",
+            "290.0",
+            "45.3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "2",
+            "190.0",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q186",
+      "sql": "WITH combined_data AS (\n  SELECT facility_zone, sorter_model, throughput_rate, load_factor, 'high_tput' AS source\n  FROM \"{stream}\"\n  WHERE throughput_rate >= 500.0 AND load_factor > 20.0\n  UNION ALL\n  SELECT facility_zone, sorter_model, throughput_rate, load_factor, 'low_tput' AS source\n  FROM \"{stream}\"\n  WHERE throughput_rate < 200.0 AND load_factor > 20.0\n)\nSELECT facility_zone, sorter_model, source,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  AVG(load_factor) AS avg_load\nFROM combined_data\nGROUP BY facility_zone, sorter_model, source\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11099000000,
+        "end_offset": 11263000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "source",
+          "cnt",
+          "avg_throughput",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "high_tput",
+            "6",
+            "870.0",
+            "96.80000000000001"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5",
+            "high_tput",
+            "3",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "high_tput",
+            "3",
+            "725.0",
+            "88.09999999999998"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "low_tput",
+            "3",
+            "190.0",
+            "21.399999999999995"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "high_tput",
+            "2",
+            "610.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q187",
+      "sql": "SELECT facility_zone, op_mode, COUNT(*) AS cnt,\n  AVG(avg_tput) AS overall_avg_tput,\n  SUM(cnt_rows) AS total_rows\nFROM (\n  SELECT facility_zone, op_mode,\n    AVG(throughput_rate) AS avg_tput,\n    COUNT(*) AS cnt_rows\n  FROM (\n    SELECT facility_zone,\n      CASE\n        WHEN operation_mode = 'auto' THEN 'AUTO'\n        WHEN operation_mode = 'manual' THEN 'MANUAL'\n        ELSE 'OTHER'\n      END AS op_mode,\n      throughput_rate, load_factor\n    FROM \"{stream}\"\n    WHERE load_factor > 10.0\n  ) inner_q\n  GROUP BY facility_zone, op_mode\n  HAVING COUNT(*) >= 1\n) mid_q\nGROUP BY facility_zone, op_mode\nORDER BY overall_avg_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11159000000,
+        "end_offset": 11323000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "op_mode",
+          "cnt",
+          "overall_avg_tput",
+          "total_rows"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "OTHER",
+            "1",
+            "840.0",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "MANUAL",
+            "1",
+            "725.0",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "AUTO",
+            "1",
+            "610.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "MANUAL",
+            "1",
+            "610.0",
+            "6"
+          ],
+          [
+            "ZONE-4",
+            "MANUAL",
+            "1",
+            "555.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "OTHER",
+            "1",
+            "480.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "AUTO",
+            "1",
+            "290.0",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "AUTO",
+            "1",
+            "170.0",
+            "6"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     }

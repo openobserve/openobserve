@@ -222,16 +222,16 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "9",
-            "686.67",
-            "SORT-A7"
-          ],
-          [
             "ZONE-1",
             "9",
             "355.0",
             "SORT-X1"
+          ],
+          [
+            "ZONE-2",
+            "9",
+            "686.67",
+            "SORT-A7"
           ],
           [
             "ZONE-3",
@@ -1111,6 +1111,10 @@
             "scanPallet"
           ],
           [
+            "3",
+            "updateBatch"
+          ],
+          [
             "2",
             "checkThreshold"
           ],
@@ -1120,11 +1124,11 @@
           ],
           [
             "3",
-            "updateBatch"
+            "retryScan"
           ],
           [
             "3",
-            "syncZone"
+            "rerouteTrack"
           ],
           [
             "3",
@@ -1136,11 +1140,7 @@
           ],
           [
             "3",
-            "retryScan"
-          ],
-          [
-            "3",
-            "rerouteTrack"
+            "syncZone"
           ]
         ],
         "results_mode": "rowsort"
@@ -1217,23 +1217,12 @@
           ],
           [
             "itemPage",
-            "File Inclusion",
+            "SQL Injection (Param)",
             "N/A",
             "US",
             "business",
-            "Computer",
-            "Android 12",
-            "dc-west",
-            "3"
-          ],
-          [
-            "cartPage",
-            "Path Traversal",
-            "Allowlisted",
-            "UK",
-            "business",
-            "Tablet",
-            "Android 13",
+            "Mobile",
+            "Android 14",
             "dc-east",
             "3"
           ],
@@ -1249,15 +1238,223 @@
             "3"
           ],
           [
+            "cartPage",
+            "Path Traversal",
+            "Allowlisted",
+            "UK",
+            "business",
+            "Tablet",
+            "Android 13",
+            "dc-east",
+            "3"
+          ],
+          [
             "itemPage",
-            "SQL Injection (Param)",
+            "File Inclusion",
             "N/A",
             "US",
             "business",
-            "Mobile",
-            "Android 14",
-            "dc-east",
+            "Computer",
+            "Android 12",
+            "dc-west",
             "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q180",
+      "sql": "SELECT facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  SUM(CASE WHEN operation_mode = 'auto' THEN 1 ELSE 0 END) AS auto_count,\n  SUM(CASE WHEN operation_mode = 'manual' THEN 1 ELSE 0 END) AS manual_count\nFROM \"{stream}\"\nWHERE match_all('warehouse')\n  AND load_factor > 10.0\n  AND facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3')\n  AND throughput_rate >= 100.0\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\n  AND AVG(throughput_rate) > 150.0\nORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 10739000000,
+        "end_offset": 10903000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "auto_count",
+          "manual_count"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "9",
+            "686.6666666666666",
+            "0",
+            "6"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "355.0",
+            "6",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "404.0",
+            "2",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q181",
+      "sql": "SELECT api_name,\n  json_get_str(request_payload, 'status') AS req_status,\n  COUNT(*) AS cnt,\n  AVG(latency_ms) AS avg_latency\nFROM \"{stream}\"\nWHERE json_get_str(request_payload, 'status') IS NOT NULL\n  AND json_get_str(request_payload, 'status') != ''\n  AND latency_ms > 0\nGROUP BY api_name, json_get_str(request_payload, 'status')\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 10799000000,
+        "end_offset": 10963000000
+      },
+      "expected": {
+        "columns": [
+          "api_name",
+          "req_status",
+          "cnt",
+          "avg_latency"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q182",
+      "sql": "SELECT facility_zone,\n  UPPER(operation_mode) AS op_mode,\n  COUNT(*) AS cnt,\n  AVG(load_factor) AS avg_load,\n  MAX(cell_temp) AS max_temp,\n  SUM(throughput_rate) AS total_throughput,\n  AVG(latency_ms) AS avg_latency,\n  (MAX(_timestamp) - MIN(_timestamp)) / 1000000 AS span_seconds\nFROM \"{stream}\"\nWHERE (operation_mode = 'auto' OR operation_mode = 'hybrid')\n  AND load_factor > 20.0\nGROUP BY facility_zone, UPPER(operation_mode)\nHAVING COUNT(*) >= 1\nORDER BY span_seconds DESC, cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 10859000000,
+        "end_offset": 11023000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "op_mode",
+          "cnt",
+          "avg_load",
+          "max_temp",
+          "total_throughput",
+          "avg_latency",
+          "span_seconds"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "HYBRID",
+            "3",
+            "94.59999999999998",
+            "19.2",
+            "2520.0",
+            "567.0",
+            "120.0"
+          ],
+          [
+            "ZONE-1",
+            "AUTO",
+            "3",
+            "21.399999999999995",
+            "32.5",
+            "570.0",
+            "1900.0",
+            "120.0"
+          ],
+          [
+            "ZONE-3",
+            "HYBRID",
+            "3",
+            "55.20000000000001",
+            "26.3",
+            "1440.0",
+            "230.0",
+            "120.0"
+          ],
+          [
+            "ZONE-3",
+            "AUTO",
+            "2",
+            "45.3",
+            "24.8",
+            "580.0",
+            "3200.0",
+            "60.0"
+          ],
+          [
+            "ZONE-4",
+            "AUTO",
+            "2",
+            "72.8",
+            "30.1",
+            "1220.0",
+            "1450.0",
+            "60.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q183",
+      "sql": "SELECT\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH_LOAD'\n    WHEN load_factor >= 40.0 THEN 'MED_LOAD'\n    ELSE 'LOW_LOAD'\n  END AS load_category,\n  CASE\n    WHEN throughput_rate >= 500.0 THEN 'HIGH_TPUT'\n    WHEN throughput_rate >= 200.0 THEN 'MED_TPUT'\n    ELSE 'LOW_TPUT'\n  END AS throughput_category,\n  COUNT(*) AS cnt,\n  AVG(cell_temp) AS avg_temp,\n  SUM(item_count) AS total_items,\n  MAX(defect_limit) AS max_defect\nFROM \"{stream}\"\nWHERE facility_zone LIKE 'ZONE-%'\nGROUP BY\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH_LOAD'\n    WHEN load_factor >= 40.0 THEN 'MED_LOAD'\n    ELSE 'LOW_LOAD'\n  END,\n  CASE\n    WHEN throughput_rate >= 500.0 THEN 'HIGH_TPUT'\n    WHEN throughput_rate >= 200.0 THEN 'MED_TPUT'\n    ELSE 'LOW_TPUT'\n  END\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 10919000000,
+        "end_offset": 11083000000
+      },
+      "expected": {
+        "columns": [
+          "load_category",
+          "throughput_category",
+          "cnt",
+          "avg_temp",
+          "total_items",
+          "max_defect"
+        ],
+        "results": [
+          [
+            "HIGH_LOAD",
+            "HIGH_TPUT",
+            "11",
+            "31.354545454545452",
+            "2909",
+            "3.5"
+          ],
+          [
+            "LOW_LOAD",
+            "LOW_TPUT",
+            "6",
+            "25.5",
+            "330",
+            "2.8"
+          ],
+          [
+            "MED_LOAD",
+            "MED_TPUT",
+            "5",
+            "25.7",
+            "1420",
+            "1.5"
+          ],
+          [
+            "MED_LOAD",
+            "HIGH_TPUT",
+            "3",
+            "28.899999999999995",
+            "825",
+            "1.2"
+          ],
+          [
+            "LOW_LOAD",
+            "MED_TPUT",
+            "3",
+            "22.0",
+            "360",
+            "1.0"
           ]
         ],
         "results_mode": "rowsort"

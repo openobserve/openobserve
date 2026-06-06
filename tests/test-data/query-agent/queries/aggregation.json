@@ -853,21 +853,6 @@
           [
             "0",
             "3",
-            "0",
-            "3",
-            "0",
-            "3",
-            "E002",
-            "@warehouse-iOS-sort-v2",
-            "UP-E002",
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
-            "SORT-A7-UP-E002-E002",
-            "SORT-A7",
-            "iOS"
-          ],
-          [
-            "0",
-            "3",
             "3",
             "0",
             "3",
@@ -879,6 +864,21 @@
             "SORT-X1-UP-E001-E001",
             "SORT-X1",
             "Android"
+          ],
+          [
+            "0",
+            "3",
+            "0",
+            "3",
+            "0",
+            "3",
+            "E002",
+            "@warehouse-iOS-sort-v2",
+            "UP-E002",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "SORT-A7-UP-E002-E002",
+            "SORT-A7",
+            "iOS"
           ]
         ],
         "results_mode": "rowsort"
@@ -886,6 +886,226 @@
       "time_offset": {
         "start_offset": 9359000000,
         "end_offset": 9523000000
+      }
+    },
+    {
+      "id": "Q175",
+      "sql": "SELECT facility_zone, sorter_model, operation_mode,\n  COUNT(*) AS total_rows,\n  SUM(throughput_rate) AS total_throughput,\n  AVG(load_factor) AS avg_load,\n  MAX(cell_temp) AS max_temp,\n  MIN(charge_remaining) AS min_charge\nFROM \"{stream}\"\nWHERE (operation_mode = 'auto' OR operation_mode = 'hybrid')\n  AND load_factor > 20.0\n  AND facility_zone IN ('ZONE-1', 'ZONE-2', 'ZONE-3')\n  AND throughput_rate >= 100.0\nGROUP BY facility_zone, sorter_model, operation_mode\nHAVING COUNT(*) >= 1\n  AND AVG(load_factor) > 10.0\nORDER BY total_throughput DESC, avg_load DESC\nLIMIT 20",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10439000000,
+        "end_offset": 10603000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "operation_mode",
+          "total_rows",
+          "total_throughput",
+          "avg_load",
+          "max_temp",
+          "min_charge"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "hybrid",
+            "3",
+            "2520.0",
+            "94.59999999999998",
+            "19.2",
+            "88.7"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "hybrid",
+            "3",
+            "1440.0",
+            "55.20000000000001",
+            "26.3",
+            "42.5"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "auto",
+            "2",
+            "580.0",
+            "45.3",
+            "24.8",
+            "95.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "auto",
+            "3",
+            "570.0",
+            "21.399999999999995",
+            "32.5",
+            "33.3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q176",
+      "sql": "SELECT region_code,\n  COUNT(*) AS cnt,\n  SUM(CASE WHEN operation_mode = 'auto' THEN throughput_rate ELSE 0 END) AS auto_throughput,\n  SUM(CASE WHEN operation_mode = 'manual' THEN throughput_rate ELSE 0 END) AS manual_throughput,\n  AVG(CASE WHEN load_factor > 50.0 THEN cell_temp ELSE NULL END) AS avg_temp_high_load,\n  COUNT(CASE WHEN charge_remaining < 30.0 THEN 1 END) AS low_charge_count\nFROM \"{stream}\"\nWHERE facility_zone LIKE 'ZONE-%'\n  AND sorter_model IN ('SORT-X1', 'SORT-A7', 'SORT-M3')\nGROUP BY region_code\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10499000000,
+        "end_offset": 10663000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "cnt",
+          "auto_throughput",
+          "manual_throughput",
+          "avg_temp_high_load",
+          "low_charge_count"
+        ],
+        "results": [
+          [
+            "AP-SOUTH",
+            "3",
+            "0.0",
+            "2175.0",
+            "35.7",
+            "0"
+          ],
+          [
+            "EU-CENTRAL",
+            "3",
+            "570.0",
+            "0.0",
+            "None",
+            "0"
+          ],
+          [
+            "US-WEST",
+            "3",
+            "0.0",
+            "960.0",
+            "None",
+            "3"
+          ],
+          [
+            "AP-EAST",
+            "3",
+            "0.0",
+            "0.0",
+            "19.2",
+            "0"
+          ],
+          [
+            "AP-CENTRAL",
+            "3",
+            "0.0",
+            "2700.0",
+            "40.0",
+            "0"
+          ],
+          [
+            "US-EAST",
+            "3",
+            "450.0",
+            "0.0",
+            "None",
+            "3"
+          ],
+          [
+            "EU-WEST",
+            "3",
+            "0.0",
+            "0.0",
+            "26.3",
+            "0"
+          ],
+          [
+            "SA-EAST",
+            "2",
+            "580.0",
+            "0.0",
+            "None",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q177",
+      "sql": "SELECT UPPER(operation_mode) AS mode_upper,\n  CONCAT(facility_zone, '-', sorter_model) AS zone_sorter,\n  COUNT(*) AS cnt,\n  SUM(item_count) AS total_items,\n  AVG(defect_limit) AS avg_defect,\n  STDDEV(throughput_rate) AS stddev_throughput\nFROM \"{stream}\"\nWHERE package_size BETWEEN 100 AND 1000\n  AND runtime_hours >= 24\nGROUP BY UPPER(operation_mode), CONCAT(facility_zone, '-', sorter_model)\nHAVING COUNT(*) >= 1\n  AND AVG(defect_limit) > 1.0\nORDER BY cnt DESC, stddev_throughput ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 10559000000,
+        "end_offset": 10723000000
+      },
+      "expected": {
+        "columns": [
+          "mode_upper",
+          "zone_sorter",
+          "cnt",
+          "total_items",
+          "avg_defect",
+          "stddev_throughput"
+        ],
+        "results": [
+          [
+            "AUTO",
+            "ZONE-1-SORT-X1",
+            "6",
+            "330",
+            "1.6499999999999997",
+            "21.908902300206645"
+          ],
+          [
+            "MANUAL",
+            "ZONE-4-SORT-Q5",
+            "3",
+            "825",
+            "1.2",
+            "0.0"
+          ],
+          [
+            "MANUAL",
+            "ZONE-1-SORT-X1",
+            "3",
+            "264",
+            "2.5",
+            "0.0"
+          ],
+          [
+            "HYBRID",
+            "ZONE-3-SORT-M3",
+            "3",
+            "600",
+            "1.5",
+            "0.0"
+          ],
+          [
+            "HYBRID",
+            "ZONE-2-SORT-A7",
+            "3",
+            "465",
+            "3.0",
+            "0.0"
+          ],
+          [
+            "AUTO",
+            "ZONE-4-SORT-Z9",
+            "2",
+            "680",
+            "2.0",
+            "0.0"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

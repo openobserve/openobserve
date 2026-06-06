@@ -548,6 +548,181 @@
         "start_offset": 4319000000,
         "end_offset": 4483000000
       }
+    },
+    {
+      "id": "Q188",
+      "sql": "SELECT\n  (_timestamp - (_timestamp % 60000000)) AS ts_minute,\n  facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(cell_temp) AS max_temp,\n  MIN(charge_remaining) AS min_charge,\n  SUM(item_count) AS total_items\nFROM \"{stream}\"\nWHERE load_factor > 20.0\n  AND throughput_rate >= 100.0\nGROUP BY (_timestamp - (_timestamp % 60000000)), facility_zone\nHAVING COUNT(*) >= 1\nORDER BY ts_minute DESC, cnt DESC\nLIMIT 20",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 11219000000,
+        "end_offset": 11383000000
+      },
+      "expected": {
+        "columns": [
+          "ts_minute",
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "max_temp",
+          "min_charge",
+          "total_items"
+        ],
+        "results": [
+          [
+            "1780666200000000",
+            "ZONE-2",
+            "3",
+            "686.6666666666666",
+            "40.0",
+            "25.0",
+            "775"
+          ],
+          [
+            "1780666200000000",
+            "ZONE-1",
+            "2",
+            "457.5",
+            "35.7",
+            "33.3",
+            "148"
+          ],
+          [
+            "1780666200000000",
+            "ZONE-4",
+            "1",
+            "555.0",
+            "28.9",
+            "5.0",
+            "275"
+          ],
+          [
+            "1780666200000000",
+            "ZONE-3",
+            "1",
+            "480.0",
+            "26.3",
+            "42.5",
+            "200"
+          ],
+          [
+            "1780666140000000",
+            "ZONE-2",
+            "3",
+            "686.6666666666666",
+            "40.0",
+            "25.0",
+            "775"
+          ],
+          [
+            "1780666140000000",
+            "ZONE-3",
+            "2",
+            "385.0",
+            "26.3",
+            "42.5",
+            "610"
+          ],
+          [
+            "1780666140000000",
+            "ZONE-4",
+            "2",
+            "582.5",
+            "30.1",
+            "5.0",
+            "615"
+          ],
+          [
+            "1780666140000000",
+            "ZONE-1",
+            "2",
+            "457.5",
+            "35.7",
+            "33.3",
+            "148"
+          ],
+          [
+            "1780666080000000",
+            "ZONE-2",
+            "3",
+            "686.6666666666666",
+            "40.0",
+            "25.0",
+            "775"
+          ],
+          [
+            "1780666080000000",
+            "ZONE-1",
+            "2",
+            "457.5",
+            "35.7",
+            "33.3",
+            "148"
+          ],
+          [
+            "1780666080000000",
+            "ZONE-4",
+            "2",
+            "582.5",
+            "30.1",
+            "5.0",
+            "615"
+          ],
+          [
+            "1780666080000000",
+            "ZONE-3",
+            "2",
+            "385.0",
+            "26.3",
+            "42.5",
+            "610"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q189",
+      "sql": "SELECT time_band, facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput\nFROM (\n  SELECT _timestamp, facility_zone, throughput_rate, load_factor,\n    CASE\n      WHEN ((_timestamp - MIN(_timestamp) OVER ()) / 60000000) < 60 THEN 'first_minute'\n      WHEN ((_timestamp - MIN(_timestamp) OVER ()) / 60000000) < 120 THEN 'second_minute'\n      ELSE 'later'\n    END AS time_band\n  FROM \"{stream}\"\n  WHERE load_factor > 10.0\n) sub\nGROUP BY time_band, facility_zone\nHAVING COUNT(*) >= 1\nORDER BY time_band, cnt DESC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 11279000000,
+        "end_offset": 11443000000
+      },
+      "expected": {
+        "columns": [
+          "time_band",
+          "facility_zone",
+          "cnt",
+          "avg_throughput"
+        ],
+        "results": [
+          [
+            "first_minute",
+            "ZONE-1",
+            "9",
+            "355.0"
+          ],
+          [
+            "first_minute",
+            "ZONE-2",
+            "9",
+            "686.6666666666666"
+          ],
+          [
+            "first_minute",
+            "ZONE-3",
+            "5",
+            "404.0"
+          ],
+          [
+            "first_minute",
+            "ZONE-4",
+            "5",
+            "577.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
   "last_query_id": 73

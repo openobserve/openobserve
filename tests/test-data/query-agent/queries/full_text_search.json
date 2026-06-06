@@ -203,11 +203,11 @@
             "9"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "5"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "5"
           ],
           [
@@ -794,6 +794,106 @@
           "session"
         ],
         "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q190",
+      "sql": "SELECT _timestamp, log, facility_zone, operation_mode, api_name\nFROM \"{stream}\"\nWHERE match_all('warehouse')\n  AND str_match_ignore_case(log, 'batch')\n  AND facility_zone IN ('ZONE-1', 'ZONE-2')\nORDER BY _timestamp DESC\nLIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 11339000000,
+        "end_offset": 11503000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "facility_zone",
+          "operation_mode",
+          "api_name"
+        ],
+        "results": [
+          [
+            "Q190 warehouse event record 9 ACK batch batchIdList:Q190-9",
+            "ZONE-2",
+            "manual",
+            "SyncZone"
+          ],
+          [
+            "Q192 warehouse event record 0 ACK batch batchIdList:Q192-0",
+            "ZONE-1",
+            "auto",
+            "SearchItems"
+          ],
+          [
+            "Q189 warehouse event record 9 ACK batch batchIdList:Q189-9",
+            "ZONE-2",
+            "manual",
+            "SyncZone"
+          ],
+          [
+            "Q191 warehouse event record 0 ACK batch batchIdList:Q191-0",
+            "ZONE-1",
+            "auto",
+            "SearchItems"
+          ],
+          [
+            "Q188 warehouse event record 9 ACK batch batchIdList:Q188-9",
+            "ZONE-2",
+            "manual",
+            "SyncZone"
+          ],
+          [
+            "Q190 warehouse event record 0 ACK batch batchIdList:Q190-0",
+            "ZONE-1",
+            "auto",
+            "SearchItems"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q191",
+      "sql": "SELECT facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM \"{stream}\"\nWHERE match_all('warehouse')\n  AND str_match_ignore_case(log, 'event')\n  AND throughput_rate >= 100.0\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\n  AND AVG(throughput_rate) > 100.0\nORDER BY cnt DESC",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 11399000000,
+        "end_offset": 11563000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "max_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "9",
+            "686.6666666666666",
+            "99.0"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "355.0",
+            "88.1"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "404.0",
+            "55.2"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "577.0",
+            "72.8"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     }
