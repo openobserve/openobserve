@@ -59,13 +59,13 @@
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "3",
             "0",
             "0.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "3",
             "0",
             "0.0"
@@ -865,14 +865,14 @@
             "50.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "0",
             "3",
             "0",
             "0.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-3",
             "0",
             "3",
             "0",
@@ -1078,14 +1078,14 @@
             "372.0"
           ],
           [
-            "ZONE-3",
-            "3",
-            "168.0"
-          ],
-          [
             "ZONE-2",
             "3",
             "72.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "168.0"
           ],
           [
             "ZONE-4",
@@ -1506,17 +1506,17 @@
         ],
         "results": [
           [
-            "NullPointerException at ConveyorController.handle()",
-            "3",
-            "1"
-          ],
-          [
             "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1"
           ],
           [
             "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "3",
+            "1"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
             "3",
             "1"
           ]
@@ -1572,13 +1572,13 @@
             "3"
           ],
           [
-            "interaction",
-            "cartPage",
+            "performanceMetric",
+            "checkoutPage",
             "3"
           ],
           [
-            "performanceMetric",
-            "checkoutPage",
+            "interaction",
+            "cartPage",
             "3"
           ],
           [
@@ -1678,13 +1678,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "6",
+            "sess_002",
+            "3",
             "0"
           ],
           [
-            "sess_002",
-            "3",
+            "sess_001",
+            "6",
             "0"
           ],
           [
@@ -1739,7 +1739,7 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "3"
           ],
           [
@@ -1749,12 +1749,12 @@
           ],
           [
             "fast",
-            "client_error",
+            "ok",
             "3"
           ],
           [
             "fast",
-            "unknown",
+            "client_error",
             "3"
           ],
           [
@@ -1836,17 +1836,17 @@
         ],
         "results": [
           [
-            "checkoutPage/performanceMetric",
-            "3",
-            "1"
-          ],
-          [
             "itemPage/performanceMetric",
             "3",
             "1"
           ],
           [
             "searchPage/performanceMetric",
+            "3",
+            "1"
+          ],
+          [
+            "checkoutPage/performanceMetric",
             "3",
             "1"
           ]
@@ -1894,13 +1894,8 @@
         ],
         "results": [
           [
-            "navigation",
-            "itemPage",
-            "1"
-          ],
-          [
-            "interaction",
-            "cartPage",
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ],
           [
@@ -1914,8 +1909,13 @@
             "1"
           ],
           [
-            "performanceMetric",
-            "checkoutPage",
+            "interaction",
+            "cartPage",
+            "1"
+          ],
+          [
+            "navigation",
+            "itemPage",
             "1"
           ]
         ],
@@ -1945,13 +1945,13 @@
             "3"
           ],
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1",
             "3"
           ],
           [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "3",
             "1",
             "3"
@@ -2007,16 +2007,16 @@
             "2"
           ],
           [
-            "checkoutPage",
-            "3",
-            "89.0",
-            "3"
-          ],
-          [
             "cartPage",
             "3",
             "230.0",
             "0"
+          ],
+          [
+            "checkoutPage",
+            "3",
+            "89.0",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -2062,12 +2062,12 @@
             "3"
           ],
           [
-            "https://shop.example.com/cart",
+            "https://shop.example.com/item/1001",
             "3",
             "3"
           ],
           [
-            "https://shop.example.com/item/1001",
+            "https://shop.example.com/cart",
             "3",
             "3"
           ]

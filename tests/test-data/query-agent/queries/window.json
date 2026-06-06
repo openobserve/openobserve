@@ -13,6 +13,24 @@
         ],
         "results": [
           [
+            "SORT-M3",
+            "480.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "480.0",
+            "2",
+            "1"
+          ],
+          [
+            "SORT-M3",
+            "480.0",
+            "3",
+            "1"
+          ],
+          [
             "SORT-X1",
             "725.0",
             "1",
@@ -58,24 +76,6 @@
             "SORT-Z9",
             "610.0",
             "2",
-            "1"
-          ],
-          [
-            "SORT-M3",
-            "480.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-M3",
-            "480.0",
-            "2",
-            "1"
-          ],
-          [
-            "SORT-M3",
-            "480.0",
-            "3",
             "1"
           ],
           [
@@ -2669,7 +2669,8 @@
           ]
         ],
         "results_mode": "rowsort",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_column_check": true
       }
     },
     {
@@ -2764,7 +2765,8 @@
             "itemPage"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {

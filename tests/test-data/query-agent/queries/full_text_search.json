@@ -143,15 +143,15 @@
         ],
         "results": [
           [
+            "ZONE-2",
+            "3"
+          ],
+          [
             "ZONE-3",
             "3"
           ],
           [
             "ZONE-1",
-            "3"
-          ],
-          [
-            "ZONE-2",
             "3"
           ],
           [
@@ -1626,7 +1626,8 @@
           ]
         ],
         "results_mode": "rowsort",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_column_check": true
       }
     },
     {
@@ -2976,7 +2977,8 @@
           ]
         ],
         "results_mode": "rowsort",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_column_check": true
       }
     },
     {

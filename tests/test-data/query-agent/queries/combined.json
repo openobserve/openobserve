@@ -675,13 +675,6 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "SORT-M3",
-            "480.0",
-            "55.2",
-            "0.0"
-          ],
-          [
             "ZONE-1",
             "SORT-X1",
             "437.5",
@@ -700,6 +693,13 @@
             "SORT-Z9",
             "610.0",
             "72.8",
+            "0.0"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "480.0",
+            "55.2",
             "0.0"
           ]
         ],
@@ -803,10 +803,6 @@
         ],
         "results": [
           [
-            "2",
-            "scanPallet"
-          ],
-          [
             "3",
             "updateBatch"
           ],
@@ -817,6 +813,10 @@
           [
             "3",
             "rerouteTrack"
+          ],
+          [
+            "2",
+            "scanPallet"
           ]
         ],
         "results_mode": "rowsort"
@@ -881,17 +881,6 @@
         ],
         "results": [
           [
-            "itemPage",
-            "SQL Injection (Param)",
-            "N/A",
-            "US",
-            "business",
-            "Mobile",
-            "Android 14",
-            "dc-east",
-            "3"
-          ],
-          [
             "cartPage",
             "Path Traversal",
             "Allowlisted",
@@ -899,6 +888,17 @@
             "business",
             "Tablet",
             "Android 13",
+            "dc-east",
+            "3"
+          ],
+          [
+            "itemPage",
+            "SQL Injection (Param)",
+            "N/A",
+            "US",
+            "business",
+            "Mobile",
+            "Android 14",
             "dc-east",
             "3"
           ]
@@ -931,18 +931,18 @@
             "3"
           ],
           [
-            "ZONE-2",
-            "3",
-            "320.0",
-            "0",
-            "3"
-          ],
-          [
             "ZONE-3",
             "3",
             "480.0",
             "0",
             "0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "320.0",
+            "0",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1038,6 +1038,14 @@
             "2.5"
           ],
           [
+            "LOW_LOAD",
+            "LOW_TPUT",
+            "3",
+            "18.5",
+            "150",
+            "0.5"
+          ],
+          [
             "MED_LOAD",
             "MED_TPUT",
             "3",
@@ -1052,14 +1060,6 @@
             "22.0",
             "360",
             "1.0"
-          ],
-          [
-            "LOW_LOAD",
-            "LOW_TPUT",
-            "3",
-            "18.5",
-            "150",
-            "0.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1080,16 +1080,16 @@
         ],
         "results": [
           [
-            "item_click",
-            "2"
-          ],
-          [
             "item_error",
             "3"
           ],
           [
             "other",
             "9"
+          ],
+          [
+            "item_click",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1112,16 +1112,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "3",
-            "3",
-            "0"
-          ],
-          [
             "itemPage",
             "5",
             "2",
             "2"
+          ],
+          [
+            "checkoutPage",
+            "3",
+            "3",
+            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1169,7 +1169,7 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1002",
+            "https://shop.example.com/cart",
             "3",
             "1"
           ],
@@ -1184,7 +1184,7 @@
             "1"
           ],
           [
-            "https://shop.example.com/cart",
+            "https://shop.example.com/item/1002",
             "3",
             "1"
           ],
@@ -1247,18 +1247,18 @@
         ],
         "results": [
           [
-            "scan-hub",
-            "itemPage",
-            "2",
-            "1450.0",
-            "1450"
-          ],
-          [
             "track-router",
             "checkoutPage",
             "3",
             "89.0",
             "89"
+          ],
+          [
+            "scan-hub",
+            "itemPage",
+            "2",
+            "1450.0",
+            "1450"
           ],
           [
             "zone-controller",
@@ -1292,11 +1292,6 @@
             "1"
           ],
           [
-            "other",
-            "6",
-            "1"
-          ],
-          [
             "purchase",
             "3",
             "1"
@@ -1304,6 +1299,11 @@
           [
             "browse",
             "2",
+            "1"
+          ],
+          [
+            "other",
+            "6",
             "1"
           ]
         ],
@@ -1326,12 +1326,12 @@
         ],
         "results": [
           [
-            "E001",
+            "E002",
             "3",
             "1"
           ],
           [
-            "E002",
+            "E001",
             "3",
             "1"
           ],
@@ -1424,11 +1424,6 @@
         ],
         "results": [
           [
-            "medium",
-            "other",
-            "3"
-          ],
-          [
             "fast",
             "other",
             "3"
@@ -1441,6 +1436,11 @@
           [
             "fast",
             "success",
+            "3"
+          ],
+          [
+            "medium",
+            "other",
             "3"
           ],
           [
@@ -1486,14 +1486,14 @@
         ],
         "results": [
           [
-            "conveyor-driver",
-            "E002",
+            "track-router",
+            "E005",
             "3",
             "medium"
           ],
           [
-            "track-router",
-            "E005",
+            "conveyor-driver",
+            "E002",
             "3",
             "medium"
           ],
@@ -1524,12 +1524,6 @@
         ],
         "results": [
           [
-            "cartPage",
-            "3",
-            "3",
-            "100.0"
-          ],
-          [
             "itemPage",
             "5",
             "5",
@@ -1537,6 +1531,12 @@
           ],
           [
             "searchPage",
+            "3",
+            "3",
+            "100.0"
+          ],
+          [
+            "cartPage",
             "3",
             "3",
             "100.0"

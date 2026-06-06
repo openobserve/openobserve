@@ -98,23 +98,23 @@
         ],
         "results": [
           [
-            "SORT-A7",
-            "manual",
-            "3"
-          ],
-          [
-            "SORT-X1",
-            "manual",
-            "3"
-          ],
-          [
             "SORT-X1",
             "auto",
             "3"
           ],
           [
+            "SORT-A7",
+            "manual",
+            "3"
+          ],
+          [
             "SORT-M3",
             "hybrid",
+            "3"
+          ],
+          [
+            "SORT-X1",
+            "manual",
             "3"
           ],
           [
@@ -888,13 +888,13 @@
         "results": [
           [
             "mobile",
-            "navigation",
-            "2"
+            "performanceMetric",
+            "3"
           ],
           [
             "mobile",
-            "performanceMetric",
-            "3"
+            "navigation",
+            "2"
           ],
           [
             "desktop",
@@ -922,17 +922,17 @@
         "results": [
           [
             "errors",
-            "E005",
-            "3"
-          ],
-          [
-            "errors",
             "E001",
             "3"
           ],
           [
             "errors",
             "E002",
+            "3"
+          ],
+          [
+            "errors",
+            "E005",
             "3"
           ],
           [
@@ -970,14 +970,14 @@
         ],
         "results": [
           [
-            "Android",
-            "0",
-            "3"
-          ],
-          [
             "non-Android",
             "2",
             "6"
+          ],
+          [
+            "Android",
+            "0",
+            "3"
           ],
           [
             "TOTAL",
@@ -1074,12 +1074,12 @@
           ],
           [
             "staging",
-            "E002",
+            "E005",
             "3"
           ],
           [
             "staging",
-            "E005",
+            "E002",
             "3"
           ]
         ],
@@ -1108,17 +1108,17 @@
           ],
           [
             "component_err",
+            "sorter-engine",
+            "3"
+          ],
+          [
+            "component_err",
             "conveyor-driver",
             "3"
           ],
           [
             "component_err",
             "track-router",
-            "3"
-          ],
-          [
-            "component_err",
-            "sorter-engine",
             "3"
           ]
         ],
@@ -1158,7 +1158,15 @@
         ],
         "results": [
           [
-            "UP-E001",
+            "E001",
+            "3"
+          ],
+          [
+            "E005",
+            "3"
+          ],
+          [
+            "E002",
             "3"
           ],
           [
@@ -1170,15 +1178,7 @@
             "3"
           ],
           [
-            "E005",
-            "3"
-          ],
-          [
-            "E001",
-            "3"
-          ],
-          [
-            "E002",
+            "UP-E001",
             "3"
           ]
         ],
