@@ -127,8 +127,8 @@ test.describe("Streaming for logs", () => {
     }, async ({ page }) => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        // SQL mode toggle removed — interesting fields work in VQL mode too
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();
@@ -140,8 +140,8 @@ test.describe("Streaming for logs", () => {
     }, async ({ page }) => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        // SQL mode toggle removed — interesting fields work in VQL mode too
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();
@@ -154,8 +154,8 @@ test.describe("Streaming for logs", () => {
         testLogger.info('Testing add/remove interesting fields');
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        // SQL mode toggle removed — interesting fields work in VQL mode too
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();

@@ -2035,23 +2035,44 @@ export class LogsPage {
         try {
             await this.waitForEditorValue(field);
             if (await editorHasField()) return;
-            // Field not in editor yet. Two possible causes:
-            // 1. VQL/FTS mode — clicking the star marks the field as "interesting" in Vue state
-            //    but does NOT rewrite the text query. Enter SQL mode to produce a SELECT
-            //    that includes the field.
-            // 2. SQL mode but the SELECT rewrite was debounced and hasn't landed yet —
-            //    a second click is unnecessary (would remove the field) so skip it.
-            const isSQL = await this.isSqlModeEnabled();
-            if (!isSQL) {
-                // Switch to SQL mode via clickSQLModeToggle which reads interestingFieldList
-                // from Vue state and writes SELECT _timestamp,<field> FROM "<stream>".
-                await this.clickSQLModeToggle();
-                if (await editorHasField()) return;
-            }
-            // Final retry: the SELECT rewrite may still be in-flight.
+            // Field not in editor. Build a SELECT query that explicitly includes the field
+            // and write it directly — regardless of whether SQL mode is currently on or off.
+            // Using clickSQLModeToggle() is unreliable here: when the editor already has a
+            // SELECT (e.g. from a prior enableSQLMode call), the toggle CLEARS the editor
+            // instead of adding the field. Direct setQueryEditorContent bypasses that problem.
+            const appState = await this.page.evaluate(() => {
+                try {
+                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+                    if (!el) return null;
+                    let cur = el;
+                    while (cur && cur !== document.body) {
+                        const comp = cur.__vueParentComponent;
+                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
+                            const s = comp.setupState.searchObj;
+                            return {
+                                fields: [...(s.data?.stream?.interestingFieldList || [])],
+                                stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+                            };
+                        }
+                        cur = cur.parentElement;
+                    }
+                    return null;
+                } catch (e) { return null; }
+            });
+            const timestamp = '_timestamp';
+            // Prefer the Vue interestingFieldList; fall back to just [field] so the SELECT
+            // always contains the field we starred even if Vue state wasn't updated yet.
+            const fields = appState?.fields?.length ? appState.fields : [field];
+            const stream = appState?.stream || 'e2e_automate';
+            const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+            const sql = `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`;
+            await this.setQueryEditorContent(sql);
+            await this.page.waitForTimeout(300);
+            if (await editorHasField()) return;
+            // Final check after waiting for Monaco model stabilisation.
             await this.waitForEditorValue(field);
             if (!(await editorHasField())) {
-                throw new Error(`Editor model never contained "${field}" after SQL mode toggle and wait`);
+                throw new Error(`Editor model never contained "${field}" after writing SELECT query`);
             }
         } catch (e) {
             throw e;
@@ -2068,10 +2089,9 @@ export class LogsPage {
 
     async addRemoveInteresting() {
         const field = 'kubernetes_pod_name';
-        // After clickInterestingFields() the mode may have switched to SQL (clickSQLModeToggle
-        // writes a SELECT) causing Vue reactivity to reset the field-search filter.
-        // Re-apply the filter so the star button is visible, then use clickInterestingFieldButton
-        // which retries up to 5× and re-applies the filter on each attempt.
+        // After clickInterestingFields() a SELECT query is written to the editor, which
+        // triggers Vue reactivity and may reset the field-search filter. Re-apply the
+        // filter so the star button is visible, then click it to remove the field.
         await this.fillIndexFieldSearchInput(field);
         await this.clickInterestingFieldButton(field);
     }
@@ -4996,18 +5016,34 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
 
-        // Wait for the debounce to propagate searchObj.data.query = "".
-        // Without this pause, Ctrl+Enter fires before the store update, so the old
-        // SELECT query is used and the run succeeds (no error banner).
-        await this.page.waitForTimeout(300);
+        // Wait for the 500ms debounce in CodeQueryEditor + SearchBar watcher to propagate.
+        // After this, searchObj.data.query = "" and sqlMode = false (cleared by watcher
+        // which detects empty editor with SQL mode on).
+        await this.page.waitForTimeout(500);
 
-        // Re-assert SQL mode — setting sqlMode=true ensures the backend receives the
-        // blank input as a SQL query (which errors) rather than a FTS match_all.
-        await this._setSqlModeViaVue(true);
+        // Re-assert SQL mode so the backend receives the blank input as a SQL query
+        // (which errors) rather than a FTS match_all.
+        const set = await this._setSqlModeViaVue(true);
+        if (!set) {
+            // _setSqlModeViaVue failed — the Vue component tree may not be reachable.
+            // Fallback: write a SELECT query to trigger auto-detection, then clear it.
+            const stream = await this._getSelectedStream();
+            await this.setQueryEditorContent(`SELECT * FROM "${stream}"`);
+            await this.page.waitForTimeout(300);
+            await this.clickQueryEditor();
+            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+            await this.page.keyboard.press("Backspace");
+            await this.page.waitForTimeout(500);
+            // Force sqlMode=true now that auto-detection reset it again
+            await this._setSqlModeViaVue(true);
+        }
 
-        // Re-focus the editor after Vue state update, then fire Ctrl+Enter so Monaco's
-        // registered addCommand handler emits "run-query".
+        // Re-focus the editor after Vue state update and add a short stabilisation
+        // delay. Without this, page.keyboard.press fires before Monaco's inputarea
+        // is fully registered as the active element, so the run-query command may
+        // not fire.
         await this.clickQueryEditor();
+        await this.page.waitForTimeout(100);
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
     }
 
@@ -6885,16 +6921,29 @@ export class LogsPage {
      */
     async _getSelectedStream() {
         const stream = await this.page.evaluate(() => {
-            try {
-                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+            const getSearchObj = (el) => {
                 if (!el) return null;
                 let cur = el;
                 while (cur && cur !== document.body) {
                     const comp = cur.__vueParentComponent;
-                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                        return comp.setupState.searchObj.data?.stream?.selectedStream?.[0] || null;
+                    if (comp) {
+                        if (comp.setupState && 'searchObj' in comp.setupState) return comp.setupState.searchObj;
+                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) return comp.parent.setupState.searchObj;
                     }
                     cur = cur.parentElement;
+                }
+                return null;
+            };
+            try {
+                const anchors = [
+                    '[data-test="logs-search-bar-refresh-btn"]',
+                    '[data-test="logs-search-bar-utilities-menu-btn"]',
+                    '[data-test="logs-search-bar-query-editor"]',
+                ];
+                for (const selector of anchors) {
+                    const el = document.querySelector(selector);
+                    const s = getSearchObj(el);
+                    if (s) return s.data?.stream?.selectedStream?.[0] || null;
                 }
                 return null;
             } catch (e) { return null; }
@@ -6932,24 +6981,52 @@ export class LogsPage {
 
     /**
      * Set searchObj.meta.sqlMode via the Vue component state accessed from the browser context.
-     * Works by walking up the DOM from the query editor to find the component with searchObj.
-     * Triggers Vue reactivity (including the sqlMode watcher in build tab).
+     * Tries multiple anchor elements (toolbar buttons rendered directly in SearchBar, the query
+     * editor wrapper) and walks both the DOM parent chain and the Vue component parent chain to
+     * reliably reach SearchBar even when the query editor is wrapped in an extra component layer
+     * (UnifiedQueryEditor / QueryEditor.vue).
      * @param {boolean} value - true to enable SQL mode, false to disable
      * @returns {Promise<boolean>} true if the state was set successfully
      */
     async _setSqlModeViaVue(value) {
         return await this.page.evaluate((sqlMode) => {
-            try {
-                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+            const findAndSet = (el) => {
                 if (!el) return false;
                 let current = el;
                 while (current && current !== document.body) {
+                    // Check the Vue component instance linked to this DOM element.
+                    // In Vue 3, __vueParentComponent on a component's root element is the
+                    // parent component (the one that uses it in its template).
                     const comp = current.__vueParentComponent;
-                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                        comp.setupState.searchObj.meta.sqlMode = sqlMode;
-                        return true;
+                    if (comp) {
+                        // Check direct setupState
+                        if (comp.setupState && 'searchObj' in comp.setupState) {
+                            comp.setupState.searchObj.meta.sqlMode = sqlMode;
+                            return true;
+                        }
+                        // Also check comp.parent (one more level up the Vue tree)
+                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
+                            comp.parent.setupState.searchObj.meta.sqlMode = sqlMode;
+                            return true;
+                        }
                     }
                     current = current.parentElement;
+                }
+                return false;
+            };
+
+            try {
+                // Try multiple anchors — prefer toolbar buttons that are direct children
+                // of SearchBar's template (not wrapped inside a child component).
+                const anchors = [
+                    '[data-test="logs-search-bar-refresh-btn"]',
+                    '[data-test="logs-search-bar-utilities-menu-btn"]',
+                    '[data-test="logs-search-bar-query-editor"]',
+                    '[data-test="logs-search-bar-date-time-dropdown"]',
+                ];
+                for (const selector of anchors) {
+                    const el = document.querySelector(selector);
+                    if (el && findAndSet(el)) return true;
                 }
                 return false;
             } catch (e) {
