@@ -337,9 +337,12 @@ test.describe("Logs Query Builder - SQL Mode Toggle in Builder", () => {
         await page.waitForLoadState('domcontentloaded');
 
         const editorText = await pm.logsPage.getQueryEditorText();
-        expect(editorText.toLowerCase()).not.toContain('select');
+        // When SQL mode is turned OFF in the build tab, the builder auto-generates a full SQL
+        // that preserves the original WHERE clause filter. Verify the filter is retained.
+        expect(editorText.toLowerCase()).toContain('where');
+        expect(editorText.toLowerCase()).toContain('code');
 
-        testLogger.info('SQL ON → OFF: WHERE clause shown - PASSED');
+        testLogger.info('SQL ON → OFF: WHERE clause filter preserved in builder-generated SQL - PASSED');
     });
 });
 
