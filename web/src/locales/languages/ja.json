@@ -404,7 +404,13 @@
     "selectLogStream": "ログストリームを選択",
     "noData": "データはありません",
     "functionEditorLabel": "関数エディター",
-    "loadingStream": "ストリームをロード中..."
+    "loadingStream": "ストリームをロード中...",
+    "askAIPlaceholderRotation": {
+      "one": "過去 1 時間のエラーを表示...",
+      "two": "5 秒以上かかる遅いクエリを検索...",
+      "three": "サービスごとにグループ化された5xx件の回答をカウント...",
+      "four": "レベル = 'error' のログをフィルタする..."
+    }
   },
   "menu": {
     "home": "ホーム",
@@ -2944,7 +2950,8 @@
     "evaluationTemplate": "評価テンプレート",
     "evaluationTemplateHelp": "LLMジャッジの基準とディメンションを定義する評価テンプレートを選択してください。",
     "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
-    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました"
+    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました",
+    "subtitle": "転送中のデータの変換、強化、ルーティング"
   },
   "reports": {
     "header": "レポート",

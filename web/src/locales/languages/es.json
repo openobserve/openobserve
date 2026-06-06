@@ -404,7 +404,13 @@
     "selectLogStream": "Seleccione la secuencia de registros",
     "noData": "No hay datos disponibles",
     "functionEditorLabel": "Editor de funciones",
-    "loadingStream": "Cargando Stream..."
+    "loadingStream": "Cargando Stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Muéstrame los errores de la última hora...",
+      "two": "Encuentra consultas lentas que tardan más de 5 segundos...",
+      "three": "Cuenta 5xx respuestas agrupadas por servicio...",
+      "four": "Filtrar registros en los que nivel = 'error'..."
+    }
   },
   "menu": {
     "home": "Inicio",
@@ -2921,7 +2927,8 @@
     "evaluationTemplate": "Plantilla de evaluación",
     "evaluationTemplateHelp": "Seleccione una plantilla de evaluación que defina los criterios y las dimensiones del juez del LLM.",
     "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación. Cree una en la página de plantillas de evaluación.",
-    "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente"
+    "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente",
+    "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo"
   },
   "reports": {
     "header": "Informes",

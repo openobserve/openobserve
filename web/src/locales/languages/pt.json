@@ -404,7 +404,13 @@
     "selectLogStream": "Selecione o fluxo de registros",
     "noData": "Não há dados disponíveis",
     "functionEditorLabel": "Editor de funções",
-    "loadingStream": "Carregando Stream..."
+    "loadingStream": "Carregando Stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Mostre-me os erros da última hora...",
+      "two": "Encontre consultas lentas que demoram mais de 5s...",
+      "three": "Conte 5xx respostas agrupadas por serviço...",
+      "four": "Filtrar registros em que nível = 'erro'..."
+    }
   },
   "menu": {
     "home": "Início",
@@ -2923,7 +2929,8 @@
     "evaluationTemplate": "Modelo de avaliação",
     "evaluationTemplateHelp": "Selecione um modelo de avaliação que defina os critérios e as dimensões para o juiz do LLM.",
     "noTemplatesFound": "Nenhum modelo de avaliação encontrado. Crie um na página Modelos de avaliação.",
-    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso"
+    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso",
+    "subtitle": "Transforme, enriqueça e direcione dados em voo"
   },
   "reports": {
     "header": "Relatórios",

@@ -404,7 +404,13 @@
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
     "functionEditorLabel": "Functie-editor",
-    "loadingStream": "Stream wordt geladen..."
+    "loadingStream": "Stream wordt geladen...",
+    "askAIPlaceholderRotation": {
+      "one": "Laat me fouten zien van het afgelopen uur...",
+      "two": "Vind langzame zoekopdrachten die meer dan 5 seconden duren...",
+      "three": "Tel 5xx reacties gegroepeerd per service...",
+      "four": "Filterlogboeken waarbij level = 'error'..."
+    }
   },
   "menu": {
     "home": "Home",
@@ -2934,7 +2940,8 @@
     "evaluationTemplate": "Evaluatiesjabloon",
     "evaluationTemplateHelp": "Selecteer een evaluatiesjabloon dat de criteria en dimensies voor de LLM-jurylid definieert.",
     "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
-    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd"
+    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd",
+    "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht"
   },
   "reports": {
     "header": "Rapporten",

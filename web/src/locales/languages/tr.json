@@ -404,7 +404,13 @@
     "selectLogStream": "Günlükler akışını seçin",
     "noData": "Veri yok",
     "functionEditorLabel": "İşlev Düzenleyicisi",
-    "loadingStream": "Akış Yükleniyor..."
+    "loadingStream": "Akış Yükleniyor...",
+    "askAIPlaceholderRotation": {
+      "one": "Bana son saatteki hataları göster...",
+      "two": "5 saniyeden fazla süren yavaş sorguları bulun...",
+      "three": "Hizmete göre gruplandırılmış 5xx yanıtlarını sayın...",
+      "four": "Level = 'error' olduğu günlükleri filtreleyin..."
+    }
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -2934,7 +2940,8 @@
     "evaluationTemplate": "Değerlendirme Şablonu",
     "evaluationTemplateHelp": "LLM hakimi için kriterleri ve boyutları tanımlayan bir değerlendirme şablonu seçin.",
     "noTemplatesFound": "Değerlendirme şablonu bulunamadı. Değerlendirme Şablonları sayfasında bir tane oluşturun.",
-    "evalTemplatesRefreshed": "Değerlendirme şablonları başarıyla yenilendi"
+    "evalTemplatesRefreshed": "Değerlendirme şablonları başarıyla yenilendi",
+    "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin"
   },
   "reports": {
     "header": "Raporlar",

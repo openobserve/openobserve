@@ -404,7 +404,13 @@
     "selectLogStream": "Logs-Stream auswählen",
     "noData": "Keine Daten verfügbar",
     "functionEditorLabel": "Funktionseditor",
-    "loadingStream": "Stream wird geladen..."
+    "loadingStream": "Stream wird geladen...",
+    "askAIPlaceholderRotation": {
+      "one": "Zeige mir Fehler der letzten Stunde...",
+      "two": "Finden Sie langsame Abfragen, die länger als 5 Sekunden dauern...",
+      "three": "Zählen Sie 5xx Antworten, gruppiert nach Service...",
+      "four": "Filtert Protokolle, bei denen level = 'error'..."
+    }
   },
   "menu": {
     "home": "Startseite",
@@ -2923,7 +2929,8 @@
     "evaluationTemplate": "Vorlage für eine Bewertung",
     "evaluationTemplateHelp": "Wählen Sie eine Bewertungsvorlage aus, die die Kriterien und Dimensionen für den LLM-Richter definiert.",
     "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
-    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert"
+    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert",
+    "subtitle": "Daten während des Fluges transformieren, anreichern und routen"
   },
   "reports": {
     "header": "Berichte",

@@ -404,7 +404,13 @@
     "selectLogStream": "选择日志流",
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
-    "loadingStream": "正在加载直播..."
+    "loadingStream": "正在加载直播...",
+    "askAIPlaceholderRotation": {
+      "one": "让我看看过去一小时的错误...",
+      "two": "查找耗时超过 5 秒的慢速查询...",
+      "three": "计算按服务分组的 5xx 个响应...",
+      "four": "筛选等级 = “错误” 的日志..."
+    }
   },
   "menu": {
     "home": "主页",
@@ -2927,7 +2933,8 @@
     "evaluationTemplate": "评估模板",
     "evaluationTemplateHelp": "选择一个评估模板来定义 LLM 评委的标准和维度。",
     "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
-    "evalTemplatesRefreshed": "评估模板已成功刷新"
+    "evalTemplatesRefreshed": "评估模板已成功刷新",
+    "subtitle": "在飞行中转换、丰富和路由数据"
   },
   "reports": {
     "header": "报表",

@@ -404,7 +404,13 @@
     "selectLogStream": "Sélectionnez le flux de journaux",
     "noData": "Aucune donnée disponible",
     "functionEditorLabel": "Éditeur de fonctions",
-    "loadingStream": "Chargement du flux..."
+    "loadingStream": "Chargement du flux...",
+    "askAIPlaceholderRotation": {
+      "one": "Montrez-moi les erreurs de la dernière heure...",
+      "two": "Trouvez des requêtes lentes qui prennent plus de 5 secondes...",
+      "three": "Comptez 5xx réponses regroupées par service...",
+      "four": "Filtrer les journaux où level = « erreur »..."
+    }
   },
   "menu": {
     "home": "Accueil",
@@ -2923,7 +2929,8 @@
     "evaluationTemplate": "Modèle d'évaluation",
     "evaluationTemplateHelp": "Sélectionnez un modèle d'évaluation qui définit les critères et les dimensions pour le juge LLM.",
     "noTemplatesFound": "Aucun modèle d'évaluation n'a été trouvé. Créez-en un sur la page Modèles d'évaluation.",
-    "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès"
+    "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès",
+    "subtitle": "Transformez, enrichissez et acheminez les données en vol"
   },
   "reports": {
     "header": "Rapports",
