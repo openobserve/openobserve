@@ -1486,10 +1486,9 @@ export class LogsPage {
 
     // SQL Mode methods
     // SQL mode toggle was removed from the UI. The editor now auto-detects SQL mode
-    // when the user types a SELECT/SQL query. These methods are kept as no-ops so
-    // callers that haven't been updated yet don't throw hard failures.
+    // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
-        testLogger.info('enableSQLMode: SQL mode toggle removed from UI — skipping (auto-detected from query content)');
+        await this.enableSqlModeIfNeeded();
     }
 
     // Quick Mode methods (now inside the utilities hamburger menu)
@@ -1587,9 +1586,7 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        // In narrow viewport the histogram switch is inside the utilities ("More") menu.
-        // In normal viewport it is a standalone toolbar button — check the OSwitch state
-        // via the menu item's switch (only rendered when shouldMoveButtonsToMenu is true).
+        // Verifies histogram is OFF (unchecked). Works in both normal and narrow viewports.
         await this.page.keyboard.press('Escape').catch(() => {});
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
@@ -1607,8 +1604,6 @@ export class LogsPage {
             const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
             await expect(switchEl).toBeVisible({ timeout: 5000 });
         }
-        // In normal viewport the histogram is inline; the OSwitch has no data-test so we
-        // cannot check its state here — callers should rely on the inline button's aria state.
         await this.page.keyboard.press('Escape').catch(() => {});
     }
 
@@ -2795,11 +2790,21 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        // SQL mode toggle was removed from the UI. SQL mode is now auto-detected from
-        // SELECT...FROM in the query content. We read the current interesting fields and
-        // stream from the Vue component state to build the correct SELECT query, so that
-        // tests which add an interesting field before calling this method will see the
-        // field appear in the editor (e.g. SELECT _timestamp,kubernetes_pod_id FROM ...).
+        // Behaves as a true toggle:
+        //   SQL ON  → clear the editor (FTS mode, no SELECT)
+        //   SQL OFF → write SELECT query with current interesting fields (SQL mode)
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            // Toggle OFF: clear editor so auto-detection sets sqlMode = false
+            const monacoHelper = this.getMonacoEditorHelper();
+            const container = this.getQueryEditorContainer();
+            await monacoHelper.clear(container);
+            await this.page.waitForTimeout(600);
+            testLogger.info('clickSQLModeToggle: toggled OFF (editor cleared)');
+            return;
+        }
+
+        // Toggle ON: read interesting fields + stream from Vue state, build SELECT
         const appState = await this.page.evaluate(() => {
             try {
                 const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
@@ -2825,7 +2830,6 @@ export class LogsPage {
         const timestamp = '_timestamp';
         const fields = appState?.fields || [];
         const stream = appState?.stream || 'e2e_automate';
-        // Build SELECT with timestamp first, then any interesting fields
         const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
         const sql = allFields.length > 1
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
@@ -2835,7 +2839,7 @@ export class LogsPage {
         const container = this.getQueryEditorContainer();
         await monacoHelper.setContent(container, sql);
         await this.page.waitForTimeout(600);
-        testLogger.info(`clickSQLModeToggle: set SQL="${sql.substring(0, 80)}"`);
+        testLogger.info(`clickSQLModeToggle: toggled ON — set SQL="${sql.substring(0, 80)}"`);
     }
 
     async clickShowQueryToggle() {
@@ -5111,9 +5115,16 @@ export class LogsPage {
         await this.setQueryEditorContent('SELECT *');
         await this.page.waitForTimeout(300);
 
-        await this.clickQueryEditor();
-        await this.page.waitForTimeout(100);
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+        // Re-assert SQL mode after blanking — auto-detection resets sqlMode to false
+        // when the editor content is empty. Force it back so the backend receives a
+        // blank SQL query (not a blank FTS query) and returns the expected error.
+        await this._setSqlModeViaVue(true);
+
+        // Run the blank query — Monaco's internal Ctrl+Enter keybinding emits
+        // "run-query" which propagates to SearchBar's handleRunQueryFn.
+        await this.page.locator(this.queryEditor).press(
+            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"
+        );
     }
 
     async expectBlankQueryError() {
@@ -7395,8 +7406,9 @@ export class LogsPage {
      * Opens the utilities dropdown first since the toggle lives inside it.
      */
     async clickSQLModeSwitch() {
-        // SQL mode toggle removed from UI — no-op
-        testLogger.info('clickSQLModeSwitch: SQL mode toggle removed from UI — skipping');
+        // SQL mode toggle removed — delegate to clickSQLModeToggle which writes a SELECT
+        // query into the editor so that SQL mode is auto-detected as ON.
+        await this.clickSQLModeToggle();
     }
 
     /**
@@ -7918,14 +7930,21 @@ export class LogsPage {
             testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
             return;
         }
-        const set = await this._setSqlModeViaVue(true);
-        if (!set) {
-            // Fallback: type a SELECT query to trigger auto-detection
+        // Set the Vue flag first — in the build tab this triggers the sqlMode watcher
+        // which updates the editor with the full generated SQL query.
+        await this._setSqlModeViaVue(true);
+        await this.page.waitForTimeout(600);
+
+        // Check if the editor was updated (build tab watcher fired).
+        // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
+        // In that case fall back to writing SELECT directly so the editor reflects SQL mode.
+        const isSQLNow = await this.isSqlModeEnabled();
+        if (!isSQLNow) {
             const monacoHelper = this.getMonacoEditorHelper();
             const container = this.getQueryEditorContainer();
             await monacoHelper.setContent(container, 'SELECT * FROM "e2e_automate"');
+            await this.page.waitForTimeout(600);
         }
-        await this.page.waitForTimeout(600);
         testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
 
