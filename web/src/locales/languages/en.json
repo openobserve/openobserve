@@ -414,6 +414,12 @@
     "nlQueryGenerationSuccess": "Query generated successfully!",
     "askAIPlaceholder": "Ask AI to help with your query...",
     "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIPlaceholderRotation": {
+      "one": "Show me errors from the last hour…",
+      "two": "Find slow queries taking more than 5s…",
+      "three": "Count 5xx responses grouped by service…",
+      "four": "Filter logs where level = 'error'…"
+    },
     "enterPrompt": "Enter a prompt to generate query",
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "analyzingQuery": "Analyzing query...",

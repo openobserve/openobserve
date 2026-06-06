@@ -410,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:flex tw:h-[calc(100%-3.1rem)]!"
     >
       <div
-        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full"
+        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full tw:relative"
       >
         <code-query-editor
           ref="queryEditorRef"
@@ -430,6 +430,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
           @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
         />
+        <div
+          v-if="
+            searchObj.data.editorValue == '' &&
+            searchObj.meta.queryEditorPlaceholderFlag
+          "
+          class="query-editor-placeholder-overlay"
+        >
+          <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -447,6 +456,7 @@ import {
   onActivated,
   computed,
 } from "vue";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -962,6 +972,19 @@ export default defineComponent({
       localStorage.setItem("serviceGraph_layoutType", type);
     };
 
+    const _traceStreamFields = computed(
+      () => searchObj.data.stream.selectedStreamFields ?? [],
+    );
+    const _traceFieldValues = computed(() => props.fieldValues ?? {});
+    const _traceSqlMode = computed(() => false);
+    const _traceNoStream = computed(() => !searchObj.data.stream.selectedStream?.value);
+    const { placeholder: traceEditorPlaceholder } = useQueryPlaceholder(
+      _traceStreamFields,
+      _traceFieldValues,
+      _traceSqlMode,
+      _traceNoStream,
+    );
+
     return {
       t,
       router,
@@ -992,6 +1015,7 @@ export default defineComponent({
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
       toggleLiveMode,
+      traceEditorPlaceholder,
     };
   },
   computed: {
@@ -1241,5 +1265,34 @@ export default defineComponent({
 
 :global(.body--dark) .toolbar-toggle-container {
   border: 0.0625rem solid var(--color-button-outline-border);
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 0.8rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-size: var(--text-base);
+    line-height: 1.375rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+:global(.body--dark) .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
 }
 </style>

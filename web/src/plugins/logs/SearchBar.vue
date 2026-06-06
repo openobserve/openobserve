@@ -915,6 +915,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('search.selectStreamForAI')
                     : t('search.nlpModeDisabledForVisualization')
                 "
+                :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
@@ -937,6 +938,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                 @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
               />
+              <!-- Query editor placeholder overlay — shown when editor is empty and unfocused -->
+              <div
+                v-if="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag &&
+                  !searchObj.meta.nlpMode
+                "
+                class="query-editor-placeholder-overlay"
+              >
+                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+              </div>
             </div>
           </template>
           <template #after>
@@ -1556,6 +1568,8 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { inject } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { computed } from "vue";
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
@@ -4501,6 +4515,33 @@ export default defineComponent({
     };
     // [END] explain query functionality
 
+    // [START] query editor placeholder overlay
+    const _streamFields = computed(
+      () => searchObj.data.stream.selectedStreamFields ?? [],
+    );
+    const _fieldValues = computed(() => props.fieldValues ?? {});
+    const _sqlMode = computed(() => searchObj.meta.sqlMode);
+    const _noStream = computed(() => !searchObj.data.stream.selectedStream.length);
+    const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+      _streamFields,
+      _fieldValues,
+      _sqlMode,
+      _noStream,
+    );
+    // [END] query editor placeholder overlay
+
+    // [START] typewriter placeholder for AI query input
+    const aiQueryPlaceholderPrompts = computed(() => [
+      t("search.askAIPlaceholderRotation.one"),
+      t("search.askAIPlaceholderRotation.two"),
+      t("search.askAIPlaceholderRotation.three"),
+      t("search.askAIPlaceholderRotation.four"),
+    ]);
+    const { placeholder: aiQueryPlaceholder } = useTypewriterPlaceholder(
+      aiQueryPlaceholderPrompts,
+    );
+    // [END] typewriter placeholder for AI query input
+
     return {
       t,
       store,
@@ -4672,6 +4713,8 @@ export default defineComponent({
       vrlEditorNlpMode,
       shouldMoveShareToMenu,
       toggleLiveMode,
+      aiQueryPlaceholder,
+      editorPlaceholder,
     };
   },
   computed: {
@@ -5297,5 +5340,34 @@ html.dark .file-type label,
 
 .body--dark .vrl-disabled-warning {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 0.8rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-size: var(--text-base);
+    line-height: 1.375rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
 }
 </style>
