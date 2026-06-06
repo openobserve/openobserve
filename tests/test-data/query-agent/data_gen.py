@@ -598,13 +598,13 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=200):
+def build_dataset(num_queries=400):
     """Generate deterministic records for queries Q001-Q{num_queries}."""
     records = []
     for qi in range(1, num_queries + 1):
         qid = f"Q{qi:03d}"
         base = BASE_TS + (qi - 1) * 60_000_000
-        for i in range(10):
+        for i in range(5):
             ts = base + i * 18_000_000
             records.append(make_record(ts, i, qid))
     return records

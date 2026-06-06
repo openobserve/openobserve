@@ -12,44 +12,44 @@
         ],
         "results": [
           [
-            "PL-006",
-            "ZONE-2",
-            "840.0"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0"
-          ],
-          [
-            "PL-005",
-            "ZONE-1",
-            "725.0"
-          ],
-          [
-            "PL-005",
-            "ZONE-1",
-            "725.0"
-          ],
-          [
-            "PL-005",
-            "ZONE-1",
-            "725.0"
-          ],
-          [
             "PL-004",
             "ZONE-4",
             "610.0"
           ],
           [
-            "PL-004",
-            "ZONE-4",
-            "610.0"
+            "PL-003",
+            "ZONE-3",
+            "480.0"
           ],
           [
-            "PL-008",
-            "ZONE-4",
-            "555.0"
+            "PL-003",
+            "ZONE-3",
+            "480.0"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "480.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0"
+          ],
+          [
+            "PL-002",
+            "ZONE-2",
+            "320.0"
+          ],
+          [
+            "PL-001",
+            "ZONE-1",
+            "150.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -71,29 +71,14 @@
         ],
         "results": [
           [
-            "SORT-Q5",
-            "manual",
+            "SORT-M3",
+            "hybrid",
             "3"
           ],
           [
             "SORT-X1",
             "manual",
             "3"
-          ],
-          [
-            "SORT-M3",
-            "hybrid",
-            "3"
-          ],
-          [
-            "SORT-A7",
-            "hybrid",
-            "3"
-          ],
-          [
-            "SORT-M3",
-            "auto",
-            "2"
           ],
           [
             "SORT-Z9",
@@ -120,33 +105,33 @@
         ],
         "results": [
           [
-            "SORT-A7",
-            "840.0",
+            "SORT-Z9",
+            "610.0",
             "5"
           ],
           [
-            "SORT-A7",
-            "840.0",
+            "SORT-M3",
+            "480.0",
             "6"
           ],
           [
-            "SORT-X1",
-            "725.0",
+            "SORT-M3",
+            "480.0",
             "7"
           ],
           [
-            "SORT-X1",
-            "725.0",
+            "SORT-M3",
+            "480.0",
             "8"
           ],
           [
-            "SORT-X1",
-            "725.0",
+            "SORT-A7",
+            "320.0",
             "9"
           ],
           [
-            "SORT-Z9",
-            "610.0",
+            "SORT-A7",
+            "320.0",
             "10"
           ]
         ],
@@ -170,22 +155,22 @@
         ],
         "results": [
           [
-            "PL-003",
-            "ZONE-3",
-            "SORT-M3",
-            "480.0"
+            "PL-005",
+            "ZONE-1",
+            "SORT-X1",
+            "725.0"
           ],
           [
             "PL-002",
             "ZONE-2",
             "SORT-A7",
-            "900.0"
+            "320.0"
           ],
           [
-            "PL-007",
+            "PL-003",
             "ZONE-3",
             "SORT-M3",
-            "290.0"
+            "480.0"
           ],
           [
             "PL-004",
@@ -200,12 +185,6 @@
             "150.0"
           ],
           [
-            "PL-008",
-            "ZONE-4",
-            "SORT-Q5",
-            "555.0"
-          ],
-          [
             "PL-005",
             "ZONE-1",
             "SORT-X1",
@@ -216,6 +195,12 @@
             "ZONE-2",
             "SORT-A7",
             "320.0"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "SORT-M3",
+            "480.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -239,59 +224,59 @@
         ],
         "results": [
           [
-            "PL-005",
-            "CC-ALPHA",
-            "88.1",
-            "725.0",
+            "PL-003",
+            "CC-GAMMA",
+            "55.2",
+            "480.0",
             "7"
           ],
           [
-            "PL-005",
-            "CC-ALPHA",
-            "88.1",
-            "725.0",
+            "PL-003",
+            "CC-GAMMA",
+            "55.2",
+            "480.0",
             "8"
           ],
           [
-            "PL-005",
-            "CC-ALPHA",
-            "88.1",
-            "725.0",
+            "PL-002",
+            "CC-BETA",
+            "33.0",
+            "320.0",
             "9"
           ],
           [
-            "PL-004",
-            "CC-DELTA",
-            "72.8",
-            "610.0",
+            "PL-002",
+            "CC-BETA",
+            "33.0",
+            "320.0",
             "10"
           ],
           [
-            "PL-004",
-            "CC-DELTA",
-            "72.8",
-            "610.0",
+            "PL-002",
+            "CC-BETA",
+            "33.0",
+            "320.0",
             "11"
           ],
           [
-            "PL-008",
-            "CC-DELTA",
-            "67.9",
-            "555.0",
+            "PL-001",
+            "CC-ALPHA",
+            "12.5",
+            "150.0",
             "12"
           ],
           [
-            "PL-008",
-            "CC-DELTA",
-            "67.9",
-            "555.0",
+            "PL-001",
+            "CC-ALPHA",
+            "12.5",
+            "150.0",
             "13"
           ],
           [
-            "PL-008",
-            "CC-DELTA",
-            "67.9",
-            "555.0",
+            "PL-001",
+            "CC-ALPHA",
+            "12.5",
+            "150.0",
             "14"
           ]
         ],
@@ -316,33 +301,15 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "3",
-            "725.0"
-          ],
-          [
-            "ZONE-4",
-            "manual",
-            "3",
-            "555.0"
-          ],
-          [
-            "ZONE-3",
-            "hybrid",
-            "3",
-            "480.0"
+            "150.0"
           ],
           [
             "ZONE-4",
             "auto",
             "2",
             "610.0"
-          ],
-          [
-            "ZONE-3",
-            "auto",
-            "2",
-            "290.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -379,26 +346,20 @@
           [
             "PL-001",
             "ZONE-1",
-            "190.0",
+            "150.0",
             "4"
           ],
           [
             "PL-002",
             "ZONE-2",
-            "900.0",
+            "320.0",
             "2"
           ],
           [
             "PL-002",
             "ZONE-2",
-            "900.0",
+            "320.0",
             "3"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "4"
           ],
           [
             "PL-003",
@@ -411,30 +372,12 @@
             "ZONE-3",
             "480.0",
             "3"
-          ],
-          [
-            "PL-007",
-            "ZONE-3",
-            "290.0",
-            "4"
           ],
           [
             "PL-004",
             "ZONE-4",
             "610.0",
             "2"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "3"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "4"
           ]
         ],
         "results_mode": "rowsort"
@@ -457,46 +400,46 @@
         ],
         "results": [
           [
-            "PL-005",
+            "PL-003",
+            "LANE-C",
+            "55.2",
+            "42.5"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "PL-002",
+            "LANE-B",
+            "33.0",
+            "25.0"
+          ],
+          [
+            "PL-001",
             "LANE-A",
-            "88.1",
-            "75.3"
+            "12.5",
+            "10.0"
           ],
           [
-            "PL-005",
+            "PL-001",
             "LANE-A",
-            "88.1",
-            "75.3"
+            "12.5",
+            "10.0"
           ],
           [
-            "PL-004",
-            "LANE-D",
-            "72.8",
-            "58.0"
-          ],
-          [
-            "PL-004",
-            "LANE-D",
-            "72.8",
-            "58.0"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "67.9",
-            "5.0"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "67.9",
-            "5.0"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "67.9",
-            "5.0"
+            "PL-001",
+            "LANE-A",
+            "12.5",
+            "10.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -537,81 +480,81 @@
             "1"
           ],
           [
-            "PL-002",
-            "ZONE-2",
-            "40.0",
+            "PL-005",
+            "ZONE-1",
+            "35.7",
             "1"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "40.0",
-            "1"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "40.0",
-            "1"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "19.2",
-            "4"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "19.2",
-            "4"
           ],
           [
             "PL-005",
             "ZONE-1",
             "35.7",
-            "4"
+            "1"
           ],
           [
-            "PL-006",
+            "PL-005",
+            "ZONE-1",
+            "35.7",
+            "1"
+          ],
+          [
+            "PL-002",
             "ZONE-2",
-            "19.2",
+            "22.0",
             "4"
           ],
           [
-            "PL-005",
-            "ZONE-1",
-            "35.7",
-            "4"
-          ],
-          [
-            "PL-005",
-            "ZONE-1",
-            "35.7",
+            "PL-004",
+            "ZONE-4",
+            "30.1",
             "4"
           ],
           [
             "PL-002",
             "ZONE-2",
             "22.0",
-            "7"
+            "4"
           ],
           [
             "PL-002",
             "ZONE-2",
             "22.0",
+            "4"
+          ],
+          [
+            "PL-004",
+            "ZONE-4",
+            "30.1",
+            "4"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "26.3",
+            "6"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "26.3",
+            "6"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "26.3",
+            "6"
+          ],
+          [
+            "PL-003",
+            "ZONE-3",
+            "26.3",
             "7"
           ],
           [
-            "PL-001",
-            "ZONE-1",
-            "32.5",
-            "7"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "22.0",
+            "PL-003",
+            "ZONE-3",
+            "26.3",
             "7"
           ]
         ],
@@ -634,24 +577,12 @@
         ],
         "results": [
           [
-            "610.0",
+            "320.0",
             "4"
           ],
           [
-            "555.0",
+            "150.0",
             "5"
-          ],
-          [
-            "480.0",
-            "6"
-          ],
-          [
-            "320.0",
-            "7"
-          ],
-          [
-            "290.0",
-            "8"
           ]
         ],
         "results_mode": "rowsort"
@@ -659,6 +590,722 @@
       "time_offset": {
         "start_offset": 6659000000,
         "end_offset": 6823000000
+      }
+    },
+    {
+      "id": "Q359",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'clickEvent' AND page_slug = 'itemPage' AND component_name LIKE '%zone%' LIMIT 20",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21479000000,
+        "end_offset": 21643000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q360",
+      "sql": "SELECT _timestamp, visitor_session_id, action_category, exception_message FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category = 'performanceMetric' AND exception_message LIKE '%Exception%' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21539000000,
+        "end_offset": 21703000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "performanceMetric",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "NullPointerException at ConveyorController.handle()"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q361",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'clickEvent' AND page_slug = 'itemPage' AND component_name LIKE '%conveyor%' AND device_type IN ('Mobile', 'Computer') LIMIT 10",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21599000000,
+        "end_offset": 21763000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q362",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'clickEvent' AND page_slug = 'itemPage' AND device_type IN ('Mobile', 'Computer', 'Tablet') AND error_code NOT IN ('E001', 'E002') LIMIT 15",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21659000000,
+        "end_offset": 21823000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [
+          [
+            "Q362 warehouse event record 3 ACK batch batchIdList:Q362-3",
+            "stderr",
+            "PL-004",
+            "72.8",
+            "58.0",
+            "610.0",
+            "SORT-Z9",
+            "LANE-D",
+            "ZONE-4",
+            "CC-DELTA",
+            "340",
+            "2.0",
+            "360",
+            "auto",
+            "750",
+            "1",
+            "4",
+            "30.1",
+            "BS-2025-D4",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E004",
+            "@warehouse-Windows-sort-v1",
+            "UP-E004",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-jkl012\",\"status-ok\"]",
+            "ScanPallet",
+            "10.12.0.104",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "scheduler",
+            "EU-NORTH",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "ScanPallet",
+            "site-syd-04",
+            "/api/v2/sorter/scan",
+            "DELETE",
+            "400",
+            "inbound",
+            "pass",
+            "task-j0k1l2",
+            "ent-004-wh",
+            "latency",
+            "jam",
+            "allow",
+            "active",
+            "track",
+            "/logs/warehouse/error.log",
+            "1450",
+            "warehouse-south",
+            "false",
+            "v2.1.3",
+            "BIN-D4",
+            "4096",
+            "scan-hub",
+            "rk-warehouse-004",
+            "tok-wh-stu901vwx234",
+            "warehouse-merge",
+            "variant_c",
+            "var1_pqr012",
+            "500",
+            "3200000",
+            "95000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "navigation",
+            "clickEvent",
+            "https://shop.example.com/item/1003",
+            "SSR",
+            "Mac OS X (iPhone)",
+            "CSRF Attempt",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Firefox/121",
+            "/admin/login",
+            "FastHost Ltd",
+            "US",
+            "business",
+            "[\"session_hijack\",\"ip_hop\"]",
+            "sess_003",
+            "suspicious",
+            "true",
+            "ORD-003",
+            "None",
+            "updateCart",
+            "dc-central"
+          ],
+          [
+            "Q363 warehouse event record 3 ACK batch batchIdList:Q363-3",
+            "stderr",
+            "PL-004",
+            "72.8",
+            "58.0",
+            "610.0",
+            "SORT-Z9",
+            "LANE-D",
+            "ZONE-4",
+            "CC-DELTA",
+            "340",
+            "2.0",
+            "360",
+            "auto",
+            "750",
+            "1",
+            "4",
+            "30.1",
+            "BS-2025-D4",
+            "batch XYZ789 timed out at checkpoint 3",
+            "ACK batch batchIdList:BT-004-2026 validated",
+            "WARN: lane jam detected at conveyor_segment=3",
+            "E004",
+            "@warehouse-Windows-sort-v1",
+            "UP-E004",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}",
+            "[\"{\\\"name\\\":\\\"scan\\\",\\\"startTime\\\":\\\"0\\\"}\", \"{\\\"name\\\":\\\"sort\\\",\\\"startTime\\\":\\\"180\\\"}\", \"{\\\"name\\\":\\\"pack\\\",\\\"startTime\\\":\\\"360\\\"}\"]",
+            "[\"cid-jkl012\",\"status-ok\"]",
+            "ScanPallet",
+            "10.12.0.104",
+            "192.168.1.13",
+            "prod",
+            "low",
+            "scheduler",
+            "EU-NORTH",
+            "Java/17.0.8 (OpenJDK; sorter-agent)",
+            "ScanPallet",
+            "site-syd-04",
+            "/api/v2/sorter/scan",
+            "DELETE",
+            "400",
+            "inbound",
+            "pass",
+            "task-j0k1l2",
+            "ent-004-wh",
+            "latency",
+            "jam",
+            "allow",
+            "active",
+            "track",
+            "/logs/warehouse/error.log",
+            "1450",
+            "warehouse-south",
+            "false",
+            "v2.1.3",
+            "BIN-D4",
+            "4096",
+            "scan-hub",
+            "rk-warehouse-004",
+            "tok-wh-stu901vwx234",
+            "warehouse-merge",
+            "variant_c",
+            "var1_pqr012",
+            "500",
+            "3200000",
+            "95000",
+            "0.25",
+            "Mobile",
+            "itemPage",
+            "navigation",
+            "clickEvent",
+            "https://shop.example.com/item/1003",
+            "SSR",
+            "Mac OS X (iPhone)",
+            "CSRF Attempt",
+            "GET /favicon.ico",
+            "Mozilla/5.0 Firefox/121",
+            "/admin/login",
+            "FastHost Ltd",
+            "US",
+            "business",
+            "[\"session_hijack\",\"ip_hop\"]",
+            "sess_003",
+            "suspicious",
+            "true",
+            "ORD-003",
+            "None",
+            "updateCart",
+            "dc-central"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q363",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY latency_ms DESC LIMIT 10 OFFSET 5",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21719000000,
+        "end_offset": 21883000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "searchPage",
+            "45"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q364",
+      "sql": "SELECT * FROM \"{stream}\" WHERE action_category = 'navigation' AND action_subcategory = 'clickEvent' AND page_slug = 'itemPage' AND (component_name LIKE '%sorter%' OR component_name LIKE '%zone%') AND os_platform IN ('Android 14', 'iOS 17.4') LIMIT 10",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21779000000,
+        "end_offset": 21943000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "stream",
+          "pallet_id",
+          "load_factor",
+          "charge_remaining",
+          "throughput_rate",
+          "sorter_model",
+          "conveyor_lane",
+          "facility_zone",
+          "control_center",
+          "item_count",
+          "defect_limit",
+          "runtime_hours",
+          "operation_mode",
+          "package_size",
+          "scan_attempts",
+          "conveyor_segment",
+          "cell_temp",
+          "build_signature",
+          "event_detail",
+          "ack_detail",
+          "log_message",
+          "error_code",
+          "service_owner",
+          "upstream_error_code",
+          "exception_message",
+          "request_payload",
+          "phase_data",
+          "db_info",
+          "api_name",
+          "node_ip",
+          "source_ip",
+          "tag_a",
+          "tag_b",
+          "query_source",
+          "region_code",
+          "client_agent",
+          "operation_name",
+          "site_name",
+          "endpoint_path",
+          "http_method",
+          "response_code",
+          "scan_category",
+          "auth_result",
+          "task_id",
+          "entity_id",
+          "alert_tags",
+          "issue_type",
+          "filter_result",
+          "guard_mode",
+          "record_type",
+          "resource_path",
+          "latency_ms",
+          "org_name",
+          "threat_flag",
+          "build_version",
+          "bin_code",
+          "payload_size",
+          "component_name",
+          "route_key",
+          "auth_token",
+          "app_label",
+          "variant_tag",
+          "cookie_id",
+          "status_code",
+          "lcp_micros",
+          "inp_micros",
+          "cls_score",
+          "device_type",
+          "page_slug",
+          "action_category",
+          "action_subcategory",
+          "page_url",
+          "render_scope",
+          "os_platform",
+          "attack_name",
+          "http_request",
+          "user_agent_str",
+          "uri_path",
+          "geo_org",
+          "geo_country",
+          "geo_user_type",
+          "risk_rules_list",
+          "visitor_session_id",
+          "bot_flag",
+          "passthrough_flag",
+          "order_ref",
+          "info_tag",
+          "graphql_operation",
+          "datacenter"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q365",
+      "sql": "SELECT _timestamp, action_category, page_slug, error_code, exception_message FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category IN ('performanceMetric', 'navigation') ORDER BY (CASE WHEN error_code IS NOT NULL THEN 0 ELSE 1 END), _timestamp DESC LIMIT 20",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 21839000000,
+        "end_offset": 22003000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "error_code",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage",
+            "E001",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "E001",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "E001",
+            "NullPointerException at ConveyorController.handle()"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],
