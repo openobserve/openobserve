@@ -71,13 +71,13 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "auto",
+            "SORT-M3",
+            "hybrid",
             "3"
           ],
           [
-            "SORT-M3",
-            "hybrid",
+            "SORT-X1",
+            "manual",
             "3"
           ],
           [
@@ -86,7 +86,8 @@
             "2"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 6179000000,

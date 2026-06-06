@@ -158,16 +158,16 @@
             "SORT-X1"
           ],
           [
-            "ZONE-2",
-            "3",
-            "320.0",
-            "SORT-A7"
-          ],
-          [
             "ZONE-3",
             "3",
             "480.0",
             "SORT-M3"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "320.0",
+            "SORT-A7"
           ],
           [
             "ZONE-4",
@@ -931,18 +931,18 @@
             "3"
           ],
           [
-            "ZONE-3",
-            "3",
-            "480.0",
-            "0",
-            "0"
-          ],
-          [
             "ZONE-2",
             "3",
             "320.0",
             "0",
             "3"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "480.0",
+            "0",
+            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1038,12 +1038,12 @@
             "2.5"
           ],
           [
-            "LOW_LOAD",
-            "LOW_TPUT",
+            "MED_LOAD",
+            "MED_TPUT",
             "3",
-            "18.5",
-            "150",
-            "0.5"
+            "26.3",
+            "600",
+            "1.5"
           ],
           [
             "LOW_LOAD",
@@ -1054,12 +1054,12 @@
             "1.0"
           ],
           [
-            "MED_LOAD",
-            "MED_TPUT",
+            "LOW_LOAD",
+            "LOW_TPUT",
             "3",
-            "26.3",
-            "600",
-            "1.5"
+            "18.5",
+            "150",
+            "0.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1080,12 +1080,12 @@
         ],
         "results": [
           [
-            "item_error",
-            "3"
-          ],
-          [
             "item_click",
             "2"
+          ],
+          [
+            "item_error",
+            "3"
           ],
           [
             "other",
@@ -1112,16 +1112,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "5",
-            "2",
-            "2"
-          ],
-          [
             "checkoutPage",
             "3",
             "3",
             "0"
+          ],
+          [
+            "itemPage",
+            "5",
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1174,17 +1174,17 @@
             "1"
           ],
           [
-            "https://shop.example.com/cart",
-            "3",
-            "1"
-          ],
-          [
             "https://shop.example.com/item/1001",
             "3",
             "1"
           ],
           [
             "https://shop.example.com/search?q=test",
+            "3",
+            "1"
+          ],
+          [
+            "https://shop.example.com/cart",
             "3",
             "1"
           ],
@@ -1247,13 +1247,6 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "cartPage",
-            "3",
-            "230.0",
-            "230"
-          ],
-          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1266,6 +1259,13 @@
             "3",
             "89.0",
             "89"
+          ],
+          [
+            "zone-controller",
+            "cartPage",
+            "3",
+            "230.0",
+            "230"
           ]
         ],
         "results_mode": "rowsort"
@@ -1287,13 +1287,13 @@
         ],
         "results": [
           [
-            "other",
-            "6",
+            "monitoring",
+            "3",
             "1"
           ],
           [
-            "monitoring",
-            "3",
+            "other",
+            "6",
             "1"
           ],
           [
@@ -1387,12 +1387,6 @@
         ],
         "results": [
           [
-            "Mobile",
-            "5",
-            "2",
-            "587.2"
-          ],
-          [
             "Tablet",
             "3",
             "0",
@@ -1403,6 +1397,12 @@
             "6",
             "3",
             "67.0"
+          ],
+          [
+            "Mobile",
+            "5",
+            "2",
+            "587.2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1424,12 +1424,12 @@
         ],
         "results": [
           [
-            "fast",
+            "medium",
             "other",
             "3"
           ],
           [
-            "medium",
+            "fast",
             "other",
             "3"
           ],
@@ -1486,14 +1486,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "E005",
+            "conveyor-driver",
+            "E002",
             "3",
             "medium"
           ],
           [
-            "conveyor-driver",
-            "E002",
+            "track-router",
+            "E005",
             "3",
             "medium"
           ],
@@ -1524,6 +1524,12 @@
         ],
         "results": [
           [
+            "cartPage",
+            "3",
+            "3",
+            "100.0"
+          ],
+          [
             "itemPage",
             "5",
             "5",
@@ -1531,12 +1537,6 @@
           ],
           [
             "searchPage",
-            "3",
-            "3",
-            "100.0"
-          ],
-          [
-            "cartPage",
             "3",
             "3",
             "100.0"

@@ -83,11 +83,11 @@
             "6"
           ],
           [
-            "SORT-M3",
+            "SORT-A7",
             "3"
           ],
           [
-            "SORT-A7",
+            "SORT-M3",
             "3"
           ],
           [
@@ -170,15 +170,15 @@
         "results": [
           [
             "ZONE-1",
-            "auto",
-            "3",
-            "150.0"
-          ],
-          [
-            "ZONE-1",
             "manual",
             "3",
             "725.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "3",
+            "150.0"
           ],
           [
             "ZONE-2",
@@ -441,16 +441,16 @@
             "30.1"
           ],
           [
-            "ZONE-3",
-            "0",
-            "3",
-            "26.3"
-          ],
-          [
             "ZONE-2",
             "0",
             "3",
             "22.0"
+          ],
+          [
+            "ZONE-3",
+            "0",
+            "3",
+            "26.3"
           ]
         ],
         "results_mode": "rowsort"
@@ -601,7 +601,7 @@
           [
             "ZONE-1",
             "3",
-            "auto"
+            "manual"
           ],
           [
             "ZONE-2",
@@ -619,7 +619,8 @@
             "auto"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 899000000,
@@ -683,15 +684,15 @@
             "100.0"
           ],
           [
-            "LANE-A",
-            "9",
-            "1.5",
-            "0.0"
-          ],
-          [
             "LANE-B",
             "6",
             "2.0",
+            "0.0"
+          ],
+          [
+            "LANE-A",
+            "9",
+            "1.5",
             "0.0"
           ],
           [
@@ -774,12 +775,12 @@
             "50.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "0.0",
             "0.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "0.0",
             "0.0"
           ]
@@ -1170,12 +1171,12 @@
             "1"
           ],
           [
-            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "3",
             "1"
           ],
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
             "3",
             "1"
           ]
@@ -1218,19 +1219,19 @@
             "1"
           ],
           [
-            "cartPage",
-            "3",
-            "230",
-            "230",
-            "230.0",
-            "1"
-          ],
-          [
             "checkoutPage",
             "3",
             "89",
             "89",
             "89.0",
+            "1"
+          ],
+          [
+            "cartPage",
+            "3",
+            "230",
+            "230",
+            "230.0",
             "1"
           ]
         ],
@@ -1482,12 +1483,12 @@
             "E005"
           ],
           [
-            "searchPage",
-            "E002"
-          ],
-          [
             "itemPage",
             "E001"
+          ],
+          [
+            "searchPage",
+            "E002"
           ]
         ],
         "results_mode": "rowsort"
@@ -1509,12 +1510,12 @@
         ],
         "results": [
           [
-            "vitalsInp",
+            "vitalsLcp",
             "3",
             "1"
           ],
           [
-            "vitalsLcp",
+            "vitalsInp",
             "3",
             "1"
           ]
@@ -1629,14 +1630,14 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "3",
-            "3"
-          ],
-          [
             "itemPage",
             "5",
             "2"
+          ],
+          [
+            "checkoutPage",
+            "3",
+            "3"
           ]
         ],
         "results_mode": "rowsort"

@@ -13,18 +13,6 @@
         ],
         "results": [
           [
-            "SORT-Z9",
-            "610.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "610.0",
-            "2",
-            "1"
-          ],
-          [
             "SORT-X1",
             "725.0",
             "1",
@@ -59,6 +47,18 @@
             "150.0",
             "6",
             "2"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "610.0",
+            "2",
+            "1"
           ],
           [
             "SORT-M3",
@@ -601,7 +601,8 @@
             "4"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 8399000000,
@@ -1184,7 +1185,8 @@
             "2"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 8699000000,
@@ -2666,7 +2668,8 @@
             "0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {

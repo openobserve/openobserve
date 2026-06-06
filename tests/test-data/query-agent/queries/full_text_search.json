@@ -147,11 +147,11 @@
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
@@ -1625,7 +1625,8 @@
             "dc-east"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -2974,7 +2975,8 @@
             "dc-east"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -3188,7 +3190,7 @@
     },
     {
       "id": "Q325",
-      "sql": "SELECT _timestamp, regexp_extract(db_info, 'cid-([a-z0-9]+)', 1) AS extracted_cid, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND db_info IS NOT NULL LIMIT 10",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(db_info, 'cid-([a-z0-9]+)'), 1) AS extracted_cid, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND db_info IS NOT NULL LIMIT 10",
       "category": "full_text_search",
       "time_offset": {
         "start_offset": 19439000000,

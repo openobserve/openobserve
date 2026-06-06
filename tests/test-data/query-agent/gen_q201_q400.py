@@ -448,8 +448,8 @@ FULL_TEXT_SEARCH = [
     # Complex LIKE with OR + NOT LIKE combo
     ("""SELECT _timestamp, visitor_session_id, exception_message, error_code FROM "{stream}" WHERE (exception_message LIKE '%Exception%' OR error_code LIKE '%E00%') AND exception_message NOT LIKE '%Timeout%' AND error_code NOT IN ('E002') AND page_slug = 'itemPage'"""),
 
-    # FTS with regexp_extract (june6: regex capture group)
-    ("""SELECT _timestamp, regexp_extract(db_info, 'cid-([a-z0-9]+)', 1) AS extracted_cid, action_category FROM "{stream}" WHERE action_category = 'performanceMetric' AND db_info IS NOT NULL LIMIT 10"""),
+    # FTS with array_extract(regexp_match(...)) (june6: regex capture group)
+    ("""SELECT _timestamp, array_extract(regexp_match(db_info, 'cid-([a-z0-9]+)'), 1) AS extracted_cid, action_category FROM "{stream}" WHERE action_category = 'performanceMetric' AND db_info IS NOT NULL LIMIT 10"""),
 ]
 
 # ============================

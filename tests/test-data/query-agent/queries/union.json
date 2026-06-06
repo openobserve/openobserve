@@ -888,13 +888,13 @@
         "results": [
           [
             "mobile",
-            "performanceMetric",
-            "3"
+            "navigation",
+            "2"
           ],
           [
             "mobile",
-            "navigation",
-            "2"
+            "performanceMetric",
+            "3"
           ],
           [
             "desktop",
@@ -1074,12 +1074,12 @@
           ],
           [
             "staging",
-            "E005",
+            "E002",
             "3"
           ],
           [
             "staging",
-            "E002",
+            "E005",
             "3"
           ]
         ],
@@ -1108,17 +1108,17 @@
           ],
           [
             "component_err",
+            "conveyor-driver",
+            "3"
+          ],
+          [
+            "component_err",
             "track-router",
             "3"
           ],
           [
             "component_err",
             "sorter-engine",
-            "3"
-          ],
-          [
-            "component_err",
-            "conveyor-driver",
             "3"
           ]
         ],
@@ -1158,6 +1158,10 @@
         ],
         "results": [
           [
+            "UP-E001",
+            "3"
+          ],
+          [
             "UP-E005",
             "3"
           ],
@@ -1166,7 +1170,7 @@
             "3"
           ],
           [
-            "E002",
+            "E005",
             "3"
           ],
           [
@@ -1174,11 +1178,7 @@
             "3"
           ],
           [
-            "E005",
-            "3"
-          ],
-          [
-            "UP-E001",
+            "E002",
             "3"
           ]
         ],

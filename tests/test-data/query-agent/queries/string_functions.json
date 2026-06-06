@@ -356,7 +356,7 @@
           [
             "CC-ALPHA",
             "SORT-X1",
-            "auto, manual",
+            "manual, auto",
             "6"
           ],
           [
@@ -909,13 +909,6 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "manual",
-            "SORT-ZONE-2",
-            "29",
-            "3"
-          ],
-          [
             "ZONE-1",
             "auto",
             "SORT-ZONE-1",
@@ -926,6 +919,13 @@
             "ZONE-1",
             "manual",
             "SORT-ZONE-1",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "SORT-ZONE-2",
             "29",
             "3"
           ],
@@ -972,18 +972,18 @@
             "12.0"
           ],
           [
-            "RerouteTrack",
-            "REROUT",
-            "False",
-            "3",
-            "89.0"
-          ],
-          [
             "UpdateBatch",
             "UPDATE",
             "False",
             "3",
             "45.0"
+          ],
+          [
+            "RerouteTrack",
+            "REROUT",
+            "False",
+            "3",
+            "89.0"
           ],
           [
             "DeleteRecord",
@@ -1021,13 +1021,6 @@
         ],
         "results": [
           [
-            "US-EAST-ZONE-1-AUT",
-            "3",
-            "3",
-            "0",
-            "50.0"
-          ],
-          [
             "EU-WEST-ZONE-3-HYB",
             "3",
             "0",
@@ -1035,18 +1028,25 @@
             "200.0"
           ],
           [
-            "US-WEST-ZONE-2-MAN",
-            "3",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
             "AP-SOUTH-ZONE-1-MAN",
             "3",
             "0",
             "0",
             "88.0"
+          ],
+          [
+            "US-EAST-ZONE-1-AUT",
+            "3",
+            "3",
+            "0",
+            "50.0"
+          ],
+          [
+            "US-WEST-ZONE-2-MAN",
+            "3",
+            "0",
+            "0",
+            "120.0"
           ],
           [
             "EU-NORTH-ZONE-4-AUT",
