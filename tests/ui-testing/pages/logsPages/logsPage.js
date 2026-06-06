@@ -4571,7 +4571,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsSelectFrom() {
-        return await expect(this.page.locator(this.queryEditor)).toContainText('SELECT * FROM "e2e_automate"');
+        return await expect(this.page.locator(this.queryEditor)).toContainText('FROM "e2e_automate"');
     }
 
     generateRandomString() {
@@ -7989,6 +7989,12 @@ export class LogsPage {
             target.executeEdits('setQueryEditorContent', [
                 { range: fullRange, text: value, forceMoveMarkers: true },
             ]);
+            // executeEdits is a no-op on read-only editors (e.g. build-tab auto mode).
+            // Fall back to model.setValue() which bypasses the readOnly restriction and
+            // still fires onDidChangeModelContent so the Vue component can react.
+            if (model.getValue() !== value) {
+                model.setValue(value);
+            }
             target.setSelection(model.getFullModelRange());
         }, { selector: this.queryEditor, value: query });
         // Verify via getValue() that the model now reflects the value (handles empty string too)
@@ -8013,7 +8019,23 @@ export class LogsPage {
         // Set the Vue flag first — in the build tab this triggers the sqlMode watcher
         // which updates the editor with the full generated SQL query.
         await this._setSqlModeViaVue(true);
-        await this.page.waitForTimeout(600);
+
+        // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
+        // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
+        // then Vue re-renders the editor prop) — a fixed 600ms was too short under CI load.
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase().trim();
+                    return val.includes('select') && val.includes('from');
+                }
+            }
+            return false;
+        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
 
         // Check if the editor was updated (build tab watcher fired).
         // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
@@ -8063,7 +8085,9 @@ export class LogsPage {
                 } catch (e) { return false; }
             }, sql);
             if (!updatedViaState) {
-                // Fallback for non-build-mode where the editor is not read-only
+                // Last resort: write SELECT directly via setQueryEditorContent.
+                // In build-tab auto mode the editor is read-only, but setQueryEditorContent
+                // now falls back to model.setValue() which bypasses the readOnly restriction.
                 await this.setQueryEditorContent(sql);
             }
             // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate

@@ -64,7 +64,17 @@ test.describe("Logs Quickmode testcases", () => {
     } catch (error) {
       testLogger.warn('All fields button click failed', { error: error.message });
     }
-    
+
+    // Reset SQL mode to OFF so that clickSQLModeToggle reliably turns it ON.
+    // If a previous test (or localStorage restore) left the editor in SQL mode,
+    // clickSQLModeToggle would clear the editor instead of building a SELECT query.
+    try {
+      await pm.logsPage.disableSqlModeIfNeeded();
+      testLogger.info('SQL mode reset to OFF');
+    } catch (error) {
+      testLogger.warn('SQL mode reset failed, continuing', { error: error.message });
+    }
+
     testLogger.info('Test setup completed');
   });
 
