@@ -278,6 +278,22 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Selecting kubernetes_pod_id field');
     await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
+    testLogger.info('Waiting for kubernetes_pod_id to appear in Vue interestingFieldList');
+    await page.waitForFunction(() => {
+        const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
+        if (!el) return false;
+        let current = el;
+        while (current && current !== document.body) {
+            const comp = current.__vueParentComponent;
+            if (comp?.setupState && 'searchObj' in comp.setupState) {
+                const list = comp.setupState.searchObj?.data?.stream?.interestingFieldList || [];
+                return list.includes('kubernetes_pod_id');
+            }
+            current = current.parentElement;
+        }
+        return false;
+    }, { timeout: 5000 });
+
     testLogger.info('Switching to SQL mode');
     await pageManager.unflattenedPage.toggleSqlMode();
     await page.waitForTimeout(500);
