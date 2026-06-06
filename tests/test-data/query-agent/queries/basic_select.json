@@ -2033,12 +2033,12 @@
             "3"
           ],
           [
-            "[\"scraping_pattern\",\"ip_hop\",\"rapid_login\"]",
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "3"
           ],
           [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "2"
+            "[\"scraping_pattern\",\"ip_hop\",\"rapid_login\"]",
+            "3"
           ],
           [
             "[\"session_hijack\",\"ip_hop\"]",

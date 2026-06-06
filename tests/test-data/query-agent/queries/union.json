@@ -124,13 +124,18 @@
             "6"
           ],
           [
-            "SORT-M3",
+            "None",
             "hybrid",
             "3"
           ],
           [
+            "SORT-Q5",
+            "manual",
+            "3"
+          ],
+          [
             "None",
-            "hybrid",
+            "manual",
             "3"
           ],
           [
@@ -139,13 +144,8 @@
             "3"
           ],
           [
-            "None",
-            "manual",
-            "3"
-          ],
-          [
-            "SORT-Q5",
-            "manual",
+            "SORT-M3",
+            "hybrid",
             "3"
           ],
           [

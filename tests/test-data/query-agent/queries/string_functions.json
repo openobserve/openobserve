@@ -438,27 +438,27 @@
         ],
         "results": [
           [
+            "CC-BETA",
+            "SORT-A7",
+            "manual, hybrid",
+            "9"
+          ],
+          [
             "CC-ALPHA",
             "SORT-X1",
             "auto, manual",
             "9"
           ],
           [
-            "CC-BETA",
-            "SORT-A7",
-            "hybrid, manual",
-            "9"
-          ],
-          [
             "CC-DELTA",
             "SORT-Q5 | SORT-Z9",
-            "auto, manual",
+            "manual, auto",
             "5"
           ],
           [
             "CC-GAMMA",
             "SORT-M3",
-            "auto, hybrid",
+            "hybrid, auto",
             "5"
           ]
         ],
@@ -1141,15 +1141,15 @@
         ],
         "results": [
           [
-            "192.168.2.24",
-            "sess_001",
-            "var1_yza234",
-            "3"
-          ],
-          [
             "192.168.1.12",
             "sess_002",
             "ctl_xyz789",
+            "3"
+          ],
+          [
+            "192.168.2.24",
+            "sess_001",
+            "var1_yza234",
             "3"
           ]
         ],
