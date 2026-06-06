@@ -452,7 +452,7 @@
           [
             "CC-DELTA",
             "SORT-Q5 | SORT-Z9",
-            "manual, auto",
+            "auto, manual",
             "5"
           ],
           [
@@ -989,99 +989,99 @@
         ],
         "results": [
           [
-            "Q119 warehouse event record 7",
-            "PL-008",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q119 warehouse event record 8",
-            "PL-001",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q119 warehouse event record 9",
+            "Q119 warehouse event record 9 ACK batch batchIdList:Q119-9",
             "PL-002",
             "True",
             "True",
-            "29",
+            "58",
             "22"
           ],
           [
-            "Q120 warehouse event record 4",
-            "PL-005",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 5",
-            "PL-006",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 6",
+            "Q120 warehouse event record 6 ACK batch batchIdList:Q120-6",
             "PL-007",
             "True",
             "True",
-            "29",
+            "58",
             "22"
           ],
           [
-            "Q120 warehouse event record 7",
-            "PL-008",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 8",
-            "PL-001",
-            "True",
-            "True",
-            "29",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 9",
+            "Q120 warehouse event record 9 ACK batch batchIdList:Q120-9",
             "PL-002",
             "True",
             "True",
-            "29",
+            "58",
             "22"
           ],
           [
-            "Q121 warehouse event record 0",
+            "Q121 warehouse event record 0 ACK batch batchIdList:Q121-0",
             "PL-001",
             "True",
             "True",
-            "29",
+            "58",
             "22"
           ],
           [
-            "Q121 warehouse event record 1",
+            "Q121 warehouse event record 3 ACK batch batchIdList:Q121-3",
+            "PL-004",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 6 ACK batch batchIdList:Q121-6",
+            "PL-007",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 9 ACK batch batchIdList:Q121-9",
             "PL-002",
             "True",
             "True",
-            "29",
+            "58",
             "22"
           ],
           [
-            "Q121 warehouse event record 2",
-            "PL-003",
+            "Q122 warehouse event record 0 ACK batch batchIdList:Q122-0",
+            "PL-001",
             "True",
             "True",
-            "29",
+            "58",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 3 ACK batch batchIdList:Q122-3",
+            "PL-004",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q123 warehouse event record 0 ACK batch batchIdList:Q123-0",
+            "PL-001",
+            "True",
+            "True",
+            "58",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 5 error E005 traceback",
+            "PL-006",
+            "True",
+            "True",
+            "50",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 5 error E005 traceback",
+            "PL-006",
+            "True",
+            "True",
+            "50",
             "22"
           ]
         ],
@@ -1107,7 +1107,328 @@
         "start_offset": 7259000000,
         "end_offset": 7423000000
       }
+    },
+    {
+      "id": "Q162",
+      "sql": "SELECT rtrim(ltrim(spath(array_element(cast_to_arr(db_info), 1), 'cid'), '[\"'), '\"]') as cid, count(_timestamp) as count_s FROM \"{stream}\" WHERE str_match_ignore_case(api_name, 'sams') GROUP BY cid",
+      "category": "string_functions",
+      "expected": {
+        "columns": [
+          "cid",
+          "count_s"
+        ],
+        "note": "String trimming with rtrim/ltrim, spath, array_element, cast_to_arr \u2014 OO-specific, skip_sqllogictest"
+      },
+      "time_offset": {
+        "start_offset": 9659000000,
+        "end_offset": 9823000000
+      }
+    },
+    {
+      "id": "Q168",
+      "sql": "SELECT source_ip, visitor_session_id, cookie_id, COUNT(*) AS cnt FROM \"{stream}\" WHERE source_ip IS NOT NULL   AND TRIM(CAST(source_ip AS VARCHAR)) <> ''   AND visitor_session_id IS NOT NULL   AND TRIM(CAST(visitor_session_id AS VARCHAR)) <> ''   AND LENGTH(CAST(visitor_session_id AS VARCHAR)) >= 8   AND cookie_id IS NOT NULL   AND TRIM(CAST(cookie_id AS VARCHAR)) <> ''   AND LENGTH(CAST(cookie_id AS VARCHAR)) >= 8   AND graphql_operation = 'verifyPayment' GROUP BY source_ip, visitor_session_id, cookie_id ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 10019000000,
+        "end_offset": 10183000000
+      },
+      "expected": {
+        "columns": [
+          "source_ip",
+          "visitor_session_id",
+          "cookie_id",
+          "cnt"
+        ],
+        "results": [
+          [
+            "192.168.1.12",
+            "sess_002",
+            "ctl_xyz789",
+            "3"
+          ],
+          [
+            "192.168.2.24",
+            "sess_001",
+            "var1_yza234",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q194",
+      "sql": "SELECT\n  UPPER(TRIM(facility_zone)) AS clean_zone,\n  LOWER(operation_mode) AS lower_mode,\n  CONCAT(UPPER(SUBSTR(sorter_model, 1, 4)), '-', facility_zone) AS model_zone,\n  LENGTH(log) AS log_length,\n  COUNT(*) AS cnt\nFROM \"{stream}\"\nWHERE log LIKE '%warehouse%'\n  AND LENGTH(log) > 20\nGROUP BY\n  UPPER(TRIM(facility_zone)),\n  LOWER(operation_mode),\n  CONCAT(UPPER(SUBSTR(sorter_model, 1, 4)), '-', facility_zone),\n  LENGTH(log)\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11579000000,
+        "end_offset": 11743000000
+      },
+      "expected": {
+        "columns": [
+          "clean_zone",
+          "lower_mode",
+          "model_zone",
+          "log_length",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "SORT-ZONE-1",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "SORT-ZONE-4",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "SORT-ZONE-2",
+            "58",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "SORT-ZONE-2",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "58",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "29",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "SORT-ZONE-2",
+            "50",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "SORT-ZONE-3",
+            "58",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "SORT-ZONE-4",
+            "58",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q195",
+      "sql": "SELECT api_name,\n  UPPER(SUBSTR(api_name, 1, 6)) AS api_prefix,\n  str_match_ignore_case(log, 'error') AS has_error,\n  COUNT(*) AS cnt,\n  AVG(latency_ms) AS avg_latency\nFROM \"{stream}\"\nWHERE LENGTH(api_name) > 3\n  AND latency_ms > 0\nGROUP BY api_name, UPPER(SUBSTR(api_name, 1, 6)), str_match_ignore_case(log, 'error')\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11639000000,
+        "end_offset": 11803000000
+      },
+      "expected": {
+        "columns": [
+          "api_name",
+          "api_prefix",
+          "has_error",
+          "cnt",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "RetryScan",
+            "RETRYS",
+            "False",
+            "3",
+            "1900.0"
+          ],
+          [
+            "ArchiveLog",
+            "ARCHIV",
+            "False",
+            "3",
+            "78.0"
+          ],
+          [
+            "DeleteRecord",
+            "DELETE",
+            "False",
+            "3",
+            "230.0"
+          ],
+          [
+            "RerouteTrack",
+            "REROUT",
+            "False",
+            "3",
+            "89.0"
+          ],
+          [
+            "UpdateBatch",
+            "UPDATE",
+            "False",
+            "3",
+            "45.0"
+          ],
+          [
+            "SearchItems",
+            "SEARCH",
+            "False",
+            "3",
+            "12.0"
+          ],
+          [
+            "SyncZone",
+            "SYNCZO",
+            "False",
+            "3",
+            "15.0"
+          ],
+          [
+            "MergeBatch",
+            "MERGEB",
+            "True",
+            "3",
+            "567.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "2",
+            "3200.0"
+          ],
+          [
+            "ScanPallet",
+            "SCANPA",
+            "False",
+            "2",
+            "1450.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q196",
+      "sql": "SELECT\n  CONCAT(region_code, '-', facility_zone, '-', UPPER(SUBSTR(operation_mode, 1, 3))) AS location_tag,\n  COUNT(*) AS cnt,\n  SUM(CASE WHEN str_match_ignore_case(log, 'ACK') THEN 1 ELSE 0 END) AS ack_count,\n  SUM(CASE WHEN str_match_ignore_case(log, 'error') THEN 1 ELSE 0 END) AS error_count,\n  AVG(item_count) AS avg_items\nFROM \"{stream}\"\nWHERE LENGTH(region_code) > 2\nGROUP BY CONCAT(region_code, '-', facility_zone, '-', UPPER(SUBSTR(operation_mode, 1, 3)))\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC\nLIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 11699000000,
+        "end_offset": 11863000000
+      },
+      "expected": {
+        "columns": [
+          "location_tag",
+          "cnt",
+          "ack_count",
+          "error_count",
+          "avg_items"
+        ],
+        "results": [
+          [
+            "EU-CENTRAL-ZONE-1-AUT",
+            "3",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "EU-WEST-ZONE-3-HYB",
+            "3",
+            "0",
+            "0",
+            "200.0"
+          ],
+          [
+            "AP-SOUTH-ZONE-1-MAN",
+            "3",
+            "0",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-WEST-ZONE-2-MAN",
+            "3",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "US-CENTRAL-ZONE-4-MAN",
+            "3",
+            "0",
+            "0",
+            "275.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-2-MAN",
+            "3",
+            "3",
+            "0",
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-2-HYB",
+            "3",
+            "3",
+            "3",
+            "155.0"
+          ],
+          [
+            "US-EAST-ZONE-1-AUT",
+            "3",
+            "3",
+            "0",
+            "50.0"
+          ],
+          [
+            "EU-NORTH-ZONE-4-AUT",
+            "2",
+            "2",
+            "0",
+            "340.0"
+          ],
+          [
+            "SA-EAST-ZONE-3-AUT",
+            "2",
+            "2",
+            "0",
+            "410.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
-  "last_query_id": 122
+  "last_query_id": 366
 }
