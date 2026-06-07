@@ -11,52 +11,52 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "SORT-X1 @ CC-ALPHA"
-          ],
-          [
             "ZONE-4",
-            "SORT-Q5 @ CC-DELTA"
-          ],
-          [
-            "ZONE-1",
-            "SORT-X1 @ CC-ALPHA"
-          ],
-          [
-            "ZONE-2",
-            "SORT-A7 @ CC-BETA"
-          ],
-          [
-            "ZONE-1",
-            "SORT-X1 @ CC-ALPHA"
-          ],
-          [
-            "ZONE-2",
-            "SORT-A7 @ CC-BETA"
+            "SORT-A7 @ CC-GAMMA"
           ],
           [
             "ZONE-3",
-            "SORT-M3 @ CC-GAMMA"
-          ],
-          [
-            "ZONE-2",
-            "SORT-A7 @ CC-BETA"
-          ],
-          [
-            "ZONE-3",
-            "SORT-M3 @ CC-GAMMA"
-          ],
-          [
-            "ZONE-4",
-            "SORT-Z9 @ CC-DELTA"
+            "SORT-X1 @ CC-BETA"
           ],
           [
             "ZONE-1",
-            "SORT-X1 @ CC-ALPHA"
+            "SORT-M3 @ CC-DELTA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Z9 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1 @ CC-BETA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3 @ CC-DELTA"
           ],
           [
             "ZONE-4",
-            "SORT-Q5 @ CC-DELTA"
+            "SORT-A7 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Q5 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1 @ CC-BETA"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7 @ CC-GAMMA"
+          ],
+          [
+            "ZONE-2",
+            "SORT-Z9 @ CC-ALPHA"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3 @ CC-DELTA"
           ]
         ],
         "results_mode": "rowsort"
@@ -78,7 +78,7 @@
         "results": [
           [
             "True",
-            "Q114"
+            "Q116"
           ],
           [
             "True",
@@ -90,10 +90,6 @@
           ],
           [
             "True",
-            "Q114"
-          ],
-          [
-            "True",
             "Q116"
           ],
           [
@@ -102,11 +98,7 @@
           ],
           [
             "True",
-            "Q114"
-          ],
-          [
-            "True",
-            "Q116"
+            "Q115"
           ],
           [
             "True",
@@ -118,11 +110,19 @@
           ],
           [
             "True",
-            "Q113"
+            "Q115"
           ],
           [
             "True",
-            "Q115"
+            "Q114"
+          ],
+          [
+            "True",
+            "Q114"
+          ],
+          [
+            "True",
+            "Q114"
           ]
         ],
         "results_mode": "rowsort"
@@ -146,88 +146,88 @@
         ],
         "results": [
           [
-            "PL-002",
-            "lane-b",
-            "SORT-A7-manual",
+            "PL-004",
+            "lane-c",
+            "SORT-Q5-auto",
             "BS-2026-B2",
-            "14"
+            "15"
           ],
           [
             "PL-003",
-            "lane-c",
-            "SORT-M3-hybrid",
-            "BS-2026-C3",
-            "15"
-          ],
-          [
-            "PL-006",
             "lane-b",
-            "SORT-A7-hybrid",
-            "BS-2026-B2",
-            "14"
+            "SORT-M3-manual",
+            "BS-2026-A1",
+            "15"
           ],
           [
             "PL-001",
-            "lane-a",
-            "SORT-X1-auto",
+            "lane-d",
+            "SORT-X1-hybrid",
             "BS-2026-A1",
-            "15"
-          ],
-          [
-            "PL-002",
-            "lane-b",
-            "SORT-A7-manual",
-            "BS-2026-B2",
             "14"
           ],
           [
-            "PL-005",
+            "PL-002",
             "lane-a",
-            "SORT-X1-manual",
-            "BS-2026-A1",
-            "15"
-          ],
-          [
-            "PL-008",
-            "lane-d",
-            "SORT-Q5-manual",
+            "SORT-A7-auto",
             "BS-2025-D4",
             "15"
           ],
           [
-            "PL-001",
-            "lane-a",
-            "SORT-X1-auto",
-            "BS-2026-A1",
-            "15"
-          ],
-          [
-            "PL-004",
-            "lane-d",
-            "SORT-Z9-auto",
+            "PL-008",
+            "lane-c",
+            "SORT-Z9-manual",
             "BS-2025-D4",
             "15"
           ],
           [
             "PL-007",
-            "lane-c",
+            "lane-b",
             "SORT-M3-auto",
             "BS-2026-C3",
             "15"
           ],
           [
-            "PL-002",
-            "lane-b",
-            "SORT-A7-manual",
+            "PL-006",
+            "lane-a",
+            "SORT-A7-hybrid",
             "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-004",
+            "lane-c",
+            "SORT-Q5-auto",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-005",
+            "lane-d",
+            "SORT-X1-manual",
+            "BS-2026-A1",
             "14"
           ],
           [
             "PL-003",
-            "lane-c",
-            "SORT-M3-hybrid",
-            "BS-2026-C3",
+            "lane-b",
+            "SORT-M3-manual",
+            "BS-2026-A1",
             "15"
+          ],
+          [
+            "PL-002",
+            "lane-a",
+            "SORT-A7-auto",
+            "BS-2026-B2",
+            "15"
+          ],
+          [
+            "PL-001",
+            "lane-d",
+            "SORT-X1-hybrid",
+            "BS-2026-A1",
+            "14"
           ]
         ],
         "results_mode": "rowsort"
@@ -262,76 +262,10 @@
             "001"
           ],
           [
-            "PL-001",
-            "True",
-            "PL",
-            "001"
-          ],
-          [
-            "PL-001",
-            "True",
-            "PL",
-            "001"
-          ],
-          [
-            "PL-001",
-            "True",
-            "PL",
-            "001"
-          ],
-          [
-            "PL-001",
-            "True",
-            "PL",
-            "001"
-          ],
-          [
             "PL-002",
             "True",
             "PL",
             "002"
-          ],
-          [
-            "PL-002",
-            "True",
-            "PL",
-            "002"
-          ],
-          [
-            "PL-002",
-            "True",
-            "PL",
-            "002"
-          ],
-          [
-            "PL-002",
-            "True",
-            "PL",
-            "002"
-          ],
-          [
-            "PL-002",
-            "True",
-            "PL",
-            "002"
-          ],
-          [
-            "PL-002",
-            "True",
-            "PL",
-            "002"
-          ],
-          [
-            "PL-003",
-            "True",
-            "PL",
-            "003"
-          ],
-          [
-            "PL-003",
-            "True",
-            "PL",
-            "003"
           ],
           [
             "PL-003",
@@ -364,18 +298,6 @@
             "005"
           ],
           [
-            "PL-005",
-            "False",
-            "PL",
-            "005"
-          ],
-          [
-            "PL-006",
-            "False",
-            "PL",
-            "006"
-          ],
-          [
             "PL-006",
             "False",
             "PL",
@@ -398,12 +320,6 @@
             "False",
             "PL",
             "007"
-          ],
-          [
-            "PL-008",
-            "False",
-            "PL",
-            "008"
           ],
           [
             "PL-008",
@@ -439,27 +355,27 @@
         "results": [
           [
             "CC-BETA",
-            "SORT-A7",
-            "manual, hybrid",
-            "9"
-          ],
-          [
-            "CC-ALPHA",
             "SORT-X1",
-            "manual, auto",
-            "9"
-          ],
-          [
-            "CC-DELTA",
-            "SORT-Q5 | SORT-Z9",
-            "auto, manual",
-            "5"
+            "manual, hybrid",
+            "4"
           ],
           [
             "CC-GAMMA",
-            "SORT-M3",
+            "SORT-A7",
             "auto, hybrid",
-            "5"
+            "4"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3",
+            "auto, manual",
+            "3"
+          ],
+          [
+            "CC-ALPHA",
+            "SORT-Q5 | SORT-Z9",
+            "auto, manual",
+            "3"
           ]
         ],
         "results_mode": "rowsort",
@@ -491,21 +407,7 @@
             "BUILD_2026-A1"
           ],
           [
-            "PL-005",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-001",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-001",
+            "PL-003",
             "BS-2026-A1",
             "BS-2026-",
             "1",
@@ -517,100 +419,37 @@
             "BS-2026-",
             "1",
             "BUILD_2026-A1"
-          ],
-          [
-            "PL-001",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-001",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-005",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-001",
-            "BS-2026-A1",
-            "BS-2026-",
-            "1",
-            "BUILD_2026-A1"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-006",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-006",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-006",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
-          ],
-          [
-            "PL-002",
-            "BS-2026-B2",
-            "BS-2026-",
-            "2",
-            "BUILD_2026-B2"
           ],
           [
             "PL-003",
+            "BS-2026-A1",
+            "BS-2026-",
+            "1",
+            "BUILD_2026-A1"
+          ],
+          [
+            "PL-002",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-004",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-006",
+            "BS-2026-B2",
+            "BS-2026-",
+            "2",
+            "BUILD_2026-B2"
+          ],
+          [
+            "PL-007",
             "BS-2026-C3",
             "BS-2026-",
             "3",
@@ -624,21 +463,7 @@
             "BUILD_2026-C3"
           ],
           [
-            "PL-003",
-            "BS-2026-C3",
-            "BS-2026-",
-            "3",
-            "BUILD_2026-C3"
-          ],
-          [
-            "PL-007",
-            "BS-2026-C3",
-            "BS-2026-",
-            "3",
-            "BUILD_2026-C3"
-          ],
-          [
-            "PL-003",
+            "PL-001",
             "BS-2026-C3",
             "BS-2026-",
             "3",
@@ -666,198 +491,100 @@
         ],
         "results": [
           [
-            "PL-001",
-            "LANE-A",
+            "PL-003",
+            "LANE-B",
             "ZONE-1",
             "lane--",
             "core"
           ],
           [
-            "PL-001",
-            "LANE-A",
+            "PL-007",
+            "LANE-B",
             "ZONE-1",
             "lane--",
             "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-005",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-006",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-001",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-001",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-001",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-006",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-005",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-005",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-006",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-001",
-            "LANE-A",
-            "ZONE-1",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-002",
-            "LANE-B",
-            "ZONE-2",
-            "lane--",
-            "core"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "ZONE-4",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "ZONE-4",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-008",
-            "LANE-D",
-            "ZONE-4",
-            "lane--",
-            "edge"
           ],
           [
             "PL-003",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-007",
+            "LANE-B",
+            "ZONE-1",
+            "lane--",
+            "core"
+          ],
+          [
+            "PL-004",
             "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-005",
+            "LANE-D",
             "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-006",
+            "LANE-A",
+            "ZONE-4",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-008",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-001",
+            "LANE-D",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-002",
+            "LANE-A",
+            "ZONE-4",
             "lane--",
             "edge"
           ],
           [
             "PL-004",
+            "LANE-C",
+            "ZONE-2",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-005",
             "LANE-D",
+            "ZONE-3",
+            "lane--",
+            "edge"
+          ],
+          [
+            "PL-006",
+            "LANE-A",
             "ZONE-4",
             "lane--",
             "edge"
           ],
           [
-            "PL-007",
+            "PL-008",
             "LANE-C",
-            "ZONE-3",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-004",
-            "LANE-D",
-            "ZONE-4",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-003",
-            "LANE-C",
-            "ZONE-3",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-007",
-            "LANE-C",
-            "ZONE-3",
-            "lane--",
-            "edge"
-          ],
-          [
-            "PL-003",
-            "LANE-C",
-            "ZONE-3",
+            "ZONE-2",
             "lane--",
             "edge"
           ]
@@ -891,17 +618,10 @@
           ],
           [
             "PL-008",
-            "SORT-Q5",
-            "SORT-Q5",
-            "None",
-            "FILTERED"
-          ],
-          [
-            "PL-005",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1"
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9"
           ],
           [
             "PL-002",
@@ -911,11 +631,18 @@
             "SORT-A7"
           ],
           [
-            "PL-001",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1"
+            "PL-003",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-004",
+            "SORT-Q5",
+            "SORT-Q5",
+            "None",
+            "FILTERED"
           ],
           [
             "PL-006",
@@ -923,6 +650,34 @@
             "SORT-A7",
             "SORT-A7",
             "SORT-A7"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3",
+            "SORT-M3"
+          ],
+          [
+            "PL-008",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9",
+            "SORT-Z9"
+          ],
+          [
+            "PL-001",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1",
+            "SORT-X1"
           ],
           [
             "PL-003",
@@ -937,34 +692,6 @@
             "SORT-A7",
             "SORT-A7",
             "SORT-A7"
-          ],
-          [
-            "PL-007",
-            "SORT-M3",
-            "SORT-M3",
-            "SORT-M3",
-            "SORT-M3"
-          ],
-          [
-            "PL-004",
-            "SORT-Z9",
-            "SORT-Z9",
-            "SORT-Z9",
-            "SORT-Z9"
-          ],
-          [
-            "PL-001",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1",
-            "SORT-X1"
-          ],
-          [
-            "PL-008",
-            "SORT-Q5",
-            "SORT-Q5",
-            "None",
-            "FILTERED"
           ]
         ],
         "results_mode": "rowsort"
@@ -989,32 +716,8 @@
         ],
         "results": [
           [
-            "Q119 warehouse event record 9 ACK batch batchIdList:Q119-9",
-            "PL-002",
-            "True",
-            "True",
-            "58",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 6 ACK batch batchIdList:Q120-6",
-            "PL-007",
-            "True",
-            "True",
-            "58",
-            "22"
-          ],
-          [
-            "Q120 warehouse event record 9 ACK batch batchIdList:Q120-9",
-            "PL-002",
-            "True",
-            "True",
-            "58",
-            "22"
-          ],
-          [
             "Q121 warehouse event record 0 ACK batch batchIdList:Q121-0",
-            "PL-001",
+            "PL-006",
             "True",
             "True",
             "58",
@@ -1022,23 +725,7 @@
           ],
           [
             "Q121 warehouse event record 3 ACK batch batchIdList:Q121-3",
-            "PL-004",
-            "True",
-            "True",
-            "58",
-            "22"
-          ],
-          [
-            "Q121 warehouse event record 6 ACK batch batchIdList:Q121-6",
-            "PL-007",
-            "True",
-            "True",
-            "58",
-            "22"
-          ],
-          [
-            "Q121 warehouse event record 9 ACK batch batchIdList:Q121-9",
-            "PL-002",
+            "PL-001",
             "True",
             "True",
             "58",
@@ -1046,7 +733,7 @@
           ],
           [
             "Q122 warehouse event record 0 ACK batch batchIdList:Q122-0",
-            "PL-001",
+            "PL-003",
             "True",
             "True",
             "58",
@@ -1054,7 +741,7 @@
           ],
           [
             "Q122 warehouse event record 3 ACK batch batchIdList:Q122-3",
-            "PL-004",
+            "PL-006",
             "True",
             "True",
             "58",
@@ -1062,26 +749,66 @@
           ],
           [
             "Q123 warehouse event record 0 ACK batch batchIdList:Q123-0",
-            "PL-001",
+            "PL-008",
             "True",
             "True",
             "58",
             "22"
           ],
           [
-            "Q121 warehouse event record 5 error E005 traceback",
-            "PL-006",
+            "Q120 warehouse event record 4",
+            "PL-005",
             "True",
             "True",
-            "50",
+            "29",
             "22"
           ],
           [
-            "Q122 warehouse event record 5 error E005 traceback",
-            "PL-006",
+            "Q121 warehouse event record 1",
+            "PL-007",
             "True",
             "True",
-            "50",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 2",
+            "PL-008",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q121 warehouse event record 4",
+            "PL-002",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 1",
+            "PL-004",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 2",
+            "PL-005",
+            "True",
+            "True",
+            "29",
+            "22"
+          ],
+          [
+            "Q122 warehouse event record 4",
+            "PL-007",
+            "True",
+            "True",
+            "29",
             "22"
           ]
         ],
@@ -1141,16 +868,16 @@
         ],
         "results": [
           [
-            "192.168.1.12",
+            "192.168.1.10",
             "sess_002",
-            "ctl_xyz789",
-            "3"
+            "var2_mno345",
+            "2"
           ],
           [
-            "192.168.2.24",
-            "sess_001",
-            "var1_yza234",
-            "3"
+            "192.168.1.13",
+            "sess_003",
+            "ctl_vwx901",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1175,73 +902,73 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
-            "SORT-ZONE-1",
-            "29",
-            "3"
-          ],
-          [
-            "ZONE-4",
-            "manual",
-            "SORT-ZONE-4",
-            "29",
-            "3"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "SORT-ZONE-2",
-            "58",
-            "3"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "SORT-ZONE-2",
-            "29",
-            "3"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "58",
-            "3"
-          ],
-          [
-            "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
-            "29",
-            "3"
-          ],
-          [
-            "ZONE-1",
             "auto",
             "SORT-ZONE-1",
             "29",
-            "3"
+            "2"
           ],
           [
             "ZONE-2",
-            "hybrid",
-            "SORT-ZONE-2",
-            "50",
-            "3"
-          ],
-          [
-            "ZONE-3",
             "auto",
-            "SORT-ZONE-3",
-            "58",
+            "SORT-ZONE-2",
+            "29",
             "2"
           ],
           [
             "ZONE-4",
             "auto",
             "SORT-ZONE-4",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "SORT-ZONE-1",
             "58",
             "2"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "SORT-ZONE-2",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1265,74 +992,67 @@
         ],
         "results": [
           [
-            "RetryScan",
-            "RETRYS",
+            "SearchItems",
+            "SEARCH",
             "False",
-            "3",
-            "1900.0"
-          ],
-          [
-            "ArchiveLog",
-            "ARCHIV",
-            "False",
-            "3",
-            "78.0"
-          ],
-          [
-            "DeleteRecord",
-            "DELETE",
-            "False",
-            "3",
-            "230.0"
-          ],
-          [
-            "RerouteTrack",
-            "REROUT",
-            "False",
-            "3",
-            "89.0"
+            "2",
+            "45.0"
           ],
           [
             "UpdateBatch",
             "UPDATE",
             "False",
-            "3",
-            "45.0"
+            "2",
+            "230.0"
           ],
           [
-            "SearchItems",
-            "SEARCH",
+            "ArchiveLog",
+            "ARCHIV",
             "False",
-            "3",
-            "12.0"
+            "2",
+            "1900.0"
           ],
           [
-            "SyncZone",
-            "SYNCZO",
+            "RetryScan",
+            "RETRYS",
             "False",
-            "3",
+            "2",
             "15.0"
           ],
           [
             "MergeBatch",
             "MERGEB",
-            "True",
-            "3",
-            "567.0"
-          ],
-          [
-            "CheckThreshold",
-            "CHECKT",
             "False",
             "2",
             "3200.0"
           ],
           [
-            "ScanPallet",
-            "SCANPA",
+            "SyncZone",
+            "SYNCZO",
             "False",
-            "2",
+            "1",
+            "12.0"
+          ],
+          [
+            "DeleteRecord",
+            "DELETE",
+            "False",
+            "1",
             "1450.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "1",
+            "78.0"
+          ],
+          [
+            "RerouteTrack",
+            "REROUT",
+            "False",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1356,74 +1076,550 @@
         ],
         "results": [
           [
-            "EU-CENTRAL-ZONE-1-AUT",
-            "3",
+            "US-EAST-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "EU-NORTH-ZONE-3-HYB",
+            "1",
             "0",
             "0",
             "60.0"
           ],
           [
-            "EU-WEST-ZONE-3-HYB",
-            "3",
+            "AP-EAST-ZONE-1-AUT",
+            "1",
+            "1",
             "0",
-            "0",
-            "200.0"
+            "50.0"
           ],
           [
-            "AP-SOUTH-ZONE-1-MAN",
-            "3",
-            "0",
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
             "0",
             "88.0"
           ],
           [
-            "US-WEST-ZONE-2-MAN",
-            "3",
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-2-MAN",
+            "1",
             "0",
             "0",
             "120.0"
           ],
           [
-            "US-CENTRAL-ZONE-4-MAN",
-            "3",
+            "EU-NORTH-ZONE-1-MAN",
+            "1",
             "0",
             "0",
-            "275.0"
+            "60.0"
           ],
           [
-            "AP-CENTRAL-ZONE-2-MAN",
-            "3",
-            "3",
+            "AP-SOUTH-ZONE-2-AUT",
+            "1",
+            "0",
             "0",
             "500.0"
           ],
           [
-            "AP-EAST-ZONE-2-HYB",
-            "3",
-            "3",
-            "3",
-            "155.0"
-          ],
-          [
-            "US-EAST-ZONE-1-AUT",
-            "3",
-            "3",
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
             "0",
             "50.0"
           ],
           [
-            "EU-NORTH-ZONE-4-AUT",
-            "2",
-            "2",
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
             "0",
-            "340.0"
+            "275.0"
           ],
           [
-            "SA-EAST-ZONE-3-AUT",
-            "2",
-            "2",
+            "SA-EAST-ZONE-4-HYB",
+            "1",
             "0",
-            "410.0"
+            "0",
+            "120.0"
+          ],
+          [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q366",
+      "sql": "SELECT concat(action_category, '-', action_subcategory, ' :: ', coalesce(exception_message, 'ok')) AS event_summary, _timestamp, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 21899000000,
+        "end_offset": 21973000000
+      },
+      "expected": {
+        "columns": [
+          "event_summary",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "performanceMetric-vitalsInp :: OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ],
+          [
+            "performanceMetric-clickEvent :: TimeoutException: lane LANE-A did not respond within 5000ms",
+            "sess_003"
+          ],
+          [
+            "performanceMetric-vitalsInp :: ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "sess_001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q367",
+      "sql": "SELECT _timestamp, coalesce(exception_message, upstream_error_code, error_code, 'no_error') AS display_error, coalesce(page_url, resource_path, endpoint_path) AS source FROM \"{stream}\" WHERE action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 21959000000,
+        "end_offset": 22033000000
+      },
+      "expected": {
+        "columns": [
+          "display_error",
+          "source"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "https://shop.example.com/search?q=test"
+          ],
+          [
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "None"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "https://shop.example.com/item/1003"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "https://shop.example.com/cart"
+          ],
+          [
+            "NetworkException: connection to batch sync failed",
+            "None"
+          ],
+          [
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q368",
+      "sql": "SELECT _timestamp, UPPER(error_code) AS err, LOWER(exception_message) AS msg, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND LOWER(exception_message) LIKE '%exception%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22019000000,
+        "end_offset": 22093000000
+      },
+      "expected": {
+        "columns": [
+          "err",
+          "msg",
+          "action_category"
+        ],
+        "results": [
+          [
+            "E006",
+            "networkexception: connection to batch sync failed",
+            "performanceMetric"
+          ],
+          [
+            "E005",
+            "configurationexception: missing facility_zone zone-3 override",
+            "performanceMetric"
+          ],
+          [
+            "E006",
+            "networkexception: connection to batch sync failed",
+            "performanceMetric"
+          ],
+          [
+            "E009",
+            "overflowexception: throughput_rate 999.0 exceeds max capacity",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q369",
+      "sql": "SELECT _timestamp, (CASE WHEN char_length(exception_message) > 30 THEN substring(exception_message, 1, 30) || '...' ELSE exception_message END) AS truncated_error, error_code FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22079000000,
+        "end_offset": 22153000000
+      },
+      "expected": {
+        "columns": [
+          "truncated_error",
+          "error_code"
+        ],
+        "results": [
+          [
+            "OverflowException: throughput_...",
+            "E009"
+          ],
+          [
+            "OverflowException: throughput_...",
+            "E009"
+          ],
+          [
+            "TimeoutException: lane LANE-A ...",
+            "E001"
+          ],
+          [
+            "TimeoutException: lane LANE-A ...",
+            "E001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q370",
+      "sql": "SELECT concat(page_slug, '/', action_category) AS path, COUNT(*) AS cnt FROM \"{stream}\" WHERE concat(page_slug, '/', action_category) LIKE '%itemPage%' GROUP BY path ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22139000000,
+        "end_offset": 22213000000
+      },
+      "expected": {
+        "columns": [
+          "path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage/navigation",
+            "2"
+          ],
+          [
+            "itemPage/performanceMetric",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q371",
+      "sql": "SELECT _timestamp, action_category, error_code FROM \"{stream}\" WHERE LOWER(TRIM(error_code)) IN ('e001', 'e003', 'e005') AND action_category = 'performanceMetric'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22199000000,
+        "end_offset": 22273000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "error_code"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "E005"
+          ],
+          [
+            "performanceMetric",
+            "E005"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q372",
+      "sql": "SELECT _timestamp, REPLACE(component_name, '-engine', '') AS comp_short, REPLACE(exception_message, 'Exception', 'ERR') AS short_msg FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND component_name LIKE '%engine%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22259000000,
+        "end_offset": 22333000000
+      },
+      "expected": {
+        "columns": [
+          "comp_short",
+          "short_msg"
+        ],
+        "results": [
+          [
+            "sorter",
+            "OverflowERR: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q373",
+      "sql": "SELECT (CASE WHEN char_length(exception_message) > 40 THEN 'long_msg' WHEN char_length(exception_message) > 10 THEN 'medium_msg' WHEN char_length(exception_message) > 0 THEN 'short_msg' ELSE 'no_msg' END) AS msg_length_class, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY msg_length_class",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22319000000,
+        "end_offset": 22393000000
+      },
+      "expected": {
+        "columns": [
+          "msg_length_class",
+          "cnt"
+        ],
+        "results": [
+          [
+            "long_msg",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q374",
+      "sql": "SELECT page_slug, STRING_AGG(DISTINCT error_code, ' | ' ORDER BY error_code ASC) AS error_list FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL GROUP BY page_slug",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22379000000,
+        "end_offset": 22453000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "error_list"
+        ],
+        "results": [
+          [
+            "searchPage",
+            "E003"
+          ],
+          [
+            "itemPage",
+            "E005"
+          ],
+          [
+            "cartPage",
+            "E004"
+          ],
+          [
+            "checkoutPage",
+            "E006"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q375",
+      "sql": "SELECT _timestamp, concat(coalesce(page_url, page_slug), ' | ', coalesce(exception_message, 'ok')) AS display_text, visitor_session_id FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category = 'performanceMetric' LIMIT 20",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22439000000,
+        "end_offset": 22513000000
+      },
+      "expected": {
+        "columns": [
+          "display_text",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "itemPage | OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ],
+          [
+            "itemPage | OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sess_001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q376",
+      "sql": "SELECT _timestamp, concat(UPPER(action_category), ':', LOWER(error_code)) AS type_code, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22499000000,
+        "end_offset": 22573000000
+      },
+      "expected": {
+        "columns": [
+          "type_code",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "PERFORMANCEMETRIC:e009",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ],
+          [
+            "PERFORMANCEMETRIC:e001",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "PERFORMANCEMETRIC:e003",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q377",
+      "sql": "SELECT concat(substring(exception_message, 1, 25), '... [', error_code, ']') AS summary, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND char_length(exception_message) > 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22559000000,
+        "end_offset": 22633000000
+      },
+      "expected": {
+        "columns": [
+          "summary",
+          "action_category"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedExceptio... [E003]",
+            "performanceMetric"
+          ],
+          [
+            "ResourceExhaustedExceptio... [E003]",
+            "performanceMetric"
+          ],
+          [
+            "SecurityException: unauth... [E004]",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: m... [E005]",
+            "performanceMetric"
+          ],
+          [
+            "NetworkException: connect... [E006]",
+            "performanceMetric"
+          ],
+          [
+            "ConfigurationException: m... [E005]",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q378",
+      "sql": "SELECT _timestamp, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND LOWER(exception_message) LIKE '%exception%' AND LOWER(component_name) LIKE '%engine%'",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22619000000,
+        "end_offset": 22693000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message"
+        ],
+        "results": [
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q379",
+      "sql": "SELECT _timestamp, concat(page_slug, ' -> ', action_category, ' -> ', action_subcategory) AS full_path, latency_ms FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp DESC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22679000000,
+        "end_offset": 22753000000
+      },
+      "expected": {
+        "columns": [
+          "full_path",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "itemPage -> navigation -> vitalsLcp",
+            "45"
+          ],
+          [
+            "homePage -> navigation -> vitalsLcp",
+            "78"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q380",
+      "sql": "SELECT _timestamp, concat(coalesce(page_url, resource_path, endpoint_path, page_slug), '?', coalesce(http_method, 'GET')) AS full_url, visitor_session_id, action_category FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category IN ('performanceMetric', 'navigation') LIMIT 20",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 22739000000,
+        "end_offset": 22813000000
+      },
+      "expected": {
+        "columns": [
+          "full_url",
+          "visitor_session_id",
+          "action_category"
+        ],
+        "results": [
+          [
+            "cartPage?POST",
+            "sess_001",
+            "performanceMetric"
+          ],
+          [
+            "cartPage?POST",
+            "sess_001",
+            "performanceMetric"
           ]
         ],
         "results_mode": "rowsort"

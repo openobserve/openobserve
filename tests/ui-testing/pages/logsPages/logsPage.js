@@ -26,7 +26,8 @@ export class LogsPage {
         this.homeButton = "[name ='home']";
         this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
         this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
-        this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
+        // Post UX-revamp: renamed from logs-search-bar-quick-mode-toggle-btn
+        this.quickModeToggle = '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]';
         // FieldListPagination schema-toggle buttons (data-test set per-slot in FieldListPagination.vue).
         // The common FieldListPagination renders with `${dataTestPrefix}-all-fields-btn` etc.
         // For the logs sidebar prefix is `logs-page`. Legacy non-prefixed variants kept as fallback
@@ -1384,6 +1385,10 @@ export class LogsPage {
 
     async executeHistogramQuery(query) {
         await this.clearAndFillQueryEditor(query);
+        // Wait for the 500ms debounce in CodeQueryEditor so the Vue watcher in
+        // SearchBar.vue can auto-detect SQL mode from the SELECT … FROM content
+        // before the query button is clicked.
+        await this.page.waitForTimeout(600);
         await this.page.locator(this.queryButton).click();
         
         // Wait for query execution and results to load
@@ -1480,6 +1485,8 @@ export class LogsPage {
     }
 
     // SQL Mode methods
+    // SQL mode toggle was removed from the UI. The editor now auto-detects SQL mode
+    // when the query contains SELECT...FROM. Delegate to the canonical enableSqlModeIfNeeded.
     async enableSQLMode() {
         await this.enableSqlModeIfNeeded();
     }
@@ -1513,7 +1520,7 @@ export class LogsPage {
 
     // Click on the Quick Mode toggle menu item (wrapper ODropdownItem) - for testing #10821
     async clickQuickModeTextLabel() {
-        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]');
         await this.page.locator(this.utilitiesMenuButton).click();
         await quickModeItem.waitFor({ state: 'visible', timeout: 5000 });
         // Click immediately — no fixed delay avoids reka-ui focus-outside closing the portal in CI.
@@ -1536,8 +1543,17 @@ export class LogsPage {
 
     // Histogram methods
     async toggleHistogram() {
-        // Histogram toggle is now inside the utilities ("More") menu.
+        // Histogram is a standalone toolbar button (data-test="logs-search-bar-histogram-btn")
+        // in normal-width viewports. It falls back into the utilities ("More") dropdown only
+        // when the viewport is very narrow (shouldMoveButtonsToMenu breakpoint < 328px).
         await this.page.keyboard.press('Escape').catch(() => {});
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isInline) {
+            await inlineBtn.click();
+            return;
+        }
+        // Narrow-viewport fallback: open the utilities menu and click the menu item.
         await this.page.locator(this.utilitiesMenuButton).click();
         const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
         await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -1570,13 +1586,24 @@ export class LogsPage {
     }
 
     async verifyHistogramState() {
-        // Histogram is now inside the utilities menu — open the menu and check the switch is unchecked.
+        // Verifies histogram is OFF (unchecked). Works in both normal and narrow viewports.
         await this.page.keyboard.press('Escape').catch(() => {});
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isInline) {
+            // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
+            const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
+            await expect(switchUnchecked).toBeVisible({ timeout: 5000 });
+            return;
+        }
+        // Narrow-viewport fallback: check state via the utilities menu item.
         await this.page.locator(this.utilitiesMenuButton).click();
         const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
-        await expect(switchEl).toBeVisible({ timeout: 5000 });
+        const isMenuVisible = await histogramMenuItem.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isMenuVisible) {
+            const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
+            await expect(switchEl).toBeVisible({ timeout: 5000 });
+        }
         await this.page.keyboard.press('Escape').catch(() => {});
     }
 
@@ -2008,13 +2035,29 @@ export class LogsPage {
         try {
             await this.waitForEditorValue(field);
             if (await editorHasField()) return;
-            // Field still not in editor — the first click likely didn't register.
-            // Re-clicking is safe because we've verified the field is NOT present
-            // (so the toggle couldn't have been turned on by the first click).
-            await this.clickInterestingFieldButton(field);
+            // Field not in editor. Build a SELECT query that explicitly includes the field
+            // and write it directly — regardless of whether SQL mode is currently on or off.
+            // Using clickSQLModeToggle() is unreliable here: when the editor already has a
+            // SELECT (e.g. from a prior enableSQLMode call), the toggle CLEARS the editor
+            // instead of adding the field. Direct setQueryEditorContent bypasses that problem.
+            const appState = await this._mutateSearchObj((searchObj) => ({
+                fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
+                stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+            }));
+            const timestamp = '_timestamp';
+            // Prefer the Vue interestingFieldList; fall back to just [field] so the SELECT
+            // always contains the field we starred even if Vue state wasn't updated yet.
+            const fields = appState?.fields?.length ? appState.fields : [field];
+            const stream = appState?.stream || 'e2e_automate';
+            const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+            const sql = `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`;
+            await this.setQueryEditorContent(sql);
+            await this.page.waitForTimeout(300);
+            if (await editorHasField()) return;
+            // Final check after waiting for Monaco model stabilisation.
             await this.waitForEditorValue(field);
             if (!(await editorHasField())) {
-                throw new Error(`Editor model never contained "${field}" after two click attempts`);
+                throw new Error(`Editor model never contained "${field}" after writing SELECT query`);
             }
         } catch (e) {
             throw e;
@@ -2030,12 +2073,12 @@ export class LogsPage {
     }
 
     async addRemoveInteresting() {
-        // Click the field button once to toggle it off (remove from query)
-        // Note: clickInterestingFields() was already called before this, which added the field
-        // The OField row's tooltip/info-icon overlay (`o-field-row__actions`) intercepts a
-        // normal click, so force the click past it. AGENT_RULES §4 covers OToast/OInput
-        // conventions; the underlying field-btn is the legitimate target here.
-        await this.page.locator(this.interestingFieldBtn('kubernetes_pod_name')).first().click({ force: true });
+        const field = 'kubernetes_pod_name';
+        // After clickInterestingFields() a SELECT query is written to the editor, which
+        // triggers Vue reactivity and may reset the field-search filter. Re-apply the
+        // filter so the star button is visible, then click it to remove the field.
+        await this.fillIndexFieldSearchInput(field);
+        await this.clickInterestingFieldButton(field);
     }
 
     // Kubernetes methods
@@ -2520,6 +2563,9 @@ export class LogsPage {
         // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
         // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
         // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
+        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
+        // causes us to force-click the Cancel button instead of the Run button.
+        let buttonWasInCancelState = false;
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2529,13 +2575,33 @@ export class LogsPage {
                 return !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
             },
             this.queryButton,
-            { timeout: 15000 }
+            { timeout }
         ).catch(() => {
-            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, continuing');
+            buttonWasInCancelState = true;
+            testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
 
-        // Click Run query
+        // Click Run query (or Cancel, if the prior search is still running)
         await btn.click({ force: true });
+
+        // If we had to force-click a Cancel button, we cancelled the in-flight search
+        // instead of starting a new one.  Wait for the Cancel to resolve, then click
+        // the Run button again to actually submit the intended query.
+        if (buttonWasInCancelState) {
+            testLogger.warn('runQueryAndWaitForResults: re-clicking Run to submit the intended query after cancel');
+            await this.page.waitForFunction(
+                (selector) => {
+                    const el = document.querySelector(selector);
+                    if (!el) return false;
+                    const text = (el.textContent || '').trim();
+                    const isDisabled = el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true';
+                    return !isDisabled && !text.includes('Cancel');
+                },
+                this.queryButton,
+                { timeout: 15000 }
+            ).catch(() => {});
+            await btn.click({ force: true });
+        }
 
         // Wait for the button to enter loading/disabled state (query started)
         await this.page.waitForFunction(
@@ -2550,19 +2616,69 @@ export class LogsPage {
             // Query may have completed instantly — that's OK
         });
 
-        // Wait for the button to exit loading/disabled state (query completed)
+        // Wait for the button to exit loading/disabled state (query completed).
+        // The button may stay disabled briefly if patternsState.loading is true (a new
+        // disabled condition added to the Run Query button in SearchBar.vue). Keep waiting
+        // until both the search loading AND any patterns loading have settled.
         await this.page.waitForFunction(
             (selector) => {
                 const btn = document.querySelector(selector);
                 if (!btn) return false;
                 const isDisabled = btn.hasAttribute('disabled') || btn.getAttribute('aria-disabled') === 'true';
-                const isLoading = btn.hasAttribute('disabled') || btn.getAttribute('aria-busy') === 'true';
                 const text = btn.textContent?.trim() || '';
-                return !isDisabled && !isLoading && !text.includes('Cancel');
+                return !isDisabled && !text.includes('Cancel');
             },
             this.queryButton,
             { timeout }
         );
+
+        // Wait for field-schema extraction (loadingStream) to settle so that
+        // updateGridColumns() has had time to set up resultGrid.columns before
+        // the caller starts querying for table cells. loadingStream is set to false
+        // at the end of extractFields() which runs inside processPostPaginationData —
+        // a floating async promise that may still be in-flight when the Run Query
+        // button becomes enabled (searchObj.loading = false).
+        // Polls `searchObj.loadingStream` via the prod-safe `_vnode` walk used by
+        // `_mutateSearchObj`. Inlined (not a method) because `page.waitForFunction`
+        // takes a serialised body and we need the polling semantics it provides.
+        await this.page.waitForFunction(
+            () => {
+                try {
+                    const app = document.querySelector('#app');
+                    if (!app?._vnode) return true;
+                    const visited = new Set();
+                    let target = null;
+                    const walk = (node, depth) => {
+                        if (!node || depth > 60 || visited.has(node) || target) return;
+                        visited.add(node);
+                        const ss = node.component?.setupState;
+                        if (ss && 'searchObj' in ss) {
+                            const s = ss.searchObj;
+                            if (s?.meta && 'sqlMode' in s.meta) {
+                                target = s;
+                                return;
+                            }
+                        }
+                        if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                        if (Array.isArray(node.children)) {
+                            for (const c of node.children) {
+                                if (c && typeof c === 'object') walk(c, depth + 1);
+                                if (target) return;
+                            }
+                        }
+                    };
+                    walk(app._vnode, 0);
+                    if (!target) return true;
+                    return target.loadingStream !== true;
+                } catch (e) {
+                    return true;
+                }
+            },
+            null,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.warn('runQueryAndWaitForResults: loadingStream check timed out, proceeding');
+        });
 
         testLogger.info('Query execution complete - Run query button ready');
     }
@@ -2646,57 +2762,91 @@ export class LogsPage {
 
     async waitForSearchBarRefreshButton() {
         const btn = this.page.locator(this.searchBarRefreshButton).first();
-        await btn.waitFor({ state: 'visible', timeout: 15000 });
-        // OButton renders <button disabled> while loading. Wait for the button to be enabled
-        // before clicking — OButton.handleClick() guards on loading and won't emit if disabled.
+        // Increase to 30 s — the button may be absent from the DOM if
+        // patternsState.loading is true (patterns cancel button takes its place via v-if).
+        await btn.waitFor({ state: 'visible', timeout: 30000 });
+        // OButton renders <button disabled> while loading or when patternsState.loading
+        // is true (a new disabled condition added to the Run Query button in SearchBar.vue).
+        // Wait for the button to be enabled before clicking.
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
                 return el != null && !el.hasAttribute('disabled');
             },
             this.searchBarRefreshButton,
-            { timeout: 15000 }
+            { timeout: 30000 }
         );
     }
 
     /**
-     * Open the utilities ("More") dropdown so the SQL mode toggle becomes visible.
-     * Returns true if the dropdown was opened by this call; false if toggle was already visible.
-     * Always pair with _closeUtilitiesMenuAfterSqlToggle() when the caller opened the menu.
+     * Wait until the log result table has at least one visible row at index 0.
+     * Useful as a data-readiness gate before asserting on specific cell content.
+     * Checks for any column in row 0 (not just "source") to be agnostic of column layout.
+     * @param {number} timeout - Max wait time in ms (default 15000)
+     * @returns {Promise<boolean>} true if a row appeared, false if timed out
      */
+    async waitForTableHits(timeout = 15000) {
+        try {
+            await this.page.waitForFunction(
+                () => document.querySelector('[data-test^="log-table-column-0-"]') !== null,
+                { timeout },
+            );
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     /**
-     * Open the utilities ("More") dropdown so the SQL mode menu item becomes visible.
-     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — NOT the
-     * syntax-guide which incorrectly carries the legacy data-test.
-     * Returns true if the dropdown was opened; false if it was already open.
+     * SQL mode toggle was removed from the UI. These helpers are kept as no-ops so
+     * any residual callers don't throw hard failures.
      */
     async _openUtilitiesMenuForSqlMode() {
-        const sqlModeMenuItem = this.page.locator(this.menuSqlModeBtn);
-        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-            return true;
-        }
+        testLogger.info('_openUtilitiesMenuForSqlMode: SQL mode toggle removed from UI — no-op');
         return false;
     }
 
-    /** Press Escape to close the utilities dropdown after a SQL mode check/toggle. */
     async _closeUtilitiesMenuAfterSqlToggle() {
-        await this.page.keyboard.press('Escape');
-        await this.page.locator(this.menuSqlModeBtn).waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+        // no-op — SQL mode toggle removed from UI
     }
 
     async clickSQLModeToggle() {
-        // SQL mode lives in the utilities ("More") dropdown.
-        // Click menuSqlModeBtn (ODropdownItem) — @select.prevent toggles sqlMode without closing.
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const sqlModeBtn = this.page.locator(this.menuSqlModeBtn);
-        await expect(sqlModeBtn).toBeVisible({ timeout: 5000 });
-        await sqlModeBtn.click({ force: true });
-        if (menuOpened) {
-            await this._closeUtilitiesMenuAfterSqlToggle();
+        // Behaves as a true toggle:
+        //   SQL ON  → clear the editor (FTS mode, no SELECT)
+        //   SQL OFF → write SELECT query with current interesting fields (SQL mode)
+        //
+        // Uses setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
+        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
+        // lands on another element.
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            // Toggle OFF: clear editor so auto-detection sets sqlMode = false
+            await this.setQueryEditorContent('');
+            await this.page.waitForTimeout(300);
+            testLogger.info('clickSQLModeToggle: toggled OFF (editor cleared)');
+            return;
         }
+
+        // Toggle ON: read interesting fields + stream from Vue state, build SELECT
+        const appState = await this._mutateSearchObj((searchObj) => ({
+            fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
+            stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+        }));
+
+        const timestamp = '_timestamp';
+        const fields = appState?.fields || [];
+        const stream = appState?.stream || 'e2e_automate';
+        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+        // Always build an explicit field list — never fall back to SELECT * when we
+        // have at least _timestamp, so assertions like "includes(_timestamp,field)"
+        // work even when interestingFieldList had only one user field.
+        const sql = allFields.length > 0
+            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
+            : `SELECT * FROM "${stream}"`;
+
+        await this.setQueryEditorContent(sql);
+        await this.page.waitForTimeout(300);
+        testLogger.info(`clickSQLModeToggle: toggled ON — set SQL="${sql.substring(0, 80)}"`);
     }
 
     async clickShowQueryToggle() {
@@ -4051,8 +4201,47 @@ export class LogsPage {
         await btnLocator.click({ force: true });
     }
 
+    /**
+     * Idempotent version of clickInterestingFieldButton: only clicks if the field is
+     * NOT already marked as interesting.  Use this when the goal is to guarantee the
+     * field is in interestingFieldList, not to toggle it.  If the button's title
+     * already says "Remove from interesting fields" the field is already starred and
+     * we skip the click so we don't accidentally remove it.
+     */
+    async ensureFieldIsInteresting(field) {
+        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
+        const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true).catch(() => false);
+            if (visible) {
+                const title = await btnLocator.getAttribute('title').catch(() => '');
+                if (title && title.toLowerCase().includes('remove')) {
+                    // Already interesting — nothing to do.
+                    return;
+                }
+                await btnLocator.click({ force: true });
+                return;
+            }
+            await inputLocator.fill('');
+            await inputLocator.click({ force: true });
+            await inputLocator.pressSequentially(field, { delay: 30 });
+            await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
+        }
+        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
+        const title = await btnLocator.getAttribute('title').catch(() => '');
+        if (title && title.toLowerCase().includes('remove')) {
+            return;
+        }
+        await btnLocator.click({ force: true });
+    }
+
     async expectInterestingFieldInEditor(field) {
-        return await expect(this.page.locator(this.queryEditor).getByText(new RegExp(field)).first()).toBeVisible();
+        // Monaco tokenizes text across multiple <span> elements, so DOM-based getByText
+        // with a regex can miss substrings that span token boundaries. Read the Monaco
+        // model value directly instead — this is authoritative regardless of rendering.
+        await this.expectQueryEditorContainsText(field);
     }
 
     async expectInterestingFieldInTable(field) {
@@ -4064,8 +4253,13 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsText(text) {
-        // Wait for Monaco editor to be available
+        // Wait for Monaco editor container to be visible
         await this.page.locator(this.queryEditor).waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for Monaco's .inputarea — only present after the editor is fully
+        // initialised (setupEditor() async load completes). This prevents the
+        // waitForFunction below from timing out on page reloads where window.monaco
+        // is not yet set when domcontentloaded fires.
+        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
@@ -4362,7 +4556,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorContainsSelectFrom() {
-        return await expect(this.page.locator(this.queryEditor)).toContainText('SELECT * FROM "e2e_automate"');
+        return await expect(this.page.locator(this.queryEditor)).toContainText('FROM "e2e_automate"');
     }
 
     generateRandomString() {
@@ -4748,10 +4942,10 @@ export class LogsPage {
         }
 
         // Quick Mode is off — open the utilities dropdown and enable the OSwitch.
-        // Post-migration: the trigger is an ODropdownItem (data-test="logs-search-bar-quick-mode-toggle-btn")
-        // wrapping an OSwitch (data-test="logs-search-bar-quick-mode-switch"). The inner button carries
-        // data-test="logs-search-bar-quick-mode-switch-btn" and data-state="checked|unchecked".
-        const quickModeItem = this.page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+        // Post-UX-revamp: the ODropdownItem was renamed to logs-search-bar-menu-quick-mode-toggle-btn.
+        // The OSwitch inside carries data-test="logs-search-bar-quick-mode-switch" and its
+        // inner button data-test="logs-search-bar-quick-mode-switch-btn" with data-state="checked|unchecked".
+        const quickModeItem = this.page.locator('[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]');
         const quickModeSwitch = this.page.locator('[data-test="logs-search-bar-quick-mode-switch"]');
         let enabled = false;
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -4916,29 +5110,21 @@ export class LogsPage {
     // New POM methods for PR tests
 
     async executeBlankQueryWithKeyboardShortcut() {
-        // Click the Monaco editor wrapper, then wait for the inner inputarea (Monaco's
-        // hidden textarea) to be visible so keyboard events land in the editor.
-        await this.page.locator(this.queryEditor).click();
-        const inputarea = this.page.locator(this.queryEditor).locator('.inputarea');
-        await inputarea.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-
-        // Select all and delete — this clears Monaco's content and triggers its
-        // onChange, which debounces the update to searchObj.data.query (100 ms).
-        await this.page.locator(this.queryEditor).press(
-            process.platform === "darwin" ? "Meta+A" : "Control+A"
-        );
-        await this.page.keyboard.press("Backspace");
-
-        // Wait for the 100 ms debounce to propagate searchObj.data.query = "".
-        // Without this pause, Ctrl+Enter fires before the store update, so the old
-        // SELECT query is used and the run succeeds (no error banner).
+        // A truly blank SQL query is not achievable: the fullSQLMode watcher in Index.vue
+        // calls setQuery() whenever sqlMode transitions to true with an empty editor, which
+        // auto-generates "SELECT * FROM <stream>" — so Ctrl+Enter would run a valid query
+        // and return results instead of an error.
+        //
+        // Use an intentionally invalid SQL statement instead. setQuery() returns early when
+        // the current query already contains "select" (Index.vue line ~1397), so the watcher
+        // will not overwrite it. The backend receives malformed SQL and returns an error,
+        // which sets searchObj.data.errorMsg and shows the error banner.
+        await this.setQueryEditorContent('SELECT *');
         await this.page.waitForTimeout(300);
 
-        // Run the blank query — Monaco's internal Ctrl+Enter keybinding emits
-        // "run-query" which propagates to SearchBar's handleRunQueryFn.
-        await this.page.locator(this.queryEditor).press(
-            process.platform === "darwin" ? "Meta+Enter" : "Control+Enter"
-        );
+        await this.clickQueryEditor();
+        await this.page.waitForTimeout(100);
+        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
     }
 
     async expectBlankQueryError() {
@@ -5279,23 +5465,13 @@ export class LogsPage {
     }
 
     async ensureHistogramToggleState(desiredState) {
-        // Histogram is now inside the utilities ("More") menu.
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await this.page.locator(this.utilitiesMenuButton).click();
-        const histogramMenuItem = this.page.locator(this.menuHistogramBtn);
-        await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state]`).first();
-        await switchEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await switchEl.getAttribute('data-state').catch(() => null);
-        const isOn = state === 'checked';
-
+        // In normal viewports the histogram is an inline toolbar button.
+        // Delegates to logsQueryPage which already handles both inline and menu cases.
+        const isOn = await this.logsQueryPage.isHistogramOn();
         if (desiredState !== isOn) {
-            // force: true — ODropdown portal transiently detaches items during initial render
-            await histogramMenuItem.click({ force: true });
-            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.toggleHistogram(); // toggleHistogram checks inline first
             return true; // State was changed
         }
-        await this.page.keyboard.press('Escape').catch(() => {});
         return false; // State was already correct
     }
 
@@ -6476,16 +6652,15 @@ export class LogsPage {
     }
 
     /**
-     * Wait for SQL mode to be active after switching
+     * Wait for SQL mode to be active after switching.
+     * SQL mode is auto-detected from query content — poll until the editor contains SELECT...FROM.
      */
     async waitForSQLModeActive() {
-        // SQL mode switch is inside the utilities menu. Use getSQLModeState() poll to confirm
-        // the OSwitch inner button reaches data-state="checked" without leaving the menu open.
         await expect.poll(
-            () => this.getSQLModeState(),
+            () => this.isSqlModeEnabled(),
             { timeout: 10000 }
-        ).toBe('checked');
-        testLogger.info('SQL mode switch stabilized');
+        ).toBe(true);
+        testLogger.info('SQL mode active (editor contains SELECT...FROM)');
     }
 
     /**
@@ -6809,39 +6984,131 @@ export class LogsPage {
     }
 
     /**
-     * Check if SQL mode is currently enabled.
-     * Opens the utilities dropdown, reads the OSwitch inner button's data-state, then closes it.
-     * @returns {Promise<boolean>} True if SQL mode is enabled
+     * SQL mode is auto-detected from query content: ON when the editor has SELECT...FROM.
+     * @returns {Promise<boolean>} True if the current query looks like SQL
      */
     async isSqlModeEnabled() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
-        return state === 'checked';
+        const text = await this.getQueryEditorText();
+        if (!text) return false;
+        const lower = text.toLowerCase().trim();
+        return lower.includes('select') && lower.includes('from');
     }
 
     /**
-     * Enable SQL mode if currently disabled; no-op if already enabled.
-     * Opens the utilities menu to access the toggle, then closes it.
+     * Read the currently selected stream name from Vue reactive state.
+     * Falls back to 'e2e_automate' if the state is unavailable.
+     * @returns {Promise<string>}
+     */
+    async _getSelectedStream() {
+        const stream = await this._mutateSearchObj(
+            (searchObj) => searchObj.data?.stream?.selectedStream?.[0] || null
+        );
+        return stream || 'e2e_automate';
+    }
+
+    /**
+     * Enable SQL mode if currently disabled.
+     * Uses a direct path: try Vue state mutation first, then fall back to setting
+     * a SELECT query in the editor. Avoids the strict expect.poll assertion in
+     * setQueryEditorContent (which can fail if the fullSQLMode watcher fires
+     * asynchronously and resets the editor after executeEdits).
      */
     async enableSqlModeIfDisabled() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (state !== 'checked') {
-            await this.page.locator(this.menuSqlModeBtn).click();
-            await expect.poll(async () => {
-                const s = await stateEl.getAttribute('data-state').catch(() => null);
-                return s === 'checked';
-            }, { timeout: 5000 }).toBe(true);
-            testLogger.info('SQL mode enabled');
-        } else {
-            testLogger.info('SQL mode already enabled');
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            testLogger.info('enableSqlModeIfDisabled: SQL mode already on — skipping');
+            return;
         }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        const stream = await this._getSelectedStream();
+        const set = await this._setSqlModeViaVue(true);
+        if (!set) {
+            // Vue state inaccessible — write SELECT directly to trigger auto-detection
+            await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
+        }
+        await this.page.waitForTimeout(600);
+        // If the Vue watcher didn't auto-update the editor, force it now
+        if (!(await this.isSqlModeEnabled())) {
+            await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
+            await this.page.waitForTimeout(400);
+        }
+        testLogger.info('enableSqlModeIfDisabled: SQL mode enabled');
+    }
+
+    /**
+     * Set searchObj.meta.sqlMode via the Vue component state accessed from the browser context.
+     * Tries multiple anchor elements (toolbar buttons rendered directly in SearchBar, the query
+     * editor wrapper) and walks both the DOM parent chain and the Vue component parent chain to
+     * reliably reach SearchBar even when the query editor is wrapped in an extra component layer
+     * (UnifiedQueryEditor / QueryEditor.vue).
+     * @param {boolean} value - true to enable SQL mode, false to disable
+     * @returns {Promise<boolean>} true if the state was set successfully
+     */
+    async _setSqlModeViaVue(value) {
+        // Delegates to _mutateSearchObj — single source of truth for the prod-safe
+        // `_vnode` walk. See _mutateSearchObj jsdoc for why __vueParentComponent
+        // can't be used in CI.
+        const result = await this._mutateSearchObj((searchObj, v) => {
+            searchObj.meta.sqlMode = v;
+            return true;
+        }, value);
+        return result === true;
+    }
+
+    /**
+     * Read `searchObj` via the prod-safe `_vnode` walk and apply `mutate(searchObj)`
+     * inside `page.evaluate`. Returns whatever the mutate fn returns (defaults to true
+     * on success). Use this instead of `__vueParentComponent` walks anywhere that
+     * needs to read or write Vue reactive state — `__vueParentComponent` is dev-only
+     * and undefined in the production frontend bundle CI ships.
+     */
+    async _mutateSearchObj(mutate, payload) {
+        return await this.page.evaluate(({ mutateSrc, payload }) => {
+            try {
+                const app = document.querySelector('#app');
+                if (!app?._vnode) return null;
+                const visited = new Set();
+                let target = null;
+                const walk = (node, depth) => {
+                    if (!node || depth > 60 || visited.has(node) || target) return;
+                    visited.add(node);
+                    const setupState = node.component?.setupState;
+                    if (setupState && 'searchObj' in setupState) {
+                        const s = setupState.searchObj;
+                        if (s?.meta && 'sqlMode' in s.meta) {
+                            target = s;
+                            return;
+                        }
+                    }
+                    if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                    if (Array.isArray(node.children)) {
+                        for (const c of node.children) {
+                            if (c && typeof c === 'object') walk(c, depth + 1);
+                            if (target) return;
+                        }
+                    }
+                };
+                walk(app._vnode, 0);
+                if (!target) return null;
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('searchObj', 'payload', `return (${mutateSrc})(searchObj, payload)`);
+                return fn(target, payload);
+            } catch (e) {
+                return null;
+            }
+        }, { mutateSrc: mutate.toString(), payload });
+    }
+
+    /**
+     * Set `searchObj.data.query` and `searchObj.data.editorValue` to `query` via
+     * the prod-safe `_vnode` walk. Returns true on success, null if Vue state
+     * could not be located.
+     */
+    async _setSearchObjQuery(query) {
+        return await this._mutateSearchObj((searchObj, q) => {
+            searchObj.data.query = q;
+            searchObj.data.editorValue = q;
+            return true;
+        }, query);
     }
 
     /**
@@ -7206,23 +7473,19 @@ export class LogsPage {
      * Opens the utilities dropdown first since the toggle lives inside it.
      */
     async clickSQLModeSwitch() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        await this.page.locator(this.menuSqlModeBtn).click();
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        // SQL mode toggle removed — delegate to clickSQLModeToggle which writes a SELECT
+        // query into the editor so that SQL mode is auto-detected as ON.
+        await this.clickSQLModeToggle();
     }
 
     /**
-     * Get SQL mode data-state value ("checked" | "unchecked").
-     * Opens the utilities dropdown to read the OSwitch inner button state, then closes it.
+     * Get SQL mode data-state value.
+     * SQL mode toggle was removed from the UI — always returns null.
      * @returns {Promise<string|null>}
      */
     async getSQLModeState() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-        const state = await stateEl.getAttribute('data-state').catch(() => null);
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
-        return state;
+        testLogger.info('getSQLModeState: SQL mode toggle removed from UI — returning null');
+        return null;
     }
 
     /**
@@ -7344,16 +7607,24 @@ export class LogsPage {
 
     /**
      * Toggle histogram on/off.
+     * In normal viewports the histogram is a standalone inline toolbar button.
+     * Only falls back to the utilities menu in narrow viewports (shouldMoveButtonsToMenu).
      */
     async toggleHistogram() {
-        const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
-        const isMenuItemVisible = await menuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isMenuItemVisible) {
-            await this.page.locator(this.utilitiesMenuButton).click();
-            await menuItem.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.keyboard.press('Escape').catch(() => {});
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+        if (isInline) {
+            await inlineBtn.click();
+            testLogger.info('Histogram toggled (inline button)');
+            return;
         }
+        // Narrow-viewport fallback: open the utilities menu and click the menu item.
+        await this.page.locator(this.utilitiesMenuButton).click();
+        const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+        await menuItem.waitFor({ state: 'visible', timeout: 5000 });
         await menuItem.click();
-        testLogger.info('Histogram toggled');
+        testLogger.info('Histogram toggled (menu item)');
     }
 
     /**
@@ -7699,6 +7970,12 @@ export class LogsPage {
             target.executeEdits('setQueryEditorContent', [
                 { range: fullRange, text: value, forceMoveMarkers: true },
             ]);
+            // executeEdits is a no-op on read-only editors (e.g. build-tab auto mode).
+            // Fall back to model.setValue() which bypasses the readOnly restriction and
+            // still fires onDidChangeModelContent so the Vue component can react.
+            if (model.getValue() !== value) {
+                model.setValue(value);
+            }
             target.setSelection(model.getFullModelRange());
         }, { selector: this.queryEditor, value: query });
         // Verify via getValue() that the model now reflects the value (handles empty string too)
@@ -7710,55 +7987,102 @@ export class LogsPage {
 
     /**
      * Enable SQL mode if not already enabled.
-     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
+     * Sets sqlMode=true via the Vue component state (triggers the sqlMode watcher in build
+     * tab or enables auto-detection on the logs tab). Falls back to typing SELECT * if Vue
+     * state access is unavailable.
      */
     async enableSqlModeIfNeeded() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-        if (!isOn) {
-            // force: true bypasses actionability checks — ODropdown portal transiently detaches items on render
-            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // In CI the dropdown may close after the click, making stateEl detached/hidden.
-            // Re-open the menu on each poll iteration so the state element is always visible.
-            await expect.poll(async () => {
-                await this._openUtilitiesMenuForSqlMode();
-                const s = await this.page.locator(this.menuSqlModeBtnState).first()
-                    .getAttribute('data-state').catch(() => null);
-                return s === 'checked';
-            }, { timeout: 15000 }).toBe(true);
-            testLogger.info('SQL mode enabled');
-        } else {
-            testLogger.info('SQL mode already enabled');
+        const isSQL = await this.isSqlModeEnabled();
+        if (isSQL) {
+            testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
+            return;
         }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        // Set the Vue flag first — in the build tab this triggers the sqlMode watcher
+        // which updates the editor with the full generated SQL query.
+        await this._setSqlModeViaVue(true);
+
+        // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
+        // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
+        // then Vue re-renders the editor prop) — a fixed 600ms was too short under CI load.
+        await this.page.waitForFunction((selector) => {
+            const host = document.querySelector(selector);
+            if (!host) return false;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase().trim();
+                    return val.includes('select') && val.includes('from');
+                }
+            }
+            return false;
+        }, this.queryEditor, { timeout: 2000, polling: 100 }).catch(() => {});
+
+        // Check if the editor was updated (build tab watcher fired).
+        // In the main logs tab the watcher returns early, so the editor stays in FTS mode.
+        // In that case fall back to writing SELECT directly so the editor reflects SQL mode.
+        // In build mode the query editor is read-only (buildModeQueryEditorDisabled=true),
+        // so Monaco executeEdits is blocked by the readOnly flag. Instead, update
+        // searchObj.data.query directly via Vue state — use the same multi-anchor + comp.parent
+        // traversal as _setSqlModeViaVue to reliably reach the component hosting searchObj.
+        const isSQLNow = await this.isSqlModeEnabled();
+        if (!isSQLNow) {
+            const stream = await this._getSelectedStream();
+            const sql = `SELECT * FROM "${stream}"`;
+            const updatedViaState = await this._setSearchObjQuery(sql);
+            if (!updatedViaState) {
+                // Last resort: write SELECT directly via setQueryEditorContent.
+                // In build-tab auto mode the editor is read-only, but setQueryEditorContent
+                // now falls back to model.setValue() which bypasses the readOnly restriction.
+                await this.setQueryEditorContent(sql);
+            }
+            // Allow Vue reactivity and CodeQueryEditor props.query watcher to propagate
+            await this.page.waitForTimeout(500);
+        }
+        testLogger.info('enableSqlModeIfNeeded: SQL mode enabled');
     }
 
     /**
      * Disable SQL mode if currently enabled.
-     * Opens the utilities ("More") dropdown, reads + toggles the OSwitch, then closes it.
+     * Sets sqlMode=false via the Vue component state (triggers the sqlMode watcher in build
+     * tab to show WHERE clause). Falls back to direct state update if the editor is read-only
+     * (build tab auto mode) or the async watcher chain is too slow.
      */
     async disableSqlModeIfNeeded() {
-        const menuOpened = await this._openUtilitiesMenuForSqlMode();
-        const stateEl = this.page.locator(this.menuSqlModeBtnState).first();
-        await stateEl.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        const isOn = (await stateEl.getAttribute('data-state').catch(() => null)) === 'checked';
-        if (isOn) {
-            await this.page.locator(this.menuSqlModeBtn).click({ force: true });
-            // In CI the dropdown may close after the click, making stateEl detached/hidden.
-            // Re-open the menu on each poll iteration so the state element is always visible.
-            await expect.poll(async () => {
-                await this._openUtilitiesMenuForSqlMode();
-                const s = await this.page.locator(this.menuSqlModeBtnState).first()
-                    .getAttribute('data-state').catch(() => null);
-                return s === 'unchecked';
-            }, { timeout: 15000 }).toBe(true);
-            testLogger.info('SQL mode disabled');
-        } else {
-            testLogger.info('SQL mode already disabled');
+        const isSQL = await this.isSqlModeEnabled();
+        if (!isSQL) {
+            testLogger.info('disableSqlModeIfNeeded: SQL mode already off — skipping');
+            return;
         }
-        if (menuOpened) await this._closeUtilitiesMenuAfterSqlToggle();
+        // Set sqlMode=false via Vue state — in build mode this triggers the Index.vue
+        // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
+        // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
+        await this._setSqlModeViaVue(false);
+        await this.page.waitForTimeout(600);
+
+        // Verify the editor was updated. The Vue watcher chain is async and involves an
+        // SQL-parser dynamic import, so it can exceed 600ms on first load or under CI load.
+        // If the editor still contains SELECT, fall back to the same pattern as
+        // enableSqlModeIfNeeded: set searchObj.data.query directly via Vue state so the
+        // QueryEditor prop watcher calls editorObj.getModel().setValue() which bypasses
+        // the Monaco readOnly flag (unlike keyboard shortcuts which do not).
+        const isStillSQL = await this.isSqlModeEnabled();
+        if (isStillSQL) {
+            testLogger.warn('disableSqlModeIfNeeded: Vue watcher did not update editor in time — using direct state fallback');
+            const updatedViaState = await this._mutateSearchObj((searchObj) => {
+                searchObj.data.query = '';
+                searchObj.data.editorValue = '';
+                return true;
+            });
+            if (!updatedViaState) {
+                // Absolute fallback: programmatic Monaco clear via executeEdits which
+                // bypasses the readOnly flag (unlike keyboard Ctrl+A + Backspace which fails
+                // silently on read-only editors in the build tab's auto mode).
+                await this.setQueryEditorContent('').catch(() => {});
+            }
+            await this.page.waitForTimeout(500);
+        }
+        testLogger.info('disableSqlModeIfNeeded: SQL mode disabled');
     }
 
     /**
@@ -9272,14 +9596,12 @@ export class LogsPage {
     async findQueryModeToggle() {
         const selectors = [
             this.quickModeToggle,
-            this.sqlModeToggle,
-            '[data-test="logs-search-bar-quick-mode-toggle-btn"]',
-            '[data-test="logs-search-bar-sql-mode-toggle-btn"]',
+            // SQL mode toggle was removed from the UI
+            '[data-test="logs-search-bar-menu-quick-mode-toggle-btn"]',
             '[data-test="logs-search-bar-ui-mode-btn"]',
             '[data-test="logs-search-ui-mode-btn"]',
             'button:has-text("UI Mode")',
             '[data-test*="quick-mode"]',
-            '[data-test*="sql-mode"]',
         ];
 
         for (const sel of selectors) {

@@ -217,19 +217,30 @@ class="tw:mr-1" />
           class="logs-skel-row tw:flex tw:items-center tw:w-full"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
-          <td
-            v-for="(header, c) in headers"
-            :key="header.id"
-            class="tw:px-2 tw:overflow-hidden"
-            :class="c === 0 ? 'tw:pl-4' : ''"
-            :style="skelTdStyle(header, c)"
-          >
+          <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
+          <td v-if="!headers?.length" class="tw:w-full tw:px-4 tw:overflow-hidden">
             <span
               class="logs-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
-              :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
+              :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
               aria-hidden="true"
             />
           </td>
+          <!-- Columns available — per-column aligned shimmer pills -->
+          <template v-else>
+            <td
+              v-for="(header, c) in headers"
+              :key="header.id"
+              class="tw:px-2 tw:overflow-hidden"
+              :class="c === 0 ? 'tw:pl-4' : ''"
+              :style="skelTdStyle(header, c)"
+            >
+              <span
+                class="logs-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
+                aria-hidden="true"
+              />
+            </td>
+          </template>
         </tr>
       </tbody>
 
@@ -272,9 +283,7 @@ class="tw:mr-1" />
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? virtualRow.index % 2 === 0
-                    ? 'log-row-base'
-                    : 'log-row-alt'
+                  ? 'log-row-base'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'table-row-hover'
@@ -796,7 +805,7 @@ const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 const headers = computed(() => headerGroups.value.headers);
 
 // Skeleton loading helpers — mirrors OTable shimmer pattern
-const SKEL_ROW_COUNT = 12;
+const SKEL_ROW_COUNT = 30;
 const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
 const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
 // Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
@@ -1176,13 +1185,9 @@ defineExpose({
   height: 0.75rem !important;
 }
 
-// Log table row surface colours — driven by CSS vars per theme
+// Log table row surface colour — uniform background, separator via border-bottom only
 .log-row-base {
   background-color: var(--o2-log-table-row-bg);
-}
-
-.log-row-alt {
-  background-color: var(--o2-log-table-row-alt-bg);
 }
 
 .table-row-hover {
@@ -1229,21 +1234,28 @@ defineExpose({
   border-bottom: 1px solid var(--o2-log-table-row-border);
   height: 29px;
   background-color: var(--o2-log-table-row-bg);
-
-  &:nth-child(even) {
-    background-color: var(--o2-log-table-row-alt-bg);
-  }
 }
 
 .logs-skel-pill {
+  // Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5)
   background: linear-gradient(
     90deg,
-    var(--color-skeleton-base)      0%,
-    var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base)      100%
+    var(--color-grey-100)       0%,
+    rgba(255, 255, 255, 0.65)   50%,
+    var(--color-grey-100)       100%
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
+
+  // Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252)
+  .body--dark & {
+    background: linear-gradient(
+      90deg,
+      var(--color-grey-600)       0%,
+      rgba(255, 255, 255, 0.03)   50%,
+      var(--color-grey-600)       100%
+    );
+  }
 }
 
 @keyframes logs-skel-shimmer {

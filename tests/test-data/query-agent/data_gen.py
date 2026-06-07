@@ -19,7 +19,9 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
+    # Shift enough so all per-query windows (60s each) are in the past.
+    # 400 queries × 60s = 6.67h; 8h shift gives ~1.3h of headroom.
+    BASE_TS = int((_now - timedelta(hours=8)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     # --- Original 17 fields (warehouse/sorter themed) ---
@@ -576,9 +578,23 @@ FIELD_POOL = {
 
 STREAM_VALUES = ["stdout", "stdout", "stdout", "stderr"]
 
+# Fields that are NULL for some records to exercise COALESCE / IS NULL /
+# IS NOT NULL paths.  Two out of every five records per query get None
+# for these fields.
+_NULLABLE_FIELDS = {
+    "bot_flag", "info_tag", "upstream_error_code", "page_url",
+    "endpoint_path", "resource_path", "variant_tag", "threat_flag",
+}
+
 
 def make_record(ts, idx, qid):
-    """Build a single deterministic data record."""
+    """Build a single deterministic data record.
+
+    Each field uses a different rotation offset so field-value
+    combinations vary independently — no two fields pick from the same
+    pool position for the same (idx, qi) pair.
+    """
+    qi = int(qid[1:])
     # Vary the log field: some records get an ACK batch suffix for
     # str_match_ignore_case testing on ack_detail-like patterns.
     if idx % 3 == 0:
@@ -591,20 +607,37 @@ def make_record(ts, idx, qid):
     r = {
         "_timestamp": ts,
         "log": log,
-        "stream": STREAM_VALUES[idx % len(STREAM_VALUES)],
+        "stream": STREAM_VALUES[(idx + qi) % len(STREAM_VALUES)],
     }
-    for field, pool in FIELD_POOL.items():
-        r[field] = pool[idx % len(pool)]
+    # Per-field rotation: multipliers 13 and 7 are coprime with all pool
+    # sizes (8, 10) and with each other, so every (qi, idx) pair produces
+    # a unique value fingerprint.  Two records with the same idx but
+    # different qi get different values for every field.
+    # NULL injection: (idx + qi) % 5 ∈ {1, 3} gives a deterministic 40 %
+    # rate across the 5-record window, varying which records are nulled
+    # per query so both nullable and non-nullable combinations appear.
+    inject_null = (idx + qi) % 5 in (1, 3)
+    for i, (field, pool) in enumerate(FIELD_POOL.items()):
+        if inject_null and field in _NULLABLE_FIELDS:
+            r[field] = None
+            continue
+        offset = (qi * 13 + i * 7) % len(pool)
+        r[field] = pool[(idx + offset) % len(pool)]
+
     return r
 
 
-def build_dataset(num_queries=200):
-    """Generate deterministic records for queries Q001-Q{num_queries}."""
+def build_dataset(num_queries=400):
+    """Generate deterministic records for queries Q001-Q{num_queries}.
+
+    Each query gets 5 records spaced 18 seconds apart within its own
+    non-overlapping 60-second time window.
+    """
     records = []
     for qi in range(1, num_queries + 1):
         qid = f"Q{qi:03d}"
         base = BASE_TS + (qi - 1) * 60_000_000
-        for i in range(10):
+        for i in range(5):
             ts = base + i * 18_000_000
             records.append(make_record(ts, i, qid))
     return records

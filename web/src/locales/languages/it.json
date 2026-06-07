@@ -404,7 +404,18 @@
     "selectLogStream": "Seleziona lo stream dei log",
     "noData": "Nessun dato disponibile",
     "functionEditorLabel": "Editor di funzioni",
-    "loadingStream": "Caricamento dello stream..."
+    "loadingStream": "Caricamento dello stream...",
+    "hideHistogram": "Nascondi istogramma",
+    "disableQuickMode": "Disattiva la modalità rapida",
+    "menuGroupSetOnce": "Imposta una volta",
+    "menuGroupSavedViews": "Visualizzazioni salvate",
+    "menuGroupTools": "Utensili",
+    "menuGroupHistory": "Storia",
+    "menuGroupDownloads": "Download",
+    "menuGroupSchedule": "Pianificazione",
+    "menuGroupInspect": "Ispezionare",
+    "validSql": "SQL valido",
+    "invalidSql": "Query non valida"
   },
   "menu": {
     "home": "Home",
