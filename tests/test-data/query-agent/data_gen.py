@@ -597,6 +597,16 @@ def make_record(ts, idx, qid, stream_offset=0):
     stream_offset shifts the per-field rotation so the same (qi, idx)
     produces different values for a secondary stream while keeping
     partial overlap on join keys (pallet_id, org_name, etc.).
+
+    IMPORTANT: stream_offset only affects field VALUES, NOT timestamps.
+    Both streams generate records at the same _timestamp values (same
+    BASE_TS, same per-query time windows).  This means cross-stream
+    JOIN queries can use a single time_offset — both streams' records
+    for a given query fall within the same 74-second window.
+
+    The log field always uses the original qid (unshifted) so that log
+    entries are tagged with the query that owns them, regardless of
+    stream_offset.  Only qi (used for per-field rotation) is shifted.
     """
     qi = int(qid[1:]) + stream_offset
     # Vary the log field: some records get an ACK batch suffix for

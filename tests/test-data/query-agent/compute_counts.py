@@ -214,6 +214,9 @@ def translate_oo_to_duckdb(sql: str) -> tuple[str, bool]:
     Returns (translated_sql, has_oo_specific_functions).
     """
     s = sql.replace("{stream}", STREAM).replace("{stream2}", "logs2")
+    # NOTE: "{stream2}" → "logs2" (DuckDB view name), while conftest.py
+    # replaces the same placeholder with STREAM2 (the actual OO stream
+    # name).  Both are correct — each runs in its own execution context.
 
     # Check for OO-specific functions before translation
     has_oo = _has_oo_specific_functions(s)
@@ -315,6 +318,8 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
     # Create a pre-filtered view so EVERY query (CTEs, subqueries, etc.)
     # gets the right records without fragile SQL WHERE injection.
+    # Views are recreated per query because each query has its own
+    # time_offset — this is intentional, not overhead.
     con.execute(
         f"CREATE OR REPLACE VIEW logs AS "
         f"SELECT * FROM _logs WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
