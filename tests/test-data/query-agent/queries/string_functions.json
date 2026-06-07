@@ -354,27 +354,27 @@
         ],
         "results": [
           [
-            "CC-GAMMA",
-            "SORT-A7",
-            "hybrid, auto",
-            "4"
-          ],
-          [
             "CC-BETA",
             "SORT-X1",
             "manual, hybrid",
             "4"
           ],
           [
+            "CC-GAMMA",
+            "SORT-A7",
+            "auto, hybrid",
+            "4"
+          ],
+          [
             "CC-DELTA",
             "SORT-M3",
-            "manual, auto",
+            "auto, manual",
             "3"
           ],
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
-            "manual, auto",
+            "auto, manual",
             "3"
           ]
         ],
@@ -992,6 +992,13 @@
         ],
         "results": [
           [
+            "SearchItems",
+            "SEARCH",
+            "False",
+            "2",
+            "45.0"
+          ],
+          [
             "UpdateBatch",
             "UPDATE",
             "False",
@@ -1004,13 +1011,6 @@
             "False",
             "2",
             "1900.0"
-          ],
-          [
-            "SearchItems",
-            "SEARCH",
-            "False",
-            "2",
-            "45.0"
           ],
           [
             "RetryScan",
@@ -1034,18 +1034,18 @@
             "12.0"
           ],
           [
-            "CheckThreshold",
-            "CHECKT",
-            "False",
-            "1",
-            "78.0"
-          ],
-          [
             "DeleteRecord",
             "DELETE",
             "False",
             "1",
             "1450.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "1",
+            "78.0"
           ],
           [
             "RerouteTrack",
@@ -1097,46 +1097,18 @@
             "50.0"
           ],
           [
-            "AP-SOUTH-ZONE-2-AUT",
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
             "1",
             "0",
-            "0",
-            "500.0"
+            "88.0"
           ],
           [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
+            "US-EAST-ZONE-4-HYB",
             "1",
             "0",
             "0",
-            "60.0"
-          ],
-          [
-            "US-CENTRAL-ZONE-3-HYB",
-            "1",
-            "0",
-            "0",
-            "200.0"
-          ],
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
+            "155.0"
           ],
           [
             "US-WEST-ZONE-1-AUT",
@@ -1160,18 +1132,46 @@
             "120.0"
           ],
           [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
+            "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
-            "88.0"
+            "0",
+            "60.0"
           ],
           [
-            "US-EAST-ZONE-4-HYB",
+            "AP-SOUTH-ZONE-2-AUT",
             "1",
             "0",
             "0",
-            "155.0"
+            "500.0"
+          ],
+          [
+            "AP-EAST-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,20 +1433,20 @@
         ],
         "results": [
           [
-            "itemPage",
-            "E005"
-          ],
-          [
             "searchPage",
             "E003"
           ],
           [
-            "checkoutPage",
-            "E006"
+            "itemPage",
+            "E005"
           ],
           [
             "cartPage",
             "E004"
+          ],
+          [
+            "checkoutPage",
+            "E006"
           ]
         ],
         "results_mode": "rowsort"

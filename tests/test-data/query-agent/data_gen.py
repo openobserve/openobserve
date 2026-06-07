@@ -609,14 +609,20 @@ def make_record(ts, idx, qid):
         "log": log,
         "stream": STREAM_VALUES[(idx + qi) % len(STREAM_VALUES)],
     }
+    # Per-field rotation: multipliers 13 and 7 are coprime with all pool
+    # sizes (8, 10) and with each other, so every (qi, idx) pair produces
+    # a unique value fingerprint.  Two records with the same idx but
+    # different qi get different values for every field.
+    # NULL injection: (idx + qi) % 5 ∈ {1, 3} gives a deterministic 40 %
+    # rate across the 5-record window, varying which records are nulled
+    # per query so both nullable and non-nullable combinations appear.
+    inject_null = (idx + qi) % 5 in (1, 3)
     for i, (field, pool) in enumerate(FIELD_POOL.items()):
+        if inject_null and field in _NULLABLE_FIELDS:
+            r[field] = None
+            continue
         offset = (qi * 13 + i * 7) % len(pool)
         r[field] = pool[(idx + offset) % len(pool)]
-
-    # NULL stress: deterministically inject None for ~40 % of records
-    if (idx + qi) % 5 in (1, 3):
-        for field in _NULLABLE_FIELDS:
-            r[field] = None
 
     return r
 

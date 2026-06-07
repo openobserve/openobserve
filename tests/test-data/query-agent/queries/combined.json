@@ -14,17 +14,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "2905.0",
-            "74.85",
-            "25.0"
-          ],
-          [
             "ZONE-2",
             "4",
             "1645.0",
             "33.6",
+            "25.0"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "2905.0",
+            "74.85",
             "25.0"
           ],
           [
@@ -731,13 +731,6 @@
             "118.75"
           ],
           [
-            "ZONE-1",
-            "SORT-M3",
-            "581.25",
-            "68.18",
-            "0.0"
-          ],
-          [
             "ZONE-3",
             "SORT-X1",
             "495.0",
@@ -749,6 +742,13 @@
             "SORT-A7",
             "498.33",
             "29.7",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "581.25",
+            "68.18",
             "0.0"
           ],
           [
@@ -868,15 +868,7 @@
           ],
           [
             "2",
-            "syncZone"
-          ],
-          [
-            "2",
-            "checkThreshold"
-          ],
-          [
-            "2",
-            "deleteRecord"
+            "retryScan"
           ],
           [
             "1",
@@ -888,7 +880,15 @@
           ],
           [
             "2",
-            "retryScan"
+            "checkThreshold"
+          ],
+          [
+            "2",
+            "deleteRecord"
+          ],
+          [
+            "2",
+            "syncZone"
           ]
         ],
         "results_mode": "rowsort"
@@ -1026,18 +1026,6 @@
         ],
         "results": [
           [
-            "CheckThreshold",
-            "ok",
-            "2",
-            "78.0"
-          ],
-          [
-            "RetryScan",
-            "ok",
-            "2",
-            "15.0"
-          ],
-          [
             "ScanPallet",
             "failed",
             "2",
@@ -1050,16 +1038,22 @@
             "12.0"
           ],
           [
+            "CheckThreshold",
+            "ok",
+            "2",
+            "78.0"
+          ],
+          [
             "MergeBatch",
             "queued",
             "2",
             "3200.0"
           ],
           [
-            "RerouteTrack",
+            "RetryScan",
             "ok",
-            "1",
-            "567.0"
+            "2",
+            "15.0"
           ],
           [
             "SearchItems",
@@ -1068,16 +1062,22 @@
             "45.0"
           ],
           [
-            "ArchiveLog",
-            "warning",
-            "1",
-            "1900.0"
-          ],
-          [
             "DeleteRecord",
             "pending",
             "1",
             "1450.0"
+          ],
+          [
+            "RerouteTrack",
+            "ok",
+            "1",
+            "567.0"
+          ],
+          [
+            "ArchiveLog",
+            "warning",
+            "1",
+            "1900.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1114,6 +1114,16 @@
             "114.0"
           ],
           [
+            "ZONE-4",
+            "HYBRID",
+            "2",
+            "54.75",
+            "26.3",
+            "670.0",
+            "61.5",
+            "84.0"
+          ],
+          [
             "ZONE-3",
             "HYBRID",
             "2",
@@ -1125,16 +1135,6 @@
           ],
           [
             "ZONE-4",
-            "HYBRID",
-            "2",
-            "54.75",
-            "26.3",
-            "670.0",
-            "61.5",
-            "84.0"
-          ],
-          [
-            "ZONE-2",
             "AUTO",
             "1",
             "45.3",
@@ -1144,7 +1144,7 @@
             "0.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "AUTO",
             "1",
             "45.3",
@@ -1176,14 +1176,6 @@
         ],
         "results": [
           [
-            "MED_LOAD",
-            "MED_TPUT",
-            "4",
-            "18.85",
-            "1060",
-            "2.8"
-          ],
-          [
             "HIGH_LOAD",
             "HIGH_TPUT",
             "4",
@@ -1192,12 +1184,28 @@
             "3.5"
           ],
           [
+            "MED_LOAD",
+            "MED_TPUT",
+            "4",
+            "18.85",
+            "1060",
+            "2.8"
+          ],
+          [
             "LOW_LOAD",
             "HIGH_TPUT",
             "3",
             "35.0",
             "1050",
             "1.2"
+          ],
+          [
+            "LOW_LOAD",
+            "MED_TPUT",
+            "1",
+            "24.8",
+            "275",
+            "2.5"
           ],
           [
             "MED_LOAD",
@@ -1214,14 +1222,6 @@
             "26.3",
             "340",
             "0.5"
-          ],
-          [
-            "LOW_LOAD",
-            "MED_TPUT",
-            "1",
-            "24.8",
-            "275",
-            "2.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1292,15 +1292,15 @@
         ],
         "results": [
           [
-            "Windows 11",
-            "performanceMetric",
-            "2",
-            "100.0"
-          ],
-          [
             "Android 14",
             "navigation",
             "1",
+            "100.0"
+          ],
+          [
+            "Windows 11",
+            "performanceMetric",
+            "2",
             "100.0"
           ]
         ],
@@ -1396,6 +1396,13 @@
         ],
         "results": [
           [
+            "zone-controller",
+            "itemPage",
+            "1",
+            "12.0",
+            "12"
+          ],
+          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1408,13 +1415,6 @@
             "1",
             "230.0",
             "230"
-          ],
-          [
-            "zone-controller",
-            "itemPage",
-            "1",
-            "12.0",
-            "12"
           ],
           [
             "conveyor-driver",
@@ -1450,14 +1450,14 @@
         ],
         "results": [
           [
-            "browse",
-            "1",
-            "1"
-          ],
-          [
             "monitoring",
             "6",
             "2"
+          ],
+          [
+            "browse",
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,11 +1479,6 @@
         ],
         "results": [
           [
-            "E005",
-            "1",
-            "1"
-          ],
-          [
             "E009",
             "1",
             "1"
@@ -1491,6 +1486,11 @@
           [
             "E006",
             "2",
+            "1"
+          ],
+          [
+            "E005",
+            "1",
             "1"
           ]
         ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Computer",
-            "1",
-            "1",
-            "230.0"
-          ],
-          [
             "Mobile",
             "4",
             "4",
             "747.5"
+          ],
+          [
+            "Computer",
+            "1",
+            "1",
+            "230.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1571,13 +1571,13 @@
         ],
         "results": [
           [
-            "fast",
-            "error",
+            "timeout",
+            "success",
             "2"
           ],
           [
-            "timeout",
-            "success",
+            "fast",
+            "error",
             "2"
           ],
           [
@@ -1642,14 +1642,14 @@
         ],
         "results": [
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
