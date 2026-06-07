@@ -66,68 +66,74 @@
           [
             "2026-06-06T07:20:00",
             "ZONE-1",
-            "2",
-            "437.5"
+            "1",
+            "555.0"
           ],
           [
             "2026-06-06T07:20:00",
             "ZONE-2",
             "1",
-            "320.0"
+            "190.0"
           ],
           [
             "2026-06-06T07:20:00",
             "ZONE-3",
-            "1",
-            "480.0"
+            "2",
+            "727.5"
           ],
           [
             "2026-06-06T07:20:00",
             "ZONE-4",
             "1",
-            "610.0"
+            "290.0"
           ],
           [
             "2026-06-06T07:21:00",
             "ZONE-1",
-            "2",
-            "437.5"
+            "1",
+            "900.0"
           ],
           [
             "2026-06-06T07:21:00",
             "ZONE-2",
             "1",
-            "320.0"
+            "150.0"
           ],
           [
             "2026-06-06T07:21:00",
             "ZONE-3",
             "1",
-            "480.0"
+            "320.0"
           ],
           [
             "2026-06-06T07:21:00",
             "ZONE-4",
+            "2",
+            "315.0"
+          ],
+          [
+            "2026-06-06T07:22:00",
+            "ZONE-1",
             "1",
             "610.0"
           ],
           [
             "2026-06-06T07:22:00",
-            "ZONE-1",
-            "2",
-            "437.5"
-          ],
-          [
-            "2026-06-06T07:22:00",
             "ZONE-2",
             "1",
-            "320.0"
+            "480.0"
           ],
           [
             "2026-06-06T07:22:00",
             "ZONE-3",
             "1",
-            "480.0"
+            "610.0"
+          ],
+          [
+            "2026-06-06T07:22:00",
+            "ZONE-4",
+            "1",
+            "725.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -152,45 +158,38 @@
         "results": [
           [
             "2026-06-06T07:21:00",
-            "1",
-            "50",
-            "18.5",
-            "10.0"
+            "2",
+            "243",
+            "32.9",
+            "50.25"
           ],
           [
             "2026-06-06T07:21:30",
             "2",
-            "540",
-            "28.2",
-            "50.25"
+            "685",
+            "22.0",
+            "82.0"
           ],
           [
             "2026-06-06T07:22:00",
             "1",
-            "50",
-            "18.5",
-            "10.0"
+            "275",
+            "24.8",
+            "88.7"
           ],
           [
             "2026-06-06T07:22:30",
             "2",
-            "540",
-            "28.2",
-            "50.25"
+            "550",
+            "36.25",
+            "19.15"
           ],
           [
             "2026-06-06T07:23:00",
-            "1",
-            "50",
-            "18.5",
-            "10.0"
-          ],
-          [
-            "2026-06-06T07:23:30",
-            "1",
-            "200",
-            "26.3",
-            "42.5"
+            "2",
+            "170",
+            "29.25",
+            "49.95"
           ]
         ],
         "results_mode": "rowsort"
@@ -223,22 +222,22 @@
           [
             "2026-06-06T07:22:00",
             "hybrid",
-            "2",
             "0",
+            "2",
             "2"
           ],
           [
             "2026-06-06T07:22:00",
             "manual",
-            "2",
-            "2",
+            "4",
+            "0",
             "4"
           ],
           [
             "2026-06-06T07:24:00",
             "auto",
-            "0",
             "1",
+            "0",
             "1"
           ],
           [
@@ -278,38 +277,31 @@
         "results": [
           [
             "2026-06-06T07:20:00",
-            "SORT-X1",
-            "4",
-            "150.0",
-            "725.0"
-          ],
-          [
-            "2026-06-06T07:20:00",
-            "SORT-Z9",
-            "2",
-            "610.0",
-            "610.0"
-          ],
-          [
-            "2026-06-06T07:20:00",
             "SORT-M3",
             "2",
-            "480.0",
-            "480.0"
+            "555.0",
+            "900.0"
+          ],
+          [
+            "2026-06-06T07:20:00",
+            "SORT-X1",
+            "3",
+            "320.0",
+            "900.0"
           ],
           [
             "2026-06-06T07:20:00",
             "SORT-A7",
             "2",
-            "320.0",
-            "320.0"
+            "190.0",
+            "290.0"
           ],
           [
-            "2026-06-06T07:25:00",
-            "SORT-X1",
+            "2026-06-06T07:20:00",
+            "SORT-Z9",
             "2",
             "150.0",
-            "725.0"
+            "290.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -380,7 +372,7 @@
             "2026-06-06T07:27:00",
             "4",
             "4",
-            "3"
+            "4"
           ]
         ],
         "results_mode": "rowsort"
@@ -405,8 +397,29 @@
         "results": [
           [
             "2026-06-06T07:24:00",
-            "LANE-C",
+            "LANE-B",
+            "auto",
+            "1",
+            "4.0"
+          ],
+          [
+            "2026-06-06T07:24:00",
+            "LANE-D",
             "hybrid",
+            "1",
+            "4.0"
+          ],
+          [
+            "2026-06-06T07:24:00",
+            "LANE-C",
+            "manual",
+            "1",
+            "2.0"
+          ],
+          [
+            "2026-06-06T07:24:00",
+            "LANE-B",
+            "manual",
             "1",
             "3.0"
           ],
@@ -418,60 +431,60 @@
             "1.0"
           ],
           [
-            "2026-06-06T07:24:00",
-            "LANE-B",
-            "manual",
-            "1",
-            "2.0"
+            "2026-06-06T07:27:00",
+            "LANE-C",
+            "auto",
+            "2",
+            "2.5"
           ],
           [
-            "2026-06-06T07:24:00",
-            "LANE-A",
-            "manual",
-            "1",
-            "2.0"
-          ],
-          [
-            "2026-06-06T07:24:00",
+            "2026-06-06T07:27:00",
             "LANE-D",
+            "hybrid",
+            "1",
+            "2.0"
+          ],
+          [
+            "2026-06-06T07:27:00",
+            "LANE-A",
             "auto",
             "1",
             "1.0"
+          ],
+          [
+            "2026-06-06T07:27:00",
+            "LANE-A",
+            "hybrid",
+            "1",
+            "2.0"
           ],
           [
             "2026-06-06T07:27:00",
             "LANE-C",
-            "hybrid",
-            "2",
-            "3.0"
-          ],
-          [
-            "2026-06-06T07:27:00",
-            "LANE-A",
-            "auto",
-            "2",
-            "1.0"
-          ],
-          [
-            "2026-06-06T07:27:00",
-            "LANE-A",
             "manual",
-            "2",
-            "2.0"
+            "1",
+            "1.0"
           ],
           [
             "2026-06-06T07:27:00",
             "LANE-B",
             "manual",
-            "2",
+            "1",
             "2.0"
           ],
           [
             "2026-06-06T07:27:00",
             "LANE-D",
+            "manual",
+            "1",
+            "3.0"
+          ],
+          [
+            "2026-06-06T07:27:00",
+            "LANE-B",
             "auto",
             "1",
-            "1.0"
+            "5.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -495,15 +508,15 @@
         "results": [
           [
             "2026-06-06T07:24:00",
-            "1",
-            "2",
-            "20.25"
+            "0",
+            "3",
+            "24.87"
           ],
           [
             "2026-06-06T07:28:00",
+            "5",
             "2",
-            "4",
-            "20.25"
+            "32.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -528,20 +541,20 @@
           [
             "2026-06-06T07:28:00",
             "2",
-            "1.5",
-            "406.59"
+            "1.75",
+            "120.21"
           ],
           [
             "2026-06-06T07:29:00",
             "2",
-            "1.5",
-            "406.59"
+            "1.9",
+            "81.32"
           ],
           [
             "2026-06-06T07:30:00",
             "2",
-            "1.5",
-            "406.59"
+            "3.15",
+            "187.38"
           ]
         ],
         "results_mode": "rowsort"
@@ -571,11 +584,11 @@
         "results": [
           [
             "1780732800000000",
-            "cartPage",
+            "itemPage",
             "verifyPayment",
-            "Allowlisted",
-            "sess_002",
-            "3"
+            "N/A",
+            "sess_003",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -598,7 +611,12 @@
         "results": [
           [
             "2026-06-06T11:20:00",
-            "iOS",
+            "Android",
+            "1"
+          ],
+          [
+            "2026-06-06T11:22:00",
+            "Android",
             "1"
           ]
         ],
@@ -622,8 +640,8 @@
         "results": [
           [
             "2026-06-06T11:22:00",
-            "0",
-            "2"
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -644,10 +662,6 @@
         ],
         "results": [
           [
-            "2026-06-06T11:22:00",
-            "100.0"
-          ],
-          [
             "2026-06-06T11:24:00",
             "100.0"
           ]
@@ -657,7 +671,7 @@
     },
     {
       "id": "Q329",
-      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt, os_platform AS breakdown FROM \"{stream}\" WHERE page_slug IN ('itemPage', 'searchPage') AND action_category IN ('navigation') AND os_platform IN ('Mac OS X (iPhone)') AND org_name IN ('warehouse-south') GROUP BY _time, breakdown ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt, os_platform AS breakdown FROM \"{stream}\" WHERE page_slug IN ('itemPage', 'searchPage') AND action_category IN ('navigation') AND os_platform IN ('Mac OS X (iPhone)', 'Android 14') AND org_name IN ('warehouse-south') GROUP BY _time, breakdown ORDER BY _time ASC",
       "category": "histogram",
       "time_offset": {
         "start_offset": 19679000000,
@@ -673,7 +687,7 @@
           [
             "2026-06-06T11:24:00",
             "1",
-            "Mac OS X (iPhone)"
+            "Android 14"
           ]
         ],
         "results_mode": "rowsort"
@@ -681,7 +695,7 @@
     },
     {
       "id": "Q330",
-      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND build_version IS NOT NULL AND device_type IN ('Mobile', 'Computer', 'Tablet') AND page_slug = 'itemPage' AND action_category IN ('performanceMetric', 'navigation') GROUP BY _time ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND build_version IS NOT NULL AND device_type IN ('Mobile', 'Computer', 'Tablet') AND page_slug IN ('itemPage', 'cartPage') AND action_category IN ('performanceMetric', 'navigation') GROUP BY _time ORDER BY _time ASC",
       "category": "histogram",
       "time_offset": {
         "start_offset": 19739000000,
@@ -707,7 +721,7 @@
     },
     {
       "id": "Q331",
-      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south', 'warehouse-central') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer') AND page_slug = 'itemPage' AND action_category IN ('performanceMetric', 'navigation') GROUP BY _time ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south', 'warehouse-central') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer') AND page_slug = 'itemPage' AND action_category IN ('performanceMetric', 'navigation', 'interaction') GROUP BY _time ORDER BY _time ASC",
       "category": "histogram",
       "time_offset": {
         "start_offset": 19799000000,
@@ -721,7 +735,7 @@
         "results": [
           [
             "2026-06-06T11:26:00",
-            "1"
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -744,12 +758,7 @@
         "results": [
           [
             "2026-06-06T11:26:00",
-            "NullPointerException at ConveyorController.handle()",
-            "1"
-          ],
-          [
-            "2026-06-06T11:28:00",
-            "NullPointerException at ConveyorController.handle()",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1"
           ]
         ],
@@ -774,7 +783,7 @@
           [
             "2026-06-06T11:28:00",
             "Android",
-            "2"
+            "0"
           ]
         ],
         "results_mode": "rowsort"
@@ -798,15 +807,15 @@
         "results": [
           [
             "2026-06-06T11:28:00",
-            "89",
-            "0",
-            "3"
+            "1450",
+            "3",
+            "5"
           ],
           [
             "2026-06-06T11:30:00",
-            "89",
-            "0",
-            "2"
+            "567",
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -856,7 +865,12 @@
           [
             "2026-06-06T11:30:00",
             "1",
-            "https://shop.example.com/item/1003"
+            "https://shop.example.com/item/1002"
+          ],
+          [
+            "2026-06-06T11:32:00",
+            "1",
+            "https://shop.example.com/item/1002"
           ]
         ],
         "results_mode": "rowsort"
@@ -879,17 +893,22 @@
         "results": [
           [
             "2026-06-06T11:32:00",
-            "NullPointerException...",
+            "ResourceExhaustedExc...",
             "2"
           ],
           [
             "2026-06-06T11:32:00",
             "SecurityException: u...",
+            "1"
+          ],
+          [
+            "2026-06-06T11:32:00",
+            "ConfigurationExcepti...",
             "2"
           ],
           [
             "2026-06-06T11:32:00",
-            "TimeoutException: la...",
+            "NetworkException: co...",
             "1"
           ]
         ],
@@ -913,13 +932,13 @@
         "results": [
           [
             "2026-06-06T11:32:00",
-            "89.0",
+            "567.0",
             "3"
           ],
           [
             "2026-06-06T11:34:00",
-            "89.0",
-            "2"
+            "1900.0",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -953,7 +972,7 @@
     },
     {
       "id": "Q340",
-      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south', 'warehouse-central') AND build_version NOT IN ('v1.0.0', 'v1.1.2', 'v1.2.0') AND device_type IN ('Mobile', 'Computer') AND page_slug = 'checkoutPage' AND action_category NOT IN ('interaction', 'navigation') GROUP BY _time ORDER BY _time ASC",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south', 'warehouse-central') AND build_version NOT IN ('v1.0.0', 'v1.2.0') AND device_type IN ('Mobile', 'Computer') AND page_slug IN ('itemPage', 'searchPage', 'checkoutPage') AND action_category NOT IN ('interaction', 'navigation') GROUP BY _time ORDER BY _time ASC",
       "category": "histogram",
       "time_offset": {
         "start_offset": 20339000000,
@@ -967,10 +986,6 @@
         "results": [
           [
             "2026-06-06T11:34:00",
-            "1"
-          ],
-          [
-            "2026-06-06T11:36:00",
             "1"
           ]
         ],
@@ -994,17 +1009,12 @@
         "results": [
           [
             "2026-06-06T11:36:00",
-            "E001",
-            "2"
-          ],
-          [
-            "2026-06-06T11:36:00",
             "E005",
             "2"
           ],
           [
             "2026-06-06T11:36:00",
-            "E002",
+            "E004",
             "1"
           ]
         ],
@@ -1027,10 +1037,6 @@
         "results": [
           [
             "2026-06-06T11:36:00",
-            "1"
-          ],
-          [
-            "2026-06-06T11:38:00",
             "1"
           ]
         ],
@@ -1055,21 +1061,21 @@
         "results": [
           [
             "2026-06-06T11:38:00",
-            "track-router",
-            "2",
-            "89.0"
-          ],
-          [
-            "2026-06-06T11:38:00",
-            "sorter-engine",
+            "zone-controller",
             "2",
             "12.0"
           ],
           [
             "2026-06-06T11:38:00",
-            "conveyor-driver",
+            "batch-sync",
             "1",
-            "45.0"
+            "1450.0"
+          ],
+          [
+            "2026-06-06T11:38:00",
+            "track-router",
+            "2",
+            "230.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1092,12 +1098,7 @@
         "results": [
           [
             "2026-06-06T11:35:00",
-            "1",
-            "1"
-          ],
-          [
-            "2026-06-06T11:40:00",
-            "1",
+            "2",
             "1"
           ]
         ],
@@ -1173,17 +1174,22 @@
         "results": [
           [
             "2026-06-06T11:42:00",
-            "404",
+            "500",
             "2"
           ],
           [
             "2026-06-06T11:42:00",
-            "200",
+            "401",
             "2"
           ],
           [
             "2026-06-06T11:42:00",
-            "201",
+            "503",
+            "1"
+          ],
+          [
+            "2026-06-06T11:42:00",
+            "403",
             "1"
           ]
         ],
@@ -1208,7 +1214,13 @@
         "results": [
           [
             "2026-06-06T11:42:00",
-            "prod",
+            "staging",
+            "1",
+            "1"
+          ],
+          [
+            "2026-06-06T11:44:00",
+            "staging",
             "1",
             "1"
           ]
@@ -1234,12 +1246,17 @@
           [
             "2026-06-06T11:44:00",
             "fast",
-            "3"
+            "1"
+          ],
+          [
+            "2026-06-06T11:44:00",
+            "slow",
+            "2"
           ],
           [
             "2026-06-06T11:45:00",
             "fast",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"
