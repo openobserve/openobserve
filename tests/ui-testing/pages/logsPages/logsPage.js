@@ -8467,8 +8467,14 @@ export class LogsPage {
      * @param {number} expectedIndex - The expected pattern index (1-based for display)
      */
     async waitForPatternDetailIndex(expectedIndex) {
-        // Pattern detail shows "Pattern X of Y" in the header
-        await this.page.getByText(`Pattern ${expectedIndex} of`).waitFor({ state: 'visible', timeout: 5000 });
+        // The footer renders `patternXofYShort` = "{index} of {total}" (e.g. "2 of 5").
+        // PatternDetailsDialog provides a #header slot, so ODrawer never renders the
+        // subTitle prop ("Pattern {index} of {total}") — searching for that text would
+        // never find anything. Scope to the drawer panel to avoid pagination collisions.
+        await this.page
+            .locator('[data-test="pattern-details-dialog"]')
+            .getByText(`${expectedIndex} of`)
+            .waitFor({ state: 'visible', timeout: 10000 });
         testLogger.info(`Pattern details showing pattern ${expectedIndex}`);
     }
 
