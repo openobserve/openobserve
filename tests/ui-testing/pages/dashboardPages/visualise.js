@@ -183,14 +183,9 @@ export default class LogsVisualise {
 
   //enable SQL Mode
   async enableSQLMode() {
-    // SQL mode toggle is inside the utilities menu dropdown
-    const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
-    await utilitiesBtn.waitFor({ state: "visible", timeout: 10000 });
-    await utilitiesBtn.click();
-    const sqlModeBtn = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-    await sqlModeBtn.waitFor({ state: "visible", timeout: 5000 });
-    await sqlModeBtn.click();
-    await this.page.keyboard.press("Escape");
+    // SQL mode toggle was removed from the UI. SQL mode is now auto-detected
+    // from query content — entering a SELECT query enables it automatically.
+    // This method is intentionally a no-op.
   }
 
   //stream index list

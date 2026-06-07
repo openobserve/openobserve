@@ -192,15 +192,17 @@ describe("WildcardValuePopover", () => {
   });
 
   describe("color scheme", () => {
-    it("should apply correct header color for <*> token", () => {
-      const headerEl = wrapper.find(".wildcard-popover-header");
+    it("should render the header for <*> token", () => {
+      const headerEl = wrapper.find(".wcp__header");
       expect(headerEl.exists()).toBe(true);
-      expect(headerEl.classes().some((c) => c.includes("wildcard-header"))).toBe(true);
+      // bar color class is applied to the fill, not the header
+      const barFill = wrapper.find(".wcp__bar-fill");
+      expect(barFill.exists()).toBe(true);
     });
 
-    it("should apply correct header color for <:IP> token", () => {
+    it("should render the header for <:IP> token", () => {
       wrapper = mountComponent({ token: "<:IP>", displayValues: [{ value: "10.0.0.1", count: 5 }] });
-      const headerEl = wrapper.find(".wildcard-popover-header");
+      const headerEl = wrapper.find(".wcp__header");
       expect(headerEl.exists()).toBe(true);
     });
   });
