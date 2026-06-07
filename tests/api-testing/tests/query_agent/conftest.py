@@ -248,16 +248,19 @@ def ingest_query_agent_data():
     else:
         pytest.fail(f"Stream2 ingestion failed: {resp2.status_code} — {resp2.text[:300]}")
 
-    # Poll until all records from BOTH streams are searchable
-    all_records = records1 + records2
-    expected = len(all_records)
-    _max_ts = max(r["_timestamp"] for r in all_records)
+    # Poll until all records from both streams are searchable.
+    # Each stream is checked independently so cross-stream queries
+    # never run against a partially-ready stream.
+    expected1 = len(records1)
+    expected2 = len(records2)
+    _max_ts = max(r["_timestamp"] for r in records1 + records2)
 
     def _data_is_searchable():
         now = datetime.now(UTC)
         end_us = int(now.timestamp() * 1_000_000)
         start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
-        payload = {
+        # Check stream 1
+        r1 = client.post("_search?type=logs", json={
             "query": {
                 "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": start_us,
@@ -265,14 +268,29 @@ def ingest_query_agent_data():
                 "from": 0,
                 "size": 1,
             }
-        }
-        r = client.post("_search?type=logs", json=payload)
-        if r.status_code != 200:
+        })
+        if r1.status_code != 200:
             return False
-        hits = r.json().get("hits", [])
-        if not (hits and hits[0].get("c", 0) >= len(records1)):
+        hits1 = r1.json().get("hits", [])
+        if not (hits1 and hits1[0].get("c", 0) >= expected1):
             return False
-        tail_payload = {
+        # Check stream 2
+        r2 = client.post("_search?type=logs", json={
+            "query": {
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM2}"',
+                "start_time": start_us,
+                "end_time": end_us,
+                "from": 0,
+                "size": 1,
+            }
+        })
+        if r2.status_code != 200:
+            return False
+        hits2 = r2.json().get("hits", [])
+        if not (hits2 and hits2[0].get("c", 0) >= expected2):
+            return False
+        # Tail poll: verify a record near max_ts is searchable
+        tail_r = client.post("_search?type=logs", json={
             "query": {
                 "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": _max_ts - 60_000_000,
@@ -280,12 +298,11 @@ def ingest_query_agent_data():
                 "from": 0,
                 "size": 1,
             }
-        }
-        tr = client.post("_search?type=logs", json=tail_payload)
-        if tr.status_code != 200:
+        })
+        if tail_r.status_code != 200:
             return False
-        thits = tr.json().get("hits", [])
-        return bool(thits and thits[0].get("c", 0) >= 1)
+        tail_hits = tail_r.json().get("hits", [])
+        return bool(tail_hits and tail_hits[0].get("c", 0) >= 1)
 
     wait_until(_data_is_searchable, timeout=300, interval=1.0,
                msg=f"Stream data not searchable ({len(records1)} records)")

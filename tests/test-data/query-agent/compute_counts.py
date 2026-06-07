@@ -319,7 +319,9 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
         f"CREATE OR REPLACE VIEW logs AS "
         f"SELECT * FROM _logs WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
     )
-    # Cross-stream: second stream view (same time window, offset=7 data)
+    # Cross-stream: second stream view uses the same time window because
+    # both streams share identical timestamp ranges — only field values
+    # differ (via stream_offset=7).  A single time_offset covers both.
     con.execute(
         f"CREATE OR REPLACE VIEW logs2 AS "
         f"SELECT * FROM _logs2 WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
