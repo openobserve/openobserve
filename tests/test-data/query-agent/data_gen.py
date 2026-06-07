@@ -578,9 +578,23 @@ FIELD_POOL = {
 
 STREAM_VALUES = ["stdout", "stdout", "stdout", "stderr"]
 
+# Fields that are NULL for some records to exercise COALESCE / IS NULL /
+# IS NOT NULL paths.  Two out of every five records per query get None
+# for these fields.
+_NULLABLE_FIELDS = {
+    "bot_flag", "info_tag", "upstream_error_code", "page_url",
+    "endpoint_path", "resource_path", "variant_tag", "threat_flag",
+}
+
 
 def make_record(ts, idx, qid):
-    """Build a single deterministic data record."""
+    """Build a single deterministic data record.
+
+    Each field uses a different rotation offset so field-value
+    combinations vary independently — no two fields pick from the same
+    pool position for the same (idx, qi) pair.
+    """
+    qi = int(qid[1:])
     # Vary the log field: some records get an ACK batch suffix for
     # str_match_ignore_case testing on ack_detail-like patterns.
     if idx % 3 == 0:
@@ -593,10 +607,17 @@ def make_record(ts, idx, qid):
     r = {
         "_timestamp": ts,
         "log": log,
-        "stream": STREAM_VALUES[idx % len(STREAM_VALUES)],
+        "stream": STREAM_VALUES[(idx + qi) % len(STREAM_VALUES)],
     }
-    for field, pool in FIELD_POOL.items():
-        r[field] = pool[idx % len(pool)]
+    for i, (field, pool) in enumerate(FIELD_POOL.items()):
+        offset = (qi * 13 + i * 7) % len(pool)
+        r[field] = pool[(idx + offset) % len(pool)]
+
+    # NULL stress: deterministically inject None for ~40 % of records
+    if (idx + qi) % 5 in (1, 3):
+        for field in _NULLABLE_FIELDS:
+            r[field] = None
+
     return r
 
 
