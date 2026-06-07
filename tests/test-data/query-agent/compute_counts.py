@@ -273,6 +273,7 @@ _SKIP_SQLLOGICTEST = {
     "Q111",  # ROW_NUMBER ties in pagination
     "Q117",  # STRING_AGG ordering differs between engines
     "Q121",  # STRING_AGG concatenation order
+    "Q219",  # STRING_AGG DISTINCT without ORDER BY — ordering non-deterministic
     "Q127",  # UNION across 5 groups: boundary records compete for top-10 spots
     "Q141",  # NTILE quartile mismatch with 5 records/query
     "Q146",  # NTILE quartile mismatch with 5 records/query
