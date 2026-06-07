@@ -13,17 +13,17 @@
         "results": [
           [
             "heavy",
-            "14",
-            "900.0"
+            "5",
+            "725.0"
           ],
           [
             "light",
-            "6",
-            "190.0"
+            "3",
+            "150.0"
           ],
           [
             "moderate",
-            "8",
+            "6",
             "480.0"
           ]
         ],
@@ -47,26 +47,26 @@
         ],
         "results": [
           [
+            "ZONE-4",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
             "ZONE-1",
-            "9",
             "6",
-            "66.66999816894531"
+            "3",
+            "50.0"
           ],
           [
             "ZONE-3",
-            "5",
-            "2",
-            "40.0"
-          ],
-          [
-            "ZONE-4",
-            "5",
-            "2",
-            "40.0"
+            "3",
+            "0",
+            "0.0"
           ],
           [
             "ZONE-2",
-            "9",
+            "3",
             "0",
             "0.0"
           ]
@@ -90,36 +90,6 @@
         ],
         "results": [
           [
-            "PL-002",
-            "900.0",
-            "99.0"
-          ],
-          [
-            "PL-002",
-            "900.0",
-            "99.0"
-          ],
-          [
-            "PL-002",
-            "900.0",
-            "99.0"
-          ],
-          [
-            "PL-006",
-            "840.0",
-            "94.6"
-          ],
-          [
-            "PL-006",
-            "840.0",
-            "94.6"
-          ],
-          [
-            "PL-006",
-            "840.0",
-            "94.6"
-          ],
-          [
             "PL-005",
             "725.0",
             "88.1"
@@ -145,19 +115,19 @@
             "72.8"
           ],
           [
-            "PL-008",
-            "555.0",
-            "67.9"
+            "PL-003",
+            "480.0",
+            "55.2"
           ],
           [
-            "PL-008",
-            "555.0",
-            "67.9"
+            "PL-003",
+            "480.0",
+            "55.2"
           ],
           [
-            "PL-008",
-            "555.0",
-            "67.9"
+            "PL-003",
+            "480.0",
+            "55.2"
           ]
         ],
         "results_mode": "rowsort"
@@ -179,24 +149,24 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "686.67",
-            "9"
-          ],
-          [
             "ZONE-4",
-            "577.0",
-            "5"
+            "610.0",
+            "2"
           ],
           [
             "ZONE-3",
-            "404.0",
-            "5"
+            "480.0",
+            "3"
           ],
           [
             "ZONE-1",
-            "355.0",
-            "9"
+            "437.5",
+            "6"
+          ],
+          [
+            "ZONE-2",
+            "320.0",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -220,62 +190,62 @@
           [
             "ZONE-1",
             "150.0",
-            "355.0"
-          ],
-          [
-            "ZONE-4",
-            "555.0",
-            "577.0"
+            "437.5"
           ],
           [
             "ZONE-1",
             "725.0",
-            "355.0"
+            "437.5"
           ],
           [
             "ZONE-2",
             "320.0",
-            "686.67"
-          ],
-          [
-            "ZONE-1",
-            "190.0",
-            "355.0"
-          ],
-          [
-            "ZONE-2",
-            "840.0",
-            "686.67"
+            "320.0"
           ],
           [
             "ZONE-3",
             "480.0",
-            "404.0"
-          ],
-          [
-            "ZONE-2",
-            "900.0",
-            "686.67"
-          ],
-          [
-            "ZONE-3",
-            "290.0",
-            "404.0"
+            "480.0"
           ],
           [
             "ZONE-4",
             "610.0",
-            "577.0"
+            "610.0"
           ],
           [
             "ZONE-1",
             "150.0",
-            "355.0"
+            "437.5"
+          ],
+          [
+            "ZONE-1",
+            "725.0",
+            "437.5"
+          ],
+          [
+            "ZONE-2",
+            "320.0",
+            "320.0"
+          ],
+          [
+            "ZONE-3",
+            "480.0",
+            "480.0"
           ],
           [
             "ZONE-4",
-            "555.0",
-            "577.0"
+            "610.0",
+            "610.0"
+          ],
+          [
+            "ZONE-1",
+            "150.0",
+            "437.5"
+          ],
+          [
+            "ZONE-1",
+            "725.0",
+            "437.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -298,12 +268,12 @@
         "results": [
           [
             "SORT-A7",
-            "900.0",
+            "320.0",
             "1"
           ],
           [
             "SORT-A7",
-            "900.0",
+            "320.0",
             "2"
           ],
           [
@@ -314,16 +284,6 @@
           [
             "SORT-M3",
             "480.0",
-            "2"
-          ],
-          [
-            "SORT-Q5",
-            "555.0",
-            "1"
-          ],
-          [
-            "SORT-Q5",
-            "555.0",
             "2"
           ],
           [
@@ -369,39 +329,40 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "9",
-            "686.67",
-            "27.07",
-            "manual",
-            "6"
-          ],
-          [
             "ZONE-4",
-            "5",
-            "577.0",
-            "29.38",
-            "manual",
-            "3"
+            "2",
+            "610.0",
+            "30.1",
+            "auto",
+            "2"
           ],
           [
             "ZONE-3",
-            "5",
-            "404.0",
-            "25.7",
+            "3",
+            "480.0",
+            "26.3",
             "hybrid",
             "3"
           ],
           [
             "ZONE-1",
-            "9",
-            "355.0",
-            "28.9",
-            "auto",
-            "6"
+            "6",
+            "437.5",
+            "27.1",
+            "manual",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "320.0",
+            "22.0",
+            "manual",
+            "3"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       },
       "time_offset": {
         "start_offset": 3059000000,
@@ -421,104 +382,7 @@
           "var_tput",
           "sq_dev_ratio"
         ],
-        "results": [
-          [
-            "ZONE-1",
-            "auto",
-            "190.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "900.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "190.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "900.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "150.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "320.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "190.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "900.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "150.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "320.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "150.0",
-            "170.0",
-            "400.0",
-            "1.0"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "320.0",
-            "610.0",
-            "84100.0",
-            "1.0"
-          ]
-        ],
+        "results": [],
         "results_mode": "rowsort"
       },
       "time_offset": {
@@ -544,21 +408,21 @@
             "ZONE-1",
             "PL-001",
             "150.0",
-            "7"
+            "4"
           ],
           [
             "bottom",
             "ZONE-1",
             "PL-001",
             "150.0",
-            "8"
+            "5"
           ],
           [
             "bottom",
             "ZONE-1",
             "PL-001",
             "150.0",
-            "9"
+            "6"
           ],
           [
             "top",
@@ -586,41 +450,41 @@
             "ZONE-2",
             "PL-002",
             "320.0",
-            "7"
+            "1"
           ],
           [
             "bottom",
             "ZONE-2",
             "PL-002",
             "320.0",
-            "8"
+            "2"
           ],
           [
             "bottom",
             "ZONE-2",
             "PL-002",
             "320.0",
-            "9"
+            "3"
           ],
           [
             "top",
             "ZONE-2",
             "PL-002",
-            "900.0",
+            "320.0",
             "1"
           ],
           [
             "top",
             "ZONE-2",
             "PL-002",
-            "900.0",
+            "320.0",
             "2"
           ],
           [
             "top",
             "ZONE-2",
             "PL-002",
-            "900.0",
+            "320.0",
             "3"
           ],
           [
@@ -628,21 +492,21 @@
             "ZONE-3",
             "PL-003",
             "480.0",
+            "1"
+          ],
+          [
+            "bottom",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
+            "2"
+          ],
+          [
+            "bottom",
+            "ZONE-3",
+            "PL-003",
+            "480.0",
             "3"
-          ],
-          [
-            "bottom",
-            "ZONE-3",
-            "PL-007",
-            "290.0",
-            "4"
-          ],
-          [
-            "bottom",
-            "ZONE-3",
-            "PL-007",
-            "290.0",
-            "5"
           ],
           [
             "top",
@@ -668,23 +532,16 @@
           [
             "bottom",
             "ZONE-4",
-            "PL-008",
-            "555.0",
-            "3"
+            "PL-004",
+            "610.0",
+            "1"
           ],
           [
             "bottom",
             "ZONE-4",
-            "PL-008",
-            "555.0",
-            "4"
-          ],
-          [
-            "bottom",
-            "ZONE-4",
-            "PL-008",
-            "555.0",
-            "5"
+            "PL-004",
+            "610.0",
+            "2"
           ],
           [
             "top",
@@ -699,13 +556,6 @@
             "PL-004",
             "610.0",
             "2"
-          ],
-          [
-            "top",
-            "ZONE-4",
-            "PL-008",
-            "555.0",
-            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -729,18 +579,11 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-2",
-            "9",
-            "7.0",
-            "2.0"
-          ],
-          [
             "LANE-A",
             "ZONE-1",
-            "9",
-            "7.0",
-            "2.0"
+            "6",
+            "3.5",
+            "2.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -768,196 +611,98 @@
             "ZONE-1",
             "725.0",
             "1",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-005",
             "ZONE-1",
             "725.0",
             "2",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-005",
             "ZONE-1",
             "725.0",
             "3",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-001",
             "ZONE-1",
-            "190.0",
+            "150.0",
             "4",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-001",
             "ZONE-1",
-            "190.0",
+            "150.0",
             "5",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-001",
             "ZONE-1",
-            "190.0",
+            "150.0",
             "6",
-            "28.9"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "150.0",
-            "7",
-            "28.9"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "150.0",
-            "8",
-            "28.9"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "150.0",
-            "9",
-            "28.9"
+            "27.1"
           ],
           [
             "PL-002",
             "ZONE-2",
-            "900.0",
+            "320.0",
             "1",
-            "27.07"
+            "22.0"
           ],
           [
             "PL-002",
             "ZONE-2",
-            "900.0",
+            "320.0",
             "2",
-            "27.07"
+            "22.0"
           ],
           [
             "PL-002",
             "ZONE-2",
-            "900.0",
+            "320.0",
             "3",
-            "27.07"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "4",
-            "27.07"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "5",
-            "27.07"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "6",
-            "27.07"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "320.0",
-            "7",
-            "27.07"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "320.0",
-            "8",
-            "27.07"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "320.0",
-            "9",
-            "27.07"
+            "22.0"
           ],
           [
             "PL-003",
             "ZONE-3",
             "480.0",
             "1",
-            "25.7"
+            "26.3"
           ],
           [
             "PL-003",
             "ZONE-3",
             "480.0",
             "2",
-            "25.7"
+            "26.3"
           ],
           [
             "PL-003",
             "ZONE-3",
             "480.0",
             "3",
-            "25.7"
-          ],
-          [
-            "PL-007",
-            "ZONE-3",
-            "290.0",
-            "4",
-            "25.7"
-          ],
-          [
-            "PL-007",
-            "ZONE-3",
-            "290.0",
-            "5",
-            "25.7"
+            "26.3"
           ],
           [
             "PL-004",
             "ZONE-4",
             "610.0",
             "1",
-            "29.38"
+            "30.1"
           ],
           [
             "PL-004",
             "ZONE-4",
             "610.0",
             "2",
-            "29.38"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "3",
-            "29.38"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "4",
-            "29.38"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "5",
-            "29.38"
+            "30.1"
           ]
         ],
         "results_mode": "rowsort"
@@ -988,20 +733,14 @@
           [
             "ZONE-1",
             "auto",
-            "170.0",
+            "150.0",
             "2"
-          ],
-          [
-            "ZONE-2",
-            "hybrid",
-            "840.0",
-            "1"
           ],
           [
             "ZONE-2",
             "manual",
-            "610.0",
-            "2"
+            "320.0",
+            "1"
           ],
           [
             "ZONE-3",
@@ -1010,22 +749,10 @@
             "1"
           ],
           [
-            "ZONE-3",
-            "auto",
-            "290.0",
-            "2"
-          ],
-          [
             "ZONE-4",
             "auto",
             "610.0",
             "1"
-          ],
-          [
-            "ZONE-4",
-            "manual",
-            "555.0",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1048,76 +775,58 @@
         ],
         "results": [
           [
-            "PL-008",
-            "PL-004",
-            "ZONE-4",
-            "55.0"
+            "PL-005",
+            "PL-001",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-004",
-            "PL-008",
-            "ZONE-4",
-            "55.0"
+            "PL-005",
+            "PL-001",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-008",
-            "PL-004",
-            "ZONE-4",
-            "55.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-004",
-            "PL-008",
-            "ZONE-4",
-            "55.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-008",
-            "PL-004",
-            "ZONE-4",
-            "55.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-004",
-            "PL-008",
-            "ZONE-4",
-            "55.0"
+            "PL-005",
+            "PL-001",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-002",
-            "PL-006",
-            "ZONE-2",
-            "60.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-006",
-            "PL-002",
-            "ZONE-2",
-            "60.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ],
           [
-            "PL-002",
-            "PL-006",
-            "ZONE-2",
-            "60.0"
-          ],
-          [
-            "PL-006",
-            "PL-002",
-            "ZONE-2",
-            "60.0"
-          ],
-          [
-            "PL-002",
-            "PL-006",
-            "ZONE-2",
-            "60.0"
-          ],
-          [
-            "PL-006",
-            "PL-002",
-            "ZONE-2",
-            "60.0"
+            "PL-001",
+            "PL-005",
+            "ZONE-1",
+            "575.0"
           ]
         ],
         "results_mode": "rowsort",
@@ -1142,30 +851,30 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "6",
-            "0",
-            "3",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-4",
             "2",
-            "3",
             "0",
-            "40.0"
+            "0",
+            "100.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3",
+            "0",
             "3",
-            "3",
-            "33.33000183105469"
+            "50.0"
           ],
           [
             "ZONE-3",
             "0",
-            "5",
+            "3",
+            "0",
+            "0.0"
+          ],
+          [
+            "ZONE-2",
+            "0",
+            "3",
             "0",
             "0.0"
           ]
@@ -1190,16 +899,10 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "SORT-Z9",
-            "610.0",
-            "72.8"
-          ],
-          [
-            "ZONE-4",
-            "SORT-Q5",
-            "555.0",
-            "67.9"
+            "ZONE-1",
+            "SORT-X1",
+            "437.5",
+            "50.3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1231,7 +934,7 @@
             "manual",
             "35.7",
             "3",
-            "40.67"
+            "50.3"
           ],
           [
             "PL-005",
@@ -1240,7 +943,7 @@
             "manual",
             "35.7",
             "3",
-            "40.67"
+            "50.3"
           ],
           [
             "PL-005",
@@ -1249,34 +952,7 @@
             "manual",
             "35.7",
             "3",
-            "40.67"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "190.0",
-            "auto",
-            "32.5",
-            "6",
-            "40.67"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "190.0",
-            "auto",
-            "32.5",
-            "6",
-            "40.67"
-          ],
-          [
-            "PL-001",
-            "ZONE-1",
-            "190.0",
-            "auto",
-            "32.5",
-            "6",
-            "40.67"
+            "50.3"
           ],
           [
             "PL-001",
@@ -1284,8 +960,8 @@
             "150.0",
             "auto",
             "18.5",
-            "6",
-            "40.67"
+            "3",
+            "50.3"
           ],
           [
             "PL-001",
@@ -1293,8 +969,8 @@
             "150.0",
             "auto",
             "18.5",
-            "6",
-            "40.67"
+            "3",
+            "50.3"
           ],
           [
             "PL-001",
@@ -1302,62 +978,8 @@
             "150.0",
             "auto",
             "18.5",
-            "6",
-            "40.67"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "900.0",
-            "manual",
-            "40.0",
-            "6",
-            "75.53"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "900.0",
-            "manual",
-            "40.0",
-            "6",
-            "75.53"
-          ],
-          [
-            "PL-002",
-            "ZONE-2",
-            "900.0",
-            "manual",
-            "40.0",
-            "6",
-            "75.53"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "hybrid",
-            "19.2",
             "3",
-            "75.53"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "hybrid",
-            "19.2",
-            "3",
-            "75.53"
-          ],
-          [
-            "PL-006",
-            "ZONE-2",
-            "840.0",
-            "hybrid",
-            "19.2",
-            "3",
-            "75.53"
+            "50.3"
           ],
           [
             "PL-002",
@@ -1365,8 +987,8 @@
             "320.0",
             "manual",
             "22.0",
-            "6",
-            "75.53"
+            "3",
+            "33.0"
           ],
           [
             "PL-002",
@@ -1374,8 +996,8 @@
             "320.0",
             "manual",
             "22.0",
-            "6",
-            "75.53"
+            "3",
+            "33.0"
           ],
           [
             "PL-002",
@@ -1383,8 +1005,8 @@
             "320.0",
             "manual",
             "22.0",
-            "6",
-            "75.53"
+            "3",
+            "33.0"
           ],
           [
             "PL-003",
@@ -1393,7 +1015,7 @@
             "hybrid",
             "26.3",
             "3",
-            "51.24"
+            "55.2"
           ],
           [
             "PL-003",
@@ -1402,7 +1024,7 @@
             "hybrid",
             "26.3",
             "3",
-            "51.24"
+            "55.2"
           ],
           [
             "PL-003",
@@ -1411,25 +1033,7 @@
             "hybrid",
             "26.3",
             "3",
-            "51.24"
-          ],
-          [
-            "PL-007",
-            "ZONE-3",
-            "290.0",
-            "auto",
-            "24.8",
-            "2",
-            "51.24"
-          ],
-          [
-            "PL-007",
-            "ZONE-3",
-            "290.0",
-            "auto",
-            "24.8",
-            "2",
-            "51.24"
+            "55.2"
           ],
           [
             "PL-004",
@@ -1438,7 +1042,7 @@
             "auto",
             "30.1",
             "2",
-            "69.86"
+            "72.8"
           ],
           [
             "PL-004",
@@ -1447,34 +1051,7 @@
             "auto",
             "30.1",
             "2",
-            "69.86"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "manual",
-            "28.9",
-            "3",
-            "69.86"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "manual",
-            "28.9",
-            "3",
-            "69.86"
-          ],
-          [
-            "PL-008",
-            "ZONE-4",
-            "555.0",
-            "manual",
-            "28.9",
-            "3",
-            "69.86"
+            "72.8"
           ]
         ],
         "results_mode": "rowsort"
@@ -1496,24 +1073,24 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "9",
-            "373.3"
-          ],
-          [
             "ZONE-1",
-            "9",
-            "278.0"
-          ],
-          [
-            "ZONE-4",
-            "5",
-            "444.0"
+            "6",
+            "372.0"
           ],
           [
             "ZONE-3",
-            "5",
-            "148.8"
+            "3",
+            "168.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "72.0"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "360.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1574,11 +1151,6 @@
         "results": [
           [
             "itemPage",
-            "sess_003",
-            "3"
-          ],
-          [
-            "itemPage",
             "sess_001",
             "3"
           ]
@@ -1605,11 +1177,6 @@
             "itemPage",
             "sess_001",
             "3"
-          ],
-          [
-            "itemPage",
-            "sess_003",
-            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -1617,7 +1184,7 @@
     },
     {
       "id": "Q174",
-      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%Allowlisted%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
+      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%NonexistentPattern%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
       "category": "cte_subquery",
       "time_offset": {
         "start_offset": 10379000000,
@@ -1629,7 +1196,13 @@
           "visitor_session_id",
           "row_count"
         ],
-        "results": [],
+        "results": [
+          [
+            "verifyPayment",
+            "sess_002",
+            "3"
+          ]
+        ],
         "results_mode": "rowsort"
       }
     },
@@ -1653,15 +1226,6 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "SORT-A7",
-            "hybrid",
-            "3",
-            "840.0",
-            "94.6",
-            "19.2"
-          ],
-          [
             "ZONE-1",
             "SORT-X1",
             "manual",
@@ -1669,15 +1233,6 @@
             "725.0",
             "88.1",
             "35.7"
-          ],
-          [
-            "ZONE-2",
-            "SORT-A7",
-            "manual",
-            "6",
-            "610.0",
-            "99.0",
-            "22.0"
           ],
           [
             "ZONE-4",
@@ -1689,15 +1244,6 @@
             "30.1"
           ],
           [
-            "ZONE-4",
-            "SORT-Q5",
-            "manual",
-            "3",
-            "555.0",
-            "67.9",
-            "28.9"
-          ],
-          [
             "ZONE-3",
             "SORT-M3",
             "hybrid",
@@ -1707,21 +1253,21 @@
             "26.3"
           ],
           [
-            "ZONE-3",
-            "SORT-M3",
-            "auto",
-            "2",
-            "290.0",
-            "45.3",
-            "24.8"
+            "ZONE-2",
+            "SORT-A7",
+            "manual",
+            "3",
+            "320.0",
+            "33.0",
+            "22.0"
           ],
           [
             "ZONE-1",
             "SORT-X1",
             "auto",
-            "6",
-            "170.0",
-            "21.4",
+            "3",
+            "150.0",
+            "12.5",
             "18.5"
           ]
         ],
@@ -1746,20 +1292,6 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "manual",
-            "3",
-            "900.0",
-            "99.0"
-          ],
-          [
-            "ZONE-2",
-            "hybrid",
-            "2",
-            "840.0",
-            "94.6"
-          ],
-          [
             "ZONE-1",
             "manual",
             "3",
@@ -1774,13 +1306,6 @@
             "72.8"
           ],
           [
-            "ZONE-4",
-            "manual",
-            "3",
-            "555.0",
-            "67.9"
-          ],
-          [
             "ZONE-3",
             "hybrid",
             "3",
@@ -1788,18 +1313,11 @@
             "55.2"
           ],
           [
-            "ZONE-3",
-            "auto",
-            "2",
-            "290.0",
-            "45.3"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "2",
-            "190.0",
-            "21.4"
+            "ZONE-2",
+            "manual",
+            "3",
+            "320.0",
+            "33.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1824,36 +1342,12 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "SORT-A7",
-            "high_tput",
-            "6",
-            "870.0",
-            "96.80000000000001"
-          ],
-          [
-            "ZONE-4",
-            "SORT-Q5",
-            "high_tput",
-            "3",
-            "555.0",
-            "67.9"
-          ],
-          [
             "ZONE-1",
             "SORT-X1",
             "high_tput",
             "3",
             "725.0",
             "88.09999999999998"
-          ],
-          [
-            "ZONE-1",
-            "SORT-X1",
-            "low_tput",
-            "3",
-            "190.0",
-            "21.399999999999995"
           ],
           [
             "ZONE-4",
@@ -1885,13 +1379,6 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "OTHER",
-            "1",
-            "840.0",
-            "3"
-          ],
-          [
             "ZONE-1",
             "MANUAL",
             "1",
@@ -1906,20 +1393,6 @@
             "2"
           ],
           [
-            "ZONE-2",
-            "MANUAL",
-            "1",
-            "610.0",
-            "6"
-          ],
-          [
-            "ZONE-4",
-            "MANUAL",
-            "1",
-            "555.0",
-            "3"
-          ],
-          [
             "ZONE-3",
             "OTHER",
             "1",
@@ -1927,18 +1400,770 @@
             "3"
           ],
           [
-            "ZONE-3",
-            "AUTO",
+            "ZONE-2",
+            "MANUAL",
             "1",
-            "290.0",
-            "2"
+            "320.0",
+            "3"
           ],
           [
             "ZONE-1",
             "AUTO",
             "1",
-            "170.0",
-            "6"
+            "150.0",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q271",
+      "sql": "WITH platform_events AS (SELECT _timestamp, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' WHEN os_platform LIKE '%iOS%' OR os_platform LIKE '%iPhone%' THEN 'iOS' ELSE 'Other' END) AS platform, action_category, exception_message, error_code, visitor_session_id FROM \"{stream}\" WHERE org_name = 'warehouse-east') SELECT platform, COUNT(*) AS total, COUNT(DISTINCT visitor_session_id) AS users, COUNT(CASE WHEN exception_message LIKE '%Exception%' THEN 1 END) AS errors FROM platform_events GROUP BY platform",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16199000000,
+        "end_offset": 16273000000
+      },
+      "expected": {
+        "columns": [
+          "platform",
+          "total",
+          "users",
+          "errors"
+        ],
+        "results": [
+          [
+            "Android",
+            "2",
+            "1",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q272",
+      "sql": "WITH enriched AS (SELECT _timestamp, concat(coalesce(page_url, page_slug), '::', action_category) AS event_path, coalesce(exception_message, error_code) AS issue, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric') SELECT event_path, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM enriched WHERE issue IS NOT NULL GROUP BY event_path ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16259000000,
+        "end_offset": 16333000000
+      },
+      "expected": {
+        "columns": [
+          "event_path",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/item/1001::performanceMetric",
+            "2",
+            "1"
+          ],
+          [
+            "https://shop.example.com/cart::performanceMetric",
+            "2",
+            "1"
+          ],
+          [
+            "https://shop.example.com/item/1002::performanceMetric",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q273",
+      "sql": "WITH filtered AS (SELECT * FROM \"{stream}\" WHERE org_name IN ('warehouse-north', 'warehouse-south') AND build_version NOT IN ('v1.0.0', 'v1.1.2') AND device_type IN ('Mobile', 'Computer', 'Tablet') AND action_category IN ('performanceMetric', 'navigation') AND page_slug = 'itemPage') SELECT action_category, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM filtered GROUP BY action_category",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16319000000,
+        "end_offset": 16393000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "cnt",
+          "users",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "navigation",
+            "1",
+            "1",
+            "1450.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q274",
+      "sql": "WITH error_messages AS (SELECT _timestamp, (CASE WHEN char_length(exception_message) > 0 THEN exception_message ELSE error_code END) AS display_error, action_category, page_slug, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric') SELECT display_error, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM error_messages GROUP BY display_error ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16379000000,
+        "end_offset": 16453000000
+      },
+      "expected": {
+        "columns": [
+          "display_error",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "2",
+            "1"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "2",
+            "1"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q275",
+      "sql": "SELECT duration_bucket, COUNT(*) AS cnt FROM (SELECT (CASE WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 60 THEN 'under_1min' WHEN ((MAX(_timestamp) - MIN(_timestamp)) / 60000000) < 120 THEN '1_2min' ELSE 'over_2min' END) AS duration_bucket FROM \"{stream}\" WHERE action_category = 'navigation' GROUP BY visitor_session_id) GROUP BY duration_bucket",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16439000000,
+        "end_offset": 16513000000
+      },
+      "expected": {
+        "columns": [
+          "duration_bucket",
+          "cnt"
+        ],
+        "results": [
+          [
+            "under_1min",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q276",
+      "sql": "WITH error_set AS (SELECT * FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' OR upstream_error_code LIKE '%UP-E00%' OR error_code LIKE '%E00%' OR event_detail LIKE '%fail%') SELECT action_category, page_slug, COUNT(*) AS cnt FROM error_set GROUP BY action_category, page_slug ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16499000000,
+        "end_offset": 16573000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "cnt"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage",
+            "2"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
+            "2"
+          ],
+          [
+            "navigation",
+            "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "interaction",
+            "cartPage",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q277",
+      "sql": "SELECT error_type, COUNT(*) AS total FROM (SELECT (CASE WHEN exception_message LIKE '%Exception%' THEN 'exception' WHEN upstream_error_code LIKE '%UP-E%' THEN 'upstream' WHEN error_code LIKE '%E00%' THEN 'coded' ELSE 'other' END) AS error_type FROM \"{stream}\" WHERE action_category = 'performanceMetric') GROUP BY error_type",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16559000000,
+        "end_offset": 16633000000
+      },
+      "expected": {
+        "columns": [
+          "error_type",
+          "total"
+        ],
+        "results": [
+          [
+            "exception",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q278",
+      "sql": "WITH source_map AS (SELECT _timestamp, coalesce(page_url, resource_path) AS origin, action_category, action_subcategory, visitor_session_id, latency_ms FROM \"{stream}\" WHERE action_category = 'navigation') SELECT origin, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM source_map GROUP BY origin ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16619000000,
+        "end_offset": 16693000000
+      },
+      "expected": {
+        "columns": [
+          "origin",
+          "cnt",
+          "users",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/item/1003",
+            "1",
+            "1",
+            "1450.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q279",
+      "sql": "WITH clean_data AS (SELECT * FROM \"{stream}\" WHERE error_code NOT IN ('E002', 'E004', 'E005') AND exception_message NOT LIKE '%Timeout%' AND action_category NOT IN ('interaction', 'navigation') AND info_tag IS NULL) SELECT component_name, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM clean_data GROUP BY component_name ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16679000000,
+        "end_offset": 16753000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "sorter-engine",
+            "2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q280",
+      "sql": "WITH metrics AS (SELECT visitor_session_id, COUNT(*) AS event_count FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY visitor_session_id), navigations AS (SELECT visitor_session_id, COUNT(*) AS nav_count FROM \"{stream}\" WHERE action_category = 'navigation' GROUP BY visitor_session_id) SELECT COALESCE(m.visitor_session_id, n.visitor_session_id) AS user_id, COALESCE(m.event_count, 0) AS metrics, COALESCE(n.nav_count, 0) AS navigations FROM metrics m FULL OUTER JOIN navigations n ON m.visitor_session_id = n.visitor_session_id",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16739000000,
+        "end_offset": 16813000000
+      },
+      "expected": {
+        "columns": [
+          "user_id",
+          "metrics",
+          "navigations"
+        ],
+        "results": [
+          [
+            "sess_002",
+            "2",
+            "0"
+          ],
+          [
+            "sess_001",
+            "3",
+            "0"
+          ],
+          [
+            "sess_003",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q281",
+      "sql": "WITH classified AS (SELECT *, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' WHEN os_platform LIKE '%iOS%' OR os_platform LIKE '%iPhone%' THEN 'iOS' ELSE 'Other' END) AS platform_group FROM \"{stream}\" WHERE org_name = 'warehouse-east') SELECT platform_group, page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM classified GROUP BY platform_group, page_slug ORDER BY platform_group, cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16799000000,
+        "end_offset": 16873000000
+      },
+      "expected": {
+        "columns": [
+          "platform_group",
+          "page_slug",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "Android",
+            "itemPage",
+            "2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q282",
+      "sql": "WITH event_class AS (SELECT *, (CASE WHEN latency_ms < 100 THEN 'fast' WHEN latency_ms < 500 THEN 'normal' WHEN latency_ms < 1000 THEN 'slow' ELSE 'degraded' END) AS speed, (CASE WHEN response_code = 200 THEN 'ok' WHEN response_code >= 500 THEN 'server_error' WHEN response_code >= 400 THEN 'client_error' ELSE 'unknown' END) AS outcome FROM \"{stream}\" WHERE latency_ms > 0) SELECT speed, outcome, COUNT(*) AS cnt FROM event_class GROUP BY speed, outcome ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16859000000,
+        "end_offset": 16933000000
+      },
+      "expected": {
+        "columns": [
+          "speed",
+          "outcome",
+          "cnt"
+        ],
+        "results": [
+          [
+            "fast",
+            "ok",
+            "2"
+          ],
+          [
+            "fast",
+            "client_error",
+            "2"
+          ],
+          [
+            "fast",
+            "unknown",
+            "1"
+          ],
+          [
+            "normal",
+            "unknown",
+            "1"
+          ],
+          [
+            "degraded",
+            "client_error",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q283",
+      "sql": "SELECT error_code, COUNT(*) AS cnt FROM (SELECT error_code, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL) GROUP BY error_code ORDER BY cnt DESC LIMIT 5",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16919000000,
+        "end_offset": 16993000000
+      },
+      "expected": {
+        "columns": [
+          "error_code",
+          "cnt"
+        ],
+        "results": [
+          [
+            "E005",
+            "2"
+          ],
+          [
+            "E001",
+            "2"
+          ],
+          [
+            "E002",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q284",
+      "sql": "WITH filtered AS (SELECT * FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND build_version IS NOT NULL AND device_type IN ('Mobile', 'Computer', 'Tablet') AND page_slug IN ('itemPage', 'cartPage', 'checkoutPage') AND action_category IN ('performanceMetric', 'navigation', 'interaction')) SELECT page_slug, action_category, COUNT(*) AS cnt FROM filtered GROUP BY page_slug, action_category HAVING COUNT(*) >= 2",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 16979000000,
+        "end_offset": 17053000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "action_category",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "performanceMetric",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q285",
+      "sql": "WITH display AS (SELECT concat(page_slug, '/', action_category) AS page_action, coalesce(exception_message, error_code, 'none') AS issue, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric') SELECT page_action, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM display GROUP BY page_action ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17039000000,
+        "end_offset": 17113000000
+      },
+      "expected": {
+        "columns": [
+          "page_action",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "itemPage/performanceMetric",
+            "2",
+            "1"
+          ],
+          [
+            "checkoutPage/performanceMetric",
+            "2",
+            "1"
+          ],
+          [
+            "searchPage/performanceMetric",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q286",
+      "sql": "WITH raw_counts AS (SELECT page_slug, COUNT(*) AS total FROM \"{stream}\" WHERE action_category = 'navigation' GROUP BY page_slug), error_counts AS (SELECT page_slug, COUNT(*) AS errors FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND error_code IS NOT NULL GROUP BY page_slug) SELECT COALESCE(r.page_slug, e.page_slug) AS page, COALESCE(r.total, 0) AS total_nav, COALESCE(e.errors, 0) AS total_errors FROM raw_counts r LEFT JOIN error_counts e ON r.page_slug = e.page_slug ORDER BY total_nav DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17099000000,
+        "end_offset": 17173000000
+      },
+      "expected": {
+        "columns": [
+          "page",
+          "total_nav",
+          "total_errors"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "1",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q287",
+      "sql": "WITH suspect_events AS (SELECT DISTINCT visitor_session_id, action_category, page_slug FROM \"{stream}\" WHERE exception_message LIKE '%Exception%' OR upstream_error_code LIKE '%UP-E%' OR error_code LIKE '%E00%' OR event_detail LIKE '%fail%') SELECT action_category, page_slug, COUNT(*) AS cnt FROM suspect_events GROUP BY action_category, page_slug ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17159000000,
+        "end_offset": 17233000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "cnt"
+        ],
+        "results": [
+          [
+            "navigation",
+            "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "searchPage",
+            "1"
+          ],
+          [
+            "interaction",
+            "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q288",
+      "sql": "WITH error_data AS (SELECT (CASE WHEN char_length(exception_message) > 0 THEN exception_message ELSE error_code END) AS error_label, action_category, page_slug, visitor_session_id, info_tag FROM \"{stream}\" WHERE action_category = 'performanceMetric') SELECT error_label, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, COUNT(CASE WHEN info_tag IS NULL THEN 1 END) AS untagged FROM error_data GROUP BY error_label ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17219000000,
+        "end_offset": 17293000000
+      },
+      "expected": {
+        "columns": [
+          "error_label",
+          "cnt",
+          "users",
+          "untagged"
+        ],
+        "results": [
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "2",
+            "1",
+            "2"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "2",
+            "1",
+            "2"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "1",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q289",
+      "sql": "WITH platform_data AS (SELECT (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' WHEN os_platform LIKE '%iOS%' OR os_platform LIKE '%iPhone%' THEN 'iOS' ELSE os_platform END) AS platform, action_category, error_code, exception_message FROM \"{stream}\" WHERE org_name = 'warehouse-east' AND action_category IN ('performanceMetric', 'navigation')) SELECT platform, COUNT(*) AS total, (100.0 * COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) / COUNT(*)) AS error_rate FROM platform_data GROUP BY platform",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17279000000,
+        "end_offset": 17353000000
+      },
+      "expected": {
+        "columns": [
+          "platform",
+          "total",
+          "error_rate"
+        ],
+        "results": [
+          [
+            "Android",
+            "2",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q290",
+      "sql": "WITH latency_data AS (SELECT coalesce(page_slug, 'unknown') AS page, latency_ms, response_code FROM \"{stream}\" WHERE latency_ms BETWEEN 50 AND 2000) SELECT page, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat, COUNT(CASE WHEN response_code >= 400 THEN 1 END) AS errors FROM latency_data GROUP BY page",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17339000000,
+        "end_offset": 17413000000
+      },
+      "expected": {
+        "columns": [
+          "page",
+          "cnt",
+          "avg_lat",
+          "errors"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "1",
+            "1450.0",
+            "1"
+          ],
+          [
+            "checkoutPage",
+            "2",
+            "89.0",
+            "2"
+          ],
+          [
+            "cartPage",
+            "1",
+            "230.0",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q291",
+      "sql": "WITH clean AS (SELECT * FROM \"{stream}\" WHERE org_name NOT IN ('warehouse-south', 'warehouse-central') AND error_code NOT IN ('E002', 'E004')  AND build_version NOT IN ('v1.0.0')) SELECT page_slug, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM clean GROUP BY page_slug",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17399000000,
+        "end_offset": 17473000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt",
+          "users",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "cartPage",
+            "1",
+            "1",
+            "230.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q292",
+      "sql": "WITH enriched AS (SELECT _timestamp, coalesce(page_url, resource_path, endpoint_path, page_slug) AS effective_url, coalesce(exception_message, upstream_error_code, error_code) AS issue_text, visitor_session_id FROM \"{stream}\" WHERE action_category = 'performanceMetric') SELECT effective_url, COUNT(*) AS cnt, COUNT(CASE WHEN issue_text LIKE '%Exception%' OR issue_text LIKE '%UP-E%' THEN 1 END) AS issues FROM enriched GROUP BY effective_url ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17459000000,
+        "end_offset": 17533000000
+      },
+      "expected": {
+        "columns": [
+          "effective_url",
+          "cnt",
+          "issues"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/cart",
+            "2",
+            "2"
+          ],
+          [
+            "https://shop.example.com/item/1001",
+            "2",
+            "2"
+          ],
+          [
+            "https://shop.example.com/item/1002",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q293",
+      "sql": "SELECT component_name, COUNT(*) AS cnt FROM (SELECT component_name, error_code FROM (SELECT component_name, error_code, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL) WHERE error_code IN ('E001', 'E003', 'E005')) GROUP BY component_name",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17519000000,
+        "end_offset": 17593000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "track-router",
+            "2"
+          ],
+          [
+            "sorter-engine",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q294",
+      "sql": "WITH android_item_page AS (SELECT * FROM \"{stream}\" WHERE re_match(os_platform, 'Android') AND page_slug = 'itemPage' AND action_category IN ('navigation', 'performanceMetric') AND exception_message IS NOT NULL) SELECT error_code, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM android_item_page GROUP BY error_code ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17579000000,
+        "end_offset": 17653000000
+      },
+      "expected": {
+        "columns": [
+          "error_code",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "E001",
+            "2",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q295",
+      "sql": "WITH page_stats AS (SELECT page_slug, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY page_slug) SELECT page_slug, cnt, avg_lat FROM page_stats WHERE avg_lat > 100 AND cnt > 2 ORDER BY avg_lat DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 17639000000,
+        "end_offset": 17713000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "3",
+            "491.3333333333333"
           ]
         ],
         "results_mode": "rowsort"

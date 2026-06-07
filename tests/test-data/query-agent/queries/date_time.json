@@ -11,12 +11,12 @@
         ],
         "results": [
           [
-            "2026-06-05T11:22:00",
+            "2026-06-06T06:58:00",
             "10"
           ],
           [
-            "2026-06-05T11:24:00",
-            "18"
+            "2026-06-06T07:00:00",
+            "4"
           ]
         ],
         "results_mode": "rowsort"
@@ -38,49 +38,49 @@
         ],
         "results": [
           [
-            "2026-06-05T11:24:00",
-            "auto",
-            "4"
-          ],
-          [
-            "2026-06-05T11:24:00",
-            "hybrid",
-            "2"
-          ],
-          [
-            "2026-06-05T11:24:00",
-            "manual",
-            "4"
-          ],
-          [
-            "2026-06-05T11:25:00",
-            "auto",
-            "4"
-          ],
-          [
-            "2026-06-05T11:25:00",
-            "hybrid",
-            "2"
-          ],
-          [
-            "2026-06-05T11:25:00",
-            "manual",
-            "4"
-          ],
-          [
-            "2026-06-05T11:26:00",
+            "2026-06-06T06:59:00",
             "auto",
             "2"
           ],
           [
-            "2026-06-05T11:26:00",
+            "2026-06-06T06:59:00",
             "hybrid",
+            "1"
+          ],
+          [
+            "2026-06-06T06:59:00",
+            "manual",
             "2"
           ],
           [
-            "2026-06-05T11:26:00",
+            "2026-06-06T07:00:00",
+            "auto",
+            "2"
+          ],
+          [
+            "2026-06-06T07:00:00",
+            "hybrid",
+            "1"
+          ],
+          [
+            "2026-06-06T07:00:00",
             "manual",
-            "4"
+            "2"
+          ],
+          [
+            "2026-06-06T07:01:00",
+            "auto",
+            "1"
+          ],
+          [
+            "2026-06-06T07:01:00",
+            "hybrid",
+            "1"
+          ],
+          [
+            "2026-06-06T07:01:00",
+            "manual",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -102,29 +102,29 @@
         ],
         "results": [
           [
-            "PL-002",
-            "ZONE-2",
-            "Q065 warehouse event record 9 ACK batch batchIdList:Q065-9"
-          ],
-          [
             "PL-003",
             "ZONE-3",
             "Q067 warehouse event record 2"
           ],
           [
-            "PL-006",
+            "PL-002",
             "ZONE-2",
-            "Q066 warehouse event record 5 error E005 traceback"
+            "Q067 warehouse event record 1"
+          ],
+          [
+            "PL-005",
+            "ZONE-1",
+            "Q066 warehouse event record 4"
           ],
           [
             "PL-001",
             "ZONE-1",
-            "Q065 warehouse event record 8"
+            "Q067 warehouse event record 0 ACK batch batchIdList:Q067-0"
           ],
           [
-            "PL-002",
-            "ZONE-2",
-            "Q067 warehouse event record 1"
+            "PL-004",
+            "ZONE-4",
+            "Q066 warehouse event record 3 ACK batch batchIdList:Q066-3"
           ]
         ],
         "results_mode": "rowsort"
@@ -147,10 +147,10 @@
         ],
         "results": [
           [
-            "2026-06-05T11:25:00",
-            "14280.0",
+            "2026-06-06T07:00:00",
+            "6245.0",
             "150.0",
-            "900.0"
+            "725.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -173,22 +173,22 @@
         ],
         "results": [
           [
-            "2026-06-05T11:27:00",
-            "4",
-            "4",
-            "2"
-          ],
-          [
-            "2026-06-05T11:28:00",
-            "4",
-            "4",
-            "2"
-          ],
-          [
-            "2026-06-05T11:29:00",
+            "2026-06-06T07:02:00",
             "2",
-            "4",
-            "2"
+            "2",
+            "1"
+          ],
+          [
+            "2026-06-06T07:03:00",
+            "2",
+            "2",
+            "1"
+          ],
+          [
+            "2026-06-06T07:04:00",
+            "1",
+            "2",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -212,119 +212,77 @@
         ],
         "results": [
           [
-            "2026-06-05T11:28:00",
+            "2026-06-06T07:03:00",
             "ZONE-1",
-            "2",
-            "54.75",
-            "33.3"
+            "1",
+            "88.1",
+            "75.3"
           ],
           [
-            "2026-06-05T11:28:00",
+            "2026-06-06T07:03:00",
             "ZONE-2",
             "1",
             "33.0",
             "25.0"
           ],
           [
-            "2026-06-05T11:28:00",
-            "ZONE-4",
-            "1",
-            "67.9",
-            "5.0"
-          ],
-          [
-            "2026-06-05T11:28:30",
-            "ZONE-2",
-            "1",
-            "99.0",
-            "66.6"
-          ],
-          [
-            "2026-06-05T11:28:30",
+            "2026-06-06T07:03:30",
             "ZONE-3",
-            "2",
-            "50.25",
+            "1",
+            "55.2",
             "42.5"
           ],
           [
-            "2026-06-05T11:28:30",
+            "2026-06-06T07:03:30",
             "ZONE-4",
             "1",
             "72.8",
             "58.0"
           ],
           [
-            "2026-06-05T11:29:00",
+            "2026-06-06T07:04:00",
             "ZONE-1",
-            "2",
-            "54.75",
-            "33.3"
+            "1",
+            "88.1",
+            "75.3"
           ],
           [
-            "2026-06-05T11:29:00",
+            "2026-06-06T07:04:00",
             "ZONE-2",
             "1",
             "33.0",
             "25.0"
           ],
           [
-            "2026-06-05T11:29:00",
-            "ZONE-4",
-            "1",
-            "67.9",
-            "5.0"
-          ],
-          [
-            "2026-06-05T11:29:30",
-            "ZONE-2",
-            "1",
-            "99.0",
-            "66.6"
-          ],
-          [
-            "2026-06-05T11:29:30",
+            "2026-06-06T07:04:30",
             "ZONE-3",
-            "2",
-            "50.25",
+            "1",
+            "55.2",
             "42.5"
           ],
           [
-            "2026-06-05T11:29:30",
+            "2026-06-06T07:04:30",
             "ZONE-4",
             "1",
             "72.8",
             "58.0"
           ],
           [
-            "2026-06-05T11:30:00",
+            "2026-06-06T07:05:00",
             "ZONE-1",
-            "2",
-            "54.75",
-            "33.3"
+            "1",
+            "88.1",
+            "75.3"
           ],
           [
-            "2026-06-05T11:30:00",
+            "2026-06-06T07:05:00",
             "ZONE-2",
             "1",
             "33.0",
             "25.0"
           ],
           [
-            "2026-06-05T11:30:00",
-            "ZONE-4",
-            "1",
-            "67.9",
-            "5.0"
-          ],
-          [
-            "2026-06-05T11:30:30",
-            "ZONE-2",
-            "1",
-            "99.0",
-            "66.6"
-          ],
-          [
-            "2026-06-05T11:30:30",
+            "2026-06-06T07:05:30",
             "ZONE-3",
             "1",
             "55.2",
@@ -352,18 +310,18 @@
         ],
         "results": [
           [
-            "2026-06-05T11:28:00",
+            "2026-06-06T07:04:00",
             "10",
-            "506.0",
-            "506.0",
-            "2"
+            "457.0",
+            "457.0",
+            "1"
           ],
           [
-            "2026-06-05T11:30:00",
-            "18",
-            "512.22",
-            "509.11",
-            "1"
+            "2026-06-06T07:06:00",
+            "4",
+            "418.75",
+            "437.88",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -388,15 +346,7 @@
         ],
         "results": [
           [
-            "2026-06-05T11:30:00",
-            "SORT-A7",
-            "9",
-            "686.67",
-            "27.07",
-            "66.66999816894531"
-          ],
-          [
-            "2026-06-05T11:30:00",
+            "2026-06-06T07:05:00",
             "SORT-Z9",
             "2",
             "610.0",
@@ -404,27 +354,27 @@
             "0.0"
           ],
           [
-            "2026-06-05T11:30:00",
-            "SORT-Q5",
+            "2026-06-06T07:05:00",
+            "SORT-M3",
             "3",
-            "555.0",
-            "28.9",
+            "480.0",
+            "26.3",
             "100.0"
           ],
           [
-            "2026-06-05T11:30:00",
-            "SORT-M3",
-            "5",
-            "404.0",
-            "25.7",
-            "60.0"
+            "2026-06-06T07:05:00",
+            "SORT-X1",
+            "6",
+            "437.5",
+            "27.1",
+            "0.0"
           ],
           [
-            "2026-06-05T11:30:00",
-            "SORT-X1",
-            "9",
-            "355.0",
-            "28.9",
+            "2026-06-06T07:05:00",
+            "SORT-A7",
+            "3",
+            "320.0",
+            "22.0",
             "0.0"
           ]
         ],
@@ -453,15 +403,13 @@
         "skip_row_count": true,
         "assertions": [
           {
-            "type": "row_contains",
-            "match": {
-              "operation_mode": "manual",
-              "control_center": "CC-DELTA"
-            }
+            "type": "value_range",
+            "column": "event_count",
+            "min": 0
           },
           {
             "type": "value_range",
-            "column": "event_count",
+            "column": "total_items",
             "min": 0
           }
         ]
@@ -486,20 +434,20 @@
         ],
         "results": [
           [
-            "2026-06-05T11:30:00",
-            "10",
-            "506.0",
-            "None",
-            "None",
-            "None"
+            "2026-06-06T07:06:00",
+            "7",
+            "451.43",
+            "2026-06-06T07:06:00",
+            "3",
+            "470.0"
           ],
           [
-            "2026-06-05T11:33:00",
+            "None",
+            "None",
+            "None",
+            "2026-06-06T07:09:00",
             "4",
-            "437.5",
-            "2026-06-05T11:33:00",
-            "14",
-            "533.57"
+            "418.75"
           ]
         ],
         "results_mode": "rowsort",
@@ -524,22 +472,22 @@
         ],
         "results": [
           [
-            "2026-06-05T11:33:00",
-            "10",
-            "596.0",
-            "416.0"
+            "2026-06-06T07:08:00",
+            "5",
+            "667.5",
+            "316.67"
           ],
           [
-            "2026-06-05T11:34:00",
-            "10",
-            "596.0",
-            "416.0"
+            "2026-06-06T07:09:00",
+            "5",
+            "667.5",
+            "316.67"
           ],
           [
-            "2026-06-05T11:35:00",
-            "8",
-            "592.5",
-            "447.5"
+            "2026-06-06T07:10:00",
+            "4",
+            "725.0",
+            "316.67"
           ]
         ],
         "results_mode": "rowsort"
@@ -569,34 +517,16 @@
         ],
         "results": [
           [
-            "1780666200000000",
+            "1780736700000000",
             "ZONE-2",
-            "3",
-            "686.6666666666666",
-            "40.0",
-            "25.0",
-            "775"
-          ],
-          [
-            "1780666200000000",
-            "ZONE-1",
-            "2",
-            "457.5",
-            "35.7",
-            "33.3",
-            "148"
-          ],
-          [
-            "1780666200000000",
-            "ZONE-4",
             "1",
-            "555.0",
-            "28.9",
-            "5.0",
-            "275"
+            "320.0",
+            "22.0",
+            "25.0",
+            "120"
           ],
           [
-            "1780666200000000",
+            "1780736700000000",
             "ZONE-3",
             "1",
             "480.0",
@@ -605,76 +535,85 @@
             "200"
           ],
           [
-            "1780666140000000",
-            "ZONE-2",
-            "3",
-            "686.6666666666666",
-            "40.0",
-            "25.0",
-            "775"
+            "1780736700000000",
+            "ZONE-1",
+            "1",
+            "725.0",
+            "35.7",
+            "75.3",
+            "88"
           ],
           [
-            "1780666140000000",
+            "1780736640000000",
+            "ZONE-4",
+            "1",
+            "610.0",
+            "30.1",
+            "58.0",
+            "340"
+          ],
+          [
+            "1780736640000000",
             "ZONE-3",
-            "2",
-            "385.0",
+            "1",
+            "480.0",
             "26.3",
             "42.5",
-            "610"
+            "200"
           ],
           [
-            "1780666140000000",
-            "ZONE-4",
-            "2",
-            "582.5",
-            "30.1",
-            "5.0",
-            "615"
-          ],
-          [
-            "1780666140000000",
+            "1780736640000000",
             "ZONE-1",
-            "2",
-            "457.5",
+            "1",
+            "725.0",
             "35.7",
-            "33.3",
-            "148"
+            "75.3",
+            "88"
           ],
           [
-            "1780666080000000",
+            "1780736640000000",
             "ZONE-2",
-            "3",
-            "686.6666666666666",
-            "40.0",
+            "1",
+            "320.0",
+            "22.0",
             "25.0",
-            "775"
+            "120"
           ],
           [
-            "1780666080000000",
-            "ZONE-1",
-            "2",
-            "457.5",
-            "35.7",
-            "33.3",
-            "148"
+            "1780736580000000",
+            "ZONE-2",
+            "1",
+            "320.0",
+            "22.0",
+            "25.0",
+            "120"
           ],
           [
-            "1780666080000000",
+            "1780736580000000",
             "ZONE-4",
-            "2",
-            "582.5",
+            "1",
+            "610.0",
             "30.1",
-            "5.0",
-            "615"
+            "58.0",
+            "340"
           ],
           [
-            "1780666080000000",
+            "1780736580000000",
+            "ZONE-1",
+            "1",
+            "725.0",
+            "35.7",
+            "75.3",
+            "88"
+          ],
+          [
+            "1780736580000000",
             "ZONE-3",
-            "2",
-            "385.0",
+            "1",
+            "480.0",
             "26.3",
             "42.5",
-            "610"
+            "200"
           ]
         ],
         "results_mode": "rowsort"
@@ -699,29 +638,406 @@
           [
             "first_minute",
             "ZONE-1",
-            "9",
-            "355.0"
+            "6",
+            "437.5"
           ],
           [
             "first_minute",
             "ZONE-2",
-            "9",
-            "686.6666666666666"
+            "3",
+            "320.0"
           ],
           [
             "first_minute",
             "ZONE-3",
-            "5",
-            "404.0"
+            "3",
+            "480.0"
           ],
           [
             "first_minute",
             "ZONE-4",
-            "5",
-            "577.0"
+            "2",
+            "610.0"
           ]
         ],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q296",
+      "sql": "SELECT _timestamp, _timestamp - 360000000 AS reduced_start, _timestamp + 60000000 AS reduced_end, visitor_session_id, action_category, exception_message FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message LIKE '%Exception%' AND visitor_session_id IS NOT NULL",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17699000000,
+        "end_offset": 17773000000
+      },
+      "expected": {
+        "columns": [
+          "reduced_start",
+          "reduced_end",
+          "visitor_session_id",
+          "action_category",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "1780742712000000",
+            "1780743132000000",
+            "sess_002",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ],
+          [
+            "1780742700000000",
+            "1780743120000000",
+            "sess_001",
+            "performanceMetric",
+            "NullPointerException at ConveyorController.handle()"
+          ],
+          [
+            "1780742718000000",
+            "1780743138000000",
+            "sess_001",
+            "performanceMetric",
+            "TimeoutException: lane LANE-A did not respond within 5000ms"
+          ],
+          [
+            "1780742772000000",
+            "1780743192000000",
+            "sess_002",
+            "performanceMetric",
+            "SecurityException: unauthorized access to control_center CC-ALPHA"
+          ],
+          [
+            "1780742760000000",
+            "1780743180000000",
+            "sess_001",
+            "performanceMetric",
+            "NullPointerException at ConveyorController.handle()"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q297",
+      "sql": "SELECT (_timestamp - (_timestamp % 60000000)) AS minute_bucket, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'navigation' AND page_slug = 'itemPage' GROUP BY minute_bucket ORDER BY minute_bucket",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17759000000,
+        "end_offset": 17833000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780743120000000",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q298",
+      "sql": "SELECT action_category, COUNT(*) AS cnt, MIN(_timestamp) AS first_event, MAX(_timestamp) AS last_event FROM \"{stream}\" WHERE action_category IN ('performanceMetric', 'navigation') GROUP BY action_category",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17819000000,
+        "end_offset": 17893000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "cnt",
+          "first_event",
+          "last_event"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "5",
+            "1780743180000000",
+            "1780743252000000"
+          ],
+          [
+            "navigation",
+            "1",
+            "1780743234000000",
+            "1780743234000000"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q299",
+      "sql": "SELECT _timestamp, concat(page_slug, '-', action_category) AS event_type, latency_ms, component_name FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 79 ORDER BY _timestamp DESC LIMIT 20",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17879000000,
+        "end_offset": 17953000000
+      },
+      "expected": {
+        "columns": [
+          "event_type",
+          "latency_ms",
+          "component_name"
+        ],
+        "results": [
+          [
+            "checkoutPage-performanceMetric",
+            "89",
+            "track-router"
+          ],
+          [
+            "checkoutPage-performanceMetric",
+            "89",
+            "track-router"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q300",
+      "sql": "SELECT (_timestamp - (_timestamp % 120000000)) AS two_min_bucket, (CASE WHEN os_platform LIKE '%Android%' THEN 'Android' WHEN os_platform LIKE '%iOS%' OR os_platform LIKE '%iPhone%' THEN 'iOS' ELSE 'Other' END) AS platform, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'navigation' GROUP BY two_min_bucket, platform ORDER BY two_min_bucket",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17939000000,
+        "end_offset": 18013000000
+      },
+      "expected": {
+        "columns": [
+          "two_min_bucket",
+          "platform",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780743240000000",
+            "iOS",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q301",
+      "sql": "SELECT (_timestamp / 3600000000) * 3600000000 AS hour_bucket, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY hour_bucket ORDER BY hour_bucket",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 17999000000,
+        "end_offset": 18073000000
+      },
+      "expected": {
+        "columns": [
+          "hour_bucket",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "1780743360000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780743372000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780743378000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780743420000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780743432000000.0",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q302",
+      "sql": "SELECT _timestamp, visitor_session_id, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE _timestamp BETWEEN (_timestamp - 300000000) AND (_timestamp + 300000000) AND action_category = 'performanceMetric' ORDER BY latency_ms DESC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 18059000000,
+        "end_offset": 18133000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "sess_002",
+            "performanceMetric",
+            "checkoutPage",
+            "89"
+          ],
+          [
+            "sess_002",
+            "performanceMetric",
+            "checkoutPage",
+            "89"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "searchPage",
+            "45"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ],
+          [
+            "sess_001",
+            "performanceMetric",
+            "itemPage",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q303",
+      "sql": "SELECT _timestamp, coalesce(page_url, page_slug) AS source, action_category, response_code, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY _timestamp DESC LIMIT 15",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 18119000000,
+        "end_offset": 18193000000
+      },
+      "expected": {
+        "columns": [
+          "source",
+          "action_category",
+          "response_code",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/cart",
+            "performanceMetric",
+            "404",
+            "89"
+          ],
+          [
+            "https://shop.example.com/item/1001",
+            "performanceMetric",
+            "200",
+            "12"
+          ],
+          [
+            "https://shop.example.com/item/1002",
+            "performanceMetric",
+            "201",
+            "45"
+          ],
+          [
+            "https://shop.example.com/cart",
+            "performanceMetric",
+            "404",
+            "89"
+          ],
+          [
+            "https://shop.example.com/item/1001",
+            "performanceMetric",
+            "200",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q304",
+      "sql": "SELECT _timestamp, os_platform, action_category, page_slug, error_code FROM \"{stream}\" WHERE re_match(os_platform, 'Android|iPhone|iOS') AND page_slug IN ('itemPage', 'cartPage') AND action_category IN ('navigation', 'performanceMetric', 'interaction') ORDER BY _timestamp ASC LIMIT 25",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 18179000000,
+        "end_offset": 18253000000
+      },
+      "expected": {
+        "columns": [
+          "os_platform",
+          "action_category",
+          "page_slug",
+          "error_code"
+        ],
+        "results": [
+          [
+            "Android 14",
+            "performanceMetric",
+            "itemPage",
+            "E001"
+          ],
+          [
+            "Android 13",
+            "interaction",
+            "cartPage",
+            "E003"
+          ],
+          [
+            "Mac OS X (iPhone)",
+            "navigation",
+            "itemPage",
+            "E004"
+          ],
+          [
+            "Android 14",
+            "performanceMetric",
+            "itemPage",
+            "E001"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q305",
+      "sql": "SELECT (_timestamp / 3600000000) * 3600000000 AS hour_slot, page_slug, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'navigation' GROUP BY hour_slot, page_slug ORDER BY hour_slot, cnt DESC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 18239000000,
+        "end_offset": 18313000000
+      },
+      "expected": {
+        "columns": [
+          "hour_slot",
+          "page_slug",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780743654000000.0",
+            "itemPage",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     }
   ],

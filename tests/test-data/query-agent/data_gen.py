@@ -19,7 +19,9 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    BASE_TS = int((_now - timedelta(hours=4)).timestamp() * 1_000_000)
+    # Shift enough so all per-query windows (60s each) are in the past.
+    # 400 queries × 60s = 6.67h; 8h shift gives ~1.3h of headroom.
+    BASE_TS = int((_now - timedelta(hours=8)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     # --- Original 17 fields (warehouse/sorter themed) ---
@@ -598,13 +600,17 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=200):
-    """Generate deterministic records for queries Q001-Q{num_queries}."""
+def build_dataset(num_queries=400):
+    """Generate deterministic records for queries Q001-Q{num_queries}.
+
+    Each query gets 5 records spaced 18 seconds apart within its own
+    non-overlapping 60-second time window.
+    """
     records = []
     for qi in range(1, num_queries + 1):
         qid = f"Q{qi:03d}"
         base = BASE_TS + (qi - 1) * 60_000_000
-        for i in range(10):
+        for i in range(5):
             ts = base + i * 18_000_000
             records.append(make_record(ts, i, qid))
     return records
