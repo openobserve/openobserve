@@ -281,9 +281,12 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await page.waitForLoadState('domcontentloaded'); // Replace hard wait
     await pm.logsPage.clickSQLModeToggle();
-    const expectedQuery = 'SELECT * FROM "e2e_automate"';
     const text = await pm.logsPage.getQueryEditorText();
-    await expect(text.replace(/\s/g, "")).toContain(expectedQuery.replace(/\s/g, ""));
+    // `clickSQLModeToggle` writes a SELECT including any currently-interesting fields
+    // (default is just `_timestamp`). Assert structurally — `SELECT … FROM "e2e_automate"` —
+    // rather than pinning to a `SELECT *` shape that only the legacy code path produced.
+    const compact = text.replace(/\s/g, "");
+    expect(compact).toMatch(/^SELECT[\s\S]+FROM"e2e_automate"/);
     await pm.logsPage.clickMenuLinkMetricsItem();
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Replace hard wait

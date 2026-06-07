@@ -2040,25 +2040,10 @@ export class LogsPage {
             // Using clickSQLModeToggle() is unreliable here: when the editor already has a
             // SELECT (e.g. from a prior enableSQLMode call), the toggle CLEARS the editor
             // instead of adding the field. Direct setQueryEditorContent bypasses that problem.
-            const appState = await this.page.evaluate(() => {
-                try {
-                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
-                    if (!el) return null;
-                    let cur = el;
-                    while (cur && cur !== document.body) {
-                        const comp = cur.__vueParentComponent;
-                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                            const s = comp.setupState.searchObj;
-                            return {
-                                fields: [...(s.data?.stream?.interestingFieldList || [])],
-                                stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
-                            };
-                        }
-                        cur = cur.parentElement;
-                    }
-                    return null;
-                } catch (e) { return null; }
-            });
+            const appState = await this._mutateSearchObj((searchObj) => ({
+                fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
+                stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+            }));
             const timestamp = '_timestamp';
             // Prefer the Vue interestingFieldList; fall back to just [field] so the SELECT
             // always contains the field we starred even if Vue state wasn't updated yet.
@@ -2653,26 +2638,43 @@ export class LogsPage {
         // at the end of extractFields() which runs inside processPostPaginationData —
         // a floating async promise that may still be in-flight when the Run Query
         // button becomes enabled (searchObj.loading = false).
+        // Polls `searchObj.loadingStream` via the prod-safe `_vnode` walk used by
+        // `_mutateSearchObj`. Inlined (not a method) because `page.waitForFunction`
+        // takes a serialised body and we need the polling semantics it provides.
         await this.page.waitForFunction(
-            (selector) => {
-                const el = document.querySelector(selector);
-                if (!el) return true; // can't reach Vue state, proceed
-                let cur = el;
-                while (cur && cur !== document.body) {
-                    const comp = cur.__vueParentComponent;
-                    if (comp) {
-                        if (comp.setupState && 'searchObj' in comp.setupState) {
-                            return comp.setupState.searchObj.loadingStream !== true;
+            () => {
+                try {
+                    const app = document.querySelector('#app');
+                    if (!app?._vnode) return true;
+                    const visited = new Set();
+                    let target = null;
+                    const walk = (node, depth) => {
+                        if (!node || depth > 60 || visited.has(node) || target) return;
+                        visited.add(node);
+                        const ss = node.component?.setupState;
+                        if (ss && 'searchObj' in ss) {
+                            const s = ss.searchObj;
+                            if (s?.meta && 'sqlMode' in s.meta) {
+                                target = s;
+                                return;
+                            }
                         }
-                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
-                            return comp.parent.setupState.searchObj.loadingStream !== true;
+                        if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                        if (Array.isArray(node.children)) {
+                            for (const c of node.children) {
+                                if (c && typeof c === 'object') walk(c, depth + 1);
+                                if (target) return;
+                            }
                         }
-                    }
-                    cur = cur.parentElement;
+                    };
+                    walk(app._vnode, 0);
+                    if (!target) return true;
+                    return target.loadingStream !== true;
+                } catch (e) {
+                    return true;
                 }
-                return true; // Vue state not found, proceed
             },
-            this.queryButton,
+            null,
             { timeout: 15000 }
         ).catch(() => {
             testLogger.warn('runQueryAndWaitForResults: loadingStream check timed out, proceeding');
@@ -2826,27 +2828,10 @@ export class LogsPage {
         }
 
         // Toggle ON: read interesting fields + stream from Vue state, build SELECT
-        const appState = await this.page.evaluate(() => {
-            try {
-                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
-                if (!el) return null;
-                let current = el;
-                while (current && current !== document.body) {
-                    const comp = current.__vueParentComponent;
-                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                        const s = comp.setupState.searchObj;
-                        return {
-                            fields: [...(s.data?.stream?.interestingFieldList || [])],
-                            stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
-                        };
-                    }
-                    current = current.parentElement;
-                }
-                return null;
-            } catch (e) {
-                return null;
-            }
-        });
+        const appState = await this._mutateSearchObj((searchObj) => ({
+            fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
+            stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
+        }));
 
         const timestamp = '_timestamp';
         const fields = appState?.fields || [];
@@ -7015,34 +7000,9 @@ export class LogsPage {
      * @returns {Promise<string>}
      */
     async _getSelectedStream() {
-        const stream = await this.page.evaluate(() => {
-            const getSearchObj = (el) => {
-                if (!el) return null;
-                let cur = el;
-                while (cur && cur !== document.body) {
-                    const comp = cur.__vueParentComponent;
-                    if (comp) {
-                        if (comp.setupState && 'searchObj' in comp.setupState) return comp.setupState.searchObj;
-                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) return comp.parent.setupState.searchObj;
-                    }
-                    cur = cur.parentElement;
-                }
-                return null;
-            };
-            try {
-                const anchors = [
-                    '[data-test="logs-search-bar-refresh-btn"]',
-                    '[data-test="logs-search-bar-utilities-menu-btn"]',
-                    '[data-test="logs-search-bar-query-editor"]',
-                ];
-                for (const selector of anchors) {
-                    const el = document.querySelector(selector);
-                    const s = getSearchObj(el);
-                    if (s) return s.data?.stream?.selectedStream?.[0] || null;
-                }
-                return null;
-            } catch (e) { return null; }
-        });
+        const stream = await this._mutateSearchObj(
+            (searchObj) => searchObj.data?.stream?.selectedStream?.[0] || null
+        );
         return stream || 'e2e_automate';
     }
 
@@ -7084,50 +7044,71 @@ export class LogsPage {
      * @returns {Promise<boolean>} true if the state was set successfully
      */
     async _setSqlModeViaVue(value) {
-        return await this.page.evaluate((sqlMode) => {
-            const findAndSet = (el) => {
-                if (!el) return false;
-                let current = el;
-                while (current && current !== document.body) {
-                    // Check the Vue component instance linked to this DOM element.
-                    // In Vue 3, __vueParentComponent on a component's root element is the
-                    // parent component (the one that uses it in its template).
-                    const comp = current.__vueParentComponent;
-                    if (comp) {
-                        // Check direct setupState
-                        if (comp.setupState && 'searchObj' in comp.setupState) {
-                            comp.setupState.searchObj.meta.sqlMode = sqlMode;
-                            return true;
-                        }
-                        // Also check comp.parent (one more level up the Vue tree)
-                        if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
-                            comp.parent.setupState.searchObj.meta.sqlMode = sqlMode;
-                            return true;
+        // Delegates to _mutateSearchObj — single source of truth for the prod-safe
+        // `_vnode` walk. See _mutateSearchObj jsdoc for why __vueParentComponent
+        // can't be used in CI.
+        const result = await this._mutateSearchObj((searchObj, v) => {
+            searchObj.meta.sqlMode = v;
+            return true;
+        }, value);
+        return result === true;
+    }
+
+    /**
+     * Read `searchObj` via the prod-safe `_vnode` walk and apply `mutate(searchObj)`
+     * inside `page.evaluate`. Returns whatever the mutate fn returns (defaults to true
+     * on success). Use this instead of `__vueParentComponent` walks anywhere that
+     * needs to read or write Vue reactive state — `__vueParentComponent` is dev-only
+     * and undefined in the production frontend bundle CI ships.
+     */
+    async _mutateSearchObj(mutate, payload) {
+        return await this.page.evaluate(({ mutateSrc, payload }) => {
+            try {
+                const app = document.querySelector('#app');
+                if (!app?._vnode) return null;
+                const visited = new Set();
+                let target = null;
+                const walk = (node, depth) => {
+                    if (!node || depth > 60 || visited.has(node) || target) return;
+                    visited.add(node);
+                    const setupState = node.component?.setupState;
+                    if (setupState && 'searchObj' in setupState) {
+                        const s = setupState.searchObj;
+                        if (s?.meta && 'sqlMode' in s.meta) {
+                            target = s;
+                            return;
                         }
                     }
-                    current = current.parentElement;
-                }
-                return false;
-            };
-
-            try {
-                // Try multiple anchors — prefer toolbar buttons that are direct children
-                // of SearchBar's template (not wrapped inside a child component).
-                const anchors = [
-                    '[data-test="logs-search-bar-refresh-btn"]',
-                    '[data-test="logs-search-bar-utilities-menu-btn"]',
-                    '[data-test="logs-search-bar-query-editor"]',
-                    '[data-test="logs-search-bar-date-time-dropdown"]',
-                ];
-                for (const selector of anchors) {
-                    const el = document.querySelector(selector);
-                    if (el && findAndSet(el)) return true;
-                }
-                return false;
+                    if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+                    if (Array.isArray(node.children)) {
+                        for (const c of node.children) {
+                            if (c && typeof c === 'object') walk(c, depth + 1);
+                            if (target) return;
+                        }
+                    }
+                };
+                walk(app._vnode, 0);
+                if (!target) return null;
+                // eslint-disable-next-line no-new-func
+                const fn = new Function('searchObj', 'payload', `return (${mutateSrc})(searchObj, payload)`);
+                return fn(target, payload);
             } catch (e) {
-                return false;
+                return null;
             }
-        }, value);
+        }, { mutateSrc: mutate.toString(), payload });
+    }
+
+    /**
+     * Set `searchObj.data.query` and `searchObj.data.editorValue` to `query` via
+     * the prod-safe `_vnode` walk. Returns true on success, null if Vue state
+     * could not be located.
+     */
+    async _setSearchObjQuery(query) {
+        return await this._mutateSearchObj((searchObj, q) => {
+            searchObj.data.query = q;
+            searchObj.data.editorValue = q;
+            return true;
+        }, query);
     }
 
     /**
@@ -8048,42 +8029,7 @@ export class LogsPage {
         if (!isSQLNow) {
             const stream = await this._getSelectedStream();
             const sql = `SELECT * FROM "${stream}"`;
-            const updatedViaState = await this.page.evaluate((q) => {
-                const setQuery = (el) => {
-                    if (!el) return false;
-                    let cur = el;
-                    while (cur && cur !== document.body) {
-                        const comp = cur.__vueParentComponent;
-                        if (comp) {
-                            if (comp.setupState && 'searchObj' in comp.setupState) {
-                                comp.setupState.searchObj.data.query = q;
-                                comp.setupState.searchObj.data.editorValue = q;
-                                return true;
-                            }
-                            if (comp.parent && comp.parent.setupState && 'searchObj' in comp.parent.setupState) {
-                                comp.parent.setupState.searchObj.data.query = q;
-                                comp.parent.setupState.searchObj.data.editorValue = q;
-                                return true;
-                            }
-                        }
-                        cur = cur.parentElement;
-                    }
-                    return false;
-                };
-                try {
-                    const anchors = [
-                        '[data-test="logs-search-bar-refresh-btn"]',
-                        '[data-test="logs-search-bar-utilities-menu-btn"]',
-                        '[data-test="logs-search-bar-query-editor"]',
-                        '[data-test="logs-search-bar-date-time-dropdown"]',
-                    ];
-                    for (const selector of anchors) {
-                        const el = document.querySelector(selector);
-                        if (el && setQuery(el)) return true;
-                    }
-                    return false;
-                } catch (e) { return false; }
-            }, sql);
+            const updatedViaState = await this._setSearchObjQuery(sql);
             if (!updatedViaState) {
                 // Last resort: write SELECT directly via setQueryEditorContent.
                 // In build-tab auto mode the editor is read-only, but setQueryEditorContent
@@ -8123,22 +8069,10 @@ export class LogsPage {
         const isStillSQL = await this.isSqlModeEnabled();
         if (isStillSQL) {
             testLogger.warn('disableSqlModeIfNeeded: Vue watcher did not update editor in time — using direct state fallback');
-            const updatedViaState = await this.page.evaluate(() => {
-                try {
-                    const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
-                    if (!el) return false;
-                    let cur = el;
-                    while (cur && cur !== document.body) {
-                        const comp = cur.__vueParentComponent;
-                        if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                            comp.setupState.searchObj.data.query = '';
-                            comp.setupState.searchObj.data.editorValue = '';
-                            return true;
-                        }
-                        cur = cur.parentElement;
-                    }
-                    return false;
-                } catch (e) { return false; }
+            const updatedViaState = await this._mutateSearchObj((searchObj) => {
+                searchObj.data.query = '';
+                searchObj.data.editorValue = '';
+                return true;
             });
             if (!updatedViaState) {
                 // Absolute fallback: programmatic Monaco clear via executeEdits which
