@@ -297,7 +297,7 @@ export class LogsPage {
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
         this.queryEditorFullScreenBtn = '[data-test="logs-query-editor-full_screen-btn"]';
         this.queryEditorContainer = '.query-editor-container';
-        this.expandOnFocusClass = '.expand-on-focus';
+        this.expandOnFocusClass = '.editor-fullscreen';
 
         // ===== LOG DETAIL SIDEBAR SELECTORS (Bug #9724) =====
         this.logDetailDialogBox = '[data-test="log-detail-dialog"]';
@@ -7592,17 +7592,17 @@ export class LogsPage {
      * Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
      */
     async enableHistogram() {
-        await this.page.locator(this.utilitiesMenuButton).click();
-        await this.page.waitForTimeout(200);
-        const histogramToggle = this.page.locator(this.histogramToggle);
-        const isPressed = await histogramToggle.getAttribute('aria-pressed').catch(() => 'false');
-        if (isPressed === 'false') {
-            await histogramToggle.click();
-            await this.page.waitForTimeout(500);
-            testLogger.info('Histogram enabled');
-        } else {
-            await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+        // If histogram canvas is already visible, nothing to do.
+        const canvas = this.page.locator(this.barChartCanvas);
+        const alreadyVisible = await canvas.isVisible({ timeout: 2000 }).catch(() => false);
+        if (alreadyVisible) {
+            testLogger.info('Histogram already enabled');
+            return;
         }
+        // toggleHistogram() correctly handles inline button (normal viewport) and
+        // the menu fallback (narrow viewport), so delegate rather than duplicating.
+        await this.toggleHistogram();
+        testLogger.info('Histogram enabled');
     }
 
     /**
