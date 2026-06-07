@@ -10,6 +10,10 @@ from pathlib import Path
 
 random.seed(42)
 
+# Number of queries this generator produces data for.
+# build_dataset() default must match this value.
+NUM_QUERIES = 520
+
 # Check for a BASE_TS override saved by compute_counts.py so that the
 # compute oracle and the test harness share the same BASE_TS. Without
 # this, a minute boundary crossing between compute and test shifts
@@ -19,9 +23,12 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    # Shift enough so all per-query windows (60s each) are in the past.
-    # 400 queries × 60s = 6.67h; 8h shift gives ~1.3h of headroom.
-    BASE_TS = int((_now - timedelta(hours=8)).timestamp() * 1_000_000)
+    # Each query gets a 60s window. Shift far enough into the past so
+    # ALL records are behind _now at ingestion time (necessary for the
+    # fixture's wait_until poll to find them).  NUM_QUERIES * 60 // 3600
+    # is the span in hours; +2h adds margin for CI runner delays.
+    _span_hours = NUM_QUERIES * 60 // 3600 + 2
+    BASE_TS = int((_now - timedelta(hours=_span_hours)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     # --- Original 17 fields (warehouse/sorter themed) ---
@@ -641,7 +648,7 @@ def make_record(ts, idx, qid, stream_offset=0):
     return r
 
 
-def build_dataset(num_queries=520, stream_offset=0):
+def build_dataset(num_queries=NUM_QUERIES, stream_offset=0):
     """Generate deterministic records for queries Q001-Q{num_queries}.
 
     Each query gets 5 records spaced 18 seconds apart within its own
