@@ -121,6 +121,21 @@ class UnflattenedPage {
     }
 
     /**
+     * Wait for an interesting-field toggle button's `title` to flip to
+     * "Remove from interesting fields" — the DOM-side proxy for
+     * `field.isInterestingField === true`. Used instead of reading Vue state
+     * because `__vueParentComponent` is dev-only in Vue 3 and undefined in
+     * production builds.
+     */
+    async expectFieldMarkedAsInteresting(fieldName, opts = {}) {
+        const { timeout = 10000 } = opts;
+        const btn = this.page.locator(
+            `[data-test="logs-search-index-list"] [data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`
+        ).first();
+        await expect(btn).toHaveAttribute('title', /remove from interesting fields/i, { timeout });
+    }
+
+    /**
      * Switch to SQL mode.
      *
      * The SQL mode toggle button was removed from the UI — SQL mode is now
@@ -130,31 +145,41 @@ class UnflattenedPage {
      * that the interesting fields appear in the editor (matching previous behavior).
      */
     async toggleSqlMode() {
+        // Read the set of "interesting" fields from the DOM instead of walking
+        // `__vueParentComponent`, which is dev-only and undefined in production
+        // builds (the build CI ships). Each interesting-field toggle button's
+        // `title` flips to "Remove from interesting fields" when active. Read the
+        // active stream from the URL — `?stream=` is set on every navigation.
         const appState = await this.page.evaluate(() => {
-            try {
-                const el = document.querySelector('[data-test="logs-search-bar-query-editor"]');
-                if (!el) return null;
-                let current = el;
-                while (current && current !== document.body) {
-                    const comp = current.__vueParentComponent;
-                    if (comp && comp.setupState && 'searchObj' in comp.setupState) {
-                        const s = comp.setupState.searchObj;
-                        return {
-                            fields: [...(s.data?.stream?.interestingFieldList || [])],
-                            stream: s.data?.stream?.selectedStream?.[0] || 'e2e_automate',
-                        };
-                    }
-                    current = current.parentElement;
-                }
-                return null;
-            } catch (e) {
-                return null;
-            }
+            const btnSelector = '[data-test="logs-search-index-list"] [data-test^="log-search-index-list-interesting-"][data-test$="-field-btn"]';
+            const fields = Array.from(document.querySelectorAll(btnSelector))
+                .filter(b => /remove from interesting fields/i.test(b.getAttribute('title') || ''))
+                .map(b => {
+                    const m = (b.getAttribute('data-test') || '').match(/^log-search-index-list-interesting-(.+)-field-btn$/);
+                    return m ? m[1] : null;
+                })
+                .filter(Boolean);
+            // De-duplicate (FieldRow renders the same button twice — once in the
+            // default slot and once in the `#actions` slot).
+            const uniqueFields = Array.from(new Set(fields));
+            const stream = new URLSearchParams(window.location.search).get('stream') || null;
+            return { fields: uniqueFields, stream };
         });
 
         const timestamp = '_timestamp';
         const fields = appState?.fields || [];
-        const stream = appState?.stream || 'e2e_automate';
+        // Fallback chain: URL `?stream=` → first selected stream chip on the page.
+        // We avoid a hardcoded stream name so this helper is reusable beyond the
+        // single test that currently calls it.
+        let stream = appState?.stream;
+        if (!stream) {
+            const chipText = await this.page
+                .locator('[data-test="logs-search-bar-streamname-select-stream-button"]')
+                .first()
+                .textContent()
+                .catch(() => null);
+            stream = (chipText || '').trim() || 'e2e_automate';
+        }
         const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
         const sql = allFields.length > 1
             ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
