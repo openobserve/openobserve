@@ -302,7 +302,8 @@
             "72.8"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "note": ". Subqueries use ORDER BY pallet_id ASC so LIMIT 3 is deterministic (PR review fix)"
       }
     },
     {
@@ -407,7 +408,8 @@
             "secondary"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "note": ". ORDER BY uses pallet_id ASC, source ASC as tiebreaker to prevent non-deterministic ordering (PR review fix)"
       }
     },
     {
