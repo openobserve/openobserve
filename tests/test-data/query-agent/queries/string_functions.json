@@ -354,15 +354,15 @@
         ],
         "results": [
           [
-            "CC-GAMMA",
-            "SORT-A7",
-            "hybrid, auto",
-            "4"
-          ],
-          [
             "CC-BETA",
             "SORT-X1",
             "manual, hybrid",
+            "4"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-A7",
+            "hybrid, auto",
             "4"
           ],
           [
@@ -374,7 +374,7 @@
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
-            "auto, manual",
+            "manual, auto",
             "3"
           ]
         ],
@@ -908,9 +908,9 @@
             "2"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
-            "SORT-ZONE-4",
+            "SORT-ZONE-2",
             "29",
             "2"
           ],
@@ -922,34 +922,13 @@
             "2"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
-            "SORT-ZONE-2",
+            "SORT-ZONE-4",
             "29",
             "2"
           ],
           [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "58",
-            "1"
-          ],
-          [
             "ZONE-2",
             "manual",
             "SORT-ZONE-2",
@@ -967,7 +946,28 @@
             "ZONE-4",
             "hybrid",
             "SORT-ZONE-4",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
             "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "58",
             "1"
           ]
         ],
@@ -992,18 +992,18 @@
         ],
         "results": [
           [
-            "ArchiveLog",
-            "ARCHIV",
-            "False",
-            "2",
-            "1900.0"
-          ],
-          [
             "MergeBatch",
             "MERGEB",
             "False",
             "2",
             "3200.0"
+          ],
+          [
+            "ArchiveLog",
+            "ARCHIV",
+            "False",
+            "2",
+            "1900.0"
           ],
           [
             "UpdateBatch",
@@ -1027,11 +1027,11 @@
             "15.0"
           ],
           [
-            "SyncZone",
-            "SYNCZO",
+            "DeleteRecord",
+            "DELETE",
             "False",
             "1",
-            "12.0"
+            "1450.0"
           ],
           [
             "CheckThreshold",
@@ -1041,11 +1041,11 @@
             "78.0"
           ],
           [
-            "DeleteRecord",
-            "DELETE",
+            "SyncZone",
+            "SYNCZO",
             "False",
             "1",
-            "1450.0"
+            "12.0"
           ],
           [
             "RerouteTrack",
@@ -1076,18 +1076,11 @@
         ],
         "results": [
           [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
+            "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
             "0",
-            "120.0"
+            "60.0"
           ],
           [
             "AP-CENTRAL-ZONE-3-MAN",
@@ -1125,6 +1118,13 @@
             "50.0"
           ],
           [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ],
+          [
             "AP-SOUTH-ZONE-2-AUT",
             "1",
             "0",
@@ -1139,11 +1139,18 @@
             "50.0"
           ],
           [
-            "US-CENTRAL-ZONE-3-HYB",
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
             "1",
             "0",
             "0",
-            "200.0"
+            "120.0"
           ],
           [
             "US-WEST-ZONE-1-AUT",
@@ -1165,13 +1172,6 @@
             "0",
             "0",
             "120.0"
-          ],
-          [
-            "EU-NORTH-ZONE-1-MAN",
-            "1",
-            "0",
-            "0",
-            "60.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,20 +1433,20 @@
         ],
         "results": [
           [
-            "searchPage",
-            "E003"
-          ],
-          [
-            "itemPage",
-            "E005"
+            "cartPage",
+            "E004"
           ],
           [
             "checkoutPage",
             "E006"
           ],
           [
-            "cartPage",
-            "E004"
+            "searchPage",
+            "E003"
+          ],
+          [
+            "itemPage",
+            "E005"
           ]
         ],
         "results_mode": "rowsort"
@@ -1831,7 +1831,7 @@
     },
     {
       "id": "Q495",
-      "sql": "SELECT _timestamp, array_extract(regexp_match(exception_message, '([A-Za-z]+Exception)'), 1) AS exc_type, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL AND regexp_match(exception_message, 'Exception') ORDER BY exc_type ASC, _timestamp ASC LIMIT 10",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(exception_message, '([A-Za-z]+Exception)'), 1) AS exc_type, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL AND re_match(exception_message, 'Exception') ORDER BY exc_type ASC, _timestamp ASC LIMIT 10",
       "category": "string_functions",
       "time_offset": {
         "start_offset": 29639000000,

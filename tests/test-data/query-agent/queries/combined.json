@@ -28,17 +28,17 @@
             "25.0"
           ],
           [
-            "ZONE-1",
-            "3",
-            "1770.0",
-            "66.63",
-            "0.0"
-          ],
-          [
             "ZONE-4",
             "3",
             "920.0",
             "40.63",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "1770.0",
+            "66.63",
             "0.0"
           ]
         ],
@@ -864,11 +864,7 @@
           ],
           [
             "2",
-            "checkThreshold"
-          ],
-          [
-            "2",
-            "deleteRecord"
+            "retryScan"
           ],
           [
             "2",
@@ -888,7 +884,11 @@
           ],
           [
             "2",
-            "retryScan"
+            "checkThreshold"
+          ],
+          [
+            "2",
+            "deleteRecord"
           ]
         ],
         "results_mode": "rowsort"
@@ -1026,22 +1026,10 @@
         ],
         "results": [
           [
-            "MergeBatch",
-            "queued",
-            "2",
-            "3200.0"
-          ],
-          [
             "ScanPallet",
             "failed",
             "2",
             "89.0"
-          ],
-          [
-            "SyncZone",
-            "retrying",
-            "2",
-            "12.0"
           ],
           [
             "CheckThreshold",
@@ -1050,10 +1038,22 @@
             "78.0"
           ],
           [
+            "MergeBatch",
+            "queued",
+            "2",
+            "3200.0"
+          ],
+          [
             "RetryScan",
             "ok",
             "2",
             "15.0"
+          ],
+          [
+            "SyncZone",
+            "retrying",
+            "2",
+            "12.0"
           ],
           [
             "SearchItems",
@@ -1114,16 +1114,6 @@
             "114.0"
           ],
           [
-            "ZONE-3",
-            "HYBRID",
-            "2",
-            "96.8",
-            "30.1",
-            "1510.0",
-            "1065.0",
-            "84.0"
-          ],
-          [
             "ZONE-4",
             "HYBRID",
             "2",
@@ -1131,6 +1121,16 @@
             "26.3",
             "670.0",
             "61.5",
+            "84.0"
+          ],
+          [
+            "ZONE-3",
+            "HYBRID",
+            "2",
+            "96.8",
+            "30.1",
+            "1510.0",
+            "1065.0",
             "84.0"
           ],
           [
@@ -1410,6 +1410,13 @@
             "1900"
           ],
           [
+            "zone-controller",
+            "itemPage",
+            "1",
+            "12.0",
+            "12"
+          ],
+          [
             "scan-hub",
             "itemPage",
             "2",
@@ -1422,13 +1429,6 @@
             "1",
             "230.0",
             "230"
-          ],
-          [
-            "zone-controller",
-            "itemPage",
-            "1",
-            "12.0",
-            "12"
           ]
         ],
         "results_mode": "rowsort"
@@ -1484,13 +1484,13 @@
             "1"
           ],
           [
-            "E009",
-            "1",
+            "E006",
+            "2",
             "1"
           ],
           [
-            "E006",
-            "2",
+            "E009",
+            "1",
             "1"
           ]
         ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Mobile",
-            "4",
-            "4",
-            "747.5"
-          ],
-          [
             "Computer",
             "1",
             "1",
             "230.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "4",
+            "747.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1581,17 +1581,17 @@
             "2"
           ],
           [
-            "slow",
-            "error",
-            "1"
-          ],
-          [
             "fast",
             "success",
             "1"
           ],
           [
             "timeout",
+            "error",
+            "1"
+          ],
+          [
+            "slow",
             "error",
             "1"
           ]
@@ -1614,11 +1614,11 @@
         ],
         "results": [
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ]
         ],
@@ -1642,14 +1642,14 @@
         ],
         "results": [
           [
-            "track-router",
-            "E003",
+            "zone-controller",
+            "E001",
             "2",
             "medium"
           ],
           [
-            "zone-controller",
-            "E001",
+            "track-router",
+            "E003",
             "2",
             "medium"
           ],
@@ -1692,13 +1692,13 @@
             "100.0"
           ],
           [
-            "checkoutPage",
+            "cartPage",
             "2",
             "2",
             "100.0"
           ],
           [
-            "cartPage",
+            "checkoutPage",
             "2",
             "2",
             "100.0"
@@ -1767,13 +1767,13 @@
         ],
         "results": [
           [
-            "ios",
-            "desktop",
+            "android",
+            "mobile",
             "3"
           ],
           [
-            "android",
-            "mobile",
+            "ios",
+            "desktop",
             "3"
           ]
         ],
@@ -1831,13 +1831,13 @@
         ],
         "results": [
           [
-            "warehouse-west",
+            "warehouse-east",
             "1",
             "0",
             "0.0"
           ],
           [
-            "warehouse-east",
+            "warehouse-west",
             "1",
             "0",
             "0.0"

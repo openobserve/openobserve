@@ -71,8 +71,13 @@
         ],
         "results": [
           [
-            "SORT-Z9",
-            "manual",
+            "SORT-X1",
+            "hybrid",
+            "2"
+          ],
+          [
+            "SORT-Q5",
+            "auto",
             "2"
           ],
           [
@@ -83,11 +88,6 @@
           [
             "SORT-A7",
             "auto",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "hybrid",
             "2"
           ],
           [

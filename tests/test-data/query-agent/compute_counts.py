@@ -383,14 +383,16 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
     # Detect empty-aggregate results: DuckDB returns 1 row of NULLs for
     # aggregate queries with zero matching rows, but OO returns 0 rows.
+    # OO also drops NULL-valued columns from JSON hits, so column presence
+    # and row count are unreliable — skip both.
     if filtered_rows and all(
         all(v == 'None' for v in row) for row in filtered_rows
     ):
         result = {
             "skip_sqllogictest": True,
-            "skip_row_count": False,
+            "skip_row_count": True,
+            "skip_column_check": True,
             "columns": filtered_cols,
-            "row_count": 0,
         }
         print(f"  {q['id']}: empty-aggregate → skip_sqllogictest")
         return result

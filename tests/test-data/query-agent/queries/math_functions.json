@@ -1218,6 +1218,11 @@
         ],
         "results": [
           [
+            "batch-sync",
+            "100.0",
+            "1"
+          ],
+          [
             "track-router",
             "100.0",
             "2"
@@ -1231,11 +1236,6 @@
             "pallet-mapper",
             "100.0",
             "2"
-          ],
-          [
-            "batch-sync",
-            "100.0",
-            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1319,7 +1319,7 @@
     },
     {
       "id": "Q481",
-      "sql": "SELECT component_name, ROUND(ABS(AVG(CAST(latency_ms AS FLOAT)) - (SELECT AVG(CAST(latency_ms AS FLOAT)) FROM \"{stream}\" WHERE latency_ms > 0)), 2) AS abs_deviation, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND component_name IS NOT NULL GROUP BY component_name ORDER BY abs_deviation DESC, component_name ASC LIMIT 5",
+      "sql": "SELECT component_name, ROUND(ABS(AVG(CAST(latency_ms AS FLOAT)) - MAX(oa.avg_latency)), 2) AS abs_deviation, COUNT(*) AS cnt FROM \"{stream}\" CROSS JOIN (SELECT AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM \"{stream}\" WHERE latency_ms > 0) oa WHERE latency_ms > 0 AND component_name IS NOT NULL GROUP BY component_name ORDER BY abs_deviation DESC, component_name ASC LIMIT 5",
       "category": "math_functions",
       "time_offset": {
         "start_offset": 28799000000,

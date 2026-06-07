@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
@@ -91,11 +91,11 @@
             "3"
           ],
           [
-            "SORT-Q5",
+            "SORT-Z9",
             "2"
           ],
           [
-            "SORT-Z9",
+            "SORT-Q5",
             "2"
           ]
         ],
@@ -174,15 +174,15 @@
         "results": [
           [
             "ZONE-1",
-            "auto",
-            "2",
-            "870.0"
-          ],
-          [
-            "ZONE-1",
             "manual",
             "2",
             "582.5"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "2",
+            "870.0"
           ],
           [
             "ZONE-2",
@@ -289,22 +289,22 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "1"
-          ],
-          [
             "ZONE-2",
             "4",
             "2"
           ],
           [
-            "ZONE-4",
-            "3",
+            "ZONE-3",
+            "4",
             "1"
           ],
           [
             "ZONE-1",
+            "3",
+            "1"
+          ],
+          [
+            "ZONE-4",
             "3",
             "1"
           ]
@@ -639,7 +639,7 @@
           [
             "ZONE-2",
             "2",
-            "manual"
+            "auto"
           ],
           [
             "ZONE-3",
@@ -864,21 +864,6 @@
           [
             "0",
             "1",
-            "1",
-            "0",
-            "1",
-            "0",
-            "E004",
-            "@warehouse-Android-sort-v1",
-            "UP-E008",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "SORT-Q5-UP-E008-E004",
-            "SORT-Q5",
-            "Android"
-          ],
-          [
-            "0",
-            "1",
             "0",
             "1",
             "0",
@@ -890,6 +875,21 @@
             "SORT-M3--E005",
             "SORT-M3",
             "iOS"
+          ],
+          [
+            "0",
+            "1",
+            "1",
+            "0",
+            "1",
+            "0",
+            "E004",
+            "@warehouse-Android-sort-v1",
+            "UP-E008",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "SORT-Q5-UP-E008-E004",
+            "SORT-Q5",
+            "Android"
           ]
         ],
         "results_mode": "rowsort"
@@ -996,20 +996,20 @@
             "0"
           ],
           [
-            "SA-EAST",
-            "1",
-            "290.0",
-            "0.0",
-            "18.5",
-            "0"
-          ],
-          [
             "US-CENTRAL",
             "1",
             "0.0",
             "555.0",
             "22.0",
             "1"
+          ],
+          [
+            "SA-EAST",
+            "1",
+            "290.0",
+            "0.0",
+            "18.5",
+            "0"
           ],
           [
             "AP-CENTRAL",
@@ -1272,8 +1272,8 @@
         ],
         "results": [
           [
-            "batch-sync",
-            "1",
+            "pallet-mapper",
+            "2",
             "1"
           ],
           [
@@ -1282,12 +1282,12 @@
             "1"
           ],
           [
-            "track-router",
-            "2",
+            "batch-sync",
+            "1",
             "1"
           ],
           [
-            "pallet-mapper",
+            "track-router",
             "2",
             "1"
           ]
@@ -1577,11 +1577,11 @@
             "2"
           ],
           [
-            "E004",
+            "E006",
             "1"
           ],
           [
-            "E006",
+            "E004",
             "1"
           ]
         ],
@@ -1657,12 +1657,12 @@
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1",
             "1"
           ],
           [
-            "vitalsInp",
+            "clickEvent",
             "1",
             "1"
           ]
@@ -1788,11 +1788,6 @@
             "2"
           ],
           [
-            "checkoutPage",
-            "2",
-            "2"
-          ],
-          [
             "searchPage",
             "1",
             "1"
@@ -1801,6 +1796,11 @@
             "itemPage",
             "2",
             "1"
+          ],
+          [
+            "checkoutPage",
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2088,15 +2088,15 @@
         "results": [
           [
             "ZONE-1",
-            "auto",
-            "1",
-            "320.0"
-          ],
-          [
-            "ZONE-1",
             "manual",
             "1",
             "610.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "1",
+            "320.0"
           ],
           [
             "ZONE-2",
@@ -2106,15 +2106,15 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
-            "1",
-            "610.0"
-          ],
-          [
-            "ZONE-3",
             "manual",
             "1",
             "320.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "610.0"
           ],
           [
             "ZONE-4",

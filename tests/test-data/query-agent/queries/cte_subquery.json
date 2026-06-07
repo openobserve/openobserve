@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -1409,15 +1409,6 @@
             "26.3"
           ],
           [
-            "ZONE-3",
-            "SORT-X1",
-            "manual",
-            "2",
-            "437.5",
-            "72.8",
-            "19.2"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "auto",
@@ -1425,6 +1416,15 @@
             "437.5",
             "45.3",
             "32.5"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1",
+            "manual",
+            "2",
+            "437.5",
+            "72.8",
+            "19.2"
           ],
           [
             "ZONE-4",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1763,12 +1763,12 @@
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ]
@@ -1814,11 +1814,6 @@
         ],
         "results": [
           [
-            "navigation",
-            "itemPage",
-            "2"
-          ],
-          [
             "performanceMetric",
             "itemPage",
             "2"
@@ -1826,6 +1821,11 @@
           [
             "interaction",
             "searchPage",
+            "2"
+          ],
+          [
+            "navigation",
+            "itemPage",
             "2"
           ],
           [
@@ -1931,13 +1931,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
@@ -2142,16 +2142,6 @@
         ],
         "results": [
           [
-            "navigation",
-            "itemPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "checkoutPage",
-            "1"
-          ],
-          [
             "performanceMetric",
             "searchPage",
             "1"
@@ -2164,6 +2154,16 @@
           [
             "performanceMetric",
             "cartPage",
+            "1"
+          ],
+          [
+            "navigation",
+            "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "checkoutPage",
             "1"
           ]
         ],
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "1",
-            "1",
-            "567.0"
-          ],
-          [
             "itemPage",
             "2",
             "1",
             "89.0"
+          ],
+          [
+            "checkoutPage",
+            "1",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
