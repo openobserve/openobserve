@@ -587,14 +587,18 @@ _NULLABLE_FIELDS = {
 }
 
 
-def make_record(ts, idx, qid):
+def make_record(ts, idx, qid, stream_offset=0):
     """Build a single deterministic data record.
 
     Each field uses a different rotation offset so field-value
     combinations vary independently — no two fields pick from the same
     pool position for the same (idx, qi) pair.
+
+    stream_offset shifts the per-field rotation so the same (qi, idx)
+    produces different values for a secondary stream while keeping
+    partial overlap on join keys (pallet_id, org_name, etc.).
     """
-    qi = int(qid[1:])
+    qi = int(qid[1:]) + stream_offset
     # Vary the log field: some records get an ACK batch suffix for
     # str_match_ignore_case testing on ack_detail-like patterns.
     if idx % 3 == 0:
@@ -627,11 +631,14 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=400):
+def build_dataset(num_queries=520, stream_offset=0):
     """Generate deterministic records for queries Q001-Q{num_queries}.
 
     Each query gets 5 records spaced 18 seconds apart within its own
     non-overlapping 60-second time window.
+
+    stream_offset shifts field rotation for secondary streams while
+    preserving shared time windows and partial join-key overlap.
     """
     records = []
     for qi in range(1, num_queries + 1):
@@ -639,5 +646,5 @@ def build_dataset(num_queries=400):
         base = BASE_TS + (qi - 1) * 60_000_000
         for i in range(5):
             ts = base + i * 18_000_000
-            records.append(make_record(ts, i, qid))
+            records.append(make_record(ts, i, qid, stream_offset))
     return records

@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
@@ -210,15 +210,15 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
-            "2",
-            "437.5"
-          ],
-          [
-            "ZONE-4",
             "auto",
             "2",
             "385.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "2",
+            "437.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -289,14 +289,14 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "1"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "2"
           ],
           [
             "ZONE-4",
@@ -457,16 +457,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "3",
-            "0",
-            "26.07"
-          ],
-          [
             "ZONE-3",
             "3",
             "1",
             "27.53"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "0",
+            "26.07"
           ],
           [
             "ZONE-2",
@@ -644,7 +644,7 @@
           [
             "ZONE-3",
             "2",
-            "manual"
+            "hybrid"
           ],
           [
             "ZONE-4",
@@ -849,17 +849,17 @@
           [
             "0",
             "1",
-            "0",
             "1",
             "0",
             "1",
-            "E005",
-            "@warehouse-iOS-sort-v2",
-            "UP-E009",
-            "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
-            "iOS"
+            "0",
+            "E004",
+            "@warehouse-Android-sort-v1",
+            "UP-E008",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "SORT-Q5-UP-E008-E004",
+            "SORT-Q5",
+            "Android"
           ],
           [
             "0",
@@ -879,17 +879,17 @@
           [
             "0",
             "1",
-            "1",
             "0",
             "1",
             "0",
-            "E004",
-            "@warehouse-Android-sort-v1",
-            "UP-E008",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "SORT-Q5-UP-E008-E004",
-            "SORT-Q5",
-            "Android"
+            "1",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "UP-E009",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
+            "iOS"
           ]
         ],
         "results_mode": "rowsort"
@@ -1074,19 +1074,19 @@
             "42.42640687119285"
           ],
           [
-            "HYBRID",
-            "ZONE-4-SORT-A7",
-            "2",
-            "615",
-            "1.5",
-            "205.0609665440988"
-          ],
-          [
             "AUTO",
             "ZONE-1-SORT-M3",
             "2",
             "148",
             "2.0",
+            "205.0609665440988"
+          ],
+          [
+            "HYBRID",
+            "ZONE-4-SORT-A7",
+            "2",
+            "615",
+            "1.5",
             "205.0609665440988"
           ],
           [
@@ -1282,13 +1282,13 @@
             "1"
           ],
           [
-            "pallet-mapper",
-            "2",
+            "lane-monitor",
+            "1",
             "1"
           ],
           [
-            "lane-monitor",
-            "1",
+            "pallet-mapper",
+            "2",
             "1"
           ]
         ],
@@ -1577,11 +1577,11 @@
             "2"
           ],
           [
-            "E004",
+            "E006",
             "1"
           ],
           [
-            "E006",
+            "E004",
             "1"
           ]
         ],
@@ -1621,8 +1621,14 @@
           "page_slug",
           "error_codes"
         ],
-        "skip_sqllogictest": true,
-        "note": "STRING_AGG ordering differs between DuckDB and OO"
+        "results": [
+          [
+            "itemPage",
+            "E001, E009"
+          ]
+        ],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
       }
     },
     {
@@ -1646,12 +1652,12 @@
             "1"
           ],
           [
-            "vitalsInp",
+            "clickEvent",
             "1",
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1",
             "1"
           ],
@@ -1777,16 +1783,6 @@
         ],
         "results": [
           [
-            "cartPage",
-            "2",
-            "2"
-          ],
-          [
-            "checkoutPage",
-            "2",
-            "2"
-          ],
-          [
             "searchPage",
             "1",
             "1"
@@ -1795,6 +1791,16 @@
             "itemPage",
             "2",
             "1"
+          ],
+          [
+            "cartPage",
+            "2",
+            "2"
+          ],
+          [
+            "checkoutPage",
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1828,7 +1834,590 @@
         ],
         "results_mode": "rowsort"
       }
+    },
+    {
+      "id": "Q226",
+      "sql": "SELECT histogram(_timestamp, '1 minute') AS time, ROUND(SUM(CASE WHEN throughput_rate > 500.0 AND operation_mode = 'auto' THEN 1 ELSE 0 END) * 100.0 / NULLIF(SUM(CASE WHEN throughput_rate > 0 THEN 1 ELSE 0 END), 0), 2) AS auto_high_pct FROM \"{stream}\" WHERE _timestamp IS NOT NULL GROUP BY time ORDER BY time ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13499000000,
+        "end_offset": 13573000000
+      },
+      "expected": {
+        "columns": [
+          "time",
+          "auto_high_pct"
+        ],
+        "results": [
+          [
+            "2026-06-06T09:41:00",
+            "0.0"
+          ],
+          [
+            "2026-06-06T09:42:00",
+            "50.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q227",
+      "sql": "SELECT page_slug, COUNT(*) AS total, COUNT(DISTINCT CASE WHEN error_code IS NOT NULL THEN visitor_session_id END) AS unique_error_sessions, CASE WHEN COUNT(DISTINCT CASE WHEN error_code IS NOT NULL THEN visitor_session_id END) = 0 THEN 'N/A' ELSE CAST(COUNT(DISTINCT CASE WHEN error_code IS NOT NULL THEN visitor_session_id END) AS VARCHAR) END AS unique_display FROM \"{stream}\" WHERE page_slug IS NOT NULL GROUP BY page_slug ORDER BY total DESC, page_slug ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13559000000,
+        "end_offset": 13633000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "total",
+          "unique_error_sessions",
+          "unique_display"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "3",
+            "2",
+            "2"
+          ],
+          [
+            "searchPage",
+            "2",
+            "1",
+            "1"
+          ],
+          [
+            "cartPage",
+            "1",
+            "1",
+            "1"
+          ],
+          [
+            "checkoutPage",
+            "1",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q228",
+      "sql": "SELECT org_name, COUNT(*) AS cnt, ROUND(AVG(CAST(COALESCE(throughput_rate, load_factor) AS DOUBLE)), 1) AS avg_latency FROM \"{stream}\" WHERE CAST(COALESCE(throughput_rate, load_factor) AS DOUBLE) > 100.0 AND CAST(COALESCE(throughput_rate, load_factor) AS DOUBLE) < 900.0 GROUP BY org_name ORDER BY cnt DESC, org_name ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13619000000,
+        "end_offset": 13693000000
+      },
+      "expected": {
+        "columns": [
+          "org_name",
+          "cnt",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "warehouse-central",
+            "2",
+            "190.0"
+          ],
+          [
+            "warehouse-north",
+            "2",
+            "290.0"
+          ],
+          [
+            "warehouse-south",
+            "1",
+            "555.0"
+          ],
+          [
+            "warehouse-west",
+            "1",
+            "840.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q229",
+      "sql": "SELECT CAST(scan_attempts AS VARCHAR) AS scan_val, COUNT(*) AS cnt FROM \"{stream}\" WHERE scan_attempts IS NOT NULL GROUP BY scan_val ORDER BY cnt DESC, scan_val ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13679000000,
+        "end_offset": 13753000000
+      },
+      "expected": {
+        "columns": [
+          "scan_val",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2",
+            "3"
+          ],
+          [
+            "5",
+            "2"
+          ],
+          [
+            "1",
+            "1"
+          ],
+          [
+            "3",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q230",
+      "sql": "SELECT COUNT(*) AS cnt FROM \"{stream}\" WHERE (bot_flag = 'suspicious' AND geo_country IN ('US', 'DE', 'UK')) OR (threat_flag = 'true' AND geo_country IN ('BR', 'IN', 'JP'))",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13739000000,
+        "end_offset": 13813000000
+      },
+      "expected": {
+        "columns": [
+          "cnt"
+        ],
+        "results": [
+          [
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q231",
+      "sql": "SELECT COALESCE(upstream_error_code, error_code, exception_message, 'unknown') AS error_info, COUNT(*) AS cnt FROM \"{stream}\" WHERE COALESCE(upstream_error_code, error_code, exception_message, 'unknown') != 'unknown' GROUP BY error_info ORDER BY cnt DESC, error_info ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13799000000,
+        "end_offset": 13873000000
+      },
+      "expected": {
+        "columns": [
+          "error_info",
+          "cnt"
+        ],
+        "results": [
+          [
+            "UP-E001",
+            "2"
+          ],
+          [
+            "UP-E009",
+            "2"
+          ],
+          [
+            "E004",
+            "1"
+          ],
+          [
+            "E006",
+            "1"
+          ],
+          [
+            "UP-E002",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q232",
+      "sql": "SELECT record_type, COUNT(*) AS cnt FROM \"{stream}\" WHERE record_type IS NOT NULL AND record_type != '' GROUP BY record_type ORDER BY cnt DESC, record_type ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13859000000,
+        "end_offset": 13933000000
+      },
+      "expected": {
+        "columns": [
+          "record_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "merge",
+            "2"
+          ],
+          [
+            "sort",
+            "2"
+          ],
+          [
+            "track",
+            "2"
+          ],
+          [
+            "scan",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q233",
+      "sql": "SELECT facility_zone, operation_mode, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 1) AS avg_tput FROM \"{stream}\" GROUP BY facility_zone, operation_mode HAVING COUNT(*) >= 1 AND AVG(throughput_rate) > 200.0 ORDER BY facility_zone ASC, cnt DESC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13919000000,
+        "end_offset": 13993000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "ZONE-1",
+            "manual",
+            "1",
+            "610.0"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "1",
+            "320.0"
+          ],
+          [
+            "ZONE-2",
+            "manual",
+            "1",
+            "480.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "1",
+            "320.0"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "1",
+            "610.0"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "1",
+            "725.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q234",
+      "sql": "SELECT page_slug, COUNT(*) AS total, COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) AS errors, CASE WHEN COUNT(*) > 0 AND COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) = COUNT(*) THEN 'all_error' WHEN COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) > 0 THEN 'partial' ELSE 'clean' END AS status FROM \"{stream}\" WHERE page_slug IS NOT NULL GROUP BY page_slug ORDER BY total DESC, page_slug ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 13979000000,
+        "end_offset": 14053000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "total",
+          "errors",
+          "status"
+        ],
+        "results": [
+          [
+            "cartPage",
+            "2",
+            "2",
+            "all_error"
+          ],
+          [
+            "checkoutPage",
+            "2",
+            "2",
+            "all_error"
+          ],
+          [
+            "itemPage",
+            "2",
+            "2",
+            "all_error"
+          ],
+          [
+            "searchPage",
+            "1",
+            "1",
+            "all_error"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q235",
+      "sql": "SELECT page_slug, COUNT(DISTINCT CASE WHEN action_category = 'performanceMetric' THEN visitor_session_id END) AS perf_sessions, COUNT(DISTINCT CASE WHEN action_category = 'navigation' THEN visitor_session_id END) AS nav_sessions FROM \"{stream}\" WHERE page_slug IS NOT NULL GROUP BY page_slug ORDER BY page_slug ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14039000000,
+        "end_offset": 14113000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "perf_sessions",
+          "nav_sessions"
+        ],
+        "results": [
+          [
+            "checkoutPage",
+            "1",
+            "0"
+          ],
+          [
+            "homePage",
+            "0",
+            "1"
+          ],
+          [
+            "itemPage",
+            "1",
+            "0"
+          ],
+          [
+            "searchPage",
+            "0",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q236",
+      "sql": "SELECT facility_zone, ROUND(SUM(throughput_rate) * 1.0 / NULLIF(SUM(load_factor), 0), 2) AS ratio FROM \"{stream}\" WHERE throughput_rate > 0 AND load_factor > 0 GROUP BY facility_zone ORDER BY ratio DESC, facility_zone ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14099000000,
+        "end_offset": 14173000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "ratio"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "9.45"
+          ],
+          [
+            "ZONE-4",
+            "9.45"
+          ],
+          [
+            "ZONE-3",
+            "7.8"
+          ],
+          [
+            "ZONE-1",
+            "4.71"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q237",
+      "sql": "SELECT entity_id, COUNT(*) AS cnt, ROUND(AVG(throughput_rate), 1) AS avg_tput FROM \"{stream}\" WHERE entity_id IS NOT NULL GROUP BY entity_id ORDER BY cnt DESC, entity_id ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14159000000,
+        "end_offset": 14233000000
+      },
+      "expected": {
+        "columns": [
+          "entity_id",
+          "cnt",
+          "avg_tput"
+        ],
+        "results": [
+          [
+            "ent-004-wh",
+            "2",
+            "610.0"
+          ],
+          [
+            "ent-006-wh",
+            "2",
+            "840.0"
+          ],
+          [
+            "ent-003-wh",
+            "1",
+            "480.0"
+          ],
+          [
+            "ent-005-wh",
+            "1",
+            "725.0"
+          ],
+          [
+            "ent-007-wh",
+            "1",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q238",
+      "sql": "SELECT task_id, COUNT(*) AS cnt, MAX(throughput_rate) AS max_tput FROM \"{stream}\" WHERE task_id IS NOT NULL GROUP BY task_id ORDER BY cnt DESC, task_id ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14219000000,
+        "end_offset": 14293000000
+      },
+      "expected": {
+        "columns": [
+          "task_id",
+          "cnt",
+          "max_tput"
+        ],
+        "results": [
+          [
+            "task-b8c9d0",
+            "2",
+            "290.0"
+          ],
+          [
+            "task-d4e5f6",
+            "2",
+            "190.0"
+          ],
+          [
+            "task-a1b2c3",
+            "1",
+            "555.0"
+          ],
+          [
+            "task-g7h8i9",
+            "1",
+            "900.0"
+          ],
+          [
+            "task-y5z6a7",
+            "1",
+            "840.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q239",
+      "sql": "SELECT node_ip, COUNT(*) AS cnt, ROUND(AVG(latency_ms), 1) AS avg_lat FROM \"{stream}\" WHERE node_ip IS NOT NULL GROUP BY node_ip ORDER BY cnt DESC, node_ip ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14279000000,
+        "end_offset": 14353000000
+      },
+      "expected": {
+        "columns": [
+          "node_ip",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "10.12.0.105",
+            "2",
+            "1900.0"
+          ],
+          [
+            "10.12.1.202",
+            "2",
+            "12.0"
+          ],
+          [
+            "10.12.0.104",
+            "1",
+            "78.0"
+          ],
+          [
+            "10.12.1.201",
+            "1",
+            "15.0"
+          ],
+          [
+            "10.12.1.203",
+            "1",
+            "45.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q240",
+      "sql": "SELECT site_name, COUNT(*) AS cnt, ROUND(AVG(cell_temp), 1) AS avg_temp FROM \"{stream}\" WHERE site_name IS NOT NULL GROUP BY site_name ORDER BY cnt DESC, site_name ASC",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 14339000000,
+        "end_offset": 14413000000
+      },
+      "expected": {
+        "columns": [
+          "site_name",
+          "cnt",
+          "avg_temp"
+        ],
+        "results": [
+          [
+            "site-ber-06",
+            "2",
+            "32.5"
+          ],
+          [
+            "site-syd-04",
+            "2",
+            "24.8"
+          ],
+          [
+            "site-dub-07",
+            "1",
+            "40.0"
+          ],
+          [
+            "site-sfo-05",
+            "1",
+            "28.9"
+          ],
+          [
+            "site-tok-03",
+            "1",
+            "19.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
-  ],
-  "last_query_id": 392
+  ]
 }

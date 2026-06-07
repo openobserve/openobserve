@@ -354,27 +354,27 @@
         ],
         "results": [
           [
-            "CC-BETA",
-            "SORT-X1",
-            "manual, hybrid",
-            "4"
-          ],
-          [
             "CC-GAMMA",
             "SORT-A7",
-            "auto, hybrid",
+            "hybrid, auto",
             "4"
           ],
           [
-            "CC-DELTA",
-            "SORT-M3",
-            "auto, manual",
-            "3"
+            "CC-BETA",
+            "SORT-X1",
+            "hybrid, manual",
+            "4"
           ],
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
             "auto, manual",
+            "3"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3",
+            "manual, auto",
             "3"
           ]
         ],
@@ -901,6 +901,20 @@
         ],
         "results": [
           [
+            "ZONE-4",
+            "auto",
+            "SORT-ZONE-4",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "SORT-ZONE-1",
+            "58",
+            "2"
+          ],
+          [
             "ZONE-1",
             "auto",
             "SORT-ZONE-1",
@@ -916,58 +930,44 @@
           ],
           [
             "ZONE-4",
-            "auto",
+            "hybrid",
             "SORT-ZONE-4",
-            "29",
-            "2"
+            "58",
+            "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
             "manual",
-            "SORT-ZONE-1",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
             "58",
-            "2"
+            "1"
           ],
           [
             "ZONE-2",
             "manual",
             "SORT-ZONE-2",
             "58",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "manual",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "29",
             "1"
           ]
         ],
@@ -999,11 +999,11 @@
             "45.0"
           ],
           [
-            "UpdateBatch",
-            "UPDATE",
+            "MergeBatch",
+            "MERGEB",
             "False",
             "2",
-            "230.0"
+            "3200.0"
           ],
           [
             "ArchiveLog",
@@ -1020,11 +1020,11 @@
             "15.0"
           ],
           [
-            "MergeBatch",
-            "MERGEB",
+            "UpdateBatch",
+            "UPDATE",
             "False",
             "2",
-            "3200.0"
+            "230.0"
           ],
           [
             "SyncZone",
@@ -1041,18 +1041,18 @@
             "1450.0"
           ],
           [
-            "CheckThreshold",
-            "CHECKT",
-            "False",
-            "1",
-            "78.0"
-          ],
-          [
             "RerouteTrack",
             "REROUT",
             "False",
             "1",
             "567.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "1",
+            "78.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1076,25 +1076,11 @@
         ],
         "results": [
           [
-            "US-EAST-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "155.0"
-          ],
-          [
-            "EU-NORTH-ZONE-3-HYB",
+            "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
             "0",
             "60.0"
-          ],
-          [
-            "AP-EAST-ZONE-1-AUT",
-            "1",
-            "1",
-            "0",
-            "50.0"
           ],
           [
             "AP-CENTRAL-ZONE-3-MAN",
@@ -1132,11 +1118,25 @@
             "120.0"
           ],
           [
-            "EU-NORTH-ZONE-1-MAN",
+            "US-EAST-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "EU-NORTH-ZONE-3-HYB",
             "1",
             "0",
             "0",
             "60.0"
+          ],
+          [
+            "AP-EAST-ZONE-1-AUT",
+            "1",
+            "1",
+            "0",
+            "50.0"
           ],
           [
             "AP-SOUTH-ZONE-2-AUT",
@@ -1620,6 +1620,381 @@
             "cartPage?POST",
             "sess_001",
             "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q490",
+      "sql": "SELECT _timestamp, concat(COALESCE(page_slug, 'unknown'), '|', COALESCE(action_category, 'unknown'), '|', COALESCE(action_subcategory, 'unknown')) AS full_path, latency_ms FROM \"{stream}\" WHERE latency_ms > 0 ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29339000000,
+        "end_offset": 29413000000
+      },
+      "expected": {
+        "columns": [
+          "full_path",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "itemPage|performanceMetric|pageView",
+            "89"
+          ],
+          [
+            "cartPage|performanceMetric|vitalsCls",
+            "1450"
+          ],
+          [
+            "cartPage|performanceMetric|vitalsCls",
+            "1450"
+          ],
+          [
+            "searchPage|performanceMetric|vitalsInp",
+            "230"
+          ],
+          [
+            "itemPage|navigation|vitalsLcp",
+            "45"
+          ],
+          [
+            "itemPage|navigation|vitalsLcp",
+            "45"
+          ],
+          [
+            "itemPage|performanceMetric|clickEvent",
+            "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q491",
+      "sql": "SELECT _timestamp, UPPER(component_name) AS comp_upper, LOWER(exception_message) AS exc_lower, LENGTH(COALESCE(exception_message, '')) AS exc_len FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND component_name IS NOT NULL ORDER BY exc_len DESC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29399000000,
+        "end_offset": 29473000000
+      },
+      "expected": {
+        "columns": [
+          "comp_upper",
+          "exc_lower",
+          "exc_len"
+        ],
+        "results": [
+          [
+            "BATCH-SYNC",
+            "securityexception: unauthorized access to control_center cc-alpha",
+            "65"
+          ],
+          [
+            "PALLET-MAPPER",
+            "configurationexception: missing facility_zone zone-3 override",
+            "61"
+          ],
+          [
+            "PALLET-MAPPER",
+            "configurationexception: missing facility_zone zone-3 override",
+            "61"
+          ],
+          [
+            "LANE-MONITOR",
+            "networkexception: connection to batch sync failed",
+            "49"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q492",
+      "sql": "SELECT _timestamp, SUBSTRING(COALESCE(client_agent, ''), 1, 30) AS agent_short, SUBSTRING(COALESCE(exception_message, ''), 1, 40) AS exc_short FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29459000000,
+        "end_offset": 29533000000
+      },
+      "expected": {
+        "columns": [
+          "agent_short",
+          "exc_short"
+        ],
+        "results": [
+          [
+            "axios/1.6.0 (Node.js; warehous",
+            "OverflowException: throughput_rate 999.0"
+          ],
+          [
+            "Alamofire/5.8.0 (iOS; scan-app",
+            "TimeoutException: lane LANE-A did not re"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q493",
+      "sql": "SELECT _timestamp, TRIM(COALESCE(page_slug, '')) AS clean_page, TRIM(COALESCE(error_code, '')) AS clean_error, REPLACE(COALESCE(component_name, ''), '-', '_') AS comp_name_normalized FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29519000000,
+        "end_offset": 29593000000
+      },
+      "expected": {
+        "columns": [
+          "clean_page",
+          "clean_error",
+          "comp_name_normalized"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "E001",
+            "zone_controller"
+          ],
+          [
+            "itemPage",
+            "E001",
+            "zone_controller"
+          ],
+          [
+            "searchPage",
+            "E003",
+            "track_router"
+          ],
+          [
+            "searchPage",
+            "E003",
+            "track_router"
+          ],
+          [
+            "cartPage",
+            "E004",
+            "batch_sync"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q494",
+      "sql": "SELECT _timestamp, CONCAT(COALESCE(os_platform, 'Unknown'), ' / ', COALESCE(device_type, 'Unknown')) AS platform_device, action_category, page_slug FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp DESC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29579000000,
+        "end_offset": 29653000000
+      },
+      "expected": {
+        "columns": [
+          "platform_device",
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "Android 14 / Computer",
+            "performanceMetric",
+            "checkoutPage"
+          ],
+          [
+            "Android 14 / Computer",
+            "performanceMetric",
+            "checkoutPage"
+          ],
+          [
+            "Mac OS X (iPhone) / Tablet",
+            "performanceMetric",
+            "itemPage"
+          ],
+          [
+            "Android 12 / Mobile",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "Android 12 / Mobile",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "iOS 18.1 / Computer",
+            "performanceMetric",
+            "searchPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q495",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(exception_message, '([A-Za-z]+Exception)'), 1) AS exc_type, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND exception_message IS NOT NULL AND regexp_match(exception_message, 'Exception') ORDER BY exc_type ASC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29639000000,
+        "end_offset": 29713000000
+      },
+      "expected": {
+        "columns": [
+          "exc_type",
+          "action_category"
+        ],
+        "results": [
+          [
+            "NetworkException",
+            "performanceMetric"
+          ],
+          [
+            "OverflowException",
+            "performanceMetric"
+          ],
+          [
+            "OverflowException",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q496",
+      "sql": "SELECT _timestamp, (CASE WHEN LENGTH(COALESCE(page_url, '')) > 20 THEN SUBSTRING(page_url, 1, 20) || '...' ELSE COALESCE(page_url, page_slug) END) AS short_url, action_category FROM \"{stream}\" WHERE action_category IN ('navigation', 'interaction') ORDER BY _timestamp ASC LIMIT 12",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29699000000,
+        "end_offset": 29773000000
+      },
+      "expected": {
+        "columns": [
+          "short_url",
+          "action_category"
+        ],
+        "results": [
+          [
+            "https://shop.example...",
+            "interaction"
+          ],
+          [
+            "https://shop.example...",
+            "interaction"
+          ],
+          [
+            "https://shop.example...",
+            "navigation"
+          ],
+          [
+            "https://shop.example...",
+            "navigation"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q497",
+      "sql": "SELECT _timestamp, concat(COALESCE(org_name, 'unknown-org'), '/', COALESCE(site_name, 'unknown-site'), '/', COALESCE(region_code, 'unknown-region')) AS location_hierarchy, COUNT(*) OVER () AS total FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29759000000,
+        "end_offset": 29833000000
+      },
+      "expected": {
+        "columns": [
+          "location_hierarchy",
+          "total"
+        ],
+        "results": [
+          [
+            "warehouse-central/site-sfo-05/EU-NORTH",
+            "6"
+          ],
+          [
+            "warehouse-central/site-sfo-05/EU-NORTH",
+            "6"
+          ],
+          [
+            "warehouse-east/site-ber-06/AP-SOUTH",
+            "6"
+          ],
+          [
+            "warehouse-west/site-dub-07/AP-EAST",
+            "6"
+          ],
+          [
+            "warehouse-west/site-dub-07/AP-EAST",
+            "6"
+          ],
+          [
+            "warehouse-north/site-sin-08/SA-EAST",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q498",
+      "sql": "SELECT _timestamp, REPLACE(REPLACE(COALESCE(resource_path, ''), '/logs/', ''), '/data/', '') AS clean_resource, action_category FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND resource_path IS NOT NULL ORDER BY clean_resource ASC, _timestamp ASC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29819000000,
+        "end_offset": 29893000000
+      },
+      "expected": {
+        "columns": [
+          "clean_resource",
+          "action_category"
+        ],
+        "results": [
+          [
+            "/config/zone/ZONE-3.yaml",
+            "performanceMetric"
+          ],
+          [
+            "sorter/output.dat",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q499",
+      "sql": "SELECT _timestamp, (CASE WHEN re_match(os_platform, 'Android') THEN 'Android' WHEN re_match(os_platform, 'iPhone|iOS|Mac OS X') THEN 'iOS' WHEN re_match(os_platform, 'Windows') THEN 'Windows' ELSE COALESCE(os_platform, 'Other') END) AS platform_group, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY platform_group ASC, _timestamp ASC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 29879000000,
+        "end_offset": 29953000000
+      },
+      "expected": {
+        "columns": [
+          "platform_group",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "Android",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "Android",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "Windows",
+            "itemPage",
+            "12"
+          ],
+          [
+            "Windows",
+            "itemPage",
+            "12"
           ]
         ],
         "results_mode": "rowsort"

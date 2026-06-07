@@ -213,7 +213,7 @@ def translate_oo_to_duckdb(sql: str) -> tuple[str, bool]:
 
     Returns (translated_sql, has_oo_specific_functions).
     """
-    s = sql.replace("{stream}", STREAM)
+    s = sql.replace("{stream}", STREAM).replace("{stream2}", "logs2")
 
     # Check for OO-specific functions before translation
     has_oo = _has_oo_specific_functions(s)
@@ -319,6 +319,11 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
         f"CREATE OR REPLACE VIEW logs AS "
         f"SELECT * FROM _logs WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
     )
+    # Cross-stream: second stream view (same time window, offset=7 data)
+    con.execute(
+        f"CREATE OR REPLACE VIEW logs2 AS "
+        f"SELECT * FROM _logs2 WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
+    )
 
     duck_sql, has_oo = translate_oo_to_duckdb(q["sql"])
 
@@ -395,25 +400,28 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
 def main():
     print("Generating dataset in DuckDB...")
-    records = build_dataset()
+    records1 = build_dataset()
+    records2 = build_dataset(stream_offset=7)
     con = duckdb.connect(":memory:")
 
-    jsonl_str = "\n".join(json.dumps(r) for r in records)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
-        tf.write(jsonl_str)
-        tmp_path = tf.name
+    for label, records in [("_logs", records1), ("_logs2", records2)]:
+        jsonl_str = "\n".join(json.dumps(r) for r in records)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
+            tf.write(jsonl_str)
+            tmp_path = tf.name
 
-    try:
-        # Load into _logs (underscore — "logs" is the per-query view)
-        con.execute(
-            "CREATE TABLE _logs AS SELECT * FROM read_json_auto(?)",
-            [tmp_path],
-        )
-    finally:
-        Path(tmp_path).unlink()
+        try:
+            con.execute(
+                f"CREATE TABLE {label} AS SELECT * FROM read_json_auto(?)",
+                [tmp_path],
+            )
+        finally:
+            Path(tmp_path).unlink()
+
+        count = con.execute(f"SELECT COUNT(*) FROM {label}").fetchone()[0]
+        print(f"Loaded {label}: {count} records")
 
     total = con.execute("SELECT COUNT(*) FROM _logs").fetchone()[0]
-    print(f"Loaded {total} records")
 
     # Persist the BASE_TS so the test harness uses the same value.
     # Without this, a minute-boundary crossing between compute and test

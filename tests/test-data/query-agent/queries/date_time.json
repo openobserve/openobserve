@@ -492,16 +492,7 @@
         "results": [
           [
             "1780736700000000",
-            "ZONE-3",
-            "1",
-            "610.0",
-            "28.9",
-            "95.0",
-            "60"
-          ],
-          [
-            "1780736700000000",
-            "ZONE-4",
+            "ZONE-2",
             "1",
             "480.0",
             "24.8",
@@ -519,12 +510,21 @@
           ],
           [
             "1780736700000000",
-            "ZONE-2",
+            "ZONE-4",
             "1",
             "480.0",
             "24.8",
             "88.7",
             "275"
+          ],
+          [
+            "1780736700000000",
+            "ZONE-3",
+            "1",
+            "610.0",
+            "28.9",
+            "95.0",
+            "60"
           ],
           [
             "1780736640000000",
@@ -546,21 +546,21 @@
           ],
           [
             "1780736640000000",
-            "ZONE-1",
-            "1",
-            "900.0",
-            "30.1",
-            "42.5",
-            "88"
-          ],
-          [
-            "1780736640000000",
             "ZONE-2",
             "1",
             "150.0",
             "35.7",
             "58.0",
             "155"
+          ],
+          [
+            "1780736640000000",
+            "ZONE-1",
+            "1",
+            "900.0",
+            "30.1",
+            "42.5",
+            "88"
           ],
           [
             "1780736580000000",
@@ -570,15 +570,6 @@
             "26.3",
             "25.0",
             "460"
-          ],
-          [
-            "1780736580000000",
-            "ZONE-3",
-            "1",
-            "840.0",
-            "40.0",
-            "33.3",
-            "50"
           ],
           [
             "1780736580000000",
@@ -597,6 +588,15 @@
             "22.0",
             "10.0",
             "200"
+          ],
+          [
+            "1780736580000000",
+            "ZONE-3",
+            "1",
+            "840.0",
+            "40.0",
+            "33.3",
+            "50"
           ]
         ],
         "results_mode": "rowsort"
@@ -727,16 +727,16 @@
         ],
         "results": [
           [
-            "performanceMetric",
-            "4",
-            "1780743180000000",
-            "1780743252000000"
-          ],
-          [
             "navigation",
             "2",
             "1780743234000000",
             "1780743240000000"
+          ],
+          [
+            "performanceMetric",
+            "4",
+            "1780743180000000",
+            "1780743252000000"
           ]
         ],
         "results_mode": "rowsort"
@@ -984,6 +984,269 @@
         ],
         "results_mode": "rowsort",
         "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q453",
+      "sql": "SELECT (_timestamp / 3600000000) * 3600000000 AS hour_bucket, action_category, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category IS NOT NULL GROUP BY hour_bucket, action_category ORDER BY hour_bucket ASC, cnt DESC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27119000000,
+        "end_offset": 27193000000
+      },
+      "expected": {
+        "columns": [
+          "hour_bucket",
+          "action_category",
+          "cnt"
+        ],
+        "results": [
+          [
+            "1780752480000000.0",
+            "interaction",
+            "1"
+          ],
+          [
+            "1780752492000000.0",
+            "performanceMetric",
+            "1"
+          ],
+          [
+            "1780752498000000.0",
+            "performanceMetric",
+            "1"
+          ],
+          [
+            "1780752516000000.0",
+            "navigation",
+            "1"
+          ],
+          [
+            "1780752534000000.0",
+            "performanceMetric",
+            "1"
+          ],
+          [
+            "1780752540000000.0",
+            "performanceMetric",
+            "1"
+          ],
+          [
+            "1780752552000000.0",
+            "performanceMetric",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q454",
+      "sql": "SELECT (_timestamp / 60000000) * 60000000 AS minute_bucket, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY minute_bucket ORDER BY minute_bucket ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27179000000,
+        "end_offset": 27253000000
+      },
+      "expected": {
+        "columns": [
+          "minute_bucket",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "1780752540000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780752552000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780752558000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780752576000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780752594000000.0",
+            "1",
+            "1"
+          ],
+          [
+            "1780752600000000.0",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q455",
+      "sql": "SELECT _timestamp, action_category, page_slug FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10 OFFSET 2",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27239000000,
+        "end_offset": 27313000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q456",
+      "sql": "SELECT (CASE WHEN _timestamp % 60000000 < 30000000 THEN 'first_half' ELSE 'second_half' END) AS half_of_minute, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY half_of_minute ORDER BY half_of_minute ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27299000000,
+        "end_offset": 27373000000
+      },
+      "expected": {
+        "columns": [
+          "half_of_minute",
+          "cnt"
+        ],
+        "results": [
+          [
+            "first_half",
+            "2"
+          ],
+          [
+            "second_half",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q457",
+      "sql": "SELECT _timestamp, (LEAD(_timestamp) OVER (ORDER BY _timestamp) - _timestamp) / 1000 AS gap_ms FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27359000000,
+        "end_offset": 27433000000
+      },
+      "expected": {
+        "skip_sqllogictest": true,
+        "skip_row_count": false,
+        "columns": [
+          "gap_ms"
+        ],
+        "row_count": 0
+      }
+    },
+    {
+      "id": "Q458",
+      "sql": "SELECT page_slug, MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen, (MAX(_timestamp) - MIN(_timestamp)) / 1000000 AS duration_seconds FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND page_slug IS NOT NULL GROUP BY page_slug ORDER BY duration_seconds DESC, page_slug ASC",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27419000000,
+        "end_offset": 27493000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "first_seen",
+          "last_seen",
+          "duration_seconds"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "1780752780000000",
+            "1780752852000000",
+            "72.0"
+          ],
+          [
+            "checkoutPage",
+            "1780752792000000",
+            "1780752798000000",
+            "6.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q459",
+      "sql": "SELECT _timestamp, page_slug, (ROW_NUMBER() OVER (PARTITION BY page_slug ORDER BY _timestamp) - 1) * 18000 AS ms_since_first FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND page_slug IS NOT NULL ORDER BY page_slug ASC, _timestamp ASC LIMIT 15",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27479000000,
+        "end_offset": 27553000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "ms_since_first"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "0"
+          ],
+          [
+            "itemPage",
+            "18000"
+          ],
+          [
+            "itemPage",
+            "36000"
+          ],
+          [
+            "itemPage",
+            "54000"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q460",
+      "sql": "SELECT _timestamp, action_category, page_slug, visitor_session_id FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp ASC LIMIT 5 OFFSET 0",
+      "category": "date_time",
+      "time_offset": {
+        "start_offset": 27539000000,
+        "end_offset": 27613000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "navigation",
+            "itemPage",
+            "sess_005"
+          ],
+          [
+            "navigation",
+            "itemPage",
+            "sess_005"
+          ]
+        ],
+        "results_mode": "rowsort"
       }
     }
   ],

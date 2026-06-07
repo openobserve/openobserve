@@ -71,12 +71,17 @@
         ],
         "results": [
           [
-            "SORT-X1",
+            "SORT-Q5",
+            "auto",
+            "2"
+          ],
+          [
+            "SORT-M3",
             "manual",
             "2"
           ],
           [
-            "SORT-Z9",
+            "SORT-X1",
             "manual",
             "2"
           ],
@@ -84,20 +89,15 @@
             "SORT-A7",
             "auto",
             "2"
-          ],
-          [
-            "SORT-X1",
-            "hybrid",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "hybrid",
-            "1"
           ],
           [
             "SORT-M3",
             "auto",
+            "1"
+          ],
+          [
+            "SORT-A7",
+            "hybrid",
             "1"
           ]
         ],
@@ -1726,6 +1726,186 @@
             "itemPage",
             "E009",
             "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q485",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 ORDER BY latency_ms ASC, _timestamp ASC, page_slug ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29039000000,
+        "end_offset": 29113000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "checkoutPage",
+            "567"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q486",
+      "sql": "SELECT _timestamp, visitor_session_id, pallet_id, throughput_rate FROM \"{stream}\" ORDER BY throughput_rate DESC, pallet_id ASC, _timestamp ASC LIMIT 8 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29099000000,
+        "end_offset": 29173000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "PL-007",
+            "900.0"
+          ],
+          [
+            "sess_001",
+            "PL-003",
+            "610.0"
+          ],
+          [
+            "sess_005",
+            "PL-002",
+            "480.0"
+          ],
+          [
+            "sess_005",
+            "PL-004",
+            "480.0"
+          ],
+          [
+            "sess_003",
+            "PL-001",
+            "320.0"
+          ],
+          [
+            "sess_004",
+            "PL-006",
+            "150.0"
+          ],
+          [
+            "sess_004",
+            "PL-008",
+            "150.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q487",
+      "sql": "SELECT _timestamp, visitor_session_id, pallet_id, throughput_rate FROM \"{stream}\" ORDER BY throughput_rate DESC, pallet_id ASC, _timestamp ASC LIMIT 5 OFFSET 3",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29159000000,
+        "end_offset": 29233000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "pallet_id",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "PL-003",
+            "610.0"
+          ],
+          [
+            "sess_001",
+            "PL-005",
+            "610.0"
+          ],
+          [
+            "sess_005",
+            "PL-004",
+            "480.0"
+          ],
+          [
+            "sess_002",
+            "PL-008",
+            "290.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q488",
+      "sql": "SELECT _timestamp, action_category, page_slug, latency_ms FROM \"{stream}\" WHERE org_name = 'warehouse-east' ORDER BY (CASE WHEN action_category = 'performanceMetric' THEN 0 ELSE 1 END) ASC, latency_ms DESC NULLS LAST, _timestamp ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29219000000,
+        "end_offset": 29293000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "page_slug",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "itemPage",
+            "1900"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q489",
+      "sql": "SELECT _timestamp, page_slug, COUNT(*) OVER () AS total_rows, ROW_NUMBER() OVER (ORDER BY _timestamp) AS row_num FROM \"{stream}\" WHERE action_category = 'navigation' ORDER BY _timestamp ASC LIMIT 5 OFFSET 0",
+      "category": "pagination",
+      "time_offset": {
+        "start_offset": 29279000000,
+        "end_offset": 29353000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "total_rows",
+          "row_num"
+        ],
+        "results": [
+          [
+            "homePage",
+            "2",
+            "1"
+          ],
+          [
+            "itemPage",
+            "2",
+            "2"
           ]
         ],
         "results_mode": "rowsort"

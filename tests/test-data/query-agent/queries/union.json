@@ -115,22 +115,22 @@
         "results": [
           [
             "SORT-A7",
-            "auto",
-            "2"
-          ],
-          [
-            "SORT-A7",
             "hybrid",
             "2"
           ],
           [
-            "SORT-M3",
+            "SORT-A7",
             "auto",
             "2"
           ],
           [
             "SORT-M3",
             "manual",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "auto",
             "2"
           ],
           [
@@ -432,14 +432,14 @@
         ],
         "results": [
           [
-            "PL-006",
-            "ZONE-4",
+            "PL-004",
+            "ZONE-2",
             "88.1",
             "day_shift"
           ],
           [
-            "PL-004",
-            "ZONE-2",
+            "PL-006",
+            "ZONE-4",
             "88.1",
             "day_shift"
           ],
@@ -447,6 +447,12 @@
             "PL-002",
             "ZONE-4",
             "55.2",
+            "day_shift"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "33.0",
             "day_shift"
           ],
           [
@@ -458,24 +464,18 @@
           [
             "PL-007",
             "ZONE-1",
-            "33.0",
-            "day_shift"
-          ],
-          [
-            "PL-007",
-            "ZONE-1",
             "94.6",
-            "night_shift"
-          ],
-          [
-            "PL-005",
-            "ZONE-3",
-            "72.8",
             "night_shift"
           ],
           [
             "PL-003",
             "ZONE-1",
+            "72.8",
+            "night_shift"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
             "72.8",
             "night_shift"
           ],
@@ -988,12 +988,12 @@
           ],
           [
             "desktop",
-            "navigation",
+            "performanceMetric",
             "1"
           ],
           [
             "desktop",
-            "performanceMetric",
+            "navigation",
             "1"
           ]
         ],
@@ -1017,17 +1017,17 @@
         "results": [
           [
             "errors",
+            "E001",
+            "1"
+          ],
+          [
+            "errors",
             "E009",
             "1"
           ],
           [
             "errors",
             "E003",
-            "1"
-          ],
-          [
-            "errors",
-            "E001",
             "1"
           ],
           [
@@ -1239,6 +1239,262 @@
           [
             "UP-E003",
             "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q500",
+      "sql": "SELECT 'error_bucket' AS source, error_code AS label, COUNT(*) AS cnt FROM \"{stream}\" WHERE error_code IS NOT NULL GROUP BY error_code UNION ALL SELECT 'response_bucket' AS source, CAST(response_code AS VARCHAR) AS label, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY response_code ORDER BY source ASC, cnt DESC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 29939000000,
+        "end_offset": 30013000000
+      },
+      "expected": {
+        "columns": [
+          "source",
+          "label",
+          "cnt"
+        ],
+        "results": [
+          [
+            "error_bucket",
+            "E004",
+            "2"
+          ],
+          [
+            "error_bucket",
+            "E002",
+            "2"
+          ],
+          [
+            "error_bucket",
+            "E005",
+            "1"
+          ],
+          [
+            "error_bucket",
+            "E001",
+            "1"
+          ],
+          [
+            "error_bucket",
+            "E003",
+            "1"
+          ],
+          [
+            "response_bucket",
+            "503",
+            "2"
+          ],
+          [
+            "response_bucket",
+            "400",
+            "1"
+          ],
+          [
+            "response_bucket",
+            "401",
+            "1"
+          ],
+          [
+            "response_bucket",
+            "500",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q501",
+      "sql": "SELECT page_slug, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'navigation' AND page_slug IS NOT NULL GROUP BY page_slug UNION ALL SELECT page_slug, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'interaction' AND page_slug IS NOT NULL GROUP BY page_slug ORDER BY cnt DESC, page_slug ASC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 29999000000,
+        "end_offset": 30073000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "2"
+          ],
+          [
+            "homePage",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q502",
+      "sql": "SELECT action_category, 'min' AS stat, ROUND(MIN(CAST(latency_ms AS FLOAT)), 1) AS val FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY action_category UNION ALL SELECT action_category, 'max' AS stat, ROUND(MAX(CAST(latency_ms AS FLOAT)), 1) AS val FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY action_category UNION ALL SELECT action_category, 'avg' AS stat, ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS val FROM \"{stream}\" WHERE latency_ms > 0 GROUP BY action_category ORDER BY action_category ASC, stat ASC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 30059000000,
+        "end_offset": 30133000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "stat",
+          "val"
+        ],
+        "results": [
+          [
+            "interaction",
+            "avg",
+            "1076.7"
+          ],
+          [
+            "interaction",
+            "max",
+            "3200.0"
+          ],
+          [
+            "interaction",
+            "min",
+            "15.0"
+          ],
+          [
+            "navigation",
+            "avg",
+            "78.0"
+          ],
+          [
+            "navigation",
+            "max",
+            "78.0"
+          ],
+          [
+            "navigation",
+            "min",
+            "78.0"
+          ],
+          [
+            "performanceMetric",
+            "avg",
+            "956.0"
+          ],
+          [
+            "performanceMetric",
+            "max",
+            "1900.0"
+          ],
+          [
+            "performanceMetric",
+            "min",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q503",
+      "sql": "SELECT 'high_tput' AS label, COUNT(*) AS cnt, ROUND(AVG(CAST(throughput_rate AS FLOAT)), 1) AS avg_val FROM \"{stream}\" WHERE throughput_rate > 500 UNION ALL SELECT 'low_tput' AS label, COUNT(*) AS cnt, ROUND(AVG(CAST(throughput_rate AS FLOAT)), 1) AS avg_val FROM \"{stream}\" WHERE throughput_rate <= 500 UNION ALL SELECT 'high_load' AS label, COUNT(*) AS cnt, ROUND(AVG(CAST(load_factor AS FLOAT)), 1) AS avg_val FROM \"{stream}\" WHERE load_factor > 50 ORDER BY label ASC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 30119000000,
+        "end_offset": 30193000000
+      },
+      "expected": {
+        "columns": [
+          "label",
+          "cnt",
+          "avg_val"
+        ],
+        "results": [
+          [
+            "high_load",
+            "4",
+            "83.5"
+          ],
+          [
+            "high_tput",
+            "3",
+            "648.3"
+          ],
+          [
+            "low_tput",
+            "4",
+            "317.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q504",
+      "sql": "SELECT component_name, COUNT(*) AS cnt FROM \"{stream}\" WHERE component_name IN ('sorter-engine', 'conveyor-driver', 'zone-controller', 'scan-hub') AND action_category = 'performanceMetric' GROUP BY component_name UNION ALL SELECT component_name, COUNT(*) AS cnt FROM \"{stream}\" WHERE component_name IN ('track-router', 'batch-sync', 'pallet-mapper', 'lane-monitor') AND action_category = 'performanceMetric' GROUP BY component_name ORDER BY cnt DESC, component_name ASC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 30179000000,
+        "end_offset": 30253000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "2"
+          ],
+          [
+            "lane-monitor",
+            "2"
+          ],
+          [
+            "pallet-mapper",
+            "1"
+          ],
+          [
+            "track-router",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q505",
+      "sql": "SELECT 'Mobile' AS platform_type, COUNT(*) AS cnt, ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS avg_lat FROM \"{stream}\" WHERE device_type = 'Mobile' AND latency_ms > 0 UNION ALL SELECT 'Computer' AS platform_type, COUNT(*) AS cnt, ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS avg_lat FROM \"{stream}\" WHERE device_type = 'Computer' AND latency_ms > 0 UNION ALL SELECT 'Tablet' AS platform_type, COUNT(*) AS cnt, ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS avg_lat FROM \"{stream}\" WHERE device_type = 'Tablet' AND latency_ms > 0 ORDER BY platform_type ASC",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 30239000000,
+        "end_offset": 30313000000
+      },
+      "expected": {
+        "columns": [
+          "platform_type",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "Computer",
+            "3",
+            "220.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "2550.0"
+          ],
+          [
+            "Tablet",
+            "0",
+            "None"
           ]
         ],
         "results_mode": "rowsort"

@@ -32,6 +32,7 @@ from data_gen import BASE_TS, build_dataset  # noqa: E402
 # the same environment.
 import os as _os
 STREAM = f"query_agent_test_{BASE_TS}_{_os.getpid()}"
+STREAM2 = f"query_agent_test2_{BASE_TS}_{_os.getpid()}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ def run_query(client, query, *, skip_fts_count=False):
     qid = query["id"]
     size = 500
     offset = query["time_offset"]
-    sql = query["sql"].replace("{stream}", STREAM)
+    sql = query["sql"].replace("{stream}", STREAM).replace("{stream2}", STREAM2)
     json_data = search_payload(
         sql,
         start_time=BASE_TS + offset["start_offset"],
@@ -219,29 +220,38 @@ def _run_content_assertions(query, sql, hits):
 # ── Session fixture: ingest data (no flush) ────────────────────────────────
 @pytest.fixture(scope="session")
 def ingest_query_agent_data():
-    """Ingest deterministic data and wait for it to be searchable.
+    """Ingest deterministic data into both streams and wait for searchability.
 
-    Does NOT flush — the data stays in memtable for the pre-flush phase.
-    The post-flush phase triggers its own flush + re-poll.
+    Does NOT flush — data stays in memtable for the pre-flush phase.
+    Stream 2 uses stream_offset=7 for different but join-key-overlapping data.
     """
 
     client = OpenObserveClient()
-    stream = STREAM
 
-    # Generate data in-memory — no external JSON file dependency
-    records = build_dataset()
-    data = json.dumps(records)
-
-    resp = client.post(f"{stream}/_json", data=data,
-                       headers={"Content-Type": "application/json"})
-    if resp.status_code == 200:
-        logging.info("Ingested %d generated records (%d bytes)", len(records), len(data))
+    # Stream 1 (primary)
+    records1 = build_dataset()
+    data1 = json.dumps(records1)
+    resp1 = client.post(f"{STREAM}/_json", data=data1,
+                        headers={"Content-Type": "application/json"})
+    if resp1.status_code == 200:
+        logging.info("Stream1: ingested %d records (%d bytes)", len(records1), len(data1))
     else:
-        pytest.fail(f"Ingestion failed: {resp.status_code} — {resp.text[:300]}")
+        pytest.fail(f"Stream1 ingestion failed: {resp1.status_code} — {resp1.text[:300]}")
 
-    # Poll until all records are searchable (no flush — memtable only)
-    expected = len(records)
-    _max_ts = max(r["_timestamp"] for r in records)
+    # Stream 2 (secondary, offset=7 for different but overlapping join keys)
+    records2 = build_dataset(stream_offset=7)
+    data2 = json.dumps(records2)
+    resp2 = client.post(f"{STREAM2}/_json", data=data2,
+                        headers={"Content-Type": "application/json"})
+    if resp2.status_code == 200:
+        logging.info("Stream2: ingested %d records (%d bytes)", len(records2), len(data2))
+    else:
+        pytest.fail(f"Stream2 ingestion failed: {resp2.status_code} — {resp2.text[:300]}")
+
+    # Poll until all records from BOTH streams are searchable
+    all_records = records1 + records2
+    expected = len(all_records)
+    _max_ts = max(r["_timestamp"] for r in all_records)
 
     def _data_is_searchable():
         now = datetime.now(UTC)
@@ -249,7 +259,7 @@ def ingest_query_agent_data():
         start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
         payload = {
             "query": {
-                "sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": start_us,
                 "end_time": end_us,
                 "from": 0,
@@ -260,11 +270,11 @@ def ingest_query_agent_data():
         if r.status_code != 200:
             return False
         hits = r.json().get("hits", [])
-        if not (hits and hits[0].get("c", 0) >= expected):
+        if not (hits and hits[0].get("c", 0) >= len(records1)):
             return False
         tail_payload = {
             "query": {
-                "sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": _max_ts - 60_000_000,
                 "end_time": _max_ts + 60_000_000,
                 "from": 0,
@@ -278,5 +288,5 @@ def ingest_query_agent_data():
         return bool(thits and thits[0].get("c", 0) >= 1)
 
     wait_until(_data_is_searchable, timeout=300, interval=1.0,
-               msg=f"{stream} data not searchable ({expected} records)")
-    logging.info("%s data is searchable (%d records)", stream, expected)
+               msg=f"Stream data not searchable ({len(records1)} records)")
+    logging.info("Both streams data is searchable (%d + %d records)", len(records1), len(records2))

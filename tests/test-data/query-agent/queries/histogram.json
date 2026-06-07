@@ -291,16 +291,16 @@
           ],
           [
             "2026-06-06T07:20:00",
-            "SORT-A7",
+            "SORT-Z9",
             "2",
-            "190.0",
+            "150.0",
             "290.0"
           ],
           [
             "2026-06-06T07:20:00",
-            "SORT-Z9",
+            "SORT-A7",
             "2",
-            "150.0",
+            "190.0",
             "290.0"
           ]
         ],
@@ -397,10 +397,10 @@
         "results": [
           [
             "2026-06-06T07:24:00",
-            "LANE-B",
-            "auto",
+            "LANE-C",
+            "manual",
             "1",
-            "4.0"
+            "2.0"
           ],
           [
             "2026-06-06T07:24:00",
@@ -411,10 +411,10 @@
           ],
           [
             "2026-06-06T07:24:00",
-            "LANE-C",
-            "manual",
+            "LANE-B",
+            "auto",
             "1",
-            "2.0"
+            "4.0"
           ],
           [
             "2026-06-06T07:24:00",
@@ -439,17 +439,17 @@
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-D",
-            "hybrid",
+            "LANE-B",
+            "manual",
             "1",
             "2.0"
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-A",
-            "auto",
+            "LANE-D",
+            "manual",
             "1",
-            "1.0"
+            "3.0"
           ],
           [
             "2026-06-06T07:27:00",
@@ -467,17 +467,17 @@
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-B",
-            "manual",
+            "LANE-D",
+            "hybrid",
             "1",
             "2.0"
           ],
           [
             "2026-06-06T07:27:00",
-            "LANE-D",
-            "manual",
+            "LANE-A",
+            "auto",
             "1",
-            "3.0"
+            "1.0"
           ],
           [
             "2026-06-06T07:27:00",
@@ -893,11 +893,6 @@
         "results": [
           [
             "2026-06-06T11:32:00",
-            "ResourceExhaustedExc...",
-            "2"
-          ],
-          [
-            "2026-06-06T11:32:00",
             "SecurityException: u...",
             "1"
           ],
@@ -910,6 +905,11 @@
             "2026-06-06T11:32:00",
             "NetworkException: co...",
             "1"
+          ],
+          [
+            "2026-06-06T11:32:00",
+            "ResourceExhaustedExc...",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1174,22 +1174,22 @@
         "results": [
           [
             "2026-06-06T11:42:00",
-            "500",
-            "2"
-          ],
-          [
-            "2026-06-06T11:42:00",
             "401",
             "2"
           ],
           [
             "2026-06-06T11:42:00",
-            "503",
+            "403",
             "1"
           ],
           [
             "2026-06-06T11:42:00",
-            "403",
+            "500",
+            "2"
+          ],
+          [
+            "2026-06-06T11:42:00",
+            "503",
             "1"
           ]
         ],
@@ -1245,13 +1245,13 @@
         "results": [
           [
             "2026-06-06T11:44:00",
-            "fast",
-            "1"
+            "slow",
+            "2"
           ],
           [
             "2026-06-06T11:44:00",
-            "slow",
-            "2"
+            "fast",
+            "1"
           ],
           [
             "2026-06-06T11:45:00",
@@ -1282,6 +1282,289 @@
           ],
           [
             "2026-06-06T11:46:00",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q471",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, org_name, COUNT(*) AS cnt FROM \"{stream}\" WHERE org_name IS NOT NULL GROUP BY _time, org_name ORDER BY _time ASC, org_name ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28199000000,
+        "end_offset": 28273000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "org_name",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:46:00",
+            "warehouse-central",
+            "1"
+          ],
+          [
+            "2026-06-06T13:46:00",
+            "warehouse-east",
+            "1"
+          ],
+          [
+            "2026-06-06T13:46:00",
+            "warehouse-north",
+            "1"
+          ],
+          [
+            "2026-06-06T13:46:00",
+            "warehouse-south",
+            "2"
+          ],
+          [
+            "2026-06-06T13:46:00",
+            "warehouse-west",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q472",
+      "sql": "SELECT histogram(_timestamp, '1 minutes') AS _time, device_type, COUNT(*) AS cnt, COUNT(DISTINCT visitor_session_id) AS users FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY _time, device_type ORDER BY _time ASC, device_type ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28259000000,
+        "end_offset": 28333000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "device_type",
+          "cnt",
+          "users"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:47:00",
+            "Mobile",
+            "1",
+            "1"
+          ],
+          [
+            "2026-06-06T13:48:00",
+            "Tablet",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q473",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, (CASE WHEN response_code < 400 THEN 'success' ELSE 'error' END) AS outcome, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY _time, outcome ORDER BY _time ASC, outcome ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28319000000,
+        "end_offset": 28393000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "outcome",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:48:00",
+            "error",
+            "5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q474",
+      "sql": "SELECT histogram(_timestamp, '5 minutes') AS _time, COUNT(*) AS cnt FROM \"{stream}\" WHERE action_category = 'interaction' GROUP BY _time ORDER BY _time ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28379000000,
+        "end_offset": 28453000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:50:00",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q475",
+      "sql": "SELECT histogram(_timestamp, '1 minutes') AS _time, action_subcategory, ROUND(AVG(CAST(latency_ms AS FLOAT)), 1) AS avg_lat, COUNT(*) AS cnt FROM \"{stream}\" WHERE latency_ms > 0 AND action_subcategory IS NOT NULL GROUP BY _time, action_subcategory ORDER BY _time ASC, cnt DESC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28439000000,
+        "end_offset": 28513000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "action_subcategory",
+          "avg_lat",
+          "cnt"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:50:00",
+            "vitalsInp",
+            "2766.7",
+            "3"
+          ],
+          [
+            "2026-06-06T13:50:00",
+            "vitalsLcp",
+            "322.5",
+            "2"
+          ],
+          [
+            "2026-06-06T13:51:00",
+            "vitalsInp",
+            "1900.0",
+            "1"
+          ],
+          [
+            "2026-06-06T13:51:00",
+            "vitalsCls",
+            "15.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q476",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, page_slug, MIN(CAST(latency_ms AS FLOAT)) AS min_lat, MAX(CAST(latency_ms AS FLOAT)) AS max_lat FROM \"{stream}\" WHERE latency_ms > 0 AND page_slug IS NOT NULL GROUP BY _time, page_slug ORDER BY _time ASC, min_lat ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28499000000,
+        "end_offset": 28573000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "page_slug",
+          "min_lat",
+          "max_lat"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:50:00",
+            "itemPage",
+            "12.0",
+            "1900.0"
+          ],
+          [
+            "2026-06-06T13:50:00",
+            "searchPage",
+            "15.0",
+            "15.0"
+          ],
+          [
+            "2026-06-06T13:52:00",
+            "itemPage",
+            "45.0",
+            "45.0"
+          ],
+          [
+            "2026-06-06T13:52:00",
+            "searchPage",
+            "230.0",
+            "230.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q477",
+      "sql": "SELECT histogram(_timestamp, '1 minutes') AS _time, COUNT(*) AS total, COUNT(CASE WHEN error_code IS NOT NULL THEN 1 END) AS errors FROM \"{stream}\" WHERE action_category = 'performanceMetric' GROUP BY _time ORDER BY _time ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28559000000,
+        "end_offset": 28633000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "total",
+          "errors"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:52:00",
+            "4",
+            "4"
+          ],
+          [
+            "2026-06-06T13:53:00",
+            "2",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q478",
+      "sql": "SELECT histogram(_timestamp, '2 minutes') AS _time, guard_mode, COUNT(*) AS cnt, COUNT(DISTINCT component_name) AS components FROM \"{stream}\" WHERE guard_mode IS NOT NULL GROUP BY _time, guard_mode ORDER BY _time ASC, guard_mode ASC",
+      "category": "histogram",
+      "time_offset": {
+        "start_offset": 28619000000,
+        "end_offset": 28693000000
+      },
+      "expected": {
+        "columns": [
+          "_time",
+          "guard_mode",
+          "cnt",
+          "components"
+        ],
+        "results": [
+          [
+            "2026-06-06T13:52:00",
+            "active",
+            "2",
+            "2"
+          ],
+          [
+            "2026-06-06T13:52:00",
+            "passive",
+            "3",
+            "2"
+          ],
+          [
+            "2026-06-06T13:54:00",
+            "disabled",
+            "1",
+            "1"
+          ],
+          [
+            "2026-06-06T13:54:00",
+            "passive",
+            "1",
             "1"
           ]
         ],
