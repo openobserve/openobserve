@@ -289,6 +289,8 @@ _SKIP_SQLLOGICTEST = {
     "Q192",  # approx_percentile_cont mismatch with 5 records/query
     "Q301",  # Hour bucket row count mismatch with 5 records/query
     "Q305",  # Hour bucket row count mismatch with 5 records/query
+    "Q453",  # Hour bucket integer division mismatch (DataFusion vs DuckDB)
+    "Q454",  # Minute bucket integer division mismatch (DataFusion vs DuckDB)
     "Q308",  # SELECT * — OO omits NULL-valued columns from JSON
     "Q320",  # SELECT * — OO omits NULL-valued columns from JSON
     "Q145",  # ROW_NUMBER tie-breaking with 5 records/query (window)

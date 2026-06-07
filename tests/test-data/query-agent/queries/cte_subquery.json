@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "2",
-            "1",
-            "0",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-3",
             "2",
             "0",
             "1",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "1",
+            "0",
             "66.66999816894531"
           ],
           [
@@ -1242,14 +1242,14 @@
             "258.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "620.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "94.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "620.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1409,15 +1409,6 @@
             "26.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
-            "auto",
-            "2",
-            "437.5",
-            "45.3",
-            "32.5"
-          ],
-          [
             "ZONE-3",
             "SORT-X1",
             "manual",
@@ -1425,6 +1416,15 @@
             "437.5",
             "72.8",
             "19.2"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "auto",
+            "2",
+            "437.5",
+            "45.3",
+            "32.5"
           ],
           [
             "ZONE-4",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1753,12 +1753,12 @@
         ],
         "results": [
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
@@ -1814,7 +1814,7 @@
         ],
         "results": [
           [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "2"
           ],
@@ -1824,7 +1824,7 @@
             "2"
           ],
           [
-            "navigation",
+            "performanceMetric",
             "itemPage",
             "2"
           ],
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
@@ -2152,11 +2152,6 @@
             "1"
           ],
           [
-            "performanceMetric",
-            "cartPage",
-            "1"
-          ],
-          [
             "navigation",
             "itemPage",
             "1"
@@ -2164,6 +2159,11 @@
           [
             "performanceMetric",
             "checkoutPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ]
         ],
@@ -2193,13 +2193,13 @@
             "2"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"

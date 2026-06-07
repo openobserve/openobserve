@@ -368,7 +368,7 @@
           [
             "CC-DELTA",
             "SORT-M3",
-            "auto, manual",
+            "manual, auto",
             "3"
           ],
           [
@@ -902,20 +902,6 @@
         "results": [
           [
             "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "auto",
-            "SORT-ZONE-2",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-1",
             "manual",
             "SORT-ZONE-1",
             "58",
@@ -929,9 +915,30 @@
             "2"
           ],
           [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
+            "29",
+            "2"
+          ],
+          [
             "ZONE-2",
             "manual",
             "SORT-ZONE-2",
+            "58",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
             "58",
             "1"
           ],
@@ -940,13 +947,6 @@
             "hybrid",
             "SORT-ZONE-3",
             "29",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "58",
             "1"
           ],
           [
@@ -992,11 +992,11 @@
         ],
         "results": [
           [
-            "MergeBatch",
-            "MERGEB",
+            "SearchItems",
+            "SEARCH",
             "False",
             "2",
-            "3200.0"
+            "45.0"
           ],
           [
             "ArchiveLog",
@@ -1006,18 +1006,18 @@
             "1900.0"
           ],
           [
+            "MergeBatch",
+            "MERGEB",
+            "False",
+            "2",
+            "3200.0"
+          ],
+          [
             "UpdateBatch",
             "UPDATE",
             "False",
             "2",
             "230.0"
-          ],
-          [
-            "SearchItems",
-            "SEARCH",
-            "False",
-            "2",
-            "45.0"
           ],
           [
             "RetryScan",
@@ -1027,11 +1027,11 @@
             "15.0"
           ],
           [
-            "DeleteRecord",
-            "DELETE",
+            "SyncZone",
+            "SYNCZO",
             "False",
             "1",
-            "1450.0"
+            "12.0"
           ],
           [
             "CheckThreshold",
@@ -1041,11 +1041,11 @@
             "78.0"
           ],
           [
-            "SyncZone",
-            "SYNCZO",
+            "DeleteRecord",
+            "DELETE",
             "False",
             "1",
-            "12.0"
+            "1450.0"
           ],
           [
             "RerouteTrack",
@@ -1076,6 +1076,27 @@
         ],
         "results": [
           [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-2-MAN",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
             "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
@@ -1083,18 +1104,18 @@
             "60.0"
           ],
           [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
+            "AP-SOUTH-ZONE-2-AUT",
             "1",
             "0",
-            "88.0"
+            "0",
+            "500.0"
           ],
           [
-            "US-EAST-ZONE-4-HYB",
+            "AP-EAST-ZONE-3-MAN",
+            "1",
             "1",
             "0",
-            "0",
-            "155.0"
+            "50.0"
           ],
           [
             "US-EAST-ZONE-2-AUT",
@@ -1125,20 +1146,6 @@
             "200.0"
           ],
           [
-            "AP-SOUTH-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "500.0"
-          ],
-          [
-            "AP-EAST-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
             "EU-WEST-ZONE-2-MAN",
             "1",
             "1",
@@ -1153,25 +1160,18 @@
             "120.0"
           ],
           [
-            "US-WEST-ZONE-1-AUT",
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
             "1",
             "0",
-            "0",
-            "410.0"
+            "88.0"
           ],
           [
-            "EU-WEST-ZONE-4-AUT",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-2-MAN",
+            "US-EAST-ZONE-4-HYB",
             "1",
             "0",
             "0",
-            "120.0"
+            "155.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,12 +1433,12 @@
         ],
         "results": [
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "checkoutPage",
             "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ],
           [
             "searchPage",

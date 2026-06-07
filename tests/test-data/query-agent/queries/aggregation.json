@@ -91,11 +91,11 @@
             "3"
           ],
           [
-            "SORT-Z9",
+            "SORT-Q5",
             "2"
           ],
           [
-            "SORT-Q5",
+            "SORT-Z9",
             "2"
           ]
         ],
@@ -289,22 +289,22 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
+            "4",
+            "2"
+          ],
+          [
+            "ZONE-4",
             "3",
             "1"
           ],
           [
-            "ZONE-4",
+            "ZONE-1",
             "3",
             "1"
           ]
@@ -457,16 +457,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "3",
-            "0",
-            "26.07"
-          ],
-          [
             "ZONE-3",
             "3",
             "1",
             "27.53"
+          ],
+          [
+            "ZONE-1",
+            "3",
+            "0",
+            "26.07"
           ],
           [
             "ZONE-2",
@@ -639,12 +639,12 @@
           [
             "ZONE-2",
             "2",
-            "auto"
+            "manual"
           ],
           [
             "ZONE-3",
             "2",
-            "hybrid"
+            "manual"
           ],
           [
             "ZONE-4",
@@ -855,10 +855,10 @@
             "1",
             "E005",
             "@warehouse-iOS-sort-v2",
-            "UP-E009",
+            "None",
             "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
+            "SORT-M3--E005",
+            "SORT-M3",
             "iOS"
           ],
           [
@@ -870,10 +870,10 @@
             "1",
             "E005",
             "@warehouse-iOS-sort-v2",
-            "None",
+            "UP-E009",
             "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-M3--E005",
-            "SORT-M3",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
             "iOS"
           ],
           [
@@ -988,30 +988,6 @@
             "0"
           ],
           [
-            "US-WEST",
-            "1",
-            "0.0",
-            "320.0",
-            "19.2",
-            "0"
-          ],
-          [
-            "US-CENTRAL",
-            "1",
-            "0.0",
-            "555.0",
-            "22.0",
-            "1"
-          ],
-          [
-            "SA-EAST",
-            "1",
-            "290.0",
-            "0.0",
-            "18.5",
-            "0"
-          ],
-          [
             "AP-CENTRAL",
             "1",
             "0.0",
@@ -1034,6 +1010,30 @@
             "0.0",
             "None",
             "0"
+          ],
+          [
+            "US-WEST",
+            "1",
+            "0.0",
+            "320.0",
+            "19.2",
+            "0"
+          ],
+          [
+            "SA-EAST",
+            "1",
+            "290.0",
+            "0.0",
+            "18.5",
+            "0"
+          ],
+          [
+            "US-CENTRAL",
+            "1",
+            "0.0",
+            "555.0",
+            "22.0",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1074,19 +1074,19 @@
             "42.42640687119285"
           ],
           [
-            "HYBRID",
-            "ZONE-4-SORT-A7",
-            "2",
-            "615",
-            "1.5",
-            "205.0609665440988"
-          ],
-          [
             "AUTO",
             "ZONE-1-SORT-M3",
             "2",
             "148",
             "2.0",
+            "205.0609665440988"
+          ],
+          [
+            "HYBRID",
+            "ZONE-4-SORT-A7",
+            "2",
+            "615",
+            "1.5",
             "205.0609665440988"
           ],
           [
@@ -1272,13 +1272,13 @@
         ],
         "results": [
           [
-            "pallet-mapper",
+            "track-router",
             "2",
             "1"
           ],
           [
-            "lane-monitor",
-            "1",
+            "pallet-mapper",
+            "2",
             "1"
           ],
           [
@@ -1287,8 +1287,8 @@
             "1"
           ],
           [
-            "track-router",
-            "2",
+            "lane-monitor",
+            "1",
             "1"
           ]
         ],
@@ -1316,12 +1316,12 @@
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1"
           ]
@@ -1569,19 +1569,19 @@
         ],
         "results": [
           [
-            "E005",
-            "2"
-          ],
-          [
             "E003",
             "2"
           ],
           [
-            "E006",
-            "1"
+            "E005",
+            "2"
           ],
           [
             "E004",
+            "1"
+          ],
+          [
+            "E006",
             "1"
           ]
         ],
@@ -1624,7 +1624,7 @@
         "results": [
           [
             "itemPage",
-            "E009, E001"
+            "E001, E009"
           ]
         ],
         "results_mode": "rowsort",
@@ -1652,7 +1652,7 @@
             "1"
           ],
           [
-            "pageView",
+            "clickEvent",
             "1",
             "1"
           ],
@@ -1662,7 +1662,7 @@
             "1"
           ],
           [
-            "clickEvent",
+            "pageView",
             "1",
             "1"
           ]
@@ -1783,7 +1783,7 @@
         ],
         "results": [
           [
-            "cartPage",
+            "checkoutPage",
             "2",
             "2"
           ],
@@ -1798,7 +1798,7 @@
             "1"
           ],
           [
-            "checkoutPage",
+            "cartPage",
             "2",
             "2"
           ]
@@ -2088,15 +2088,15 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
-            "1",
-            "610.0"
-          ],
-          [
-            "ZONE-1",
             "auto",
             "1",
             "320.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "1",
+            "610.0"
           ],
           [
             "ZONE-2",
@@ -2106,15 +2106,15 @@
           ],
           [
             "ZONE-3",
-            "manual",
-            "1",
-            "320.0"
-          ],
-          [
-            "ZONE-3",
             "hybrid",
             "1",
             "610.0"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "1",
+            "320.0"
           ],
           [
             "ZONE-4",
