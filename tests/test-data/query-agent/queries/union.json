@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -1261,22 +1261,22 @@
         "results": [
           [
             "error_bucket",
-            "E004",
-            "2"
-          ],
-          [
-            "error_bucket",
             "E002",
             "2"
           ],
           [
             "error_bucket",
-            "E005",
-            "1"
+            "E004",
+            "2"
           ],
           [
             "error_bucket",
             "E001",
+            "1"
+          ],
+          [
+            "error_bucket",
+            "E005",
             "1"
           ],
           [

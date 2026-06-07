@@ -1218,9 +1218,9 @@
         ],
         "results": [
           [
-            "batch-sync",
+            "track-router",
             "100.0",
-            "1"
+            "2"
           ],
           [
             "lane-monitor",
@@ -1233,9 +1233,9 @@
             "2"
           ],
           [
-            "track-router",
+            "batch-sync",
             "100.0",
-            "2"
+            "1"
           ]
         ],
         "results_mode": "rowsort"

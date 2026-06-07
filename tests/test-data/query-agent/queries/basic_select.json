@@ -1699,11 +1699,7 @@
         ],
         "results": [
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "2"
-          ],
-          [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
           [
@@ -1711,7 +1707,11 @@
             "2"
           ],
           [
-            "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ]
         ],

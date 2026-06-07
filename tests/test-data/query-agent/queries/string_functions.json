@@ -362,19 +362,19 @@
           [
             "CC-BETA",
             "SORT-X1",
-            "hybrid, manual",
+            "manual, hybrid",
             "4"
+          ],
+          [
+            "CC-DELTA",
+            "SORT-M3",
+            "auto, manual",
+            "3"
           ],
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
             "auto, manual",
-            "3"
-          ],
-          [
-            "CC-DELTA",
-            "SORT-M3",
-            "manual, auto",
             "3"
           ]
         ],
@@ -901,6 +901,13 @@
         ],
         "results": [
           [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
             "ZONE-4",
             "auto",
             "SORT-ZONE-4",
@@ -912,13 +919,6 @@
             "manual",
             "SORT-ZONE-1",
             "58",
-            "2"
-          ],
-          [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "29",
             "2"
           ],
           [
@@ -937,22 +937,8 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-3",
             "manual",
             "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
             "29",
             "1"
           ],
@@ -968,6 +954,20 @@
             "manual",
             "SORT-ZONE-2",
             "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
             "1"
           ]
         ],
@@ -992,11 +992,11 @@
         ],
         "results": [
           [
-            "SearchItems",
-            "SEARCH",
+            "ArchiveLog",
+            "ARCHIV",
             "False",
             "2",
-            "45.0"
+            "1900.0"
           ],
           [
             "MergeBatch",
@@ -1006,11 +1006,18 @@
             "3200.0"
           ],
           [
-            "ArchiveLog",
-            "ARCHIV",
+            "UpdateBatch",
+            "UPDATE",
             "False",
             "2",
-            "1900.0"
+            "230.0"
+          ],
+          [
+            "SearchItems",
+            "SEARCH",
+            "False",
+            "2",
+            "45.0"
           ],
           [
             "RetryScan",
@@ -1020,18 +1027,18 @@
             "15.0"
           ],
           [
-            "UpdateBatch",
-            "UPDATE",
-            "False",
-            "2",
-            "230.0"
-          ],
-          [
             "SyncZone",
             "SYNCZO",
             "False",
             "1",
             "12.0"
+          ],
+          [
+            "CheckThreshold",
+            "CHECKT",
+            "False",
+            "1",
+            "78.0"
           ],
           [
             "DeleteRecord",
@@ -1046,13 +1053,6 @@
             "False",
             "1",
             "567.0"
-          ],
-          [
-            "CheckThreshold",
-            "CHECKT",
-            "False",
-            "1",
-            "78.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1076,11 +1076,18 @@
         ],
         "results": [
           [
-            "EU-NORTH-ZONE-1-MAN",
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
             "1",
             "0",
             "0",
-            "60.0"
+            "120.0"
           ],
           [
             "AP-CENTRAL-ZONE-3-MAN",
@@ -1095,27 +1102,6 @@
             "0",
             "0",
             "155.0"
-          ],
-          [
-            "US-WEST-ZONE-1-AUT",
-            "1",
-            "0",
-            "0",
-            "410.0"
-          ],
-          [
-            "EU-WEST-ZONE-4-AUT",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-2-MAN",
-            "1",
-            "0",
-            "0",
-            "120.0"
           ],
           [
             "US-EAST-ZONE-2-AUT",
@@ -1153,25 +1139,39 @@
             "50.0"
           ],
           [
-            "EU-WEST-ZONE-2-MAN",
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ],
+          [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
             "1",
             "1",
             "0",
             "275.0"
           ],
           [
-            "SA-EAST-ZONE-4-HYB",
+            "SA-EAST-ZONE-2-MAN",
             "1",
             "0",
             "0",
             "120.0"
           ],
           [
-            "US-CENTRAL-ZONE-3-HYB",
+            "EU-NORTH-ZONE-1-MAN",
             "1",
             "0",
             "0",
-            "200.0"
+            "60.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1441,12 +1441,12 @@
             "E005"
           ],
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "checkoutPage",
             "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ]
         ],
         "results_mode": "rowsort"

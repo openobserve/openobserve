@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -1232,24 +1232,24 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
           ],
           [
-            "ZONE-3",
-            "3",
-            "94.0"
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-2",
             "3",
             "620.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "94.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1508,14 +1508,14 @@
             "88.1"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
             "1",
             "150.0",
@@ -1753,12 +1753,12 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
@@ -2006,13 +2006,13 @@
             "1"
           ],
           [
-            "fast",
-            "client_error",
+            "degraded",
+            "ok",
             "1"
           ],
           [
-            "degraded",
-            "ok",
+            "fast",
+            "client_error",
             "1"
           ]
         ],
@@ -2153,17 +2153,17 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "searchPage",
             "1"
           ],
           [
             "performanceMetric",
             "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ]
         ],
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"
