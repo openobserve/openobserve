@@ -104,7 +104,7 @@
     },
     {
       "id": "Q126",
-      "sql": "SELECT sorter_model, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY sorter_model, operation_mode HAVING COUNT(*) > 0 UNION ALL SELECT NULL AS sorter_model, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" WHERE throughput_rate >= 800.0 GROUP BY operation_mode ORDER BY cnt DESC LIMIT 8",
+      "sql": "SELECT sorter_model, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY sorter_model, operation_mode HAVING COUNT(*) > 0 UNION ALL SELECT NULL AS sorter_model, operation_mode, COUNT(*) AS cnt FROM \"{stream}\" WHERE throughput_rate >= 800.0 GROUP BY operation_mode ORDER BY cnt DESC, sorter_model ASC LIMIT 8",
       "category": "union",
       "expected": {
         "columns": [
@@ -114,28 +114,23 @@
         ],
         "results": [
           [
-            "SORT-Z9",
-            "manual",
-            "2"
-          ],
-          [
             "SORT-A7",
-            "auto",
-            "2"
-          ],
-          [
-            "SORT-M3",
-            "auto",
-            "2"
-          ],
-          [
-            "None",
             "auto",
             "2"
           ],
           [
             "SORT-A7",
             "hybrid",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-M3",
+            "auto",
             "2"
           ],
           [
@@ -144,8 +139,13 @@
             "2"
           ],
           [
-            "SORT-M3",
+            "SORT-Z9",
             "manual",
+            "2"
+          ],
+          [
+            "None",
+            "auto",
             "2"
           ],
           [
@@ -811,14 +811,14 @@
         "results": [
           [
             "AP-CENTRAL",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "900.0",
             "94.6"
           ],
           [
             "AP-CENTRAL",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "900.0",
             "94.6"
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
@@ -988,12 +988,12 @@
           ],
           [
             "desktop",
-            "navigation",
+            "performanceMetric",
             "1"
           ],
           [
             "desktop",
-            "performanceMetric",
+            "navigation",
             "1"
           ]
         ],
@@ -1168,6 +1168,11 @@
           ],
           [
             "component_err",
+            "batch-sync",
+            "2"
+          ],
+          [
+            "component_err",
             "pallet-mapper",
             "1"
           ],
@@ -1175,11 +1180,6 @@
             "component_err",
             "track-router",
             "1"
-          ],
-          [
-            "component_err",
-            "batch-sync",
-            "2"
           ]
         ],
         "results_mode": "rowsort"

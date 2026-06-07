@@ -37,18 +37,6 @@
             "4"
           ],
           [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
             "SORT-X1",
             "900.0",
             "1",
@@ -83,6 +71,18 @@
             "150.0",
             "3",
             "3"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
           ],
           [
             "SORT-Q5",
@@ -191,6 +191,30 @@
         ],
         "results": [
           [
+            "ZONE-4",
+            "88.1",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "55.2",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-4",
+            "45.3",
+            "3",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "21.4",
+            "4",
+            "4"
+          ],
+          [
             "ZONE-1",
             "99.0",
             "1",
@@ -225,30 +249,6 @@
             "12.5",
             "3",
             "3"
-          ],
-          [
-            "ZONE-4",
-            "88.1",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "55.2",
-            "2",
-            "2"
-          ],
-          [
-            "ZONE-4",
-            "45.3",
-            "3",
-            "3"
-          ],
-          [
-            "ZONE-4",
-            "21.4",
-            "4",
-            "4"
           ],
           [
             "ZONE-3",
@@ -373,7 +373,7 @@
     },
     {
       "id": "Q139",
-      "sql": "SELECT facility_zone, sorter_model, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY COUNT(*) DESC) AS rn FROM \"{stream}\" GROUP BY facility_zone, sorter_model ORDER BY facility_zone ASC, rn ASC",
+      "sql": "SELECT facility_zone, sorter_model, COUNT(*) AS cnt, ROW_NUMBER() OVER (PARTITION BY facility_zone ORDER BY COUNT(*) DESC, sorter_model ASC) AS rn FROM \"{stream}\" GROUP BY facility_zone, sorter_model ORDER BY facility_zone ASC, rn ASC",
       "category": "window",
       "expected": {
         "columns": [
@@ -1065,7 +1065,7 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
+            "manual",
             "2",
             "4",
             "50.0",
@@ -1073,7 +1073,7 @@
           ],
           [
             "ZONE-3",
-            "manual",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1081,7 +1081,7 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
+            "auto",
             "2",
             "4",
             "50.0",
@@ -1089,7 +1089,7 @@
           ],
           [
             "ZONE-4",
-            "auto",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1226,7 +1226,7 @@
     },
     {
       "id": "Q147",
-      "sql": "SELECT _timestamp, pallet_id, build_signature, runtime_hours, LAG(runtime_hours, 2, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours) AS hours_2_back, LEAD(runtime_hours, 2, 9999) OVER (PARTITION BY build_signature ORDER BY runtime_hours) AS hours_2_ahead, ROUND(runtime_hours - LAG(runtime_hours, 1, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours), 1) AS delta_from_prev FROM \"{stream}\" WHERE runtime_hours IS NOT NULL ORDER BY build_signature ASC, runtime_hours ASC",
+      "sql": "SELECT _timestamp, pallet_id, build_signature, runtime_hours, LAG(runtime_hours, 2, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours, pallet_id ASC) AS hours_2_back, LEAD(runtime_hours, 2, 9999) OVER (PARTITION BY build_signature ORDER BY runtime_hours, pallet_id ASC) AS hours_2_ahead, ROUND(runtime_hours - LAG(runtime_hours, 1, 0) OVER (PARTITION BY build_signature ORDER BY runtime_hours, pallet_id ASC), 1) AS delta_from_prev FROM \"{stream}\" WHERE runtime_hours IS NOT NULL ORDER BY build_signature ASC, runtime_hours ASC, pallet_id ASC",
       "category": "window",
       "expected": {
         "columns": [
@@ -1273,13 +1273,13 @@
             "168"
           ],
           [
-            "PL-007",
+            "PL-001",
             "BS-2026-A1",
             "168",
             "9999"
           ],
           [
-            "PL-001",
+            "PL-007",
             "BS-2026-A1",
             "168",
             "9999"
@@ -1291,13 +1291,13 @@
             "500"
           ],
           [
-            "PL-008",
+            "PL-002",
             "BS-2026-B2",
             "500",
             "1000"
           ],
           [
-            "PL-002",
+            "PL-008",
             "BS-2026-B2",
             "500",
             "9999"
