@@ -53,13 +53,13 @@
             "66.66999816894531"
           ],
           [
-            "ZONE-4",
+            "ZONE-3",
             "5",
             "2",
             "40.0"
           ],
           [
-            "ZONE-3",
+            "ZONE-4",
             "5",
             "2",
             "40.0"
@@ -1522,7 +1522,428 @@
         "start_offset": 3659000000,
         "end_offset": 3823000000
       }
+    },
+    {
+      "id": "Q156",
+      "sql": "WITH extracted AS (SELECT _timestamp, sorter_model, array_extract(regexp_match(event_detail, 'batch ([A-Z0-9]+)'), 1) AS batch_id, array_extract(regexp_match(event_detail, 'segment ([0-9]+)'), 1) AS segment_nbr, array_extract(regexp_match(event_detail, 'track ([A-Za-z0-9-]+)'), 1) AS track_id FROM \"{stream}\" WHERE event_detail LIKE '%sorter batch%'), with_batch_flag AS (SELECT _timestamp, batch_id, sorter_model, segment_nbr, track_id, CASE WHEN array_extract(regexp_match(track_id, '([A-Z]+)'), 1) = 'TRK' THEN 'batch' ELSE 'non batch' END AS is_batch, concat('srt', lpad(CAST(segment_nbr AS VARCHAR), 5, '0'), '#', track_id) AS sorterWithTrackId FROM extracted), recovered_status AS (SELECT wbf.batch_id, wbf.sorter_model, wbf.segment_nbr, wbf.track_id, wbf.is_batch, wbf.sorterWithTrackId, CASE WHEN ack.ack_detail IS NOT NULL AND ack.ack_detail != '' THEN 'received' ELSE 'notreceived' END AS ack_status FROM with_batch_flag wbf LEFT JOIN (SELECT ack_detail FROM \"{stream}\" WHERE ack_detail IS NOT NULL AND ack_detail != '' AND str_match_ignore_case(ack_detail, 'ACK batch')) ack ON ack.ack_detail LIKE concat('%batchIdList:%', wbf.batch_id, '%') WHERE wbf.is_batch = 'batch') SELECT array_agg('batch_id-' || batch_id || ', sorter_model-' || sorter_model || ', segment_nbr-' || segment_nbr || ', track_id-' || track_id || ', is_batch-' || is_batch || ', sorterWithTrackId-' || sorterWithTrackId || ', ack_status-' || ack_status) AS results, COUNT(*) AS event_count FROM recovered_status HAVING COUNT(*) > 0",
+      "category": "cte_subquery",
+      "expected": {
+        "columns": [
+          "results",
+          "event_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true
+      },
+      "time_offset": {
+        "start_offset": 9299000000,
+        "end_offset": 9463000000
+      }
+    },
+    {
+      "id": "Q160",
+      "sql": "SELECT dependency, statuscode FROM (SELECT array_extract(regexp_match(log_message, 'responseCode:\\\\W(?<statuscode>[^,]+)'), 1) AS statuscode, array_extract(regexp_match(log_message, 'name: [A-Z]+\\\\W(https:\\\\/\\\\/[a-zA-Z0-9.-]+\\\\/[a-zA-Z0-9\\\\/-]+)'), 1) AS dependency FROM \"{stream}\" WHERE str_match_ignore_case(log_message, 'service.api.warehouse.com')) GROUP BY dependency, statuscode",
+      "category": "cte_subquery",
+      "expected": {
+        "columns": [
+          "dependency",
+          "statuscode"
+        ],
+        "note": "Subquery in FROM with regexp named groups, str_match_ignore_case"
+      },
+      "time_offset": {
+        "start_offset": 9539000000,
+        "end_offset": 9703000000
+      }
+    },
+    {
+      "id": "Q165",
+      "sql": "SELECT page_slug, \"key\", SUM(cnt) AS cnt FROM (   SELECT page_slug, visitor_session_id AS \"key\", COUNT(*) AS cnt   FROM \"{stream}\"   WHERE (match_all('warehouse') AND page_slug = 'itemPage')     AND uri_path LIKE '%api%'     AND (visitor_session_id IS NOT NULL AND visitor_session_id != 'null')     AND (lower(graphql_operation) IN (       'updateitems','placeorder','verifypayment','updatecart','createaccount'     ))     AND lower(user_agent_str) NOT LIKE '%bot%'     AND lower(user_agent_str) NOT LIKE '%test%'   GROUP BY \"key\", page_slug, geo_country, geo_user_type   HAVING ((geo_user_type IS NULL OR geo_user_type != 'hosting') AND geo_country = 'US' AND COUNT(*) > 1)     OR ((geo_user_type = 'hosting' OR geo_country != 'US') AND COUNT(*) > 0) ) sub GROUP BY page_slug, \"key\" ORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 9839000000,
+        "end_offset": 10003000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "key",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "sess_003",
+            "3"
+          ],
+          [
+            "itemPage",
+            "sess_001",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q173",
+      "sql": "SELECT page_slug, \"key\", SUM(cnt) AS cnt\nFROM (\n  SELECT page_slug, visitor_session_id AS \"key\", COUNT(*) AS cnt\n  FROM \"{stream}\"\n  WHERE (match_all('warehouse') AND page_slug = 'itemPage')\n    AND uri_path LIKE '%api%'\n    AND (visitor_session_id IS NOT NULL AND visitor_session_id != 'null')\n    AND (lower(graphql_operation) IN (\n      'updateitems','placeorder','verifypayment','updatecart','createaccount',\n      'getinventory','createcontract','createcreditcard','createdeliveryaddress',\n      'updatequantity','movesfltocart'\n    ))\n    AND lower(user_agent_str) NOT LIKE '%bot%'\n    AND lower(user_agent_str) NOT LIKE '%test%'\n    AND lower(user_agent_str) NOT LIKE '%curl%'\n  GROUP BY \"key\", page_slug, geo_country, geo_user_type\n  HAVING ((geo_user_type IS NULL OR geo_user_type != 'hosting') AND geo_country = 'US' AND COUNT(*) > 1)\n    OR ((geo_user_type = 'hosting' OR geo_country != 'US') AND COUNT(*) > 0)\n) sub\nGROUP BY page_slug, \"key\"\nORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10319000000,
+        "end_offset": 10483000000
+      },
+      "expected": {
+        "columns": [
+          "page_slug",
+          "key",
+          "cnt"
+        ],
+        "results": [
+          [
+            "itemPage",
+            "sess_001",
+            "3"
+          ],
+          [
+            "itemPage",
+            "sess_003",
+            "3"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q174",
+      "sql": "SELECT graphql_operation, COALESCE(visitor_session_id, 'N/A') AS visitor_session_id, COUNT(*) AS row_count\nFROM \"{stream}\"\nWHERE graphql_operation = 'verifyPayment'\n  AND (passthrough_flag <> 'true')\n  AND (passthrough_flag <> '')\n  AND (passthrough_flag IS NOT NULL)\n  AND ((visitor_session_id NOT IN ('sess_001', 'sess_003') OR visitor_session_id IS NULL))\n  AND ((NOT (LOWER(user_agent_str) LIKE 'curl%') OR user_agent_str IS NULL))\n  AND (info_tag IS NULL OR info_tag NOT LIKE '%Allowlisted%')\nGROUP BY graphql_operation, visitor_session_id\nHAVING (COUNT(*) > 1)\nORDER BY row_count DESC\nLIMIT 5",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10379000000,
+        "end_offset": 10543000000
+      },
+      "expected": {
+        "columns": [
+          "graphql_operation",
+          "visitor_session_id",
+          "row_count"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q184",
+      "sql": "WITH base AS (\n  SELECT _timestamp, facility_zone, sorter_model,\n    operation_mode, throughput_rate, load_factor, cell_temp\n  FROM \"{stream}\"\n  WHERE load_factor > 10.0\n    AND throughput_rate >= 100.0\n),\naggregated AS (\n  SELECT facility_zone, sorter_model, operation_mode,\n    COUNT(*) AS cnt,\n    AVG(throughput_rate) AS avg_throughput,\n    MAX(load_factor) AS max_load,\n    MIN(cell_temp) AS min_temp\n  FROM base\n  GROUP BY facility_zone, sorter_model, operation_mode\n  HAVING COUNT(*) >= 1\n)\nSELECT a.facility_zone, a.sorter_model, a.operation_mode,\n  a.cnt, a.avg_throughput, a.max_load, a.min_temp\nFROM aggregated a\nORDER BY a.avg_throughput DESC, a.cnt DESC\nLIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 10979000000,
+        "end_offset": 11143000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "operation_mode",
+          "cnt",
+          "avg_throughput",
+          "max_load",
+          "min_temp"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "hybrid",
+            "3",
+            "840.0",
+            "94.6",
+            "19.2"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "manual",
+            "3",
+            "725.0",
+            "88.1",
+            "35.7"
+          ],
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "manual",
+            "6",
+            "610.0",
+            "99.0",
+            "22.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "auto",
+            "2",
+            "610.0",
+            "72.8",
+            "30.1"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5",
+            "manual",
+            "3",
+            "555.0",
+            "67.9",
+            "28.9"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "hybrid",
+            "3",
+            "480.0",
+            "55.2",
+            "26.3"
+          ],
+          [
+            "ZONE-3",
+            "SORT-M3",
+            "auto",
+            "2",
+            "290.0",
+            "45.3",
+            "24.8"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "auto",
+            "6",
+            "170.0",
+            "21.4",
+            "18.5"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q185",
+      "sql": "WITH ranked AS (\n  SELECT _timestamp, facility_zone, operation_mode,\n    throughput_rate, load_factor,\n    ROW_NUMBER() OVER (\n      PARTITION BY facility_zone\n      ORDER BY throughput_rate DESC\n    ) AS rn\n  FROM \"{stream}\"\n  WHERE load_factor > 20.0\n)\nSELECT facility_zone, operation_mode,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  MAX(load_factor) AS max_load\nFROM ranked\nWHERE rn <= 5\nGROUP BY facility_zone, operation_mode\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11039000000,
+        "end_offset": 11203000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "operation_mode",
+          "cnt",
+          "avg_throughput",
+          "max_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "manual",
+            "3",
+            "900.0",
+            "99.0"
+          ],
+          [
+            "ZONE-2",
+            "hybrid",
+            "2",
+            "840.0",
+            "94.6"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "3",
+            "725.0",
+            "88.1"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "610.0",
+            "72.8"
+          ],
+          [
+            "ZONE-4",
+            "manual",
+            "3",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "3",
+            "480.0",
+            "55.2"
+          ],
+          [
+            "ZONE-3",
+            "auto",
+            "2",
+            "290.0",
+            "45.3"
+          ],
+          [
+            "ZONE-1",
+            "auto",
+            "2",
+            "190.0",
+            "21.4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q186",
+      "sql": "WITH combined_data AS (\n  SELECT facility_zone, sorter_model, throughput_rate, load_factor, 'high_tput' AS source\n  FROM \"{stream}\"\n  WHERE throughput_rate >= 500.0 AND load_factor > 20.0\n  UNION ALL\n  SELECT facility_zone, sorter_model, throughput_rate, load_factor, 'low_tput' AS source\n  FROM \"{stream}\"\n  WHERE throughput_rate < 200.0 AND load_factor > 20.0\n)\nSELECT facility_zone, sorter_model, source,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  AVG(load_factor) AS avg_load\nFROM combined_data\nGROUP BY facility_zone, sorter_model, source\nHAVING COUNT(*) >= 1\nORDER BY cnt DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11099000000,
+        "end_offset": 11263000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "sorter_model",
+          "source",
+          "cnt",
+          "avg_throughput",
+          "avg_load"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "SORT-A7",
+            "high_tput",
+            "6",
+            "870.0",
+            "96.80000000000001"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Q5",
+            "high_tput",
+            "3",
+            "555.0",
+            "67.9"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "high_tput",
+            "3",
+            "725.0",
+            "88.09999999999998"
+          ],
+          [
+            "ZONE-1",
+            "SORT-X1",
+            "low_tput",
+            "3",
+            "190.0",
+            "21.399999999999995"
+          ],
+          [
+            "ZONE-4",
+            "SORT-Z9",
+            "high_tput",
+            "2",
+            "610.0",
+            "72.8"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q187",
+      "sql": "SELECT facility_zone, op_mode, COUNT(*) AS cnt,\n  AVG(avg_tput) AS overall_avg_tput,\n  SUM(cnt_rows) AS total_rows\nFROM (\n  SELECT facility_zone, op_mode,\n    AVG(throughput_rate) AS avg_tput,\n    COUNT(*) AS cnt_rows\n  FROM (\n    SELECT facility_zone,\n      CASE\n        WHEN operation_mode = 'auto' THEN 'AUTO'\n        WHEN operation_mode = 'manual' THEN 'MANUAL'\n        ELSE 'OTHER'\n      END AS op_mode,\n      throughput_rate, load_factor\n    FROM \"{stream}\"\n    WHERE load_factor > 10.0\n  ) inner_q\n  GROUP BY facility_zone, op_mode\n  HAVING COUNT(*) >= 1\n) mid_q\nGROUP BY facility_zone, op_mode\nORDER BY overall_avg_tput DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 11159000000,
+        "end_offset": 11323000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "op_mode",
+          "cnt",
+          "overall_avg_tput",
+          "total_rows"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "OTHER",
+            "1",
+            "840.0",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "MANUAL",
+            "1",
+            "725.0",
+            "3"
+          ],
+          [
+            "ZONE-4",
+            "AUTO",
+            "1",
+            "610.0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "MANUAL",
+            "1",
+            "610.0",
+            "6"
+          ],
+          [
+            "ZONE-4",
+            "MANUAL",
+            "1",
+            "555.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "OTHER",
+            "1",
+            "480.0",
+            "3"
+          ],
+          [
+            "ZONE-3",
+            "AUTO",
+            "1",
+            "290.0",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "AUTO",
+            "1",
+            "170.0",
+            "6"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
-  "last_query_id": 62
+  "last_query_id": 204
 }

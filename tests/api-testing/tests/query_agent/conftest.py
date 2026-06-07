@@ -27,10 +27,11 @@ sys.path.insert(0, str(_DATA_DIR))
 from data_gen import BASE_TS, build_dataset  # noqa: E402
 
 # Tie stream name to BASE_TS (stable within a session: comes from
-# base_ts_override.json written by compute_counts.py).  Using time.time()
-# caused a 1-second race between pytest collection and fixture setup,
-# producing two different stream names in the same run.
-STREAM = f"query_agent_test_{BASE_TS // 1_000_000}"
+# base_ts_override.json written by compute_counts.py).  PID suffix
+# prevents data accumulation across multiple test invocations against
+# the same environment.
+import os as _os
+STREAM = f"query_agent_test_{BASE_TS}_{_os.getpid()}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────

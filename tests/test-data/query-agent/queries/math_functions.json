@@ -1353,6 +1353,140 @@
         "start_offset": 6059000000,
         "end_offset": 6223000000
       }
+    },
+    {
+      "id": "Q167",
+      "sql": "SELECT duration_range, COUNT(*) AS query_count,   approx_percentile_cont(CAST(resp_time AS FLOAT), 0.95) AS p95 FROM (   SELECT     CASE       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 240 THEN '1. p95_0h_4h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 240 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 720 THEN '2. p95_4h_12h'       WHEN ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) >= 720 AND ((MAX(lcp_micros) - MIN(lcp_micros)) / 60000000) < 1440 THEN '3. p95_12h_1d'       ELSE '4. p95_gt_1d'     END AS duration_range,     COUNT(_timestamp) AS query_count,     action_category,     MAX(cls_score) AS resp_time   FROM \"{stream}\"   WHERE action_category IN ('performanceMetric', 'navigationTiming')   GROUP BY action_category, _timestamp ) GROUP BY duration_range ORDER BY duration_range ASC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 9959000000,
+        "end_offset": 10123000000
+      },
+      "expected": {
+        "columns": [
+          "duration_range",
+          "query_count",
+          "p95"
+        ],
+        "results": [
+          [
+            "1. p95_0h_4h",
+            "17",
+            "0.30000001192092896"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q192",
+      "sql": "SELECT facility_zone,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.50) AS p50,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.90) AS p90,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.95) AS p95,\n  approx_percentile_cont(CAST(throughput_rate AS FLOAT), 0.99) AS p99,\n  approx_distinct(sorter_model) AS unique_sorters\nFROM \"{stream}\"\nWHERE throughput_rate > 0\nGROUP BY facility_zone\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 11459000000,
+        "end_offset": 11623000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "cnt",
+          "avg_throughput",
+          "p50",
+          "p90",
+          "p95",
+          "p99",
+          "unique_sorters"
+        ],
+        "results": [
+          [
+            "ZONE-2",
+            "9",
+            "686.6666666666666",
+            "840.0",
+            "900.0",
+            "900.0",
+            "900.0",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "5",
+            "577.0",
+            "555.0",
+            "610.0",
+            "610.0",
+            "610.0",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "5",
+            "404.0",
+            "480.0",
+            "480.0",
+            "480.0",
+            "480.0",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "9",
+            "355.0",
+            "190.0",
+            "725.0",
+            "725.0",
+            "725.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q193",
+      "sql": "SELECT\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH'\n    WHEN load_factor >= 40.0 THEN 'MED'\n    ELSE 'LOW'\n  END AS load_band,\n  COUNT(*) AS cnt,\n  AVG(throughput_rate) AS avg_throughput,\n  STDDEV(throughput_rate) AS stddev_throughput,\n  (MAX(throughput_rate) - MIN(throughput_rate)) AS tput_range,\n  SQRT(AVG(throughput_rate * throughput_rate) - AVG(throughput_rate) * AVG(throughput_rate)) AS computed_stddev\nFROM \"{stream}\"\nWHERE throughput_rate > 0\nGROUP BY\n  CASE\n    WHEN load_factor >= 70.0 THEN 'HIGH'\n    WHEN load_factor >= 40.0 THEN 'MED'\n    ELSE 'LOW'\n  END\nHAVING COUNT(*) >= 1\nORDER BY avg_throughput DESC",
+      "category": "math_functions",
+      "time_offset": {
+        "start_offset": 11519000000,
+        "end_offset": 11683000000
+      },
+      "expected": {
+        "columns": [
+          "load_band",
+          "cnt",
+          "avg_throughput",
+          "stddev_throughput",
+          "tput_range",
+          "computed_stddev"
+        ],
+        "results": [
+          [
+            "HIGH",
+            "11",
+            "783.1818181818181",
+            "109.89250946431079",
+            "290.0",
+            "104.77839661253782"
+          ],
+          [
+            "MED",
+            "8",
+            "460.625",
+            "110.88724968569264",
+            "265.0",
+            "103.72552422137957"
+          ],
+          [
+            "LOW",
+            "9",
+            "220.0",
+            "76.97402159170326",
+            "170.0",
+            "72.57180352359079"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ],
   "last_query_id": 102
