@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-test="llm-providers-settings" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
     <ProviderFormPage
       v-if="formPage"
@@ -171,6 +171,7 @@ import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/Provider
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -193,7 +194,7 @@ const columns = computed(() => [
     header: "#",
     accessorKey: "#",
     sortable: false,
-    size: 56,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" },
   },
   {
@@ -201,7 +202,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
+    size: COL.name,
     meta: { align: "left" },
   },
   {
@@ -209,7 +210,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.type"),
     accessorFn: (row: Provider) => providerTypeOf(row),
     sortable: true,
-    size: 140,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -217,7 +218,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.endpoint"),
     accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
     sortable: false,
-    size: 240,
+    size: COL.url,
     meta: { align: "left" },
   },
   {
@@ -233,7 +234,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.default"),
     accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
     sortable: true,
-    size: 110,
+    size: COL.toggle,
     meta: { align: "left" },
   },
   {

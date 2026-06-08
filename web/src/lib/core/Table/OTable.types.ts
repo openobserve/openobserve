@@ -3,6 +3,39 @@
 import type { Component } from "vue";
 import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
 
+// ─── Shared column size constants ────────────────────────────────
+export const TABLE_INDEX_COL_SIZE = 26;
+
+export const COL = {
+  name:         200,
+  firstName:    130,
+  lastName:     130,
+  email:        220,
+  description:  300,
+  status:       100,
+  toggle:        80,
+  date:         160,
+  duration:     120,
+  frequency:    130,
+  type:         120,
+  streamType:   120,
+  streamName:   180,
+  method:        80,
+  count:         90,
+  sizeBytes:    130,
+  url:          220,
+  template:     180,
+  owner:        150,
+  folder:       150,
+  role:         160,
+  authType:     100,
+  token:        200,
+  cron:         160,
+  price:        110,
+  defaultModel: 180,
+  version:      100,
+} as const;
+
 // ── Column Definition ────────────────────────────────────────────
 
 export interface OTableColumnMeta {
@@ -341,6 +374,8 @@ export interface OTableSlots<TData = any> {
   /** Toolbar rendered INSIDE the table's bordered frame, above the column
    *  header (search / filters / view controls). Reads as part of the table. */
   toolbar?: () => any;
+  /** Trailing toolbar actions rendered AFTER the auto-injected column toggle (e.g. a refresh button). */
+  "toolbar-trailing"?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;

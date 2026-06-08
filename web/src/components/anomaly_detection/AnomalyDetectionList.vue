@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -245,6 +245,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
@@ -277,7 +278,7 @@ export default defineComponent({
     const cancellingId = ref<string | null>(null);
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
       { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, meta: { align: "left" } },
       { id: "status", header: "Status", accessorKey: "status", sortable: true, meta: { align: "left" } },

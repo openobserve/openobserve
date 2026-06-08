@@ -8,6 +8,7 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
+const TABLE_CHECKBOX_COL_WIDTH = 26;
 
 const props = defineProps<{
   headerGroups: HeaderGroup<any>[];
@@ -270,7 +271,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:w-10 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px' }"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox
@@ -409,7 +411,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       />
       <th
         v-if="selectionMultiple"
-        class="tw:w-10 tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="tw:text-center tw:border-b tw:border-[var(--color-table-header-border)]"
+        :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px' }"
         data-test="o2-table-th-select"
       >
         <OTableSelectCheckbox

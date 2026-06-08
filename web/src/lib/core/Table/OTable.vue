@@ -469,11 +469,22 @@ defineExpose({
     >
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
-      v-if="slots.toolbar"
-      class="tw:flex tw:items-center tw:p-3 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      v-if="slots.toolbar || slots['toolbar-trailing']"
+      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:gap-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />
+      <OTableColumnToggle
+        v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
+        :columns="props.columns"
+        :column-visibility="internalColumnVisibility"
+        :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+        class="tw:shrink-0"
+        data-test="o2-table-column-toggle"
+        @update:column-visibility="handleColumnVisibilityChange"
+        @reset:column-sizes="handleResetColumnSizes"
+      />
+      <slot name="toolbar-trailing" />
     </div>
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
@@ -790,21 +801,10 @@ defineExpose({
       <!-- OTablePagination authoritatively swaps the slot for a skeleton when
            its `loading` prop is true, so we can always pass the slot. -->
       <template
-        v-if="slots.bottom || (props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction))"
+        v-if="slots.bottom"
         #actions
       >
-        <!-- Column visibility toggle in the footer left area -->
-        <OTableColumnToggle
-          v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-          @reset:column-sizes="handleResetColumnSizes"
-        />
         <slot
-          v-if="slots.bottom"
           name="bottom"
           :current-page="pagination.currentPage.value"
           :page-size="pagination.pageSize.value"

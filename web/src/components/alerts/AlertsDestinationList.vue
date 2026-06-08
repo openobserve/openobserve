@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -274,6 +274,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -310,7 +311,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -318,6 +319,7 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
+        size: COL.name,
         meta: { align: "left", autoWidth: true },
       },
       {
@@ -325,14 +327,14 @@ export default defineComponent({
         header: "Type",
         accessorKey: "type",
         sortable: true,
-        size: 180,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
-        size: 200,
+        size: COL.url,
         meta: { align: "left" },
       },
       {
@@ -340,7 +342,7 @@ export default defineComponent({
         header: t("alert_destinations.template"),
         accessorKey: "template",
         sortable: true,
-        size: 280,
+        size: COL.template,
         meta: { align: "left" },
       },
       {
@@ -348,7 +350,7 @@ export default defineComponent({
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
-        size: 150,
+        size: COL.method,
         meta: { align: "left" },
       },
       {

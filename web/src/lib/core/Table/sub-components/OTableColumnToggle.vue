@@ -57,7 +57,7 @@ function resetToDefault(): void {
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
       <OButton
-        variant="ghost"
+        variant="outline"
         size="sm"
         :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
         data-test="o2-table-column-toggle-btn"

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -474,6 +474,7 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -526,7 +527,7 @@ const columns = ref([
     id: "row_number",
     header: "#",
     accessorKey: "#",
-    size: 37,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" as const },
   },
   {

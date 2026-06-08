@@ -121,6 +121,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -154,7 +155,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 36,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 32,
         maxSize: 40,
         meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },

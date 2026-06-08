@@ -269,6 +269,7 @@ import {
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -331,7 +332,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 36,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 32,
         maxSize: 40,
         meta: { align: "left", compactPadding: true },
@@ -341,7 +342,7 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "email",
         sortable: true,
-        size: 550,
+        size: COL.email,
         meta: { align: "left" },
       },
       {
@@ -349,6 +350,7 @@ export default defineComponent({
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
+        size: COL.description,
         meta: { align: "left", autoWidth: true },
       },
       {
@@ -356,7 +358,7 @@ export default defineComponent({
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
-        size: 200,
+        size: COL.token,
         meta: { align: "left" },
       },
       {

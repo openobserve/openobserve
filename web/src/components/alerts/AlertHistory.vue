@@ -496,6 +496,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -543,7 +544,7 @@ const errorMessage = ref("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
-  { id: "#", header: "#", accessorKey: "#", size: 37, minSize: 37, maxSize: 37, sortable: false, meta: { align: "left" } },
+  { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, minSize: TABLE_INDEX_COL_SIZE, maxSize: TABLE_INDEX_COL_SIZE, sortable: false, meta: { align: "left" } },
   {
     id: "alert_name",
     header: t("alerts.alertName") || "Alert Name",
@@ -608,8 +609,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.duration") || "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: COL.duration,
+    maxSize: COL.duration,
     cell: " ",
     meta: { align: "right" },
   },
@@ -618,8 +619,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.status") || "Status",
     accessorKey: "status",
     sortable: true,
-    size: 150,
-    maxSize: 150,
+    size: COL.status,
+    maxSize: COL.status,
     cell: " ",
     meta: { align: "left" },
   },

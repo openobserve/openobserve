@@ -153,6 +153,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -178,7 +179,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -186,6 +187,7 @@ export default defineComponent({
         header: t("cipherKey.name"),
         accessorKey: "name",
         sortable: true,
+        size: COL.name,
         meta: { align: "left", autoWidth: true },
       },
       {
@@ -193,7 +195,7 @@ export default defineComponent({
         header: t("cipherKey.storeType"),
         accessorKey: "store_type",
         sortable: true,
-        size: 150,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -201,7 +203,7 @@ export default defineComponent({
         header: t("cipherKey.mechanismType"),
         accessorKey: "mechanism_type",
         sortable: true,
-        size: 150,
+        size: COL.type,
         meta: { align: "left" },
       },
       {

@@ -109,6 +109,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "InvitationList",
@@ -138,7 +139,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 48,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 40,
         maxSize: 64,
         meta: { align: "center", compactPadding: true },

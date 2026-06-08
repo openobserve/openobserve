@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -416,6 +416,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -560,7 +561,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: "#",
     accessorKey: "#",
     sortable: false,
-    size: 67,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" },
   };
   const nameColumn = {
@@ -576,6 +577,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.stream_name"),
     accessorKey: "stream_name",
     sortable: true,
+    size: COL.streamName,
     meta: { align: "left" },
   };
   const streamTypeColumn = {
@@ -583,6 +585,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("alerts.streamType"),
     accessorKey: "stream_type",
     sortable: true,
+    size: COL.streamType,
     meta: { align: "left" },
   };
   const frequencyColumn = {
@@ -590,6 +593,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.frequency"),
     accessorKey: "frequency",
     sortable: true,
+    size: COL.frequency,
     meta: { align: "left" },
   };
   const periodColumn = {
@@ -597,6 +601,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.period"),
     accessorKey: "period",
     sortable: true,
+    size: COL.frequency,
     meta: { align: "left" },
   };
   const cronColumn = {
@@ -604,6 +609,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.cron"),
     accessorKey: "cron",
     sortable: false,
+    size: COL.cron,
     meta: { align: "left" },
   };
   const typeColumn = {
@@ -611,6 +617,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.type"),
     accessorKey: "type",
     sortable: true,
+    size: COL.type,
     meta: { align: "left" },
   };
   const scheduledStreamTypeColumn = {

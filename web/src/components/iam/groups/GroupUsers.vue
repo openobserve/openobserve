@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -153,6 +153,7 @@ import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -230,7 +231,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },

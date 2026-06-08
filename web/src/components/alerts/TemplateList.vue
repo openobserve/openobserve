@@ -233,6 +233,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -248,7 +249,7 @@ const columns: OTableColumnDef[] = [
     id: "#",
     header: "#",
     accessorKey: "#",
-    size: 67,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" },
   },
   {

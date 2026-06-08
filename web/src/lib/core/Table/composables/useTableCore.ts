@@ -109,7 +109,7 @@ export function useTableCore<TData>(
             })
           : undefined,
         size: col.size ?? 150,
-        minSize: col.minSize ?? 40,
+        minSize: col.minSize ?? (col.size !== undefined && col.size < 40 ? col.size : 40),
         maxSize: col.maxSize ?? 800,
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
@@ -202,7 +202,7 @@ export function useTableCore<TData>(
       columnPinning.value = next;
     },
     defaultColumn: {
-      minSize: 40,
+      minSize: 20,
       maxSize: 800,
     },
     state: {

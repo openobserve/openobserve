@@ -329,6 +329,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -403,11 +404,11 @@ const confirmBulkDelete = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
-    { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "center" } },
-    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, meta: { align: "left" } },
+    { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
+    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, meta: { align: "left" } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: 150, meta: { align: "center" } },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: 300, meta: { align: "center" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: 220, meta: { align: "left" } },
+    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.date, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
 
@@ -420,7 +421,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       sortable: true,
       resizable: true,
       hideable: true,
-      size: 150,
+      size: COL.folder,
       meta: { align: "left" },
     });
   }

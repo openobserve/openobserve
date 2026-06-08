@@ -256,6 +256,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -367,7 +368,7 @@ export default defineComponent({
           id: "#",
           header: "#",
           accessorFn: (row: any) => row["#"],
-          size: 40,
+          size: TABLE_INDEX_COL_SIZE,
           minSize: 32,
           maxSize: 50,
           meta: { compactPadding: true, align: "left" },
@@ -377,6 +378,7 @@ export default defineComponent({
           header: t("user.email"),
           accessorKey: "email",
           sortable: true,
+          size: COL.email,
           meta: { align: "left", autoWidth: true },
         },
         {
@@ -384,7 +386,7 @@ export default defineComponent({
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
-          size: 150,
+          size: COL.firstName,
           meta: { align: "left", isName: true },
         },
         {
@@ -392,7 +394,7 @@ export default defineComponent({
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
-          size: 150,
+          size: COL.lastName,
           meta: { align: "left", isName: true },
         },
       ];
@@ -404,7 +406,7 @@ export default defineComponent({
           header: "Auth",
           accessorKey: "auth_type",
           sortable: true,
-          size: 120,
+          size: COL.authType,
           meta: { align: "left" },
         });
       }
@@ -415,7 +417,7 @@ export default defineComponent({
         header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
-        size: 220,
+        size: COL.role,
         meta: { align: "left" },
       });
 

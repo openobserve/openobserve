@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -96,6 +96,7 @@ import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -130,12 +131,13 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size:67, meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
         accessorKey: "user_id",
         sortable: true,
+        size: COL.email,
         meta: { align: "left" , autoWidth: true },
       },
       {
@@ -150,6 +152,7 @@ export default defineComponent({
         header: t("queries.searchType"),
         accessorKey: "search_type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -157,6 +160,7 @@ export default defineComponent({
         header: t("queries.querySource"),
         accessorKey: "query_source",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -164,6 +168,7 @@ export default defineComponent({
         header: t("queries.duration"),
         accessorKey: "duration",
         sortable: true,
+        size: COL.duration,
         meta: { align: "left" },
       },
       {
@@ -171,6 +176,7 @@ export default defineComponent({
         header: t("queries.queryRange"),
         accessorKey: "queryRange",
         sortable: true,
+        size: COL.duration,
         meta: { align: "left" },
       },
       {
@@ -178,6 +184,7 @@ export default defineComponent({
         header: t("queries.queryType"),
         accessorKey: "work_group",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -185,6 +192,7 @@ export default defineComponent({
         header: t("queries.status"),
         accessorKey: "status",
         sortable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {
@@ -192,6 +200,7 @@ export default defineComponent({
         header: t("alerts.streamType"),
         accessorKey: "stream_type",
         sortable: true,
+        size: COL.streamType,
         meta: { align: "left" },
       },
       {

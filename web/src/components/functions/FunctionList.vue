@@ -219,6 +219,7 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "functionList",
@@ -265,7 +266,7 @@ export default defineComponent({
         header: "#",
         accessorKey: "#",
         sortable: false,
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {

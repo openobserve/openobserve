@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -154,6 +154,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
 
@@ -194,7 +195,7 @@ const columns: OTableColumnDef[] = [
     id: "#",
     header: "#",
     accessorFn: (row: any) => row["#"],
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { compactPadding: true, align: "left" },

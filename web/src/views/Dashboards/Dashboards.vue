@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -183,16 +183,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OInput>
                 </div>
 
-                <OButton
-                  variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="loading"
-                  title="Reload dashboards"
-                  data-test="dashboard-list-refresh"
-                  @click="getDashboards"
-                />
               </div>
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                title="Reload dashboards"
+                data-test="dashboard-list-refresh"
+                @click="getDashboards"
+              />
             </template>
             <template #cell-name="{ row, value }">
               <span
@@ -472,6 +474,7 @@ import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import {
   useAppBreadcrumb,
@@ -616,7 +619,7 @@ export default defineComponent({
           header: "#",
           accessorKey: "#",
           sortable: false,
-          size: 48,
+          size: TABLE_INDEX_COL_SIZE,
           meta: { align: "left" },
         },
         {

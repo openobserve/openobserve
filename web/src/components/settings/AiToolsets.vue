@@ -131,6 +131,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
 // skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
@@ -164,10 +165,10 @@ export default defineComponent({
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: 52, meta: { align: "left" } },
-      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
-      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, size: 110, meta: { align: "left" } },
-      { id: "description", header: t("aiToolset.description"), accessorKey: "description", meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
+      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left" } },
+      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, size: COL.type, meta: { align: "left" } },
+      { id: "description", header: t("aiToolset.description"), accessorKey: "description", size: COL.description, meta: { align: "left" } },
       {
         id: "actions",
         header: t("aiToolset.actions"),

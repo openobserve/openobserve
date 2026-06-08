@@ -733,6 +733,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1005,7 +1006,7 @@ export default defineComponent({
           id: "#",
           header: "#",
           accessorKey: "#",
-          size: 67,
+          size: TABLE_INDEX_COL_SIZE,
           meta: { align: "left" },
         },
         {
@@ -1015,7 +1016,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 250,
+          size: COL.name,
           minSize: 200,
           meta: { align: "left" },
         },
@@ -1027,7 +1028,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.owner,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1041,7 +1042,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.frequency,
                 meta: { align: "center" },
               } as OTableColumnDef,
             ]
@@ -1057,7 +1058,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.frequency,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1070,7 +1071,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.date,
           meta: { align: "left" },
         },
         {
@@ -1081,7 +1082,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.date,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1095,7 +1096,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.date,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
@@ -1106,7 +1107,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 120,
+                size: COL.status,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1131,7 +1132,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.folder,
           meta: { align: "center" },
         } as OTableColumnDef);
       }

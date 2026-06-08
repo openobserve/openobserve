@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc. -->
+﻿<!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -8,6 +8,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18n } from "vue-i18n";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 
@@ -31,7 +32,7 @@ const columns: OTableColumnDef[] = [
     id: "#",
     header: "#",
     accessorFn: (row: any) => row["#"],
-    size: 40,
+    size: TABLE_INDEX_COL_SIZE,
     minSize: 32,
     maxSize: 50,
     meta: { compactPadding: true, align: "left" },

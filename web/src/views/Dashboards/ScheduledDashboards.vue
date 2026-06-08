@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -116,6 +116,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -260,7 +261,7 @@ const columns: OTableColumnDef[] = [
     header: "#",
     accessorKey: "#",
     meta: { align: "left" },
-    size: 50,
+    size: TABLE_INDEX_COL_SIZE,
   },
   {
     id: "name",

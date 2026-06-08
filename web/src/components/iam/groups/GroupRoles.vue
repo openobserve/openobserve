@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -114,6 +114,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -178,7 +179,7 @@ const columns: OTableColumnDef[] = [
     header: "",
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { align: "center", compactPadding: true },
