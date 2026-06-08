@@ -13,18 +13,6 @@
         ],
         "results": [
           [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
             "SORT-X1",
             "900.0",
             "1",
@@ -41,6 +29,18 @@
             "555.0",
             "3",
             "3"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
           ],
           [
             "SORT-M3",
@@ -191,24 +191,6 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "99.0",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-1",
-            "94.6",
-            "2",
-            "2"
-          ],
-          [
-            "ZONE-1",
-            "33.0",
-            "3",
-            "3"
-          ],
-          [
             "ZONE-4",
             "88.1",
             "1",
@@ -233,6 +215,42 @@
             "4"
           ],
           [
+            "ZONE-2",
+            "88.1",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "55.2",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "12.5",
+            "3",
+            "3"
+          ],
+          [
+            "ZONE-1",
+            "99.0",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "94.6",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "33.0",
+            "3",
+            "3"
+          ],
+          [
             "ZONE-3",
             "99.0",
             "1",
@@ -255,24 +273,6 @@
             "33.0",
             "4",
             "4"
-          ],
-          [
-            "ZONE-2",
-            "88.1",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-2",
-            "55.2",
-            "2",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "12.5",
-            "3",
-            "3"
           ]
         ],
         "results_mode": "rowsort"
@@ -2675,14 +2675,14 @@
         ],
         "results": [
           [
-            "cartPage",
-            "Android 12",
+            "checkoutPage",
+            "Android 14",
             "2",
             "1"
           ],
           [
-            "checkoutPage",
-            "Android 14",
+            "cartPage",
+            "Android 12",
             "2",
             "1"
           ],
@@ -2854,6 +2854,228 @@
           [
             "sess_001",
             "1450",
+            "1"
+          ],
+          [
+            "sess_001",
+            "1450",
+            "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q506",
+      "sql": "SELECT _timestamp, visitor_session_id, latency_ms, SUM(CAST(latency_ms AS FLOAT)) OVER (PARTITION BY visitor_session_id ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_latency FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 AND visitor_session_id IS NOT NULL ORDER BY visitor_session_id ASC, _timestamp ASC LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 30299000000,
+        "end_offset": 30373000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "latency_ms",
+          "cumulative_latency"
+        ],
+        "results": [
+          [
+            "sess_001",
+            "1900",
+            "1900.0"
+          ],
+          [
+            "sess_001",
+            "230",
+            "2130.0"
+          ],
+          [
+            "sess_003",
+            "12",
+            "12.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q507",
+      "sql": "SELECT _timestamp, pallet_id, throughput_rate, FIRST_VALUE(throughput_rate) OVER (PARTITION BY pallet_id ORDER BY _timestamp) AS first_tput, LAST_VALUE(throughput_rate) OVER (PARTITION BY pallet_id ORDER BY _timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_tput FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND pallet_id IS NOT NULL ORDER BY pallet_id ASC, _timestamp ASC LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 30359000000,
+        "end_offset": 30433000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "throughput_rate",
+          "first_tput",
+          "last_tput"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "610.0",
+            "610.0",
+            "610.0"
+          ],
+          [
+            "PL-002",
+            "725.0",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "PL-003",
+            "840.0",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "PL-004",
+            "290.0",
+            "290.0",
+            "290.0"
+          ],
+          [
+            "PL-005",
+            "840.0",
+            "840.0",
+            "840.0"
+          ],
+          [
+            "PL-007",
+            "610.0",
+            "610.0",
+            "610.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q508",
+      "sql": "SELECT _timestamp, action_category, latency_ms, AVG(CAST(latency_ms AS FLOAT)) OVER (ORDER BY _timestamp ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS rolling_avg_5 FROM \"{stream}\" WHERE latency_ms > 0 AND action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 30419000000,
+        "end_offset": 30493000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "latency_ms",
+          "rolling_avg_5"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "89",
+            "407.6666666666667"
+          ],
+          [
+            "performanceMetric",
+            "567",
+            "780.75"
+          ],
+          [
+            "performanceMetric",
+            "567",
+            "780.75"
+          ],
+          [
+            "performanceMetric",
+            "1900",
+            "1011.3333333333334"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q509",
+      "sql": "SELECT _timestamp, visitor_session_id, page_slug, ROW_NUMBER() OVER (PARTITION BY visitor_session_id ORDER BY _timestamp) AS visit_seq, LEAD(page_slug) OVER (PARTITION BY visitor_session_id ORDER BY _timestamp) AS next_page FROM \"{stream}\" WHERE action_category IN ('navigation', 'interaction') AND visitor_session_id IS NOT NULL ORDER BY visitor_session_id ASC, _timestamp ASC LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 30479000000,
+        "end_offset": 30553000000
+      },
+      "expected": {
+        "columns": [
+          "visitor_session_id",
+          "page_slug",
+          "visit_seq",
+          "next_page"
+        ],
+        "results": [
+          [
+            "sess_002",
+            "homePage",
+            "1",
+            "None"
+          ],
+          [
+            "sess_004",
+            "searchPage",
+            "1",
+            "None"
+          ],
+          [
+            "sess_005",
+            "itemPage",
+            "1",
+            "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q510",
+      "sql": "SELECT _timestamp, component_name, latency_ms, RANK() OVER (PARTITION BY component_name ORDER BY latency_ms DESC) AS latency_rank, DENSE_RANK() OVER (PARTITION BY component_name ORDER BY latency_ms DESC) AS latency_dense_rank FROM \"{stream}\" WHERE action_category = 'performanceMetric' AND latency_ms > 0 AND component_name IS NOT NULL ORDER BY component_name ASC, latency_ms DESC, _timestamp ASC LIMIT 15",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 30539000000,
+        "end_offset": 30613000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "latency_rank",
+          "latency_dense_rank"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450",
+            "1",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "1450",
+            "1",
+            "1"
+          ],
+          [
+            "pallet-mapper",
+            "89",
+            "1",
+            "1"
+          ],
+          [
+            "track-router",
+            "230",
+            "1",
+            "1"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "1",
             "1"
           ]
         ],
