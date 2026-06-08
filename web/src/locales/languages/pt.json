@@ -1786,7 +1786,8 @@
     "noDataAvailable": "Não há dados disponíveis",
     "tabAiAssistant": "Assistente de IA O2",
     "tabOverview": "Visão geral",
-    "tabUsage": "Uso"
+    "tabUsage": "Uso",
+    "subtitle": "Seu espaço de trabalho de observabilidade em um piscar de olhos"
   },
   "billing": {
     "header": "Uso e cobrança",

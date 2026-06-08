@@ -1786,7 +1786,8 @@
     "noDataAvailable": "Geen gegevens beschikbaar",
     "tabAiAssistant": "O2 AI-assistent",
     "tabOverview": "Overzicht",
-    "tabUsage": "Gebruik"
+    "tabUsage": "Gebruik",
+    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag"
   },
   "billing": {
     "header": "Gebruik en facturering",

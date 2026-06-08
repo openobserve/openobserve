@@ -1786,7 +1786,8 @@
     "noDataAvailable": "无可用数据",
     "tabAiAssistant": "O2 AI 助手",
     "tabOverview": "概述",
-    "tabUsage": "用法"
+    "tabUsage": "用法",
+    "subtitle": "您的可观测性工作空间一览"
   },
   "billing": {
     "header": "用量和账单",
