@@ -113,6 +113,8 @@
 
     <template #table>
       <OTable
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="score-config-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -156,6 +158,23 @@
           {{ formatDateShort(rowCreated(row)) }}
         </template>
 
+        <template #bottom="{ totalRows }">
+          <span class="o2-table-footer-title tw:text-primary">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline"
+            size="sm"
+            class="tw:ml-3"
+            icon-left="download"
+            data-test="score-config-bulk-export-btn"
+            @click="handleBulkExport"
+          >
+            {{ t("onlineEvals.scoreConfig.export.bulkButton") }} ({{ selectedIds.length }})
+          </OButton>
+        </template>
+
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -165,6 +184,14 @@
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
               @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`score-config-list-${row.name}-export-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.export')"
+              icon-left="download"
+              @click.stop="$emit('export', row)"
             />
             <OButton
               :data-test="`score-config-list-${row.name}-delete-btn`"
@@ -206,7 +233,7 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: ScoreConfig): void;
@@ -215,10 +242,21 @@ defineEmits<{
   (e: "imported"): void;
   (e: "import-custom"): void;
   (e: "open-library"): void;
+  (e: "export", row: ScoreConfig): void;
+  (e: "export-bulk", ids: string[]): void;
 }>();
 
 const { t } = useI18n();
 const typeFilter = ref<DataType | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkExport() {
+  // Snapshot the ids before clearing so the parent receives a stable array
+  // and the table immediately reflects deselection.
+  const ids = [...selectedIds.value];
+  selectedIds.value = [];
+  emit("export-bulk", ids);
+}
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
@@ -296,8 +334,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.actions"),
     sortable: false,
     isAction: true,
-    size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    size: 140,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 

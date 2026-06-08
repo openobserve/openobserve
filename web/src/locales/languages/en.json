@@ -4173,6 +4173,7 @@
     "actions": {
       "edit": "Edit",
       "delete": "Delete",
+      "export": "Export",
       "activate": "Activate",
       "pause": "Pause",
       "activated": "Job activated",
@@ -4494,6 +4495,9 @@
         "errors": {
           "title": "Validation Errors"
         }
+      },
+      "export": {
+        "bulkButton": "Export"
       }
     },
     "scorer": {

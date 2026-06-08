@@ -73,6 +73,8 @@ the Free Software Foundation, either version 3 of the License, or
             @delete="(row) => deleteRow(row)"
             @open-library="openScoreConfigLibrary"
             @import-custom="goToImportScoreConfig"
+            @export="exportScoreConfigRow"
+            @export-bulk="exportScoreConfigBulk"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -229,6 +231,12 @@ import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
+import { downloadFile } from "@/utils/dom";
+import {
+  bulkExportFileName,
+  exportScoreConfigFileName,
+  stripScoreConfigForExport,
+} from "./onlineEvals/utils/exportScoreConfig";
 
 const store = useStore();
 const route = useRoute();
@@ -525,6 +533,42 @@ async function triggerScoreConfigLibraryImport() {
 async function handleScoreConfigLibraryImported() {
   showScoreConfigLibrary.value = false;
   await loadAll(orgId.value);
+}
+
+function exportScoreConfigRow(row: ScoreConfig) {
+  const payload = stripScoreConfigForExport(row);
+  const ok = downloadFile(
+    exportScoreConfigFileName(row),
+    JSON.stringify(payload, null, 2),
+    "application/json",
+  );
+  if (!ok) {
+    toast({ variant: "error", message: "Failed to export score config" });
+  }
+}
+
+function exportScoreConfigBulk(ids: string[]) {
+  const selected = scoreConfigs.value.filter((row) =>
+    ids.includes(entityId(row)) || ids.includes(row.id),
+  );
+  if (selected.length === 0) {
+    toast({ variant: "warning", message: "No score configs selected" });
+    return;
+  }
+  const payload = selected.map(stripScoreConfigForExport);
+  const ok = downloadFile(
+    bulkExportFileName(),
+    JSON.stringify(payload, null, 2),
+    "application/json",
+  );
+  if (ok) {
+    toast({
+      variant: "success",
+      message: `Exported ${selected.length} score config${selected.length > 1 ? "s" : ""}`,
+    });
+  } else {
+    toast({ variant: "error", message: "Failed to export score configs" });
+  }
 }
 
 function syncFromRoute() {
