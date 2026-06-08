@@ -1344,7 +1344,6 @@ mod tests {
 
     #[test]
     fn test_to_tantivy_query_all_fields_present() {
-        // Schema has both A and B.
         let schema = build_tantivy_schema(&["A", "B"]);
         let field_a = schema.get_field("A").unwrap();
         let field_b = schema.get_field("B").unwrap();
@@ -1353,10 +1352,9 @@ mod tests {
         cond.add_condition(Condition::Equal("A".into(), "a".into()));
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let (query, has_skipped) = cond
-            .to_tantivy_query("test", schema, None)
+        let query = cond
+            .to_tantivy_query(schema, None)
             .expect("query build should succeed");
-        assert!(!has_skipped, "no field is missing, should not skip");
 
         let referenced = collect_query_fields(query.as_ref());
         assert!(referenced.contains(&field_a));
@@ -1364,37 +1362,26 @@ mod tests {
     }
 
     #[test]
-    fn test_to_tantivy_query_missing_field_is_skipped() {
-        // Schema only has A; condition references B (newly added index field,
-        // no historical data in this tantivy file).
+    fn test_to_tantivy_query_missing_field_returns_error() {
+        // Current implementation errors on any missing field.
         let schema = build_tantivy_schema(&["A"]);
-        let field_a = schema.get_field("A").unwrap();
 
         let mut cond = IndexCondition::new();
         cond.add_condition(Condition::Equal("A".into(), "a".into()));
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let (query, has_skipped) = cond
-            .to_tantivy_query("test", schema, None)
-            .expect("query build should succeed even when a field is missing");
-        assert!(has_skipped, "missing field B should be reported as skipped");
-
-        let referenced = collect_query_fields(query.as_ref());
-        // Only A should be referenced; B was dropped.
-        assert_eq!(referenced.len(), 1);
-        assert!(referenced.contains(&field_a));
+        let result = cond.to_tantivy_query(schema, None);
+        assert!(result.is_err(), "missing field B should return an error");
     }
 
     #[test]
     fn test_to_tantivy_query_all_fields_missing_returns_error() {
-        // Schema has no matching fields for any condition.
-        // Should return an error so the caller falls back to parquet scan.
         let schema = build_tantivy_schema(&["other_field"]);
         let mut cond = IndexCondition::new();
         cond.add_condition(Condition::Equal("A".into(), "a".into()));
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let result = cond.to_tantivy_query("test", schema, None);
+        let result = cond.to_tantivy_query(schema, None);
         assert!(
             result.is_err(),
             "should return error when all fields are missing"
@@ -1403,12 +1390,11 @@ mod tests {
 
     #[test]
     fn test_to_tantivy_query_single_condition_missing_field() {
-        // Single condition whose field is missing — should return an error.
         let schema = build_tantivy_schema(&["A"]);
         let mut cond = IndexCondition::new();
         cond.add_condition(Condition::Equal("B".into(), "b".into()));
 
-        let result = cond.to_tantivy_query("test", schema, None);
+        let result = cond.to_tantivy_query(schema, None);
         assert!(
             result.is_err(),
             "should return error when the only field is missing"
