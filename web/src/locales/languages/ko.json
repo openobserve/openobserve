@@ -410,7 +410,18 @@
       "two": "5초 이상 걸리는 느린 쿼리 찾기...",
       "three": "서비스별로 그룹화된 5xx 응답 수 계산...",
       "four": "레벨 = '오류'인 필터 로그..."
-    }
+    },
+    "hideHistogram": "히스토그램 숨기기",
+    "disableQuickMode": "퀵 모드 비활성화",
+    "menuGroupSetOnce": "한 번 설정",
+    "menuGroupSavedViews": "저장된 뷰",
+    "menuGroupTools": "도구",
+    "menuGroupHistory": "역사",
+    "menuGroupDownloads": "다운로드",
+    "menuGroupSchedule": "스케줄",
+    "menuGroupInspect": "검사",
+    "validSql": "유효한 SQL",
+    "invalidSql": "잘못된 쿼리"
   },
   "menu": {
     "home": "홈",

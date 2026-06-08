@@ -410,7 +410,18 @@
       "two": "5 saniyeden fazla süren yavaş sorguları bulun...",
       "three": "Hizmete göre gruplandırılmış 5xx yanıtlarını sayın...",
       "four": "Level = 'error' olduğu günlükleri filtreleyin..."
-    }
+    },
+    "hideHistogram": "Histogramı Gizle",
+    "disableQuickMode": "Hızlı Mod Devre Dışı Bırak",
+    "menuGroupSetOnce": "Bir Kez Ayarla",
+    "menuGroupSavedViews": "Kayıtlı Görünümler",
+    "menuGroupTools": "Araçlar",
+    "menuGroupHistory": "Tarihçe",
+    "menuGroupDownloads": "İndirilenler",
+    "menuGroupSchedule": "Çizelge",
+    "menuGroupInspect": "İnceleyin",
+    "validSql": "Geçerli SQL",
+    "invalidSql": "Geçersiz sorgu"
   },
   "menu": {
     "home": "Ana Sayfa",

@@ -121,20 +121,78 @@ class UnflattenedPage {
     }
 
     /**
-     * Toggle SQL mode via the utilities ("More") menu.
+     * Wait for an interesting-field toggle button's `title` to flip to
+     * "Remove from interesting fields" — the DOM-side proxy for
+     * `field.isInterestingField === true`. Used instead of reading Vue state
+     * because `__vueParentComponent` is dev-only in Vue 3 and undefined in
+     * production builds.
+     */
+    async expectFieldMarkedAsInteresting(fieldName, opts = {}) {
+        const { timeout = 10000 } = opts;
+        const btn = this.page.locator(
+            `[data-test="logs-search-index-list"] [data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`
+        ).first();
+        await expect(btn).toHaveAttribute('title', /remove from interesting fields/i, { timeout });
+    }
+
+    /**
+     * Switch to SQL mode.
      *
-     * Post-menu-migration: the SQL mode switch was moved from the main search bar
-     * into the utilities dropdown, so the switch isn't in the DOM until the menu
-     * is opened. Open the menu, then click the inner switch button (auto-generated
-     * `-btn` suffix on the OSwitch parent data-test in SearchBar.vue).
+     * The SQL mode toggle button was removed from the UI — SQL mode is now
+     * auto-detected from query content (SELECT...FROM = SQL ON).
+     * This method reads the current interesting fields and selected stream from
+     * Vue component state, then writes a SELECT query into the Monaco editor so
+     * that the interesting fields appear in the editor (matching previous behavior).
      */
     async toggleSqlMode() {
-        const isAlreadyVisible = await this.sqlModeToggle.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isAlreadyVisible) {
-            await this.utilitiesMenuButton.click();
-            await this.sqlModeToggle.waitFor({ state: 'visible', timeout: 5000 });
+        // Read the set of "interesting" fields from the DOM instead of walking
+        // `__vueParentComponent`, which is dev-only and undefined in production
+        // builds (the build CI ships). Each interesting-field toggle button's
+        // `title` flips to "Remove from interesting fields" when active. Read the
+        // active stream from the URL — `?stream=` is set on every navigation.
+        const appState = await this.page.evaluate(() => {
+            const btnSelector = '[data-test="logs-search-index-list"] [data-test^="log-search-index-list-interesting-"][data-test$="-field-btn"]';
+            const fields = Array.from(document.querySelectorAll(btnSelector))
+                .filter(b => /remove from interesting fields/i.test(b.getAttribute('title') || ''))
+                .map(b => {
+                    const m = (b.getAttribute('data-test') || '').match(/^log-search-index-list-interesting-(.+)-field-btn$/);
+                    return m ? m[1] : null;
+                })
+                .filter(Boolean);
+            // De-duplicate (FieldRow renders the same button twice — once in the
+            // default slot and once in the `#actions` slot).
+            const uniqueFields = Array.from(new Set(fields));
+            const stream = new URLSearchParams(window.location.search).get('stream') || null;
+            return { fields: uniqueFields, stream };
+        });
+
+        const timestamp = '_timestamp';
+        const fields = appState?.fields || [];
+        // Fallback chain: URL `?stream=` → first selected stream chip on the page.
+        // We avoid a hardcoded stream name so this helper is reusable beyond the
+        // single test that currently calls it.
+        let stream = appState?.stream;
+        if (!stream) {
+            const chipText = await this.page
+                .locator('[data-test="logs-search-bar-streamname-select-stream-button"]')
+                .first()
+                .textContent()
+                .catch(() => null);
+            stream = (chipText || '').trim() || 'e2e_automate';
         }
-        await this.sqlModeToggle.click();
+        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
+        const sql = allFields.length > 1
+            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
+            : `SELECT * FROM "${stream}"`;
+
+        // Write the SQL into the Monaco editor via the .inputarea
+        await this.logsSearchBarQueryEditor.waitFor({ state: 'visible', timeout: 10000 });
+        await this.logsSearchBarQueryEditor.click();
+        const inputArea = this.logsSearchBarQueryEditor.locator('.inputarea');
+        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await inputArea.fill(sql);
+        await this.page.waitForTimeout(600);
     }
 
     async ensureStoreOriginalDataEnabled() {

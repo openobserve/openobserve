@@ -410,7 +410,18 @@
       "two": "Finden Sie langsame Abfragen, die länger als 5 Sekunden dauern...",
       "three": "Zählen Sie 5xx Antworten, gruppiert nach Service...",
       "four": "Filtert Protokolle, bei denen level = 'error'..."
-    }
+    },
+    "hideHistogram": "Histogramm ausblenden",
+    "disableQuickMode": "Schnellmodus deaktivieren",
+    "menuGroupSetOnce": "Einmal einstellen",
+    "menuGroupSavedViews": "Gespeicherte Ansichten",
+    "menuGroupTools": "Werkzeuge",
+    "menuGroupHistory": "Geschichte",
+    "menuGroupDownloads": "herunterladbare",
+    "menuGroupSchedule": "Zeitplan",
+    "menuGroupInspect": "Inspizieren",
+    "validSql": "Gültiges SQL",
+    "invalidSql": "Ungültige Abfrage"
   },
   "menu": {
     "home": "Startseite",

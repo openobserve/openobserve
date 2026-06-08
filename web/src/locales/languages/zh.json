@@ -410,7 +410,18 @@
       "two": "查找耗时超过 5 秒的慢速查询...",
       "three": "计算按服务分组的 5xx 个响应...",
       "four": "筛选等级 = “错误” 的日志..."
-    }
+    },
+    "hideHistogram": "隐藏直方图",
+    "disableQuickMode": "禁用快速模式",
+    "menuGroupSetOnce": "设置一次",
+    "menuGroupSavedViews": "保存的视图",
+    "menuGroupTools": "工具",
+    "menuGroupHistory": "历史",
+    "menuGroupDownloads": "下载",
+    "menuGroupSchedule": "日程安排",
+    "menuGroupInspect": "检查",
+    "validSql": "有效的 SQL",
+    "invalidSql": "查询无效"
   },
   "menu": {
     "home": "主页",

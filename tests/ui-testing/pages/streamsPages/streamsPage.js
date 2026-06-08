@@ -65,6 +65,10 @@ export class StreamsPage {
         await this.logsPage.clickQuickModeToggle();
     }
 
+    async enableQuickModeIfDisabled() {
+        await this.logsPage.enableQuickModeIfDisabled();
+    }
+
     async clickAllFieldsButton() {
         await this.logsPage.clickAllFieldsButton();
     }

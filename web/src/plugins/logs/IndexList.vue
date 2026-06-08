@@ -62,11 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-if="
-        (!searchObj.data.stream.selectedStreamFields ||
-          searchObj.data.stream.selectedStreamFields.length == 0) &&
-        searchObj.loading == false
-      "
+      v-if="!searchObj.data.stream.selectedStream.length"
       class="index-table tw:mt-1"
     >
       <div
@@ -152,11 +148,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
+        <template #empty>
+          <div
+            data-test="logs-search-no-field-found-text"
+            class="tw:text-center tw:w-5/6 tw:mx-0 tw:pt-3"
+          >
+            <OIcon name="info" size="sm" class="tw:align-middle tw:mr-1" />
+            {{ t("search.noFieldFoundInStream") }}
+          </div>
+        </template>
+
         <template #loading>
-          <div class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]">
-            <div class="tw:text-sm tw:font-medium text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center">
-              <OSpinner size="sm" />
-              {{ t("search.loadingStream") }}
+          <div
+            data-test="logs-indexlist-fieldlist-loading-skeleton"
+            class="tw:w-full tw:flex tw:flex-col"
+          >
+            <!-- Group 1 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 1 fields -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-3/4" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-4/5" />
+            </div>
+            <!-- Group 2 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 2 field -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-2/3" />
+            </div>
+            <!-- Group 3 header -->
+            <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
+              <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
+              <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+            </div>
+            <!-- Group 3 fields -->
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-4/5" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:w-3/4" />
+            </div>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
+              <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
+              <OSkeleton type="text" class="tw:flex-1" />
             </div>
           </div>
         </template>
@@ -213,6 +276,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";

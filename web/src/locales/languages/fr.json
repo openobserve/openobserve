@@ -409,8 +409,19 @@
       "one": "Montrez-moi les erreurs de la dernière heure...",
       "two": "Trouvez des requêtes lentes qui prennent plus de 5 secondes...",
       "three": "Comptez 5xx réponses regroupées par service...",
-      "four": "Filtrer les journaux où level = « erreur »..."
-    }
+      "four": "Filtrer les journaux où level = « erreur »..."
+    },
+    "hideHistogram": "Masquer l'histogramme",
+    "disableQuickMode": "Désactiver le mode rapide",
+    "menuGroupSetOnce": "Réglez une fois",
+    "menuGroupSavedViews": "Vues enregistrées",
+    "menuGroupTools": "Outils",
+    "menuGroupHistory": "L'histoire",
+    "menuGroupDownloads": "Téléchargements",
+    "menuGroupSchedule": "Calendrier",
+    "menuGroupInspect": "Inspectez",
+    "validSql": "SQL valide",
+    "invalidSql": "Requête non valide"
   },
   "menu": {
     "home": "Accueil",

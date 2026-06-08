@@ -410,7 +410,18 @@
       "two": "Vind langzame zoekopdrachten die meer dan 5 seconden duren...",
       "three": "Tel 5xx reacties gegroepeerd per service...",
       "four": "Filterlogboeken waarbij level = 'error'..."
-    }
+    },
+    "hideHistogram": "Histogram verbergen",
+    "disableQuickMode": "Schakel de snelle modus uit",
+    "menuGroupSetOnce": "Eenmaal instellen",
+    "menuGroupSavedViews": "Opgeslagen weergaven",
+    "menuGroupTools": "Hulpmiddelen",
+    "menuGroupHistory": "Historie",
+    "menuGroupDownloads": "Downloads",
+    "menuGroupSchedule": "Schema",
+    "menuGroupInspect": "Inspecteer",
+    "validSql": "Geldige SQL",
+    "invalidSql": "Ongeldige vraag"
   },
   "menu": {
     "home": "Home",

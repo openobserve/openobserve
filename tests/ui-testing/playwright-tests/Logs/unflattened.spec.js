@@ -278,6 +278,9 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Selecting kubernetes_pod_id field');
     await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
+    testLogger.info('Waiting for kubernetes_pod_id to be marked as interesting (button title flips to "Remove…")');
+    await pageManager.unflattenedPage.expectFieldMarkedAsInteresting('kubernetes_pod_id');
+
     testLogger.info('Switching to SQL mode');
     await pageManager.unflattenedPage.toggleSqlMode();
     await page.waitForTimeout(500);

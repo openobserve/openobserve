@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="field-list-pagination-wrapper tw:justify-between tw:w-full tw:pt-2 tw:pb-1 tw:px-2"
+    class="field-list-pagination-wrapper tw:justify-between tw:w-full tw:py-px tw:px-1"
     :class="showSchemaToggle || showQuickMode ? 'tw:flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle tw:mr-1 tw:p-0"
+        class="schema-field-toggle tw:p-0 tw:mt-1"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="tw:text-[12px]!"></OIcon>
-            <OIcon name="schema" size="xs" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="person" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="tw:text-[12px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
+            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -89,17 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle tw:mr-1"
+        class="schema-field-toggle"
       >
         <OToggleGroupItem
           v-for="opt in interestingFieldsToggleOptions"
           :key="opt.value"
           :value="opt.value"
-          size="sm"
+          size="xs"
           :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="tw:text-[12px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[12px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
+            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+    <div class="tw:flex tw:items-center tw:justify-end tw:gap-1">
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="field-list-pagination">
         <OTooltip
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :data-test="`${dataTestPrefix}-fields-list-pagination-firstpage-button`"
           variant="ghost"
-          size="xs"
+          size="icon-xs-sq"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
           aria-label="First page"
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="page in visiblePages" :key="page">
           <OButton
             :variant="currentPage === page ? 'primary' : 'ghost'"
-            size="xs"
+            size="icon-xs-sq"
             :data-test="`${dataTestPrefix}-fields-list-pagination-page-${page}-button`"
             @click="$emit('set-page', page)"
           >
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :data-test="`${dataTestPrefix}-fields-list-pagination-lastpage-button`"
           variant="ghost"
-          size="xs"
+          size="icon-xs-sq"
           :disabled="isLastPage"
           @click="$emit('last-page')"
           aria-label="Last page"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="field-list-reset">
         <OIcon
           name="restart-alt"
-          size="md"
+          size="sm"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
           class="tw:cursor-pointer reset-icon"
           @click="$emit('reset-fields')"
@@ -280,7 +280,14 @@ const visiblePages = computed(() => {
 .field-list-pagination {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.125rem;
+
+  :deep(button) {
+    height: 1.375rem;
+    width: 1.375rem;
+    min-height: unset;
+    min-width: unset;
+  }
 }
 
 .field-list-reset {
@@ -289,7 +296,7 @@ const visiblePages = computed(() => {
 }
 
 .reset-icon {
-  font-size: 1.25rem;
+  font-size: 0.875rem;
   cursor: pointer;
   opacity: 0.7;
   transition: opacity 0.2s;
@@ -300,8 +307,14 @@ const visiblePages = computed(() => {
 }
 
 .schema-field-toggle {
-  :deep(.q-btn) {
-    padding: 0.25rem 0.5rem;
+  :deep([role="group"]) {
+    gap: 0.125rem;
+  }
+
+  :deep([role="group"] > *) {
+    gap: 0.25rem;
+    height: 1.375rem;
+    min-height: unset;
   }
 }
 </style>

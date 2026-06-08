@@ -410,7 +410,18 @@
       "two": "5 秒以上かかる遅いクエリを検索...",
       "three": "サービスごとにグループ化された5xx件の回答をカウント...",
       "four": "レベル = 'error' のログをフィルタする..."
-    }
+    },
+    "hideHistogram": "ヒストグラムを非表示",
+    "disableQuickMode": "クイックモードを無効にする",
+    "menuGroupSetOnce": "1 回設定",
+    "menuGroupSavedViews": "保存済みビュー",
+    "menuGroupTools": "ツール",
+    "menuGroupHistory": "歴史",
+    "menuGroupDownloads": "ダウンロード",
+    "menuGroupSchedule": "スケジュール",
+    "menuGroupInspect": "検査",
+    "validSql": "有効な SQL",
+    "invalidSql": "クエリが無効です"
   },
   "menu": {
     "home": "ホーム",

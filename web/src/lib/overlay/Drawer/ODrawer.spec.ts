@@ -181,14 +181,14 @@ describe("ODrawer", () => {
       expect(headerEl?.className).toContain("tw:shrink-0");
     });
 
-    it("body does NOT have flex-1 (must not push footer to bottom on short content)", () => {
+    it("body has flex-1 and min-h-0 so it fills available space and the footer stays anchored", () => {
       const wrapper = mount(ODrawer, {
         props: { open: true },
         slots: { default: '<p data-testid="body-content">body</p>' },
       });
       const bodyContent = wrapper.find('[data-testid="body-content"]');
       const bodyEl = bodyContent.element.parentElement;
-      expect(bodyEl?.className).not.toContain("tw:flex-1");
+      expect(bodyEl?.className).toContain("tw:flex-1");
       expect(bodyEl?.className).toContain("tw:min-h-0");
       expect(bodyEl?.className).toContain("tw:overflow-y-auto");
     });

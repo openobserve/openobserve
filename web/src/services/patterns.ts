@@ -27,14 +27,16 @@ const patterns = {
     org_identifier,
     stream_name,
     query,
+    signal,
   }: {
     org_identifier: string;
     stream_name: string;
     query: any;
+    signal?: AbortSignal;
   }) => {
     const url = `/api/${org_identifier}/streams/${stream_name}/patterns/extract`;
 
-    return http().post(url, query);
+    return signal ? http().post(url, query, { signal }) : http().post(url, query);
   },
 };
 

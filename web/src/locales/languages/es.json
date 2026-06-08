@@ -410,7 +410,18 @@
       "two": "Encuentra consultas lentas que tardan más de 5 segundos...",
       "three": "Cuenta 5xx respuestas agrupadas por servicio...",
       "four": "Filtrar registros en los que nivel = 'error'..."
-    }
+    },
+    "hideHistogram": "Ocultar histograma",
+    "disableQuickMode": "Desactivar el modo rápido",
+    "menuGroupSetOnce": "Establecer una vez",
+    "menuGroupSavedViews": "Vistas guardadas",
+    "menuGroupTools": "Herramientas",
+    "menuGroupHistory": "Historia",
+    "menuGroupDownloads": "Descargas",
+    "menuGroupSchedule": "Programar",
+    "menuGroupInspect": "Inspeccionar",
+    "validSql": "SQL válido",
+    "invalidSql": "Consulta no válida"
   },
   "menu": {
     "home": "Inicio",

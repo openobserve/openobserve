@@ -410,7 +410,18 @@
       "two": "Trova le query lente che richiedono più di 5 secondi...",
       "three": "Conta 5xx risposte raggruppate per servizio...",
       "four": "Filtra i log dove level = 'error'..."
-    }
+    },
+    "hideHistogram": "Nascondi istogramma",
+    "disableQuickMode": "Disattiva la modalità rapida",
+    "menuGroupSetOnce": "Imposta una volta",
+    "menuGroupSavedViews": "Visualizzazioni salvate",
+    "menuGroupTools": "Utensili",
+    "menuGroupHistory": "Storia",
+    "menuGroupDownloads": "Download",
+    "menuGroupSchedule": "Pianificazione",
+    "menuGroupInspect": "Ispezionare",
+    "validSql": "SQL valido",
+    "invalidSql": "Query non valida"
   },
   "menu": {
     "home": "Home",
