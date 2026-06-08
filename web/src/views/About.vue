@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:block tw:max-w-55"
               width="220"
             />
-            <p class="tw:text-base tw:font-medium tw:mt-1 tw:mb-0" style="color: var(--o2-text-secondary)">
+            <OText variant="body" class="tw:mt-1 tw:mb-0">
               {{ t("about.logoMsg") }}
-            </p>
+            </OText>
 
             <!-- One-line meta bar -->
             <div class="tw:inline-flex tw:items-center tw:flex-wrap tw:gap-2 tw:mt-5">
               <!-- version -->
-              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-bold tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-positive) tw:border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
+              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-semibold tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-positive) tw:border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
                 <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive) tw:shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- commit -->
               <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
                 <OIcon name="code" size="sm" class="tw:text-(--o2-info) tw:shrink-0" />
-                <span class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-wide tw:text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
-                <code class="tw:font-mono tw:text-sm tw:font-semibold tw:text-(--o2-text-heading)">{{ store.state.zoConfig.commit_hash }}</code>
+                <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
+                <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
                   class="tw:inline-flex tw:items-center tw:justify-center tw:p-0.5 tw:rounded tw:border-none tw:bg-transparent tw:cursor-pointer tw:text-(--o2-text-muted) tw:hover:text-(--o2-info) tw:transition-colors tw:duration-150"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- built date -->
               <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
                 <OIcon name="event" size="sm" class="tw:text-(--o2-warning) tw:shrink-0" />
-                <span class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-wide tw:text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
+                <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
                 {{ formatDate(store.state.zoConfig.build_date) }}
               </span>
             </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="code" size="md" />
               </div>
-                <h2 style="color: var(--o2-text-heading)">{{ t("about.os_libraries") }}</h2>
+                <OText variant="panel-title" as="h2">{{ t("about.os_libraries") }}</OText>
             </div>
             <div class="tw:text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
             <div class="tw:grid tw:grid-cols-4 tw:gap-2.5">
@@ -143,19 +143,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
                 <OIcon name="shield" size="md" />
               </div>
-              <h2 class="tw:text-lg tw:font-semibold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.license_info") }}</h2>
+              <OText variant="page-title" as="h2" class="tw:m-0">{{ t("about.license_info") }}</OText>
             </div>
-            <div v-if="store.state.zoConfig.build_type == 'opensource'" class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-4" style="color: var(--o2-text-secondary)">
+            <OText v-if="store.state.zoConfig.build_type == 'opensource'" variant="body" as="div" class="tw:leading-relaxed tw:m-0 tw:mb-4">
               {{ t("about.license_info_os_msg") }}
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                 target="_blank"
                 class="tw:text-(--o2-text-link) tw:no-underline tw:font-medium tw:border-b tw:border-[color-mix(in_srgb,var(--o2-text-link)_35%,transparent)] tw:transition-colors tw:duration-200 tw:hover:border-(--o2-text-link)"
               >GNU Affero General Public License (AGPL)</a>.
-            </div>
-            <div v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="tw:text-sm tw:leading-relaxed" style="color: var(--o2-text-secondary)">
+            </OText>
+            <OText v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" variant="body" as="div" class="tw:leading-relaxed">
               {{ t("about.license_info_msg") }}
-            </div>
+            </OText>
             <OBanner variant="info" icon="info" class="tw:mt-2">
               {{ t("about.license_info_note") }}
             </OBanner>
@@ -167,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
                 <OIcon name="groups" size="md" />
               </div>
-              <h3 class="tw:text-lg tw:font-semibold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.community_lbl") }}</h3>
+              <OText variant="page-title" as="h3" class="tw:m-0">{{ t("about.community_lbl") }}</OText>
             </div>
-            <p class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-4" style="color: var(--o2-text-secondary)">{{ t("about.community_msg") }}</p>
+            <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-4">{{ t("about.community_msg") }}</OText>
             <div class="tw:flex tw:flex-wrap tw:gap-2">
               <a
                 href="https://github.com/openobserve/openobserve"
@@ -200,15 +200,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="workspace-premium" size="md" />
               </div>
               <div>
-                <p class="tw:text-xs tw:font-bold tw:uppercase tw:tracking-widest tw:m-0 tw:mb-1" style="color: var(--o2-primary-color)">License &amp; Usage</p>
-                <h2 class="tw:text-2xl tw:font-bold tw:m-0" style="color: var(--o2-text-heading)">{{ t("about.ent_lincese_detail_lbl") }}</h2>
+                <OText variant="label" class="tw:uppercase tw:tracking-widest tw:m-0 tw:mb-1 tw:text-(--o2-primary-color)">License &amp; Usage</OText>
+                <h2 class="tw:text-xl tw:font-semibold tw:m-0 tw:text-text-heading">{{ t("about.ent_lincese_detail_lbl") }}</h2>
               </div>
             </div>
             <OButton variant="primary" size="sm" @click="navigateToLicense">
               {{ t('about.manage_license') }}
             </OButton>
           </div>
-          <p class="tw:text-sm tw:leading-relaxed tw:m-0 tw:mb-5 tw:ml-15" style="color: var(--o2-text-secondary)">{{ t("about.license_info_msg") }}</p>
+          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5 tw:ml-15">{{ t("about.license_info_msg") }}</OText>
 
           <div v-if="loadingLicense" class="tw:text-center tw:py-8">
             <OSpinner size="md" />
@@ -335,6 +335,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -346,6 +347,7 @@ export default defineComponent({
     OBadge,
     OSpinner,
     OBanner,
+    OText,
   },
   setup() {
     const store = useStore();

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Your Plan badge (floats above the card top border) -->
         <div v-if="buildType === ed.id" class="your-plan-badge">
-          <OIcon name="arrow-upward" size="xs" class="tw:mr-1" />
+          <OIcon name="arrow-upward" size="sm" class="tw:mr-1" />
           Your Plan
         </div>
 
@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 v-if="getFeatureStatus(feature, ed.id) !== 'unavailable'"
                 name="check-circle"
-                size="xs"
+                size="sm"
               />
               <OIcon
                 v-else
                 name="cancel"
-                size="xs"
+                size="sm"
               />
             </span>
             <span class="feature-item__body">
@@ -239,8 +239,8 @@ function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
   }
 
   .header-eyebrow {
-    font-size: 0.625rem;
-    font-weight: 700;
+    font-size: var(--text-xs);
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--o2-primary-color);
@@ -248,15 +248,15 @@ function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
   }
 
   .header-title {
-    font-size: 1.0625rem;
+    font-size: var(--text-xl);
     font-weight: 600;
-    color: var(--o2-text-heading);
+    color: var(--color-text-heading);
     margin: 0;
     letter-spacing: -0.015em;
   }
 
   .header-desc {
-    font-size: 0.9375rem;
+    font-size: var(--text-sm);
     line-height: 1.65;
     color: var(--o2-text-secondary);
     margin: 0.5rem 0 0;

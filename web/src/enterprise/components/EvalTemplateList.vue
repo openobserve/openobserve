@@ -385,7 +385,7 @@ onBeforeMount(async () => {
   align-items: center;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.15));
   color: var(--q-color-text);

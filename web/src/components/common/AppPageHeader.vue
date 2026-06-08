@@ -111,9 +111,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the subtitle is plain text (listing) or a taller breadcrumb nav
              (detail view), so the title doesn't appear to shift when navigating
              between the two. Content is vertically centered within the band. -->
-        <div
+        <OText
           v-if="hasSubtitle"
-          class="tw:flex tw:items-center tw:h-5 tw:min-w-0 tw:text-xs tw:text-text-secondary"
+          variant="meta"
+          as="div"
+          class="tw:flex tw:items-center tw:h-5 tw:min-w-0"
         >
           <slot name="subtitle">
             <AppBreadcrumb
@@ -123,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <span v-else class="tw:truncate tw:min-w-0">{{ subtitle }}</span>
           </slot>
-        </div>
+        </OText>
       </div>
 
       <!-- Module tabs (Level-2 nav), inline to the right of the title.
@@ -160,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import AppBreadcrumb, {
   type BreadcrumbItem,
