@@ -1088,15 +1088,24 @@ export default defineComponent({
 
       // Set markers to the model
       // monaco.editor.setModelMarkers(getModel(), "owner", markers);
-      const markers = ranges.map((range: any) => ({
-        severity: monaco.MarkerSeverity.Error, // Mark as error
-        startLineNumber: range.startLine,
-        startColumn: 1, // Start of the line
-        endLineNumber: range.endLine,
-        endColumn: 1, // End of the line
-        message: range.error, // The error message
-        code: "", // Optional error code
-      }));
+      const model = getModel();
+      const markers = ranges.map((range: any) => {
+        const startLine = range.startLine;
+        const endLine = range.endLine;
+        const startCol = range.column ?? 1;
+        // Highlight to end-of-line so the squiggle is visible
+        const lineContent = model?.getLineContent?.(endLine) ?? "";
+        const endCol = lineContent.length + 1 || startCol + 1;
+        return {
+          severity: monaco.MarkerSeverity.Error,
+          startLineNumber: startLine,
+          startColumn: startCol,
+          endLineNumber: endLine,
+          endColumn: endCol,
+          message: range.error,
+          code: "",
+        };
+      });
 
       monaco.editor.setModelMarkers(getModel(), "owner", []);
       monaco.editor.setModelMarkers(getModel(), "owner", markers);

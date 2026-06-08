@@ -1033,8 +1033,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
                 @run-query="handleRunQueryFn"
                 @keydown="handleKeyDown"
-                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+                @focus="onQueryEditorFocus"
+                @blur="handleQueryEditorBlur"
               />
             </div>
           </template>
@@ -1634,6 +1634,7 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { validateSql } from "@/utils/query/sqlDiagnostics";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -1949,6 +1950,41 @@ export default defineComponent({
       useStreams();
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
+
+    const onQueryEditorFocus = () => {
+      searchObj.meta.queryEditorPlaceholderFlag = false;
+      // Clear stale markers immediately when the user re-enters the editor
+      if (searchObj.data.sqlSyntaxErrorRanges?.length) {
+        searchObj.data.sqlSyntaxErrorRanges = [];
+      }
+    };
+
+    // Pre-flight SQL validation on blur — runs without firing the query.
+    // SQL mode: validate the raw query the user typed.
+    // Non-SQL mode: wrap the filter in a full SELECT and validate that.
+    const handleQueryEditorBlur = async () => {
+      searchObj.meta.queryEditorPlaceholderFlag = true;
+
+      const query = searchObj.data.query?.trim();
+      if (!query) {
+        searchObj.data.sqlSyntaxErrorRanges = [];
+        return;
+      }
+
+      let range = null;
+      if (searchObj.meta.sqlMode) {
+        range = await validateSql(query);
+      } else {
+        const stream = searchObj.data.stream.selectedStream?.[0];
+        if (stream) {
+          const prefix = `select * from "${stream}" WHERE `;
+          const constructedSql = prefix + query;
+          range = await validateSql(constructedSql, 0, prefix.length);
+        }
+      }
+
+      searchObj.data.sqlSyntaxErrorRanges = range ? [range] : [];
+    };
 
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
@@ -2374,6 +2410,10 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
+      // Clear stale syntax error markers after the user pauses typing.
+      // Debounced so setModelMarkers isn't called on every keypress.
+      debouncedClearSqlErrors();
+
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
@@ -2565,6 +2605,12 @@ export default defineComponent({
     const debouncedAutoRunPatterns = debounce(() => {
       emit("extractPatterns");
     }, 2500);
+
+    const debouncedClearSqlErrors = debounce(() => {
+      if (searchObj.data.sqlSyntaxErrorRanges?.length) {
+        searchObj.data.sqlSyntaxErrorRanges = [];
+      }
+    }, 500);
 
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
@@ -4688,6 +4734,9 @@ export default defineComponent({
       refreshData,
       handleRunQuery,
       handleRunQueryFn,
+      onQueryEditorFocus,
+      handleQueryEditorBlur,
+      debouncedClearSqlErrors,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
