@@ -1317,14 +1317,23 @@ export default defineComponent({
   bottom: 0;
   display: flex;
   align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 0.8rem;
+  /* Align with Monaco's text start in CodeQueryEditor: host padding-left
+     (0.5rem) + line-number gutter (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) +
+     lineDecorationsWidth (10px ≈ 0.625rem) ≈ 2.15rem. top 0.1875rem matches the
+     editor's padding.top (3px) so it sits on line 1 next to the gutter number.
+     Keep in sync with those editor options. */
+  padding: 0.1875rem 0.5rem 0 2.15rem;
   pointer-events: none;
   z-index: 1;
   user-select: none;
 
   .query-editor-placeholder-typewriter {
+    /* Mirror Monaco's rendered text so the placeholder reads as the future
+       typed query, not a different (proportional) font on a different baseline:
+       same monospace family and same ~21px (1.5 × 14px) line height. */
+    font-family: monospace;
     font-size: var(--text-base);
-    line-height: 1.375rem;
+    line-height: 1.3125rem;
     color: #a0aec0;
     white-space: nowrap;
     overflow: hidden;

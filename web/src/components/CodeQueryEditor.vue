@@ -684,16 +684,24 @@ export default defineComponent({
         wordWrap: "on",
         automaticLayout: true,
         lineNumbers: props.showLineNumbers ? "on" : "off",
-        lineNumbersMinChars: 0,
+        // Reserve a couple of gutter chars so the right-aligned line numbers get
+        // left breathing room instead of sitting flush against the editor edge
+        // (and so the gutter width doesn't visibly jump as digit count grows).
+        lineNumbersMinChars: 2,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
+        // Gap between the (right-aligned) line numbers and the code text. 3px was
+        // too tight and made the digit visually collide with the first character.
+        lineDecorationsWidth: 10,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
         scrollBeyondLastColumn: 0,
         scrollBeyondLastLine: false,
+        // Small top/bottom breathing room so line 1 (and the cursor) doesn't
+        // hug the top edge of the editor.
+        padding: { top: 3, bottom: 3 },
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
@@ -1456,6 +1464,13 @@ export default defineComponent({
 .logs-query-editor {
   flex: 1;
   min-height: 0;
+  /* Fixed left breathing room for the whole editor. Monaco mounts as a child of
+     this host, so padding here insets the line-number gutter (and code) by a
+     constant amount regardless of the line-number digit count — unlike
+     lineNumbersMinChars, which only pads while digits stay below the reserved
+     width and goes flush again at 2+ digits. automaticLayout measures the
+     content box, so the editor adapts to the reduced width. */
+  padding-left: 0.5rem;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;
