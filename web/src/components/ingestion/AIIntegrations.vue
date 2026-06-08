@@ -15,67 +15,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:h-full tw:gap-0">
-    <div class="tw:w-[200px] tw:flex tw:flex-col tw:border-r tw:border-border-default">
-      <div class="tw:flex-1 tw:min-h-0 tw:bg-surface-panel el-border-radius">
-        <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
-          <OTabs
-            v-model="selectedCategory"
-            orientation="vertical"
-          >
-            <OTab
-              v-for="cat in aiCategories"
-              :key="cat.slug"
-              :name="cat.slug"
-              :label="cat.name"
-              :data-test="`ai-integrations-category-${cat.slug}`"
-            />
-          </OTabs>
-        </div>
-      </div>
-    </div>
-
-    <div class="tw:w-[250px] tw:flex tw:flex-col">
-      <div class="tw:flex-1 tw:min-h-0 tw:bg-surface-panel el-border-radius">
-        <div class="tw:flex tw:flex-col tw:h-full">
-          <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
-          <OSearchInput
-            data-test="ai-integrations-search-input"
-            v-model="integrationFilter"
-            clearable
-            class="tw:w-full indexlist-search-input"
-            :placeholder="t('common.search')"
-          />
-          </div>
-          <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+  <OSplitter
+    v-model="categorySplitterModel"
+    unit="px"
+    class="tw:h-full"
+  >
+    <template v-slot:before>
+      <div class="tw:w-full tw:h-full">
+        <div class="tw:h-full tw:bg-surface-panel el-border-radius">
+          <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
             <OTabs
-              v-model="selectedIntegration"
+              v-model="selectedCategory"
               orientation="vertical"
-              @update:model-value="navigateToIntegration"
             >
               <OTab
-                v-for="integration in filteredIntegrations"
-                :key="integration.slug"
-                :name="integration.routeName"
-                :label="integration.name"
-                :data-test="`ai-integrations-item-${integration.slug}`"
+                v-for="cat in aiCategories"
+                :key="cat.slug"
+                :name="cat.slug"
+                :label="cat.name"
+                :data-test="`ai-integrations-category-${cat.slug}`"
               />
             </OTabs>
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
-    <div class="tw:flex-1 tw:flex tw:flex-col">
-      <div class="card-container tw:flex-1 tw:min-h-0 el-border-radius">
-        <div class="tw:flex tw:flex-col tw:h-full">
-          <div class="tw:flex-1 tw:overflow-auto tw:min-h-0">
-            <router-view />
+    <template v-slot:after>
+      <OSplitter
+        v-model="integrationSplitterModel"
+        unit="px"
+        class="tw:h-full"
+      >
+        <template v-slot:before>
+          <div class="tw:w-full tw:h-full">
+            <div class="tw:h-full tw:bg-surface-panel el-border-radius">
+              <div class="tw:flex tw:flex-col tw:h-full">
+                <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
+                  <OSearchInput
+                    data-test="ai-integrations-search-input"
+                    v-model="integrationFilter"
+                    clearable
+                    class="tw:w-full indexlist-search-input"
+                    :placeholder="t('common.search')"
+                  />
+                </div>
+                <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+                  <OTabs
+                    v-model="selectedIntegration"
+                    orientation="vertical"
+                    @update:model-value="navigateToIntegration"
+                  >
+                    <OTab
+                      v-for="integration in filteredIntegrations"
+                      :key="integration.slug"
+                      :name="integration.routeName"
+                      :label="integration.name"
+                      :data-test="`ai-integrations-item-${integration.slug}`"
+                    />
+                  </OTabs>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </div>
+        </template>
+
+        <template v-slot:after>
+          <div class="tw:w-full tw:h-full">
+            <div class="card-container tw:h-full">
+              <div class="tw:overflow-auto tw:h-full">
+                <router-view />
+              </div>
+            </div>
+          </div>
+        </template>
+      </OSplitter>
+    </template>
+  </OSplitter>
 </template>
 
 <script lang="ts">
@@ -87,11 +103,11 @@ import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 import OTab from '@/lib/navigation/Tabs/OTab.vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab, OSearchInput,
-},
+  components: { OTabs, OTab, OSearchInput, OSplitter },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -187,6 +203,8 @@ export default defineComponent({
       integrationFilter,
       filteredIntegrations,
       navigateToIntegration,
+      categorySplitterModel: ref(200),
+      integrationSplitterModel: ref(250),
     };
   },
 });
