@@ -3055,6 +3055,8 @@ export class PipelinesPage {
         const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
+        // Wait for the Teleport target (#o2-page-actions) to be ready before filters render
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
     }
 
@@ -3081,8 +3083,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if filter is visible
      */
     async isStatusFilterVisible() {
-        const filterLocator = this.page.locator('[data-test*="status-filter"], [data-test*="filter"]').first();
-        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        const filterLocator = this.page.locator('[data-test="status-filter"]').first();
+        return await filterLocator.isVisible({ timeout: 10000 }).catch(() => false);
     }
 
     /**
@@ -3217,6 +3219,8 @@ export class PipelinesPage {
         const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
         await this.page.goto(historyUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
+        // Wait for the Teleport target (#o2-page-actions) to be ready before controls render
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
         testLogger.info('Navigated to pipeline history page', { url: historyUrl });
     }
 

@@ -60,12 +60,8 @@ test.describe("dashboard folder testcases", () => {
     await page.waitForTimeout(1000);
     await pm.dashboardPage.verifyShareDashboardLink(randomDashboardName);
     await page.waitForTimeout(1000);
-    // Click on folder name in breadcrumbs to go back to folder view.
-    // Use the explicit data-test on the breadcrumb span (ViewDashboard.vue) —
-    // resolving by data-test prevents strict-mode collisions with toast
-    // notifications, history popups, and auto-completion lists that may also
-    // contain the folder name as text.
-    await page.locator('[data-test="dashboard-view-folder-breadcrumb"]').click();
+    // Click the back button to return to the folder dashboard list.
+    await page.locator('[data-test="dashboard-back-btn"]').click();
     await page.waitForTimeout(1000);
     await pm.dashboardPage.deleteSearchedDashboard(randomDashboardName);
 
