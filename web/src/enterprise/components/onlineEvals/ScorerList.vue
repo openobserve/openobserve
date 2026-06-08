@@ -5,12 +5,22 @@
     :search="search"
     :search-placeholder="t('onlineEvals.scorer.searchPlaceholder')"
     :add-label="t('onlineEvals.scorer.newButton')"
-    :show-empty="showEmptyState"
+    :show-empty="showEmptyState || shouldShowCatalog"
     @update:search="$emit('update:search', $event)"
     @create="$emit('create')"
   >
     <template #empty>
+      <OnlineEvalsCatalog
+        v-if="shouldShowCatalog"
+        kind="scorers"
+        :org-id="orgId"
+        :score-configs="scoreConfigs"
+        :scorers="allScorers"
+        :providers="providers"
+        @imported="$emit('imported')"
+      />
       <EvalEmptyState
+        v-else
         data-test="scorer-empty-state"
         icon="rule"
         :title="t('onlineEvals.scorer.empty.title')"
@@ -25,6 +35,18 @@
       />
     </template>
 
+    <template #actions>
+      <OButton
+        class="tw:ml-2"
+        variant="secondary"
+        size="sm"
+        data-test="scorer-browse-library-btn"
+        @click="$emit('toggle-catalog')"
+      >
+        {{ showCatalog ? "Hide Library" : "Browse Library" }}
+      </OButton>
+    </template>
+
     <template #filter>
       <OSelect
         v-model="typeFilter"
@@ -37,7 +59,17 @@
     </template>
 
     <template #table>
+      <OnlineEvalsCatalog
+        v-if="showCatalog"
+        kind="scorers"
+        :org-id="orgId"
+        :score-configs="scoreConfigs"
+        :scorers="allScorers"
+        :providers="providers"
+        @imported="$emit('imported')"
+      />
       <OTable
+        v-else
         data-test="scorer-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -107,6 +139,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type {
   EvalJob,
+  Provider,
   ScoreConfig,
   Scorer,
   ScorerType,
@@ -114,14 +147,19 @@ import type {
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
+import OnlineEvalsCatalog from "./OnlineEvalsCatalog.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
   rows: Scorer[];
+  allScorers: Scorer[];
   jobs: EvalJob[];
   scoreConfigs: ScoreConfig[];
+  providers: Provider[];
+  orgId: string;
   search: string;
   loading?: boolean;
+  showCatalog?: boolean;
 }>();
 
 defineEmits<{
@@ -130,6 +168,8 @@ defineEmits<{
   (e: "edit", row: Scorer): void;
   (e: "view", row: Scorer): void;
   (e: "delete", row: Scorer): void;
+  (e: "imported"): void;
+  (e: "toggle-catalog"): void;
 }>();
 
 const { t } = useI18n();
@@ -217,9 +257,13 @@ const numberedRows = useNumberedRows(filteredRows);
 const showEmptyState = computed(
   () =>
     !props.loading &&
-    props.rows.length === 0 &&
+    props.allScorers.length === 0 &&
     !props.search &&
     !typeFilter.value,
+);
+
+const shouldShowCatalog = computed(
+  () => !props.loading && props.rows.length === 0 && !props.search && !typeFilter.value,
 );
 
 function scorerTypeLabel(type: ScorerType) {

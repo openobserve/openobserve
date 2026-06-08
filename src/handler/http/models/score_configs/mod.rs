@@ -19,7 +19,7 @@ use utoipa::ToSchema;
 
 /// HTTP request body for creating a Score Config.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScoreConfigRequestBody {
     pub name: String,
     #[schema(value_type = String)]
@@ -38,7 +38,7 @@ pub struct ScoreConfigRequestBody {
 /// If provided, `name` is updated by creating a new version.
 /// `data_type` is immutable across versions.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScoreConfigUpdateRequestBody {
     #[serde(default)]
     pub name: Option<String>,
@@ -212,6 +212,20 @@ mod tests {
         assert_eq!(config.name, "accuracy");
         assert_eq!(config.data_type, ScoreConfigDataType::Numeric);
         assert_eq!(config.version, 0);
+    }
+
+    #[test]
+    fn test_score_config_request_rejects_catalog_metadata() {
+        let result: Result<ScoreConfigRequestBody, _> = serde_json::from_value(serde_json::json!({
+            "name": "accuracy",
+            "displayName": "Accuracy",
+            "category": "Safety & Quality",
+            "level": "span",
+            "dataType": "numeric",
+            "numericRange": {"min": 0.0, "max": 1.0}
+        }));
+
+        assert!(result.is_err());
     }
 
     #[test]

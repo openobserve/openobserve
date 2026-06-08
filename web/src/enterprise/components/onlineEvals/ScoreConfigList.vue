@@ -5,12 +5,22 @@
     :search="search"
     :search-placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
     :add-label="t('onlineEvals.scoreConfig.newButton')"
-    :show-empty="showEmptyState"
+    :show-empty="showEmptyState || shouldShowCatalog"
     @update:search="$emit('update:search', $event)"
     @create="$emit('create')"
   >
     <template #empty>
+      <OnlineEvalsCatalog
+        v-if="shouldShowCatalog"
+        kind="scoreConfigs"
+        :org-id="orgId"
+        :score-configs="allScoreConfigs"
+        :scorers="scorers"
+        :providers="providers"
+        @imported="$emit('imported')"
+      />
       <EvalEmptyState
+        v-else
         data-test="score-config-empty-state"
         icon="fact-check"
         :title="t('onlineEvals.scoreConfig.empty.title')"
@@ -25,6 +35,18 @@
       />
     </template>
 
+    <template #actions>
+      <OButton
+        class="tw:ml-2"
+        variant="secondary"
+        size="sm"
+        data-test="score-config-browse-library-btn"
+        @click="$emit('toggle-catalog')"
+      >
+        {{ showCatalog ? "Hide Library" : "Browse Library" }}
+      </OButton>
+    </template>
+
     <template #filter>
       <OSelect
         v-model="typeFilter"
@@ -37,7 +59,17 @@
     </template>
 
     <template #table>
+      <OnlineEvalsCatalog
+        v-if="showCatalog"
+        kind="scoreConfigs"
+        :org-id="orgId"
+        :score-configs="allScoreConfigs"
+        :scorers="scorers"
+        :providers="providers"
+        @imported="$emit('imported')"
+      />
       <OTable
+        v-else
         data-test="score-config-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -112,20 +144,25 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
+import type { Provider, ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
+import OnlineEvalsCatalog from "./OnlineEvalsCatalog.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 type DataType = "numeric" | "categorical" | "boolean";
 
 const props = defineProps<{
   rows: ScoreConfig[];
+  allScoreConfigs: ScoreConfig[];
   scorers: Scorer[];
+  providers: Provider[];
+  orgId: string;
   search: string;
   loading?: boolean;
+  showCatalog?: boolean;
 }>();
 
 defineEmits<{
@@ -134,6 +171,8 @@ defineEmits<{
   (e: "edit", row: ScoreConfig): void;
   (e: "view", row: ScoreConfig): void;
   (e: "delete", row: ScoreConfig): void;
+  (e: "imported"): void;
+  (e: "toggle-catalog"): void;
 }>();
 
 const { t } = useI18n();
@@ -231,9 +270,13 @@ const numberedRows = useNumberedRows(filteredRows);
 const showEmptyState = computed(
   () =>
     !props.loading &&
-    props.rows.length === 0 &&
+    props.allScoreConfigs.length === 0 &&
     !props.search &&
     !typeFilter.value,
+);
+
+const shouldShowCatalog = computed(
+  () => !props.loading && props.rows.length === 0 && !props.search && !typeFilter.value,
 );
 
 function rowCreated(row: ScoreConfig) {

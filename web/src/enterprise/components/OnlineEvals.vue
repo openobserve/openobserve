@@ -62,27 +62,39 @@ the Free Software Foundation, either version 3 of the License, or
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
             :rows="(filteredRows as ScoreConfig[])"
+            :all-score-configs="scoreConfigs"
             :scorers="scorers"
+            :providers="providers"
+            :org-id="orgId"
             :search="filterQuery"
             :loading="isLoading"
+            :show-catalog="catalogOpenTab === 'scoreConfigs'"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row) => openViewDialog(row)"
             @edit="(row) => openEditDialog(row)"
             @delete="(row) => deleteRow(row)"
+            @imported="handleCatalogImported"
+            @toggle-catalog="toggleCatalog('scoreConfigs')"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
             :rows="(filteredRows as Scorer[])"
+            :all-scorers="scorers"
             :jobs="jobs"
             :score-configs="scoreConfigs"
+            :providers="providers"
+            :org-id="orgId"
             :search="filterQuery"
             :loading="isLoading"
+            :show-catalog="catalogOpenTab === 'scorers'"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row: Scorer) => openScorerView(row)"
             @edit="(row: Scorer) => openEditDialog(row)"
             @delete="(row: Scorer) => deleteRow(row)"
+            @imported="handleCatalogImported"
+            @toggle-catalog="toggleCatalog('scorers')"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -224,6 +236,7 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
+const catalogOpenTab = ref<ActiveTab | null>(null);
 
 const {
   jobs,
@@ -454,6 +467,14 @@ async function handleSaved() {
   scorerTypeDialog.value = false;
   clearRouteAction();
   await loadAll(orgId.value);
+}
+
+async function handleCatalogImported() {
+  await loadAll(orgId.value);
+}
+
+function toggleCatalog(tab: ActiveTab) {
+  catalogOpenTab.value = catalogOpenTab.value === tab ? null : tab;
 }
 
 function syncFromRoute() {

@@ -21,14 +21,19 @@ use utoipa::ToSchema;
 #[serde(rename_all = "camelCase")]
 pub struct ProviderRequestBody {
     pub name: String,
+    #[serde(alias = "provider_type")]
     pub provider_type: String,
     #[serde(default)]
     pub endpoint: Option<String>,
+    #[serde(alias = "default_model")]
     pub default_model: String,
     #[serde(default)]
+    #[serde(alias = "available_models")]
     pub available_models: Vec<String>,
+    #[serde(alias = "auth_config")]
     pub auth_config: serde_json::Value,
     #[serde(default)]
+    #[serde(alias = "is_default")]
     pub is_default: bool,
 }
 
@@ -139,5 +144,24 @@ mod tests {
         let provider = infra::table::providers::Provider::from(body);
         assert!(provider.id.is_empty());
         assert_eq!(provider.name, "Test");
+    }
+
+    #[test]
+    fn test_provider_request_body_accepts_snake_case_json() {
+        let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test",
+            "provider_type": "openai",
+            "default_model": "gpt-4o",
+            "available_models": ["gpt-4o", "gpt-4o-mini"],
+            "auth_config": {"api_key": "k"},
+            "is_default": true
+        }))
+        .unwrap();
+
+        assert_eq!(body.provider_type, "openai");
+        assert_eq!(body.default_model, "gpt-4o");
+        assert_eq!(body.available_models, vec!["gpt-4o", "gpt-4o-mini"]);
+        assert_eq!(body.auth_config, serde_json::json!({"api_key": "k"}));
+        assert!(body.is_default);
     }
 }
