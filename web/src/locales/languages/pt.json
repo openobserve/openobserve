@@ -3108,7 +3108,10 @@
         "cost": "Custo",
         "spans": "Vãos"
       }
-    }
+    },
+    "serviceMap": "Mapa de serviços",
+    "patternView": "Visualização de padrões",
+    "spanView": "Vista da Espanha"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

@@ -3108,7 +3108,10 @@
         "cost": "Kosten",
         "spans": "Spannweiten"
       }
-    }
+    },
+    "serviceMap": "Karte des Service",
+    "patternView": "Musteransicht",
+    "spanView": "Span-Ansicht"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

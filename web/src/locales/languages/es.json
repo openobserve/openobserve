@@ -3106,7 +3106,10 @@
         "cost": "Coste",
         "spans": "Vanos"
       }
-    }
+    },
+    "serviceMap": "Mapa de servicios",
+    "patternView": "Vista de patrón",
+    "spanView": "Vista de España"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",

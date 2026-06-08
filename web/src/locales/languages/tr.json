@@ -3119,7 +3119,10 @@
         "cost": "Maliyet",
         "spans": "Açıklıklar"
       }
-    }
+    },
+    "serviceMap": "Servis Haritası",
+    "patternView": "Desen Görünümü",
+    "spanView": "Açıklık Görünümü"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

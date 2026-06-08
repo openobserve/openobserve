@@ -3129,7 +3129,10 @@
         "cost": "費用",
         "spans": "スパン"
       }
-    }
+    },
+    "serviceMap": "サービスマップ",
+    "patternView": "パターンビュー",
+    "spanView": "スパンビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",

@@ -3119,7 +3119,10 @@
         "cost": "Kost",
         "spans": "Overspant"
       }
-    }
+    },
+    "serviceMap": "Servicekaart",
+    "patternView": "Patroonweergave",
+    "spanView": "Spanweergave"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
