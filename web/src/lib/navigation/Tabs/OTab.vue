@@ -69,14 +69,17 @@ const stateClasses = computed<string>(() => {
     ].join(' ')
   }
   if (isActive.value) {
-    // Horizontal tabs: underline-only (colored text + bottom border, no bg pill).
+    // Horizontal tabs: colored text only. The active underline is a single
+    // shared bar in OTabs that slides between tabs, so each tab keeps a
+    // transparent 2px border (layout parity with inactive) rather than drawing
+    // its own colored one.
     // Vertical tabs (side rail): tint bg + primary text, NO left bar — identical
     // to SectionRail and the prototype .l2-link so every vertical nav matches.
     return [
       'tw:text-tabs-active-text tw:cursor-pointer',
       isVertical.value
         ? 'tw:bg-tabs-active-bg'
-        : 'tw:border-b-2 tw:border-tabs-indicator',
+        : 'tw:border-b-2 tw:border-transparent',
     ].join(' ')
   }
   return [
