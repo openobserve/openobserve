@@ -221,8 +221,8 @@ const dataTypeOptions = [
 ];
 
 const editorHeights = computed(() => ({
-  urlEditor: "calc(100vh - 286px)",
-  fileEditor: "calc(100vh - 290px)",
+  urlEditor: "calc(100vh - 266px)",
+  fileEditor: "calc(100vh - 296px)",
   outputContainer: "calc(100vh - 130px)",
   errorReport: "calc(100vh - 192px)",
 }));
