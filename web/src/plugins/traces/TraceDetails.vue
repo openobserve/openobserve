@@ -465,21 +465,20 @@ size="14px"
                   }}
                 </OButton>
               </span>
-              <OButton
-                v-if="hasRumSessionId"
-                data-test="trace-details-view-session-replay-btn"
-                variant="outline"
-                size="sm"
-                class="tw:ml-2"
-                @click="redirectToSessionReplay"
-              >
-                <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle"
-size="14px"
-                /></template>
-                {{ t("rum.playSessionReplay") }}
-              </OButton>
             </div>
+            <OButton
+              v-if="hasRumSessionId"
+              data-test="trace-details-view-session-replay-btn"
+              variant="outline"
+              size="sm"
+              class="tw:ml-2"
+              @click="redirectToSessionReplay"
+            >
+              <template #icon-left
+                ><q-icon :name="outlinedPlayCircle" size="14px"
+              /></template>
+              {{ t("rum.playSessionReplay") }}
+            </OButton>
           </div>
         </div>
         <div
@@ -969,6 +968,7 @@ import {
   outlinedPlayCircle,
 } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
@@ -1799,11 +1799,9 @@ export default defineComponent({
         return;
       }
 
-      // Standalone mode - fetch from API
-      if (props.mode === "standalone") {
+      // Fetch from API — standalone mode, or embedded with no pre-fetched spans
         await loadLogStreams();
         await getTraceMeta();
-      }
     };
 
     onMounted(async () => {
@@ -1999,144 +1997,8 @@ export default defineComponent({
       return req;
     };
 
-    /**
-     * Fetch RUM events that have the matching trace_id
-     */
-    const fetchRumEventsForTrace = async (
-      traceId: string,
-      startTime: number,
-      endTime: number,
-    ) => {
-      try {
-        // Check if _rumdata stream exists in logs
-        if (!logStreams.value.includes("_rumdata")) {
-          return [];
-        }
-
-        // Check if traceId is valid (indicating _oo_trace_id might be present)
-        if (!traceId) {
-          return [];
-        }
-
-        // Verify _oo_trace_id field exists in _rumdata stream schema
-        const rumStream = await getStream("_rumdata", "logs", true);
-        const hasTraceIdField = rumStream?.schema?.some(
-          (field: any) => field.name === "_oo_trace_id",
-        );
-
-        if (!hasTraceIdField) {
-          return [];
-        }
-
-        const req = {
-          query: {
-            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-            start_time: startTime - 10000000,
-            end_time: endTime + 10000000,
-            from: 0,
-            size: 100,
-          },
-        };
-
-        const res = await searchService.search(
-          {
-            org_identifier:
-              (router.currentRoute.value.query?.org_identifier as string) ||
-              store.state.selectedOrganization.identifier,
-            query: req,
-            page_type: "logs",
-          },
-          "RUM",
-        );
-
-        return res.data?.hits || [];
-      } catch (error) {
-        console.error("Error fetching RUM events for trace:", error);
-        return [];
-      }
-    };
-
-    /**
-     * Format RUM events as trace spans
-     * This converts RUM event structure to span structure
-     */
-    const formatRumEventsAsSpans = (rumEvents: any[]) => {
-      if (!rumEvents || !rumEvents.length) return [];
-
-      return rumEvents.map((event: any) => {
-        // Calculate start_time and end_time from event timestamp and duration
-        const eventTimestamp = event.date * 1000000; // Convert to nanoseconds
-        const durationNs =
-          event.resource_duration || event.action_duration || 0; // in nanoseconds
-
-        const startTime = eventTimestamp;
-        const endTime = eventTimestamp + durationNs;
-
-        // Determine operation name based on event type
-        let operationName = "Unknown RUM Event";
-        if (event.type === "resource") {
-          operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
-        } else if (event.type === "action") {
-          operationName = `Action: ${event.action_type || "Unknown"} on ${event.action_target_name || "Unknown"}`;
-        } else if (event.type === "view") {
-          operationName = `View: ${event.view_url || "Unknown Page"}`;
-        } else if (event.type === "error") {
-          operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
-        }
-
-        // Generate a unique span_id for the RUM event
-        const spanId =
-          event._oo_span_id ||
-          event[`${event.type}_id`] ||
-          `rum_${event.type}_${event.date}_${Math.random().toString(36).substring(7)}`;
-
-        // Determine parent_span_id from _oo_span_id if available
-        const parentSpanId =
-          event._oo_parent_span_id || event._oo_span_id || "";
-
-        // Add service to selectedTrace if not already present
-        const serviceName = event.service || "Frontend";
-        const traceObj = searchObj.data.traceDetails.selectedTrace as any;
-        const existingService = traceObj.service_name.find(
-          (s: any) => s.service_name === serviceName,
-        );
-
-        if (!existingService) {
-          traceObj.service_name.push({
-            service_name: serviceName,
-            count: 1,
-          });
-        } else {
-          existingService.count = (existingService.count || 0) + 1;
-        }
-
-        return {
-          [store.state.zoConfig.timestamp_column]:
-            event[store.state.zoConfig.timestamp_column],
-          start_time: startTime,
-          end_time: endTime,
-          duration: durationNs / 1000,
-          span_id: spanId,
-          trace_id: event._oo_trace_id,
-          operation_name: operationName,
-          service_name: event.service || "Frontend",
-          span_status:
-            event.type === "error" ||
-            (event.type === "resource" && event.resource_status_code >= 400)
-              ? "ERROR"
-              : "OK",
-          span_kind:
-            event.type === "resource"
-              ? SPAN_KIND_CLIENT
-              : SPAN_KIND_UNSPECIFIED,
-          // Store original RUM event data for reference
-          rum_event_type: event.type,
-          rum_session_id: event.session_id,
-          events: JSON.stringify([event]),
-          rum_date: event.date,
-        };
-      });
-    };
+    const { fetchRumEventsForTrace, formatRumEventsAsSpans } =
+      useRumSpanBuilder(logStreams, searchObj);
 
     const getTraceDetails = async (data: any) => {
       try {
@@ -2161,15 +2023,34 @@ export default defineComponent({
         );
 
         Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumEvents]) => {
+          .then(([traceRes, rumData]) => {
             if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
             }
 
             const traceSpans = traceRes.data?.hits || [];
-            const rumSpans = formatRumEventsAsSpans(rumEvents);
-            searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
+            const {
+              tracedResources,
+              viewEvents,
+              actionEvents,
+              allViewEvents,
+            } = rumData;
+            const rumSpans = formatRumEventsAsSpans(
+              tracedResources,
+              viewEvents,
+              actionEvents,
+              allViewEvents,
+            );
+            // RUM spans take priority over trace spans with the same span_id
+            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+            const deduplicatedTraceSpans = traceSpans.filter(
+              (s: any) => !rumSpanIds.has(s.span_id),
+            );
+            searchObj.data.traceDetails.spanList = [
+              ...rumSpans,
+              ...deduplicatedTraceSpans,
+            ];
             updateServiceColors();
             buildTracesTree();
           })
@@ -2253,6 +2134,7 @@ export default defineComponent({
 
     const calculateTracePosition = () => {
       const tics = [];
+      console.log(timeRange);
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
