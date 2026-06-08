@@ -26,8 +26,8 @@ describe('App.vue', () => {
   let wrapper: VueWrapper;
   let store: any;
   let router: any;
-  let mockDispatch: any;
-  let mockPush: any;
+  let mockDispatch: ReturnType<typeof vi.fn>;
+  let mockPush: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     // Reset mocks
