@@ -257,7 +257,10 @@ def ingest_query_agent_data():
 
     def _data_is_searchable():
         now = datetime.now(UTC)
-        end_us = int(now.timestamp() * 1_000_000)
+        # Records have timestamps from BASE_TS to BASE_TS + ~66 min (future).
+        # Extend end_us past _max_ts so the COUNT(*) window covers all records.
+        # The vortex search engine enforces end_time strictly; parquet WAL does not.
+        end_us = max(int(now.timestamp() * 1_000_000), _max_ts) + 3_600_000_000
         start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
         # Check stream 1
         r1 = client.post("_search?type=logs", json={
@@ -294,7 +297,7 @@ def ingest_query_agent_data():
             "query": {
                 "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": _max_ts - 60_000_000,
-                "end_time": _max_ts + 60_000_000,
+                "end_time": _max_ts + 3_600_000_000,
                 "from": 0,
                 "size": 1,
             }
