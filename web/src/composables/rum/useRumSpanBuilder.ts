@@ -77,19 +77,18 @@ export default function useRumSpanBuilder(
    * Fetch action events for the given action ID.
    */
   const fetchActionEvents = async (
-    actionId: string,
+    actionId: string[],
     startTime: number,
     endTime: number,
   ): Promise<any[]> => {
     try {
       const orgId = getOrgId();
-      const sanitized = sanitizeTraceId(actionId);
       const res = await searchService.search(
         {
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE action_id = '${sanitized}' and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              sql: `SELECT * FROM "_rumdata" WHERE action_id IN (${actionId.map((id) => `'${sanitizeTraceId(id)}'`).join(",")}) and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
               start_time: startTime - 10000000,
               end_time: endTime + 10000000,
               from: 0,
@@ -205,7 +204,7 @@ export default function useRumSpanBuilder(
       } catch {
         parsedActionIds = [];
       }
-      const primaryActionId = parsedActionIds[0] || "";
+      const primaryActionId = parsedActionIds || "";
 
       // Run all 3 queries in parallel
       const [viewEvents, actionEvents, allViewEvents] = await Promise.all([
@@ -225,18 +224,28 @@ export default function useRumSpanBuilder(
 
   const tsCol = () => store.state.zoConfig.timestamp_column;
 
-  const parseActionId = (actionId: string): string => {
-    try {
-      const parsed = JSON.parse(actionId || "[]");
-      return parsed[0] || "";
-    } catch {
-      return "";
-    }
-  };
+  const resolveParentSpanId = (event: any, actionEvents: any[] = []): string => {
+    // Build a lookup of action IDs that were actually fetched and have a span in the tree.
+    const fetchedActionIds = new Set(
+      actionEvents.map((a: any) => String(a.action_id)),
+    );
 
-  const resolveParentSpanId = (event: any): string => {
-    const actionId = parseActionId(event.action_id);
-    if (actionId) return `rum_action_${actionId}`;
+    let actionIds: string[] = [];
+    try {
+      const parsed = JSON.parse(event.action_id || "[]");
+      actionIds = Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      // Not a JSON array — treat as a plain string ID.
+      if (event.action_id) actionIds = [String(event.action_id)];
+    }
+
+    // Use the first action ID that has a real fetched span.
+    // If none match, fall through to view_id — a ghost action reference
+    // would leave the span orphaned at the root level.
+    for (const id of actionIds) {
+      if (fetchedActionIds.has(id)) return `rum_action_${id}`;
+    }
+
     if (event.view_id) return `rum_view_${event.view_id}`;
     return "";
   };
@@ -311,43 +320,6 @@ export default function useRumSpanBuilder(
     };
   };
 
-  const buildSessionSpans = (
-    allViewEvents: any[],
-    traceId: string,
-  ): any[] => {
-    const sessionIds = new Set(
-      allViewEvents.map((e: any) => e.session_id).filter(Boolean),
-    );
-    const allDates = allViewEvents
-      .map((e: any) => e.date)
-      .filter((d: any) => typeof d === "number");
-    const globalMin = allDates.length ? Math.min(...allDates) : 0;
-    const globalMax = allDates.length ? Math.max(...allDates) : 0;
-
-    return [...sessionIds].map((sessionId) => {
-      const sessionEvents = allViewEvents.filter(
-        (e: any) => e.session_id === sessionId,
-      );
-      const dates = sessionEvents
-        .map((e: any) => e.date)
-        .filter((d: any) => typeof d === "number");
-      return {
-        [tsCol()]: dates.length ? Math.min(...dates) : globalMin,
-        start_time: (dates.length ? Math.min(...dates) : globalMin) * 1_000_000,
-        end_time: (dates.length ? Math.max(...dates) : globalMax) * 1_000_000,
-        duration: ((dates.length ? Math.max(...dates) : globalMax) - (dates.length ? Math.min(...dates) : globalMin)) * 1000,
-        span_id: `rum_session_${sessionId}`,
-        trace_id: traceId || undefined,
-        operation_name: `RUM Session: ${String(sessionId).substring(0, 8)}`,
-        service_name: "Frontend",
-        span_status: "OK",
-        span_kind: SPAN_KIND_UNSPECIFIED,
-        rum_event_type: "session",
-        rum_session_id: sessionId,
-      };
-    });
-  };
-
   const buildViewSpans = (
     viewEvents: any[],
     traceId: string,
@@ -369,9 +341,7 @@ export default function useRumSpanBuilder(
         end_time: ((view.date || 0) + (viewDuration/1000000)) * 1_000_000,
         duration: viewDuration/1000,
         span_id: `rum_view_${view.view_id}`,
-        reference_parent_span_id: view.session_id
-          ? `rum_session_${view.session_id}`
-          : "",
+        reference_parent_span_id: "",
         trace_id: traceId || undefined,
         operation_name: `View: ${view.view_url || view.view_name || "Unknown Page"}`,
         service_name: view.service || "Frontend",
@@ -477,21 +447,22 @@ export default function useRumSpanBuilder(
     return { staticAssets, apiCalls, errors, longTasks };
   };
 
-  const buildResourceSpans = (apiCalls: any[]): any[] =>
+  const buildResourceSpans = (apiCalls: any[], actionEvents: any[]): any[] =>
     apiCalls.map((event) =>
-      createLeafSpan(event, resolveParentSpanId(event)),
+      createLeafSpan(event, resolveParentSpanId(event, actionEvents)),
     );
 
   const buildErrorSpans = (
     errors: any[],
     firstTracedResource: any,
     traceId: string,
+    actionEvents: any[] = [],
   ): any[] => {
     if (!errors.length) return [];
     const spans: any[] = [];
 
     for (const event of errors.slice(0, 3)) {
-      spans.push(createLeafSpan(event, resolveParentSpanId(event)));
+      spans.push(createLeafSpan(event, resolveParentSpanId(event, actionEvents)));
     }
 
     if (errors.length > 3) {
@@ -611,11 +582,10 @@ export default function useRumSpanBuilder(
       classifyLeafEvents(allViewEvents);
 
     const spans: any[] = [
-      ...buildSessionSpans(allViewEvents, traceId),
       ...buildViewSpans(viewEvents, traceId),
       ...buildActionSpans(actionEvents, firstTracedResource, traceId, tracedTimestamp),
-      ...buildResourceSpans(apiCalls),
-      ...buildErrorSpans(errors, firstTracedResource, traceId),
+      ...buildResourceSpans(apiCalls, actionEvents),
+      ...buildErrorSpans(errors, firstTracedResource, traceId, actionEvents),
       ...buildStaticAssetSpans(staticAssets, firstTracedResource, traceId),
       ...buildLongTaskSpans(longTasks, firstTracedResource, traceId),
     ];
