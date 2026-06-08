@@ -4,7 +4,18 @@ import type { Component } from "vue";
 import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
 
 // ─── Shared column size constants ────────────────────────────────
-export const TABLE_INDEX_COL_SIZE = 26;
+/**
+ * Fixed width (px) of the auto-rendered selection-checkbox column. Includes the
+ * left padding (TABLE_CHECKBOX_COL_PAD_LEFT) that insets the box from the table
+ * edge. Imported by OTableHeader/OTableBodyRow so the three stay in sync.
+ */
+export const TABLE_CHECKBOX_COL_PAD_LEFT = 18;
+export const TABLE_CHECKBOX_COL_SIZE = 44;
+/**
+ * Fixed width (px) of the row-index ("#") column. Wide enough to fit a
+ * zero-padded 3-digit number at text-xs plus the cell's horizontal padding.
+ */
+export const TABLE_INDEX_COL_SIZE = 44;
 
 export const COL = {
   name:         200,
@@ -15,6 +26,9 @@ export const COL = {
   status:       100,
   toggle:        80,
   date:         160,
+  // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
+  createdAt:    180,
+  updatedAt:    180,
   duration:     120,
   frequency:    130,
   type:         120,
@@ -220,6 +234,15 @@ export interface OTableProps<TData = any> {
   maxHeight?: string | number;
 
   // ── Column Features ──
+  /**
+   * Auto-render a fixed-width row-index ("#") column as the first data column.
+   * OTable injects the column, fixes its width (TABLE_INDEX_COL_SIZE), and
+   * numbers rows by their position (accounting for the page offset under
+   * server-side pagination). Pages no longer need to declare a `#` column or
+   * inject a `"#"` value into row data. Ignored if the caller already provides
+   * a column with id `"#"`.
+   */
+  showIndex?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   enableColumnPin?: boolean;

@@ -7,7 +7,7 @@ import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-const TABLE_CHECKBOX_COL_WIDTH = 26;
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
 
 const props = defineProps<{
   row: Row<any>;
@@ -174,14 +174,14 @@ function onDblclick(event: MouseEvent) {
     <td
       v-if="selectionEnabled"
       :class="[
-        'tw:text-center tw:align-middle',
+        'tw:text-left tw:align-middle',
         bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
         isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
       ]"
-      :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px' }"
+      :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       data-test="o2-table-select-cell"
     >
-      <div class="tw:flex tw:items-center tw:justify-center">
+      <div class="tw:flex tw:items-center tw:justify-start">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"

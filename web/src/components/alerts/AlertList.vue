@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-list-table"
                 :data="filteredResults || []"
                 :columns="columns"
+                show-index
                 row-key="alert_id"
                 :loading="loading"
                 pagination="client"
@@ -735,7 +736,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1005,13 +1006,6 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => {
       const baseColumns: OTableColumnDef[] = [
         {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          size: TABLE_INDEX_COL_SIZE,
-          meta: { align: "left" },
-        },
-        {
           id: "name",
           accessorKey: "name",
           header: t("alerts.name"),
@@ -1020,7 +1014,9 @@ export default defineComponent({
           hideable: true,
           size: COL.name,
           minSize: 200,
-          meta: { align: "left" },
+          // Elastic column: absorbs the table's leftover width so the fixed
+          // columns (#, dates, actions) keep their exact widths.
+          meta: { align: "left", autoWidth: true },
         },
         {
           id: "owner",
@@ -1124,9 +1120,9 @@ export default defineComponent({
         },
       ];
 
-      // insert folder_name column if applicable
+      // insert folder_name column after the name column if applicable
       if (searchAcrossFolders.value && searchQuery.value !== "") {
-        baseColumns.splice(2, 0, {
+        baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
           header: "Folder",
@@ -1179,7 +1175,6 @@ export default defineComponent({
       anomaly: any,
       counter: number,
     ): any => ({
-      "#": counter <= 9 ? `0${counter}` : `${counter}`,
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1323,7 +1318,6 @@ export default defineComponent({
           }
 
           return {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
             alert_id: data.alert_id,
             name: data.name,
             alert_type: data.is_real_time ? "Real Time" : "Scheduled",

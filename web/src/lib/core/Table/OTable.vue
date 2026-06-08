@@ -1,11 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, getCurrentInstance, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, provide, ref, toRef, useSlots, watch } from "vue";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
-import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, type OTableProps, type OTableEmits, type OTableSlots } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
 import { useTablePagination } from "./composables/useTablePagination";
@@ -224,6 +224,7 @@ provide("o2TableHorizontalScroll", computed(() => !!props.horizontalScroll));
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
+  effectiveColumns,
   columnOrder,
   columnSizing,
   isClientSort,
@@ -234,6 +235,8 @@ const {
     get data() { return tree.enabled.value ? tree.flatRows.value : props.data; },
     get columns() { return props.columns; },
     get pageSize() { return props.pageSize; },
+    get currentPage() { return props.currentPage; },
+    showIndex: props.showIndex,
     sortBy: props.sortBy,
     sortOrder: props.sortOrder,
     sortFieldMap: props.sortFieldMap,
@@ -359,6 +362,120 @@ const {
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
+
+// ── Actions column content-measurement ──────────────────────────
+// The actions column has no fixed semantic width — it's "as wide as its
+// buttons, no more". We can't know that from the column def (buttons live in a
+// slot), so after each render we measure the rendered action cells and pin the
+// column's CSS size var to the widest content. These vars override the nominal
+// sizes computed in useTableCore.
+const measuredColumnSizeVars = ref<Record<string, string>>({});
+
+function measureActionColumns() {
+  const root = scrollContainerRef.value;
+  if (!root) return;
+  const actionCols = effectiveColumns.value.filter(
+    (c) => c.isAction === true || c.id === "actions",
+  );
+  if (!actionCols.length) {
+    if (Object.keys(measuredColumnSizeVars.value).length) {
+      measuredColumnSizeVars.value = {};
+    }
+    return;
+  }
+  const next: Record<string, string> = {};
+  for (const col of actionCols) {
+    const safeId = col.id.replace(/[^a-zA-Z0-9]/g, "-");
+    const cells = root.querySelectorAll<HTMLElement>(
+      `td[data-test="o2-table-cell-${col.id}"]`,
+    );
+    if (!cells.length) continue;
+    let contentMax = 0;
+    let padX = 16; // fallback: tw:px-2 (8px each side)
+    cells.forEach((cell, i) => {
+      if (i === 0) {
+        const cs = getComputedStyle(cell);
+        padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      }
+      // The slot wrapper is inline-flex (natural content width) even when the
+      // td is momentarily narrower, so its rect is the true content width.
+      const wrapper = cell.firstElementChild as HTMLElement | null;
+      const w = wrapper
+        ? wrapper.getBoundingClientRect().width
+        : cell.getBoundingClientRect().width;
+      if (w > contentMax) contentMax = w;
+    });
+    if (contentMax > 0) {
+      const total = `${Math.ceil(contentMax + padX) + 1}px`;
+      next[`--header-${safeId}-size`] = total;
+      next[`--col-${col.id}-size`] = total;
+    }
+  }
+  const cur = measuredColumnSizeVars.value;
+  const changed =
+    Object.keys(next).length !== Object.keys(cur).length ||
+    Object.keys(next).some((k) => next[k] !== cur[k]);
+  if (changed) measuredColumnSizeVars.value = next;
+}
+
+function scheduleMeasureActions() {
+  nextTick(() => requestAnimationFrame(measureActionColumns));
+}
+
+onMounted(scheduleMeasureActions);
+watch(
+  [displayRows, effectiveColumns, () => props.loading, () => props.dense],
+  scheduleMeasureActions,
+  { flush: "post" },
+);
+
+// ── Resizable-table width strategy ──────────────────────────────
+// With `table-fixed; width:100%` resizing one column forces the total back to
+// 100% by squeezing the others (and they can collapse past their min-width).
+// Instead, when resizing is enabled we set an explicit table width of
+// max(container, sum-of-columns): the table fills the viewport when it fits and
+// grows + scrolls horizontally when it doesn't — so a drag only changes the
+// dragged column, and the elastic (autoWidth) column absorbs any slack while
+// every other column keeps its exact width.
+const EXPANSION_COL_WIDTH = 16; // tw:w-4
+const containerWidth = ref(0);
+let containerRO: ResizeObserver | null = null;
+
+onMounted(() => {
+  if (scrollContainerRef.value && typeof ResizeObserver !== "undefined") {
+    containerWidth.value = scrollContainerRef.value.clientWidth;
+    containerRO = new ResizeObserver(() => {
+      containerWidth.value = scrollContainerRef.value?.clientWidth ?? 0;
+    });
+    containerRO.observe(scrollContainerRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  containerRO?.disconnect();
+  containerRO = null;
+});
+
+const useComputedWidth = computed(
+  () => props.enableColumnResize && !props.horizontalScroll && !props.defaultColumns,
+);
+
+const computedTableWidth = computed<string | undefined>(() => {
+  if (!useComputedWidth.value) return undefined;
+  // Touch reactive sources so the width recomputes on resize / column change.
+  void columnSizing.value;
+  void effectiveColumns.value;
+  const measured = measuredColumnSizeVars.value;
+  let sum = 0;
+  for (const col of table.getVisibleLeafColumns()) {
+    const m = col.columnDef.meta as any;
+    const measuredVar = m?.isAction ? measured[`--col-${col.id}-size`] : undefined;
+    sum += measuredVar ? parseFloat(measuredVar) : col.getSize();
+  }
+  if (selection.isMultiple.value) sum += TABLE_CHECKBOX_COL_SIZE;
+  if (expansion.isEnabled.value) sum += EXPANSION_COL_WIDTH;
+  const cw = containerWidth.value;
+  return `${cw ? Math.max(cw, sum) : sum}px`;
+});
 
 // Virtual measureElement callback — wraps the virtualizer's measure
 function measureElement(el: any) {
@@ -552,12 +669,14 @@ defineExpose({
     >
       <table
         :class="[
-          props.horizontalScroll ? 'tw:min-w-max' : 'tw:w-full',
+          props.horizontalScroll ? 'tw:min-w-max' : (useComputedWidth ? '' : 'tw:w-full'),
           props.horizontalScroll || props.defaultColumns ? 'tw:table-auto' : 'tw:table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{
           ...columnSizeVars,
+          ...measuredColumnSizeVars,
+          ...(computedTableWidth ? { width: computedTableWidth } : {}),
           '--o2-table-row-height': props.rowHeight != null
             ? `${props.rowHeight}px`
             : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
