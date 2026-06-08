@@ -78,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, bordered, no shadow. All pages render inside this. -->
-          <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:border tw:border-border-default tw:rounded-xl tw:overflow-hidden">
+          <!-- White content card — rounded, soft shadow (no border). All pages render inside this. -->
+          <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]">
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
