@@ -4038,6 +4038,106 @@
       "queries": "requêtes",
       "serviceAccounts": "comptes de service",
       "invitations": "invitations"
+    },
+    "noDashboardsInFolder": {
+      "title": "Aucun tableau de bord dans ce dossier",
+      "description": "Ce dossier est vide. Ajoutez un tableau de bord ici ou déplacez-en un depuis un autre dossier.",
+      "action": "Nouveau tableau de bord",
+      "actionDesc": "Créez un tableau de bord dans ce dossier",
+      "import": "Tableau de bord d'importation",
+      "importDesc": "Charger un fichier JSON de tableau de bord",
+      "templates": "Parcourir les modèles",
+      "templatesDesc": "Commencez à partir d'un tableau de bord communautaire"
+    },
+    "noGroups": {
+      "title": "Pas encore de groupes",
+      "description": "Les groupes vous permettent de gérer les autorisations de plusieurs utilisateurs à la fois. Créez-en un pour commencer.",
+      "action": "Nouveau groupe",
+      "actionDesc": "Création d'un groupe d'utilisateurs"
+    },
+    "noRoles": {
+      "title": "Aucun rôle pour l'instant",
+      "description": "Les rôles définissent les actions que les utilisateurs peuvent effectuer. Créez un rôle personnalisé pour contrôler l'accès.",
+      "action": "Nouveau rôle",
+      "actionDesc": "Définir un rôle d'accès personnalisé"
+    },
+    "noAnomalyConfigs": {
+      "title": "Aucune détection d'anomalie configurée",
+      "description": "Configurez la détection des anomalies pour identifier automatiquement les tendances inhabituelles dans vos données.",
+      "action": "Nouvelle configuration",
+      "actionDesc": "Configuration de la détection des anomalies"
+    },
+    "noApiLimits": {
+      "title": "Aucune limite d'API configurée",
+      "description": "Les limites de l'API contrôlent la quantité de données que chaque organisation peut ingérer et interroger par fenêtre temporelle."
+    },
+    "noRoleLimits": {
+      "title": "Aucune limite de rôle configurée",
+      "description": "Les limites de rôles définissent les quotas d'ingestion et de requêtes appliqués aux rôles individuels au sein d'une organisation."
+    },
+    "noIngestionTokens": {
+      "title": "Pas encore de jetons d'ingestion",
+      "description": "Les jetons d'ingestion authentifient les sources de données lors de l'envoi de journaux, de métriques et de traces.",
+      "action": "Nouveau jeton",
+      "actionDesc": "Générer un jeton d'ingestion"
+    },
+    "noOrganizations": {
+      "title": "Aucune organisation pour le moment",
+      "description": "Les organisations regroupent vos utilisateurs et vos données. Créez-en un pour commencer."
+    },
+    "noAlertDestinations": {
+      "title": "Aucune destination pour le moment",
+      "description": "Les destinations définissent l'endroit où les notifications d'alerte sont envoyées : Slack, e-mail, webhooks, etc.",
+      "action": "Nouvelle destination",
+      "actionDesc": "Connecter un canal de notification"
+    },
+    "noAlertTemplates": {
+      "title": "Pas encore de modèles",
+      "description": "Les modèles définissent le format des messages de notification d'alerte.",
+      "action": "Nouveau modèle",
+      "actionDesc": "Création d'un modèle de notification"
+    },
+    "noEnrichmentTables": {
+      "title": "Pas encore de tables d'enrichissement",
+      "description": "Les tableaux d'enrichissement vous permettent de joindre un contexte supplémentaire aux données de votre journal au moment de la requête.",
+      "action": "Nouveau tableau",
+      "actionDesc": "Création d'un tableau d'enrichissement"
+    },
+    "noCipherKeys": {
+      "title": "Pas encore de clé de chiffrement",
+      "description": "Les clés de chiffrement sont utilisées pour chiffrer les champs sensibles de vos flux de données.",
+      "action": "Nouvelle clé",
+      "actionDesc": "Générer une clé de chiffrement"
+    },
+    "noAiToolsets": {
+      "title": "Aucun ensemble d'outils d'IA pour le moment",
+      "description": "Les outils d'IA connectent votre organisation à des capacités d'IA externes.",
+      "action": "Nouveau jeu d'outils",
+      "actionDesc": "Ajouter un ensemble d'outils d'IA"
+    },
+    "noLlmProviders": {
+      "title": "Aucun fournisseur LLM configuré",
+      "description": "Connectez un fournisseur de modèles linguistiques pour activer les fonctionnalités basées sur l'IA.",
+      "action": "Ajouter un fournisseur",
+      "actionDesc": "Configuration d'un fournisseur LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Aucun service n'a été découvert",
+      "description": "Les services apparaîtront automatiquement ici une fois que les traces commenceront à arriver."
+    },
+    "noNodes": {
+      "title": "Aucun nœud disponible",
+      "description": "Les nœuds de cluster apparaîtront ici une fois qu'ils seront enregistrés."
+    },
+    "noSourceMaps": {
+      "title": "Aucune carte source n'a été téléchargée",
+      "description": "Téléchargez des cartes sources pour activer des traces de pile lisibles dans vos rapports d'erreurs RUM.",
+      "action": "Téléverser",
+      "actionDesc": "Charger un fichier cartographique source"
+    },
+    "noBackfillJobs": {
+      "title": "Aucun travail de remblayage",
+      "description": "Les tâches de remblayage retraitent les données historiques via un pipeline. Exécutez-en un pour commencer."
     }
   }
 }

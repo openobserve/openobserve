@@ -4049,6 +4049,106 @@
       "queries": "의문",
       "serviceAccounts": "서비스 계정",
       "invitations": "초대장"
+    },
+    "noDashboardsInFolder": {
+      "title": "이 폴더에는 대시보드가 없습니다.",
+      "description": "이 폴더는 비어 있습니다.여기에 대시보드를 추가하거나 다른 폴더에서 대시보드를 이동합니다.",
+      "action": "새 대시보드",
+      "actionDesc": "이 폴더에 대시보드 만들기",
+      "import": "대시보드 가져오기",
+      "importDesc": "대시보드 JSON 파일 업로드",
+      "templates": "템플릿 찾아보기",
+      "templatesDesc": "커뮤니티 대시보드에서 시작"
+    },
+    "noGroups": {
+      "title": "아직 그룹이 없습니다",
+      "description": "그룹을 사용하면 여러 사용자의 권한을 한 번에 관리할 수 있습니다.시작하려면 하나를 생성하세요.",
+      "action": "새 그룹",
+      "actionDesc": "사용자 그룹 생성"
+    },
+    "noRoles": {
+      "title": "아직 역할 없음",
+      "description": "역할은 사용자가 수행할 수 있는 작업을 정의합니다.사용자 지정 역할을 생성하여 액세스를 제어하세요.",
+      "action": "새 역할",
+      "actionDesc": "사용자 지정 액세스 역할 정의"
+    },
+    "noAnomalyConfigs": {
+      "title": "예외 항목 탐지가 구성되지 않았습니다.",
+      "description": "변칙 탐지를 설정하여 데이터의 특이한 패턴을 자동으로 식별합니다.",
+      "action": "새 구성",
+      "actionDesc": "이상 탐지 구성"
+    },
+    "noApiLimits": {
+      "title": "API 제한이 구성되지 않음",
+      "description": "API 제한은 각 조직이 시간대별로 수집하고 쿼리할 수 있는 데이터의 양을 제어합니다."
+    },
+    "noRoleLimits": {
+      "title": "역할 제한이 구성되지 않음",
+      "description": "역할 제한은 조직 내 개별 역할에 적용되는 수집 및 쿼리 할당량을 정의합니다."
+    },
+    "noIngestionTokens": {
+      "title": "아직 통합 토큰이 없습니다.",
+      "description": "통합 토큰은 로그, 지표 및 추적을 전송할 때 데이터 소스를 인증합니다.",
+      "action": "새 토큰",
+      "actionDesc": "통합 토큰 생성"
+    },
+    "noOrganizations": {
+      "title": "아직 조직 없음",
+      "description": "조직은 사용자와 데이터를 함께 그룹화합니다.하나를 만들어 시작하세요."
+    },
+    "noAlertDestinations": {
+      "title": "아직 목적지가 없습니다",
+      "description": "목적지는 Slack, 이메일, 웹후크 등 경고 알림이 전송되는 위치를 정의합니다.",
+      "action": "새 목적지",
+      "actionDesc": "알림 채널 연결"
+    },
+    "noAlertTemplates": {
+      "title": "아직 템플릿이 없습니다",
+      "description": "템플릿은 경고 알림 메시지의 형식을 정의합니다.",
+      "action": "새 템플릿",
+      "actionDesc": "알림 템플릿 만들기"
+    },
+    "noEnrichmentTables": {
+      "title": "인리치먼트 테이블이 아직 없습니다",
+      "description": "강화 테이블을 사용하면 쿼리 시 로그 데이터에 추가 컨텍스트를 추가할 수 있습니다.",
+      "action": "새 테이블",
+      "actionDesc": "강화 테이블 만들기"
+    },
+    "noCipherKeys": {
+      "title": "아직 암호 키가 없습니다.",
+      "description": "암호 키는 데이터 스트림의 민감한 필드를 암호화하는 데 사용됩니다.",
+      "action": "새 키",
+      "actionDesc": "암호 키 생성"
+    },
+    "noAiToolsets": {
+      "title": "아직 AI 툴셋이 없습니다.",
+      "description": "AI 툴셋은 조직을 외부 AI 기능에 연결합니다.",
+      "action": "새 도구 세트",
+      "actionDesc": "AI 툴셋 추가"
+    },
+    "noLlmProviders": {
+      "title": "LLM 공급자가 구성되지 않았습니다.",
+      "description": "언어 모델 공급자를 연결하여 AI 기반 기능을 활성화합니다.",
+      "action": "제공자 추가",
+      "actionDesc": "LLM 공급자 구성"
+    },
+    "noDiscoveredServices": {
+      "title": "검색된 서비스 없음",
+      "description": "추적이 도착하기 시작하면 서비스가 자동으로 여기에 표시됩니다."
+    },
+    "noNodes": {
+      "title": "사용 가능한 노드 없음",
+      "description": "클러스터 노드가 등록되면 여기에 나타납니다."
+    },
+    "noSourceMaps": {
+      "title": "소스 맵이 업로드되지 않았습니다.",
+      "description": "소스 맵을 업로드하여 RUM 오류 보고서에서 읽을 수 있는 스택 트레이스를 활성화하세요.",
+      "action": "업로드",
+      "actionDesc": "소스 맵 파일 업로드"
+    },
+    "noBackfillJobs": {
+      "title": "백필 작업 없음",
+      "description": "백필 작업은 파이프라인을 통해 과거 데이터를 재처리합니다.시작하려면 하나를 실행하세요."
     }
   }
 }

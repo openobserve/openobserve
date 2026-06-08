@@ -4049,6 +4049,106 @@
       "queries": "vragen",
       "serviceAccounts": "serviceaccounts",
       "invitations": "uitnodigingen"
+    },
+    "noDashboardsInFolder": {
+      "title": "Geen dashboards in deze map",
+      "description": "Deze map is leeg. Voeg hier een dashboard toe of verplaats een dashboard uit een andere map.",
+      "action": "Nieuw dashboard",
+      "actionDesc": "Maak een dashboard in deze map",
+      "import": "Dashboard importeren",
+      "importDesc": "Een JSON-bestand op het dashboard uploaden",
+      "templates": "Sjablonen bekijken",
+      "templatesDesc": "Begin vanuit een communitydashboard"
+    },
+    "noGroups": {
+      "title": "Nog geen groepen",
+      "description": "Met groepen kun je machtigingen voor meerdere gebruikers tegelijk beheren. Maak er een om aan de slag te gaan.",
+      "action": "Nieuwe groep",
+      "actionDesc": "Een gebruikersgroep aanmaken"
+    },
+    "noRoles": {
+      "title": "Nog geen rollen",
+      "description": "Rollen bepalen welke acties gebruikers kunnen uitvoeren. Maak een aangepaste rol om de toegang te beheren.",
+      "action": "Nieuwe rol",
+      "actionDesc": "Definieer een aangepaste toegangsrol"
+    },
+    "noAnomalyConfigs": {
+      "title": "Geen anomaliedetectie geconfigureerd",
+      "description": "Stel anomaliedetectie in om automatisch ongebruikelijke patronen in uw gegevens te identificeren.",
+      "action": "Nieuwe configuratie",
+      "actionDesc": "Anomaliedetectie configureren"
+    },
+    "noApiLimits": {
+      "title": "Geen API-limieten geconfigureerd",
+      "description": "API-limieten bepalen hoeveel gegevens elke organisatie per tijdvenster kan opnemen en opvragen."
+    },
+    "noRoleLimits": {
+      "title": "Geen rollimieten geconfigureerd",
+      "description": "Rollimieten bepalen de opname- en queryquota die worden toegepast op individuele rollen binnen een organisatie."
+    },
+    "noIngestionTokens": {
+      "title": "Nog geen innametokens",
+      "description": "Ingestietokens authenticeren gegevensbronnen bij het verzenden van logboeken, statistieken en sporen.",
+      "action": "Nieuw token",
+      "actionDesc": "Genereer een innametoken"
+    },
+    "noOrganizations": {
+      "title": "Nog geen organisaties",
+      "description": "Organisaties groeperen je gebruikers en gegevens. Maak er een om aan de slag te gaan."
+    },
+    "noAlertDestinations": {
+      "title": "Nog geen bestemmingen",
+      "description": "Bestemmingen bepalen waar waarschuwingsmeldingen worden verzonden: Slack, e-mail, webhooks en meer.",
+      "action": "Nieuwe bestemming",
+      "actionDesc": "Een meldingskanaal koppelen"
+    },
+    "noAlertTemplates": {
+      "title": "Nog geen sjablonen",
+      "description": "Sjablonen bepalen de indeling van waarschuwingsberichten.",
+      "action": "Nieuw sjabloon",
+      "actionDesc": "Een meldingssjabloon maken"
+    },
+    "noEnrichmentTables": {
+      "title": "Nog geen verrijkingstabellen",
+      "description": "Met verrijkingstabellen kunt u tijdens het opvragen extra context aan uw logboekgegevens toevoegen.",
+      "action": "Nieuwe tafel",
+      "actionDesc": "Maak een verrijkingstabel"
+    },
+    "noCipherKeys": {
+      "title": "Nog geen cijfersleutels",
+      "description": "Cijfersleutels worden gebruikt om gevoelige velden in uw datastromen te versleutelen.",
+      "action": "Nieuwe sleutel",
+      "actionDesc": "Genereer een coderingssleutel"
+    },
+    "noAiToolsets": {
+      "title": "Nog geen AI-toolsets",
+      "description": "AI-toolsets verbinden je organisatie met externe AI-mogelijkheden.",
+      "action": "Nieuwe toolset",
+      "actionDesc": "Een AI-toolset toevoegen"
+    },
+    "noLlmProviders": {
+      "title": "Geen LLM-providers geconfigureerd",
+      "description": "Verbind een taalmodelprovider om AI-functies mogelijk te maken.",
+      "action": "Provider toevoegen",
+      "actionDesc": "Configureer een LLM-provider"
+    },
+    "noDiscoveredServices": {
+      "title": "Geen services ontdekt",
+      "description": "Services verschijnen hier automatisch zodra er sporen binnenkomen."
+    },
+    "noNodes": {
+      "title": "Geen nodes beschikbaar",
+      "description": "Clusterknooppunten verschijnen hier zodra ze zijn geregistreerd."
+    },
+    "noSourceMaps": {
+      "title": "Geen bronkaarten geüpload",
+      "description": "Upload bronkaarten om leesbare stacktraceringen in uw RUM-foutrapporten mogelijk te maken.",
+      "action": "Uploaden",
+      "actionDesc": "Een bronmapbestand uploaden"
+    },
+    "noBackfillJobs": {
+      "title": "Geen opvulopdrachten",
+      "description": "Bij opvulopdrachten worden historische gegevens opnieuw verwerkt via een pijplijn. Voer er een uit om te beginnen."
     }
   }
 }
