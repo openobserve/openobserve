@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-show="indicator.visible"
         aria-hidden="true"
         data-test="navbar-active-indicator"
-        class="tw:absolute tw:left-1 tw:w-0.75 tw:rounded-r-full tw:bg-primary-600 tw:pointer-events-none tw:z-10"
+        class="tw:absolute tw:left-0.5 tw:w-1 tw:rounded-full tw:bg-primary-600 tw:pointer-events-none tw:z-10"
         :class="indicatorReady ? 'tw:transition-[transform,height] tw:duration-300 tw:ease-out' : ''"
         :style="{
           transform: `translateY(${indicator.top}px)`,
@@ -84,8 +84,10 @@ const indicator = reactive({ top: 0, height: 0, visible: false });
 const indicatorReady = ref(false);
 const route = useRoute();
 
-// Vertical inset (px) so the bar is a touch shorter than the item height.
-const BAR_INSET = 6;
+// The bar is a vertically-centered pill (≈60% of the item height, clamped)
+// rather than a near-full-height slab — reads as a clean accent rail.
+const BAR_MIN = 20;
+const BAR_MAX = 34;
 
 const updateIndicator = async () => {
   await nextTick();
@@ -96,8 +98,10 @@ const updateIndicator = async () => {
     indicator.visible = false;
     return;
   }
-  indicator.top = active.offsetTop + BAR_INSET;
-  indicator.height = Math.max(0, active.offsetHeight - BAR_INSET * 2);
+  const full = active.offsetHeight;
+  const barHeight = Math.min(Math.max(Math.round(full * 0.6), BAR_MIN), BAR_MAX);
+  indicator.top = active.offsetTop + Math.round((full - barHeight) / 2);
+  indicator.height = barHeight;
   indicator.visible = true;
 };
 
