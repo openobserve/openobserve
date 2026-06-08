@@ -101,7 +101,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     shortcuts: [
       { key: "ctrl+enter", descriptionKey: "shortcuts.actions.panelEditorRun" },
       { key: "ctrl+s",     descriptionKey: "shortcuts.actions.panelEditorSave" },
-      { key: "escape",     descriptionKey: "shortcuts.actions.panelEditorBack" },
+      { key: "alt+left",   descriptionKey: "shortcuts.actions.panelEditorBack" },
     ],
   },
 

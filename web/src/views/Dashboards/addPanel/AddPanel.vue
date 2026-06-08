@@ -1739,7 +1739,7 @@ export default defineComponent({
         handler: () => savePanelData.execute(),
       },
       {
-        key: "escape",
+        key: "alt+left",
         scope: "panel-editor",
         description: "shortcuts.actions.panelEditorBack",
         handler: () => goBack(),
