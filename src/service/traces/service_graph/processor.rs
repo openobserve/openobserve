@@ -123,8 +123,6 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     }
 
     // update last updated at
-    let next_updated_at = last_updated_at
-        + get_o2_config().service_graph.processing_interval_secs as i64 * 60 * 1_000_000;
     crate::service::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone()))
         .await?;
 
