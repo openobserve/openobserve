@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div
-            class="tw:w-full tw:h-full tw:px-1 tw:pt-1"
+            class="tw:w-full tw:h-full"
           >
             <search-bar
               data-test="logs-search-bar"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <template #after>
-                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                <div class="tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
