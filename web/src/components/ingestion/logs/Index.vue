@@ -16,19 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OSplitter
-    v-model="splitterModel"
-    unit="px"
-    :horizontal="false"
-    class="tw:h-full"
+  <DataSourceSidebarLayout
+    v-model="ingestiontabs"
+    :splitter-width="250"
   >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel tw:pt-1.5">
-          <OTabs
-            v-model="ingestiontabs"
-            orientation="vertical"
-          >
+    <template #tabs>
             <ORouteTab
               name="curl"
               data-test="ingestion-logs-tab-curl"
@@ -121,12 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="plagiarism"
               label="Syslog-ng"
             />
-          </OTabs>
-        </div>
-      </div>
     </template>
 
-    <template v-slot:after>
       <div class="tw:w-full tw:h-full">
         <div class="card-container tw:h-full tw:pt-0.5">
           <router-view
@@ -138,15 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </router-view>
         </div>
       </div>
-    </template>
-  </OSplitter>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
+import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -160,7 +145,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestLogs",
-  components: { OTabs, OTab, ORouteTab, OSplitter },
+  components: { ORouteTab, DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -249,7 +234,6 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       copyToClipboardFn,

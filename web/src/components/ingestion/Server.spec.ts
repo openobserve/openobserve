@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Server from "@/components/ingestion/Server.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { useQuasar } from "quasar";
 
 
 // Mock services
@@ -54,38 +53,34 @@ vi.mock("quasar", async (importOriginal) => {
   };
 });
 
+const mountOptions = {
+  props: {
+    currOrgIdentifier: "test-org"
+  },
+  global: {
+    plugins: [i18n],
+    provide: {
+      store,
+    },
+    stubs: {
+      DataSourceSidebarLayout: true,
+      'router-view': true
+    }
+  },
+};
+
 describe("Server Component", () => {
   let wrapper: any = null;
 
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "servers";
     mockRouter.currentRoute.value.query = {};
 
-    wrapper = mount(Server, {
-      props: {
-        currOrgIdentifier: "test-org"
-      },
-      global: {
-        plugins: [i18n],
-        provide: {
-          store,
-        },
-        stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-tabs': true,
-          'q-route-tab': true,
-          'router-view': true,
-          'q-input': true,
-          'OIcon': true
-        }
-      },
-    });
+    wrapper = mount(Server, mountOptions);
   });
 
   afterEach(() => {
@@ -108,11 +103,9 @@ describe("Server Component", () => {
     });
 
     it("should initialize with correct data", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
       expect(wrapper.vm.currentUserEmail).toBeDefined();
       expect(wrapper.vm.tabs).toBe("");
       expect(wrapper.vm.ingestTabType).toBe("nginx");
-      expect(wrapper.vm.tabsFilter).toBe("");
     });
 
     it("should expose all required properties from setup", () => {
@@ -134,22 +127,9 @@ describe("Server Component", () => {
 
     it("should handle default currOrgIdentifier prop", () => {
       const testWrapper = mount(Server, {
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
+        global: mountOptions.global,
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -191,25 +171,9 @@ describe("Server Component", () => {
     it("should not redirect when route is not servers", () => {
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Server, mountOptions);
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -217,25 +181,9 @@ describe("Server Component", () => {
     it("should handle iis route without redirect", () => {
       mockRouter.currentRoute.value.name = "iis";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Server, mountOptions);
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -243,25 +191,9 @@ describe("Server Component", () => {
     it("should handle apache route without redirect", () => {
       mockRouter.currentRoute.value.name = "apache";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Server, mountOptions);
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -269,25 +201,9 @@ describe("Server Component", () => {
     it("should handle unknown route without redirect", () => {
       mockRouter.currentRoute.value.name = "unknown";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
-      
+
+      const testWrapper = mount(Server, mountOptions);
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -298,32 +214,16 @@ describe("Server Component", () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
+
+      const testWrapper = mount(Server, mountOptions);
 
       // Change route to trigger onUpdated
       mockRouter.currentRoute.value.name = "servers";
-      
+
       // Force update to trigger onUpdated
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
 
@@ -331,32 +231,16 @@ describe("Server Component", () => {
       // First mount
       mockRouter.currentRoute.value.name = "nginx";
       mockRouter.push.mockClear();
-      
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
+
+      const testWrapper = mount(Server, mountOptions);
 
       // Change route to another valid route
       mockRouter.currentRoute.value.name = "iis";
-      
+
       // Force update
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -364,15 +248,14 @@ describe("Server Component", () => {
 
   describe("Server Tabs Configuration", () => {
     it("should have serverTabs array with correct structure", () => {
-      // Access the serverTabs through setup function return
-      expect(wrapper.vm.filteredList).toBeDefined();
-      expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
+      expect(wrapper.vm.serverTabs).toBeDefined();
+      expect(Array.isArray(wrapper.vm.serverTabs)).toBe(true);
     });
 
     it("should have nginx tab with correct properties", () => {
-      const filteredList = wrapper.vm.filteredList;
-      const nginxTab = filteredList.find((tab: any) => tab.name === "nginx");
-      
+      const serverTabs = wrapper.vm.serverTabs;
+      const nginxTab = serverTabs.find((tab: any) => tab.name === "nginx");
+
       expect(nginxTab).toBeDefined();
       expect(nginxTab.name).toBe("nginx");
       expect(nginxTab.to.name).toBe("nginx");
@@ -382,9 +265,9 @@ describe("Server Component", () => {
     });
 
     it("should have iis tab with correct properties", () => {
-      const filteredList = wrapper.vm.filteredList;
-      const iisTab = filteredList.find((tab: any) => tab.name === "iis");
-      
+      const serverTabs = wrapper.vm.serverTabs;
+      const iisTab = serverTabs.find((tab: any) => tab.name === "iis");
+
       expect(iisTab).toBeDefined();
       expect(iisTab.name).toBe("iis");
       expect(iisTab.to.name).toBe("iis");
@@ -394,101 +277,34 @@ describe("Server Component", () => {
     });
 
     it("should not include apache tab (commented out)", () => {
-      const filteredList = wrapper.vm.filteredList;
-      const apacheTab = filteredList.find((tab: any) => tab.name === "apache");
-      
+      const serverTabs = wrapper.vm.serverTabs;
+      const apacheTab = serverTabs.find((tab: any) => tab.name === "apache");
+
       expect(apacheTab).toBeUndefined();
     });
 
     it("should have correct number of tabs", () => {
-      expect(wrapper.vm.filteredList.length).toBe(2); // nginx and iis only
-    });
-  });
-
-  describe("Filtered List Computed Property", () => {
-    it("should return all tabs when filter is empty", () => {
-      wrapper.vm.tabsFilter = "";
-      expect(wrapper.vm.filteredList.length).toBe(2);
-    });
-
-    it("should filter tabs by nginx", () => {
-      wrapper.vm.tabsFilter = "nginx";
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].name).toBe("nginx");
-    });
-
-    it("should filter tabs by iis", () => {
-      wrapper.vm.tabsFilter = "iis";
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].name).toBe("iis");
-    });
-
-    it("should filter case insensitive", () => {
-      wrapper.vm.tabsFilter = "NGINX";
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].name).toBe("nginx");
-    });
-
-    it("should return empty array for non-matching filter", () => {
-      wrapper.vm.tabsFilter = "nonexistent";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should filter by partial match", () => {
-      wrapper.vm.tabsFilter = "ng";
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered.length).toBe(1);
-      expect(filtered[0].name).toBe("nginx");
-    });
-
-    it("should filter by label content", () => {
-      // Assuming the translation returns text containing the filter
-      wrapper.vm.tabsFilter = "ing"; // Should match "nginx" label
-      const filtered = wrapper.vm.filteredList;
-      // This depends on what the t('ingestion.nginx') returns
-      expect(filtered.length).toBeGreaterThanOrEqual(0);
+      expect(wrapper.vm.serverTabs.length).toBe(2); // nginx and iis only
     });
   });
 
   describe("Reactive Data Properties", () => {
     it("should have reactive tabs", async () => {
       expect(wrapper.vm.tabs).toBe("");
-      
+
       wrapper.vm.tabs = "test-tab";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.tabs).toBe("test-tab");
     });
 
     it("should have reactive ingestTabType", async () => {
       expect(wrapper.vm.ingestTabType).toBe("nginx");
-      
+
       wrapper.vm.ingestTabType = "iis";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.ingestTabType).toBe("iis");
-    });
-
-    it("should have reactive tabsFilter", async () => {
-      expect(wrapper.vm.tabsFilter).toBe("");
-      
-      wrapper.vm.tabsFilter = "test-filter";
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.tabsFilter).toBe("test-filter");
-      expect(wrapper.vm.filteredList.length).toBe(0); // No matches
-    });
-
-    it("should have reactive splitterModel", async () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-      
-      wrapper.vm.splitterModel = 300;
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.splitterModel).toBe(300);
     });
 
     it("should have reactive currentOrgIdentifier", () => {
@@ -517,10 +333,10 @@ describe("Server Component", () => {
 
     it("should call getImageURL for tab icons", () => {
       // The getImageURL should be called when accessing tab icons
-      wrapper.vm.filteredList.forEach((tab: any) => {
+      wrapper.vm.serverTabs.forEach((tab: any) => {
         expect(tab.icon).toContain("img:");
       });
-      
+
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
@@ -533,21 +349,13 @@ describe("Server Component", () => {
       expect(wrapper.vm.currentUserEmail).toBeDefined();
     });
 
-    it("should have splitter model value", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-    });
-
-    it("should expose tabsFilter for template", () => {
-      expect(wrapper.vm.tabsFilter).toBe("");
-    });
-
     it("should expose ingestTabType for template", () => {
       expect(wrapper.vm.ingestTabType).toBe("nginx");
     });
 
-    it("should expose filteredList for template iteration", () => {
-      expect(wrapper.vm.filteredList).toBeDefined();
-      expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
+    it("should expose serverTabs for template iteration", () => {
+      expect(wrapper.vm.serverTabs).toBeDefined();
+      expect(Array.isArray(wrapper.vm.serverTabs)).toBe(true);
     });
   });
 
@@ -562,64 +370,20 @@ describe("Server Component", () => {
       expect(wrapper.vm.router).toBeDefined();
       expect(wrapper.vm.router.currentRoute).toBeDefined();
     });
-
-    it("should handle tab filtering with special characters", () => {
-      wrapper.vm.tabsFilter = "!@#$%";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should handle tab filtering with numbers", () => {
-      wrapper.vm.tabsFilter = "123";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should handle very long filter strings", () => {
-      wrapper.vm.tabsFilter = "a".repeat(1000);
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
   });
 
   describe("Component Lifecycle", () => {
     it("should handle multiple mounts and unmounts", () => {
-      const testWrapper = mount(Server, {
-        props: { currOrgIdentifier: "test-org" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
-      });
-      
+      const testWrapper = mount(Server, mountOptions);
+
       expect(testWrapper.exists()).toBe(true);
       testWrapper.unmount();
-      
+
       const testWrapper2 = mount(Server, {
         props: { currOrgIdentifier: "test-org-2" },
-        global: {
-          plugins: [i18n],
-          provide: { store },
-          stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
-            'router-view': true,
-            'q-input': true,
-            'OIcon': true
-          }
-        },
+        global: mountOptions.global,
       });
-      
+
       expect(testWrapper2.exists()).toBe(true);
       expect(testWrapper2.props('currOrgIdentifier')).toBe("test-org-2");
       testWrapper2.unmount();
@@ -627,9 +391,9 @@ describe("Server Component", () => {
 
     it("should handle prop changes", async () => {
       expect(wrapper.exists()).toBe(true);
-      
+
       await wrapper.setProps({ currOrgIdentifier: "new-org" });
-      
+
       expect(wrapper.exists()).toBe(true);
     });
   });
@@ -637,12 +401,12 @@ describe("Server Component", () => {
   describe("Return Object from Setup", () => {
     it("should return all required properties", () => {
       const expectedProps = [
-        't', 'store', 'router', 'config', 'splitterModel',
+        't', 'store', 'router', 'config',
         'currentUserEmail', 'currentOrgIdentifier', 'getImageURL',
         'verifyOrganizationStatus', 'tabs', 'ingestTabType',
-        'tabsFilter', 'filteredList'
+        'serverTabs'
       ];
-      
+
       expectedProps.forEach(prop => {
         expect(wrapper.vm).toHaveProperty(prop);
       });
@@ -653,14 +417,12 @@ describe("Server Component", () => {
       expect(typeof wrapper.vm.store).toBe("object");
       expect(typeof wrapper.vm.router).toBe("object");
       expect(typeof wrapper.vm.config).toBe("object");
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
       expect(typeof wrapper.vm.currentUserEmail).toBe("string");
       expect(typeof wrapper.vm.getImageURL).toBe("function");
       expect(typeof wrapper.vm.verifyOrganizationStatus).toBe("function");
       expect(typeof wrapper.vm.tabs).toBe("string");
       expect(typeof wrapper.vm.ingestTabType).toBe("string");
-      expect(typeof wrapper.vm.tabsFilter).toBe("string");
-      expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
+      expect(Array.isArray(wrapper.vm.serverTabs)).toBe(true);
     });
   });
 });

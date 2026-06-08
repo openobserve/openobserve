@@ -132,18 +132,12 @@ describe("Security Component", () => {
 
   describe("Data Initialization", () => {
     it("should initialize with correct data values", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
       expect(wrapper.vm.tabs).toBe("");
-      expect(wrapper.vm.tabsFilter).toBe("");
       expect(wrapper.vm.ingestTabType).toBe("falco");
       expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
     });
 
     it("should have reactive data properties", async () => {
-      wrapper.vm.tabsFilter = "test-filter";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.tabsFilter).toBe("test-filter");
-
       wrapper.vm.ingestTabType = "okta";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.ingestTabType).toBe("okta");
@@ -266,17 +260,17 @@ describe("Security Component", () => {
         "google-workspace"
       ];
 
-      const filteredList = wrapper.vm.filteredList;
-      expect(filteredList).toHaveLength(7);
-      
+      const tabList = wrapper.vm.securityTabs;
+      expect(tabList).toHaveLength(7);
+
       securityTabs.forEach(tabName => {
-        const tab = filteredList.find((t: any) => t.name === tabName);
+        const tab = tabList.find((t: any) => t.name === tabName);
         expect(tab).toBeDefined();
       });
     });
 
     it("should have correct falco tab configuration", () => {
-      const falcoTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "falco");
+      const falcoTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "falco");
       
       expect(falcoTab).toBeDefined();
       expect(falcoTab.name).toBe("falco");
@@ -287,7 +281,7 @@ describe("Security Component", () => {
     });
 
     it("should have correct osquery tab configuration", () => {
-      const osqueryTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "osquery");
+      const osqueryTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "osquery");
       
       expect(osqueryTab).toBeDefined();
       expect(osqueryTab.name).toBe("osquery");
@@ -297,7 +291,7 @@ describe("Security Component", () => {
     });
 
     it("should have correct okta tab configuration", () => {
-      const oktaTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "okta");
+      const oktaTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "okta");
       
       expect(oktaTab).toBeDefined();
       expect(oktaTab.name).toBe("okta");
@@ -307,7 +301,7 @@ describe("Security Component", () => {
     });
 
     it("should have correct jumpcloud tab configuration", () => {
-      const jumpcloudTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "jumpcloud");
+      const jumpcloudTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "jumpcloud");
       
       expect(jumpcloudTab).toBeDefined();
       expect(jumpcloudTab.name).toBe("jumpcloud");
@@ -317,7 +311,7 @@ describe("Security Component", () => {
     });
 
     it("should have correct openvpn tab configuration", () => {
-      const openvpnTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "openvpn");
+      const openvpnTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "openvpn");
       
       expect(openvpnTab).toBeDefined();
       expect(openvpnTab.name).toBe("openvpn");
@@ -327,7 +321,7 @@ describe("Security Component", () => {
     });
 
     it("should have correct office365 tab configuration", () => {
-      const office365Tab = wrapper.vm.filteredList.find((tab: any) => tab.name === "office365");
+      const office365Tab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "office365");
       
       expect(office365Tab).toBeDefined();
       expect(office365Tab.name).toBe("office365");
@@ -337,89 +331,13 @@ describe("Security Component", () => {
     });
 
     it("should have correct google-workspace tab configuration", () => {
-      const gworkspaceTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "google-workspace");
+      const gworkspaceTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "google-workspace");
       
       expect(gworkspaceTab).toBeDefined();
       expect(gworkspaceTab.name).toBe("google-workspace");
       expect(gworkspaceTab.to.name).toBe("google-workspace");
       expect(gworkspaceTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
       expect(gworkspaceTab.icon).toContain("mock-image-url-images/ingestion/google-workspace.png");
-    });
-  });
-
-  describe("Filtered List Computed Property", () => {
-    it("should return all tabs when filter is empty", () => {
-      wrapper.vm.tabsFilter = "";
-      expect(wrapper.vm.filteredList).toHaveLength(7);
-    });
-
-    it("should filter tabs by label case-insensitively", async () => {
-      wrapper.vm.tabsFilter = "falco";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("falco");
-    });
-
-    it("should filter tabs with uppercase input", async () => {
-      wrapper.vm.tabsFilter = "OKTA";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("okta");
-    });
-
-    it("should filter tabs with partial matching", async () => {
-      wrapper.vm.tabsFilter = "jump";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("jumpcloud");
-    });
-
-    it("should return empty array when no tabs match filter", async () => {
-      wrapper.vm.tabsFilter = "nonexistent";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("should filter multiple matching tabs", async () => {
-      wrapper.vm.tabsFilter = "o"; // Should match okta, openvpn, office365
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered.length).toBeGreaterThan(1);
-      
-      const names = filtered.map((tab: any) => tab.name);
-      expect(names).toContain("okta");
-      expect(names).toContain("openvpn");
-      expect(names).toContain("office365");
-    });
-
-    it("should handle whitespace in filter", async () => {
-      wrapper.vm.tabsFilter = "falco";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("falco");
-    });
-
-    it("should be reactive to tabsFilter changes", async () => {
-      expect(wrapper.vm.filteredList).toHaveLength(7);
-      
-      wrapper.vm.tabsFilter = "osquery";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(1);
-      
-      wrapper.vm.tabsFilter = "";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.filteredList).toHaveLength(7);
     });
   });
 
@@ -432,7 +350,7 @@ describe("Security Component", () => {
     });
 
     it("should use store organization identifier in tab configurations", () => {
-      const tabs = wrapper.vm.filteredList;
+      const tabs = wrapper.vm.securityTabs;
       tabs.forEach((tab: any) => {
         expect(tab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
       });
@@ -484,44 +402,6 @@ describe("Security Component", () => {
 
     it("should have i18n translation function", () => {
       expect(typeof wrapper.vm.t).toBe("function");
-    });
-
-    it("should have correct splitterModel default value", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-    });
-
-    it("should allow splitterModel modification", async () => {
-      wrapper.vm.splitterModel = 300;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.splitterModel).toBe(300);
-    });
-  });
-
-  describe("Tab Filtering Edge Cases", () => {
-    it("should handle special characters in filter", async () => {
-      wrapper.vm.tabsFilter = "@#$%";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(0);
-    });
-
-    it("should handle numeric filter", async () => {
-      wrapper.vm.tabsFilter = "365";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("office365");
-    });
-
-    it("should handle hyphenated filter", async () => {
-      wrapper.vm.tabsFilter = "workspace";
-      await wrapper.vm.$nextTick();
-      
-      const filtered = wrapper.vm.filteredList;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].name).toBe("google-workspace");
     });
   });
 
@@ -580,24 +460,17 @@ describe("Security Component", () => {
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.ingestTabType).toBe("okta");
     });
-
-    it("should have reactive tabsFilter property", async () => {
-      expect(wrapper.vm.tabsFilter).toBe("");
-      wrapper.vm.tabsFilter = "test-filter";
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.tabsFilter).toBe("test-filter");
-    });
   });
 
   describe("Component Return Values", () => {
     it("should return all required properties from setup", () => {
       const expectedProperties = [
-        "t", "store", "router", "config", "splitterModel",
-        "currentUserEmail", "currentOrgIdentifier", "getImageURL", 
-        "verifyOrganizationStatus", "tabs", "ingestTabType", 
-        "tabsFilter", "filteredList"
+        "t", "store", "router", "config",
+        "currentUserEmail", "currentOrgIdentifier", "getImageURL",
+        "verifyOrganizationStatus", "tabs", "ingestTabType",
+        "securityTabs"
       ];
-      
+
       expectedProperties.forEach(prop => {
         expect(wrapper.vm[prop]).toBeDefined();
       });
@@ -608,15 +481,13 @@ describe("Security Component", () => {
       expect(typeof wrapper.vm.store).toBe("object");
       expect(typeof wrapper.vm.router).toBe("object");
       expect(typeof wrapper.vm.config).toBe("object");
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
       expect(typeof wrapper.vm.currentUserEmail).toBe("string");
       expect(typeof wrapper.vm.currentOrgIdentifier).toBe("string");
       expect(typeof wrapper.vm.getImageURL).toBe("function");
       expect(typeof wrapper.vm.verifyOrganizationStatus).toBe("function");
       expect(typeof wrapper.vm.tabs).toBe("string");
       expect(typeof wrapper.vm.ingestTabType).toBe("string");
-      expect(typeof wrapper.vm.tabsFilter).toBe("string");
-      expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
+      expect(Array.isArray(wrapper.vm.securityTabs)).toBe(true);
     });
   });
 });

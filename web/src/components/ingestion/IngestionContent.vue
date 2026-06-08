@@ -14,22 +14,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Shared wrapper for ingestion (data source) detail pages.
+
+  It centralizes the page padding and the vertical rhythm between sections
+  (code blocks, doc links, notes) so every data-source tab looks identical.
+  Tune `tw:p-3` / `tw:gap-4` here to retune the spacing of ALL data-source
+  detail pages at once.
+-->
 <template>
-  <IngestionContent>
-    <CopyContent :content="content" />
-    <IngestionDocLink :href="docURL" />
-  </IngestionContent>
+  <div class="tw:p-3 tw:flex tw:flex-col tw:gap-4 tw:text-sm">
+    <slot />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
-import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import useIngestion from "@/composables/useIngestion";
-const name = "oracle";
-const store = useStore();
-const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-const docURL = databaseDocURLs[name];
+// Layout-only wrapper — no props or logic.
 </script>

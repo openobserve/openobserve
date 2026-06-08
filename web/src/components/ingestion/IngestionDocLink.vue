@@ -14,22 +14,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Standard "Click here …" documentation link for ingestion detail pages.
+
+  Renders: Click <here> <trailing text>.
+  The trailing text defaults to "to check further documentation." Pass a
+  default slot to customize it (the leading space is included automatically).
+-->
 <template>
-  <IngestionContent>
-    <CopyContent :content="content" />
-    <IngestionDocLink :href="docURL" />
-  </IngestionContent>
+  <div>
+    Click
+    <a
+      :href="href"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="tw:text-text-link hover:tw:text-text-link-hover tw:underline tw:font-medium"
+      >here</a
+    ><slot> to check further documentation.</slot>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
-import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import useIngestion from "@/composables/useIngestion";
-const name = "oracle";
-const store = useStore();
-const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-const docURL = databaseDocURLs[name];
+defineProps<{ href: string }>();
 </script>

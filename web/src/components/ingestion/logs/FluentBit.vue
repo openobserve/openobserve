@@ -15,22 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:p-2">
+  <IngestionContent>
     <CopyContent class="copy-content-container-cls" :content="content" />
-  </div>
-  <div>
-    <a
+    <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
-      class="tw:ml-4 tw:font-bold"
-      style="padding-right: 2px"
-      target="_blank"
-      title="Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!"
     >
-      Click here</a
+      to explore the process of sending logs from Kubernetes to OpenObserve using
+      FluentBit.</IngestionDocLink
     >
-    to explore the process of sending logs from Kubernetes to OpenObserve using
-    FluentBit.
-  </div>
+  </IngestionContent>
 </template>
 
 <script lang="ts">
@@ -39,6 +32,8 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
+import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 export default defineComponent({
   name: "fluentbit-mechanism",
   props: {
@@ -49,7 +44,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
     const store = useStore();
     const endpoint: any = ref({

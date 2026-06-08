@@ -114,7 +114,6 @@ describe("IngestLogs Index Component", () => {
     });
 
     it("should initialize with correct default values", () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.confirmUpdate).toBe(false);
       // ingestiontabs is now initialized from the current route name instead of ""
       expect(wrapper.vm.ingestiontabs).toBe("curl");
@@ -344,10 +343,6 @@ describe("IngestLogs Index Component", () => {
       expect(wrapper.html()).toBeTruthy();
     });
 
-    it("should set correct splitter model", () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
-    });
-
     it("should handle splitter model changes", async () => {
       wrapper.vm.splitterModel = 300;
       await nextTick();
@@ -532,7 +527,6 @@ describe("IngestLogs Index Component", () => {
     it("should initialize component properly on mount", () => {
       // Test that component mounts without errors
       expect(wrapper.vm).toBeTruthy();
-      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.confirmUpdate).toBe(false);
     });
 

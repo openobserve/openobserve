@@ -16,60 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OSplitter
-    v-model="splitterModel"
-    unit="px"
-    class="tw:h-full"
+  <DataSourceSidebarLayout
+    v-model="ingestTabType"
+    :tabs="recommendedTabs"
+    :splitter-width="270"
+    panel-data-test="data-sources-recommended-tabs"
+    tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel el-border-radius">
-          <div class="tw:overflow-hidden tw:h-full tw:pt-1.5" data-test="data-sources-recommended-tabs">
-            <OTabs
-              v-model="ingestTabType"
-              orientation="vertical"
-              class="data-sources-recommended-tabs"
-            >
-              <template v-for="(tab, index) in filteredList" :key="tab.name">
-                <ORouteTab
-                  :title="tab.name"
-                  :default="index === 0"
-                  :name="tab.name"
-                  :data-test="`ingestion-recommended-tab-${tab.name}`"
-                  :to="tab.to"
-                  :icon="tab.icon"
-                  :label="tab.label"
-                />
-              </template>
-            </OTabs>
-          </div>
+    <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-full">
+        <div class="tw:overflow-auto tw:h-full tw:pt-1.5">
+          <router-view
+            :title="tabs"
+            :currOrgIdentifier="currOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+          >
+          </router-view>
         </div>
       </div>
-    </template>
-
-    <template v-slot:after>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full">
-          <div class="tw:overflow-auto tw:h-full tw:pt-1.5">
-            <router-view
-              :title="tabs"
-              :currOrgIdentifier="currOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-            >
-            </router-view>
-          </div>
-        </div>
-      </div>
-    </template>
-  </OSplitter>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
+import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -81,7 +53,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "RecommendedPage",
-  components: { OTabs, ORouteTab, OSplitter },
+  components: { DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -222,23 +194,17 @@ export default defineComponent({
       },
     ];
 
-    const filteredList = computed(() => {
-      return recommendedTabs;
-    });
-
     return {
       t,
       store,
       router,
       config,
-      splitterModel: ref(270),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
-      filteredList,
       recommendedTabs,
     };
   },
@@ -246,11 +212,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.data-sources-recommended-tabs {
-  :deep(.o-tab) {
-    min-height: 36px;
-  }
-}
 .ingestionPage {
   padding: 1.5rem 0 0;
   .head {
