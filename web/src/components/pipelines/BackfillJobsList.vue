@@ -83,7 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Empty State -->
             <template #empty>
-              <NoData />
+              <OEmptyState
+                size="hero"
+                preset="no-backfill-jobs"
+                :filtered="!!(filters.status || filters.pipelineId)"
+                :hide-action="!(filters.status || filters.pipelineId)"
+                @action="(id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))"
+              />
             </template>
 
             <!-- Bottom footer -->
@@ -296,7 +302,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";

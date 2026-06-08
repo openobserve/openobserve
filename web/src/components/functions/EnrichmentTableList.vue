@@ -93,7 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #empty>
-                <NoData />
+                <OEmptyState
+                  size="hero"
+                  preset="no-enrichment-tables"
+                  :filtered="!!filterQuery"
+                  :hide-action="!filterQuery"
+                  @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+                />
               </template>
               <template #cell-type="{ row }">
                 <div
@@ -329,7 +335,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -361,7 +367,7 @@ export default defineComponent({
   components: {
     AppPageHeader,
     AddEnrichmentTable,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     EnrichmentSchema,
     OToggleGroup,

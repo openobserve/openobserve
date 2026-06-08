@@ -69,7 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-alert-templates"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
         </template>
         <template #cell-actions="{ row }">
           <OButton
@@ -162,7 +168,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";

@@ -57,7 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('aiToolset.search')"
           />
         </template>
-        <template #empty><NoData /></template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-ai-toolsets"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
+        </template>
 
         <template #cell-kind="{ row }">
           <OBadge
@@ -123,6 +131,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 // Distinct variants so each kind reads visually different (mcp=blue, cli=green,
 // skill=amber/warning, generic=neutral). Previously skill/mcp both rendered blue.
 const KIND_VARIANTS: Record<string, string> = {
@@ -136,7 +145,7 @@ export default defineComponent({
   name: "PageAiToolsets",
   components: {
     AppPageHeader,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     AddAiToolset,
     OButton,

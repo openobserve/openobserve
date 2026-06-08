@@ -90,10 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedRegionIdsUpdate"
                     >
                       <template #empty>
-                        <div class="tw:w-full tw:text-center tw:p-3">
-                          <OIcon name="warning" size="md" />
-                          <span class="tw:ml-2">No data available</span>
-                        </div>
+                        <OEmptyState size="block" preset="no-nodes" />
                       </template>
                     </OTable>
                   </div>
@@ -132,10 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedClusterIdsUpdate"
                     >
                       <template #empty>
-                        <div class="tw:w-full tw:text-center tw:p-3">
-                          <OIcon name="warning" size="md" />
-                          <span class="tw:ml-2">No data available</span>
-                        </div>
+                        <OEmptyState size="block" preset="no-nodes" />
                       </template>
                     </OTable>
                   </div>
@@ -452,7 +446,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('nodes.search')"
             />
           </template>
-          <template #empty><NoData /></template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-nodes"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
+          </template>
 
           <template #cell-id="{ row }">
             {{ row.id }}
@@ -527,7 +529,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -551,7 +553,7 @@ export default defineComponent({
   name: "PageCipherKeys",
   components: {
     AppPageHeader,
-    NoData,
+    OEmptyState,
     OButton,
     OProgressBar,
     OInput,

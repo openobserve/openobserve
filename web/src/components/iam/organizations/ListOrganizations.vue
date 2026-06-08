@@ -65,7 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-organizations"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
           </template>
 
 
@@ -104,7 +110,7 @@ import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -120,7 +126,7 @@ export default defineComponent({
   name: "PageOrganization",
   components: {
     AddUpdateOrganization,
-    NoData,
+    OEmptyState,
     OButton,
     AppPageHeader,
     OIcon,
@@ -151,7 +157,7 @@ export default defineComponent({
         size: 36,
         minSize: 32,
         maxSize: 40,
-        meta: { align: "left", compactPadding: true },
+        meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
       },
       {
         id: "name",

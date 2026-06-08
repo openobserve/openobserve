@@ -89,7 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-groups"
+              :filtered="!!filterQuery"
+              @action="(id) => id === 'create' ? addGroup() : (filterQuery = '')"
+            />
           </template>
           <template #bottom>
             <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
@@ -136,7 +141,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useI18n } from "vue-i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";

@@ -49,7 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-organizations"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
         </template>
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
@@ -190,7 +196,7 @@ import {
   computed,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -211,7 +217,7 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     AppPageHeader,
-    NoData,
+    OEmptyState,
     OButton,
     ODialog,
     OTooltip,

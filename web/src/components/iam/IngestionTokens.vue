@@ -57,12 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <div class="tw:text-center tw:py-8">
-              <OIcon name="key" size="xl" />
-              <div class="tw:mt-2 tw:text-gray-500">
-                {{ t("ingestion.noTokensFound") }}
-              </div>
-            </div>
+            <OEmptyState
+              size="hero"
+              preset="no-ingestion-tokens"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
           </template>
 
           <template #cell-name="{ row }">
@@ -177,6 +178,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
   name: string;
@@ -190,7 +192,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -210,6 +212,7 @@ export default defineComponent({
         header: t("ingestion.tokenNameLabel"),
         accessorKey: "name",
         sortable: true,
+        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
       },
       {
         id: "token",

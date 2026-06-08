@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -41,7 +41,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.roleName"),
     accessorKey: "role_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", autoWidth: true, isName: true },
   },
   {
     id: "actions",
@@ -112,7 +112,13 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #empty>
-      <NoData />
+      <OEmptyState
+        size="hero"
+        preset="no-roles"
+        :filtered="!!globalFilter"
+        :hide-action="!globalFilter"
+        @action="emit('update:globalFilter', '')"
+      />
     </template>
 
     <template #bottom>
