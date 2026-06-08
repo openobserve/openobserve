@@ -42,6 +42,7 @@ export interface CallPattern {
     p99: number
     totalDuration: number
     errorRate: number
+    errorCount: number
     traceTimePercent: number // % of total trace duration
   }
   spanIds: string[] // for drill-down capability
@@ -157,6 +158,7 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
           p99: 0,
           totalDuration: 0,
           errorRate: 0,
+          errorCount: 0,
           traceTimePercent: 0
         },
         spanIds: []
@@ -194,13 +196,52 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
       p99: calculatePercentile(durations, 99),
       totalDuration: durations.reduce((sum, d) => sum + d, 0),
       errorRate: pattern.instances.length > 0 ? (errorCount / pattern.instances.length) * 100 : 0,
-      traceTimePercent: totalTraceDuration > 0
-        ? (durations.reduce((sum, d) => sum + d, 0) / totalTraceDuration) * 100
+      errorCount,
+      traceTimePercent: totalTraceDuration > 0 && durations.length > 0
+        ? (calculateAverage(durations) / totalTraceDuration) * 100
         : 0
     }
   })
 
-  // Return consolidated patterns with aggregated metrics
+  // Create self-patterns for each service using its own span durations.
+  // Relationship patterns (A→B) use the child span's duration, so root services
+  // would incorrectly show child durations. Self-patterns fix this by capturing
+  // each service's own span metrics directly from allServices.
+  allServices.forEach((serviceInfo, serviceName) => {
+    const durations = serviceInfo.spans.map((s: any) => s.durationMs || 0)
+    const errorCount = serviceInfo.errorCount
+
+    patterns.set(serviceName, {
+      pathSignature: serviceName,
+      instances: serviceInfo.spans.map((span: any) => ({
+        spanId: span.span_id || span.spanId || '',
+        duration: span.durationMs || 0,
+        isError: isSpanError(span),
+        timestamp: span.start_time || 0,
+        attributes: span.attributes || {},
+        serviceName,
+        operationName: span.operationName || span.operation_name || ''
+      })),
+      metrics: {
+        count: serviceInfo.spans.length,
+        avg: calculateAverage(durations),
+        min: durations.length > 0 ? Math.min(...durations) : 0,
+        max: durations.length > 0 ? Math.max(...durations) : 0,
+        p75: calculatePercentile(durations, 75),
+        p95: calculatePercentile(durations, 95),
+        p99: calculatePercentile(durations, 99),
+        totalDuration: durations.reduce((sum, d) => sum + d, 0),
+        errorRate: serviceInfo.spans.length > 0
+          ? (errorCount / serviceInfo.spans.length) * 100
+          : 0,
+        errorCount,
+        traceTimePercent: totalTraceDuration > 0 && durations.length > 0
+          ? (calculateAverage(durations) / totalTraceDuration) * 100
+          : 0
+      },
+      spanIds: serviceInfo.spans.map((span: any) => span.span_id || span.spanId || '')
+    })
+  })
 
   return patterns
 }
@@ -209,8 +250,10 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
  * Check if a span represents an error
  */
 function isSpanError(span: any): boolean {
-  // Check span status
-  if (span.status_code === 2 || span.span_status === 'ERROR') {
+  // Check span status (supports both snake_case from API and camelCase from formatted spans)
+  if (span.status_code === 2
+    || span.span_status === 'ERROR'
+    || span.spanStatus === 'ERROR') {
     return true
   }
 

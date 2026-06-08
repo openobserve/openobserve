@@ -3177,7 +3177,6 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
-      traceServiceMapChartOptions,
       updateActiveTab
     };
   },

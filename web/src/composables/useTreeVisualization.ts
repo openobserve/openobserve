@@ -67,11 +67,11 @@ export function useTreeVisualization<T>(
     } else {
       // Pattern format: pattern name + duration (with avg for grouped patterns)
       const count = node.metadata?.count || 1
-      const duration = node.metadata?.avg || node.value
+      const duration = (node.metadata?.avg || node.value).toFixed(2)
 
       if (count > 1) {
         // Grouped pattern: show average with call count
-        return `{name|${node.name}}\n{duration|${duration}ms (avg) [${count} calls]}`
+        return `{name|${node.name}}\n{duration|${duration}ms (avg) }`
       } else {
         // Single pattern: show duration without avg label
         return `{name|${node.name}}\n{duration|${duration}ms}`
@@ -96,7 +96,7 @@ export function useTreeVisualization<T>(
    * Standardized across both service and pattern contexts
    */
   const getNodeErrorRate = (node: TreeNode): number => {
-    return node.metadata?.errorRate || 0
+    return node.metadata?.errorCount || 0
   }
 
   return {

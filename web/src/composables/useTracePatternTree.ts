@@ -79,12 +79,10 @@ export function useTracePatternTree(
         const targetService = pattern.pathSignature.split('→')[1]
         const childNode = buildServiceTree(targetService, new Set(visited))
         if (childNode) {
-          // Update child node with aggregated metrics from this relationship
-          childNode.value = pattern.metrics.avg
-          childNode.errorRate = pattern.metrics.errorRate
+          // Preserve child's own metrics (already set by its buildServiceTree call).
+          // Only add edge-specific info — don't override with pattern.metrics spread.
           childNode.metadata = {
             ...childNode.metadata,
-            ...pattern.metrics,
             pathSignature: pattern.pathSignature,
             spanIds: pattern.spanIds,
             instances: pattern.instances
@@ -93,14 +91,19 @@ export function useTracePatternTree(
         }
       })
 
-      // Calculate aggregated metrics for this service
-      const totalCalls = serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0)
-      const avgDuration = serviceInfo.children.length > 0
-        ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) / Math.max(totalCalls, 1)
-        : 0
-      const avgErrorRate = serviceInfo.children.length > 0
-        ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.errorRate * p.metrics.count, 0) / Math.max(totalCalls, 1)
-        : 0
+      // Use the service's own self-pattern for its metrics (own span durationMs).
+      // Falls back to children aggregation only if no self-pattern exists.
+      const selfPattern = patternMap.get(serviceName)
+      const totalCalls = selfPattern?.metrics?.count
+        || serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0)
+      const avgDuration = selfPattern?.metrics?.avg
+        || (serviceInfo.children.length > 0
+          ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) / Math.max(totalCalls, 1)
+          : 0)
+      const avgErrorRate = selfPattern?.metrics?.errorRate
+        ?? (serviceInfo.children.length > 0
+          ? serviceInfo.children.reduce((sum, p) => sum + p.metrics.errorRate * p.metrics.count, 0) / Math.max(totalCalls, 1)
+          : 0)
 
       return {
         id: serviceName,
@@ -109,6 +112,7 @@ export function useTracePatternTree(
         errorRate: avgErrorRate,
         children: children.length > 0 ? children : undefined,
         metadata: {
+          ...selfPattern?.metrics,
           serviceName,
           count: totalCalls,
           avg: Math.round(avgDuration * 100) / 100,

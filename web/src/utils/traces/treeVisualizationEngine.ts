@@ -86,10 +86,10 @@ export function createTreeVisualizationEngine() {
     // Convert TreeNode format to ECharts tree format
     const convertToEChartsFormat = (nodes: TreeNode[]): any[] => {
       return nodes.map(node => {
-        const errorRate = getNodeErrorRate(node)
+        const errorCount = getNodeErrorRate(node)
         const serviceColor = data.getNodeServiceColor?.(node)
           || getServiceColorHex(node.name, isDarkMode ? 'dark' : 'light')
-        const borderColor = errorRate > 0
+        const borderColor = errorCount > 0
           ? (isDarkMode ? '#ef4444' : '#dc2626') // Red for error spans
           : serviceColor
         const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"
@@ -429,7 +429,7 @@ export function createTreeVisualizationEngine() {
 
       // Use node name to find matching TreeNode instead of unreliable dataIndex
       const hoveredNode = findNodeByName(data.treeData, params.data.name);
-
+      console.log("findNodeByName --------",data, params.data.name);
       if (hoveredNode && hoveredNode.id !== activeNodeId) {
 
         // Clear any existing timer to prevent race conditions

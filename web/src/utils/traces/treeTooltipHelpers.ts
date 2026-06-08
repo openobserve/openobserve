@@ -182,24 +182,15 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     pathSignature = 'Unknown Pattern',
     count = 1,
     avg = 0,
-    min = 0,
-    max = 0,
-    p75 = 0,
-    p95 = 0,
-    p99 = 0,
-    errorRate = 0,
     traceTimePercent = 0
   } = metadata;
 
   return `
     <div class="tree-tooltip">
       <div class="tooltip-metrics">
-        <div>Calls: ${count}</div>
-        <div>Average: ${avg}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
-        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
-        <div>Max: ${max}ms</div>
-        <div>P99: ${p99}ms</div>
-        <div>P95: ${p95}ms</div>
+        <div>Spans: ${count}</div>
+        <div>Avg: ${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
+        <div>Errors: ${metadata.errorCount || 0}</div>
       </div>
     </div>
   `;
