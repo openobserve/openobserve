@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :displayContent="'HTTP Endpoint: ' + copyHTTPTracesContentURL"
       />
       <CopyContent
+        class="tw:mt-2"
         :content="copyHTTPTracesContentPasscode"
         :displayContent="'Authorization: ' + copyHTTPTracesContentPasscode"
       />
