@@ -1825,8 +1825,6 @@ pub struct Compact {
     pub old_data_max_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
     pub old_data_min_hours: i64,
-    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
-    pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
@@ -3179,9 +3177,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_hours < 1 {
         cfg.compact.old_data_min_hours = 2;
-    }
-    if cfg.compact.old_data_min_records < 1 {
-        cfg.compact.old_data_min_records = 100;
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
