@@ -76,7 +76,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.dashboards",
     shortcuts: [
-      { key: "e",      descriptionKey: "shortcuts.actions.dashboardEdit" },
       { key: "n",      descriptionKey: "shortcuts.actions.dashboardAddPanel" },
       { key: "r",      descriptionKey: "shortcuts.actions.dashboardRefresh" },
       { key: "ctrl+s", descriptionKey: "shortcuts.actions.dashboardSave" },
@@ -136,10 +135,9 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alerts",
     shortcuts: [
-      { key: "n",      descriptionKey: "shortcuts.actions.alertsCreate" },
-      { key: "i",      descriptionKey: "shortcuts.actions.alertsImport" },
-      { key: "r",      descriptionKey: "shortcuts.actions.alertsRefresh" },
-      { key: "escape", descriptionKey: "shortcuts.actions.alertsClose" },
+      { key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
+      { key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
+      { key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
     ],
   },
 

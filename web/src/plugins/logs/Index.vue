@@ -3165,6 +3165,27 @@ export default defineComponent({
     useShortcutScope("logs");
     useShortcutsWithMac([
       {
+        key: "ctrl+enter",
+        scope: "logs",
+        description: "shortcuts.actions.logsRunQuery",
+        handler: () => handleRunQueryFn(),
+      },
+      {
+        key: "ctrl+h",
+        scope: "logs",
+        description: "shortcuts.actions.logsSearchHistory",
+        handler: () => showSearchHistoryfn(),
+      },
+      {
+        key: "/",
+        scope: "logs",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          const el = document.querySelector<HTMLElement>('[data-test="logs-search-bar"] .cm-editor');
+          el?.focus();
+        },
+      },
+      {
         key: "r",
         scope: "logs",
         description: "Refresh / re-run search",

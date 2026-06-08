@@ -2625,6 +2625,15 @@ export default defineComponent({
         },
       },
       {
+        key: "i",
+        scope: "alerts",
+        description: "shortcuts.actions.alertsImport",
+        handler: () => {
+          if (isInputFocused()) return;
+          importAlert();
+        },
+      },
+      {
         key: "r",
         scope: "alerts",
         description: "Refresh alert list",
