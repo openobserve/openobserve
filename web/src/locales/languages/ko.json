@@ -1786,7 +1786,8 @@
     "noDataAvailable": "사용 가능한 데이터 없음",
     "tabAiAssistant": "O2 AI 어시스턴트",
     "tabOverview": "개요",
-    "tabUsage": "사용량"
+    "tabUsage": "사용량",
+    "subtitle": "옵저버빌리티 워크스페이스 한 눈에 보기"
   },
   "billing": {
     "header": "사용 및 청구",

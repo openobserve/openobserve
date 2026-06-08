@@ -587,10 +587,10 @@ async function performDelete() {
 
 .online-evals__header h1 {
   margin: 0;
-  font-weight: 700;
-  color: var(--o2-text);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-heading);
   letter-spacing: 0;
-  font-size: 18px;
 }
 
 .online-evals__tabs {

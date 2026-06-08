@@ -15,64 +15,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:p-2.5 home-page"
+    class="tw:rounded-md home-page"
     :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
          bordered content card, so an inner panel border would double-frame the
-         home page. Keep only the layout classes. -->
+         home page. Keep only the layout classes.
+
+         The page is NOT padded at the root: the header must be full-bleed so its
+         bottom divider reaches the card edges (like Data Sources / Pipelines) —
+         a padded root insets the header and makes it read as a floating bar.
+         Padding is reintroduced on the body wrapper below the header instead. -->
     <div
       class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
-      <!-- Tab bar (drag to reorder) — shown when multiple tabs exist.
-           Standard page-tab recipe: OTabs inside a border-b divider; the active
-           underline lands on the line automatically (OTabs draws it flush at the
-           bottom). `reorderable` keeps the drag-to-reorder behavior. -->
-      <div
-        v-if="tabOrder.length > 1"
-        class="tw:shrink-0 tw:border-b tw:border-border-default"
+      <!-- Top-level page header: module icon + "Home" title, with the home tabs
+           rendered as a full-width strip below (tabsBelow). The header owns its
+           own bottom divider when tabs are present; when only a single tab
+           exists we hand-draw the border so the header still reads as a header.
+           The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
+           OTabs draws the active underline flush with the header's divider. -->
+      <AppPageHeader
+        :title="t('menu.home')"
+        :subtitle="t('home.subtitle')"
+        icon="home"
+        :tabs-below="tabOrder.length > 1"
+        class="tw:shrink-0 tw:px-4"
+        :class="
+          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+        "
       >
-        <OTabs
-          v-model="activeHomeTab"
-          align="left"
-          reorderable
-          data-test="home-tab-bar"
-          @reorder="onTabReorder"
-        >
-          <OTab
-            v-for="tab in tabOrder"
-            :key="tab.id"
-            :name="tab.id"
-            :label="tab.label"
-            :data-test="`home-tab-${tab.id}`"
+        <template v-if="tabOrder.length > 1" #tabs>
+          <OTabs
+            v-model="activeHomeTab"
+            align="left"
+            reorderable
+            data-test="home-tab-bar"
+            @reorder="onTabReorder"
+          >
+            <OTab
+              v-for="tab in tabOrder"
+              :key="tab.id"
+              :name="tab.id"
+              :label="tab.label"
+              :data-test="`home-tab-${tab.id}`"
+            />
+          </OTabs>
+        </template>
+      </AppPageHeader>
+
+      <!-- Body: padded wrapper that holds the active tab panel. Padding lives
+           here (not on the root) so the header above stays full-bleed. -->
+      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:p-2.5">
+        <!-- O2 AI Assistant tab -->
+        <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
+          <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+          <O2AIChat
+            ref="homeChat"
+            :is-open="true"
+            :header-height="0"
+            :centered-start="true"
           />
-        </OTabs>
-      </div>
+        </div>
 
-      <!-- O2 AI Assistant tab -->
-      <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
-        <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-        <O2AIChat
-          ref="homeChat"
-          :is-open="true"
-          :header-height="0"
-          :centered-start="true"
-        />
-      </div>
+        <!-- Overview tab (no inner card-container — the outer section panel
+             already provides the border; avoids a double-bordered card). -->
+        <div
+          v-if="activeHomeTab === 'overview'"
+          class="home-tab-panel"
+        >
+          <OverviewTab />
+        </div>
 
-      <!-- Overview tab (no inner card-container — the outer section panel
-           already provides the border; avoids a double-bordered card). -->
-      <div
-        v-if="activeHomeTab === 'overview'"
-        class="home-tab-panel"
-      >
-        <OverviewTab />
-      </div>
-
-      <!-- Usage tab -->
-      <div v-if="activeHomeTab === 'usage'" class="home-tab-panel">
-        <UsageTab />
+        <!-- Usage tab -->
+        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel">
+          <UsageTab />
+        </div>
       </div>
     </div>
   </div>
@@ -96,6 +115,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -241,6 +261,7 @@ export default defineComponent({
     HomeChatHistory,
     OTabs,
     OTab,
+    AppPageHeader,
   },
 });
 </script>

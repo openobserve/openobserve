@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabs
               v-model="selectedCategory"
               orientation="vertical"
+              dense
+              class="tw:px-1"
             >
               <OTab
                 v-for="cat in aiCategories"
@@ -49,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <div class="tw:w-full tw:h-full">
-            <div class="tw:h-full tw:bg-surface-panel el-border-radius">
+            <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
               <div class="tw:flex tw:flex-col tw:h-full">
-                <div class="tw:pt-[0.625rem] tw:pl-1 tw:pr-4">
+                <div class="tw:pt-2 tw:pl-2 tw:pr-4">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
@@ -64,6 +66,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
+                    dense
+                    class="tw:px-1"
                     @update:model-value="navigateToIntegration"
                   >
                     <OTab

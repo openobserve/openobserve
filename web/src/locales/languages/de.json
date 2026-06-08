@@ -1786,7 +1786,8 @@
     "noDataAvailable": "Keine Daten verfügbar",
     "tabAiAssistant": "O2 KI-Assistent",
     "tabOverview": "Überblick",
-    "tabUsage": "Verwendungszweck"
+    "tabUsage": "Verwendungszweck",
+    "subtitle": "Ihr Observability-Workspace auf einen Blick"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",

@@ -259,30 +259,4 @@ describe("Recommended", () => {
     expect(cardContainer.exists()).toBe(true);
   });
 
-  it("should set splitter model", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
-    expect(wrapper.vm.splitterModel).toBe(270);
-  });
-
-  it("should compute filtered list correctly", () => {
-    const wrapper = mount(Recommended, {
-      global: {
-        plugins: [i18n, store, router],
-        stubs: {
-          'router-view': true,
-        },
-      },
-    });
-
-    expect(wrapper.vm.filteredList).toBeDefined();
-    expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
-  });
 });

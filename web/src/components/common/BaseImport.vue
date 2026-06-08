@@ -20,48 +20,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[containerClass, hideHeader ? 'tw:pt-[0.625rem]' : '']"
     :style="containerStyle"
   >
-    <!-- Header Section (hidden when the host page provides its own page header,
-         e.g. the pipeline shell's AppPageHeader — avoids a duplicate header). -->
-    <div v-if="!hideHeader" class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="tw:flex tw:px-4 tw:items-center tw:justify-between tw:flex-nowrap tw:h-[68px]" :class="headerClass">
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex">
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="handleBack"
-              :data-test="`${testPrefix}-import-back-btn`"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
-            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
-          </div>
-        </div>
-
+    <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
+         used across the app. Hidden when the host page provides its own page
+         header, e.g. the pipeline shell's AppPageHeader (avoids a duplicate). -->
+    <AppPageHeader
+      v-if="!hideHeader"
+      :title="title"
+      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
+      :class="headerContainerClass"
+    >
+      <template #actions>
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="tw:flex tw:ml-auto tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            :class="cancelButtonClass"
-            @click="handleCancel"
-            :data-test="`${testPrefix}-import-cancel-btn`"
-          >{{ t('function.cancel') }}</OButton>
-          <OButton
-            variant="primary"
-            size="sm"
-            type="submit"
-            :class="importButtonClass"
-            @click="handleImport"
-            :loading="isImporting || $props.isImporting"
-            :disabled="isImporting || $props.isImporting"
-            :data-test="`${testPrefix}-import-json-btn`"
-          >{{ t('dashboard.import') }}</OButton>
-        </div>
-      </div>
-    </div>
+        <OButton
+          variant="outline"
+          size="sm"
+          :class="cancelButtonClass"
+          @click="handleCancel"
+          :data-test="`${testPrefix}-import-cancel-btn`"
+        >{{ t('function.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm"
+          type="submit"
+          :class="importButtonClass"
+          @click="handleImport"
+          :loading="isImporting || $props.isImporting"
+          :disabled="isImporting || $props.isImporting"
+          :data-test="`${testPrefix}-import-json-btn`"
+        >{{ t('dashboard.import') }}</OButton>
+      </template>
+    </AppPageHeader>
 
     <div class="tw:flex" :class="contentWrapperClass">
       <div class="tw:flex" :style="contentStyle">
@@ -225,6 +216,7 @@ import {
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
+import AppPageHeader from "./AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -242,6 +234,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
+    AppPageHeader,
     OButton,
     OInput,
     OIcon,

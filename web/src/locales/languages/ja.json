@@ -1803,7 +1803,8 @@
     "noDataAvailable": "データはありません",
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
-    "tabUsage": "使い方"
+    "tabUsage": "使い方",
+    "subtitle": "一目でわかるオブザーバビリティワークスペース"
   },
   "billing": {
     "header": "使用状況と請求",

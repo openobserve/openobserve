@@ -2302,7 +2302,8 @@
     "totalDashboard": "Dashboards",
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
-    "tabUsage": "Usage"
+    "tabUsage": "Usage",
+    "subtitle": "Your observability workspace at a glance"
   },
   "overview": {
     "title": "System Overview",

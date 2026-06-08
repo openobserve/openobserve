@@ -1786,7 +1786,8 @@
     "noDataAvailable": "Aucune donnée disponible",
     "tabAiAssistant": "Assistant O2 AI",
     "tabOverview": "Vue d'ensemble",
-    "tabUsage": "Utilisation"
+    "tabUsage": "Utilisation",
+    "subtitle": "Votre espace de travail d'observabilité en un coup d'œil"
   },
   "billing": {
     "header": "Utilisation et facturation",

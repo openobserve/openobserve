@@ -131,16 +131,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </OInput>
                     </div>
-                    <OButton
-                      variant="outline"
-                      size="icon-sm"
-                      icon-left="refresh"
-                      :loading="isLoadingReports"
-                      title="Reload reports"
-                      data-test="report-list-refresh-btn"
-                      @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                    />
                   </div>
+                </template>
+                <template #toolbar-trailing>
+                  <OButton
+                    variant="outline"
+                    size="icon-sm"
+                    icon-left="refresh"
+                    :loading="isLoadingReports"
+                    title="Reload reports"
+                    data-test="report-list-refresh-btn"
+                    @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
+                  />
                 </template>
                 <template #empty>
                   <OEmptyState

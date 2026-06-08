@@ -15,69 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OSplitter
-    v-model="splitterModel"
-    unit="px"
-    :horizontal="false" class="tw:h-full"
+  <DataSourceSidebarLayout
+    v-model="ingestTabType"
+    :tabs="languagesTabs"
+    :splitter-width="270"
+    searchable
+    search-data-test="language-list-search-input"
   >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel el-border-radius">
-          <div class="tw:overflow-hidden tw:h-full">
-            <div class="tw:pt-[0.625rem] tw:px-1">
-            <OSearchInput
-              data-test="language-list-search-input"
-              v-model="tabsFilter"
-              clearable
-              class="tw:w-full indexlist-search-input"
-              :placeholder="t('common.search')"
-            />
-            </div>
-            <OTabs
-              v-model="ingestTabType"
-              orientation="vertical"
-              class="data-sources-database-tabs item-left"
-            >
-              <template v-for="(tab, index) in filteredList" :key="tab.name">
-                <ORouteTab
-                  :title="tab.name"
-                  :default="index === 0"
-                  :name="tab.name"
-                  :to="tab.to"
-                  :icon="tab.icon"
-                  :label="tab.label"
-                />
-              </template>
-            </OTabs>
-          </div>
+    <div class="tw:w-full tw:h-full">
+      <div class="card-container tw:h-full">
+        <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
+          <router-view
+            :title="tabs"
+            :currOrgIdentifier="currOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+          >
+          </router-view>
         </div>
       </div>
-    </template>
-
-    <template v-slot:after>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full">
-          <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
-            <router-view
-              :title="tabs"
-              :currOrgIdentifier="currOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-            >
-            </router-view>
-          </div>
-        </div>
-      </div>
-    </template>
-  </OSplitter>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
+import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -88,9 +51,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "LanguagesPage",
-  components: { OTabs, ORouteTab, OSearchInput,
-    OSplitter,
-},
+  components: { DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -105,8 +66,6 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );
-
-    const tabsFilter = ref("");
 
     const ingestTabType = ref(resolveTab("languages", router.currentRoute.value.name as string, "python"));
 
@@ -221,33 +180,17 @@ export default defineComponent({
       // },
     ];
 
-    let filteredTabs = [];
-    // create computed property to filter tabs
-    const filteredList = computed(() => {
-      if (!tabsFilter.value) {
-        return languagesTabs;
-      }
-      filteredTabs = languagesTabs.filter((tab) => {
-        return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
-      });
-
-      return filteredTabs;
-    });
-
     return {
       t,
       store,
       router,
       config,
-      splitterModel: ref(270),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
-      tabsFilter,
-      filteredList,
       languagesTabs,
     };
   },
@@ -255,11 +198,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.data-sources-database-tabs {
-  :deep(.o-tab) {
-    min-height: 36px;
-  }
-}
 .ingestionPage {
   padding: 1.5rem 0 0;
   .head {

@@ -177,16 +177,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </OInput>
                     </div>
-                    <OButton
-                      variant="outline"
-                      size="icon-sm"
-                      icon-left="refresh"
-                      :loading="loading"
-                      title="Reload alerts"
-                      data-test="alert-list-refresh-btn"
-                      @click="refreshAlerts"
-                    />
                   </div>
+                </template>
+                <template #toolbar-trailing>
+                  <OButton
+                    variant="outline"
+                    size="icon-sm"
+                    icon-left="refresh"
+                    :loading="loading"
+                    title="Reload alerts"
+                    data-test="alert-list-refresh-btn"
+                    @click="refreshAlerts"
+                  />
                 </template>
 
 

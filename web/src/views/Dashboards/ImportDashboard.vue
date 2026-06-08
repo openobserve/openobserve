@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2 tw:pt-1">
+  <div class="tw:mx-2">
     <!-- Breadcrumb path (Dashboards › Import) lives in the chrome bar (published
          below). Row 1 carries the title + actions. -->
     <AppPageHeader

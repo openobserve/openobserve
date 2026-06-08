@@ -1786,7 +1786,8 @@
     "noDataAvailable": "Veri yok",
     "tabAiAssistant": "O2 AI Asistanı",
     "tabOverview": "Genel Bakış",
-    "tabUsage": "Kullanımı"
+    "tabUsage": "Kullanımı",
+    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız"
   },
   "billing": {
     "header": "Kullanım ve Faturalandırma",

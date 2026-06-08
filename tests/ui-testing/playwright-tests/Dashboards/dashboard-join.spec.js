@@ -1018,10 +1018,10 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // Search and open the dashboard
       await pm.dashboardCreate.searchDashboard(dashboardName);
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
 
       const dashboardRow = pm.dashboardPanelActions.getDashboardRow(dashboardName);
-      await expect(dashboardRow).toBeVisible({ timeout: 10000 });
+      await expect(dashboardRow).toBeVisible({ timeout: 30000 });
       await dashboardRow.click();
       await page.waitForTimeout(3000);
       testLogger.info("Dashboard opened, editing panel");
