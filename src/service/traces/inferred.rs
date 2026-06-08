@@ -22,7 +22,7 @@
 //!
 //! Three derived fields are written to each qualifying span:
 //! - `infer_service_name`   — entity identity, e.g. `orders-db`, `api.stripe.com`
-//! - `infer_service_type`   — coarse category: `database` / `messaging` / `rpc` / `external`
+//! - `infer_service_type`   — coarse category: `database` / `queue` / `rpc` / `external`
 //! - `infer_service_system` — concrete system, e.g. `postgresql`, `kafka`, `grpc`, `http`
 //!
 //! The query side renders these as dotted "inferred service" nodes via
@@ -40,7 +40,7 @@ pub const INFER_SERVICE_SYSTEM: &str = "infer_service_system";
 
 /// `infer_service_type` values.
 pub const INFER_TYPE_DATABASE: &str = "database";
-pub const INFER_TYPE_MESSAGING: &str = "messaging";
+pub const INFER_TYPE_QUEUE: &str = "queue";
 pub const INFER_TYPE_RPC: &str = "rpc";
 pub const INFER_TYPE_EXTERNAL: &str = "external";
 
@@ -84,7 +84,7 @@ pub fn span_kind_to_i32(value: &str) -> i32 {
 /// Naming precedence per entity type (explicit `peer.service` always wins —
 /// it is the user's declared intent and is taken verbatim):
 /// - database:  `peer.service` > `db.namespace`/`db.name` > host > `db.system`
-/// - messaging: `peer.service` > `messaging.destination.name`/`messaging.destination` > host >
+/// - queue: `peer.service` > `messaging.destination.name`/`messaging.destination` > host >
 ///   `messaging.system`
 /// - rpc:       `peer.service` > `rpc.service` > host > `rpc.system`
 /// - external:  `peer.service` > host
@@ -117,6 +117,7 @@ where
             .map(|v| strip_port(&v).to_string())
             .filter(|host| !host.is_empty() && !is_ip_address(host))
     };
+
     let fallback_host = host_attr("server.address")
         .or_else(|| host_attr("net.peer.name"))
         .or_else(|| host_attr("http.host"))
@@ -148,7 +149,7 @@ where
         });
     }
 
-    // messaging
+    // queue
     let messaging_system = attr("messaging.system");
     let destination = attr("messaging.destination.name").or_else(|| attr("messaging.destination"));
     if messaging_system.is_some() || destination.is_some() {
@@ -158,7 +159,7 @@ where
             .or_else(|| messaging_system.clone())?;
         return Some(InferredService {
             name,
-            service_type: INFER_TYPE_MESSAGING,
+            service_type: INFER_TYPE_QUEUE,
             system: messaging_system,
         });
     }
@@ -305,7 +306,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.name, "checkout-events");
-        assert_eq!(result.service_type, INFER_TYPE_MESSAGING);
+        assert_eq!(result.service_type, INFER_TYPE_QUEUE);
         assert_eq!(result.system.as_deref(), Some("kafka"));
     }
 
