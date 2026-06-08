@@ -465,21 +465,20 @@ size="14px"
                   }}
                 </OButton>
               </span>
-              <OButton
-                v-if="hasRumSessionId"
-                data-test="trace-details-view-session-replay-btn"
-                variant="outline"
-                size="sm"
-                class="tw:ml-2"
-                @click="redirectToSessionReplay"
-              >
-                <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle"
-size="14px"
-                /></template>
-                {{ t("rum.playSessionReplay") }}
-              </OButton>
             </div>
+            <OButton
+              v-if="hasRumSessionId"
+              data-test="trace-details-view-session-replay-btn"
+              variant="outline"
+              size="sm"
+              class="tw:ml-2"
+              @click="redirectToSessionReplay"
+            >
+              <template #icon-left
+                ><q-icon :name="outlinedPlayCircle" size="14px"
+              /></template>
+              {{ t("rum.playSessionReplay") }}
+            </OButton>
           </div>
         </div>
         <div
@@ -1800,11 +1799,9 @@ export default defineComponent({
         return;
       }
 
-      // Standalone mode - fetch from API
-      if (props.mode === "standalone") {
+      // Fetch from API — standalone mode, or embedded with no pre-fetched spans
         await loadLogStreams();
         await getTraceMeta();
-      }
     };
 
     onMounted(async () => {
@@ -2045,9 +2042,14 @@ export default defineComponent({
               actionEvents,
               allViewEvents,
             );
+            // RUM spans take priority over trace spans with the same span_id
+            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+            const deduplicatedTraceSpans = traceSpans.filter(
+              (s: any) => !rumSpanIds.has(s.span_id),
+            );
             searchObj.data.traceDetails.spanList = [
               ...rumSpans,
-              ...traceSpans,
+              ...deduplicatedTraceSpans,
             ];
             updateServiceColors();
             buildTracesTree();
