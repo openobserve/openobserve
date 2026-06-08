@@ -105,27 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <div
-              v-if="!templates.length"
-              class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
-            >
-              <div style="width: 600px" class="tw:mt-6">
-                <div class="tw:text-sm">
-                  It looks like you haven't created any Templates yet. To create
-                  an Alert, you'll need to have at least one Destination and one
-                  Template in place
-                </div>
-                <OButton
-                  variant="primary"
-                  size="sm"
-                  class="tw:mt-3"
-                  @click="routeTo('alertTemplates')"
-                >Create Template</OButton>
-              </div>
-            </div>
-            <template v-else>
-              <NoData />
-            </template>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-destinations"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
           </template>
 
           <template #cell-template="{ row }">
@@ -258,7 +244,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
@@ -293,7 +279,7 @@ export default defineComponent({
   components: {
     OIcon,
     AddDestination,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     ImportDestination,
     OButton,

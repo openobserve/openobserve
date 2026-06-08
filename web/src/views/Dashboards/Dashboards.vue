@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <OEmptyState
                 size="hero"
-                preset="no-dashboards"
+                :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
                 :filtered="!!filterQuery"
                 @action="
                   (id) =>

@@ -85,7 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #empty>
-          <NoData :filtered="!!userSearchKey" @action="userSearchKey = ''" />
+          <OEmptyState
+            size="hero"
+            preset="no-roles"
+            :filtered="!!userSearchKey"
+            :hide-action="!userSearchKey"
+            @action="(id) => id === 'clear-filters' && (userSearchKey = '')"
+          />
         </template>
       </OTable>
     </div>
@@ -96,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { watch, onBeforeMount, computed } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

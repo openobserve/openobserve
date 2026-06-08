@@ -82,6 +82,15 @@
           class="tw:w-full tw:h-full"
           @row-click="(row: any) => openEdit(row)"
         >
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-llm-providers"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
           <template #cell-type="{ row }">
             <span class="llmp-type-chip">{{ providerTypeOf(row) || "—" }}</span>
           </template>
@@ -160,6 +169,7 @@ import {
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { t } = useI18n();

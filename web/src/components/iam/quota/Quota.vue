@@ -141,7 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         :show-global-filter="false"
       >
-        <template #empty><NoData :filtered="!!searchQuery" @action="searchQuery = ''" /></template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-api-limits"
+            :filtered="!!searchQuery"
+            :hide-action="!searchQuery"
+            @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+          />
+        </template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
           <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
@@ -201,7 +209,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
-          <template #empty><NoData :filtered="!!searchQuery" @action="searchQuery = ''" /></template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-role-limits"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
           <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
@@ -379,7 +395,7 @@ import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
@@ -394,7 +410,7 @@ export default defineComponent({
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-    NoData,
+    OEmptyState,
     OSpinner,
     OIcon,
     OTable,

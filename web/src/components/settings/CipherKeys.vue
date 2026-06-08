@@ -63,7 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :placeholder="t('cipherKey.search')"
           />
         </template>
-        <template #empty><NoData /></template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-cipher-keys"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
+        </template>
         <template #cell-actions="{ row }">
           <OButton
             :data-test="`cipherkey-list-${row.name}-update`"
@@ -132,7 +140,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -150,7 +158,7 @@ export default defineComponent({
   name: "PageCipherKeys",
   components: {
     AppPageHeader,
-    NoData,
+    OEmptyState,
     AddCipherKey,
     ConfirmDialog,
     OButton,
