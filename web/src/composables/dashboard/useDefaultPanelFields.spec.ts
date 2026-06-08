@@ -28,6 +28,27 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     dashboardPanelData: state.panel,
     updateGroupedFields: mockUpdateGroupedFields,
     makeAutoSQLQuery: mockMakeAutoSQLQuery,
+    // Mirror the real chart-type axis rules: metric/gauge disallow an x-axis.
+    isAddXAxisNotAllowed: {
+      get value() {
+        const t = state.panel?.data?.type;
+        const xlen =
+          state.panel?.data?.queries?.[0]?.fields?.x?.length ?? 0;
+        if (t === "metric") return xlen >= 0; // metric: x never allowed
+        if (t === "gauge" || t === "pie" || t === "donut") return xlen >= 1;
+        if (t === "table") return false;
+        return xlen >= 1; // bar/line/area/etc.
+      },
+    },
+    isAddYAxisNotAllowed: {
+      get value() {
+        const ylen =
+          state.panel?.data?.queries?.[0]?.fields?.y?.length ?? 0;
+        const t = state.panel?.data?.type;
+        if (["pie", "donut", "gauge", "metric"].includes(t)) return ylen >= 1;
+        return false;
+      },
+    },
   }),
 }));
 
@@ -131,6 +152,36 @@ describe("useDefaultPanelFields", () => {
       await applyDefaultPanelFields();
 
       expect(currentQuery().fields.y[0].functionName).toBe("avg");
+    });
+
+    it("metric chart: seeds y but NOT x (x-axis not allowed for metric)", async () => {
+      setPanel({
+        type: "metric",
+        queryType: "sql",
+        stream: "logs1",
+        streamType: "logs",
+        groupedFields: [{ name: "logs1", schema: [{ name: "_timestamp" }] }],
+      });
+      const { applyDefaultPanelFields } = useDefaultPanelFields("dashboard");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().fields.x).toEqual([]);
+      expect(currentQuery().fields.y[0].functionName).toBe("count");
+    });
+
+    it("gauge chart: seeds x and y (gauge allows one x when empty)", async () => {
+      setPanel({
+        type: "gauge",
+        queryType: "sql",
+        stream: "logs1",
+        streamType: "logs",
+        groupedFields: [{ name: "logs1", schema: [{ name: "_timestamp" }] }],
+      });
+      const { applyDefaultPanelFields } = useDefaultPanelFields("dashboard");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().fields.x[0].functionName).toBe("histogram");
+      expect(currentQuery().fields.y[0].functionName).toBe("count");
     });
 
     it("no stream: seeds x/y but skips schema load and query regeneration", async () => {

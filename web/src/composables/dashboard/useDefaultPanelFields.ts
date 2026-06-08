@@ -33,8 +33,13 @@ const SKIP_SEED_TYPES = [
  * avg(value) if the stream has a "value" column, else count(_timestamp).
  */
 const useDefaultPanelFields = (pageKey: string = "dashboard") => {
-  const { dashboardPanelData, updateGroupedFields, makeAutoSQLQuery } =
-    useDashboardPanelData(pageKey);
+  const {
+    dashboardPanelData,
+    updateGroupedFields,
+    makeAutoSQLQuery,
+    isAddXAxisNotAllowed,
+    isAddYAxisNotAllowed,
+  } = useDashboardPanelData(pageKey);
 
   const applyDefaultPanelFields = async () => {
     const idx = dashboardPanelData.layout.currentQueryIndex;
@@ -71,8 +76,11 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
       stream,
     );
 
-    query.fields.x = x;
-    query.fields.y = y;
+    // Respect chart-type axis rules: metric/gauge etc. don't allow an x-axis, so
+    // only seed x/y where the current chart type permits it (computed from the
+    // now-empty field state after removeXYFilters).
+    query.fields.x = isAddXAxisNotAllowed.value ? [] : x;
+    query.fields.y = isAddYAxisNotAllowed.value ? [] : y;
     query.fields.breakdown = [];
     query.fields.filter = {
       filterType: "group",
