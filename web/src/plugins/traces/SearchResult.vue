@@ -29,8 +29,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.searchApplied
         "
         data-test="traces-section-header"
-        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:py-1 tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
+        <!-- Field panel toggle — same style as logs page -->
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          class="tw:mr-1.5 tw:shrink-0 tw:rotate-90"
+          data-test="traces-search-field-list-collapse-btn"
+          @click="toggleFieldList"
+        >
+          <OIcon
+            :name="searchObj.meta.showFields ? 'unfold-less' : 'unfold-more'"
+            size="sm"
+          />
+          <OTooltip
+            :content="searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')"
+            side="bottom"
+          />
+        </OButton>
+
+        <!-- Left: count chips -->
         <OBadge
           data-test="traces-count-badge"
           variant="default"
@@ -43,36 +62,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
         >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
-        <!-- Insights Button -->
+
+        <div class="tw:flex-1" />
+
+        <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
+        <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6 tw:mr-1">
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading"
+            :disabled="searchObj.loading"
+            @click="$emit('run-query')"
+          />
+        </div>
         <OButton
           variant="outline"
-          size="chip"
+          size="icon-chip"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
-          <template #icon-left>
-            <OIcon name="timeline" size="xs" />
-          </template>
-          {{ t("volumeInsights.insightsButtonLabel") }}
+          <OIcon name="timeline" size="sm" />
           <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
-        <ORefreshButton
-          :last-run-at="searchObj.meta.lastRunAt"
-          :loading="searchObj.loading"
-          :disabled="searchObj.loading"
-          @click="$emit('run-query')"
-          class="tw:ml-2"
-        />
-
-        <div class="tw:flex-1" />
-        <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+            class="select-pagination tw:mr-[0.25rem] tw:mt-0! tw:ml-1"
             size="sm"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
@@ -341,6 +358,10 @@ export default defineComponent({
       }
     }
 
+    const toggleFieldList = () => {
+      searchObj.meta.showFields = !searchObj.meta.showFields;
+    };
+
     return {
       t,
       store,
@@ -359,6 +380,7 @@ export default defineComponent({
       rowsPerPageOptions,
       totalPages,
       openUnifiedAnalysisDashboard,
+      toggleFieldList,
       formatLargeNumber,
     };
   },

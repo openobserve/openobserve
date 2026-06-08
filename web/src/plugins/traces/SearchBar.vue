@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
       <div class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
@@ -64,42 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
-          <!--
-            Two-gate visibility:
-              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
-                 NOT be `"false"`. Unset (default), `"true"`, or any
-                 other value keeps the UI visible — only the literal
-                 string `"false"` hides it. Prevents accidental hide
-                 on typo / missing .env file.
-              2. The org must have at least one traces stream flagged
-                 `is_llm_stream === true` (resolved by `Index.vue` and
-                 passed as `hasLLMStreams`).
-            We also keep the toggle visible when the user is already
-            on the LLM Insights tab (e.g., navigated via URL) so the
-            active selection isn't orphaned mid-session.
-          -->
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-sessions-btn"
-            value="sessions"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="forum" size="sm" class="tw:shrink-0"
-            /></template>
-            Sessions
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-llm-insights-btn"
-            value="llm-insights"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="auto-awesome" size="sm" class="tw:shrink-0"
-            /></template>
-            LLM Insights
-          </OToggleGroupItem>
         </OToggleGroup>
 
         <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
@@ -111,6 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'sessions'
           "
         >
+          <!-- Reset: matches logs page style (icon + text) -->
+          <OButton
+            data-test="traces-search-bar-reset-filters-btn"
+            variant="outline"
+            size="xs"
+            @click="resetFilters"
+          >
+            <template #icon-left>
+              <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
+            </template>
+            {{ t("common.reset") }}
+          </OButton>
+
           <div
             class="toolbar-toggle-container element-box-shadow"
           >
@@ -120,13 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
               size="lg"
             />
-            <OIcon
-              name="bar-chart"
-              size="sm"
-              class="tw:shrink-0"
-            />
+            <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
+
           <!-- Error Only Toggle -->
           <div
             class="toolbar-toggle-container element-box-shadow"
@@ -139,28 +113,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @update:model-value="onErrorOnlyToggle"
             />
-            <OIcon
-              name="error"
-              size="sm"
-              class="tw:shrink-0 tw:text-[var(--o2-status-error)]"
-            />
+            <OIcon name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
             <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
-          <OButton
-            data-test="traces-search-bar-reset-filters-btn"
-            variant="outline"
-            size="icon-toolbar"
-            @click="resetFilters"
-          >
-            <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
-            <OTooltip :content="t('search.resetFilters')" />
-          </OButton>
-          <syntax-guide
-            data-test="logs-search-bar-sql-mode-toggle-btn"
-            :sqlmode="searchObj.meta.sqlMode"
-            class=" tw:h-[2rem]! tw:w-[2.25rem]!"
-          />
         </template>
+
+        <!-- More menu: Sessions, LLM Insights, Syntax Guide — always last -->
+        <ODropdown side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              data-test="traces-search-bar-more-menu-btn"
+              variant="outline"
+              size="xs"
+              icon-left="more-horiz"
+            >
+              More
+            </OButton>
+          </template>
+
+          <ODropdownGroup v-if="config.showLLMUI !== 'false'" label="LLM">
+            <ODropdownItem
+              data-test="traces-search-mode-sessions-btn"
+              @select="$emit('update:searchMode', 'sessions')"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge"><OIcon name="forum" size="sm" /></span>
+              </template>
+              Sessions
+              <template v-if="searchObj.meta.searchMode === 'sessions'" #icon-right>
+                <OIcon name="check" size="sm" />
+              </template>
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="traces-search-mode-llm-insights-btn"
+              @select="$emit('update:searchMode', 'llm-insights')"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge"><OIcon name="auto-awesome" size="sm" /></span>
+              </template>
+              LLM Insights
+              <template v-if="searchObj.meta.searchMode === 'llm-insights'" #icon-right>
+                <OIcon name="check" size="sm" />
+              </template>
+            </ODropdownItem>
+          </ODropdownGroup>
+
+          <ODropdownSeparator v-if="config.showLLMUI !== 'false'" />
+
+          <SyntaxGuide
+            :sqlmode="searchObj.meta.sqlMode"
+            :menuItem="true"
+            data-test="traces-search-bar-syntax-guide-btn"
+          />
+        </ODropdown>
       </div>
       <div
         v-if="
@@ -407,15 +412,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
-      class="tw:flex tw:h-[calc(100%-3.1rem)]!"
+      class="tw:flex tw:h-full!"
     >
       <div
-        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full tw:relative"
+        class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full! tw:w-full tw:relative"
       >
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
-          class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+          class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           :class="
@@ -469,6 +474,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -501,6 +508,8 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
     OSwitch,
     OSelect,
     OTooltip,
@@ -1069,6 +1078,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.more-menu-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--o2-section-header-bg);
+  color: var(--o2-text-secondary);
+  flex-shrink: 0;
+}
+
 .search-bar-component {
   padding-bottom: 1px;
 

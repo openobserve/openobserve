@@ -138,7 +138,7 @@ const presets: { preset: EmptyStatePresetName; label: string }[] = [
 ];
 
 const onAction = (which: string) => {
-  // eslint-disable-next-line no-console
+   
   console.log("OEmptyState action:", which);
 };
 </script>
