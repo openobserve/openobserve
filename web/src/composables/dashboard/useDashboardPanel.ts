@@ -201,10 +201,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       name: store.state.zoConfig.timestamp_column ?? "_timestamp",
     });
 
-    // Seed a default count(_timestamp) y-axis measure so a bar chart renders by
-    // default on Add Panel (logs streams). For metrics/traces streams the
-    // value-column heuristic is applied later via useDefaultPanelFields when the
-    // stream changes or the query mode is toggled.
+    // Seed a default count(_timestamp) y-axis so a bar chart renders on open.
     const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
     dashboardPanelData.data.queries[currentQueryIndex].fields.y = [
       DEFAULT_SQL_Y_FIELD_COUNT(),

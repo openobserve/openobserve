@@ -16,8 +16,7 @@
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { buildDefaultSqlFields } from "@/utils/dashboard/defaultFields";
 
-// Chart types that drive their own builder (latitude/longitude, source/target,
-// raw HTML/markdown, custom charts) and must NOT receive the cartesian x/y seed.
+// Chart types that drive their own builder and must not get the cartesian x/y seed.
 const SKIP_SEED_TYPES = [
   "geomap",
   "sankey",
@@ -28,16 +27,10 @@ const SKIP_SEED_TYPES = [
 ];
 
 /**
- * Centralized, page-aware default-field seeding shared by the Add Panel page and
- * the Metrics page (both render the same PanelEditor). Replaces the metrics-only
- * `applyMetricsDefaults` logic that used to live in plugins/metrics/Index.vue.
- *
- * Seeds the current query's builder fields based on queryType + stream_type:
- *  - PromQL                -> default builder query `${stream}{}`
- *  - SQL, logs / traces    -> x = histogram(_timestamp), y = count(_timestamp)
- *  - SQL, metrics          -> x = histogram(_timestamp),
- *                             y = avg(value) if the stream has a "value" column,
- *                                 else count(_timestamp)
+ * Shared default-field seeding for the Add Panel and Metrics pages (both render
+ * the same PanelEditor). Seeds the current query based on queryType + stream_type:
+ * PromQL -> `${stream}{}`; SQL logs/traces -> count(_timestamp); SQL metrics ->
+ * avg(value) if the stream has a "value" column, else count(_timestamp).
  */
 const useDefaultPanelFields = (pageKey: string = "dashboard") => {
   const { dashboardPanelData, updateGroupedFields, makeAutoSQLQuery } =
@@ -47,34 +40,36 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
     const idx = dashboardPanelData.layout.currentQueryIndex;
     const query = dashboardPanelData.data.queries[idx];
     if (!query) return;
-
-    // Leave non-cartesian / custom chart builders untouched.
     if (SKIP_SEED_TYPES.includes(dashboardPanelData.data.type)) return;
 
     const queryType = dashboardPanelData.data.queryType;
     const stream = query.fields?.stream;
     const streamType = query.fields?.stream_type;
 
-    // Defaults only apply in builder mode.
     query.customQuery = false;
 
     if (queryType === "promql") {
-      // PromQL builder default: an empty selector for the chosen metric stream.
-      if (stream) {
-        query.query = `${stream}{}`;
-      }
+      if (stream) query.query = `${stream}{}`;
       return;
     }
 
-    // SQL builder: load the stream schema first so the metrics value-column
-    // heuristic can be evaluated, then seed x/y and regenerate the query.
     if (stream) {
-      await updateGroupedFields();
+      // updateGroupedFields has no catch of its own; swallow so a failed schema
+      // load can't reject the toggle/watcher.
+      try {
+        await updateGroupedFields();
+      } catch (e) {
+        console.error("useDefaultPanelFields: updateGroupedFields failed", e);
+      }
     }
 
-    const groupedFields =
-      dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
-    const { x, y } = buildDefaultSqlFields(streamType, groupedFields);
+    // hasValueColumn is scoped to `stream`, so a missing/stale schema (incl. join
+    // streams) falls back to count(_timestamp).
+    const { x, y } = buildDefaultSqlFields(
+      streamType,
+      dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+      stream,
+    );
 
     query.fields.x = x;
     query.fields.y = y;
@@ -85,9 +80,7 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
       conditions: [],
     };
 
-    if (stream) {
-      await makeAutoSQLQuery();
-    }
+    if (stream) await makeAutoSQLQuery();
   };
 
   return { applyDefaultPanelFields };

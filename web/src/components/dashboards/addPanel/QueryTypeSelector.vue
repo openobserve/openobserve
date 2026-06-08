@@ -125,13 +125,8 @@ export default defineComponent({
     const { applyDefaultPanelFields } = useDefaultPanelFields(
       dashboardPanelDataPageKey,
     );
-    // Pages that re-seed default builder fields on the in-page Custom -> Builder
-    // toggle (and SQL <-> PromQL while in builder), discarding the previous
-    // custom query in favour of defaults — matching the Add Panel behavior.
-    //
-    // NOTE: the initial parse-from-query that happens when ENTERING a builder
-    // surface (Logs Visualize / Build tab) runs on mount via that page's own
-    // init, NOT through this toggle handler, so it is unaffected.
+    // Pages that re-seed default builder fields on the in-page Builder toggle.
+    // (Entering a builder surface parses on mount, not via this handler.)
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
@@ -315,11 +310,8 @@ export default defineComponent({
       }
 
 
-      // Re-seed default builder fields when the resulting mode is a builder
-      // (Custom -> Builder, or switching SQL <-> PromQL while in builder).
-      // removeXYFilters() above has just wiped the builder fields, so this
-      // restores sensible defaults for both SQL and PromQL — matching the Add
-      // Panel behavior on every gated page.
+      // removeXYFilters() above wiped the builder fields; re-seed defaults when
+      // the resulting mode is a builder.
       const seedQueryIdx = dashboardPanelData.layout.currentQueryIndex;
       const seedQuery = dashboardPanelData.data.queries[seedQueryIdx];
       const resultingBuilderMode = !seedQuery?.customQuery;

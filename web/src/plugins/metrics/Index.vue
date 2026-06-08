@@ -263,10 +263,8 @@ export default defineComponent({
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
-      // Seed the default builder query on initial load for the restored/selected
-      // stream. The PromQL builder only rebuilds its query when a label/operation
-      // changes, so without this the query bar stays empty on first load even
-      // though a stream is already selected.
+      // Seed the default builder query on initial load (the PromQL builder only
+      // rebuilds on label/operation change, so the bar would otherwise be empty).
       const initialQuery = dashboardPanelData.data.queries[0];
       if (
         initialQuery?.fields?.stream &&
@@ -307,12 +305,8 @@ export default defineComponent({
           );
         }
 
-        // When a stream becomes available in builder mode with an empty query
-        // (initial auto-selected stream, or a stream switch that cleared the
-        // query), seed the default builder query. Handles both SQL (x/y + value
-        // heuristic) and PromQL (`${stream}{}`). The empty-query guard ensures an
-        // existing query is never overwritten. Query-type and Custom->Builder
-        // switches are handled centrally in QueryTypeSelector.changeToggle().
+        // Seed the default query when a stream becomes available in builder mode
+        // with an empty query (the !query guard avoids overwriting an existing one).
         const query = dashboardPanelData.data.queries[0];
         if (
           isPanelConfigWatcherActivated &&

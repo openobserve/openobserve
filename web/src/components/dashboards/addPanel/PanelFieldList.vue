@@ -680,12 +680,9 @@ watch(
         .fields.stream_type === dashboardPanelData.meta.stream.streamResultsType
     ) {
       try {
-        // On stream change in PromQL mode, reset the query to the default
-        // `${stream}{}` for the newly selected metric.
-        //   - Metrics page: applies in both custom and builder mode (unchanged).
-        //   - Add Panel (dashboard): applies in PromQL CUSTOM mode only. PromQL
-        //     builder mode already regenerates its query via DashboardQueryBuilder,
-        //     and SQL mode is excluded because this whole block is promql-only.
+        // On stream change in PromQL mode, reset the query to `${stream}{}`.
+        // Metrics: custom + builder. Add Panel: PromQL custom only (builder
+        // regenerates via DashboardQueryBuilder; SQL is excluded — promql-only block).
         const promqlQuery =
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex

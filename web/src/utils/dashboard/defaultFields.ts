@@ -13,13 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Single source of truth for the default builder fields seeded into a dashboard
-// panel (Add Panel) and the Metrics page. Both surfaces share the same
-// PanelEditor component, so they share these definitions.
-//
-// See designs/dashboards/default-panel-fields for the full design.
+// Default builder fields shared by the Add Panel and Metrics pages.
 
-/** Default x-axis field for the SQL builder: histogram(_timestamp). */
+/** Default x-axis: histogram(_timestamp). */
 export const DEFAULT_SQL_X_FIELD = () => ({
   label: "_timestamp",
   alias: "x_axis_1",
@@ -36,12 +32,7 @@ export const DEFAULT_SQL_X_FIELD = () => ({
   havingConditions: [],
 });
 
-/**
- * Default y-axis measure: count(_timestamp).
- * Universal, schema-independent measure used for logs and traces streams, and
- * for metrics streams that do not expose a numeric "value" column. Renders a
- * bar chart immediately, even before the stream schema has loaded.
- */
+/** Default y-axis for logs/traces (and metrics without a "value" column): count(_timestamp). */
 export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
   label: "_timestamp",
   alias: "y_axis_1",
@@ -55,10 +46,7 @@ export const DEFAULT_SQL_Y_FIELD_COUNT = () => ({
   havingConditions: [],
 });
 
-/**
- * Y-axis upgrade for metrics streams that expose a numeric "value" column:
- * avg(value). Metrics-only — logs and traces always use count(_timestamp).
- */
+/** Metrics-only y-axis when the stream has a "value" column: avg(value). */
 export const DEFAULT_SQL_Y_FIELD_VALUE = () => ({
   label: "value",
   alias: "y_axis_1",
@@ -73,29 +61,29 @@ export const DEFAULT_SQL_Y_FIELD_VALUE = () => ({
 });
 
 /**
- * Returns true when any stream in the grouped field list exposes a "value"
- * column. `groupedFields` is `dashboardPanelData.meta.streamFields.groupedFields`.
+ * True if a stream exposes a "value" column. When `streamName` is given, only
+ * that stream is checked (groupedFields also holds joined streams for SQL joins).
  */
-export const hasValueColumn = (groupedFields: any[]): boolean =>
-  (groupedFields ?? []).some((stream: any) =>
+export const hasValueColumn = (
+  groupedFields: any[],
+  streamName?: string,
+): boolean => {
+  const streams = streamName
+    ? (groupedFields ?? []).filter((stream: any) => stream?.name === streamName)
+    : (groupedFields ?? []);
+  return streams.some((stream: any) =>
     stream?.schema?.some((field: any) => field?.name === "value"),
   );
+};
 
-/**
- * Build the default x/y builder fields for SQL mode, keyed by stream type:
- *  - logs / traces        -> x = histogram(_timestamp), y = count(_timestamp)
- *  - metrics (has value)  -> x = histogram(_timestamp), y = avg(value)
- *  - metrics (no value)   -> x = histogram(_timestamp), y = count(_timestamp)
- *
- * The avg(value) upgrade is metrics-only by design; traces deliberately use the
- * same count(_timestamp) measure as logs.
- */
+/** Default x/y for SQL builder mode; `streamName` scopes the value-column check. */
 export const buildDefaultSqlFields = (
   streamType: string,
   groupedFields: any[],
+  streamName?: string,
 ): { x: any[]; y: any[] } => {
   const useValueMeasure =
-    streamType === "metrics" && hasValueColumn(groupedFields);
+    streamType === "metrics" && hasValueColumn(groupedFields, streamName);
 
   return {
     x: [DEFAULT_SQL_X_FIELD()],
