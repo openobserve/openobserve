@@ -47,6 +47,9 @@ async function buildPanel(
   if (xField) {
     await pm.chartTypeSelector.searchAndAddField(xField, "x");
   }
+  // Add Panel now auto-seeds y_axis_1 = count(_timestamp). Remove it before
+  // adding this tab's own y-field.
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
   if (breakdownField) {
     const breakdownTarget = chartType === "table" ? "p" : "b";
@@ -69,6 +72,9 @@ async function addAndConfigureSecondQuery(pm, { yField = "kubernetes_namespace_n
   if (xField) {
     await pm.chartTypeSelector.searchAndAddField(xField, "x");
   }
+  // Add Panel now auto-seeds y_axis_1 = count(_timestamp) on the new tab.
+  // Remove it before adding this tab's own y-field.
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
 }
 
@@ -222,12 +228,14 @@ test.describe("Multi-SQL Query Support", () => {
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
       await msql.addQueryTab(2);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
       // Switching tabs must surface that query's own Y-axis field.
@@ -459,6 +467,7 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.addQueryTab(1);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
 
@@ -1042,6 +1051,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1076,6 +1086,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1109,6 +1120,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1144,6 +1156,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1175,6 +1188,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1215,6 +1229,7 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1248,6 +1263,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1285,6 +1301,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1365,6 +1382,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStream("e2e_automate");
         // Q2 starts with empty x-axis; add _timestamp so the bar chart renders
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1403,6 +1421,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1484,6 +1503,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1527,6 +1547,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStream("e2e_automate");
         // Q2 starts with empty x-axis; add _timestamp so save validates cleanly
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1593,6 +1614,7 @@ test.describe("Multi-SQL Query Support", () => {
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
         await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
           "y"
@@ -1683,6 +1705,7 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
             "y"
@@ -1748,6 +1771,7 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
             "y"
@@ -1808,6 +1832,7 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
             "y"
@@ -1860,6 +1885,7 @@ test.describe("Multi-SQL Query Support", () => {
           await pm.chartTypeSelector.selectStream(streamB);
           // Q2 needs x-field so the bar chart renders and the panel saves cleanly
           await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
             "y"

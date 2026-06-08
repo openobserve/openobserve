@@ -299,6 +299,8 @@ export async function addSimplePanel(pm, panelName, options = {}) {
   await pm.dashboardCreate.addPanel();
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStream(streamName);
+  // remove the auto-seeded default y-axis before adding this panel's measure
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yAxisField, "y");
 
   // Add filter fields if specified

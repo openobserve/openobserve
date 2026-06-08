@@ -84,6 +84,7 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
 
     // Builder mode: select stream and add Y-axis field (auto-generated alias y_axis_1)
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Apply with time range and verify
