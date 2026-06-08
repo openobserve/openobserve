@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="logs-search-splitter"
           v-model="splitterModel"
           :style="splitterStyle"
-          :limits="[30, 60]"
+          :limits="splitterLimits"
           :horizontal="false"
         >
           <template #before>
@@ -284,6 +284,17 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // Initial size (%) of the left pane in the splitter.
+    splitterDefault: {
+      type: Number,
+      default: 60,
+    },
+    // Min/max bounds (%) for the splitter. Lets callers allow the left pane
+    // to grow wider when their output panel is sparse.
+    splitterLimits: {
+      type: Array as () => [number, number],
+      default: () => [30, 60],
+    },
     // Custom heights for different editor sections
     editorHeights: {
       type: Object,
@@ -346,7 +357,7 @@ export default defineComponent({
     const url = ref("");
     const jsonArrayOfObj = ref<any[]>([]);
     const activeTab = ref(props.defaultActiveTab);
-    const splitterModel = ref(60);
+    const splitterModel = ref(props.splitterDefault);
     const queryEditorPlaceholderFlag = ref(true);
     const editorKey = ref(0); // Force editor to re-render when changes
     const isImporting = ref(false); // Track if import is in progress

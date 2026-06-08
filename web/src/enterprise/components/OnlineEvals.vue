@@ -32,6 +32,22 @@ the Free Software Foundation, either version 3 of the License, or
       @saved="handleSaved"
       @cancel="closeFormPage"
     />
+    <ImportScoreConfig
+      v-else-if="importingEntity === 'scoreConfigs'"
+      :org-id="orgId"
+      :existing-score-configs="scoreConfigs"
+      @cancel="closeImport"
+      @saved="handleImportSaved"
+    />
+    <ImportScorer
+      v-else-if="importingEntity === 'scorers'"
+      :org-id="orgId"
+      :existing-scorers="scorers"
+      :score-configs="scoreConfigs"
+      :providers="providers"
+      @cancel="closeImport"
+      @saved="handleImportSaved"
+    />
 
     <template v-else>
       <div class="online-evals__header card-container">
@@ -257,6 +273,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
+import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
+import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import { downloadFile } from "@/utils/dom";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
@@ -304,6 +322,7 @@ const showScorerLibrary = ref(false);
 const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
 const scorerLibraryRef = ref<InstanceType<typeof ScorerLibrary> | null>(null);
+const importingEntity = ref<"scoreConfigs" | "scorers" | null>(null);
 
 const {
   jobs,
@@ -545,10 +564,16 @@ function toggleCatalog(tab: ActiveTab) {
 }
 
 function goToImportScoreConfig() {
-  router.push({
-    path: "/online-evals/score-configs/import",
-    query: { org_identifier: orgId.value },
-  });
+  importingEntity.value = "scoreConfigs";
+}
+
+function closeImport() {
+  importingEntity.value = null;
+}
+
+async function handleImportSaved() {
+  importingEntity.value = null;
+  await loadAll(orgId.value);
 }
 
 function openScoreConfigLibrary() {
@@ -583,10 +608,7 @@ function exportScoreConfigRow(row: ScoreConfig) {
 }
 
 function goToImportScorer() {
-  router.push({
-    path: "/online-evals/scorers/import",
-    query: { org_identifier: orgId.value },
-  });
+  importingEntity.value = "scorers";
 }
 
 function goToAddProvider() {

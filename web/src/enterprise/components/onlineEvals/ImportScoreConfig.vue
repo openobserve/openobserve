@@ -13,6 +13,8 @@ the Free Software Foundation, either version 3 of the License, or
     :is-importing="isImporting"
     container-class="o2-custom-bg"
     container-style="height: calc(100vh - var(--navbar-height));"
+    :splitter-default="70"
+    :splitter-limits="[40, 80]"
     :editor-heights="editorHeights"
     @back="goBack"
     @cancel="goBack"
@@ -170,10 +172,8 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -190,15 +190,22 @@ import {
   type ScoreConfigImportError,
   type ScoreConfigPayload,
 } from "./utils/importScoreConfig";
-import { showError } from "./utils/evalFormat";
+
+const props = defineProps<{
+  orgId: string;
+  existingScoreConfigs: ScoreConfig[];
+}>();
+
+const emit = defineEmits<{
+  (e: "cancel"): void;
+  (e: "saved"): void;
+}>();
 
 const { t } = useI18n();
-const router = useRouter();
-const store = useStore();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
-const existingScoreConfigs = ref<ScoreConfig[]>([]);
+const existingScoreConfigs = toRef(props, "existingScoreConfigs");
 
 const errors = ref<ScoreConfigImportError[]>([]);
 const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
@@ -222,24 +229,10 @@ const editorHeights = computed(() => ({
   errorReport: "calc(100vh - 192px)",
 }));
 
-const orgId = computed(() => store.state.selectedOrganization.identifier as string);
-
-onMounted(async () => {
-  try {
-    existingScoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
-  } catch (err) {
-    showError(err, "Failed to load existing score configs");
-  }
-});
+const orgId = computed(() => props.orgId);
 
 function goBack() {
-  router.push({
-    path: "/online-evals",
-    query: {
-      org_identifier: orgId.value,
-      tab: "scoreConfigs",
-    },
-  });
+  emit("cancel");
 }
 
 function resetBaseImportFlag() {
@@ -411,19 +404,13 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       message: `Successfully imported ${successCount} score config(s)`,
       variant: "success",
     });
-    setTimeout(() => goBack(), 500);
+    setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
       message: `Imported ${successCount} of ${payloads.length} score config(s)`,
       variant: "warning",
     });
-    // Refresh the existing list so the user can retry the failed ones without
-    // re-triggering name conflicts for the ones that did succeed.
-    try {
-      existingScoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
-    } catch {
-      /* non-fatal */
-    }
+    emit("saved");
   }
 }
 </script>

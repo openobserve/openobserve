@@ -13,6 +13,8 @@ the Free Software Foundation, either version 3 of the License, or
     :is-importing="isImporting"
     container-class="o2-custom-bg"
     container-style="height: calc(100vh - var(--navbar-height));"
+    :splitter-default="70"
+    :splitter-limits="[40, 80]"
     :editor-heights="editorHeights"
     @back="goBack"
     @cancel="goBack"
@@ -163,10 +165,8 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, reactive, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -185,17 +185,26 @@ import {
   type ScorerImportError,
   type ScorerPayload,
 } from "./utils/importScorer";
-import { showError } from "./utils/evalFormat";
+
+const props = defineProps<{
+  orgId: string;
+  existingScorers: Scorer[];
+  scoreConfigs: ScoreConfig[];
+  providers: Provider[];
+}>();
+
+const emit = defineEmits<{
+  (e: "cancel"): void;
+  (e: "saved"): void;
+}>();
 
 const { t } = useI18n();
-const router = useRouter();
-const store = useStore();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
-const existingScorers = ref<Scorer[]>([]);
-const scoreConfigs = ref<ScoreConfig[]>([]);
-const providers = ref<Provider[]>([]);
+const existingScorers = toRef(props, "existingScorers");
+const scoreConfigs = toRef(props, "scoreConfigs");
+const providers = toRef(props, "providers");
 
 const errors = ref<ScorerImportError[]>([]);
 const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
@@ -229,28 +238,10 @@ const editorHeights = computed(() => ({
   errorReport: "calc(100vh - 192px)",
 }));
 
-const orgId = computed(() => store.state.selectedOrganization.identifier as string);
-
-onMounted(async () => {
-  try {
-    const [scorerList, scoreConfigList, providerList] = await Promise.all([
-      onlineEvalsService.scorers.list(orgId.value),
-      onlineEvalsService.scoreConfigs.list(orgId.value),
-      onlineEvalsService.providers.list(orgId.value),
-    ]);
-    existingScorers.value = scorerList;
-    scoreConfigs.value = scoreConfigList;
-    providers.value = providerList;
-  } catch (err) {
-    showError(err, "Failed to load existing data");
-  }
-});
+const orgId = computed(() => props.orgId);
 
 function goBack() {
-  router.push({
-    path: "/online-evals",
-    query: { org_identifier: orgId.value, tab: "scorers" },
-  });
+  emit("cancel");
 }
 
 function resetBaseImportFlag() {
@@ -428,17 +419,13 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       message: `Successfully imported ${successCount} scorer(s)`,
       variant: "success",
     });
-    setTimeout(() => goBack(), 500);
+    setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
       message: `Imported ${successCount} of ${payloads.length} scorer(s)`,
       variant: "warning",
     });
-    try {
-      existingScorers.value = await onlineEvalsService.scorers.list(orgId.value);
-    } catch {
-      /* non-fatal */
-    }
+    emit("saved");
   }
 }
 </script>
