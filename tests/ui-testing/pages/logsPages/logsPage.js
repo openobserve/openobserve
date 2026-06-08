@@ -4290,8 +4290,10 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        const container = this.page.locator(this.queryEditorContainer);
-        return await container.locator(this.expandOnFocusClass).count() > 0;
+        // editor-fullscreen is added to the container itself, not a child element.
+        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
+        // container.locator('.editor-fullscreen') which would search descendants only.
+        return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
     async toggleQueryEditorFullScreen() {
@@ -7592,10 +7594,11 @@ export class LogsPage {
      * Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
      */
     async enableHistogram() {
-        // If histogram canvas is already visible, nothing to do.
-        const canvas = this.page.locator(this.barChartCanvas);
-        const alreadyVisible = await canvas.isVisible({ timeout: 2000 }).catch(() => false);
-        if (alreadyVisible) {
+        // Use button checked-state detection, not canvas visibility.
+        // Canvas is absent before the first query runs, so visibility check
+        // would incorrectly toggle histogram OFF when it is already ON.
+        const isOn = await this.logsQueryPage.isHistogramOn();
+        if (isOn) {
             testLogger.info('Histogram already enabled');
             return;
         }
