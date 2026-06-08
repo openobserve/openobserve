@@ -13,8 +13,6 @@ the Free Software Foundation, either version 3 of the License, or
     :is-importing="isImporting"
     container-class="o2-custom-bg"
     container-style="height: calc(100vh - var(--navbar-height));"
-    :splitter-default="70"
-    :splitter-limits="[40, 80]"
     :editor-heights="editorHeights"
     @back="goBack"
     @cancel="goBack"
