@@ -29,7 +29,7 @@ use arrow::{
 use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
-    FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     utils::{
         inverted_index::convert_parquet_file_name_to_tantivy_file,
         parquet::RecordBatchStream,
@@ -171,7 +171,10 @@ async fn open_projected_reader(
                 builder.metadata().file_metadata().schema_descr(),
                 projection_indices,
             );
-            let reader = builder.with_projection(mask).build()?;
+            let reader = builder
+                .with_batch_size(get_batch_size())
+                .with_projection(mask)
+                .build()?;
             Ok(Box::pin(reader.map_err(ArrowError::from)))
         }
         #[cfg(feature = "vortex")]
@@ -245,10 +248,9 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     let fts_fields = full_text_search_fields
         .iter()
         .filter(|f| {
-            schema_fields
-                .get(f)
-                .map(|v| v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8)
-                .is_some()
+            schema_fields.get(f).is_some_and(|v| {
+                v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8
+            })
         })
         .map(String::from)
         .collect::<HashSet<_>>();
