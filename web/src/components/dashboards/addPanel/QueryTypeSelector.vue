@@ -279,7 +279,9 @@ export default defineComponent({
               "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
           }
 
-          dashboardPanelData.data.queries[0].query != ""
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].query != ""
             ? (confirmQueryModeChangeDialog.value = true)
             : changeToggle();
         }
