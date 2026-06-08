@@ -392,7 +392,8 @@ pub async fn delete_report_bulk(
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", Some(DEFAULT_FOLDER)).await
+        {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -763,14 +764,16 @@ pub async fn delete_report_v2(Path((org_id, report_id)): Path<(String, String)>)
 )]
 pub async fn delete_report_bulk_v2(
     Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<BulkDeleteRequest>,
 ) -> Response {
     let _user_id = user_email.user_id;
+    let _folder_id = get_folder(uri.query().unwrap_or(""));
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", None).await {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "DELETE", Some(&_folder_id)).await {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -871,10 +874,14 @@ pub async fn enable_report_bulk_v2(
     axum::Json(req): axum::Json<BulkDeleteRequest>,
 ) -> Response {
     let _user_id = user_email.user_id;
+    let _folder_id = query
+        .get("folder")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_FOLDER.to_owned());
 
     #[cfg(feature = "enterprise")]
     for id in &req.ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", None).await {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", Some(&_folder_id)).await {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
@@ -960,14 +967,16 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
 )]
 pub async fn move_reports(
     Path(org_id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<MoveReportsRequestBody>,
 ) -> Response {
     let _user_id = user_email.user_id;
+    let _folder_id = get_folder(uri.query().unwrap_or(""));
 
     #[cfg(feature = "enterprise")]
     for id in &req.report_ids {
-        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", None).await {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", Some(&_folder_id)).await {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }

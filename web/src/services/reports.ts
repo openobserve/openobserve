@@ -111,18 +111,24 @@ const reports = {
   deleteReportById: (org_identifier: string, report_id: string) => {
     return http().delete(`/api/v2/${org_identifier}/reports/${report_id}`);
   },
-  bulkDeleteById: (org_identifier: string, data: { ids: string[] }) => {
-    return http().delete(`/api/v2/${org_identifier}/reports/bulk`, { data });
+  bulkDeleteById: (
+    org_identifier: string,
+    data: { ids: string[] },
+    folder_id?: string,
+  ) => {
+    let url = `/api/v2/${org_identifier}/reports/bulk`;
+    if (folder_id) url += `?folder=${folder_id}`;
+    return http().delete(url, { data });
   },
   bulkToggleState: (
     org_identifier: string,
     enable: boolean,
     data: { ids: string[] },
+    folder_id?: string,
   ) => {
-    return http().patch(
-      `/api/v2/${org_identifier}/reports/bulk/enable?value=${enable}`,
-      data,
-    );
+    let url = `/api/v2/${org_identifier}/reports/bulk/enable?value=${enable}`;
+    if (folder_id) url += `&folder=${folder_id}`;
+    return http().patch(url, data);
   },
   triggerReportById: (org_identifier: string, report_id: string) => {
     return http().put(

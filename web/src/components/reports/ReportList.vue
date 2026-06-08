@@ -829,6 +829,7 @@ const bulkDeleteReports = async () => {
     const response = await reports.bulkDeleteById(
       store.state.selectedOrganization.identifier,
       payload,
+      activeFolderId.value,
     );
     dismiss();
 
@@ -883,6 +884,7 @@ const bulkToggleReports = async (action: "pause" | "resume") => {
       store.state.selectedOrganization.identifier,
       isResuming,
       payload,
+      activeFolderId.value,
     );
     dismiss();
 
