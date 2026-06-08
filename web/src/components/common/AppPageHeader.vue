@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="icon" size="md" />
       </span>
 
-      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink">
+      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink-0">
         <h1
           class="tw:text-[1.0625rem]! tw:font-semibold! tw:leading-[1.45]! tw:tracking-[-0.02em]! tw:text-text-primary tw:truncate tw:min-h-6"
           :title="title"
@@ -127,6 +127,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </slot>
         </OText>
       </div>
+
+      <!-- Inline content placed immediately after the title block (e.g. a name
+           input on create pages). Renders between title text and tabs/actions. -->
+      <slot name="title-trail" />
 
       <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->

@@ -12,6 +12,7 @@
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
+            label-position="inside"
             class="tw:p-0 tw:w-full"
             v-bind:readonly="disableName"
             v-bind:disabled="disableName"

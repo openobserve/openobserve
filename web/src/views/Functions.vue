@@ -39,6 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="showPipelineActions" #tabs>
         <PipelineSectionTabs />
       </template>
+      <!-- Pipeline name input rendered inline with the title on the create page -->
+      <template v-if="routeName === 'createPipeline'" #title-trail>
+        <div class="tw:w-64 tw:shrink-0">
+          <OInput
+            ref="pipelineNameInputRef"
+            v-model="pipelineObj.currentSelectedPipeline.name"
+            :placeholder="t('pipeline.pipelineName')"
+            hide-bottom-space
+            :error="pipelineObj.pipelineNameError"
+            :error-message="pipelineObj.pipelineNameErrorMessage"
+            data-test="pipeline-editor-name-input"
+          />
+        </div>
+      </template>
       <template #actions>
         <template v-if="showPipelineActions">
           <template v-if="!shouldCollapseActions">
@@ -139,6 +153,8 @@ import type { SectionHubItem } from "@/components/common/SectionHub.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { pipelineObj } from "@/plugins/pipelines/useDnD";
 import {
   defineComponent,
   ref,
@@ -163,6 +179,7 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
+    OInput,
   },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
@@ -348,6 +365,18 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
+    const pipelineNameInputRef = ref<any>(null);
+
+    // Auto-focus the pipeline name input when a validation error is triggered
+    watch(
+      () => pipelineObj.pipelineNameError,
+      (hasError) => {
+        if (hasError && pipelineNameInputRef.value) {
+          pipelineNameInputRef.value.focus();
+        }
+      },
+    );
+
     return {
       t,
       store,
@@ -366,6 +395,9 @@ export default defineComponent({
       goToPipelineHistory,
       goToBackfillJobs,
       sendToAiChat,
+      routeName,
+      pipelineObj,
+      pipelineNameInputRef,
     };
   },
 });

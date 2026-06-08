@@ -49,21 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </Teleport>
 
-      <template v-if="pipelineObj.isEditPipeline == false">
-        <div class="tw:flex tw:items-center tw:py-2 tw:px-3">
-          <OInput
-            ref="pipelineNameInputRef"
-            v-model="pipelineObj.currentSelectedPipeline.name"
-            :placeholder="t('pipeline.pipelineName')"
-            hide-bottom-space
-            class="tw:w-[300px]"
-            :error="pipelineNameError"
-            :error-message="pipelineNameErrorMessage"
-            data-test="pipeline-editor-name-input"
-          />
-        </div>
-        <OSeparator class="tw:mb-2 tw:px-2" />
-      </template>
 
       <div class="tw:flex tw:mt-3 tw:px-2">
         <div class="nodes-drag-container tw:pr-3">
@@ -199,9 +184,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -462,18 +445,13 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
-// Pipeline name input validation
-const pipelineNameInputRef = ref(null);
-const pipelineNameError = ref(false);
-const pipelineNameErrorMessage = ref("");
-
-// Clear error when user starts typing in pipeline name
+// Clear pipeline name error when user starts typing
 watch(
   () => pipelineObj.currentSelectedPipeline.name,
   (newValue) => {
     if (newValue && newValue.trim() !== "") {
-      pipelineNameError.value = false;
-      pipelineNameErrorMessage.value = "";
+      pipelineObj.pipelineNameError = false;
+      pipelineObj.pipelineNameErrorMessage = "";
     }
   }
 );
@@ -735,13 +713,8 @@ const resetDialog = () => {
 const savePipeline = async () => {
   forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
-    pipelineNameError.value = true;
-    pipelineNameErrorMessage.value = t("pipeline.pipelineNameRequired");
-
-    // Focus the input field
-    if (pipelineNameInputRef.value) {
-      pipelineNameInputRef.value.focus();
-    }
+    pipelineObj.pipelineNameError = true;
+    pipelineObj.pipelineNameErrorMessage = t("pipeline.pipelineNameRequired");
 
     toast({
       message: t("pipeline.pipelineNameRequired"),
@@ -751,8 +724,8 @@ const savePipeline = async () => {
   }
 
   // Clear error state if name is valid
-  pipelineNameError.value = false;
-  pipelineNameErrorMessage.value = "";
+  pipelineObj.pipelineNameError = false;
+  pipelineObj.pipelineNameErrorMessage = "";
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node: any) =>
