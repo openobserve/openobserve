@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{
-        parquet::{get_recordbatch_reader_from_bytes, read_schema_from_bytes},
+        parquet::read_schema_from_bytes,
         record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
@@ -990,14 +990,14 @@ async fn generate_inverted_index(
     buf: &Bytes,
 ) -> Result<(), anyhow::Error> {
     let file_format = get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, buf).await?;
     let index_size = create_tantivy_index(
         "COMPACTOR",
         new_file_key,
         full_text_search_fields,
         index_fields,
         latest_schema, // Use stream schema to include all configured fields
-        reader,
+        file_format,
+        buf.clone(),
     )
     .await
     .map_err(|e| {

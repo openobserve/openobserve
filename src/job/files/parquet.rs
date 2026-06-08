@@ -22,6 +22,8 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
+#[cfg(feature = "enterprise")]
+use config::utils::parquet::get_recordbatch_reader_from_bytes;
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -32,9 +34,7 @@ use config::{
     utils::{
         async_file::{get_file_meta, get_file_size},
         file::scan_files_with_channel,
-        parquet::{
-            get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
-        },
+        parquet::{read_metadata_from_file, read_schema_from_file},
         schema_ext::SchemaExt,
     },
 };
@@ -964,14 +964,14 @@ async fn merge_files(
 
     // generate tantivy inverted index and write to storage
     let file_format = config::get_config().common.file_format;
-    let (_, reader) = get_recordbatch_reader_from_bytes(file_format, &buf).await?;
     let index_size = create_tantivy_index(
         "INGESTER",
         &new_file_key,
         &full_text_search_fields,
         &index_fields,
         latest_schema.clone(), // Use stream schema to include all configured fields
-        reader,
+        file_format,
+        buf.clone(),
     )
     .await
     .map_err(|e| anyhow::anyhow!("generate_tantivy_index_on_ingester error: {e}"))?;
