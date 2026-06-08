@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 azure-config-page">
+  <div class="tw:m-3 tw:mt-1 azure-config-page">
     <!-- Header -->
     <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
       <OIcon
