@@ -4589,6 +4589,12 @@
         "chipRemote": "Remote",
         "chipCode": "Code"
       },
+      "noProviders": {
+        "title": "Add a Provider First",
+        "description": "Scorers need an LLM Provider (OpenAI, Anthropic, etc.) to run. Add a provider in Settings before creating scorers.",
+        "chipRequired": "Required for LLM Judge",
+        "cta": "Add Provider"
+      },
       "import": {
         "title": "Import Scorer",
         "button": "Import",

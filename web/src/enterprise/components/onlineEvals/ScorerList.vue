@@ -11,6 +11,20 @@
   >
     <template #empty>
       <EvalEmptyState
+        v-if="showNoProvidersState"
+        data-test="scorer-no-providers-state"
+        icon="hub"
+        :title="t('onlineEvals.scorer.noProviders.title')"
+        :description="t('onlineEvals.scorer.noProviders.description')"
+        :chips="[
+          { icon: 'smart-toy', label: t('onlineEvals.scorer.noProviders.chipRequired') },
+        ]"
+        :cta-label="t('onlineEvals.scorer.noProviders.cta')"
+        cta-data-test="scorer-empty-add-provider-btn"
+        @create="$emit('add-provider')"
+      />
+      <EvalEmptyState
+        v-else
         data-test="scorer-empty-state"
         icon="rule"
         :title="t('onlineEvals.scorer.empty.title')"
@@ -211,6 +225,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type {
   EvalJob,
+  Provider,
   ScoreConfig,
   Scorer,
   ScorerType,
@@ -225,6 +240,7 @@ const props = defineProps<{
   allScorers: Scorer[];
   jobs: EvalJob[];
   scoreConfigs: ScoreConfig[];
+  providers: Provider[];
   search: string;
   loading?: boolean;
 }>();
@@ -240,6 +256,7 @@ const emit = defineEmits<{
   (e: "open-library"): void;
   (e: "export", row: Scorer): void;
   (e: "export-bulk", ids: string[]): void;
+  (e: "add-provider"): void;
 }>();
 
 const { t } = useI18n();
@@ -337,6 +354,14 @@ const showEmptyState = computed(
     props.allScorers.length === 0 &&
     !props.search &&
     !typeFilter.value,
+);
+
+// When the org has no providers AND no scorers yet, surface a dedicated
+// provider-onboarding screen instead of the standard empty state. LLM Judge
+// scorers (the most common type) can't be created without a provider, so
+// nudging the user there first avoids a dead-end.
+const showNoProvidersState = computed(
+  () => showEmptyState.value && props.providers.length === 0,
 );
 
 function scorerTypeLabel(type: ScorerType) {

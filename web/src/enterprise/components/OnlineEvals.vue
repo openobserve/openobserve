@@ -82,6 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
             :all-scorers="scorers"
             :jobs="jobs"
             :score-configs="scoreConfigs"
+            :providers="providers"
             :search="filterQuery"
             :loading="isLoading"
             @update:search="filterQuery = $event"
@@ -93,6 +94,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScorer"
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
+            @add-provider="goToAddProvider"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -584,6 +586,13 @@ function goToImportScorer() {
   router.push({
     path: "/online-evals/scorers/import",
     query: { org_identifier: orgId.value },
+  });
+}
+
+function goToAddProvider() {
+  router.push({
+    name: "llmProviders",
+    query: { org_identifier: orgId.value, action: "add" },
   });
 }
 
