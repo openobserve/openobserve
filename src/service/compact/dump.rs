@@ -89,6 +89,10 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // we don't dump for file_list stream
             continue;
         }
+        if !super::is_past_hour(*offset) {
+            need_done_ids.push(*job_id); // the data is not past hour, need to wait
+            continue;
+        }
         let stream_settings = get_settings(&org_id, &stream_name, stream_type)
             .await
             .unwrap_or_default();
