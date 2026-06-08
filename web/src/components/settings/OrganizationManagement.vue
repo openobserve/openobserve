@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div>
       <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]">
-        <div class="tw:text-xl tw:tracking-[0.005em]" data-test="org-management-list-title">
+        <div class="tw:text-xl tw:tracking-[0.005em] tw:whitespace-nowrap tw:shrink-0" data-test="org-management-list-title">
           {{ t("settings.organizationManagement") }}
         </div>
         <OSearchInput
           data-test="org-management-search-input"
           v-model="filterQuery"
-          class="tw:ml-auto no-border o2-search-input"
+          class="tw:ml-auto tw:w-64 tw:max-w-xs no-border o2-search-input"
           :placeholder="t('settings.searchOrgs')"
         />
       </div>
@@ -124,9 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="extendTrialPrompt = false"
       @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div>
-        <div class="float-left tw:font-bold">Week(s)</div>
-        <div class="float-right tw:gap-1">
+      <div class="tw:flex tw:flex-col tw:gap-3">
+        <div class="tw:font-bold">Week(s)</div>
+        <div class="tw:flex tw:gap-1">
           <span
             v-for="page in 4"
             :key="page"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               'tw:cursor-pointer tw:px-2 tw:py-1 page-border',
               extendedTrial === page
-                ? 'tw:bg-[var(--o2-primary)] tw:text-white'
+                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
                 : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
             ]"
           >
