@@ -1,0 +1,91 @@
+name: OpenCode
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: opencode-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  check-permission:
+    if: |
+      github.event.sender.type != 'Bot' && (
+        contains(github.event.comment.body, '/oc') ||
+        contains(github.event.comment.body, '/opencode')
+      )
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      authorized: ${{ steps.check.outputs.authorized }}
+    steps:
+      - name: Check team membership
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          script: |
+            const team = 'argocd-dev';
+            const org = 'openobserve';
+            const username = context.actor;
+
+            try {
+              await github.rest.teams.getMembershipForUserInOrg({
+                org: org,
+                team_slug: team,
+                username: username
+              });
+              console.log(`✅ ${username} is a member of ${org}/${team}`);
+              core.setOutput('authorized', 'true');
+            } catch (error) {
+              if (error.status === 404) {
+                console.log(`❌ ${username} is NOT a member of ${org}/${team}`);
+                core.setOutput('authorized', 'false');
+
+                const issueNumber = context.issue?.number || context.payload.pull_request?.number;
+                if (issueNumber) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    body: `⚠️ @${username} You don't have permission to trigger \`/opencode\`. Only members of the [argocd-dev](https://github.com/orgs/openobserve/teams/argocd-dev) team can use this command.`
+                  });
+                }
+              } else {
+                throw error;
+              }
+            }
+
+  opencode:
+    needs: check-permission
+    if: |
+      needs.check-permission.outputs.authorized == 'true' &&
+      github.event.sender.type != 'Bot' && (
+        contains(github.event.comment.body, '/oc') ||
+        contains(github.event.comment.body, '/opencode')
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          model: anthropic/claude-sonnet-4-6
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}

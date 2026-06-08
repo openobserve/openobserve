@@ -1,0 +1,48 @@
+name: OpenCode PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: opencode-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          model: anthropic/claude-sonnet-4-6
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          prompt: |
+            Review this pull request for the OpenObserve codebase (Rust backend, Vue/TypeScript frontend).
+
+            Focus on:
+            - **Correctness**: Logic errors, off-by-one errors, incorrect error handling, panics in production paths
+            - **Performance**: Unnecessary allocations, blocking calls in async contexts (tokio), missing `?` short-circuits, cloning where borrowing suffices
+            - **Unsafe code**: Any `unsafe` block must have a clear safety comment explaining invariants
+            - **Proto/API compatibility**: Check for breaking changes to protobuf schemas or public REST/gRPC API surfaces
+            - **SQL/query engine changes**: Verify DataFusion plan correctness, pushdown predicate safety, and schema evolution compatibility
+            - **Ingestion path**: Changes to WAL, ingester, or compactor that could cause data loss or ordering issues
+            - **Security**: SQL injection risks, unvalidated user input reaching file paths or shell commands, secrets in logs
+            - **Dependency changes**: New crates in Cargo.toml — check for license compatibility and supply chain risk
+
+            Be concise. Only comment when there is a clear issue or meaningful improvement. Skip style nitpicks already covered by clippy/rustfmt.
