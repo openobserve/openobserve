@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useStore } from 'vuex'
 import { getServiceColorHex } from '@/utils/traces/traceColors'
 
 /**
@@ -344,15 +343,12 @@ export function createTreeVisualizationEngine() {
    * Setup custom DOM tooltips for trace graph nodes
    * Follows exact Service Graph tooltip patterns for consistency
    */
-  const setupTraceNodeTooltips = (chart: any, data: TreeVisualizationData): (() => void) => {
+  const setupTraceNodeTooltips = (chart: any, data: TreeVisualizationData, isDarkMode: boolean): (() => void) => {
 
     const chartDom = chart.getDom()
 
-    const store = useStore()
-
     // Create tooltip element with Service Graph styling
     const tooltipEl = document.createElement("div")
-    const isDarkMode = store?.state?.theme === 'dark'
 
     // Exact styling from Service Graph implementation
     tooltipEl.style.cssText = `

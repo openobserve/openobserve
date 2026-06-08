@@ -1690,7 +1690,7 @@ export default defineComponent({
             treeData: patternTreeData.value,
             getNodeTooltip: getPatternNodeTooltip,
             getNodeErrorRate: getPatternNodeErrorRate
-          });
+          }, isDarkMode.value);
         }
       }, 300);
     }

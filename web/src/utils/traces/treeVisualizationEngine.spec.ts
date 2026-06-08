@@ -74,7 +74,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeErrorRate: vi.fn().mockReturnValue(2.5)
     }
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     const tooltipEl = mockChartDom.querySelector('[style*="position: absolute"]') as HTMLElement
     expect(tooltipEl).toBeTruthy()
@@ -97,7 +97,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeErrorRate: vi.fn()
     }
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     expect(mockZr.on).toHaveBeenCalledWith('mousemove', expect.any(Function))
     expect(mockZr.on).toHaveBeenCalledWith('globalout', expect.any(Function))
@@ -130,7 +130,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       target: { dataIndex: 0 }
     })
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     // Simulate mousemove event that hits the test node
     const mouseMoveHandler = mockChart.getZr().on.mock.calls.find(
@@ -155,7 +155,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeErrorRate: vi.fn()
     }
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     const mouseLeaveHandler = mockChart.getZr().on.mock.calls.find(
       call => call[0] === 'globalout'
@@ -191,7 +191,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       target: { dataIndex: 0 }
     })
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     // Get tooltip element to mock its dimensions
     const tooltipEl = mockChartDom.querySelector('[style*="position: absolute"]') as HTMLElement
@@ -227,7 +227,7 @@ describe('createTreeVisualizationEngine tooltip system', () => {
       getNodeErrorRate: vi.fn()
     }
 
-    const cleanup = setupTraceNodeTooltips(mockChart, mockData)
+    const cleanup = setupTraceNodeTooltips(mockChart, mockData, false)
 
     // Tooltip should be created
     let tooltipEl = mockChartDom.querySelector('[style*="position: absolute"]')

@@ -100,7 +100,7 @@ export function useServiceGraphTree(
 
       const outgoingEdges = edgesMap.get(nodeId) || []
       const children = outgoingEdges
-        .map((edge: ServiceGraphEdge) => buildTree(edge.to, new Set(visited), edge))
+        .map((edge: ServiceGraphEdge) => buildTree(edge.to, visited, edge))
         .filter((child: TreeNode | null) => child !== null) as TreeNode[]
 
       // Direction-aware request count based on tree position
