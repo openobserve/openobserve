@@ -251,7 +251,7 @@ size="14px"
           >
             <OToggleGroup
               :model-value="activeTab"
-              @update:model-value="activeTab = $event as string"
+              @update:model-value="updateActiveTab"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
@@ -777,26 +777,38 @@ size="14px"
               </div>
             </div>
 
-            <!-- Map View Placeholder -->
+            <!-- Map View with Pattern/Span Toggle -->
             <div
               v-if="activeTab === 'map'"
               style="
                 display: flex;
                 flex: 1;
                 min-height: 0;
-                align-items: center;
-                justify-content: center;
+                flex-direction: column;
               "
+              class="tw:w-full tw:h-full"
             >
+              <!-- Chart Container -->
               <div
-                style="text-align: center"
-                class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                style="
+                  display: flex;
+                  flex: 1;
+                  min-height: 0;
+                  align-items: center;
+                  justify-content: center;
+                "
               >
-                <ChartRenderer
-                  data-test="trace-details-service-map-chart"
-                  :data="traceServiceMap"
-                  class="trace-chart-height tw:h-full! tw:w-full!"
-                />
+                <div
+                  style="text-align: center"
+                  class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                >
+                  <ChartRenderer
+                    ref="chartRendererRef"
+                    data-test="trace-details-service-map-chart"
+                    :data="traceServiceMapChartOptions"
+                    class="trace-chart-height tw:h-full! tw:w-full!"
+                  />
+                </div>
               </div>
             </div>
 
@@ -940,6 +952,10 @@ import {
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { useTracePatternTree } from "@/composables/useTracePatternTree";
+import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
+import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_UNSPECIFIED,
@@ -1133,6 +1149,13 @@ export default defineComponent({
     const store = useStore();
     const { getStreams, getStream } = useStreams();
 
+    // Chart renderer ref for tooltip integration
+    const chartRendererRef = ref<any>(null);
+
+    // Tooltip lifecycle management
+    let tooltipCleanup: (() => void) | null = null;
+    let pendingTooltipSetup: ReturnType<typeof setTimeout> | null = null;
+
     // AI copilot context provider for trace details page
     const setupContextProvider = () => {
       const provider = createTracesContextProvider(searchObj, store);
@@ -1146,6 +1169,58 @@ export default defineComponent({
     };
 
     const traceServiceMap: any = ref({});
+
+    // Pattern View - new functionality
+    const mapViewMode = ref<'pattern' | 'span'>('pattern'); // Default to pattern view
+    const consolidatedPatterns = ref(new Map());
+    const isDarkMode = computed(() => store.state.theme === 'dark');
+
+    // Set up pattern tree composable and visualization engine
+    const { generateEChartsOptions } = createTreeVisualizationEngine();
+    const {
+      treeData: patternTreeData,
+      getNodeLabel: getPatternNodeLabel,
+      getNodeTooltip: getPatternNodeTooltip,
+      getNodeErrorRate: getPatternNodeErrorRate
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+
+    // Computed chart options that switches between pattern and span views
+    const traceServiceMapChartOptions = computed(() => {
+      if (mapViewMode.value === 'pattern') {
+        // Pattern view - use new pattern-based visualization
+        const chartOptions = generateEChartsOptions(
+          {
+            treeData: patternTreeData.value,
+            getNodeLabel: getPatternNodeLabel,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate,
+            getNodeServiceColor: (node: any) =>
+              searchObj.meta.serviceColors[node.name]
+          },
+          {
+            layoutType: 'horizontal',
+            isDarkMode: isDarkMode.value,
+            nodeSize: 'fixed'
+          }
+        );
+
+        console.log("chartOptions ", chartOptions);
+        // Wrap in the format expected by ChartRenderer
+        return {
+          options: chartOptions,
+          notMerge: true,
+          lazyUpdate: true
+        };
+      } else {
+        // Span view - use existing service tree logic (unchanged)
+        return {
+          options: traceServiceMap.value,
+          notMerge: true,
+          lazyUpdate: true
+        };
+      }
+    });
+
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1584,6 +1659,42 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const updateActiveTab = (tab: string) => {
+      activeTab.value = tab;
+      if(tab === 'map') {
+        setupTooltips();
+      }
+    }
+
+    const setupTooltips = async () => {
+      // Cleanup existing tooltips
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+      // Only setup tooltips for Pattern View
+      if (mapViewMode.value !== 'pattern') return;
+
+      await nextTick();
+      // 300ms delay matches Service Graph tooltip setup timing
+      pendingTooltipSetup = setTimeout(() => {
+        pendingTooltipSetup = null;
+        const chart = chartRendererRef.value?.chart;
+        if (chart) {
+          const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+          tooltipCleanup = setupTraceNodeTooltips(chart, {
+            treeData: patternTreeData.value,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate
+          }, isDarkMode.value);
+        }
+      }, 300);
+    }
+    
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -1713,6 +1824,16 @@ export default defineComponent({
 
     onUnmounted(() => {
       cleanupContextProvider();
+
+      // Tooltip cleanup
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
     });
 
     // watch(
@@ -2365,6 +2486,12 @@ export default defineComponent({
         getService(span, serviceTree, "", 1, 1);
       });
 
+      // Build consolidated patterns for pattern view
+      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
+      // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
+      // Pattern consolidation completed successfully
+
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
         maxDepth,
@@ -2947,6 +3074,9 @@ export default defineComponent({
       traceChart,
       updateChart,
       traceServiceMap,
+      traceServiceMapChartOptions,
+      chartRendererRef,
+      mapViewMode,
       activeVisual,
       traceVisuals,
       getImageURL,
@@ -3047,6 +3177,7 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
+      updateActiveTab
     };
   },
 });

@@ -3108,7 +3108,10 @@
         "cost": "Coût",
         "spans": "S'étend"
       }
-    }
+    },
+    "serviceMap": "Carte des services",
+    "patternView": "Affichage du motif",
+    "spanView": "Vue sur Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
