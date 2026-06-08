@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Breadcrumb path lives in the chrome bar (published below). Row 1 carries
          the editable panel-name field (as the title) + the editor actions. -->
     <AppPageHeader
-      :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack }"
+      :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >

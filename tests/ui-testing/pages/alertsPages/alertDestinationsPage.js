@@ -505,7 +505,7 @@ export class AlertDestinationsPage {
         await this.page.locator(this.deleteDestinationButton.replace('{destinationName}', destinationName)).click();
         await this.page.locator(this.confirmButton).click();
         await this.page.waitForTimeout(1000); // Wait for deletion to complete
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     /**
@@ -603,15 +603,15 @@ export class AlertDestinationsPage {
      */
     async hasDestinations() {
         try {
-            // Check if "No data available" is shown
-            const noData = await this.page.getByText('No data available').isVisible({ timeout: 2000 });
+            // Check if empty state is shown
+            const noData = await this.page.locator('[data-test="o2-empty-state"]').isVisible({ timeout: 2000 });
             if (noData) {
                 testLogger.debug('No destinations found');
                 return false;
             }
             return true;
         } catch (e) {
-            // If no "No data available", assume there are destinations
+            // If no empty state, assume there are destinations
             return true;
         }
     }
