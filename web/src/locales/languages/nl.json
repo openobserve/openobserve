@@ -4309,6 +4309,10 @@
     "noBackfillJobs": {
       "title": "Geen opvulopdrachten",
       "description": "Bij opvulopdrachten worden historische gegevens opnieuw verwerkt via een pijplijn. Voer er een uit om te beginnen."
+    },
+    "noSearchJobs": {
+      "title": "Geen geplande zoekopdrachten",
+      "description": "Langlopende zoekopdrachten die je plant, worden hier weergegeven, waar je hun status kunt volgen en de resultaten kunt bekijken zodra ze zijn voltooid."
     }
   },
   "onlineEvals": {

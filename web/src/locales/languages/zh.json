@@ -4300,6 +4300,10 @@
     "noBackfillJobs": {
       "title": "没有回填作业",
       "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
+    },
+    "noSearchJobs": {
+      "title": "没有预定的搜索任务",
+      "description": "您安排的长时间搜索将显示在此处，您可以在其中跟踪其状态并在搜索完成后浏览结果。"
     }
   },
   "onlineEvals": {

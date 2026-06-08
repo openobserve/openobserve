@@ -4307,6 +4307,10 @@
     "noBackfillJobs": {
       "title": "Nessun lavoro di backfill",
       "description": "I lavori di backfill rielaborano i dati storici tramite una pipeline. Eseguine uno per iniziare."
+    },
+    "noSearchJobs": {
+      "title": "Nessun lavoro di ricerca pianificato",
+      "description": "Le ricerche di lunga durata che pianifichi verranno visualizzate qui, dove potrai monitorare il loro stato ed esplorare i risultati una volta terminate."
     }
   },
   "onlineEvals": {

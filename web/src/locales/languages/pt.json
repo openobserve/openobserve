@@ -4296,6 +4296,10 @@
     "noBackfillJobs": {
       "title": "Sem trabalhos de preenchimento",
       "description": "Os trabalhos de preenchimento reprocessam dados históricos por meio de um pipeline. Execute um para começar."
+    },
+    "noSearchJobs": {
+      "title": "Nenhum trabalho de pesquisa agendado",
+      "description": "As pesquisas de longa duração que você agendar aparecerão aqui, onde você poderá acompanhar seu status e explorar os resultados assim que terminarem."
     }
   },
   "onlineEvals": {
