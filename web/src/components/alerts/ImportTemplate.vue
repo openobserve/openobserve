@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :editor-heights="{
       urlEditor: 'calc(100vh - 286px)',
       fileEditor: 'calc(100vh - 306px)',
-      outputContainer: 'calc(100vh - 130px)',
+      outputContainer: 'calc(100vh - 110px)',
       errorReport: 'calc(100vh - 130px)',
     }"
     @back="arrowBackFn"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
           class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="tw:mr-4 tw:mt-4" />
         <div class="error-report-container">
         <!-- Template Errors Section -->
         <div

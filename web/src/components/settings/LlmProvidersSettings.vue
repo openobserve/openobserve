@@ -10,19 +10,18 @@
     />
 
     <template v-else>
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px] tw:border-[var(--color-dialog-header-border,var(--o2-border))]"
+      <AppPageHeader
+        icon="smart-toy"
+        :subtitle="'LLM providers for online evaluations'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="llm-providers-settings-title"
-        >
-          {{ t("llmProviders.title") }}
-        </div>
-        <div class="tw:flex tw:items-center">
+        <template #title>
+          <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+        </template>
+        <template #actions>
           <OInput
             v-model="searchQuery"
-            class="tw:mr-2 tw:w-[200px]"
+            class="tw:w-50"
             :placeholder="t('llmProviders.searchPlaceholder')"
             data-test="llm-providers-search-input"
           >
@@ -34,12 +33,12 @@
             data-test="llm-providers-add-btn"
             variant="primary"
             size="sm"
-                  @click="openCreate"
+            @click="openCreate"
           >
             {{ t("llmProviders.newButton") }}
           </OButton>
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <div v-if="isLoading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
         <OSpinner size="md" />
@@ -171,6 +170,7 @@ import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/Provider
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();

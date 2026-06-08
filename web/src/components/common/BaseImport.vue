@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="tw:w-full"
-    :class="[containerClass, hideHeader ? 'tw:pt-[0.625rem]' : '']"
+    :class="[containerClass]"
     :style="containerStyle"
   >
     <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
+      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:mb-[0.625rem] tw:w-full"
+              class="card-container tw:w-full"
               :style="outputContainerStyle"
             >
               <!-- Slot for complete output section customization -->
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-                  <OSeparator class="tw:mx-4 tw:mt-4" />
+                  <OSeparator class="tw:mr-4 tw:mt-4" />
                   <div class="error-report-container">
                     <div class="tw:text-center tw:p-3 tw:text-gray-400">
                       No messages to display

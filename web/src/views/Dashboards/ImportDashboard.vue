@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.625rem]"
+      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
         <OButton
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
+              class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
             >
               <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Error Validations</div>
               <OSeparator class="tw:mt-4" />
