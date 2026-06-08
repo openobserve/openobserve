@@ -964,7 +964,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below. -->
-    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden tw:pr-1.5">
+    <div
+      ref="editorContainerRef"
+      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible tw:pr-1.5"
+      :class="{ 'editor-fullscreen': isFocused }"
+      :style="editorFullscreenStyle"
+    >
+      <!-- Expand / collapse button — always top-right of the full editor area -->
+      <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        data-test="logs-query-editor-full_screen-btn"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleEditorFullscreen"
+        class="tw:absolute! tw:z-[51] tw:top-[0.1875rem] tw:right-[0.25rem] editor-expand-btn"
+      >
+        <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
+      </OButton>
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
       >
