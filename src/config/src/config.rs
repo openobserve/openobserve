@@ -1689,11 +1689,11 @@ pub struct Limit {
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
-        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
+        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the file stat cache. Higher values allow caching more file statistics but increase memory usage."
     )]
-    pub datafusion_file_stat_cache_max_entries: usize,
+    pub datafusion_file_stat_cache_max_size: usize,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
         default = 10000,
@@ -3011,6 +3011,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
+        cfg.limit.datafusion_file_stat_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }
