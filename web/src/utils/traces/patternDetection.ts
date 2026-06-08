@@ -46,14 +46,10 @@ export interface CallPattern {
     errorRate: number
     traceTimePercent: number // % of total trace duration
 
-    // Exclusive time metrics (service-level aggregations)
-    avgExclusive: number           // Average exclusive time across spans
-    minExclusive: number           // Minimum exclusive time
-    maxExclusive: number           // Maximum exclusive time
-    exclusiveP75: number           // 75th percentile exclusive time
-    exclusiveP95: number           // 95th percentile exclusive time
+    // Exclusive time metrics (service-level aggregations)        // 95th percentile exclusive time
     exclusiveTimePercent: number   // % of total trace time in service self-time
     selfTimeRatio: number          // avgExclusive / avg (work ratio)
+    exclusiveTime: number
   }
   spanIds: string[] // for drill-down capability
 }
@@ -62,10 +58,10 @@ export interface CallPattern {
  * Call path extracted from trace
  */
 interface CallPath {
-  services: string[]
-  leafSpan: any  // The leaf span for this path
-  duration: number
-  isError: boolean
+  services: string[]   // ['root', 'load-generator'] or ['load-generator', 'frontend-proxy']
+  spans: any[]         // ALL destination service spans in this subtree
+  duration: number     // calculateMergedDuration(spans) — non-overlapping wall clock
+  isError: boolean     // error from boundary span (spans[0])
 }
 
 /**
@@ -80,19 +76,15 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
   const patterns = new Map<string, CallPattern>()
   const totalTraceDuration = calculateTotalTraceDuration(traceTree)
 
-  // Extract services and relationships from all root spans
-  const extractionResult = extractServicesAndRelationships(traceTree)
-  const allPaths = extractionResult.relationships
-  const allServices = extractionResult.services
+  // Extract service relationships — each CallPath carries all destination spans
+  const allPaths = extractServicesAndRelationships(traceTree)
 
   // Group paths by signature and add span instances
   addCallPathPatterns(patterns, allPaths)
 
-  // Calculate aggregated metrics for each pattern
-  calculatePatternMetrics(patterns, totalTraceDuration)
-
-  // Add patterns for standalone services
-  addStandaloneServicePatterns(patterns, allServices, totalTraceDuration)
+  // Add service-level patterns with computed metrics
+  // (edge metrics are not computed — single-trace samples are too few)
+  addServicePatterns(patterns, allPaths, totalTraceDuration)
 
   return patterns
 }
@@ -109,91 +101,58 @@ function calculateTotalTraceDuration(traceTree: any[]): number {
 }
 
 /**
- * Extract services and their relationships from trace tree
- * Handles both standalone services and service-to-service relationships
+ * Extract services and their relationships from trace tree.
+ * Returns a flat list of CallPaths, each carrying the boundary span.
+ * Service-level metrics are derived from span.exclusiveTimeMs downstream
+ * (pre-computed via bottom-up enrichment in useTraceProcessing).
  */
-function extractServicesAndRelationships(spans: any[], parentService: string = ''): {
-  relationships: CallPath[],
-  services: Map<string, { spans: any[], totalDuration: number, errorCount: number }>
-} {
+function extractServicesAndRelationships(spans: any[], parentService: string = 'root'): CallPath[] {
   const relationships: CallPath[] = []
-  const services = new Map<string, { spans: any[], totalDuration: number, errorCount: number }>()
 
-  spans.forEach((span, index) => {
+  spans.forEach((span) => {
     const serviceName = extractServiceName(span)
-    const duration = span.durationMs || 0
     const isError = isSpanError(span)
 
-    // Track all services (including standalone ones)
-    addSpanToService(services, serviceName, span, duration, isError)
+    if (parentService !== serviceName) {
+      // Service boundary detected — collect all same-service spans in subtree
+      // Each span already has exclusiveTimeMs pre-computed bottom-up
+      const allServiceSpans = collectSameServiceSpans(span, serviceName)
 
-    // If this span has a parent service and is a different service, record the relationship
-    if (parentService && parentService !== serviceName) {
       relationships.push({
         services: [parentService, serviceName],
-        leafSpan: span,
-        duration,
-        isError
+        spans: allServiceSpans,               // all same-service spans (for exclusive aggregation)
+        duration: span.durationMs || 0,       // boundary span inclusive (edge count reference)
+        isError,
       })
     }
 
-    // Recursively process child spans
-    if (span.spans && span.spans.length > 0) {
-      const childResult = extractServicesAndRelationships(span.spans, serviceName)
-      relationships.push(...childResult.relationships)
-      mergeChildServices(services, childResult.services)
+    // Always recurse for deeper boundary detection
+    // Handles both old format (spans) and EnrichedSpan format (children)
+    const childSpans = span.spans || span.children
+    if (childSpans && childSpans.length > 0) {
+      relationships.push(...extractServicesAndRelationships(childSpans, serviceName))
     }
   })
 
-  return { relationships, services }
+  return relationships
 }
 
 /**
- * Update service info with span data
+ * Collects all spans in a subtree belonging to a given service.
+ * Walks same-service children; stops at different-service boundaries.
+ * Only collects — no computation (exclusiveTimeMs is pre-computed).
  */
-function updateServiceInfo(
-  serviceInfo: { spans: any[], totalDuration: number, errorCount: number },
-  spans: any[],
-  totalDuration: number,
-  errorCount: number
-): void {
-  serviceInfo.spans.push(...spans)
-  serviceInfo.totalDuration += totalDuration
-  serviceInfo.errorCount += errorCount
-}
-
-/**
- * Add a span to the service tracking map
- */
-function addSpanToService(
-  services: Map<string, { spans: any[], totalDuration: number, errorCount: number }>,
-  serviceName: string,
-  span: any,
-  duration: number,
-  isError: boolean
-): void {
-  if (!services.has(serviceName)) {
-    services.set(serviceName, { spans: [], totalDuration: 0, errorCount: 0 })
+function collectSameServiceSpans(span: any, serviceName: string): any[] {
+  const result: any[] = [span]
+  const childSpans = span.spans || span.children
+  if (childSpans) {
+    for (const child of childSpans) {
+      if (extractServiceName(child) === serviceName) {
+        result.push(...collectSameServiceSpans(child, serviceName))
+      }
+    }
   }
-  const serviceInfo = services.get(serviceName)!
-  updateServiceInfo(serviceInfo, [span], duration, isError ? 1 : 0)
-}
-
-/**
- * Merge child services into the main services map
- */
-function mergeChildServices(
-  services: Map<string, { spans: any[], totalDuration: number, errorCount: number }>,
-  childServices: Map<string, { spans: any[], totalDuration: number, errorCount: number }>
-): void {
-  childServices.forEach((childInfo, childServiceName) => {
-    if (services.has(childServiceName)) {
-      const existing = services.get(childServiceName)!
-      updateServiceInfo(existing, childInfo.spans, childInfo.totalDuration, childInfo.errorCount)
-    } else {
-      services.set(childServiceName, childInfo)
-    }
-  })
+  return result
 }
 
 /**
@@ -215,13 +174,9 @@ function initializePattern(signature: string): CallPattern {
       errorRate: 0,
       traceTimePercent: 0,
       // Initialize exclusive time metrics
-      avgExclusive: 0,
-      minExclusive: Infinity,
-      maxExclusive: 0,
-      exclusiveP75: 0,
-      exclusiveP95: 0,
       exclusiveTimePercent: 0,
-      selfTimeRatio: 0
+      selfTimeRatio: 0,
+      exclusiveTime: 0,
     },
     spanIds: []
   }
@@ -251,13 +206,6 @@ function createSpanInstanceFromSpan(span: any, serviceName?: string): SpanInstan
 }
 
 /**
- * Create a span instance from a call path
- */
-function createSpanInstance(path: CallPath): SpanInstance {
-  return createSpanInstanceFromSpan(path.leafSpan)
-}
-
-/**
  * Add call path patterns to the patterns map
  */
 function addCallPathPatterns(patterns: Map<string, CallPattern>, allPaths: CallPath[]): void {
@@ -269,10 +217,12 @@ function addCallPathPatterns(patterns: Map<string, CallPattern>, allPaths: CallP
     }
 
     const pattern = patterns.get(signature)!
-    const spanInstance = createSpanInstance(path)
-
+    // Push boundary span instance for structure/count tracking
+    // Edge metrics are not computed — service-level metrics are derived from all spans
+    const spanInstance = createSpanInstanceFromSpan(path.spans[0])
     pattern.instances.push(spanInstance)
     pattern.spanIds.push(spanInstance.spanId)
+    pattern.metrics.count++
   })
 }
 
@@ -305,11 +255,7 @@ function calculateMetricsFromDurations(
     traceTimePercent: totalTraceDuration > 0 ? (totalDuration / totalTraceDuration) * 100 : 0,
 
     // Exclusive time metrics
-    avgExclusive,
-    minExclusive: exclusiveDurations.length > 0 ? Math.min(...exclusiveDurations) : 0,
-    maxExclusive: exclusiveDurations.length > 0 ? Math.max(...exclusiveDurations) : 0,
-    exclusiveP75: calculatePercentile(exclusiveDurations, 75),
-    exclusiveP95: calculatePercentile(exclusiveDurations, 95),
+    exclusiveTime: totalExclusiveDuration,
     exclusiveTimePercent: totalTraceDuration > 0 ? (totalExclusiveDuration / totalTraceDuration) * 100 : 0,
     selfTimeRatio: avgInclusive > 0 ? avgExclusive / avgInclusive : 0
   }
@@ -329,55 +275,78 @@ function calculatePatternMetrics(patterns: Map<string, CallPattern>, totalTraceD
 }
 
 /**
- * Add patterns for standalone services (services not involved in any relationships)
+ * Add service-level patterns for ALL services (both standalone and those in relationships).
+ * Derives service patterns from CallPath data — each CallPath carries all destination
+ * service spans in its subtree. Groups spans by target service across all CallPaths.
  */
-function addStandaloneServicePatterns(
+function addServicePatterns(
   patterns: Map<string, CallPattern>,
-  allServices: Map<string, { spans: any[], totalDuration: number, errorCount: number }>,
+  allPaths: CallPath[],
   totalTraceDuration: number
 ): void {
-  const servicesInRelationships = getServicesInRelationships(patterns)
+  const servicesWithPatterns = getServicesWithPatterns(patterns)
 
-  allServices.forEach((serviceInfo, serviceName) => {
-    if (!servicesInRelationships.has(serviceName)) {
-      const standalonePattern = createStandaloneServicePattern(
-        serviceName,
-        serviceInfo,
-        totalTraceDuration
-      )
-      patterns.set(serviceName, standalonePattern)
+  // Group destination spans by target service
+  const perService = new Map<string, any[]>()
+  allPaths.forEach(path => {
+    const target = path.services[path.services.length - 1]
+    if (!perService.has(target)) perService.set(target, [])
+    perService.get(target)!.push(...path.spans)
+  })
+
+  perService.forEach((spans, serviceName) => {
+    if (!servicesWithPatterns.has(serviceName)) {
+      const servicePattern = createServicePattern(serviceName, spans, totalTraceDuration)
+      patterns.set(serviceName, servicePattern)
     }
   })
 }
 
 /**
- * Get set of services that are already involved in relationships
+ * Get set of services that already have a service-level pattern in the map.
+ * Only checks for plain-name keys (keys without '→').
+ * Services appearing in relationship patterns still need their own
+ * service-level pattern, so they are NOT included here.
  */
-function getServicesInRelationships(patterns: Map<string, CallPattern>): Set<string> {
-  const servicesInRelationships = new Set<string>()
-  patterns.forEach(pattern => {
-    const services = pattern.pathSignature.split('→')
-    services.forEach(service => servicesInRelationships.add(service))
+function getServicesWithPatterns(patterns: Map<string, CallPattern>): Set<string> {
+  const servicesWithPatterns = new Set<string>()
+  patterns.forEach((_, key) => {
+    if (!key.includes('→')) {
+      // Service-level pattern — the key IS the service name
+      servicesWithPatterns.add(key)
+    }
   })
-  return servicesInRelationships
+  return servicesWithPatterns
 }
 
 /**
- * Create a pattern for a standalone service
+ * Create a service-level pattern from the service's own spans.
+ * Uses exclusiveTimeMs (self-time) pre-computed via bottom-up enrichment
+ * as the primary duration metric. Falls back to durationMs for backward compat.
  */
-function createStandaloneServicePattern(
+function createServicePattern(
   serviceName: string,
-  serviceInfo: { spans: any[], totalDuration: number, errorCount: number },
+  spans: any[],
   totalTraceDuration: number
 ): CallPattern {
-  const instances = serviceInfo.spans.map(span => createSpanInstanceFromSpan(span, serviceName))
-  const durations = serviceInfo.spans.map(s => s.durationMs || 0)
-  const exclusiveDurations = serviceInfo.spans.map(s => s.exclusiveTimeMs || s.durationMs || 0)
+  const instances = spans.map(span => createSpanInstanceFromSpan(span, serviceName))
+  // Use exclusive time as primary metric (pre-computed bottom-up, or fallback to durationMs)
+  const durations = spans.map(s => s.durationMs || 0)
+  // Keep inclusive durations as supplementary data
+  const exclusiveDurations = spans.map(s => s.exclusiveTimeMs || 0)
+  const errorCount = spans.filter(s => isSpanError(s)).length
+
+  const metrics = calculateMetricsFromDurations(durations, exclusiveDurations, errorCount, totalTraceDuration)
+
+  // totalDuration = total self-work (sum of exclusive times)
+  // No merge needed — exclusiveTimeMs already accounts for child overlap
+  metrics.totalDuration = durations.reduce((sum, d) => sum + d, 0)
+  metrics.traceTimePercent = totalTraceDuration > 0 ? (metrics.totalDuration / totalTraceDuration) * 100 : 0
 
   return {
     pathSignature: serviceName,
     instances,
-    metrics: calculateMetricsFromDurations(durations, exclusiveDurations, serviceInfo.errorCount, totalTraceDuration),
+    metrics,
     spanIds: instances.map(instance => instance.spanId)
   }
 }

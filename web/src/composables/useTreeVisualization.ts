@@ -87,6 +87,7 @@ export function useTreeVisualization<T>(
     if (config.nodeType === 'service') {
       return generateServiceNodeTooltipContent(node.metadata)
     } else {
+      console.log(node)
       return generatePatternNodeTooltipContent(node.metadata)
     }
   }

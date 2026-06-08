@@ -34,25 +34,30 @@ export function useTracePatternTree(
       return []
     }
 
-    // Build service relationship map
+    // Separate service-level patterns from relationship patterns
+    // Service patterns: key = service name (no '→'), metrics = service's own exclusive time
+    // Relationship patterns: key = "from→to" (contains '→'), metrics = downstream call metrics
+    const servicePatterns = new Map<string, CallPattern>()
+    const relationshipPatterns = new Map<string, CallPattern>()
+
+    patternMap.forEach((pattern, key) => {
+      if (key.includes('→')) {
+        relationshipPatterns.set(key, pattern)
+      } else {
+        servicePatterns.set(key, pattern)
+      }
+    })
+
+    // Build service relationship map from relationship patterns only
+    // (for tree structure — who calls whom)
     const serviceMap = new Map<string, {
       children: CallPattern[],
       parents: string[]
     }>()
 
-    // Initialize service map and find relationships
-    patternMap.forEach(pattern => {
+    relationshipPatterns.forEach(pattern => {
       const services = pattern.pathSignature.split('→')
-
-      if (services.length === 1) {
-        // Standalone service (single service trace or isolated service)
-        const serviceName = services[0]
-        if (!serviceMap.has(serviceName)) {
-          serviceMap.set(serviceName, { children: [], parents: [] })
-        }
-        // Standalone services have no relationships, just track them
-      } else if (services.length === 2) {
-        // Service relationship
+      if (services.length === 2) {
         const [fromService, toService] = services
 
         // Initialize services in map if they don't exist
@@ -69,9 +74,22 @@ export function useTracePatternTree(
       }
     })
 
-    // Find root services (services with no parents)
+    // Add standalone services from service patterns that aren't in the relationship map
+    servicePatterns.forEach((_, serviceName) => {
+      if (!serviceMap.has(serviceName)) {
+        serviceMap.set(serviceName, { children: [], parents: [] })
+      }
+    })
+
+    // Find root services: skip the virtual 'root' node and treat services
+    // whose only parent is 'root' as the actual tree roots
     const rootServices = Array.from(serviceMap.keys()).filter(
-      service => serviceMap.get(service)!.parents.length === 0
+      service => {
+        if (service === 'root') return false
+        const parents = serviceMap.get(service)!.parents
+        return parents.length === 0 ||
+               (parents.length === 1 && parents[0] === 'root')
+      }
     )
 
     // Build tree recursively from root services
@@ -88,42 +106,33 @@ export function useTracePatternTree(
         const targetService = pattern.pathSignature.split('→')[1]
         const childNode = buildServiceTree(targetService, new Set(visited))
         if (childNode) {
-          // Update child node with aggregated metrics from this relationship
-          childNode.value = pattern.metrics.avg
-          childNode.errorRate = pattern.metrics.errorRate
+          // Preserve the child node's own metrics — do NOT overwrite with relationship metrics.
+          // Instead, attach relationship data to child's metadata for tooltip display.
           childNode.metadata = {
             ...childNode.metadata,
-            ...pattern.metrics,
-            pathSignature: pattern.pathSignature,
-            spanIds: pattern.spanIds,
-            instances: pattern.instances
+            parentRelationship: {
+              pathSignature: pattern.pathSignature,
+              callCount: pattern.metrics.count,
+              avgLatency: pattern.metrics.avg,
+              errorRate: pattern.metrics.errorRate,
+              minLatency: pattern.metrics.min,
+              maxLatency: pattern.metrics.max,
+              p75Latency: pattern.metrics.p75,
+              p95Latency: pattern.metrics.p95,
+              p99Latency: pattern.metrics.p99
+            }
           }
           children.push(childNode)
         }
       })
 
-      // Calculate aggregated metrics for this service
-      let totalCalls, avgDuration, avgErrorRate
+      // Get node-level metrics from the service's own pattern
+      // This reflects the service's OWN execution time (exclusive), not downstream time
+      const svcPattern = servicePatterns.get(serviceName)
 
-      if (serviceInfo.children.length > 0) {
-        // Service with relationships - aggregate from children
-        totalCalls = serviceInfo.children.reduce((sum, p) => sum + p.metrics.count, 0)
-        avgDuration = serviceInfo.children.reduce((sum, p) => sum + p.metrics.avg * p.metrics.count, 0) / Math.max(totalCalls, 1)
-        avgErrorRate = serviceInfo.children.reduce((sum, p) => sum + p.metrics.errorRate * p.metrics.count, 0) / Math.max(totalCalls, 1)
-      } else {
-        // Standalone service - get metrics from the service's own pattern
-        const standalonePattern = Array.from(patternMap.values()).find(p => p.pathSignature === serviceName)
-        if (standalonePattern) {
-          totalCalls = standalonePattern.metrics.count
-          avgDuration = standalonePattern.metrics.avg
-          avgErrorRate = standalonePattern.metrics.errorRate
-        } else {
-          // Fallback values
-          totalCalls = 0
-          avgDuration = 0
-          avgErrorRate = 0
-        }
-      }
+      const count = svcPattern?.metrics.count ?? 0
+      const avgDuration = svcPattern?.metrics.avg ?? 0
+      const avgErrorRate = svcPattern?.metrics.errorRate ?? 0
 
       return {
         id: serviceName,
@@ -132,10 +141,25 @@ export function useTracePatternTree(
         errorRate: avgErrorRate,
         children: children.length > 0 ? children : undefined,
         metadata: {
+          pathSignature: serviceName,
           serviceName,
-          count: totalCalls,
+          count,
           avg: Math.round(avgDuration * 100) / 100,
           errorRate: Math.round(avgErrorRate * 100) / 100,
+          // Inclusive time metrics
+          min: svcPattern?.metrics.min ?? 0,
+          max: svcPattern?.metrics.max ?? 0,
+          p75: svcPattern?.metrics.p75 ?? 0,
+          p95: svcPattern?.metrics.p95 ?? 0,
+          p99: svcPattern?.metrics.p99 ?? 0,
+          traceTimePercent: Math.round((svcPattern?.metrics.traceTimePercent ?? 0) * 100) / 100,
+          totalDuration: svcPattern?.metrics.totalDuration ?? 0,
+          exclusiveTimePercent: Math.round((svcPattern?.metrics.exclusiveTimePercent ?? 0) * 100) / 100,
+          exclusiveTime: svcPattern?.metrics.exclusiveTime,
+          selfTimeRatio: svcPattern?.metrics.selfTimeRatio ?? 0,
+          // Span drill-down
+          spanIds: svcPattern?.spanIds ?? [],
+          instances: svcPattern?.instances ?? [],
           isLeaf: children.length === 0
         }
       }
@@ -147,81 +171,6 @@ export function useTracePatternTree(
       .filter((node): node is TreeNode => node !== null)
 
     return treeNodes
-  }
-
-  /**
-   * Create a TreeNode for a call pattern
-   */
-  const createPatternNode = (
-    pattern: CallPattern,
-    displayName: string,
-    isLeaf: boolean
-  ): TreeNode => {
-    return {
-      id: pattern.pathSignature,
-      name: displayName,
-      value: pattern.metrics.avg, // Use average duration as primary value
-      errorRate: pattern.metrics.errorRate,
-      metadata: {
-        pathSignature: pattern.pathSignature,
-        count: pattern.metrics.count,
-        avg: Math.round(pattern.metrics.avg * 100) / 100, // Round to 2 decimal places
-        min: pattern.metrics.min,
-        max: pattern.metrics.max,
-        p75: Math.round(pattern.metrics.p75 * 100) / 100,
-        p95: Math.round(pattern.metrics.p95 * 100) / 100,
-        p99: Math.round(pattern.metrics.p99 * 100) / 100,
-        errorRate: Math.round(pattern.metrics.errorRate * 100) / 100,
-        traceTimePercent: Math.round(pattern.metrics.traceTimePercent * 100) / 100,
-        totalDuration: pattern.metrics.totalDuration,
-        spanIds: pattern.spanIds,
-        instances: pattern.instances,
-        isLeaf
-      }
-    }
-  }
-
-  /**
-   * Create a TreeNode for a root service that has multiple pattern children
-   */
-  const createRootServiceNode = (
-    serviceName: string,
-    patterns: CallPattern[]
-  ): TreeNode => {
-    // Aggregate metrics from all patterns under this service
-    const totalCalls = patterns.reduce((sum, p) => sum + p.metrics.count, 0)
-    const totalDuration = patterns.reduce((sum, p) => sum + p.metrics.totalDuration, 0)
-    const totalErrors = patterns.reduce((sum, p) =>
-      sum + (p.instances.filter(i => i.isError).length), 0)
-
-    const avgDuration = totalCalls > 0 ? totalDuration / totalCalls : 0
-    const errorRate = totalCalls > 0 ? (totalErrors / totalCalls) * 100 : 0
-
-    // Calculate aggregated trace time percentage
-    const traceTimePercent = patterns.reduce((sum, p) => sum + p.metrics.traceTimePercent, 0)
-
-    return {
-      id: serviceName,
-      name: serviceName,
-      value: avgDuration,
-      errorRate,
-      metadata: {
-        pathSignature: serviceName,
-        count: totalCalls,
-        avg: Math.round(avgDuration * 100) / 100,
-        min: Math.min(...patterns.map(p => p.metrics.min)),
-        max: Math.max(...patterns.map(p => p.metrics.max)),
-        p75: calculateAggregatePercentile(patterns, 75),
-        p95: calculateAggregatePercentile(patterns, 95),
-        p99: calculateAggregatePercentile(patterns, 99),
-        errorRate: Math.round(errorRate * 100) / 100,
-        traceTimePercent: Math.round(traceTimePercent * 100) / 100,
-        totalDuration,
-        spanIds: patterns.flatMap(p => p.spanIds),
-        instances: patterns.flatMap(p => p.instances),
-        isLeaf: false
-      }
-    }
   }
 
   /**

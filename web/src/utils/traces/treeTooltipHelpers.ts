@@ -204,6 +204,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     p99 = 0,
     errorRate = 0,
     traceTimePercent = 0,
+    totalDuration,
     // Exclusive time metrics (new)
     avgExclusive = 0,
     minExclusive = 0,
@@ -211,6 +212,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
     exclusiveP75 = 0,
     exclusiveP95 = 0,
     exclusiveTimePercent = 0,
+    exclusiveTime = 0,
     selfTimeRatio = 0
   } = metadata;
 
@@ -218,7 +220,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
   const hasExclusiveData = avgExclusive > 0 || exclusiveTimePercent > 0;
   const exclusiveSection = hasExclusiveData ? `
     <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-      <div style="margin-bottom: 3px;"><strong>% Exec Time:</strong> <span style="font-family: monospace;">${avg.toFixed(1)}ms</span> <span style="color: rgba(72, 71, 71, 0.7);">(${traceTimePercent.toFixed(1)}% of trace)</span></div>
+      <div style="margin-bottom: 3px;"><strong>Exec Time:</strong> <span style="font-family: monospace;">${exclusiveTime.toFixed(2)}ms</span> <span style="color: rgba(72, 71, 71, 0.7);">(${exclusiveTimePercent.toFixed(1)}% of trace)</span></div>
     </div>
   ` : '';
 
@@ -241,7 +243,9 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
 
       <div style="margin-bottom: 6px;">
         <div style="margin-bottom: 3px;"><strong>Calls:</strong> <span style="font-family: monospace;">${count}</span></div>
-        <div style="margin-bottom: 3px;"><strong>% Total Time:</strong> <span style="font-family: monospace;">${avg.toFixed(1)}ms</span> <span style="color: rgba(72, 71, 71, 0.7);">(${traceTimePercent.toFixed(1)}% of trace)</span></div>
+        <div style="margin-bottom: 3px;"><strong>Max:</strong> <span style="font-family: monospace;">${max.toFixed(2)}ms</span></div>
+        <div style="margin-bottom: 3px;"><strong>Avg:</strong> <span style="font-family: monospace;">${avg.toFixed(2)}ms</span></div>
+        <div style="margin-bottom: 3px;"><strong>P99:</strong> <span style="font-family: monospace;">${p99.toFixed(2)}ms</span></div>
       </div>
 
       <div style="margin-bottom: 6px;">

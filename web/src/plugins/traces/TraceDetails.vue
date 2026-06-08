@@ -2218,11 +2218,21 @@ export default defineComponent({
       };
 
       calculateTracePosition();
-      buildTraceChart();
       buildServiceTree();
-      flatSpans.value = useTraceProcessing(
+      const traceProcessor = useTraceProcessing(
         treeForFlameGraph as any,
-      ).flatSpans.value;
+      );
+      console.log("Trace Processor -----", traceProcessor.flatSpans.value);
+      flatSpans.value = traceProcessor.flatSpans.value;
+
+      const processedRoots = flatSpans.value.filter(
+        (s: any) => !s.parent_span_id,
+      );
+      consolidatedPatterns.value = buildPatternConsolidatedTree(processedRoots);
+
+      console.log("consolidatedPatterns.value- ----", consolidatedPatterns.value);
+
+      buildTraceChart();
 
       // After the tree is built, scroll the pre-selected span into view (e.g.
       // when arriving from spans search mode with a span_id in the URL).
@@ -2338,7 +2348,10 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
-      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      // Use processedRoots (EnrichedSpan with exclusiveTimeMs) instead of raw traceTree
+      // Extract roots for pattern detection — EnrichedSpan roots have
+      // children populated and exclusiveTimeMs pre-computed bottom-up.
+      console.log("consolidatedPatterns.value ---", consolidatedPatterns.value)
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
