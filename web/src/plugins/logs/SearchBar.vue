@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden tw:border-b tw:solid tw:border-b-[var(--o2-border-color)]">
       <div
         ref="toolbarLeftRef"
         class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
@@ -966,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the right (4px wrapper + 6px), aligning with the results panel below. -->
     <div
       ref="editorContainerRef"
-      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible tw:pr-1.5"
+      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
       :class="{ 'editor-fullscreen': isFocused }"
       :style="editorFullscreenStyle"
     >
@@ -993,7 +993,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:relative"
               :class="{
                 'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor
@@ -1061,7 +1061,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:rounded-l-none tw:border-l-0 tw:relative tw:h-full"
+                    class="tw:relative tw:h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
