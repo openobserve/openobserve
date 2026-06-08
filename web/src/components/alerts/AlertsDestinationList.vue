@@ -18,14 +18,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <AppPageHeader
         :title="t('alert_destinations.header')"
         icon="location-on"
-        :subtitle="'Where triggered alerts are delivered'"
+        subtitle="Where triggered alerts are delivered"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
+        <template #title>
+          <span data-test="alert-destinations-list-title">{{
+            t("alert_destinations.header")
+          }}</span>
+        </template>
         <template #actions>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v) => { activeTab = v; }"
+            data-test="destination-list-tabs"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("alert_destinations.filterAll") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+              {{ t("alert_destinations.filterPrebuilt") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+              <template #icon-left><OIcon name="settings" size="sm" /></template>
+              {{ t("alert_destinations.filterCustom") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OButton
             variant="outline"
             size="sm"
@@ -41,9 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mx-2.5 tw:mt-2.5 tw:mb-2.5 tw:overflow-hidden">
+      <div class="tw:flex-1 tw:min-h-0">
         <OTable
-          :frame="false"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
@@ -64,10 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="filterQuery"
               data-test="destination-list-search-input"
-              class="tw:w-64"
+              class="tw:flex-1"
               :placeholder="t('alert_destinations.search')"
             />
           </template>
+
           <template #bottom="{ totalRows }">
             <span class="o2-table-footer-title tw:text-primary">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
@@ -94,6 +116,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hide-action="!filterQuery"
               @action="(id) => id === 'clear-filters' && (filterQuery = '')"
             />
+          </template>
+
+          <template #cell-template="{ row }">
+            <div
+              v-if="row.template"
+              class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
+              :data-test="`destination-template-${row.name}`"
+            >
+              <span
+                class="tw:truncate tw:min-w-0"
+                :title="row.template"
+              >{{ row.template }}</span>
+              <OBadge
+                v-if="isDefaultPrebuiltTemplate(row)"
+                :data-test="`destination-template-default-badge-${row.name}`"
+                variant="default"
+                class="tw:text-xs tw:flex-shrink-0"
+              >{{ t('alert_destinations.templateDefaultBadge') }}</OBadge>
+            </div>
+            <span v-else class="tw:text-gray-400">—</span>
           </template>
 
           <template #cell-type="{ row }">
@@ -227,9 +269,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 interface ConformDelete {
   visible: boolean;
@@ -238,7 +282,6 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    AppPageHeader,
     OIcon,
     AddDestination,
     OEmptyState,
@@ -249,6 +292,9 @@ export default defineComponent({
     OCheckbox,
     OBadge,
     OTable,
+    OToggleGroup,
+    OToggleGroupItem,
+    AppPageHeader,
   },
   setup() {
     const store = useStore();
@@ -287,6 +333,14 @@ export default defineComponent({
         header: t("alert_destinations.url"),
         accessorKey: "url",
         size: 200,
+        meta: { align: "left" },
+      },
+      {
+        id: "template",
+        header: t("alert_destinations.template"),
+        accessorKey: "template",
+        sortable: true,
+        size: 280,
         meta: { align: "left" },
       },
       {
@@ -565,6 +619,15 @@ export default defineComponent({
       });
     };
 
+    // True when the row's template name matches the canonical `prebuilt_<type>`
+    // for its detected prebuilt type — i.e. the user kept the default rather
+    // than picking a custom template. Used to show a "Default" badge.
+    const isDefaultPrebuiltTemplate = (destination: any): boolean => {
+      const prebuiltType = detectPrebuiltType(destination);
+      if (!prebuiltType) return false;
+      return destination.template === `prebuilt_${prebuiltType}`;
+    };
+
     const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
       const prebuiltType = detectPrebuiltType(destination);
       if (!prebuiltType) return null;
@@ -584,9 +647,23 @@ export default defineComponent({
       return t("alert_destinations.custom");
     };
 
+    // Top-right tab filter — mirrors the alerts list and templates list.
+    // "prebuilt" matches any destination detectable as a prebuilt type
+    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
+    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
+    // negation, capturing user-defined HTTP/Email/Action destinations.
+    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return destinations.value || [];
-      return filterData(destinations.value || [], filterQuery.value);
+      const base = destinations.value || [];
+      const byTab =
+        activeTab.value === "prebuilt"
+          ? base.filter((d: any) => !!detectPrebuiltType(d))
+          : activeTab.value === "custom"
+            ? base.filter((d: any) => !detectPrebuiltType(d))
+            : base;
+      if (!filterQuery.value) return byTab;
+      return filterData(byTab, filterQuery.value);
     });
 
     const openBulkDeleteDialog = () => {
@@ -700,6 +777,7 @@ export default defineComponent({
       getDestinationByName,
       resetEditingDestination,
       visibleRows,
+      activeTab,
       selectedDestinationIds,
       handleSelectedIdsUpdate,
       openBulkDeleteDialog,
@@ -708,6 +786,7 @@ export default defineComponent({
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,
+      isDefaultPrebuiltTemplate,
     };
   },
 });
