@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
-      :title="t('ingestion.tokenManagementTitle')"
       :subtitle="t('ingestion.orgLevelExplanation')"
       icon="key"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
+      <template #title><span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span></template>
       <template #actions>
         <OButton
           variant="primary"

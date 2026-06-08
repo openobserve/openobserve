@@ -43,13 +43,13 @@ test.describe("Pagination for logs", () => {
         // Strategic 1000ms wait for query results - this is functionally necessary
         await page.waitForTimeout(1000);
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
         // Strategic 500ms wait for pagination change - this is functionally necessary
         await page.waitForTimeout(500);
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
         // Strategic 500ms wait for pagination change - this is functionally necessary
         await page.waitForTimeout(500);
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to');
     });
 
     test("HTTP Pagination for running query to validate WHERE match_all('zin*')", { tag: ['@pagination', '@functional', '@P1'] }, async ({ page }) => {
@@ -64,9 +64,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to 40 out of');
     });
 
     test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T1*')", { tag: ['@pagination', '@functional', '@P1'] }, async ({ page }) => {
@@ -81,9 +81,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to 40 out of');
     });
 
     test("HTTP for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", { tag: ['@pagination', '@functional', '@P1'] }, async ({ page }) => {
@@ -114,9 +114,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to');
     });
 
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
@@ -133,9 +133,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to 40 out of');
     });
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T1*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
@@ -152,9 +152,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to 40 out of');
     });
 
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
@@ -171,9 +171,9 @@ test.describe("Pagination for logs", () => {
         // Strategic 500ms wait for operation completion - this is functionally necessary
         await page.waitForTimeout(500); 
         await pageManager.logsPage.clickResultsPerPage();
-        await pageManager.logsPage.selectResultsPerPageAndVerify('2', 'Showing 11 to 20 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('3', 'Showing 21 to 30 out of');
-        await pageManager.logsPage.selectResultsPerPageAndVerify('4', 'Showing 31 to 40 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('2', '11 to 20 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('3', '21 to 30 out of');
+        await pageManager.logsPage.selectResultsPerPageAndVerify('4', '31 to 40 out of');
     });
 
     test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {

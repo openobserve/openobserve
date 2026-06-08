@@ -119,7 +119,7 @@ class EnrichmentPage {
         this.nameLabel = 'Name';
         this.warningQueryExecution = 'text=warning Query execution';
         this.startTimeCell = 'Start time';
-        this.showingText = 'Showing 1 to 2 out of 2';
+        this.showingText = '1 to 2 out of 2';
         this.csvRequiredError = 'CSV File is required!';
         this.enrichmentTablesButton = 'Enrichment Tables';
         this.appendDataToggle = 'Append data to existing';

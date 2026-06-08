@@ -1812,7 +1812,7 @@ export class LogsPage {
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                await expect(searchResult).toContainText('1 to 10', { timeout: 10000 });
                 return;
             } catch (e) {
                 if (attempt < 3) {
@@ -1821,7 +1821,7 @@ export class LogsPage {
             }
         }
         // Final attempt — let it throw
-        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
+        await expect(searchResult).toContainText('1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
@@ -1829,13 +1829,13 @@ export class LogsPage {
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
-                expectedPattern = 'Showing 11 to 20 out of';
+                expectedPattern = '11 to 20 out of';
                 break;
             case '3':
-                expectedPattern = 'Showing 21 to 30 out of';
+                expectedPattern = '21 to 30 out of';
                 break;
             case '4':
-                expectedPattern = 'Showing 31 to';
+                expectedPattern = '31 to';
                 break;
             default:
                 expectedPattern = expectedText;
@@ -4391,7 +4391,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('button[data-test="function-stream-tab"]').click();
+        return await this.page.locator('[data-test="pipeline-section-tab-functions"]').click();
     }
 
     async clickSearchFunctionInput() {

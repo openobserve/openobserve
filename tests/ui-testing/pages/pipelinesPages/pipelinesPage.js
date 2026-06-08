@@ -15,7 +15,7 @@ export class PipelinesPage {
         this.pipelineMenuLink = page.locator(
           '[data-test="menu-link-\\/pipeline-item"]'
         );
-        this.pipelineTab = page.locator('button[data-test="stream-pipelines-tab"]');
+        this.pipelineTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
         this.addPipelineButton = page.locator(
           '[data-test="pipeline-list-add-pipeline-btn"]'
         );
@@ -159,7 +159,7 @@ export class PipelinesPage {
         this.functionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
         this.addConditionSaveButton = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-primary-btn"]');
         this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
-        this.enrichmentTableTab = 'button[data-test="function-enrichment-table-tab"]';
+        this.enrichmentTableTab = '[data-test="pipeline-section-tab-enrichmentTables"]';
         // Added data-test "enrichment-tables-add-btn" on the New Enrichment
         // Table OButton — prefer the data-test locator; fall back to the
         // legacy getByRole locator for older specs still using the old PO copy.
@@ -170,7 +170,7 @@ export class PipelinesPage {
         this.addEnrichmentTablePage = page.locator('[data-test="add-enrichment-table-page"]');
         // Enrichment table tab locator (data-test prefix; the tab is rendered by
         // OToggleGroup under the Functions section).
-        this.enrichmentTableTabLocator = page.locator('button[data-test="function-enrichment-table-tab"]');
+        this.enrichmentTableTabLocator = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
         this.editButton = page.locator("button").filter({ hasText: "edit" });
         this.remoteDestinationIcon = page.getByRole("img", { name: "Remote Destination" });
         this.nameInput = page.getByLabel("Name *");
