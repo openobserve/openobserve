@@ -28,9 +28,9 @@ jobs:
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         with:
-          model: anthropic/claude-sonnet-4-6
+          model: deepseek/deepseek-reasoner
           token: ${{ secrets.E2E_DEV_CI_TOKEN }}
           prompt: |
             Review this pull request for the OpenObserve codebase (Rust backend, Vue/TypeScript frontend).
