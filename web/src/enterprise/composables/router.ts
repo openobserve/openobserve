@@ -22,6 +22,7 @@ import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import ImportScoreConfig from "@/enterprise/components/onlineEvals/ImportScoreConfig.vue";
+import ImportScorer from "@/enterprise/components/onlineEvals/ImportScorer.vue";
 import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
 import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
 import { routeGuard } from "@/utils/zincutils";
@@ -78,6 +79,18 @@ const useEnvRoutes = () => {
       },
       meta: {
         title: "Import Score Config",
+        keepAlive: false,
+      },
+    },
+    {
+      path: "online-evals/scorers/import",
+      name: "importScorer",
+      component: ImportScorer,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      meta: {
+        title: "Import Scorer",
         keepAlive: false,
       },
     },

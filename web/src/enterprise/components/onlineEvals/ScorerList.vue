@@ -5,22 +5,12 @@
     :search="search"
     :search-placeholder="t('onlineEvals.scorer.searchPlaceholder')"
     :add-label="t('onlineEvals.scorer.newButton')"
-    :show-empty="showEmptyState || shouldShowCatalog"
+    :show-empty="showEmptyState"
     @update:search="$emit('update:search', $event)"
     @create="$emit('create')"
   >
     <template #empty>
-      <OnlineEvalsCatalog
-        v-if="shouldShowCatalog"
-        kind="scorers"
-        :org-id="orgId"
-        :score-configs="scoreConfigs"
-        :scorers="allScorers"
-        :providers="providers"
-        @imported="$emit('imported')"
-      />
       <EvalEmptyState
-        v-else
         data-test="scorer-empty-state"
         icon="rule"
         :title="t('onlineEvals.scorer.empty.title')"
@@ -32,19 +22,82 @@
         :cta-label="t('onlineEvals.scorer.newButton')"
         cta-data-test="scorer-empty-create-btn"
         @create="$emit('create')"
-      />
+      >
+        <template #secondary>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="md"
+                data-test="scorer-empty-import"
+                icon-right="expand-more"
+              >
+                {{ t("onlineEvals.scorer.import.button") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="$emit('import-custom')"
+              data-test="scorer-empty-import-custom"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scorer.import.customLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scorer.import.customSubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+            <ODropdownItem
+              @select="$emit('open-library')"
+              data-test="scorer-empty-import-library"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scorer.import.libraryLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scorer.import.librarySubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+        </template>
+      </EvalEmptyState>
     </template>
 
     <template #actions>
-      <OButton
-        class="tw:ml-2"
-        variant="secondary"
-        size="sm"
-        data-test="scorer-browse-library-btn"
-        @click="$emit('toggle-catalog')"
-      >
-        {{ showCatalog ? "Hide Library" : "Browse Library" }}
-      </OButton>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="tw:ml-2"
+            data-test="scorer-import"
+            icon-right="expand-more"
+          >
+            {{ t("onlineEvals.scorer.import.button") }}
+          </OButton>
+        </template>
+        <ODropdownItem
+          @select="$emit('import-custom')"
+          data-test="scorer-import-custom"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scorer.import.customLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scorer.import.customSubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+        <ODropdownItem
+          @select="$emit('open-library')"
+          data-test="scorer-import-library"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scorer.import.libraryLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scorer.import.librarySubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+      </ODropdown>
     </template>
 
     <template #filter>
@@ -59,17 +112,9 @@
     </template>
 
     <template #table>
-      <OnlineEvalsCatalog
-        v-if="showCatalog"
-        kind="scorers"
-        :org-id="orgId"
-        :score-configs="scoreConfigs"
-        :scorers="allScorers"
-        :providers="providers"
-        @imported="$emit('imported')"
-      />
       <OTable
-        v-else
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="scorer-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -84,6 +129,23 @@
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #bottom="{ totalRows }">
+          <span class="o2-table-footer-title tw:text-primary">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline"
+            size="sm"
+            class="tw:ml-3"
+            icon-left="download"
+            data-test="scorer-bulk-export-btn"
+            @click="handleBulkExport"
+          >
+            {{ t("onlineEvals.scorer.export.bulkButton") }} ({{ selectedIds.length }})
+          </OButton>
+        </template>
+
         <template #cell-type="{ row }">
           <span class="sr-type-chip" :class="`sr-type-chip--${scorerTypeOf(row)}`">
             {{ scorerTypeLabel(scorerTypeOf(row)) }}
@@ -117,6 +179,14 @@
               @click.stop="$emit('edit', row)"
             />
             <OButton
+              :data-test="`scorer-list-${row.name}-export-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.export')"
+              icon-left="download"
+              @click.stop="$emit('export', row)"
+            />
+            <OButton
               :data-test="`scorer-list-${row.name}-delete-btn`"
               variant="ghost-destructive"
               size="icon-sm"
@@ -137,9 +207,10 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type {
   EvalJob,
-  Provider,
   ScoreConfig,
   Scorer,
   ScorerType,
@@ -147,7 +218,6 @@ import type {
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
-import OnlineEvalsCatalog from "./OnlineEvalsCatalog.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 const props = defineProps<{
@@ -155,25 +225,32 @@ const props = defineProps<{
   allScorers: Scorer[];
   jobs: EvalJob[];
   scoreConfigs: ScoreConfig[];
-  providers: Provider[];
-  orgId: string;
   search: string;
   loading?: boolean;
-  showCatalog?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: Scorer): void;
   (e: "view", row: Scorer): void;
   (e: "delete", row: Scorer): void;
   (e: "imported"): void;
-  (e: "toggle-catalog"): void;
+  (e: "import-custom"): void;
+  (e: "open-library"): void;
+  (e: "export", row: Scorer): void;
+  (e: "export-bulk", ids: string[]): void;
 }>();
 
 const { t } = useI18n();
 const typeFilter = ref<ScorerType | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkExport() {
+  const ids = [...selectedIds.value];
+  selectedIds.value = [];
+  emit("export-bulk", ids);
+}
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scorer.allTypes"), value: null },
@@ -241,8 +318,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.actions"),
     sortable: false,
     isAction: true,
-    size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    size: 140,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 
@@ -260,10 +337,6 @@ const showEmptyState = computed(
     props.allScorers.length === 0 &&
     !props.search &&
     !typeFilter.value,
-);
-
-const shouldShowCatalog = computed(
-  () => !props.loading && props.rows.length === 0 && !props.search && !typeFilter.value,
 );
 
 function scorerTypeLabel(type: ScorerType) {

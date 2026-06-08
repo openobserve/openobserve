@@ -82,18 +82,17 @@ the Free Software Foundation, either version 3 of the License, or
             :all-scorers="scorers"
             :jobs="jobs"
             :score-configs="scoreConfigs"
-            :providers="providers"
-            :org-id="orgId"
             :search="filterQuery"
             :loading="isLoading"
-            :show-catalog="catalogOpenTab === 'scorers'"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row: Scorer) => openScorerView(row)"
             @edit="(row: Scorer) => openEditDialog(row)"
             @delete="(row: Scorer) => deleteRow(row)"
-            @imported="handleCatalogImported"
-            @toggle-catalog="toggleCatalog('scorers')"
+            @open-library="openScorerLibrary"
+            @import-custom="goToImportScorer"
+            @export="exportScorerRow"
+            @export-bulk="exportScorerBulk"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -145,6 +144,30 @@ the Free Software Foundation, either version 3 of the License, or
           :org-id="orgId"
           @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
           @imported="handleScoreConfigLibraryImported"
+        />
+      </ODrawer>
+
+      <ODrawer
+        v-model:open="showScorerLibrary"
+        side="right"
+        size="lg"
+        :title="t('onlineEvals.scorer.import.libraryDrawerTitle')"
+        secondary-button-label="Cancel"
+        :primary-button-label="`Import (${scorerLibrarySelectedCount})`"
+        :primary-button-disabled="scorerLibrarySelectedCount === 0"
+        :primary-button-loading="scorerLibraryImporting"
+        data-test="scorer-library-drawer"
+        @click:secondary="showScorerLibrary = false"
+        @click:primary="triggerScorerLibraryImport"
+      >
+        <ScorerLibrary
+          ref="scorerLibraryRef"
+          :org-id="orgId"
+          :score-configs="scoreConfigs"
+          :scorers="scorers"
+          :providers="providers"
+          @update:selected-count="(n: number) => (scorerLibrarySelectedCount = n)"
+          @imported="handleScorerLibraryImported"
         />
       </ODrawer>
 
@@ -231,12 +254,18 @@ import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
+import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import { downloadFile } from "@/utils/dom";
 import {
-  bulkExportFileName,
+  bulkExportFileName as bulkExportScoreConfigFileName,
   exportScoreConfigFileName,
   stripScoreConfigForExport,
 } from "./onlineEvals/utils/exportScoreConfig";
+import {
+  bulkExportFileName as bulkExportScorerFileName,
+  exportScorerFileName,
+  stripScorerForExport,
+} from "./onlineEvals/utils/exportScorer";
 
 const store = useStore();
 const route = useRoute();
@@ -269,6 +298,10 @@ const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
 const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
+const showScorerLibrary = ref(false);
+const scorerLibrarySelectedCount = ref(0);
+const scorerLibraryImporting = ref(false);
+const scorerLibraryRef = ref<InstanceType<typeof ScorerLibrary> | null>(null);
 
 const {
   jobs,
@@ -547,6 +580,76 @@ function exportScoreConfigRow(row: ScoreConfig) {
   }
 }
 
+function goToImportScorer() {
+  router.push({
+    path: "/online-evals/scorers/import",
+    query: { org_identifier: orgId.value },
+  });
+}
+
+function openScorerLibrary() {
+  showScorerLibrary.value = true;
+}
+
+async function triggerScorerLibraryImport() {
+  if (!scorerLibraryRef.value) return;
+  scorerLibraryImporting.value = true;
+  try {
+    await scorerLibraryRef.value.importSelected();
+  } finally {
+    scorerLibraryImporting.value = false;
+  }
+}
+
+async function handleScorerLibraryImported() {
+  showScorerLibrary.value = false;
+  await loadAll(orgId.value);
+}
+
+function exportScorerRow(row: Scorer) {
+  const payload = stripScorerForExport(row, {
+    scoreConfigs: scoreConfigs.value,
+    providers: providers.value,
+  });
+  const ok = downloadFile(
+    exportScorerFileName(row),
+    JSON.stringify(payload, null, 2),
+    "application/json",
+  );
+  if (!ok) {
+    toast({ variant: "error", message: "Failed to export scorer" });
+  }
+}
+
+function exportScorerBulk(ids: string[]) {
+  const selected = scorers.value.filter((row) =>
+    ids.includes(entityId(row)) || ids.includes(row.id),
+  );
+  if (selected.length === 0) {
+    toast({ variant: "warning", message: "No scorers selected" });
+    return;
+  }
+  const payload = selected.map((row) =>
+    stripScorerForExport(row, {
+      scoreConfigs: scoreConfigs.value,
+      providers: providers.value,
+    }),
+  );
+  const ok = downloadFile(
+    bulkExportScorerFileName(),
+    JSON.stringify(payload, null, 2),
+    "application/json",
+  );
+  if (ok) {
+    toast({
+      variant: "success",
+      message: `Exported ${selected.length} scorer${selected.length > 1 ? "s" : ""}`,
+    });
+  } else {
+    toast({ variant: "error", message: "Failed to export scorers" });
+  }
+}
+
 function exportScoreConfigBulk(ids: string[]) {
   const selected = scoreConfigs.value.filter((row) =>
     ids.includes(entityId(row)) || ids.includes(row.id),
@@ -557,7 +660,7 @@ function exportScoreConfigBulk(ids: string[]) {
   }
   const payload = selected.map(stripScoreConfigForExport);
   const ok = downloadFile(
-    bulkExportFileName(),
+    bulkExportScoreConfigFileName(),
     JSON.stringify(payload, null, 2),
     "application/json",
   );

@@ -4589,6 +4589,23 @@
         "chipRemote": "Remote",
         "chipCode": "Code"
       },
+      "import": {
+        "title": "Import Scorer",
+        "button": "Import",
+        "customLabel": "Custom",
+        "customSubtitle": "Import from JSON file or URL",
+        "libraryLabel": "Library",
+        "librarySubtitle": "Browse and import from curated catalog",
+        "libraryDrawerTitle": "Scorer Library",
+        "outputMessages": "Output Messages",
+        "creation": "Scorer Creation",
+        "errors": {
+          "title": "Validation Errors"
+        }
+      },
+      "export": {
+        "bulkButton": "Export"
+      },
       "backTo": "Back to Scorers",
       "badgeRemote": "Remote",
       "badgeLlm": "LLM Judge",
