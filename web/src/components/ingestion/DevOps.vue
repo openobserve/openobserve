@@ -15,27 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-splitter
+  <OSplitter
     v-model="splitterModel"
     unit="px"
+    :horizontal="false" class="tw:h-full"
   >
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full el-border-radius">
           <div class="tw:overflow-hidden tw:h-full">
-            <q-input
+            <div class="tw:pt-[0.625rem] tw:px-1">
+            <OSearchInput
               data-test="devops-list-search-input"
               v-model="tabsFilter"
-              borderless
-              dense
               clearable
-              class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
+              class="tw:w-full indexlist-search-input"
               :placeholder="t('common.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
+            />
+            </div>
             <OTabs
               v-model="ingestTabType"
               orientation="vertical"
@@ -58,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class=" card-container tw:h-[calc(100vh-140px)]">
+      <div class="tw:w-full tw:h-full">
+        <div class="card-container tw:h-full">
           <div class="tw:overflow-auto tw:h-full">
             <router-view
               :title="tabs"
@@ -71,25 +68,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </q-splitter>
+  </OSplitter>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
+import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "DevOpsPage",
-  components: { OTabs, ORouteTab },
+  components: { OTabs, ORouteTab, OSearchInput,
+    OSplitter,
+},
   props: {
     currOrgIdentifier: {
       type: String,
@@ -99,7 +100,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const tabs = ref("");
     const currentOrgIdentifier: any = ref(

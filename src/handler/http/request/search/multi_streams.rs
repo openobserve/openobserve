@@ -56,15 +56,16 @@ use crate::{
             functions,
             http::{
                 get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_enable_align_histogram_from_request, get_fallback_order_by_col_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
+                get_fallback_order_by_col_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request,
             },
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::request::search::{Headers, error_utils::map_error_to_http_response},
+    handler::http::request::search::{
+        Headers, error_utils::map_error_to_http_response, utils::SearchStreamGuard,
+    },
     service::{
         search::{self as SearchService, streaming::process_search_stream_request_multi},
         self_reporting::report_request_usage_stats,
@@ -256,7 +257,7 @@ pub async fn search_multi(
                 req.query.start_time = req.query.end_time - max_query_range * 3600 * 1_000_000;
                 range_error = format!(
                     "{} Query duration for stream {} is modified due to query range restriction of {} hours",
-                    range_error, &stream_name, max_query_range
+                    range_error, stream_name, max_query_range
                 );
 
                 if multi_res.new_start_time.is_none() {
@@ -711,7 +712,6 @@ pub async fn search_multi(
     description = "Executes search queries across partitioned data in multiple log streams",
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("enable_align_histogram" = bool, Query, description = "Enable align histogram"),
     ),
     request_body(
         content = inline(search::MultiSearchPartitionRequest),
@@ -776,8 +776,6 @@ pub async fn _search_partition_multi(
 
     let user_id = &user_email.user_id;
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let enable_align_histogram = get_enable_align_histogram_from_request(&query);
-
     #[cfg(feature = "cloud")]
     {
         match is_org_in_free_trial_period(&org_id).await {
@@ -805,14 +803,8 @@ pub async fn _search_partition_multi(
         }
     }
 
-    let search_fut = SearchService::search_partition_multi(
-        &trace_id,
-        &org_id,
-        user_id,
-        stream_type,
-        &req,
-        enable_align_histogram,
-    );
+    let search_fut =
+        SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
     let search_res = if cfg.common.should_create_span() {
         search_fut.instrument(http_span).await
     } else {
@@ -1514,11 +1506,23 @@ pub async fn search_multi_stream(
         top_level_query_fn,
     ));
 
+    // Cancel the running queries if the client disconnects before the search
+    // produces a terminal event (e.g. the browser tab is closed). Cancellation
+    // is keyed by the parent trace_id, which covers every `{trace_id}-q{n}`
+    // sub-query via prefix matching in the query manager.
+    let mut guard = SearchStreamGuard::new(org_id.clone(), trace_id.clone());
+
     // Return streaming response
     let stream = tokio_stream::wrappers::ReceiverStream::new(rx).flat_map(move |result| {
         let chunks_iter = match result {
-            Ok(v) => v.to_chunks(),
+            Ok(v) => {
+                if matches!(v, StreamResponses::Done) {
+                    guard.mark_finished();
+                }
+                v.to_chunks()
+            }
             Err(err) => {
+                guard.mark_finished();
                 log::error!(
                     "[HTTP2_STREAM_MULTI trace_id {trace_id}] Error in multi-stream search: {err}"
                 );

@@ -18,14 +18,10 @@ import { ref, reactive } from "vue";
 
 // -- Mocks (hoisted) --
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify, dialog: vi.fn() }),
-  };
-});
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 const mockRouterPush = vi.fn();
 vi.mock("vue-router", async (importOriginal) => {
@@ -230,8 +226,8 @@ describe("usePatternActions", () => {
 
       addPatternToSearch({ template: "<*>" }, "include");
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
       );
       expect(mockSearchObj.data.stream.addToFilter).toBe("");
     });
@@ -300,8 +296,8 @@ describe("usePatternActions", () => {
 
       createAlertFromPattern({ template: "User <*> logged in" });
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
       );
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
@@ -312,8 +308,8 @@ describe("usePatternActions", () => {
 
       createAlertFromPattern({ template: "<*>" });
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
       );
       expect(mockRouterPush).not.toHaveBeenCalled();
     });

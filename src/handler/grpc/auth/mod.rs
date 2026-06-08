@@ -61,7 +61,7 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
         if org_id.is_none() {
             return Err(Status::invalid_argument(format!(
                 "Please specify organization id with header key '{}' ",
-                &cfg.grpc.org_header_key
+                cfg.grpc.org_header_key
             )));
         }
 

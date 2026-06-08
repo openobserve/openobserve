@@ -1,12 +1,12 @@
 <template>
   <div>
-    <div class="q-pa-sm">
-      <div class="text-subtitle1 text-bold q-pl-xs">OTLP HTTP</div>
-      <ContentCopy class="q-mt-sm copy-content-container-cls" :content="getOtelHttpConfig" />
+    <div class="tw:p-2">
+      <div class="tw:text-base tw:font-medium tw:font-bold tw:pl-1" data-test="ingestion-otelconfig-otlp-http-title">OTLP HTTP</div>
+      <ContentCopy class="tw:mt-2 copy-content-container-cls" :content="getOtelHttpConfig" data-test="ingestion-otelconfig-copy-http" />
     </div>
-    <div class="q-pa-sm" v-if="config.isCloud == 'false'">
-      <div class="text-subtitle1 text-bold q-mt-sm q-pl-xs">OTLP gRPC</div>
-      <ContentCopy class="q-mt-sm copy-content-container-cls" :content="getOtelGrpcConfig" />
+    <div class="tw:p-2" v-if="config.isCloud == 'false'">
+      <div class="tw:text-base tw:font-medium tw:font-bold tw:mt-2 tw:pl-1" data-test="ingestion-otelconfig-otlp-grpc-title">OTLP gRPC</div>
+      <ContentCopy class="tw:mt-2 copy-content-container-cls" :content="getOtelGrpcConfig" data-test="ingestion-otelconfig-copy-grpc" />
     </div>
   </div>
 </template>

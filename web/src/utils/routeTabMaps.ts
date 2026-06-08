@@ -124,6 +124,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     usage: "usage",
     plans: "plans",
     invoice_history: "invoice_history",
+    billing_group: "billing_group",
   },
 
   /** views/IdentityAccessManagement.vue */
@@ -131,7 +132,9 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     users: "users",
     serviceAccounts: "serviceAccounts",
     groups: "groups",
+    editGroup: "groups",
     roles: "roles",
+    editRole: "roles",
     quota: "quota",
     organizations: "organizations",
     invitations: "invitations",

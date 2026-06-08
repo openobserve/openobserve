@@ -76,10 +76,14 @@ use {
 };
 
 use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        user::{AuthTokens, AuthTokensExt},
+    common::{
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            user::{AuthTokens, AuthTokensExt},
+        },
+        utils::auth::{UserEmail, is_root_user},
     },
+    handler::http::extractors::Headers,
     service::{
         db,
         search::{
@@ -204,6 +208,7 @@ struct ConfigResponse<'a> {
     incidents_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
+    online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
@@ -215,6 +220,8 @@ struct ConfigResponse<'a> {
     org_storage_providers: String,
     #[cfg(feature = "enterprise")]
     org_storage_region: String,
+    #[cfg(feature = "cloud")]
+    billing_group_allowed_orgs: String,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -386,6 +393,9 @@ pub async fn zo_config() -> impl IntoResponse {
         (10 * 60).min(cfg.common.usage_publish_interval)
     );
 
+    #[cfg(feature = "cloud")]
+    let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
+
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -461,6 +471,7 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
+        online_evals_enabled: cfg.common.online_evals_enabled,
         anomaly_detection_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
@@ -472,6 +483,8 @@ pub async fn zo_config() -> impl IntoResponse {
         org_storage_providers,
         #[cfg(feature = "enterprise")]
         org_storage_region,
+        #[cfg(feature = "cloud")]
+        billing_group_allowed_orgs,
     })
 }
 
@@ -787,7 +800,14 @@ pub async fn cache_status() -> impl IntoResponse {
     axum::Json(stats)
 }
 
-pub async fn config_reload() -> impl IntoResponse {
+pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl IntoResponse {
+    let user_id = user_email.user_id.as_str();
+    if !is_root_user(user_id) {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({"message": "Only root users can reload config"})),
+        );
+    }
     if let Err(e) = config::refresh_config() {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -805,8 +825,7 @@ pub async fn config_reload() -> impl IntoResponse {
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
-        // Since this is not a protected route, there is no way to get the user email
-        user_email: "".to_string(),
+        user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
         protocol: Protocol::Http,
@@ -1533,6 +1552,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "short_url" => db::short_url::cache().await,
         "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
         "org_users" => db::org_users::cache().await,
+        "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
         _ => Err(anyhow::anyhow!("unsupported module")),
     }

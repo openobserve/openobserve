@@ -510,10 +510,8 @@ impl<'n> TreeNodeVisitor<'n> for ResultSchemaExtractor {
                                 self.timestamp_alias = Some(col.name.clone())
                             }
                         }
-                        Expr::ScalarFunction(_) => {
-                            if is_ts_hist_udf(expr, &self.timestamp_alias) {
-                                self.ts_hist_alias = Some(get_col_name(expr));
-                            }
+                        Expr::ScalarFunction(_) if is_ts_hist_udf(expr, &self.timestamp_alias) => {
+                            self.ts_hist_alias = Some(get_col_name(expr));
                         }
                         _ => {}
                     }
@@ -774,6 +772,7 @@ mod tests {
             skip_wal: false,
             action_id: "".to_string(),
             histogram_interval: 5,
+            timezone: None,
             sampling_ratio: None,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)
@@ -790,14 +789,12 @@ mod tests {
                     FROM FilteredLogs"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert_eq!(extractor.timeseries, Some("_timestamp".to_string()));
         assert_eq!(extractor.ts_hist_alias, None);
         assert_eq!(extractor.timestamp_alias, Some("_timestamp".to_string()));
         assert!(extractor.group_by.is_empty());
         assert_eq!(
             extractor.projections,
             vec![
-                "_timestamp",
                 "k8s_namespace_name",
                 "regexp_match(filteredlogs.log,Utf8(\"took: ([0-9]+) ms\"))[Int64(1)]"
             ]
@@ -979,7 +976,7 @@ mod tests {
         SELECT t_id FROM base"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert_eq!(extractor.projections, vec!["_timestamp", "t_id"]);
+        assert_eq!(extractor.projections, vec!["t_id"]);
         assert_eq!(
             extractor.field_alias_map.get("k8s_namespace_name"),
             Some(&"t_id".to_string()),
@@ -1001,7 +998,7 @@ mod tests {
         SELECT final_id FROM b"#;
         let parsed = get_sql(sql).await;
         let extractor = get_result_schema(parsed, false, false).await.unwrap();
-        assert_eq!(extractor.projections, vec!["_timestamp", "final_id"]);
+        assert_eq!(extractor.projections, vec!["final_id"]);
         assert_eq!(
             extractor.field_alias_map.get("k8s_namespace_name"),
             Some(&"final_id".to_string()),

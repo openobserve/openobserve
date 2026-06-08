@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick } from "vue";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -54,14 +53,8 @@ vi.mock("vuex", async (importOriginal) => {
   };
 });
 
-const { mockCopyToClipboard, mockNotify } = vi.hoisted(() => ({
-  mockCopyToClipboard: vi.fn().mockResolvedValue(undefined),
-  mockNotify: vi.fn(),
-}));
-
-vi.mock("quasar", () => ({
-  copyToClipboard: mockCopyToClipboard,
-  useQuasar: vi.fn(() => ({ notify: mockNotify })),
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
 
 // useLocalTraceFilterField behaves like a ref: called with no args it returns the
@@ -96,6 +89,7 @@ vi.mock("@/utils/traces/traceColors", () => ({
 }));
 
 import { getSpanColorHex } from "@/utils/traces/traceColors";
+import { copyToClipboard } from "@/utils/clipboard";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 
 // ---------------------------------------------------------------------------
@@ -535,9 +529,10 @@ describe("useTraces", () => {
   // copyTracesUrl
   // -------------------------------------------------------------------------
   describe("copyTracesUrl", () => {
-    it("calls copyToClipboard with a URL string", async () => {
+    it("calls copyToClipboard with a URL string", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -545,17 +540,18 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
+      copyTracesUrl();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
         expect.stringContaining("http"),
+        expect.objectContaining({ successMessage: expect.any(String) }),
       );
     });
 
-    it("shows positive notification after successful copy", async () => {
-      mockCopyToClipboard.mockResolvedValue(undefined);
+    it("passes successMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -563,19 +559,21 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
-      // Give microtasks a chance to run
-      await nextTick();
+      copyTracesUrl();
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "positive" }),
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          successMessage: "Link Copied Successfully!",
+          timeout: 5000,
+        }),
       );
     });
 
-    it("shows negative notification on copy failure", async () => {
-      mockCopyToClipboard.mockRejectedValue(new Error("denied"));
+    it("passes errorMessage option to copyToClipboard", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -583,17 +581,20 @@ describe("useTraces", () => {
         endTime: 0,
       };
 
-      await copyTracesUrl();
-      await nextTick();
+      copyTracesUrl();
 
-      expect(mockNotify).toHaveBeenCalledWith(
-        expect.objectContaining({ type: "negative" }),
+      expect(vi.mocked(copyToClipboard)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          errorMessage: "Error while copy link.",
+        }),
       );
     });
 
     it("overrides from/to with customTimeRange when provided", () => {
       const { searchObj, copyTracesUrl, resetSearchObj } = useTraces();
       resetSearchObj();
+      searchObj.data.stream.selectedStream = { label: "s", value: "test-stream" };
       searchObj.data.datetime = {
         type: "relative",
         relativeTimePeriod: "15m",
@@ -603,7 +604,7 @@ describe("useTraces", () => {
 
       copyTracesUrl({ from: "1000", to: "9999" });
 
-      const clipboardArg = mockCopyToClipboard.mock.calls[0][0];
+      const clipboardArg = vi.mocked(copyToClipboard).mock.calls[0][0];
       expect(clipboardArg).toContain("from=1000");
       expect(clipboardArg).toContain("to=9999");
     });

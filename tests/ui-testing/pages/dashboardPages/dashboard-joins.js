@@ -63,16 +63,19 @@ export class JoinHelper {
     );
     await streamDropdown.waitFor({ state: "visible", timeout: 10000 });
 
-    // Click to open the dropdown and focus the input
-    await streamDropdown.click();
-    await this.page.waitForTimeout(500);
+    // Open the OSelect dropdown via its trigger button
+    await streamDropdown.locator('button').first().evaluate((el) => el.click());
 
-    // Type in the search field
-    await this.page.keyboard.type(streamName);
+    // Type in the OSelect search input
+    const searchInput = this.page.locator('[data-test="dashboard-config-panel-join-to-search"]');
+    await searchInput.waitFor({ state: "visible", timeout: 5000 });
+    await searchInput.fill(streamName);
     await this.page.waitForTimeout(1000);
 
-    // Select the option from dropdown
-    const option = this.page.getByRole("option", { name: streamName, exact: true });
+    // Select the option using OSelect option convention: data-test="${parent}-option" data-test-value="..."
+    const option = this.page.locator(
+      `[data-test="dashboard-config-panel-join-to-option"][data-test-value="${streamName}"]`
+    );
     await option.waitFor({ state: "visible", timeout: 10000 });
     await option.click();
     await this.page.waitForTimeout(500);
@@ -91,22 +94,24 @@ export class JoinHelper {
       `[data-test="dashboard-join-condition-left-field-${conditionIndex}"]`
     );
     await leftFieldWrapper.waitFor({ state: "visible", timeout: 10000 });
+    // Click the wrapper to open the OSelect, then pressSequentially to filter
+    await leftFieldWrapper.click();
+    const leftSelect = this.page.locator('[data-test="stream-field-select"]').last();
+    await leftSelect.waitFor({ state: "visible" });
+    await leftSelect.pressSequentially(leftField, { delay: 50 });
 
-    // Click on the select inside the wrapper
-    const leftSelect = leftFieldWrapper.locator('[data-test="stream-field-select"]');
-    await leftSelect.click();
-    await this.page.waitForTimeout(500);
-
-    // Type to filter and select the field
-    await this.page.keyboard.type(leftField);
-    await this.page.waitForTimeout(1000);
-
-    // Click the option using the specific data-test attribute
-    const leftFieldOption = this.page.locator(
-      `[data-test="stream-field-select-option-${leftField}"]`
-    );
-    await leftFieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await leftFieldOption.click();
+    // Wait for the popover and click the option by data-test-label
+    const leftPopover = this.page.locator('[data-test="stream-field-select-popover"]').last();
+    await leftPopover.waitFor({ state: "visible", timeout: 5000 });
+    await leftPopover
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${leftField}"]`)
+      .first()
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
+    await leftPopover
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${leftField}"]`)
+      .first()
+      .click();
     await this.page.waitForTimeout(500);
 
     // Configure operation if not default
@@ -114,34 +119,55 @@ export class JoinHelper {
       const operationSelector = this.page.locator(
         `[data-test="dashboard-join-condition-operation-${conditionIndex}"]`
       );
-      await operationSelector.click();
-      await this.page.waitForTimeout(300);
-      const operationOption = this.page.getByRole("option", {
-        name: operation,
-        exact: true,
-      });
-      await operationOption.click();
-      await this.page.waitForTimeout(300);
+      await operationSelector.waitFor({ state: "visible", timeout: 5000 });
+      await operationSelector.locator('button').first().evaluate((el) => el.click());
+      const operationPopover = this.page.locator(
+        `[data-test="dashboard-join-condition-operation-${conditionIndex}-popover"]`
+      );
+      await operationPopover.waitFor({ state: "visible", timeout: 5000 });
+      await operationPopover
+        .locator(`[data-test="dashboard-join-condition-operation-${conditionIndex}-option"][data-test-value="${operation}"]`)
+        .first()
+        .waitFor({ state: "visible", timeout: 5000 })
+        .catch(() => {});
+      const operationOption = operationPopover.locator(
+        `[data-test="dashboard-join-condition-operation-${conditionIndex}-option"][data-test-value="${operation}"]`
+      ).first();
+      if (await operationOption.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await operationOption.click();
+      } else {
+        await operationPopover
+          .locator('[role="option"]')
+          .filter({ hasText: operation })
+          .first()
+          .click();
+      }
+      await operationPopover.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     }
 
     // Configure right field using StreamFieldSelect
     const rightFieldWrapper = this.page.locator(
       `[data-test="dashboard-join-condition-right-field-${conditionIndex}"]`
     );
-    const rightSelect = rightFieldWrapper.locator('[data-test="stream-field-select"]');
-    await rightSelect.click();
-    await this.page.waitForTimeout(500);
+    await rightFieldWrapper.waitFor({ state: "visible", timeout: 10000 });
+    // Click the wrapper to open the OSelect, then pressSequentially to filter
+    await rightFieldWrapper.click();
+    const rightSelect = this.page.locator('[data-test="stream-field-select"]').last();
+    await rightSelect.waitFor({ state: "visible" });
+    await rightSelect.pressSequentially(rightField, { delay: 50 });
 
-    // Type to filter and select the field
-    await this.page.keyboard.type(rightField);
-    await this.page.waitForTimeout(1000);
-
-    // Click the option using the specific data-test attribute
-    const rightFieldOption = this.page.locator(
-      `[data-test="stream-field-select-option-${rightField}"]`
-    );
-    await rightFieldOption.waitFor({ state: "visible", timeout: 10000 });
-    await rightFieldOption.click();
+    // Wait for the popover and click the option by data-test-label
+    const rightPopover = this.page.locator('[data-test="stream-field-select-popover"]').last();
+    await rightPopover.waitFor({ state: "visible", timeout: 5000 });
+    await rightPopover
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${rightField}"]`)
+      .first()
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
+    await rightPopover
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${rightField}"]`)
+      .first()
+      .click();
     await this.page.waitForTimeout(500);
   }
 

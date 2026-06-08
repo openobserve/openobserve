@@ -17,264 +17,236 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page>
-    <div v-if="!showAddJSTransformDialog">
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+  <div
+    data-test="enrichment-tables-list-page"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+  >
+    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+      <div class="tw:shrink-0">
         <div class="card-container tw:mb-[0.625rem]">
-          <div class="flex justify-between full-width tw:py-3 tw:px-4 items-center tw:h-[68px]">
-            <div class="q-table__title tw:font-[600]" data-test="enrichment-tables-list-title">
+          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
+            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="enrichment-tables-list-title">
               {{ t("function.enrichmentTables") }}
             </div>
-            <div class="tw:flex tw:items-center q-ml-auto">
-              <app-tabs
+            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+              <OToggleGroup
+                :model-value="selectedFilter"
+                @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
+                class="tw:mr-2"
                 data-test="enrichment-tables-list-tabs"
-                class="q-mr-sm"
-                :tabs="filterTabs"
-                v-model:active-tab="selectedFilter"
-                @update:active-tab="updateActiveTab"
-              />
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("function.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                  <template #icon-left><OIcon name="upload" size="sm" /></template>
+                  {{ t("function.filterFile") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                  <template #icon-left><OIcon name="link" size="sm" /></template>
+                  {{ t("function.filterUrl") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
 
-              <q-input
+              <OSearchInput
                 data-test="enrichment-tables-search-input"
                 v-model="filterQuery"
-                borderless
-                dense
-                flat
-                class="no-border o2-search-input"
+                class="tw:ml-2 tw:w-[200px]"
                 :placeholder="t('function.searchEnrichmentTable')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </q-input>
+              />
               <OButton
-                class="q-ml-sm"
+                data-test="enrichment-tables-add-btn"
+                class="tw:ml-2"
                 variant="primary"
-                size="sm-action"
-                @click="showAddUpdateFn({})"
+                size="sm"
+                @click="showAddUpdateFn(null)"
               >
                 {{ t(`function.addEnrichmentTable`) }}
               </OButton>
             </div>
           </div>
         </div>
-        <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-          <div class="card-container tw:h-[calc(100vh-127px)]">
-            <q-table
+      </div>
+      <div class="tw:flex-1 tw:min-h-0">
+        <div class="card-container tw:h-full">
+            <OTable
               ref="qTable"
-              :rows="visibleRows"
+              data-test="enrichment-tables-list-table"
+              :data="visibleRows"
               :columns="columns"
               row-key="name"
-              :pagination="pagination"
-              :filter="filterQuery"
-              style="width: 100%"
-              :style="hasVisibleRows
-                  ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 77px)'
-                  : 'width: 100%'"
-              class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky "
+              :loading="loading"
+              pagination="client"
+              :page-size="selectedPerPage"
+              :page-size-options="perPageOptionsList"
+              sorting="client"
+              filter-mode="client"
+              :show-global-filter="false"
               selection="multiple"
-              v-model:selected="selectedEnrichmentTables"
+              :selected-ids="selectedEnrichmentTableIds"
+              @update:selected-ids="handleSelectedIdsUpdate"
+              width="100%"
+              class="tw:w-full tw:h-full"
             >
-              <template #no-data>
+              <template #empty>
                 <NoData />
               </template>
-              <template v-slot:body-selection="scope">
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
-              </template>
-              <template v-slot:body-cell-type="props">
-                <q-td :props="props">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <span v-if="!props.row.urlJobs || props.row.urlJobs.length === 0">File</span>
-                    <template v-else>
-                      <span
-                        class="cursor-pointer"
-                        @click="showUrlJobsDialog(props.row)"
-                        :class="{'text-primary': props.row.urlJobs.length > 1}"
-                      >
-                        Url
-                        <span v-if="props.row.urlJobs.length > 1" class="text-grey-7"> ({{ props.row.urlJobs.length }})</span>
-                      </span>
-                      <q-icon
-                        v-if="props.row.aggregateStatus === 'completed'"
-                        name="check_circle"
-                        color="positive"
-                        size="18px"
-                      >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: All Completed</strong><br/>
-                            {{ props.row.urlJobs.length }} URL job(s) completed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" to see details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
-                        v-else-if="props.row.aggregateStatus === 'processing'"
-                        name="sync"
-                        color="primary"
-                        size="18px"
-                        class="rotate-animation"
-                      >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Processing</strong><br/>
-                            One or more jobs are currently processing<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
-                        v-else-if="props.row.aggregateStatus === 'failed'"
+              <template #cell-type="{ row }">
+                <div
+                  :data-test="`${row.name}-type-cell`"
+                  class="tw:flex tw:items-center tw:gap-2"
+                >
+                  <span v-if="!row.urlJobs || row.urlJobs.length === 0" :data-test="`${row.name}-type-file`">File</span>
+                  <template v-else>
+                    <span
+                      :data-test="`${row.name}-type-url-trigger`"
+                      class="tw:cursor-pointer"
+                      @click="showUrlJobsDialog(row)"
+                      :class="{'text-primary': row.urlJobs.length > 1}"
+                    >
+                      Url
+                      <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
+                    </span>
+                    <span v-if="row.aggregateStatus === 'completed'">
+                      <OIcon name="check-circle" size="sm">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: All Completed</strong><br/>
+                              {{ row.urlJobs.length }} URL job(s) completed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" to see details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'processing'">
+                      <OIcon name="sync" size="sm" class="rotate-animation">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Processing</strong><br/>
+                              One or more jobs are currently processing<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'failed'">
+                      <OIcon
                         name="warning"
-                        color="negative"
-                        size="18px"
-                        class="cursor-pointer"
-                        @click="showUrlJobsDialog(props.row)"
+                        size="sm"
+                        class="tw:cursor-pointer"
+                        @click="showUrlJobsDialog(row)"
                       >
-                        <q-tooltip>
-                          <div style="max-width: 350px;">
-                            <strong>Status: Failed</strong><br/>
-                            One or more jobs have failed<br/>
-                            <br/>
-                            Click to see details and retry failed jobs
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                      <q-icon
-                        v-else-if="props.row.aggregateStatus === 'pending'"
-                        name="schedule"
-                        color="grey-7"
-                        size="18px"
-                      >
-                        <q-tooltip>
-                          <div style="max-width: 300px;">
-                            <strong>Status: Pending</strong><br/>
-                            Job(s) waiting to be processed<br/>
-                            <br/>
-                            <em style="font-size: 0.85em;">Click "Url" for details</em>
-                          </div>
-                        </q-tooltip>
-                      </q-icon>
-                    </template>
-                  </div>
-                </q-td>
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 350px;">
+                              <strong>Status: Failed</strong><br/>
+                              One or more jobs have failed<br/>
+                              <br/>
+                              Click to see details and retry failed jobs
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                    </span>
+                    <span v-else-if="row.aggregateStatus === 'pending'">
+                      <OIcon name="schedule" size="sm">
+                        <OTooltip>
+                          <template #content>
+                            <div style="max-width: 300px;">
+                              <strong>Status: Pending</strong><br/>
+                              Job(s) waiting to be processed<br/>
+                              <br/>
+                              <em style="font-size: 0.85em;">Click "Url" for details</em>
+                            </div>
+                          </template>
+                        </OTooltip>
+                      </OIcon>
+                    </span>
+                  </template>
+                </div>
               </template>
-              <template v-slot:body-cell-actions="props">
-                <q-td :props="props">
+              <template #cell-actions="{ row }">
+                <div class="tw:flex tw:items-center tw:justify-center">
                   <OButton
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
-                    :data-test="`${props.row.name}-explore-btn`"
+                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
+                    :data-test="`${row.name}-explore-btn`"
                     :title="t('logStream.explore')"
                     variant="ghost"
                     size="icon-sm"
-                    @click="exploreEnrichmentTable(props)"
-                  >
-                    <Search :size="14" />
-                  </OButton>
+                    @click="exploreEnrichmentTable(row)"
+                    icon-left="search"
+                  />
 
                   <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
                   <OButton
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed'"
+                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
+                    :data-test="`${row.name}-schema-btn`"
                     :title="t('logStream.schemaHeader')"
                     variant="ghost"
                     size="icon-sm"
-                    @click="listSchema(props)"
-                  >
-                    <List :size="14" />
-                  </OButton>
+                    @click="listSchema(row)"
+                    icon-left="format-list-bulleted"
+                  />
 
                   <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
                   <OButton
-                    v-if="!props.row.urlJobs || props.row.urlJobs.length === 0 || props.row.aggregateStatus === 'completed' || props.row.aggregateStatus === 'failed'"
+                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
+                    :data-test="`${row.name}-edit-btn`"
                     :title="t('function.enrichmentTables')"
                     variant="ghost"
                     size="icon-sm"
-                    @click="showAddUpdateFn(props)"
-                  >
-                    <Pencil :size="14" />
-                  </OButton>
+                    @click="showAddUpdateFn(row)"
+                    icon-left="edit"
+                  />
 
                   <!-- Delete button - always visible -->
                   <OButton
+                    :data-test="`${row.name}-delete-btn`"
                     :title="t('function.delete')"
                     variant="ghost-destructive"
                     size="icon-sm"
-                    @click="showDeleteDialogFn(props)"
-                  >
-                    <Trash2 :size="14" />
-                  </OButton>
-                </q-td>
-              </template>
-
-              <template v-slot:body-cell-function="props">
-                <q-td :props="props">
-                  <q-tooltip>
-                    <pre>{{ props.row.function }}</pre>
-                  </q-tooltip>
-                  <pre style="white-space: break-spaces">{{
-                    props.row.function
-                  }}</pre>
-                </q-td>
-              </template>
-
-              <template #bottom="scope">
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                      {{ resultTotal }} {{ t('function.enrichmentTables') }}
-                    </div>
-                    <OButton
-                      v-if="selectedEnrichmentTables.length > 0"
-                      data-test="enrichment-tables-bulk-delete-btn"
-                      variant="outline"
-                      size="sm-action"
-                      class="q-mr-sm"
-                      @click="openBulkDeleteDialog"
-                    >
-                      <Trash2 :size="14" class="tw:mr-1" />
-                      Delete
-                    </OButton>
-                  </div>
-                  <QTablePagination
-                    :scope="scope"
-                    :position="'bottom'"
-                    :resultTotal="resultTotal"
-                    :perPageOptions="perPageOptions"
-                    @update:changeRecordPerPage="changePagination"
+                    @click="showDeleteDialogFn(row)"
+                    icon-left="delete"
                   />
                 </div>
               </template>
-              <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
 
-                    <!-- Rendering the rest of the columns -->
-                    <!-- here we can add the classes class so that the head will be sticky -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
-            </q-table>
+              <template #cell-function="{ row }">
+                <div>
+                  <OTooltip>
+                    <template #content><pre>{{ row.function }}</pre></template>
+                  </OTooltip>
+                  <pre style="white-space: break-spaces">{{ row.function }}</pre>
+                </div>
+              </template>
+
+              <template #bottom>
+                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
+                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
+                    {{ resultTotal }} {{ t('function.enrichmentTables') }}
+                  </div>
+                  <OButton
+                    v-if="selectedEnrichmentTables.length > 0"
+                    data-test="enrichment-tables-bulk-delete-btn"
+                    variant="outline-destructive"
+                    size="sm"
+                    icon-left="delete"
+                    @click="openBulkDeleteDialog"
+                  >
+                    Delete
+                  </OButton>
+                </div>
+              </template>
+            </OTable>
           </div>
         </div>
-      </div>
     </div>
     <div v-else>
       <add-enrichment-table
@@ -298,74 +270,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-    <q-dialog
-      v-model="showEnrichmentSchema"
-      position="right"
-      full-height
-      maximized
-    >
-      <EnrichmentSchema :selectedEnrichmentTable="selectedEnrichmentTable" />
-    </q-dialog>
+    <EnrichmentSchema
+      v-model:open="showEnrichmentSchema"
+      :selectedEnrichmentTable="selectedEnrichmentTable"
+    />
 
     <!-- URL Jobs Dialog -->
-    <q-dialog
-      v-model="showUrlJobsDialogState"
-      position="right"
-      full-height
-      maximized
+    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+      v-model:open="showUrlJobsDialogState"
+      size="lg"
     >
-      <q-card style="width: 600px; max-width: 80vw;">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
-          <q-space />
-          <OButton variant="ghost" size="icon-sm" v-close-popup><X :size="14" /></OButton>
-        </q-card-section>
-
-        <q-card-section>
-          <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-            <q-list separator>
-              <q-item v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" class="q-pa-md">
-                <q-item-section>
-                  <q-item-label class="text-weight-bold">Job {{ index + 1 }}</q-item-label>
-                  <q-item-label caption>{{ job.url }}</q-item-label>
-                  <q-item-label caption class="q-mt-sm">
-                    <q-badge :color="job.status === 'completed' ? 'positive' : job.status === 'failed' ? 'negative' : job.status === 'processing' ? 'primary' : 'grey'">
-                      {{ job.status }}
-                    </q-badge>
-                  </q-item-label>
-                  <q-item-label caption v-if="job.status === 'completed'" class="q-mt-sm">
+      <div class="tw:p-4">
+        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
+          <div class="tw:text-xl tw:font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+        </div>
+        <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
+          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
+                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+                  <OBadge
+                    :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
+                    :data-test-value="job.status"
+                    :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
+                  >
+                    {{ job.status }}
+                  </OBadge>
+                </span>
+                <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
-                  </q-item-label>
-                  <q-item-label caption v-if="job.status === 'failed'" class="q-mt-sm text-negative">
+                  </span>
+                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
                     Error: {{ job.error_message }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
+                  </span>
+                </div>
+              </li>
+            </ul>
           </div>
-          <div v-else class="text-center q-pa-md text-grey-7">
+          <div v-else class="tw:text-center tw:p-3 tw:text-gray-400">
             No URL jobs found
           </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-  </q-page>
+      </div>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
 
-import { computed, defineComponent, onBeforeMount, onMounted, ref, watch, reactive } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "../shared/grid/Pagination.vue";
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import AppTabs from "../common/AppTabs.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import segment from "../../services/segment_analytics";
 import {
   formatSizeFromMB,
@@ -373,30 +337,39 @@ import {
   verifyOrganizationStatus,
 } from "../../utils/zincutils";
 import streamService from "@/services/stream";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import jsTransformService from "@/services/jstransform";
+import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Search, List, Pencil, Trash2, X, LayoutList, Upload, Link } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
-    QTablePagination,
     AddEnrichmentTable,
     NoData,
     ConfirmDialog,
     EnrichmentSchema,
-    AppTabs,
+    OToggleGroup,
+    OToggleGroupItem,
     OButton,
-    Search,
-    List,
-    Pencil,
-    Trash2,
-    X,
-  },
+    ODrawer,
+    OSearchInput,
+    OTooltip,
+    OCheckbox,
+    OIcon,
+    OBadge,
+    OTable,
+},
   emits: [
     "updated:fields",
     "update:changeRecordPerPage",
@@ -405,7 +378,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -420,73 +392,30 @@ export default defineComponent({
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
+    const loading = ref(false);
     const { track } = useReo();
-    const columns: any = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("function.name"),
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "type",
-        field: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File",
-        label: "Type",
-        align: "left",
-        sortable: true,
-        sort: (a: string, b: string) => a.localeCompare(b),
-        style: "width: 150px",
-      },
-      {
-        name: "doc_num",
-        field: (row: any) => row.doc_num.toLocaleString(),
-        label: t("logStream.docNum"),
-        align: "left",
-        sortable: true,
-        sort: (_a, _b, rowA, rowB) => {
-          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
-        },
-        style: "width: 150px",
-      },
-      {
-        name: "storage_size",
-        label: t("logStream.storageSize"),
-        field: (row: any) => formatSizeFromMB(row.storage_size),
-        align: "left",
-        sortable: true,
-        sort: (_a, _b, rowA, rowB) => {
-          return rowA.original_storage_size - rowB.original_storage_size;
-        },
-        style: "width: 150px",
-      },
-      {
-        name: "compressed_size",
-        field: (row: any) => formatSizeFromMB(row.compressed_size),
-        label: t("logStream.compressedSize"),
-        align: "left",
-        sortable: false,
-        sort: (_a, _b, rowA, rowB) =>
-          rowA.original_compressed_size- rowB.original_compressed_size,
-        style: "width: 150px",
-      },
+    const { toast } = useToast();
+    const columns: OTableColumnDef[] = [
+      { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },
+      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
+      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
+      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },
+      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: 150 },
+      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
+    ];
 
-      {
-        name: "actions",
-        field: "actions",
-        label: t("function.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
-      },
-    ]);
+    const selectedEnrichmentTableIds = computed(() =>
+      selectedEnrichmentTables.value.map((t: any) => t.name)
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      selectedEnrichmentTables.value = ids
+        .map((id) => visibleRows.value.find((r: any) => r.name === id))
+        .filter(Boolean);
+    };
+
+    const perPageOptionsList = [20, 50, 100, 250, 500];
     const { getStreams, resetStreamType, getStream } = useStreams();
 
     onBeforeMount(() => {
@@ -499,24 +428,28 @@ export default defineComponent({
     onMounted(()=>{
       //it is for showing empty add page when user refresh the page
       if(router.currentRoute.value.query.action === "add"){
-        showAddUpdateFn({})
+        showAddUpdateFn(null)
       }
       //it is for showing the update page when user refresh the page
       //we are passing the name of the enrichment table to the update page
-      else if(router.currentRoute.value.query.action === "update"){
+      else if(router.currentRoute.value.query.action === "update" && router.currentRoute.value.query.name){
         showAddUpdateFn({
-          row: {
-            name: router.currentRoute.value.query.name,
-          }
+          name: router.currentRoute.value.query.name,
         })
+      }
+      //fallback: if action=update came in without a name, treat it as an add
+      else if(router.currentRoute.value.query.action === "update"){
+        showAddUpdateFn(null)
       }
     })
 
     const getLookupTables = async (force: boolean = false) => {
-      const dismiss = $q.notify({
-        spinner: true,
+      loading.value = true;
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading enrichment tables...",
-      });
+              timeout: 0,
+});
 
       try {
         // Fetch both streams and URL job statuses in parallel
@@ -625,24 +558,17 @@ export default defineComponent({
         console.info("Error while fetching enrichment tables", err);
         dismiss();
         if (err.response?.status != 403) {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
               err.response?.data?.message ||
               "Error while fetching functions.",
-            timeout: 2000,
           });
         }
+      } finally {
+        loading.value = false;
       }
     };
-
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
 
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
@@ -650,31 +576,8 @@ export default defineComponent({
     const selectedEnrichmentTable = ref<any>(null);
     const selectedFilter = ref<string>("all");
 
-    const filterTabs = reactive([
-      {
-        label: t("function.filterAll"),
-        value: "all",
-        icon: LayoutList,
-      },
-      {
-        label: t("function.filterFile"),
-        value: "uploaded",
-        icon: Upload,
-      },
-      {
-        label: t("function.filterUrl"),
-        value: "file_url",
-        icon: Link,
-      },
-    ]);
-
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
 
     const updateActiveTab = () => {
@@ -686,10 +589,10 @@ export default defineComponent({
       showAddJSTransformDialog.value = true;
     };
 
-    const showAddUpdateFn = (props: any) => {
-      formData.value = props.row;
+    const showAddUpdateFn = (row: any) => {
+      formData.value = row;
       let action;
-      if (!props.row) {
+      if (!row) {
         isUpdated.value = false;
         action = "Add Enrichment Table";
         router.push({
@@ -710,7 +613,7 @@ export default defineComponent({
           name: "enrichmentTables",
           query: {
             action: "update",
-            name: props.row.name,
+            name: row.name,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
@@ -760,9 +663,9 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `${selectedDelete.value.name} deleted successfully.`,
+              variant: "success",
             });
             resetStreamType("enrichment_tables");
             getLookupTables(true);
@@ -770,10 +673,10 @@ export default defineComponent({
         })
         .catch((err: any) => {
           if (err.response.status != 403) {
-            $q.notify({
-              color: "negative",
+            toast({
               message:
                 err.response?.data?.message || "Error while deleting stream.",
+              variant: "error",
             });
           }
         });
@@ -830,19 +733,19 @@ export default defineComponent({
           });
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
-            $q.notify({
-              color: "warning",
+            toast({
               message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "warning",
             });
           } else if (failedDeletions > 0) {
-            $q.notify({
-              color: "negative",
+            toast({
               message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "error",
             });
           }
 
@@ -853,8 +756,8 @@ export default defineComponent({
         });
     };
 
-    const showDeleteDialogFn = (props: any) => {
-      selectedDelete.value = props.row;
+    const showDeleteDialogFn = (row: any) => {
+      selectedDelete.value = row;
       confirmDelete.value = true;
     };
 
@@ -865,11 +768,11 @@ export default defineComponent({
     const getTimeRange = async (stream: any) => {
       const dateTime: { period?: string; from?: number; to?: number } = {};
 
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Redirecting to explorer...",
-        color: "secondary",
-      });
+              timeout: 0,
+});
 
       try {
         await getStream(stream.name, stream.stream_type, true)
@@ -908,14 +811,14 @@ export default defineComponent({
       return dateTime;
     };
 
-    const exploreEnrichmentTable = async (props: any) => {
+    const exploreEnrichmentTable = async (row: any) => {
       store.dispatch("logs/setIsInitialized", false);
-      const timestamps = await getTimeRange(props.row);
+      const timestamps = await getTimeRange(row);
       router.push({
         name: "logs",
         query: {
-          stream_type: props.row.stream_type,
-          stream: props.row.name,
+          stream_type: row.stream_type,
+          stream: row.name,
           refresh: "0",
           query: "",
           type: "stream_explorer",
@@ -924,8 +827,8 @@ export default defineComponent({
         },
       });
     };
-    const listSchema = async (props: any) => {
-      selectedEnrichmentTable.value = props.row.name;
+    const listSchema = async (row: any) => {
+      selectedEnrichmentTable.value = row.name;
       showEnrichmentSchema.value = true;
     };
 
@@ -977,10 +880,10 @@ export default defineComponent({
       confirmDelete,
       selectedDelete,
       getLookupTables,
-      pagination,
+      loading,
       resultTotal,
       refreshList,
-      perPageOptions,
+      perPageOptionsList,
       selectedPerPage,
       addLookupTable,
       deleteLookupTable,
@@ -990,7 +893,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
-      outlinedDelete,
+      "delete": "delete",
       filterQuery,
       filterData,
       getImageURL,
@@ -1004,6 +907,8 @@ export default defineComponent({
       hasVisibleRows,
       confirmBulkDelete,
       selectedEnrichmentTables,
+      selectedEnrichmentTableIds,
+      handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteEnrichmentTables,
       selectedFilter,
@@ -1011,7 +916,6 @@ export default defineComponent({
       showUrlJobsDialogState,
       selectedTableForUrlJobs,
       formatSizeFromMB,
-      filterTabs,
       updateActiveTab,
     };
   },

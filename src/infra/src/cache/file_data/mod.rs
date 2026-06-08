@@ -109,7 +109,7 @@ impl CacheStrategy {
                     return None;
                 }
                 let mut idx = None;
-                for (_, val) in map.iter() {
+                for val in map.values() {
                     if !cache[*val].is_empty() {
                         idx = Some(*val);
                         break;
@@ -287,7 +287,7 @@ async fn download_from_storage(
             } else {
                 // the entry in db does not match what there is actually in the blob store
                 // so we check if the footer is valid. If it is, then the db entry is invalid
-                // and we reset it. If footer is invalid, the the store has a corrupted file
+                // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
@@ -407,6 +407,45 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
     Err(object_store::Error::NotFound {
         path: file.to_string(),
         source: Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, file)),
+    })
+}
+
+/// Batched range read across the cache ladder.
+///
+/// `memory → disk → remote storage`, returning one `Bytes` per input
+/// range in input order. The hit-path stays inside a single file
+/// handle: memory cache slices its in-memory `Bytes`, disk cache does
+/// one `File::open` + N `pread`s. Only on a full cache miss do we go
+/// to remote storage (which itself implements batched `get_ranges`
+/// for local FS and any object_store backend).
+///
+/// `remote = false` is the search-side semantic — never hit S3 on a
+/// miss, return NotFound so the caller can degrade gracefully.
+pub async fn get_ranges_opts(
+    account: &str,
+    file: &str,
+    ranges: &[Range<u64>],
+    remote: bool,
+) -> object_store::Result<Vec<Bytes>> {
+    let cfg = config::get_config();
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get_ranges(file, ranges).await
+    {
+        return Ok(v);
+    }
+    if cfg.disk_cache.enabled
+        && let Ok(v) = disk::get_ranges(file, ranges).await
+    {
+        return Ok(v);
+    }
+
+    if remote {
+        return crate::storage::get_ranges(account, file, ranges).await;
+    }
+
+    Err(object_store::Error::NotFound {
+        path: file.to_string(),
+        source: Box::new(std::io::Error::other(file)),
     })
 }
 

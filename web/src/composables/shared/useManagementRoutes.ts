@@ -156,6 +156,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "llm_providers",
+          name: "llmProviders",
+          component: () =>
+            import("@/components/settings/LlmProvidersSettings.vue"),
+          meta: {
+            title: "LLM Providers",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "nodes",
           name: "nodes",
           component: () => import("@/components/settings/Nodes.vue"),

@@ -118,11 +118,10 @@ test.describe("Streams Regression Bugs", () => {
     await pm.logsPage.clickQuickModeToggle();
     await pm.logsPage.clickAllFieldsButton();
 
-    // Add remaining long-named streams
+    // Add remaining long-named streams using selectStream with skipNavigation
     testLogger.info('Adding additional long-named streams to trigger ellipsis');
     for (let i = 1; i < longStreamNames.length; i++) {
-      await pm.logsPage.fillStreamFilter(longStreamNames[i]);
-      await pm.logsPage.toggleStreamSelection(longStreamNames[i]);
+      await pm.logsPage.selectStream(longStreamNames[i], 5, 0, true);
       // Wait for stream to be selected
       await page.waitForLoadState('domcontentloaded').catch(() => {});
     }
@@ -292,7 +291,7 @@ test.describe("Streams Regression Bugs", () => {
     testLogger.info('✓ Full text search option exists in index type dropdown');
 
     // Close the dropdown
-    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
 
     // PART 2: Verify Quick Mode fields from env variables show icon
     testLogger.info('PART 2: Checking Quick Mode field indicators from environment variables');

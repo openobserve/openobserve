@@ -4,6 +4,7 @@
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
 // This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -14,17 +15,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import AlertWizardRightColumn from "./AlertWizardRightColumn.vue";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
-// Mock child components with proper props exposure
 vi.mock("./PreviewAlert.vue", () => ({
   default: {
     name: "PreviewAlert",
@@ -35,9 +30,11 @@ vi.mock("./PreviewAlert.vue", () => ({
       "selectedTab",
       "isAggregationEnabled",
       "isUsingBackendSql",
+      "isEditorOpen",
     ],
-    methods: {
-      refreshData: vi.fn(),
+    expose: ["refreshData", "resizeChart", "evaluationStatus"],
+    setup() {
+      return { refreshData: vi.fn(), resizeChart: vi.fn(), evaluationStatus: null };
     },
   },
 }));
@@ -57,797 +54,537 @@ vi.mock("./AlertSummary.vue", () => ({
   },
 }));
 
-// Mock store
-const createMockStore = (overrides = {}) => ({
-  state: {
-    theme: "light",
-    zoConfig: {
-      timestamp_column: "_timestamp",
+const baseFormData = () => ({
+  name: "Test Alert",
+  stream_type: "logs",
+  stream_name: "test-stream",
+  is_real_time: "false",
+  query_condition: {
+    type: "custom",
+    aggregation: {
+      group_by: [""],
+      function: "avg",
+      having: { column: "", operator: ">=", value: 1 },
     },
-    selectedOrganization: {
-      identifier: "test-org",
-    },
-    ...overrides,
   },
-  dispatch: vi.fn(),
-  commit: vi.fn(),
+  trigger_condition: { period: 10 },
+  destinations: [],
 });
 
-describe("AlertWizardRightColumn.vue", () => {
-  let wrapper: VueWrapper<any>;
-  let mockStore: any;
-  let mockFormData: any;
-
-  beforeEach(() => {
-    mockStore = createMockStore();
-    mockFormData = {
-      name: "Test Alert",
-      stream_type: "logs",
-      stream_name: "test-stream",
-      is_real_time: "false",
-      query_condition: {
-        type: "custom",
-        aggregation: {
-          group_by: [""],
-          function: "avg",
-          having: {
-            column: "",
-            operator: ">=",
-            value: 1,
-          },
-        },
-      },
-      trigger_condition: {
-        period: 10,
-      },
+async function mountComp(props: Record<string, any> = {}) {
+  localStorage.clear();
+  return mount(AlertWizardRightColumn, {
+    global: {
+      plugins: [i18n, store],
+    },
+    props: {
+      formData: baseFormData(),
+      previewQuery: "SELECT * FROM test",
+      generatedSqlQuery: "",
+      selectedTab: "custom",
+      isAggregationEnabled: false,
       destinations: [],
-    };
+      focusManager: {},
+      wizardStep: 1,
+      isUsingBackendSql: false,
+      isEditorOpen: false,
+      ...props,
+    },
+  });
+}
 
-    // Clear localStorage before each test
-    localStorage.clear();
+describe("AlertWizardRightColumn - rendering", () => {
+  let wrapper: VueWrapper<any>;
 
-    wrapper = mount(AlertWizardRightColumn, {
-      global: {
-        mocks: {
-          $store: mockStore,
-        },
-        provide: {
-          store: mockStore,
-        },
-        plugins: [i18n],
-      },
-      props: {
-        formData: mockFormData,
-        previewQuery: "SELECT * FROM test",
-        generatedSqlQuery: "",
-        selectedTab: "custom",
-        isAggregationEnabled: false,
-        destinations: [],
-        focusManager: {},
-        wizardStep: 1,
-        isUsingBackendSql: false,
-      },
-    });
+  beforeEach(async () => {
+    wrapper = await mountComp();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
     localStorage.clear();
   });
 
-  describe("Initialization", () => {
-    it("should mount component successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render preview section", () => {
-      expect(wrapper.find('[data-test="mock-preview-alert"]').exists()).toBe(
-        true
-      );
-    });
-
-    it("should render summary section", () => {
-      expect(wrapper.find('[data-test="mock-alert-summary"]').exists()).toBe(
-        true
-      );
-    });
-
-    it("should render both section headers", () => {
-      const headers = wrapper.findAll(".section-header");
-      expect(headers.length).toBe(2);
-      expect(headers[0].text()).toContain("Preview");
-      expect(headers[1].text()).toContain("Summary");
-    });
-
-    it("should have expand toggle buttons", () => {
-      const toggleButtons = wrapper.findAll(".expand-toggle-btn");
-      expect(toggleButtons.length).toBe(2);
-    });
-
-    it("should initialize with default expand state when no localStorage", () => {
-      expect(wrapper.vm.expandState.preview).toBe(true);
-      expect(wrapper.vm.expandState.summary).toBe(true);
-    });
-
-    it("should load expand state from localStorage if available", () => {
-      const savedState = { preview: false, summary: true };
-      localStorage.setItem(
-        "alertWizardExpandState",
-        JSON.stringify(savedState)
-      );
-
-      const newWrapper = mount(AlertWizardRightColumn, {
-        global: {
-          mocks: { $store: mockStore },
-          provide: { store: mockStore },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          previewQuery: "",
-          wizardStep: 1,
-        },
-      });
-
-      expect(newWrapper.vm.expandState.preview).toBe(false);
-      expect(newWrapper.vm.expandState.summary).toBe(true);
-
-      newWrapper.unmount();
-    });
-
-    it("should handle corrupted localStorage gracefully", () => {
-      localStorage.setItem("alertWizardExpandState", "invalid json");
-
-      const newWrapper = mount(AlertWizardRightColumn, {
-        global: {
-          mocks: { $store: mockStore },
-          provide: { store: mockStore },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          previewQuery: "",
-          wizardStep: 1,
-        },
-      });
-
-      // Should fall back to defaults
-      expect(newWrapper.vm.expandState.preview).toBe(true);
-      expect(newWrapper.vm.expandState.summary).toBe(true);
-
-      newWrapper.unmount();
-    });
+  it("renders without errors", () => {
+    expect(wrapper.exists()).toBe(true);
   });
 
-  describe("Props", () => {
-    it("should accept all required props", () => {
-      expect(wrapper.props().formData).toBeDefined();
-      expect(wrapper.props().previewQuery).toBe("SELECT * FROM test");
-      expect(wrapper.props().selectedTab).toBe("custom");
-      expect(wrapper.props().wizardStep).toBe(1);
-    });
-
-    it("should have default values for optional props", () => {
-      const minimalWrapper = mount(AlertWizardRightColumn, {
-        global: {
-          mocks: { $store: mockStore },
-          provide: { store: mockStore },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-        },
-      });
-
-      expect(minimalWrapper.props().previewQuery).toBe("");
-      expect(minimalWrapper.props().generatedSqlQuery).toBe("");
-      expect(minimalWrapper.props().selectedTab).toBe("custom");
-      expect(minimalWrapper.props().isAggregationEnabled).toBe(false);
-      expect(minimalWrapper.props().destinations).toEqual([]);
-      expect(minimalWrapper.props().wizardStep).toBe(1);
-      expect(minimalWrapper.props().isUsingBackendSql).toBe(false);
-
-      minimalWrapper.unmount();
-    });
-
-    it("should pass formData to PreviewAlert", () => {
-      const previewAlert = wrapper.findComponent({ name: "PreviewAlert" });
-      expect(previewAlert.props("formData")).toEqual(mockFormData);
-    });
-
-    it("should pass previewQuery to PreviewAlert", () => {
-      const previewAlert = wrapper.findComponent({ name: "PreviewAlert" });
-      expect(previewAlert.props("query")).toBe("SELECT * FROM test");
-    });
-
-    it("should pass isUsingBackendSql to PreviewAlert", () => {
-      const previewAlert = wrapper.findComponent({ name: "PreviewAlert" });
-      expect(previewAlert.props("isUsingBackendSql")).toBe(false);
-    });
-
-    it("should pass formData to AlertSummary", () => {
-      const alertSummary = wrapper.findComponent({ name: "AlertSummary" });
-      expect(alertSummary.props("formData")).toEqual(mockFormData);
-    });
-
-    it("should pass generatedSqlQuery to AlertSummary", () => {
-      const alertSummary = wrapper.findComponent({ name: "AlertSummary" });
-      expect(alertSummary.props("generatedSqlQuery")).toBe("");
-    });
+  it("renders the PreviewAlert child", () => {
+    expect(wrapper.find('[data-test="mock-preview-alert"]').exists()).toBe(true);
   });
 
-  describe("Toggle Functions", () => {
-    it("should toggle preview section on click", async () => {
-      const initialState = wrapper.vm.expandState.preview;
-      const previewHeader = wrapper
-        .findAll(".section-header")
-        .find((h) => h.text().includes("Preview"));
+  it("renders the AlertSummary child", () => {
+    expect(wrapper.find('[data-test="mock-alert-summary"]').exists()).toBe(true);
+  });
+});
 
-      await previewHeader?.trigger("click");
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(!initialState);
-    });
-
-    it("should toggle summary section on click", async () => {
-      const initialState = wrapper.vm.expandState.summary;
-      const summaryHeader = wrapper
-        .findAll(".section-header")
-        .find((h) => h.text().includes("Summary"));
-
-      await summaryHeader?.trigger("click");
-      await nextTick();
-
-      expect(wrapper.vm.expandState.summary).toBe(!initialState);
-    });
-
-    it("should toggle preview to collapsed", async () => {
-      wrapper.vm.expandState.preview = true;
-      await wrapper.vm.togglePreview();
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should toggle preview to expanded", async () => {
-      wrapper.vm.expandState.preview = false;
-      await wrapper.vm.togglePreview();
-      expect(wrapper.vm.expandState.preview).toBe(true);
-    });
-
-    it("should toggle summary to collapsed", async () => {
-      wrapper.vm.expandState.summary = true;
-      await wrapper.vm.toggleSummary();
-      expect(wrapper.vm.expandState.summary).toBe(false);
-    });
-
-    it("should toggle summary to expanded", async () => {
-      wrapper.vm.expandState.summary = false;
-      await wrapper.vm.toggleSummary();
-      expect(wrapper.vm.expandState.summary).toBe(true);
-    });
-
-    it("should save state to localStorage when preview toggled", async () => {
-      await wrapper.vm.togglePreview();
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.preview).toBe(wrapper.vm.expandState.preview);
-    });
-
-    it("should save state to localStorage when summary toggled", async () => {
-      await wrapper.vm.toggleSummary();
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.summary).toBe(wrapper.vm.expandState.summary);
-    });
-
-    it("should handle localStorage save errors gracefully", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      // Mock localStorage to throw error
-      const originalSetItem = Storage.prototype.setItem;
-      Storage.prototype.setItem = vi.fn(() => {
-        throw new Error("Storage full");
-      });
-
-      wrapper.vm.togglePreview();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Failed to save expand state:",
-        expect.any(Error)
-      );
-
-      // Restore
-      Storage.prototype.setItem = originalSetItem;
-      consoleSpy.mockRestore();
-    });
+describe("AlertWizardRightColumn - initial state", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
   });
 
-  describe("Expand State Management", () => {
-    it("should independently toggle each section", async () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = true;
-
-      await wrapper.vm.togglePreview();
-      expect(wrapper.vm.expandState.preview).toBe(false);
-      expect(wrapper.vm.expandState.summary).toBe(true);
-
-      await wrapper.vm.toggleSummary();
-      expect(wrapper.vm.expandState.preview).toBe(false);
-      expect(wrapper.vm.expandState.summary).toBe(false);
-    });
-
-    it("should allow both sections to be collapsed", async () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = true;
-
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.toggleSummary();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-      expect(wrapper.vm.expandState.summary).toBe(false);
-    });
-
-    it("should allow both sections to be expanded", async () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = false;
-
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.toggleSummary();
-
-      expect(wrapper.vm.expandState.preview).toBe(true);
-      expect(wrapper.vm.expandState.summary).toBe(true);
-    });
-
-    it("should show preview content when expanded", async () => {
-      wrapper.vm.expandState.preview = true;
-      await nextTick();
-
-      const previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      const content = previewSection?.find(".section-content");
-
-      expect(content?.isVisible()).toBe(true);
-    });
-
-    it("should hide preview content when collapsed", async () => {
-      wrapper.vm.expandState.preview = false;
-      await nextTick();
-
-      const previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      const content = previewSection?.find(".section-content");
-
-      expect(content?.isVisible()).toBe(false);
-    });
-
-    it("should show summary content when expanded", async () => {
-      wrapper.vm.expandState.summary = true;
-      await nextTick();
-
-      const summarySection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Summary"));
-      const content = summarySection?.find(".summary-section-content");
-
-      expect(content?.isVisible()).toBe(true);
-    });
-
-    it("should hide summary content when collapsed", async () => {
-      wrapper.vm.expandState.summary = false;
-      await nextTick();
-
-      const summarySection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Summary"));
-      const content = summarySection?.find(".summary-section-content");
-
-      expect(content?.isVisible()).toBe(false);
-    });
+  it("initializes expandState.preview to true by default", async () => {
+    const w = await mountComp();
+    expect(w.vm.expandState.preview).toBe(true);
+    w.unmount();
   });
 
-  describe("Computed Styles", () => {
-    it("should calculate previewSectionStyle when both expanded", () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = true;
-
-      const style = wrapper.vm.previewSectionStyle;
-      expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("250px");
-    });
-
-    it("should calculate previewSectionStyle when preview collapsed", () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = true;
-
-      const style = wrapper.vm.previewSectionStyle;
-      expect(style.flex).toBe("0 0 auto");
-    });
-
-    it("should calculate previewSectionStyle when preview expanded and summary collapsed", () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = false;
-
-      const style = wrapper.vm.previewSectionStyle;
-      expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("250px");
-    });
-
-    it("should calculate summarySectionStyle when both expanded", () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = true;
-
-      const style = wrapper.vm.summarySectionStyle;
-      expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("250px");
-    });
-
-    it("should calculate summarySectionStyle when summary collapsed", () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = false;
-
-      const style = wrapper.vm.summarySectionStyle;
-      expect(style.flex).toBe("0 0 auto");
-    });
-
-    it("should calculate summarySectionStyle when summary expanded and preview collapsed", () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = true;
-
-      const style = wrapper.vm.summarySectionStyle;
-      expect(style.flex).toBe("1");
-      expect(style.minHeight).toBe("250px");
-    });
-
-    it("should have auto flex for both when both collapsed", () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = false;
-
-      const previewStyle = wrapper.vm.previewSectionStyle;
-      const summaryStyle = wrapper.vm.summarySectionStyle;
-
-      expect(previewStyle.flex).toBe("0 0 auto");
-      expect(summaryStyle.flex).toBe("0 0 auto");
-    });
+  it("initializes expandState.summary to true by default", async () => {
+    const w = await mountComp();
+    expect(w.vm.expandState.summary).toBe(true);
+    w.unmount();
   });
 
-  describe("Manual Expand/Collapse Behavior", () => {
-    it("should NOT auto-expand preview when navigating to step 2 with custom tab", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 2, selectedTab: "custom" });
-      await nextTick();
-
-      // Preview should remain collapsed - user controls expand/collapse
-      expect(wrapper.vm.expandState.preview).toBe(false);
+  it("loads saved expandState from localStorage", async () => {
+    // Mount without clearing localStorage first
+    localStorage.setItem("alertWizardExpandState", JSON.stringify({ preview: false, summary: true }));
+    const w = mount(AlertWizardRightColumn, {
+      global: { plugins: [i18n, store] },
+      props: {
+        formData: baseFormData(),
+        previewQuery: "",
+        wizardStep: 1,
+      },
     });
-
-    it("should not auto-expand preview on step 2 with SQL tab", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 2, selectedTab: "sql" });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should not auto-expand preview on step 2 with promql tab", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 2, selectedTab: "promql" });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should not auto-expand preview when already expanded", async () => {
-      wrapper.vm.expandState.preview = true;
-
-      await wrapper.setProps({ wizardStep: 2, selectedTab: "custom" });
-      await nextTick();
-
-      // Should remain expanded
-      expect(wrapper.vm.expandState.preview).toBe(true);
-    });
-
-    it("should not auto-expand preview on step 1", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 1, selectedTab: "custom" });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should not auto-expand preview on step 3", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 3, selectedTab: "custom" });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should NOT save to localStorage when navigating to step 2 (no auto-expand)", async () => {
-      wrapper.vm.expandState.preview = false;
-      // Clear localStorage first
-      localStorage.removeItem("alertWizardExpandState");
-
-      await wrapper.setProps({ wizardStep: 2, selectedTab: "custom" });
-      await nextTick();
-
-      // Since we don't auto-expand anymore, localStorage should not be updated
-      const saved = localStorage.getItem("alertWizardExpandState");
-      expect(saved).toBeNull();
-    });
-
-    it("should respect localStorage state on mount (no auto-expand)", async () => {
-      // Set preview to collapsed in localStorage
-      localStorage.setItem(
-        "alertWizardExpandState",
-        JSON.stringify({ preview: false, summary: true })
-      );
-
-      // Create a new wrapper with preview collapsed and on step 2 with custom tab
-      const newWrapper = mount(AlertWizardRightColumn, {
-        global: {
-          mocks: { $store: mockStore },
-          provide: { store: mockStore },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          previewQuery: "",
-          wizardStep: 2,
-          selectedTab: "custom",
-        },
-      });
-
-      await nextTick();
-      await flushPromises();
-
-      // Should remain collapsed as per localStorage (no auto-expand)
-      expect(newWrapper.vm.expandState.preview).toBe(false);
-
-      newWrapper.unmount();
-    });
+    expect(w.vm.expandState.preview).toBe(false);
+    expect(w.vm.expandState.summary).toBe(true);
+    w.unmount();
   });
 
-  describe("Exposed Methods", () => {
-    it("should expose refreshData method", () => {
-      expect(wrapper.vm.refreshData).toBeDefined();
-      expect(typeof wrapper.vm.refreshData).toBe("function");
-    });
+  it("falls back to defaults when localStorage is corrupt JSON", async () => {
+    localStorage.setItem("alertWizardExpandState", "not-json-{{{");
+    const w = await mountComp();
+    expect(w.vm.expandState.preview).toBe(true);
+    expect(w.vm.expandState.summary).toBe(true);
+    w.unmount();
+  });
+});
 
-    it("should call previewAlertRef refreshData when exposed method is called", () => {
-      const mockRefreshData = vi.fn();
-      wrapper.vm.previewAlertRef = {
-        refreshData: mockRefreshData,
-      };
-
-      wrapper.vm.refreshData();
-
-      expect(mockRefreshData).toHaveBeenCalled();
-    });
-
-    it("should handle null previewAlertRef gracefully", () => {
-      wrapper.vm.previewAlertRef = null;
-
-      expect(() => wrapper.vm.refreshData()).not.toThrow();
-    });
-
-    it("should handle undefined previewAlertRef gracefully", () => {
-      wrapper.vm.previewAlertRef = undefined;
-
-      expect(() => wrapper.vm.refreshData()).not.toThrow();
-    });
+describe("AlertWizardRightColumn - props", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
   });
 
-  describe("Visual Indicators", () => {
-    it("should show expand_more icon when section is collapsed", async () => {
-      wrapper.vm.expandState.preview = false;
-      await nextTick();
-
-      const previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      const toggleBtn = previewSection?.find(".expand-toggle-btn");
-
-      // Check the actual rendered icon attribute or HTML
-      expect(toggleBtn?.html()).toContain("expand_more");
-    });
-
-    it("should show expand_less icon when section is expanded", async () => {
-      wrapper.vm.expandState.preview = true;
-      await nextTick();
-
-      const previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      const toggleBtn = previewSection?.find(".expand-toggle-btn");
-
-      // Check the actual rendered icon attribute or HTML
-      expect(toggleBtn?.html()).toContain("expand_less");
-    });
-
-    it("should update icon when toggling preview", async () => {
-      wrapper.vm.expandState.preview = true;
-      await nextTick();
-
-      let previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      let toggleBtn = previewSection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_less");
-
-      await wrapper.vm.togglePreview();
-      await nextTick();
-
-      previewSection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Preview"));
-      toggleBtn = previewSection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_more");
-    });
-
-    it("should update icon when toggling summary", async () => {
-      wrapper.vm.expandState.summary = true;
-      await nextTick();
-
-      let summarySection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Summary"));
-      let toggleBtn = summarySection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_less");
-
-      await wrapper.vm.toggleSummary();
-      await nextTick();
-
-      summarySection = wrapper
-        .findAll(".collapsible-section")
-        .find((s) => s.text().includes("Summary"));
-      toggleBtn = summarySection?.find(".expand-toggle-btn");
-      expect(toggleBtn?.html()).toContain("expand_more");
-    });
+  it("accepts all props", async () => {
+    const w = await mountComp();
+    expect(w.props("previewQuery")).toBe("SELECT * FROM test");
+    expect(w.props("selectedTab")).toBe("custom");
+    expect(w.props("wizardStep")).toBe(1);
+    w.unmount();
   });
 
-  describe("Edge Cases", () => {
-    it("should handle rapid toggling", async () => {
-      const initialState = wrapper.vm.expandState.preview;
-
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview();
-
-      expect(wrapper.vm.expandState.preview).toBe(!initialState);
-    });
-
-    it("should maintain state across prop updates", async () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = false;
-
-      await wrapper.setProps({ previewQuery: "NEW QUERY" });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-      expect(wrapper.vm.expandState.summary).toBe(false);
-    });
-
-    it("should handle formData changes without affecting expand state", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({
-        formData: {
-          ...mockFormData,
-          name: "Updated Alert",
-        },
-      });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should handle wizardStep changes to non-query steps", async () => {
-      wrapper.vm.expandState.preview = false;
-
-      await wrapper.setProps({ wizardStep: 4 });
-      await nextTick();
-
-      expect(wrapper.vm.expandState.preview).toBe(false);
-    });
-
-    it("should handle undefined wizardStep", async () => {
-      await wrapper.setProps({ wizardStep: undefined });
-      await nextTick();
-
-      expect(() => wrapper.vm.expandState).not.toThrow();
-    });
-
-    it("should handle undefined selectedTab", async () => {
-      await wrapper.setProps({ selectedTab: undefined });
-      await nextTick();
-
-      expect(() => wrapper.vm.expandState).not.toThrow();
-    });
+  it("has default values for optional props", async () => {
+    const w = await mountComp();
+    expect(w.props("generatedSqlQuery")).toBe("");
+    expect(w.props("isAggregationEnabled")).toBe(false);
+    expect(w.props("destinations")).toEqual([]);
+    expect(w.props("isUsingBackendSql")).toBe(false);
+    w.unmount();
   });
 
-  describe("LocalStorage Persistence", () => {
-    it("should persist expanded state", async () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = true;
+  it("passes formData to PreviewAlert", async () => {
+    const w = await mountComp();
+    const preview = w.findComponent({ name: "PreviewAlert" });
+    expect(preview.props("formData")).toEqual(baseFormData());
+    w.unmount();
+  });
 
-      // Trigger save by toggling
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview(); // Toggle back
+  it("passes previewQuery to PreviewAlert", async () => {
+    const w = await mountComp();
+    const preview = w.findComponent({ name: "PreviewAlert" });
+    expect(preview.props("query")).toBe("SELECT * FROM test");
+    w.unmount();
+  });
 
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.preview).toBe(true);
-      expect(saved.summary).toBe(true);
+  it("passes isUsingBackendSql to PreviewAlert", async () => {
+    const w = await mountComp({ isUsingBackendSql: true });
+    const preview = w.findComponent({ name: "PreviewAlert" });
+    expect(preview.props("isUsingBackendSql")).toBe(true);
+    w.unmount();
+  });
+
+  it("passes generatedSqlQuery to AlertSummary", async () => {
+    const w = await mountComp({ generatedSqlQuery: "SELECT * FROM generated" });
+    const summary = w.findComponent({ name: "AlertSummary" });
+    expect(summary.props("generatedSqlQuery")).toBe("SELECT * FROM generated");
+    w.unmount();
+  });
+
+  it("passes formData to AlertSummary", async () => {
+    const w = await mountComp();
+    const summary = w.findComponent({ name: "AlertSummary" });
+    expect(summary.props("formData")).toEqual(baseFormData());
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - togglePreview", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("toggles preview from true to false", async () => {
+    const w = await mountComp();
+    expect(w.vm.expandState.preview).toBe(true);
+    w.vm.togglePreview();
+    expect(w.vm.expandState.preview).toBe(false);
+    w.unmount();
+  });
+
+  it("toggles preview from false to true", async () => {
+    localStorage.setItem("alertWizardExpandState", JSON.stringify({ preview: false, summary: true }));
+    const w = mount(AlertWizardRightColumn, {
+      global: { plugins: [i18n, store] },
+      props: { formData: baseFormData(), previewQuery: "", wizardStep: 1 },
     });
+    w.vm.togglePreview();
+    expect(w.vm.expandState.preview).toBe(true);
+    w.unmount();
+  });
 
-    it("should persist collapsed state", async () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = false;
+  it("saves state to localStorage when toggling preview", async () => {
+    const w = await mountComp();
+    w.vm.togglePreview();
+    const saved = JSON.parse(localStorage.getItem("alertWizardExpandState") || "{}");
+    expect(saved.preview).toBe(false);
+    w.unmount();
+  });
 
-      // Trigger save by toggling
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview(); // Toggle back
+  it("handles localStorage.setItem failure gracefully", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = vi.fn(() => { throw new Error("quota exceeded"); });
 
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.preview).toBe(false);
-      expect(saved.summary).toBe(false);
+    const w = await mountComp();
+    expect(() => w.vm.togglePreview()).not.toThrow();
+    expect(consoleSpy).toHaveBeenCalled();
+
+    Storage.prototype.setItem = original;
+    consoleSpy.mockRestore();
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - toggleSummary", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("toggles summary from true to false", async () => {
+    const w = await mountComp();
+    expect(w.vm.expandState.summary).toBe(true);
+    w.vm.toggleSummary();
+    expect(w.vm.expandState.summary).toBe(false);
+    w.unmount();
+  });
+
+  it("toggles summary from false to true", async () => {
+    localStorage.setItem("alertWizardExpandState", JSON.stringify({ preview: true, summary: false }));
+    const w = mount(AlertWizardRightColumn, {
+      global: { plugins: [i18n, store] },
+      props: { formData: baseFormData(), previewQuery: "", wizardStep: 1 },
     });
+    w.vm.toggleSummary();
+    expect(w.vm.expandState.summary).toBe(true);
+    w.unmount();
+  });
 
-    it("should persist mixed state", async () => {
-      wrapper.vm.expandState.preview = true;
-      wrapper.vm.expandState.summary = false;
+  it("saves state to localStorage when toggling summary", async () => {
+    const w = await mountComp();
+    w.vm.toggleSummary();
+    const saved = JSON.parse(localStorage.getItem("alertWizardExpandState") || "{}");
+    expect(saved.summary).toBe(false);
+    w.unmount();
+  });
+});
 
-      // Trigger save by toggling
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview(); // Toggle back
+describe("AlertWizardRightColumn - expand state independence", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
 
-      const saved = JSON.parse(
-        localStorage.getItem("alertWizardExpandState") || "{}"
-      );
-      expect(saved.preview).toBe(true);
-      expect(saved.summary).toBe(false);
+  it("toggling preview does not affect summary state", async () => {
+    const w = await mountComp();
+    w.vm.togglePreview();
+    expect(w.vm.expandState.preview).toBe(false);
+    expect(w.vm.expandState.summary).toBe(true);
+    w.unmount();
+  });
+
+  it("toggling summary does not affect preview state", async () => {
+    const w = await mountComp();
+    w.vm.toggleSummary();
+    expect(w.vm.expandState.preview).toBe(true);
+    expect(w.vm.expandState.summary).toBe(false);
+    w.unmount();
+  });
+
+  it("rapid toggling ends up at odd-count flip from start", async () => {
+    const w = await mountComp();
+    const initial = w.vm.expandState.preview;
+    w.vm.togglePreview();
+    w.vm.togglePreview();
+    w.vm.togglePreview();
+    expect(w.vm.expandState.preview).toBe(!initial);
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - computed styles", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("previewSectionStyle has flex:1 when preview is expanded", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = true;
+    const style = w.vm.previewSectionStyle;
+    expect(style.flex).toBe("1");
+    w.unmount();
+  });
+
+  it("previewSectionStyle has flex:0 0 auto when preview is collapsed", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    const style = w.vm.previewSectionStyle;
+    expect(style.flex).toBe("0 0 auto");
+    w.unmount();
+  });
+
+  it("summarySectionStyle has flex:1 when summary is expanded", async () => {
+    const w = await mountComp();
+    w.vm.expandState.summary = true;
+    const style = w.vm.summarySectionStyle;
+    expect(style.flex).toBe("1");
+    w.unmount();
+  });
+
+  it("summarySectionStyle has flex:0 0 auto when summary is collapsed", async () => {
+    const w = await mountComp();
+    w.vm.expandState.summary = false;
+    const style = w.vm.summarySectionStyle;
+    expect(style.flex).toBe("0 0 auto");
+    w.unmount();
+  });
+
+  it("both expanded → both have minHeight:250px", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = true;
+    w.vm.expandState.summary = true;
+    expect(w.vm.previewSectionStyle.minHeight).toBe("250px");
+    expect(w.vm.summarySectionStyle.minHeight).toBe("250px");
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - exposed refreshData", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("exposes refreshData method", async () => {
+    const w = await mountComp();
+    expect(typeof w.vm.refreshData).toBe("function");
+    w.unmount();
+  });
+
+  it("calls previewAlertRef.refreshData when invoked", async () => {
+    const w = await mountComp();
+    const mockRefresh = vi.fn();
+    w.vm.previewAlertRef = { refreshData: mockRefresh };
+    w.vm.refreshData();
+    expect(mockRefresh).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("does not throw when previewAlertRef is null", async () => {
+    const w = await mountComp();
+    w.vm.previewAlertRef = null;
+    expect(() => w.vm.refreshData()).not.toThrow();
+    w.unmount();
+  });
+
+  it("does not throw when previewAlertRef is undefined", async () => {
+    const w = await mountComp();
+    w.vm.previewAlertRef = undefined;
+    expect(() => w.vm.refreshData()).not.toThrow();
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - isRealTime computed", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("returns true when is_real_time is string 'true'", async () => {
+    const w = await mountComp({ formData: { ...baseFormData(), is_real_time: "true" } });
+    expect(w.vm.isRealTime).toBe(true);
+    w.unmount();
+  });
+
+  it("returns true when is_real_time is boolean true", async () => {
+    const w = await mountComp({ formData: { ...baseFormData(), is_real_time: true } });
+    expect(w.vm.isRealTime).toBe(true);
+    w.unmount();
+  });
+
+  it("returns false when is_real_time is 'false'", async () => {
+    const w = await mountComp({ formData: { ...baseFormData(), is_real_time: "false" } });
+    expect(w.vm.isRealTime).toBe(false);
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - section content visibility (v-show)", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("preview content is visible when expandState.preview is true", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = true;
+    await nextTick();
+    const content = w.find('[data-test="mock-preview-alert"]');
+    expect(content.isVisible()).toBe(true);
+    w.unmount();
+  });
+
+  it("preview content is hidden when expandState.preview is false", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    await nextTick();
+    const content = w.find('[data-test="mock-preview-alert"]');
+    expect(content.isVisible()).toBe(false);
+    w.unmount();
+  });
+
+  it("summary content is visible when expandState.summary is true", async () => {
+    const w = await mountComp();
+    w.vm.expandState.summary = true;
+    await nextTick();
+    const content = w.find('[data-test="mock-alert-summary"]');
+    expect(content.isVisible()).toBe(true);
+    w.unmount();
+  });
+
+  it("summary content is hidden when expandState.summary is false", async () => {
+    const w = await mountComp();
+    w.vm.expandState.summary = false;
+    await nextTick();
+    const content = w.find('[data-test="mock-alert-summary"]');
+    expect(content.isVisible()).toBe(false);
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - icon names in expand toggle buttons", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("preview expand-toggle shows expand-less icon when preview is expanded", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = true;
+    await nextTick();
+    const icons = w.findAllComponents({ name: "OIcon" });
+    const previewToggleIcon = icons.find((i) => {
+      const name = i.props("name") as string;
+      return name?.includes("expand");
     });
+    expect(previewToggleIcon?.props("name")).toMatch(/expand-less/);
+    w.unmount();
+  });
 
-    it("should restore state on component remount", async () => {
-      wrapper.vm.expandState.preview = false;
-      wrapper.vm.expandState.summary = true;
-
-      // Save by toggling
-      await wrapper.vm.togglePreview();
-      await wrapper.vm.togglePreview(); // Back to false
-
-      wrapper.unmount();
-
-      const newWrapper = mount(AlertWizardRightColumn, {
-        global: {
-          mocks: { $store: mockStore },
-          provide: { store: mockStore },
-          plugins: [i18n],
-        },
-        props: {
-          formData: mockFormData,
-          previewQuery: "",
-          wizardStep: 1,
-        },
-      });
-
-      expect(newWrapper.vm.expandState.preview).toBe(false);
-      expect(newWrapper.vm.expandState.summary).toBe(true);
-
-      newWrapper.unmount();
+  it("preview expand-toggle shows expand-more icon when preview is collapsed", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    await nextTick();
+    const icons = w.findAllComponents({ name: "OIcon" });
+    // First expand icon found should correspond to preview
+    const expandIcon = icons.find((i) => {
+      const name = i.props("name") as string;
+      return name?.includes("expand");
     });
+    expect(expandIcon?.props("name")).toMatch(/expand-more/);
+    w.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - localStorage persistence", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("persists mixed state (preview=true, summary=false) after toggle + toggle-back", async () => {
+    const w = await mountComp();
+    w.vm.expandState.summary = false;
+    w.vm.togglePreview();
+    w.vm.togglePreview(); // back to true
+
+    const saved = JSON.parse(localStorage.getItem("alertWizardExpandState") || "{}");
+    expect(saved.preview).toBe(true);
+    expect(saved.summary).toBe(false);
+    w.unmount();
+  });
+
+  it("restores state on remount", async () => {
+    // First: set the localStorage state directly, then mount fresh
+    localStorage.setItem("alertWizardExpandState", JSON.stringify({ preview: false, summary: true }));
+
+    const w2 = mount(AlertWizardRightColumn, {
+      global: { plugins: [i18n, store] },
+      props: { formData: baseFormData(), previewQuery: "", wizardStep: 1 },
+    });
+    expect(w2.vm.expandState.preview).toBe(false);
+    expect(w2.vm.expandState.summary).toBe(true);
+    w2.unmount();
+  });
+});
+
+describe("AlertWizardRightColumn - edge cases", () => {
+  afterEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it("does not auto-expand preview on wizardStep change", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    await w.setProps({ wizardStep: 2, selectedTab: "custom" });
+    await nextTick();
+    expect(w.vm.expandState.preview).toBe(false);
+    w.unmount();
+  });
+
+  it("maintains expand state across prop updates", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    w.vm.expandState.summary = false;
+    await w.setProps({ previewQuery: "NEW QUERY" });
+    await nextTick();
+    expect(w.vm.expandState.preview).toBe(false);
+    expect(w.vm.expandState.summary).toBe(false);
+    w.unmount();
+  });
+
+  it("handles formData change without affecting expand state", async () => {
+    const w = await mountComp();
+    w.vm.expandState.preview = false;
+    await w.setProps({ formData: { ...baseFormData(), name: "Updated" } });
+    await nextTick();
+    expect(w.vm.expandState.preview).toBe(false);
+    w.unmount();
   });
 });

@@ -17,10 +17,13 @@ import Billing from "@/enterprise/components/billings/Billing.vue";
 import Plans from "@/enterprise/components/billings/plans.vue";
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
 import Usage from "@/enterprise/components/billings/usage.vue";
+import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
+import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
 import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
+import { routeGuard } from "@/utils/zincutils";
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
@@ -54,6 +57,18 @@ const useEnvRoutes = () => {
 
   const homeChildRoutes = [
     {
+      path: "online-evals",
+      name: "onlineEvals",
+      component: OnlineEvals,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      meta: {
+        title: "Online Evals",
+        keepAlive: false,
+      },
+    },
+    {
       path: "billings",
       name: "billings",
       component: Billing,
@@ -76,12 +91,21 @@ const useEnvRoutes = () => {
           name: "invoice_history",
           component: InvoiceHistory,
         },
+        {
+          path: "billing_group",
+          name: "billing_group",
+          component: BillingGroup,
+        },
       ],
     },
   ];
 
   // Child routes to merge under pipeline/pipelines path
   const pipelineChildren = [
+    {
+      path: "online-evals",
+      redirect: "/online-evals",
+    },
     {
       path: "eval-templates",
       name: "evalTemplates",

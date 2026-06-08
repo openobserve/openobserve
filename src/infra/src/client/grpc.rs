@@ -33,50 +33,6 @@ use crate::errors::{Error, ErrorCodes};
 
 static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
 
-#[cfg(test)]
-mod tests {
-    use opentelemetry::propagation::Injector;
-    use tonic::metadata::MetadataMap as TonicMap;
-
-    use super::MetadataMap;
-
-    #[test]
-    fn test_set_valid_key_and_value_inserts_into_map() {
-        let mut inner = TonicMap::new();
-        let mut map = MetadataMap(&mut inner);
-        map.set("x-trace-id", "abc123".to_string());
-        assert!(inner.contains_key("x-trace-id"));
-    }
-
-    #[test]
-    fn test_set_invalid_key_does_nothing() {
-        let mut inner = TonicMap::new();
-        let original_len = inner.len();
-        let mut map = MetadataMap(&mut inner);
-        // Keys with spaces are invalid for gRPC metadata
-        map.set("invalid key with spaces", "some-value".to_string());
-        assert_eq!(inner.len(), original_len);
-    }
-
-    #[test]
-    fn test_set_multiple_keys() {
-        let mut inner = TonicMap::new();
-        let mut map = MetadataMap(&mut inner);
-        map.set("traceparent", "00-abc-def-01".to_string());
-        map.set("tracestate", "vendor=trace".to_string());
-        assert!(inner.contains_key("traceparent"));
-        assert!(inner.contains_key("tracestate"));
-    }
-
-    #[test]
-    fn test_set_empty_value_inserts_key() {
-        let mut inner = TonicMap::new();
-        let mut map = MetadataMap(&mut inner);
-        map.set("x-empty", String::new());
-        assert!(inner.contains_key("x-empty"));
-    }
-}
-
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
 impl opentelemetry::propagation::Injector for MetadataMap<'_> {
@@ -113,14 +69,24 @@ pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Statu
     Ok(channel.clone())
 }
 
+/// Whether a gRPC client connection to `grpc_addr` should use TLS.
+fn grpc_addr_uses_tls(grpc_addr: &str) -> bool {
+    grpc_addr.to_lowercase().starts_with("https://")
+}
+
 pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     let cfg = config::get_config();
     let mut channel = Channel::from_shared(grpc_addr.to_string()).map_err(|err| {
-        log::error!("gRPC node: {}, parse err: {:?}", &grpc_addr, err);
+        log::error!("gRPC node: {}, parse err: {:?}", grpc_addr, err);
         Status::internal("parse gRPC node error".to_string())
     })?;
-    if cfg.grpc.tls_enabled {
-        let mut tls = ClientTlsConfig::new().domain_name(&cfg.grpc.tls_cert_domain);
+    if grpc_addr_uses_tls(grpc_addr) {
+        let mut tls = ClientTlsConfig::new();
+        // Only override the SNI/domain when explicitly configured; otherwise tonic derives
+        // it from the URI host, which matches the load balancer's certificate.
+        if !cfg.grpc.tls_cert_domain.is_empty() {
+            tls = tls.domain_name(&cfg.grpc.tls_cert_domain);
+        }
         match cfg.grpc.tls_root_certificates {
             config::TlsRootCertificates::Native => {
                 tls = tls.with_native_roots();
@@ -135,7 +101,7 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
             }
         }
         channel = channel.tls_config(tls).map_err(|err| {
-            log::error!("gRPC node: {}, tls err: {:?}", &grpc_addr, err);
+            log::error!("gRPC node: {}, tls err: {:?}", grpc_addr, err);
             Status::internal("tls gRPC node error".to_string())
         })?;
     }
@@ -146,7 +112,7 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
         .connect()
         .await
         .map_err(|err| {
-            log::error!("gRPC node: {}, connect err: {:?}", &grpc_addr, err);
+            log::error!("gRPC node: {}, connect err: {:?}", grpc_addr, err);
             Status::internal("connect to gRPC node error".to_string())
         })?;
     Ok(channel)
@@ -188,7 +154,7 @@ pub async fn make_grpc_search_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] search->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -254,7 +220,7 @@ pub async fn make_grpc_metrics_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -308,7 +274,7 @@ pub async fn make_grpc_node_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] node->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -359,7 +325,7 @@ pub async fn make_grpc_cluster_info_client<T>(
         .map_err(|err| {
             log::error!(
                 "[trace_id {trace_id}] cluster_info->grpc: node: {}, connect err: {:?}",
-                &node.get_grpc_addr(),
+                node.get_grpc_addr(),
                 err
             );
             let err = ErrorCodes::from_json(err.message())
@@ -375,4 +341,75 @@ pub async fn make_grpc_cluster_info_client<T>(
             },
         );
     Ok(client)
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry::propagation::Injector;
+    use tonic::metadata::MetadataMap as TonicMap;
+
+    use super::MetadataMap;
+
+    #[test]
+    fn test_set_valid_key_and_value_inserts_into_map() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("x-trace-id", "abc123".to_string());
+        assert!(inner.contains_key("x-trace-id"));
+    }
+
+    #[test]
+    fn test_set_invalid_key_does_nothing() {
+        let mut inner = TonicMap::new();
+        let original_len = inner.len();
+        let mut map = MetadataMap(&mut inner);
+        // Keys with spaces are invalid for gRPC metadata
+        map.set("invalid key with spaces", "some-value".to_string());
+        assert_eq!(inner.len(), original_len);
+    }
+
+    #[test]
+    fn test_set_multiple_keys() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("traceparent", "00-abc-def-01".to_string());
+        map.set("tracestate", "vendor=trace".to_string());
+        assert!(inner.contains_key("traceparent"));
+        assert!(inner.contains_key("tracestate"));
+    }
+
+    #[test]
+    fn test_set_empty_value_inserts_key() {
+        let mut inner = TonicMap::new();
+        let mut map = MetadataMap(&mut inner);
+        map.set("x-empty", String::new());
+        assert!(inner.contains_key("x-empty"));
+    }
+
+    #[test]
+    fn test_grpc_addr_uses_tls_https() {
+        // https:// addresses (e.g. a TLS-terminating load balancer) must use client TLS.
+        assert!(super::grpc_addr_uses_tls("https://lb.example.com:443"));
+        assert!(super::grpc_addr_uses_tls("https://10.0.0.1:5081"));
+        // The scheme match is case-insensitive.
+        assert!(super::grpc_addr_uses_tls("HTTPS://10.0.0.1:5081"));
+        assert!(super::grpc_addr_uses_tls("Https://lb.example.com:443"));
+    }
+
+    #[test]
+    fn test_grpc_addr_uses_tls_http() {
+        // http:// addresses (intra-cluster pod-to-pod) stay on h2c, no client TLS.
+        assert!(!super::grpc_addr_uses_tls("http://10.0.0.1:5081"));
+        assert!(!super::grpc_addr_uses_tls("http://node-1.example.com:5081"));
+    }
+
+    #[test]
+    fn test_grpc_addr_uses_tls_other_schemes() {
+        // Only the https scheme enables TLS; anything else is treated as cleartext.
+        assert!(!super::grpc_addr_uses_tls("grpc://10.0.0.1:5081"));
+        assert!(!super::grpc_addr_uses_tls("10.0.0.1:5081"));
+        assert!(!super::grpc_addr_uses_tls(""));
+        // A host that merely contains "https" without it being the scheme is not TLS.
+        assert!(!super::grpc_addr_uses_tls("http://https.example.com:5081"));
+    }
 }

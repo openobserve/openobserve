@@ -44,6 +44,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
+          <!-- Wrap Content Button -->
+          <OButton
+            variant="ghost"
+            size="icon"
+            :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            data-test="correlated-logs-table-wrap-content-btn"
+            @click="wrapTableCells = !wrapTableCells"
+          >
+            <OIcon name="wrap-text" size="sm" />
+            <OTooltip :content="t('search.messageWrapContent')" />
+          </OButton>
+
           <!-- Column Visibility Dropdown -->
           <div class="tw:pr-4">
             <ODropdown
@@ -58,8 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!hasResults"
                 >
                   <template v-if="true">
-                    <q-icon name="view_column"
-size="16px"
+                    <OIcon name="view-column"
+size="sm"
 class="tw:mr-1" />
                     {{ t('search.showHideColumns') }}
                   </template>
@@ -67,63 +79,56 @@ class="tw:mr-1" />
               </template>
               <div class="column-visibility-list tw:min-w-[220px] tw:max-h-[320px] tw:overflow-y-auto">
                 <!-- Select All / Deselect All -->
-                <q-item
-                  dense
-                  clickable
-                  @click="toggleSelectAll"
+                <ODropdownItem
                   class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
                   data-test="select-all-columns"
+                  @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
-                  <q-item-section avatar>
-                    <q-checkbox
-                      :model-value="areAllColumnsSelected"
-                      :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
-                      @update:model-value="toggleSelectAll"
-                      dense
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="tw:font-semibold">
-                      {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
-                    </q-item-label>
-                  </q-item-section>
-                </q-item>
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="areAllColumnsSelected"
+                        :indeterminate="areSomeColumnsSelected && !areAllColumnsSelected"
+                        @update:model-value="toggleSelectAll"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:font-semibold">
+                    {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                  </span>
+                </ODropdownItem>
 
                 <!-- Draggable Column Items -->
-                <q-item
+                <ODropdownItem
                   v-for="(field, index) in orderedFields"
                   :key="field"
-                  dense
-                  clickable
-                  @click="toggleColumnVisibility(field)"
-                  :disable="field === '_timestamp'"
+                  :disabled="field === '_timestamp'"
                   draggable="true"
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="{ 'dragging': draggedIndex === index }"
+                  :class="['column-item', { 'dragging': draggedIndex === index }]"
                   :data-test="`column-item-${field}`"
-                  class="column-item"
+                  @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
                 >
-                  <q-item-section avatar>
-                    <q-checkbox
-                      :model-value="visibleColumns.has(field)"
-                      @update:model-value="toggleColumnVisibility(field)"
-                      :disable="field === '_timestamp'"
-                      dense
-                    />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label>{{ field }}</q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-icon
-                      name="drag_indicator"
+                  <template #icon-left>
+                    <span @click.stop>
+                      <OCheckbox
+                        :model-value="visibleColumns.has(field)"
+                        @update:model-value="toggleColumnVisibility(field)"
+                        :disabled="field === '_timestamp'"
+                      />
+                    </span>
+                  </template>
+                  <span class="tw:flex-1">{{ field }}</span>
+                  <template #icon-right>
+                    <OIcon
+                      name="drag-indicator"
                       size="xs"
                       class="drag-handle tw:cursor-move"
                     />
-                  </q-item-section>
-                </q-item>
+                  </template>
+                </ODropdownItem>
               </div>
             </ODropdown>
           </div>
@@ -132,15 +137,9 @@ class="tw:mr-1" />
 
       <!-- Show skeleton while loading -->
       <div v-else class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap tw:p-3">
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
-        <q-skeleton type="rect"
-width="200px"
-height="32px" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
+        <OSkeleton class="tw:w-[200px] tw:h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -155,11 +154,9 @@ height="32px" />
               })
             }}
           </template>
-          <q-skeleton
+          <OSkeleton
             v-else-if="isLoading"
-            type="text"
-            width="200px"
-            height="14px"
+            class="tw:w-[200px] tw:h-[14px]"
           />
         </div>
       </div> -->
@@ -167,6 +164,19 @@ height="32px" />
 
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
+      <!-- Wrap Content Button -->
+      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-2">
+        <OButton
+          variant="ghost"
+          size="icon"
+          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+          data-test="correlated-logs-table-wrap-content-btn"
+          @click="wrapTableCells = !wrapTableCells"
+        >
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
+      </div>
       <!-- Logs Table or Skeleton -->
       <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
         <!-- Actual Table (when data is loaded) -->
@@ -211,7 +221,7 @@ height="32px" />
           <div
             class="tw:flex tw:items-center tw:justify-center tw:gap-3"
           >
-            <q-spinner color="primary" size="md" />
+            <OSpinner size="sm" />
             <span class="tw:text-sm tw:opacity-70">
               {{ t("correlation.logs.loading") }}
             </span>
@@ -250,22 +260,30 @@ height="32px" />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { formatDate } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import type { ColumnDef } from "@tanstack/vue-table";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -284,7 +302,6 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const $q = useQuasar();
 const { searchObj } = searchState();
 const { loadKeyFields } = useServiceCorrelation();
 
@@ -322,6 +339,8 @@ const jsonPreviewStreamName = computed(() => {
   return '';
 });
 
+const TIMESTAMP_COL_WIDTH = 225;
+
 // Component state
 const wrapTableCells = ref(false);
 const expandedRows = ref<any[]>([]);
@@ -330,8 +349,19 @@ const visibleColumns = ref<Set<string>>(new Set());
 const columnOrder = ref<string[]>([]);
 const defaultLogFields = ref<string[]>([]);
 const draggedIndex = ref<number | null>(null);
+const containerWidth = ref(window.innerWidth);
+
 let isSaving = false; // Prevent recursive saves
 let isUpdatingFromTable = false; // Prevent recursive updates from table
+
+// Simple canvas context for width calculation
+let canvasContext: CanvasRenderingContext2D | null = null;
+
+// ResizeObserver for container-width tracking; isResizeObserverNeeded is set to false in
+// onBeforeUnmount so the async onMounted continuation skips observer setup if the component
+// has already been torn down.
+let resizeObserver: ResizeObserver | null = null;
+let isResizeObserverNeeded = true;
 
 // Storage keys for persisting state
 const STORAGE_KEY_COLUMNS = "correlatedLogs_visibleColumns";
@@ -369,6 +399,7 @@ const saveColumnState = () => {
   }
 };
 
+
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
@@ -378,6 +409,26 @@ onMounted(async () => {
    defaultLogFields.value = _defaultLogFields;
   } catch {
     defaultLogFields.value = [];
+  }
+
+  // Initialize canvas for width calculation
+  try {
+    const canvas = document.createElement("canvas");
+    canvasContext = canvas.getContext("2d");
+  } catch (error) {
+    console.warn("Canvas not available, using default widths");
+  }
+
+  // Guard: component may have unmounted while awaiting loadKeyFields above.
+  if (!isResizeObserverNeeded) return;
+
+  // Track table container width for dynamic column cap
+  const el = document.querySelector(".logs-table-container");
+  if (el) {
+    resizeObserver = new ResizeObserver(([entry]) => {
+      containerWidth.value = entry.contentRect.width;
+    });
+    resizeObserver.observe(el);
   }
 });
 
@@ -655,18 +706,108 @@ watch(defaultLogFields, (keyFields) => {
   initializeVisibleColumns(availableFields.value);
 });
 
-// Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
-  // Filter out hidden columns, respecting custom order
-  const visibleFields = orderedFields.value.filter((field) =>
+// Filter out tw:hidden columns, respecting custom order
+const visibleFields = computed(() => {
+  return orderedFields.value.filter((field) =>
     visibleColumns.value.has(field),
   );
+});
+
+// Compute per-column max cap based on container width and number of visible columns.
+// totalCols includes timestamp (+1). With only 2 columns (timestamp + 1 other) the
+// other column can use all remaining width; with 3+ we reserve 20px for the scrollbar.
+const columnMaxCap = computed(() => {
+  const totalCols = visibleFields.value.length + 1;
+  return totalCols <= 2
+    ? Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH)
+    : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
+});
+
+const DEFAULT_LONG_TEXT_FIELDS = [];
+
+// Measures a field's content width and returns the capped size plus whether the
+// raw measurement exceeded maxCap (used to build the dynamic long-text list).
+const getColumnWidth = (
+  field: string,
+  maxCap: number,
+): { width: number; exceededCap: boolean } => {
+  if (field === "_timestamp" || field === "source") {
+    return { width: 150, exceededCap: false };
+  }
+
+  if (!canvasContext) {
+    return { width: 150, exceededCap: false };
+  }
+
+  try {
+    // Font of table header
+    canvasContext.font = "bold 14px sans-serif";
+    let max = canvasContext.measureText(field).width + 16;
+
+    // Font of the table content
+    canvasContext.font = "12px monospace";
+
+    const hits = searchResults.value || [];
+    for (let i = 0; i < Math.min(5, hits.length); i++) {
+      const cellValue = hits[i]?.[field];
+      if (cellValue !== undefined && cellValue !== null && cellValue !== "") {
+        const width = canvasContext.measureText(String(cellValue)).width;
+        if (width > max) max = width;
+      }
+    }
+
+    max += 24; // padding
+    const exceededCap = max > maxCap;
+    return { width: exceededCap ? maxCap : Math.max(150, max), exceededCap };
+  } catch {
+    return { width: 150, exceededCap: false };
+  }
+};
+
+// Single computed that measures all visible fields in one canvas pass.
+// Also builds the dynamic long-text list: any field whose raw measured width
+// exceeds maxCap is added to the set (on top of the static defaults).
+const memoizedData = computed(() => {
+  const widthMap: Record<string, number> = {};
+  const longText = new Set<string>(DEFAULT_LONG_TEXT_FIELDS);
+
+  if (!searchResults.value || searchResults.value.length === 0) {
+    return { widthMap, longTextFields: Array.from(longText) };
+  }
+
+  const maxCap = columnMaxCap.value;
+  visibleFields.value.forEach((field) => {
+    const { width, exceededCap } = getColumnWidth(field, maxCap);
+    widthMap[field] = width;
+    if (exceededCap) longText.add(field);
+  });
+
+  return { widthMap, longTextFields: Array.from(longText) };
+});
+
+const memoizedColumnWidths = computed(() => memoizedData.value.widthMap);
+
+// Dynamic long-text fields: static defaults + any field whose content exceeded maxCap
+const longTextFields = computed(() => memoizedData.value.longTextFields);
+
+// Simple helper that uses memoized widths
+const getColumnWidthHelper = (field: string): number => {
+  return (
+    memoizedColumnWidths.value[field] ||
+    (longTextFields.value.includes(field) ? Math.min(400, columnMaxCap.value) : 150)
+  );
+};
+
+// Generate table columns dynamically from visible fields in custom order
+const tableColumns = computed<ColumnDef<any>[]>(() => {
+  // Use the computed visibleFields
+  const fields = visibleFields.value;
 
   // Check if only timestamp is visible - if so, add source column
   const hasOnlyTimestamp =
-    visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+    fields.length === 1 && fields[0] === "_timestamp";
 
-  const columns = visibleFields.map((field) => {
+  const columns = fields.map((field) => {
     // Special handling for timestamp column
     if (field === "_timestamp") {
       return {
@@ -693,7 +834,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
           }
           return value !== null && value !== undefined ? String(value) : "";
         },
-        size: 260,
+        size: TIMESTAMP_COL_WIDTH,
         meta: {
           closable: false,
           showWrap: false,
@@ -715,8 +856,8 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         return byString(row, field);
       },
       cell: (info: any) => info.getValue(),
-      size: field === "message" ? 400 : 150,
-      maxSize: window.innerWidth,
+      size: getColumnWidthHelper(field),
+      maxSize: containerWidth.value,
       meta: {
         closable: true,
         showWrap: true,
@@ -743,15 +884,31 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     } as any);
   }
 
+  // Last-column fill: if total column widths leave unused horizontal space and the
+  // last column is a long-text field, expand it to fill the remaining width.
+  const totalWidth = columns.reduce((sum, col: any) => sum + (col.size ?? 150), 0);
+  const lastCol = columns[columns.length - 1] as any;
+  if (
+    totalWidth < containerWidth.value &&
+    lastCol &&
+    longTextFields.value.includes(lastCol.name as string)
+  ) {
+    lastCol.size = Math.min(columnMaxCap.value, Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)));
+  }
+
+  // Always leave 12px clearance on the last resizable column so the resize
+  // handle stays visible and grabbable.
+  const lastResizableCol = [...columns].reverse().find((col: any) => col.enableResizing) as any;
+  if (lastResizableCol) {
+    lastResizableCol.size = Math.max(150, (lastResizableCol.size ?? 150) - 12);
+  }
+
   return columns;
 });
 
 // Determine if we're showing default columns (only timestamp + source)
 const showingDefaultColumns = computed(() => {
-  const visibleFields = availableFields.value.filter((field) =>
-    visibleColumns.value.has(field),
-  );
-  return visibleFields.length === 1 && visibleFields[0] === "_timestamp";
+  return visibleFields.value.length === 1 && visibleFields.value[0] === "_timestamp";
 });
 
 /**
@@ -760,7 +917,7 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return date.formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
+  return formatDate(ms, "YYYY-MM-DD HH:mm:ss.SSS");
 };
 
 /**
@@ -817,13 +974,10 @@ const handleRowClick = (row: any) => {
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData).then(() =>
-    $q.notify({
-      type: "positive",
-      message: "Content Copied Successfully!",
-      timeout: 1000,
-    })
-  );
+  copyToClipboard(copyData, {
+    successMessage: "Content Copied Successfully!",
+    timeout: 1000,
+  });
 };
 
 const handleSendToAiChat = (value: any) => {
@@ -852,15 +1006,15 @@ const handleAddFieldToTable = (field: string) => {
     visibleColumns.value = new Set(visibleColumns.value);
 
     // Show success notification
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: `Column "${field}" added to table`,
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
-    $q.notify({
-      type: "info",
+    toast({
+      variant: "info",
       message: `Column "${field}" is already visible`,
       timeout: 1500,
     });
@@ -1020,6 +1174,11 @@ onMounted(() => {
   fetchCorrelatedLogs();
 });
 
+onBeforeUnmount(() => {
+  isResizeObserverNeeded = false;
+  resizeObserver?.disconnect();
+});
+
 // Watch for prop changes
 watch(
   () => props.timeRange,
@@ -1028,6 +1187,7 @@ watch(
   },
   { deep: true },
 );
+
 </script>
 
 <style lang="scss" scoped>
@@ -1070,11 +1230,6 @@ watch(
   }
 }
 
-// Skeleton loading styles
-:deep(.q-skeleton) {
-  opacity: 0.7;
-}
-
 // Table skeleton container
 [data-test="table-skeleton"] {
   animation: fadeIn 0.3s ease-in;
@@ -1093,6 +1248,7 @@ watch(
 .tw\:overflow-auto {
   scroll-behavior: smooth;
 }
+
 
 // Column visibility list styling
 .column-visibility-list {

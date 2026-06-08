@@ -15,10 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, config } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
 
-installQuasar();
 
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
 const ChartRendererStub = {
@@ -928,7 +926,7 @@ describe("FlameGraphView", () => {
       data.forEach((d: any) => expect(d.value[2]).toBe(0.1));
     });
 
-    it("should handle undefined selectedSpanId", () => {
+    it("should treat undefined selectedSpanId as null and return null selectedSpan", () => {
       wrapper = mount(FlameGraphView, {
         props: {
           spans: mockSpans,
@@ -937,7 +935,9 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(wrapper.vm).toBeTruthy();
+      // withDefaults maps undefined → null; selectedSpan must also be null
+      expect(wrapper.props("selectedSpanId")).toBeNull();
+      expect(wrapper.vm.selectedSpan).toBeNull();
     });
   });
 
@@ -1250,18 +1250,17 @@ describe("FlameGraphView", () => {
       wrapper = mount(FlameGraphView, {
         props: { spans: mockSpans, traceDuration: 100, selectedSpanId: null },
       });
-      // Manually set cursorVisible to true first
-      wrapper.vm.cursorVisible = true;
+      // Put cursor in visible state first via the public mousemove handler
+      wrapper.vm.handleChartMouseMove({
+        clientX: 60,
+        currentTarget: { getBoundingClientRect: () => ({ left: 10, width: 500 }) },
+      });
+      expect(wrapper.vm.cursorVisible).toBe(true);
       // Trigger mouseleave on the chart wrapper div
       const chartWrapper = wrapper.find('[data-test="flame-graph-view-chart-wrapper"]');
-      if (chartWrapper.exists()) {
-        await chartWrapper.trigger("mouseleave");
-        expect(wrapper.vm.cursorVisible).toBe(false);
-      } else {
-        // Directly test the reactive property
-        wrapper.vm.cursorVisible = false;
-        expect(wrapper.vm.cursorVisible).toBe(false);
-      }
+      expect(chartWrapper.exists()).toBe(true);
+      await chartWrapper.trigger("mouseleave");
+      expect(wrapper.vm.cursorVisible).toBe(false);
     });
 
     it("should not update cursor when hasData is false", () => {
@@ -1301,6 +1300,8 @@ describe("FlameGraphView", () => {
       wrapper = mount(FlameGraphView, {
         props: { spans: mockSpans, traceDuration: 100, selectedSpanId: null },
       });
+      // clientX=60, rect.left=10 → offsetX=50; gridWidth=500-10-10=480
+      // fraction = (50-10)/480 ≈ 0.0833; time = 0.0833 * 100 ≈ 8.33ms → "8.33ms" via mock
       const mockEvent = {
         clientX: 60,
         currentTarget: {
@@ -1308,8 +1309,8 @@ describe("FlameGraphView", () => {
         },
       } as unknown as MouseEvent;
       wrapper.vm.handleChartMouseMove(mockEvent);
-      // cursorTimeLabel should be a non-empty string (set by formatDuration)
-      expect(typeof wrapper.vm.cursorTimeLabel).toBe("string");
+      // The mocked formatDuration returns "<value>ms" for values in [1, 1000)
+      expect(wrapper.vm.cursorTimeLabel).toMatch(/^\d+\.\d+ms$/);
     });
   });
 });

@@ -80,7 +80,7 @@ pub async fn post_user(
     }
     let cfg = get_config();
     usr_req.email = usr_req.email.to_lowercase();
-    if usr_req.role.custom_role.is_some() {
+    if let Some(_custom_roles) = &usr_req.role.custom_role {
         #[cfg(not(feature = "enterprise"))]
         return Ok(MetaHttpResponse::bad_request("Custom roles not allowed"));
         #[cfg(feature = "enterprise")]
@@ -89,7 +89,7 @@ pub async fn post_user(
         } else {
             match o2_openfga::authorizer::roles::get_all_roles(org_id, None).await {
                 Ok(res) => {
-                    for custom_role in usr_req.role.custom_role.as_ref().unwrap() {
+                    for custom_role in _custom_roles {
                         if !res.contains(custom_role) {
                             return Ok(MetaHttpResponse::bad_request("Custom role not found"));
                         }
@@ -200,9 +200,8 @@ pub async fn post_user(
                     if usr_req.role.base_role.eq(&UserRole::ServiceAccount) {
                         get_service_account_creation_tuple(&org_id, &usr_req.email, &mut tuples);
                     }
-                    if usr_req.role.custom_role.is_some() {
-                        let custom_role = usr_req.role.custom_role.unwrap();
-                        custom_role.iter().for_each(|crole| {
+                    if let Some(custom_roles) = usr_req.role.custom_role {
+                        custom_roles.iter().for_each(|crole| {
                             tuples.push(get_user_crole_tuple(&org_id, crole, &usr_req.email));
                         });
                     }
@@ -264,6 +263,10 @@ pub async fn update_user(
     mut user: UpdateUser,
 ) -> Result<Response, Error> {
     let mut allow_password_update = false;
+    #[cfg(feature = "cloud")]
+    let is_cloud = true;
+    #[cfg(not(feature = "cloud"))]
+    let is_cloud = false;
     if !is_valid_email(email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
@@ -316,6 +319,7 @@ pub async fn update_user(
         let mut custom_roles_need_change = false;
         match existing_user {
             Some(local_user) => {
+                #[cfg(not(feature = "cloud"))]
                 if local_user.is_external {
                     return Ok(MetaHttpResponse::bad_request(
                         "Updates not allowed with external users, please update with source system",
@@ -356,17 +360,15 @@ pub async fn update_user(
                 }
                 new_user = local_user.clone();
                 if update_mode.is_self_update()
-                    && user.old_password.is_some()
-                    && user.new_password.is_some()
+                    && let Some(old_pass) = &user.old_password
+                    && let Some(new_pass) = &user.new_password
                 {
-                    if local_user.password.eq(&get_hash(
-                        &user.clone().old_password.unwrap(),
-                        &local_user.salt,
-                    )) {
-                        let new_pass = user.new_password.unwrap();
-
-                        new_user.password = get_hash(&new_pass, &local_user.salt);
-                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+                    if local_user
+                        .password
+                        .eq(&get_hash(old_pass, &local_user.salt))
+                    {
+                        new_user.password = get_hash(new_pass, &local_user.salt);
+                        new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
                         log::info!("Password self updated for user: {email}");
                         is_updated = true;
                     } else {
@@ -380,11 +382,9 @@ pub async fn update_user(
                     message = "Please provide existing password";
                 } else if !update_mode.is_self_update()
                     && allow_password_update
-                    && user.new_password.is_some()
                     && !local_user.is_external
+                    && let Some(new_pass) = user.new_password
                 {
-                    let new_pass = user.new_password.unwrap();
-
                     new_user.password = get_hash(&new_pass, &local_user.salt);
                     new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
                     log::info!("Password by root updated for user: {email}");
@@ -393,16 +393,20 @@ pub async fn update_user(
                 } else if user.new_password.is_some() {
                     message = "You are not authorised to change the password";
                 }
-                if user.first_name.is_some() && !local_user.is_external {
-                    new_user.first_name = user.first_name.unwrap();
-                    is_updated = true;
-                }
-                if user.last_name.is_some() && !local_user.is_external {
-                    new_user.last_name = user.last_name.unwrap();
-                    is_updated = true;
-                }
-                if user.role.is_some()
+                if let Some(first_name) = user.first_name
                     && !local_user.is_external
+                {
+                    new_user.first_name = first_name;
+                    is_updated = true;
+                }
+                if let Some(last_name) = user.last_name
+                    && !local_user.is_external
+                {
+                    new_user.last_name = last_name;
+                    is_updated = true;
+                }
+                if let Some(role) = user.role
+                    && (!local_user.is_external || is_cloud)
                     && (!update_mode.is_self_update()
                         || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
@@ -412,7 +416,7 @@ pub async fn update_user(
                 // if the User Role is Root, we do not change the Role
                 // Admins Role can still be mutable.
                 {
-                    let new_org_role = UserOrgRole::from(&user.role.unwrap());
+                    let new_org_role = UserOrgRole::from(&role);
                     old_role = Some(new_user.role);
                     new_user.role = new_org_role.base_role;
                     new_role = Some(new_user.role.clone());
@@ -433,8 +437,10 @@ pub async fn update_user(
                 // Token replacement is a privileged operation — only allow if the
                 // initiator is updating their own token OR has password-update rights
                 // (i.e. Root or Admin updating a non-root user).
-                if user.token.is_some() && (update_mode.is_self_update() || allow_password_update) {
-                    new_user.token = user.token.unwrap();
+                if let Some(token) = user.token
+                    && (update_mode.is_self_update() || allow_password_update)
+                {
+                    new_user.token = token;
                     is_org_updated = true;
                 }
 
@@ -686,9 +692,8 @@ pub async fn add_user_to_org(
                 if get_openfga_config().enabled {
                     let mut tuples = vec![];
                     get_add_user_to_org_tuples(org_id, email, &base_role.to_string(), &mut tuples);
-                    if role.custom_role.is_some() {
-                        let custom_role = role.custom_role.unwrap();
-                        custom_role.iter().for_each(|crole| {
+                    if let Some(custom_roles) = role.custom_role {
+                        custom_roles.iter().for_each(|crole| {
                             tuples.push(get_user_crole_tuple(org_id, crole, email));
                         });
                     }
@@ -917,7 +922,7 @@ pub async fn list_users(
         }
     }
 
-    user_list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    user_list.sort_by_key(|k| std::cmp::Reverse(k.created_at));
     Ok(MetaHttpResponse::json(UserList { data: user_list }))
 }
 
@@ -1010,7 +1015,7 @@ pub async fn remove_user_from_org(
                                 user_role.to_string()
                             };
                             if get_openfga_config().enabled {
-                                log::debug!("delete user single org, role: {}", &user_fga_role);
+                                log::debug!("delete user single org, role: {user_fga_role}");
                                 delete_user_from_org(org_id, email_id, &user_fga_role).await;
                                 if user_role.eq(&UserRole::ServiceAccount) {
                                     delete_service_account_from_org(org_id, email_id).await;

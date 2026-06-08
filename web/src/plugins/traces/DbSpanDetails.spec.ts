@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
@@ -22,7 +21,6 @@ import DbSpanDetails from "./DbSpanDetails.vue";
  
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 
-installQuasar();
 
 function mountDbSpanDetails(span: Record<string, unknown> = {}) {
   return mount(DbSpanDetails, { props: { span } });
@@ -301,29 +299,33 @@ describe("DbSpanDetails", () => {
       ).toBe(true);
     });
 
-    it("should show rows returned value", () => {
+    it("should show rows returned value", async () => {
       wrapper = mountDbSpanDetails({ db_response_returned_rows: 42 });
+      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
       expect(
         wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
       ).toContain("42");
     });
 
-    it("should show batch size value", () => {
+    it("should show batch size value", async () => {
       wrapper = mountDbSpanDetails({ db_operation_batch_size: 5 });
+      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
       expect(
         wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
       ).toContain("5");
     });
 
-    it("should show query summary value", () => {
+    it("should show query summary value", async () => {
       wrapper = mountDbSpanDetails({ db_query_summary: "SELECT users" });
+      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
       expect(
         wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
       ).toContain("SELECT users");
     });
 
-    it("should show response status code value", () => {
+    it("should show response status code value", async () => {
       wrapper = mountDbSpanDetails({ db_response_status_code: "08P01" });
+      await wrapper.find('[data-test="traces-db-span-details-performance"] button').trigger("click");
       expect(
         wrapper.find('[data-test="traces-db-span-details-performance"]').text(),
       ).toContain("08P01");

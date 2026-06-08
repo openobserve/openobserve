@@ -13,24 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// localStorage key for the LLM UI toggle. Must be declared *above* the
-// `config` object — `readLLMUIFlag()` is called during config
-// initialization, and a `const` declared below would be in the TDZ at
-// that moment. The try/catch inside the helper would then silently
-// swallow the ReferenceError and always return "false", which is why
-// the feature wouldn't enable even after `enableLLMUI()`.
-const LLM_UI_LS_KEY = "openobserve.llm_ui_visible";
-
+// LLM UI visibility is controlled at build time via the
+// `VITE_OPENOBSERVE_LLM_UI` env var. Visible by default; set the env
+// var to "false" to hide the LLM Observability UI.
 function readLLMUIFlag(): "true" | "false" {
-  if (typeof window === "undefined") return "false";
-  try {
-    return window.localStorage.getItem(LLM_UI_LS_KEY) === "true"
-      ? "true"
-      : "false";
-  } catch {
-    // Private mode / disabled storage — fall back to hidden.
-    return "false";
-  }
+  return String(import.meta.env.VITE_OPENOBSERVE_LLM_UI) === "false"
+    ? "false"
+    : "true";
 }
 
 const config = {
@@ -62,46 +51,10 @@ const config = {
   // Master switch for the LLM Observability UI (LLM Insights + Sessions
   // tabs on the traces page, Thread tab inside trace details).
   //
-  // Hidden by default. Users enable it at runtime from the browser
-  // console: `enableLLMUI()` → reloads with feature on. `disableLLMUI()`
-  // turns it back off. The choice is persisted in localStorage so it
-  // survives reloads and tab switches without rebuilds.
-  //
-  // Consumers continue to use the existing string check
-  // `config.showLLMUI !== 'false'`, so a "true" value flips the feature
-  // on. Anything else (including unset) keeps it hidden.
+  // Controlled at build time by `VITE_OPENOBSERVE_LLM_UI`. Visible by
+  // default; set the env var to "false" to hide. Consumers use the
+  // existing string check `config.showLLMUI !== 'false'`.
   showLLMUI: readLLMUIFlag(),
 };
-
-// Install the console helpers exactly once. Keeping them on `window`
-// (not behind any namespace) so they're trivially discoverable: a user
-// in DevTools can just type `enableLLMUI()` to see the feature.
-if (typeof window !== "undefined" && !(window as any).__o2LLMUIInstalled) {
-  (window as any).__o2LLMUIInstalled = true;
-  (window as any).enableLLMUI = () => {
-    try {
-      window.localStorage.setItem(LLM_UI_LS_KEY, "true");
-    } catch {
-      // No-op if storage write fails; user will see the same message.
-    }
-    // eslint-disable-next-line no-console
-    console.info(
-      "[openobserve] LLM Observability UI enabled — reloading the page.",
-    );
-    window.location.reload();
-  };
-  (window as any).disableLLMUI = () => {
-    try {
-      window.localStorage.setItem(LLM_UI_LS_KEY, "false");
-    } catch {
-      // No-op
-    }
-    // eslint-disable-next-line no-console
-    console.info(
-      "[openobserve] LLM Observability UI disabled — reloading the page.",
-    );
-    window.location.reload();
-  };
-}
 
 export default config;

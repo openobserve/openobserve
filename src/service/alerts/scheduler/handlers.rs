@@ -352,7 +352,7 @@ async fn handle_alert_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_alert_triggers: processing trigger: {}",
-        &trigger.module_key
+        trigger.module_key
     );
     let now = Utc::now().timestamp_micros();
     let triggered_at = trigger.start_time.unwrap_or_default();
@@ -571,8 +571,8 @@ async fn handle_alert_triggers(
     if is_realtime && is_silenced {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Realtime alert need wakeup, {}/{}",
-            &trigger.org,
-            &trigger.module_key
+            trigger.org,
+            trigger.module_key
         );
         // wakeup the trigger
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
@@ -604,8 +604,8 @@ async fn handle_alert_triggers(
         // next_run_at to the next expected trigger time
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] This alert trigger: {}/{} has passed maximum retries, skipping to next run",
-            &new_trigger.org,
-            &new_trigger.module_key
+            new_trigger.org,
+            new_trigger.module_key
         );
 
         new_trigger.next_run_at =
@@ -685,7 +685,7 @@ async fn handle_alert_triggers(
         }
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} skipped due to delay: {}",
-            &trigger.module_key,
+            trigger.module_key,
             delay
         );
         (now - final_end_time, true)
@@ -744,7 +744,7 @@ async fn handle_alert_triggers(
         let err_string = err.to_string();
         log::error!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} evaluation failed: {}",
-            &new_trigger.module_key,
+            new_trigger.module_key,
             err_string
         );
         if err_string.starts_with("Partial") {
@@ -761,8 +761,8 @@ async fn handle_alert_triggers(
                 if let Err(e) = set_without_updating_trigger(&trigger.org, alert_curr).await {
                     log::error!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update alert: {}/{} after trigger: {e}",
-                        &trigger.org,
-                        &trigger.module_key
+                        trigger.org,
+                        trigger.module_key
                     );
                 }
             }
@@ -804,14 +804,14 @@ async fn handle_alert_triggers(
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] result of alert {} evaluation matched condition: {}",
-        &new_trigger.module_key,
+        new_trigger.module_key,
         trigger_results.data.is_some(),
     );
     if trigger_results.data.is_some() {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions satisfied, org: {}, module_key: {}",
-            &new_trigger.org,
-            &new_trigger.module_key
+            new_trigger.org,
+            new_trigger.module_key
         );
     }
     if let Some(tolerance) = alert.trigger_condition.tolerance_in_secs
@@ -903,10 +903,9 @@ async fn handle_alert_triggers(
                 };
 
                 log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {}, rows: {}",
-                    &new_trigger.org,
-                    &alert.name,
-                    fingerprint,
+                    "[SCHEDULER trace_id {scheduler_trace_id}] Adding alert to batch, org: {}, alert: {}, fingerprint: {fingerprint}, rows: {}",
+                    new_trigger.org,
+                    alert.name,
                     data.len()
                 );
 
@@ -922,8 +921,7 @@ async fn handle_alert_triggers(
 
                 if batch_ready {
                     log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} reached max size, sending immediately",
-                        fingerprint
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
                     if let Some(batch) =
                         crate::service::alerts::grouping::get_ready_batch(&fingerprint)
@@ -978,8 +976,8 @@ async fn handle_alert_triggers(
                     if deduplicated_data.is_empty() && deduplicated {
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] All alert results deduplicated for org: {}, module_key: {}",
-                            &new_trigger.org,
-                            &new_trigger.module_key
+                            new_trigger.org,
+                            new_trigger.module_key
                         );
 
                         // Mark as suppressed for history tracking
@@ -1002,10 +1000,9 @@ async fn handle_alert_triggers(
                 }
                 Err(e) => {
                     log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {}",
-                        &new_trigger.org,
-                        &new_trigger.module_key,
-                        e
+                        "[SCHEDULER trace_id {scheduler_trace_id}] Error applying deduplication for org: {}, module_key: {}: {e}",
+                        new_trigger.org,
+                        new_trigger.module_key,
                     );
                     // On error, continue with original data to avoid missing alerts
                     data
@@ -1065,8 +1062,8 @@ async fn handle_alert_triggers(
                 Ok(Some(outcome)) => {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
-                        &new_trigger.org,
-                        &alert.name,
+                        new_trigger.org,
+                        alert.name,
                         outcome.incident_id(),
                         outcome.service_name(),
                     );
@@ -1077,8 +1074,8 @@ async fn handle_alert_triggers(
                 Ok(None) => {
                     log::debug!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] No incident correlation for alert {}/{}",
-                        &new_trigger.org,
-                        &alert.name,
+                        new_trigger.org,
+                        alert.name,
                     );
                     false
                 }
@@ -1150,15 +1147,15 @@ async fn handle_alert_triggers(
                     if !err_msg.is_empty() {
                         log::error!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Some notifications for alert {}/{} could not be sent: {err_msg}",
-                            &new_trigger.org,
-                            &new_trigger.module_key
+                            new_trigger.org,
+                            new_trigger.module_key
                         );
                         trigger_data_stream.error = Some(err_msg);
                     } else {
                         log::info!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Alert notification sent, org: {}, module_key: {}",
-                            &new_trigger.org,
-                            &new_trigger.module_key
+                            new_trigger.org,
+                            new_trigger.module_key
                         );
                     }
                     trigger_data_stream.success_response = Some(success_msg);
@@ -1177,16 +1174,16 @@ async fn handle_alert_triggers(
                 Err(e) => {
                     log::error!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Error sending alert notification: org: {}, module_key: {}",
-                        &new_trigger.org,
-                        &new_trigger.module_key
+                        new_trigger.org,
+                        new_trigger.module_key
                     );
                     if trigger.retries + 1 >= max_retries {
                         // It has been tried the maximum time, just update the
                         // next_run_at to the next expected trigger time
                         log::debug!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] This alert trigger: {}/{} has reached maximum retries",
-                            &new_trigger.org,
-                            &new_trigger.module_key
+                            new_trigger.org,
+                            new_trigger.module_key
                         );
                         // Alert could not be sent for multiple times, in the next run
                         // if the same start time used for alert evaluation, the extended
@@ -1227,8 +1224,8 @@ async fn handle_alert_triggers(
     } else {
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
-            &new_trigger.org,
-            &new_trigger.module_key
+            new_trigger.org,
+            new_trigger.module_key
         );
         // Condition did not match, store the last used end_time in the triggers
         // In the next run, the alert will be checked from the last end_time
@@ -1246,7 +1243,7 @@ async fn handle_alert_triggers(
 
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for alert: {}",
-        &trigger_data_stream.key
+        trigger_data_stream.key
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
@@ -1348,8 +1345,8 @@ async fn handle_report_triggers(
     let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Inside handle_report_trigger,org: {}, module_key: {}",
-        &trigger.org,
-        &trigger.module_key
+        trigger.org,
+        trigger.module_key
     );
     let org_id = &trigger.org;
     // For report, trigger.module_key is the report name
@@ -1576,7 +1573,7 @@ async fn handle_report_triggers(
         // next_run_at to the next expected trigger time
         log::info!(
             "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has passed maximum retries, skipping to next run",
-            org_id = &new_trigger.org,
+            org_id = new_trigger.org,
             report_name = report_name
         );
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
@@ -1661,7 +1658,7 @@ async fn handle_report_triggers(
     }
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] publish_triggers_usage for report: {}",
-        &trigger_data_stream.key
+        trigger_data_stream.key
     );
     publish_triggers_usage(trigger_data_stream);
 
@@ -2297,8 +2294,8 @@ async fn handle_derived_stream_triggers(
             } else {
                 log::info!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream condition does not match any data for the period, org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
+                    new_trigger.org,
+                    new_trigger.module_key
                 );
                 trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
                 trigger_data_stream.query_took = trigger_results.query_took;
@@ -2366,8 +2363,8 @@ async fn handle_derived_stream_triggers(
         // Report a final pipeline error
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream trigger has reached maximum retries.",
-            &pipeline.org,
-            &pipeline.name
+            pipeline.org,
+            pipeline.name
         );
         let err_msg = format!(
             "[SCHEDULER trace_id {scheduler_trace_id}] DerivedStream has reached max retries of {max_retries}. Pipeline will be retried after the next scheduled run. Please fix reported errors in pipeline."
@@ -2390,8 +2387,8 @@ async fn handle_derived_stream_triggers(
     if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
-            &pipeline.org,
-            &pipeline.name,
+            pipeline.org,
+            pipeline.name,
             e
         );
     }
@@ -2437,7 +2434,7 @@ async fn handle_backfill_triggers(
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] Processing backfill trigger: {}",
-        &job_id
+        job_id
     );
 
     let now = Utc::now().timestamp_micros();
@@ -2450,7 +2447,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch backfill job config: {e}",
-                &job_id
+                job_id
             );
             // Delete the trigger if config is not found
             let _ = db::scheduler::delete(
@@ -2492,7 +2489,7 @@ async fn handle_backfill_triggers(
     if !config.enabled {
         log::debug!(
             "[SCHEDULER trace_id {trace_id}] [job_id: {}] Backfill job is disabled, marking as completed",
-            &job_id
+            job_id
         );
         // Mark trigger as Completed when disabled
         let _ = db::scheduler::update_trigger(
@@ -2513,7 +2510,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to parse backfill trigger data: {e}",
-                &job_id
+                job_id
             );
             let new_retries = trigger.retries + 1;
             if new_retries >= max_retries {
@@ -2571,7 +2568,7 @@ async fn handle_backfill_triggers(
         None => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Missing backfill job data in trigger",
-                &job_id
+                job_id
             );
             let new_retries = trigger.retries + 1;
             if new_retries >= max_retries {
@@ -2630,7 +2627,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to fetch pipeline {}: {e}",
-                &job_id,
+                job_id,
                 config.pipeline_id
             );
             if trigger.retries + 1 >= max_retries {
@@ -2706,7 +2703,7 @@ async fn handle_backfill_triggers(
         _ => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Pipeline {} is not scheduled",
-                &job_id,
+                job_id,
                 config.pipeline_id
             );
             // Delete the trigger as this is a configuration error
@@ -2746,7 +2743,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to get destination streams: {e}",
-                &job_id
+                job_id
             );
             let _ = db::scheduler::delete(
                 &trigger.org,
@@ -2790,7 +2787,7 @@ async fn handle_backfill_triggers(
                 // Initiate deletion for all destination streams
                 log::info!(
                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Starting deletion for {} destination stream(s), time range {}-{}",
-                    &job_id,
+                    job_id,
                     destination_streams.len(),
                     config.start_time,
                     config.end_time
@@ -2804,7 +2801,7 @@ async fn handle_backfill_triggers(
                 for (idx, stream) in destination_streams.iter().enumerate() {
                     log::debug!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
-                        &job_id,
+                        job_id,
                         stream.stream_type,
                         stream.stream_name,
                         idx + 1,
@@ -2823,7 +2820,7 @@ async fn handle_backfill_triggers(
                             deletion_job_ids.push(deletion_job_id.clone());
                             log::debug!(
                                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion job {} created for stream {}/{}",
-                                &job_id,
+                                job_id,
                                 deletion_job_id,
                                 stream.stream_type,
                                 stream.stream_name
@@ -2836,7 +2833,7 @@ async fn handle_backfill_triggers(
                             );
                             log::error!(
                                 "[BACKFILL trace_id {trace_id}] [job_id: {}] {}",
-                                &job_id,
+                                job_id,
                                 error_msg
                             );
                             failed = true;
@@ -2892,7 +2889,7 @@ async fn handle_backfill_triggers(
 
                 log::info!(
                     "[BACKFILL trace_id {trace_id}] [job_id: {}] {} deletion job(s) initiated, will check status in {}s",
-                    &job_id,
+                    job_id,
                     deletion_job_ids.len(),
                     delay
                 );
@@ -2912,7 +2909,7 @@ async fn handle_backfill_triggers(
                             Ok(status) => {
                                 log::debug!(
                                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion job {} status: {}",
-                                    &job_id,
+                                    job_id,
                                     deletion_job_id,
                                     status
                                 );
@@ -2921,7 +2918,7 @@ async fn handle_backfill_triggers(
                             Err(e) => {
                                 log::warn!(
                                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to check deletion job {} status: {}",
-                                    &job_id,
+                                    job_id,
                                     deletion_job_id,
                                     e
                                 );
@@ -2933,7 +2930,7 @@ async fn handle_backfill_triggers(
                     if all_completed {
                         log::info!(
                             "[BACKFILL trace_id {trace_id}] [job_id: {}] All {} deletion job(s) completed, starting backfill",
-                            &job_id,
+                            job_id,
                             backfill_job.deletion_job_ids.len()
                         );
                         backfill_job.deletion_status = DeletionStatus::Completed;
@@ -2958,7 +2955,7 @@ async fn handle_backfill_triggers(
 
                         log::debug!(
                             "[BACKFILL trace_id {trace_id}] [job_id: {}] Deletion in progress ({}/{} completed), checking again in {}s",
-                            &job_id,
+                            job_id,
                             completed_count,
                             backfill_job.deletion_job_ids.len(),
                             delay
@@ -2988,7 +2985,7 @@ async fn handle_backfill_triggers(
 
     log::debug!(
         "[BACKFILL trace_id {trace_id}] [job_id: {}] Processing chunk: {}-{}",
-        &job_id,
+        job_id,
         query_start_time,
         query_end_time
     );
@@ -3006,7 +3003,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to evaluate pipeline: {e}",
-                &job_id
+                job_id
             );
 
             let error_msg = e.to_string();
@@ -3021,7 +3018,7 @@ async fn handle_backfill_triggers(
                 // Max retries reached, report error and reset retries for next scheduled run
                 log::warn!(
                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries.",
-                    &job_id,
+                    job_id,
                     config.pipeline_id
                 );
 
@@ -3096,7 +3093,7 @@ async fn handle_backfill_triggers(
         Err(e) => {
             log::error!(
                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to create executable pipeline: {e}",
-                &job_id
+                job_id
             );
 
             let error_msg = e.to_string();
@@ -3111,7 +3108,7 @@ async fn handle_backfill_triggers(
                 // Max retries reached, report error and reset retries for next scheduled run
                 log::warn!(
                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on pipeline creation.",
-                    &job_id,
+                    job_id,
                     config.pipeline_id
                 );
 
@@ -3196,7 +3193,7 @@ async fn handle_backfill_triggers(
             Err(e) => {
                 log::error!(
                     "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to process batch: {e}",
-                    &job_id
+                    job_id
                 );
 
                 let error_msg = e.to_string();
@@ -3214,7 +3211,7 @@ async fn handle_backfill_triggers(
                     // Max retries reached, report error and reset retries for next scheduled run
                     log::warn!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on batch processing.",
-                        &job_id,
+                        job_id,
                         config.pipeline_id
                     );
 
@@ -3336,14 +3333,14 @@ async fn handle_backfill_triggers(
                         Ok(resp) if resp.status_code == 200 => {
                             log::info!(
                                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill data ingested to destination {org_id}/{stream_name}/{stream_type}, records: {records_len}",
-                                &job_id
+                                job_id
                             );
                         }
                         error => {
                             let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
                             log::error!(
                                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Failed to ingest backfill data to destination {org_id}/{stream_name}/{stream_type}: {err}",
-                                &job_id
+                                job_id
                             );
                             ingestion_error = Some(format!(
                                 "Failed to ingest to {org_id}/{stream_name}/{stream_type}: {err}"
@@ -3369,7 +3366,7 @@ async fn handle_backfill_triggers(
             // Max retries reached, report error and reset retries for next scheduled run
             log::warn!(
                 "[BACKFILL trace_id {trace_id}] [job_id: {}] Backfill job for pipeline {} has reached maximum retries on ingestion.",
-                &job_id,
+                job_id,
                 config.pipeline_id
             );
 
@@ -3448,7 +3445,7 @@ async fn handle_backfill_triggers(
 
         log::info!(
             "[BACKFILL trace_id {scheduler_trace_id}] [job_id: {}] Backfill job completed for pipeline {}",
-            &job_id,
+            job_id,
             config.pipeline_id
         );
 
@@ -3547,7 +3544,7 @@ async fn handle_backfill_triggers(
             * 100.0) as u8;
         log::debug!(
             "[BACKFILL trace_id {trace_id}] [job_id: {}] Progress: {}%, next chunk in {}s",
-            &job_id,
+            job_id,
             progress,
             delay
         );
@@ -4232,6 +4229,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![source_node, output_node],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
@@ -4267,6 +4265,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![func_node],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         let result = get_destination_stream_from_pipeline(&pipeline);
@@ -4287,6 +4286,7 @@ mod tests {
             source: PipelineSource::default(),
             nodes: vec![],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         let result = get_destination_stream_from_pipeline(&pipeline);

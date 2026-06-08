@@ -1,26 +1,17 @@
 <template>
-  <div class="row">
-    <q-select
-      v-model="fields.functionName"
-      label="Select Function"
-      :options="filteredFunctions"
-      data-test="dashboard-function-dropdown"
-      input-debounce="0"
-      behavior="menu"
-      use-input
-      borderless
-      dense
-      hide-selected
-      fill-input
-      @filter="filterFunctionsOptions"
-      option-label="label"
-      option-value="value"
-      emit-value
-      map-options
-      class="tw:w-72 o2-custom-select-dashboard"
-    >
-    </q-select>
-    <div class="tw:w-full tw:p-3 tw:flex tw:gap-2">
+  <div class="tw:flex tw:flex-col">
+    <div class="tw:w-60 tw:flex-none">
+      <OSelect
+        v-model="fields.functionName"
+        label="Select Function"
+        label-position="inside"
+        :options="filteredFunctions"
+        data-test="dashboard-function-dropdown"
+        class="tw:w-full"
+        @search="onFunctionSearch"
+      />
+    </div>
+    <div class="tw:w-full tw:mt-2">
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="tw:w-full">
         <div
@@ -30,11 +21,9 @@
         >
           <div
             class="tw:flex"
-            :style="{
-              marginLeft: isChild ? '-60px' : '0px',
-            }"
+            :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="tw:mr-2 tw:relative" style="min-height: 50px">
+            <div class="tw:mr-2 tw:relative tw:w-3" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="tw:absolute tw:top-0 tw:w-[1px] tw:bg-[#001495] tw:opacity-50"
@@ -43,25 +32,25 @@
                     argIndex === fields.args.length - 1
                       ? 'calc(100% - 32px)'
                       : '0',
-                  left: '0px',
+                  left: '6px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: -1px">
+              <div class="tw:absolute" style="top: 30px; left: 5px">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div>
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
               <div class="tw:flex tw:items-center tw:gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex">
+              <div class="tw:flex tw:items-start">
                 <!-- type selector -->
-                <q-select
+                <OSelect
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
@@ -70,25 +59,20 @@
                       argIndex,
                     )
                   "
-                  option-label="label"
-                  option-value="value"
-                  behavior="menu"
-                  map-options
-                  emit-value
-                  dense
-                  filled
-                  :display-value="''"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
+                  icon-key="icon"
+                  label-position="inside"
+                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-auto"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
-                  <template v-slot:prepend>
-                    <q-icon
+                  <template #icon-left>
+                    <OIcon
                       :name="getIconBasedOnArgType(fields.args[argIndex].type)"
-                      padding="sm"
+                      size="sm"
                     />
                   </template>
-                </q-select>
+                  <template #trigger><!-- icon-only --></template>
+                </OSelect>
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
                   class="tw:w-52"
@@ -101,47 +85,52 @@
                   />
                 </div>
 
-                <q-input
+                <div
                   v-if="fields.args[argIndex]?.type === 'string'"
-                  type="text"
-                  v-model="fields.args[argIndex].value"
-                  placeholder="Enter string"
-                  :required="isRequired(fields.functionName, argIndex)"
-                  class="tw:w-52"
-                  dense
-                  :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
-                />
+                  class="tw:w-52 tw:flex-none"
+                >
+                  <OInput
+                    type="text"
+                    v-model="fields.args[argIndex].value"
+                    placeholder="Enter string"
+                    class="tw:w-full"
+                    :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
+                  />
+                </div>
 
-                <q-input
+                <OInput
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
                   placeholder="Enter number"
-                  :required="isRequired(fields.functionName, argIndex)"
                   class="tw:w-52"
-                  dense
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
+                <!-- histogram interval for sql queries -->
+                <div
+                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
+                  class="tw:w-52 tw:flex-none"
+                >
+                  <HistogramIntervalDropDown
+                    :model-value="fields.args[argIndex].value"
+                    @update:modelValue="
+                      (newValue: any) => {
+                        fields.args[argIndex].value = newValue;
+                      }
+                    "
+                    class="tw:w-full"
+                    :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                  />
+                </div>
+
+                <!-- Nested function inline with type selector -->
                 <SelectFunction
                   v-if="fields.args[argIndex]?.type === 'function'"
                   v-model="fields.args[argIndex].value"
                   :allowAggregation="allowAggregation"
                   :isChild="true"
                   :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
-                />
-
-                <!-- histogram interval for sql queries -->
-                <HistogramIntervalDropDown
-                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-                  :model-value="fields.args[argIndex].value"
-                  @update:modelValue="
-                    (newValue: any) => {
-                      fields.args[argIndex].value = newValue.value;
-                    }
-                  "
-                  class="tw:w-52"
-                  :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
                 />
 
                 <!-- Remove argument button -->
@@ -151,8 +140,8 @@
                   size="icon"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </div>
             </div>
@@ -184,12 +173,9 @@ import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  symOutlinedFunction,
-  symOutlinedTitle,
-  symOutlined123,
-  symOutlinedList,
-} from "@quasar/extras/material-symbols-outlined";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default {
   name: "SelectFunction",
@@ -198,6 +184,9 @@ export default {
     StreamFieldSelect,
     SubTaskArrow,
     OButton,
+    OSelect,
+    OInput,
+    OIcon,
   },
   props: {
     modelValue: {
@@ -279,6 +268,22 @@ export default {
           }))
           .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
       });
+    };
+
+    const onFunctionSearch = (val: string) => {
+      let filteredFunctionsValidation = functionValidation;
+      if (props.allowAggregation === false) {
+        filteredFunctionsValidation = filteredFunctionsValidation.filter(
+          (v) => !v.isAggregation,
+        );
+      }
+      const searchVal = val?.toLowerCase() ?? "";
+      filteredFunctions.value = filteredFunctionsValidation
+        .map((v) => ({
+          label: v.functionLabel,
+          value: v.functionName,
+        }))
+        .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
     };
 
     // const availableFunctions = ref(["arrzip", "concat", "count", "sum"]);
@@ -418,7 +423,12 @@ export default {
       );
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
-      return argsValidation[adjustedIndex]?.type || [];
+      const types = argsValidation[adjustedIndex]?.type || [];
+      // Inject icon name for each option so dropdown items show icons
+      return types.map((t: any) => ({
+        ...t,
+        icon: getIconBasedOnArgType(t.value),
+      }));
     };
 
     // watcher on functionName
@@ -479,15 +489,15 @@ export default {
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
-          return symOutlinedList;
+          return "list";
         case "function":
-          return symOutlinedFunction;
+          return "function";
         case "string":
-          return symOutlinedTitle;
+          return "title";
         case "number":
-          return symOutlined123;
+          return "123";
         case "histogramInterval":
-          return "bar_chart";
+          return "bar-chart";
       }
     };
 
@@ -528,6 +538,7 @@ export default {
       getSupportedTypeBasedOnFunctionNameAndIndex,
       filteredFunctions,
       filterFunctionsOptions,
+      onFunctionSearch,
       initializeFunctions,
       onArgTypeChange,
       getAllSelectedStreams,
@@ -540,39 +551,18 @@ export default {
 
 <style lang="scss" scoped>
 .arg-type-select {
-  :deep(.q-field__control) {
-    background-color: transparent !important;
-    border: 1px solid var(--o2-border-color) !important;
-    border-radius: 4px !important;
-    align-items: center !important;
-  }
+  // Constrain to icon-only width, prevent OSelect's internal tw:w-full from expanding it
+  width: fit-content !important;
+  flex: none !important;
 
-  :deep(.q-field__control):before,
-  :deep(.q-field__control):after {
+  // Make the trigger compact - only show the icon + chevron (no label text)
+  :deep(span[class~="tw:flex-1"][class~="tw:truncate"]) {
     display: none !important;
   }
 
-  :deep(.q-field):before,
-  :deep(.q-field):after {
-    display: none !important;
-  }
-
-  :deep(.q-field__append) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__prepend) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__append .q-icon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
-  }
-
-  :deep(.q-field__prepend .q-icon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
+  :deep(button[type="button"]) {
+    min-width: 2rem;
+    padding-inline-end: 1.5rem !important;
   }
 }
 </style>

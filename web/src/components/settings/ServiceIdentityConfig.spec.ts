@@ -15,13 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import { Notify } from "quasar";
 import ServiceIdentityConfig from "./ServiceIdentityConfig.vue";
 
-installQuasar({ plugins: { Notify } });
 
 vi.mock("@/services/alerts", () => ({
   default: {
@@ -130,12 +127,9 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "q-spinner-hourglass": true,
-  "q-icon": { template: "<span />", props: ["name", "size", "color"] },
+  "OIcon": { template: "<span />", props: ["name", "size", "color"] },
   "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "loading", "disable"], emits: ["click"] },
   "q-expansion-item": { template: '<div class="expansion-item"><slot /><slot name="header" /></div>', props: ["label", "icon", "dense", "class", "modelValue"], emits: ["update:modelValue"] },
-  "q-chip": { template: "<span class='q-chip'><slot /></span>", props: ["dense", "size", "color", "textColor", "removable"], emits: ["remove"] },
-  "q-badge": { template: "<span><slot /></span>" },
   "q-input": { template: '<input />', props: ["modelValue", "dense", "filled", "clearable", "placeholder"] },
   "q-item": { template: "<div class='q-item' @click=\"$emit('click')\"><slot /></div>", emits: ["click"] },
   "q-item-section": { template: "<div><slot /></div>", props: ["side", "avatar"] },

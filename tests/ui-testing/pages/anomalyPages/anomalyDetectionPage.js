@@ -68,9 +68,9 @@ class AnomalyDetectionPage {
 
             // Generic Quasar components
             qToggle: '.q-toggle',
-            qMenuItem: '.q-menu .q-item',
-            qMenu: '.q-menu',
-            qDialog: '.q-dialog',
+            qMenuItem: '[data-test$="-popover"] [data-test$="-option"]',
+            qMenu: '[data-test$="-popover"]',
+            qDialog: '[data-test$="-dialog"]',
 
             // Dynamic selectors (functions)
             editButton: (name) => `[data-test="alert-list-${name}-update-alert"]`,
@@ -480,7 +480,7 @@ class AnomalyDetectionPage {
             await fieldOption.click();
         } else {
             // Fallback: try clicking by text
-            await this.page.locator(`.q-item:has-text("${field}")`).first().click().catch(() => {});
+            await this.page.locator(`[data-test$="-option"]:has-text("${field}")`).first().click().catch(() => {});
         }
         await this.page.waitForTimeout(500);
 
@@ -494,13 +494,13 @@ class AnomalyDetectionPage {
             if (await operatorOption.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await operatorOption.click();
             } else {
-                await this.page.locator(`.q-item:has-text("${operator}")`).first().click().catch(() => {});
+                await this.page.locator(`[data-test$="-option"]:has-text("${operator}")`).first().click().catch(() => {});
             }
             await this.page.waitForTimeout(500);
         }
 
         // 3. Fill the value input (q-input in the row)
-        const valueInput = lastFilterRow.locator('.alert-v3-input input, input.q-field__native').first();
+        const valueInput = lastFilterRow.locator('.alert-v3-input input, input').first();
         if (await valueInput.isVisible({ timeout: 2000 }).catch(() => false)) {
             await valueInput.click();
             await valueInput.fill(value);
@@ -584,7 +584,7 @@ class AnomalyDetectionPage {
      */
     async expectAnomalyStatus(name, status) {
         const row = this.getAnomalyRow(name);
-        const badge = row.locator('.q-badge');
+        const badge = row.locator('[data-test*="badge"], [data-test*="chip"], .status-badge');
         await expect(badge).toContainText(status, { ignoreCase: true, timeout: 10000 });
     }
 
@@ -799,7 +799,7 @@ class AnomalyDetectionPage {
         }
 
         // Close dropdown
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         await this.page.waitForTimeout(300);
 
         if (!destFound) {
@@ -861,7 +861,7 @@ class AnomalyDetectionPage {
 
         testLogger.info('Trigger Detection menu item not available - anomaly may need to be trained first');
         // Close menu
-        await this.page.keyboard.press('Escape');
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
         return false;
     }
 
@@ -1120,15 +1120,15 @@ class AnomalyDetectionPage {
         await this.page.locator(this.destinationSelect).click();
         await this.page.waitForTimeout(1000);
 
-        const visibleMenu = this.page.locator('.q-menu:visible');
-        await expect(visibleMenu.locator('.q-item').first()).toBeVisible({ timeout: 5000 });
+        const visibleMenu = this.page.locator('[data-test$="-popover"]');
+        await expect(visibleMenu.locator('[data-test$="-option"]').first()).toBeVisible({ timeout: 5000 });
 
-        const destOption = visibleMenu.locator('.q-item').filter({ hasText: destinationName }).first();
+        const destOption = visibleMenu.locator('[data-test$="-option"]').filter({ hasText: destinationName }).first();
         if (await destOption.isVisible({ timeout: 3000 }).catch(() => false)) {
             await destOption.click();
         } else {
             // Fallback to first option
-            await visibleMenu.locator('.q-item').first().click();
+            await visibleMenu.locator('[data-test$="-option"]').first().click();
             testLogger.warn('Selected first available destination (fallback)');
         }
 
@@ -1235,7 +1235,7 @@ class AnomalyDetectionPage {
      */
     async getAnomalyStatus(name) {
         const row = this.page.locator('tr').filter({ hasText: name }).first();
-        const badge = row.locator('.q-badge');
+        const badge = row.locator('[data-test*="badge"], [data-test*="chip"], .status-badge');
 
         if (await badge.isVisible({ timeout: 3000 })) {
             const status = await badge.textContent();

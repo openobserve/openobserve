@@ -71,8 +71,10 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             "Missing pipeline ID".to_string(),
         ));
     }
-    // check if another realtime pipeline with the same source stream already exists
-    if let PipelineSource::Realtime(stream) = &pipeline.source
+    // User pipelines: only one realtime pipeline per stream
+    // Evaluation pipelines: any number allowed, no exclusivity check
+    if pipeline.is_user()
+        && let PipelineSource::Realtime(stream) = &pipeline.source
         && pipeline::list_streams_with_pipeline(&pipeline.org)
             .await
             .is_ok_and(|list| list.iter().any(|existing| existing == stream))
@@ -190,7 +192,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     pipeline::update(&pipeline, prev_source_stream).await?;
 
     // Evict any live LLM evaluation buffer tasks for this pipeline so they
-    // are re-created with the updated config (e.g. new eval_template id) on
+    // are re-created with the updated config (e.g. scorer list) on
     // the next ingestion batch.
     #[cfg(feature = "enterprise")]
     {
@@ -223,7 +225,7 @@ pub async fn list_pipelines(
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("pipeline:{}", &pipeline.id))
+                    .contains(&format!("pipeline:{}", pipeline.id))
                 || permitted
                     .as_ref()
                     .unwrap()

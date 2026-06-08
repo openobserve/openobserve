@@ -15,87 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section
-      class="q-px-md q-py-md"
-      data-test="dashboard-folder-move-header"
-    >
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold">
-            Move Dashboard To Another Folder
-          </div>
-        </div>
-        <div class="col-auto">
-          <OButton
-            v-close-popup="true"
-            variant="ghost"
-            size="icon-circle"
-            data-test="dashboard-folder-move-cancel"
-          >
-            <template #icon-left><q-icon name="cancel" /></template>
-          </OButton>
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section
-      class="q-w-md q-mx-lg"
-      data-test="dashboard-folder-move-body"
-    >
-      <q-form
-        ref="moveFolderForm"
-        @submit.stop="onSubmit.execute()"
-        data-test="dashboard-folder-move-form"
-      >
-        <q-input
-          v-model="
+  <ODialog data-test="move-dashboard-to-another-folder-dialog"
+    :open="open"
+    size="md"
+    title="Move Dashboard"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('common.move')"
+    :primary-button-loading="onSubmit.isLoading.value"
+    :primary-button-disabled="isSameFolder"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="onSubmit.execute()"
+  >
+  <div data-test="dashboard-folder-move-body">
+      <div class="tw:flex tw:flex-col tw:gap-3">
+        <OInput
+          :model-value="
             store.state.organizationData.folders.find(
-              (item: any) => item.folderId === activeFolderId,
-            ).name
+              (item) => item.folderId === activeFolderId,
+            )?.name
           "
           :label="t('dashboard.currentFolderLabel')"
-          class="q-py-none showLabelOnTop"
-          stack-label
-          borderless
-          hide-bottom-space
-          dense
-          :disable="true"
+          disabled
+          readonly
           data-test="dashboard-folder-move-name"
         />
-        <span>&nbsp;</span>
 
         <!-- select folder or create new folder and select -->
         <SelectFolderDropdown
           @folder-selected="selectedFolder = $event"
           :activeFolderId="activeFolderId"
         />
-
-        <div class="flex justify-start q-mt-sm tw:gap-2">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="dashboard-folder-move-cancel"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            data-test="dashboard-folder-move"
-            :disabled="activeFolderId === selectedFolder.value"
-            :loading="onSubmit.isLoading.value"
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            >{{ t("common.move") }}</OButton
-          >
-        </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </div>
+  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
@@ -103,11 +60,12 @@ import { moveDashboardToAnotherFolder } from "../../utils/commons";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
 import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
-  components: { SelectFolderDropdown, OButton },
+  components: { SelectFolderDropdown, ODialog, OInput },
   props: {
     activeFolderId: {
       type: String,
@@ -117,60 +75,78 @@ export default defineComponent({
       type: Array,
       default: [],
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["updated"],
+  emits: ["updated", "close", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const moveFolderForm: any = ref(null);
     //dropdown selected folder
     const selectedFolder = ref({
       label: store.state.organizationData.folders.find(
         (item: any) => item.folderId === props.activeFolderId,
-      ).name,
+      )?.name,
       value: props.activeFolderId,
     });
     const { t } = useI18n();
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();
 
-    const onSubmit = useLoading(async () => {
-      await moveFolderForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
-        }
-        // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
-
-        try {
-          await moveDashboardToAnotherFolder(
-            store,
-            props.dashboardIds,
-            props.activeFolderId,
-            selectedFolder.value.value,
+    // Reset selection to current folder whenever the drawer reopens so the
+    // same-folder comparison is always accurate.
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) {
+          const folder = store.state.organizationData.folders.find(
+            (item: any) => item.folderId === props.activeFolderId,
           );
+          selectedFolder.value = {
+            label: folder?.name,
+            value: props.activeFolderId,
+          };
+        }
+      },
+    );
 
-          showPositiveNotification("Dashboard Moved successfully", {
+    // Disable Move when the selected folder is the same as the current one.
+    const isSameFolder = computed(
+      () => props.activeFolderId === selectedFolder.value?.value,
+    );
+
+    const onSubmit = useLoading(async () => {
+      // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
+      try {
+        await moveDashboardToAnotherFolder(
+          store,
+          props.dashboardIds,
+          props.activeFolderId,
+          selectedFolder.value.value,
+        );
+
+        showPositiveNotification("Dashboard Moved successfully", {
+          timeout: 2000,
+        });
+
+        emit("updated");
+      } catch (err: any) {
+        //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
+        if (err.status !== 403) {
+          showErrorNotification(err?.message ?? "Dashboard move failed.", {
             timeout: 2000,
           });
-
-          emit("updated");
-          moveFolderForm.value?.resetValidation();
-        } catch (err: any) {
-          //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
-          if (err.status !== 403) {
-            showErrorNotification(err?.message ?? "Dashboard move failed.", {
-              timeout: 2000,
-            });
-          }
         }
-      });
+      }
     });
 
     return {
       t,
-      moveFolderForm,
       store,
       getImageURL,
       selectedFolder,
+      isSameFolder,
       onSubmit,
     };
   },

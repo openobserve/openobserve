@@ -1,60 +1,29 @@
 <template>
-  <q-card
-    class="tw:min-w-[850px] tw:max-w-[80vw] tw:max-h-[90vh] tw:flex tw:flex-col tw:rounded-xl tw:shadow-2xl tw:overflow-hidden tw:bg-[var(--o2-card-bg)] tw:text-[var(--o2-text-primary)]"
+  <ODialog data-test="query-inspector"
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    title="Query Inspector"
+    :sub-title="`Panel : ${dataTitle}  ·  Total Queries: ${totalQueries}`"
+    :width="50"
   >
-    <!-- Header -->
-    <div
-      class="tw:flex tw:items-center tw:justify-between tw:px-6 tw:py-4 tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-color)]"
-    >
-      <div class="tw:flex tw:flex-col">
-        <div
-          class="tw:text-xl tw:font-bold tw:m-0 tw:flex tw:items-center tw:gap-2"
-        >
-          Query Inspector
-        </div>
-        <div
-          class="tw:text-[var(--o2-text-secondary)] tw:text-sm tw:font-bold tw:mt-1 tw:flex tw:items-center tw:gap-3"
-        >
-          <span>Panel : {{ dataTitle }}</span>
-          <span
-            class="tw:w-1 tw:h-1 tw:bg-[var(--o2-text-secondary)] tw:rounded-full"
-          ></span>
-          <span>Total Queries: {{ totalQueries }}</span>
-        </div>
+    <!-- search input: sits left of the close button via #header-right -->
+    <template #header-right>
+      <div class="tw:flex">
+        <OSearchInput
+          v-model="searchQuery"
+          placeholder="Search keywords..."
+          data-test="query-inspector-search"
+          size="xs"
+        />
       </div>
-
-      <div class="tw:flex tw:items-center tw:gap-4">
-        <div class="tw:relative tw:w-50">
-          <q-input
-            v-model="searchQuery"
-            placeholder="Search keywords..."
-            dense
-            color="primary"
-            :dark="store.state.theme === 'dark'"
-          >
-            <template v-slot:prepend>
-              <q-icon name="search" size="xs" />
-            </template>
-          </q-input>
-        </div>
-        <OButton
-          variant="ghost"
-          size="icon"
-          v-close-popup="true"
-          data-test="query-inspector-close-btn"
-        >
-          <template #icon-left><q-icon name="close" /></template>
-        </OButton>
-      </div>
-    </div>
+    </template>
 
     <!-- Body -->
-    <q-card-section class="tw:flex-1 tw:max-h-[60vh] tw:overflow-y-auto tw:p-6">
       <div
         v-if="queryData.length === 0"
         class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-64 tw:text-[var(--o2-text-muted)]"
       >
-        <q-icon name="info" size="48px" />
+        <OIcon name="info" style="width: 48px; height: 48px;" />
         <p class="tw:mt-2">No queries executed for this panel.</p>
       </div>
 
@@ -68,8 +37,9 @@
           <div
             class="tw:p-2 tw:gap-3 tw:bg-[var(--o2-body-primary-bg)] tw:border-b tw:border-[var(--o2-border-color)] tw:flex tw:items-start tw:justify-start"
           >
-            <span class="tw:text-sm tw:font-bold tw:rounded-md">
-              Query {{ index + 1 }}
+            <span class="tw:text-sm tw:font-bold tw:rounded-md"
+                :data-test="`query-inspector-query-name-${index}`">
+              {{ query.tabName || ('Query ' + (index + 1)) }}
             </span>
             <span
               class="tw:bg-[var(--o2-body-primary-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-secondary)] tw:text-[10px] tw:font-bold tw:px-2 tw:py-0.5 tw:rounded-md"
@@ -90,8 +60,8 @@
                   variant="ghost-primary"
                   size="sm"
                   @click="copyText(query.originalQuery)"
+                  icon-left="content-copy"
                 >
-                  <template #icon-left><q-icon name="content_copy" /></template>
                   Copy
                 </OButton>
               </div>
@@ -120,8 +90,8 @@
                   variant="ghost-primary"
                   size="sm"
                   @click="copyText(query.query)"
+                  icon-left="content-copy"
                 >
-                  <template #icon-left><q-icon name="content_copy" /></template>
                   Copy
                 </OButton>
               </div>
@@ -143,31 +113,35 @@
             <div
               class="tw:grid tw:grid-cols-2 tw:gap-4 tw:border-t tw:border-[var(--o2-border-color)] tw:pt-2"
             >
-              <div class="tw:space-y-1">
+              <div class="tw:space-y-1"
+                :data-test="`dashboard-query-inspector-start-time-${index}`"
+              >
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >Start Time</label
                 >
                 <div
                   class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:font-medium tw:flex tw:items-center tw:gap-2"
                 >
-                  <q-icon
+                  <OIcon
                     name="login"
-                    size="14px"
+                    size="xs"
                     class="tw:text-[var(--o2-text-muted)]"
                   />
                   {{ formatTimestamp(query.startTime) }}
                 </div>
               </div>
-              <div class="tw:space-y-1">
+              <div class="tw:space-y-1"
+                :data-test="`dashboard-query-inspector-end-time-${index}`"
+              >
                 <label class="tw:text-xs tw:font-bold tw:tracking-wider"
                   >End Time</label
                 >
                 <div
                   class="tw:text-xs tw:text-[var(--o2-text-secondary)] tw:font-medium tw:flex tw:items-center tw:gap-2"
                 >
-                  <q-icon
+                  <OIcon
                     name="logout"
-                    size="14px"
+                    size="xs"
                     class="tw:text-[var(--o2-text-muted)]"
                   />
                   {{ formatTimestamp(query.endTime) }}
@@ -273,8 +247,7 @@
           </div>
         </div>
       </div>
-    </q-card-section>
-  </q-card>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -283,12 +256,23 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DOMPurify from "dompurify";
+import { copyToClipboard } from "@/utils/clipboard";
 
 export default defineComponent({
   name: "QueryInspector",
-  components: { OButton },
+  emits: ["update:open"],
+  components: { OButton, ODialog, OSearchInput,
+    OIcon,
+},
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     metaData: {
       type: Object,
       required: true,
@@ -387,7 +371,7 @@ export default defineComponent({
 
     const copyText = (text: string) => {
       if (!text) return;
-      navigator.clipboard.writeText(text);
+      copyToClipboard(text, { silent: true });
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

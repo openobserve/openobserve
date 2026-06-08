@@ -16,33 +16,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="overflow-y: auto" class="scroll">
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5">
     <!-- Header Section -->
-    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs">
+    <div class="tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1">
       <div
-        class="flex items-center q-pa-sm card-container"
-        :class="!store.state.isAiChatEnabled ? 'justify-between' : ''"
+        class="tw:flex tw:items-center tw:justify-between tw:p-2 card-container"
+        :class="!store.state.isAiChatEnabled ? 'tw:justify-between' : ''"
       >
         <div
-          class="flex items-center q-table__title"
-          :class="!store.state.isAiChatEnabled ? 'q-mr-md' : 'q-mr-sm'"
+          class="tw:flex tw:items-center"
+          :class="!store.state.isAiChatEnabled ? 'tw:mr-3' : 'tw:mr-2'"
         >
-          <span>
+          <span class="tw:text-xl tw:tracking-[0.005em]">
             {{ editMode ? t("panel.editPanel") : t("panel.addPanel") }}
           </span>
           <div>
-            <q-input
+            <OInput
               data-test="dashboard-panel-name"
               v-model="dashboardPanelData.data.title"
               :label="t('panel.name') + '*'"
-              class="q-ml-xl dynamic-input"
-              dense
-              borderless
+              labelPosition="inside"
+              class="tw:ml-6 dynamic-input"
               :style="inputStyle"
+              :error="!!panelNameError"
+              :error-message="panelNameError"
+              @update:model-value="panelNameError = ''"
             />
           </div>
         </div>
-        <div class="flex q-gutter-sm">
+        <div class="tw:flex tw:gap-2">
           <OButton
             variant="outline"
             size="sm"
@@ -60,11 +62,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             @click="showViewPanel = true"
             data-test="dashboard-panel-data-view-query-inspector-btn"
+            icon-left="info-outline"
           >
-            <template #icon-left><q-icon name="info_outline" /></template>
-            <q-tooltip anchor="center left" self="center right"
-              >Query Inspector</q-tooltip
-            >
+            <OTooltip side="left" align="center" content="Query Inspector" />
           </OButton>
           <DateTimePickerDashboard
             v-if="selectedDate"
@@ -132,13 +132,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     size="icon-sm"
                     :disabled="searchRequestTraceIds.length > 0"
-                  >
-                    <q-icon name="keyboard_arrow_down" size="xs" />
-                  </OButton>
+                    icon-left="keyboard-arrow-down"
+                  />
                 </template>
                 <ODropdownItem @select="runQuery(true)">
                   <div class="tw:flex tw:items-center tw:gap-2">
-                    <q-icon size="xs" name="refresh" />
+                  <OIcon name="refresh" size="xs" />
                     <span>Refresh Cache &amp; Apply</span>
                   </div>
                 </ODropdownItem>
@@ -167,9 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Query Inspector Dialog -->
-    <q-dialog v-model="showViewPanel" data-test="query-inspector-dialog">
-      <QueryInspector :metaData="metaData" :data="panelTitle"></QueryInspector>
-    </q-dialog>
+    <QueryInspector
+      v-model:open="showViewPanel"
+      :metaData="metaData"
+      :data="panelTitle"
+      data-test="query-inspector-dialog"
+    />
 
     <!-- Add Variable Drawer -->
     <div
@@ -178,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'theme-dark' : 'theme-light'"
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel tw:px-4 tw:pt-4">
+      <div class="add-variable-drawer-panel tw:px-6 tw:pt-4">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"
@@ -227,6 +229,7 @@ import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -240,6 +243,9 @@ import { useVariablesManager } from "@/composables/dashboard/useVariablesManager
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 
@@ -252,10 +258,13 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
+    OIcon,
     OButtonGroup,
     OButton,
+    OInput,
     ODropdown,
     ODropdownItem,
+    OTooltip,
     DateTimePickerDashboard,
     AddSettingVariable,
     QueryInspector,
@@ -302,6 +311,7 @@ export default defineComponent({
     const errorData: any = reactive({
       errors: [],
     });
+    const panelNameError = ref("");
     let variablesData: any = reactive({});
     const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
     const { getStream } = useStreams();
@@ -547,15 +557,12 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
-        // check if vrl function exists
-        if (
+        // Set the VRL toggle for the active query: on iff it has a VRL function.
+        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery
-        ) {
-          // enable vrl function editor
-          dashboardPanelData.layout.vrlFunctionToggle = true;
-        }
+          ],
+        );
 
         await nextTick();
         // Initialize PanelEditor's chartData after loading panel data
@@ -569,9 +576,10 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
-      // let it call the wathcers and then mark the panel config watcher as activated
+      // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
+
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
@@ -821,6 +829,8 @@ export default defineComponent({
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
+      // chartData not yet initialized — don't show "not up to date" banner
+      if (!chartData.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
 
       const normalizeVariables = (obj: any) => {
@@ -1078,6 +1088,7 @@ export default defineComponent({
 
       // Clear the tracking arrays
       variablesCreatedInSession.value = [];
+      panelNameError.value = "";
       variablesWithCurrentPanel.value = [];
 
       return router.push({
@@ -1169,6 +1180,7 @@ export default defineComponent({
           dashboardData.data.title.trim() == ""
         ) {
           errors.push("Name of Panel is required");
+          panelNameError.value = "Panel name is required.";
         }
       }
 
@@ -1767,6 +1779,7 @@ export default defineComponent({
       currentPanelId,
       panelEditorRef,
       dashboardDataForPanelEditor,
+      panelNameError,
     };
   },
   methods: {
@@ -1779,8 +1792,8 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 :deep(.date-time-button) {
-  height: 36px !important;
-  min-height: 36px !important;
+  height: 32px !important;
+  min-height: 32px !important;
 }
 
 .dynamic-input {

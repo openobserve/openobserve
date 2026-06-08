@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'container tw:rounded-none! tw:overflow-x-auto tw:relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
+    style="color: var(--o2-log-table-text)"
   >
     <table
       v-if="table"
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <thead
         class="tw:sticky tw:top-0 tw:z-10"
-        style="max-height: 44px; height: 22px"
+        style="max-height: 44px"
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
       >
@@ -62,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : table.getTotalSize() + 'px',
             minWidth: '100%',
-            background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+            background: 'var(--o2-log-table-header-bg)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="tw:flex items-center"
+          class="tw:flex tw:items-center"
         >
           <th
             v-for="header in headerGroup.headers"
@@ -96,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="!header.isPlaceholder"
               :class="[
-                'text-left',
-                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
+                'tw:text-left',
+                header.column.getCanSort() ? 'tw:cursor-pointer select-none' : '',
               ]"
               @click="
                 getSortingHandler(
@@ -123,51 +124,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (header.column.columnDef.meta as any).showWrap
                 "
               >
-                <q-icon
+                <OIcon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                  name="cancel"
-                  class="q-ma-none close-icon cursor-pointer"
+                  name="close"
+                  class="tw:m-0 close-icon tw:cursor-pointer"
                   :class="
-                    store.state.theme === 'dark' ? 'text-white' : 'text-grey-7'
+                    store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-400'
                   "
                   :title="t('common.close')"
-                  size="18px"
+                  size="sm"
                   @click="closeColumn(header.column.columnDef)"
-                >
-                </q-icon>
+                 />
               </div>
             </div>
           </th>
         </vue-draggable>
 
-        <tr v-if="loading" class="tw:w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="text-bold"
-            :style="{
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
-              opacity: 0.7,
-            }"
-          >
-            <div
-              class="text-subtitle2 text-weight-bold tw:flex tw:items-center"
-            >
-              <q-spinner-hourglass size="20px" />
-              {{ t("confirmDialog.loading") }}
-            </div>
-          </td>
-        </tr>
+
         <tr v-if="!loading && errMsg != ''" class="tw:w-full">
           <td
             :colspan="columnOrder.length"
-            class="text-bold"
+            class="tw:font-bold"
             style="opacity: 0.7"
           >
-            <div class="text-subtitle2 text-weight-bold bg-warning">
-              <q-icon size="xs"
+            <div class="tw:text-sm tw:font-medium text-weight-bold tw:bg-amber-500">
+              <OIcon size="xs"
 name="warning"
-class="q-mr-xs" />
+class="tw:mr-1" />
               {{ errMsg }}
             </div>
           </td>
@@ -178,11 +162,11 @@ class="q-mr-xs" />
         >
           <td
             :colspan="columnOrder.length"
-            class="text-bold"
+            class="tw:font-bold"
             style="opacity: 0.6"
           >
             <div
-              class="text-subtitle2 text-weight-bold q-pl-sm"
+              class="tw:text-sm tw:font-medium text-weight-bold tw:pl-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'tw:bg-yellow-600'
@@ -192,12 +176,12 @@ class="q-mr-xs" />
               <OButton
                 variant="ghost"
                 size="icon-xs"
-                class="q-mr-xs log-row-expand-btn"
+                class="tw:mr-1 log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-                ><q-icon :name="isFunctionErrorOpen ? 'expand_more' : 'chevron_right'" size="14px" /></OButton
+                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" /></OButton
               ><b>
-                <q-icon name="warning" size="15px"></q-icon>
+                <OIcon name="warning" size="sm" />
                 {{ t("search.functionErrorLabel") }}</b
               >
             </div>
@@ -207,7 +191,7 @@ class="q-mr-xs" />
           <td
             :colspan="columnOrder.length"
             style="opacity: 0.7"
-            class="q-px-sm"
+            class="tw:px-2"
             :class="
               store.state.theme === 'dark'
                 ? 'tw:bg-yellow-600'
@@ -218,6 +202,48 @@ class="q-mr-xs" />
           </td>
         </tr>
       </thead>
+
+      <!-- Skeleton loading body — replaces the old spinner row -->
+      <tbody
+        v-if="loading"
+        data-test="logs-table-skeleton-body"
+        aria-busy="true"
+        aria-label="Loading logs"
+      >
+        <!-- Rows use tw:flex to match the real virtual rows exactly -->
+        <tr
+          v-for="r in SKEL_ROW_COUNT"
+          :key="`skel-${r}`"
+          class="logs-skel-row tw:flex tw:items-center tw:w-full"
+          :style="{ animationDelay: `${(r - 1) * 40}ms` }"
+        >
+          <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
+          <td v-if="!headers?.length" class="tw:w-full tw:px-4 tw:overflow-hidden">
+            <span
+              class="logs-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+              :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
+              aria-hidden="true"
+            />
+          </td>
+          <!-- Columns available — per-column aligned shimmer pills -->
+          <template v-else>
+            <td
+              v-for="(header, c) in headers"
+              :key="header.id"
+              class="tw:px-2 tw:overflow-hidden"
+              :class="c === 0 ? 'tw:pl-4' : ''"
+              :style="skelTdStyle(header, c)"
+            >
+              <span
+                class="logs-skel-pill tw:inline-block tw:h-3 tw:rounded-md"
+                :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
+                aria-hidden="true"
+              />
+            </td>
+          </template>
+        </tr>
+      </tbody>
+
       <tbody
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
@@ -239,13 +265,16 @@ class="q-mr-xs" />
               formattedRows?.[virtualRow.index]?.original?.isExpandedRow
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            class="tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px] tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)]"
             :class="[
+              'tw:absolute tw:flex tw:w-max tw:items-center tw:justify-start tw:border-b-[1px]',
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 'tw:cursor-pointer'
+                : 'tw:cursor-default',
               defaultColumns &&
               !wrap &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw:table-row'
-                : 'tw:flex',
+                : 'tw:flex tw:break-all',
               (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
@@ -253,8 +282,12 @@ class="q-mr-xs" />
                 ? store.state.theme === 'dark'
                   ? 'tw:bg-zinc-700'
                   : 'tw:bg-zinc-300'
+                : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                  ? 'log-row-base'
+                  : '',
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                ? 'table-row-hover'
                 : '',
-              'table-row-hover',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -316,7 +349,7 @@ class="q-mr-xs" />
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw:py-none tw:px-2 tw:items-center tw:justify-start tw:relative table-cell"
+                class="tw:py-none tw:px-2 tw:flex tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
                 :style="{
                   width:
@@ -335,16 +368,16 @@ class="q-mr-xs" />
                   v-if="cellIndex == 0"
                   variant="ghost"
                   size="icon-xs"
-                  class="q-mr-xs log-row-expand-btn"
+                  class="tw:mr-1 log-row-expand-btn"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
-                  ><q-icon
+                  ><OIcon
                     :name="
                       expandedRowIndices.has(virtualRow.index)
-                        ? 'expand_more'
-                        : 'chevron_right'
+                        ? 'expand-more'
+                        : 'chevron-right'
                     "
-                    size="14px"
+                    size="sm"
                 /></OButton>
 
                 <template
@@ -426,12 +459,13 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
-import { debounce } from "quasar";
+import { debounce } from "lodash-es";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface StreamField {
   name: string;
@@ -733,7 +767,7 @@ watch(
       !props.wrap
         ? "tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
         : "",
-      props.wrap ? "tw:break-words" : "",
+      props.wrap ? "tw:break-all" : "",
     ];
   },
   {
@@ -769,6 +803,28 @@ const isResizingHeader = ref(false);
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
 const headers = computed(() => headerGroups.value.headers);
+
+// Skeleton loading helpers — mirrors OTable shimmer pattern
+const SKEL_ROW_COUNT = 30;
+const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
+const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
+// Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
+const SKEL_TIMESTAMP_PX = Math.round("2026-06-02 12:09:00.349".length * 7.2);
+const skelCellWidth = (r: number, c: number): number => {
+  const base = SKEL_BASE_WIDTHS[c % SKEL_BASE_WIDTHS.length] ?? 60;
+  const jit  = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
+  return Math.max(25, Math.min(85, base + jit));
+};
+// Mirror the exact width/flex logic from real cells so the skeleton columns align perfectly.
+// Source column: width:'auto' in real rows → flex:1 here to fill remaining row space.
+// All other columns: fixed width from the CSS variable (same as real rows).
+const skelTdStyle = (header: any, c: number): Record<string, string> => {
+  const colId = header.column.id;
+  const isStretchSource = colId === 'source' && !header.column.getCanResize();
+  if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
+  const w = `calc(var(--col-${colId}-size) * 1px)`;
+  return { width: w, minWidth: w, flexShrink: '0' };
+};
 
 watch(
   () => headers.value,
@@ -816,12 +872,14 @@ const rowVirtualizerOptions = computed(() => {
             // Only measure expanded rows (check if it's actually an expanded row)
             const isExpandedRow =
               formattedRows.value[index]?.original?.isExpandedRow;
-            if (isExpandedRow || props.wrap) {
+            if (isExpandedRow) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
               return height;
             }
-            return 24; // Fixed height for collapsed rows
+            // Return actual measured height so the virtualizer positions rows
+            // with the correct stride — prevents both overlap and gap artifacts.
+            return element.getBoundingClientRect().height;
           }
         : undefined,
   };
@@ -832,7 +890,7 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 // +22 adds bottom padding so the last virtual row isn't clipped by the container
-const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 24);
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 30);
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
@@ -909,14 +967,14 @@ const expandRow = async (index: number) => {
     // COLLAPSE OPERATION
     expandedRowIndices.value.delete(index);
 
-    // Clear cached height for collapsed row
+    // Clear cached height for collapsed "row"
     delete expandedRowHeights.value[index + 1];
 
     // Remove the expanded row from tableRows
     tableRows.value.splice(index + 1, 1);
     isCollapseOperation = true;
 
-    // Update all expanded indices that come after this collapsed row
+    // Update all expanded indices that come after this collapsed "row"
     const updatedIndices = new Set<number>();
     expandedRowIndices.value.forEach((i) => {
       updatedIndices.add(i > index ? i - 1 : i);
@@ -934,7 +992,7 @@ const expandRow = async (index: number) => {
     updatedIndices.add(index);
     expandedRowIndices.value = updatedIndices;
 
-    // Insert the expanded row
+    // Insert the expanded "row"
     tableRows.value.splice(index + 1, 0, {
       isExpandedRow: true,
       ...(props.rows[index] as {}),
@@ -1058,14 +1116,14 @@ const sendToAiChat = (
   append: boolean = true,
 ) => {
   if (isEntireRow) {
-    //here we will get the original value of the row
+    //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
     //the format of the props.columns is like this:
     //if user have not applied any filter then the props.columns will be like this:
     //it contains _timestamp column and source column
     //else we get _timestamp column and other filter columns so if user have applied any filter then we need to filter the row based on the filter columns
     const row = JSON.parse(value);
-    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the row
+    //lets filter based on props.columns so lets ignore _timestamp column as it is always present and now we want to check if source is present we can directly send the "row"
     //otherwise we need to filter the row based on the columns that user have applied
     if (checkIfSourceColumnPresent(props.columns)) {
       emits("sendToAiChat", JSON.stringify(row), append);
@@ -1114,19 +1172,104 @@ defineExpose({
 
 // Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
 .log-row-expand-btn {
-  height: 24px !important;
-  width: 24px !important;
-  min-height: 24px !important;
-  min-width: 24px !important;
+  height: 1.25rem !important;
+  width: 1.25rem !important;
+  min-height: 1.25rem !important;
+  min-width: 1.25rem !important;
   padding: 0 !important;
+  vertical-align: middle !important;
 }
 
-// Add explicit hover styles for log rows
+:deep(.log-row-expand-btn svg) {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+// Log table row surface colour — uniform background, separator via border-bottom only
+.log-row-base {
+  background-color: var(--o2-log-table-row-bg);
+}
+
 .table-row-hover {
-  transition: background-color 0.15s ease-in-out;
+  transition: background-color 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
+  border-bottom-color: var(--o2-log-table-row-border) !important;
 
   &:hover {
-    background-color: var(--o2-hover-gray) !important;
+    background-color: var(--o2-log-table-row-hover) !important;
+    box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
   }
+}
+
+// Fix: OButton base class (tw:relative) overrides tw:absolute passed via props.
+// Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
+// and height:100% to fill the td height (= row height minus 1px border).
+// Overriding the CSS `translate` property (not `transform`) is required because
+// Tailwind v4 sets tw:-translate-y-1/2 via the CSS `translate` shorthand property.
+:deep(.ai-btn) {
+  position: absolute !important;
+  top: 50% !important;
+  right: 0.875rem !important;
+  translate: -50% -50% !important;
+  height: 0.875rem !important;
+  min-height: 0 !important;
+  width: 0.900rem !important;
+  min-width: 0 !important;
+  border-radius: 0.25rem !important;
+}
+
+:deep(.ai-btn img.ai-icon) {
+  width: 0.75rem !important;
+  height: 0.75rem !important;
+}
+
+// Suppress the hover box-shadow — it visually bleeds outside the row boundary
+:deep(.ai-btn:hover) {
+  box-shadow: none !important;
+}
+
+// ── Loading skeleton ─────────────────────────────────────────────
+.logs-skel-row {
+  opacity: 0;
+  animation: logs-skel-row-in 320ms ease-out forwards;
+  border-bottom: 1px solid var(--o2-log-table-row-border);
+  height: 29px;
+  background-color: var(--o2-log-table-row-bg);
+}
+
+.logs-skel-pill {
+  // Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5)
+  background: linear-gradient(
+    90deg,
+    var(--color-grey-100)       0%,
+    rgba(255, 255, 255, 0.65)   50%,
+    var(--color-grey-100)       100%
+  );
+  background-size: 200% 100%;
+  animation: logs-skel-shimmer 1.5s ease-in-out infinite;
+
+  // Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252)
+  .body--dark & {
+    background: linear-gradient(
+      90deg,
+      var(--color-grey-600)       0%,
+      rgba(255, 255, 255, 0.03)   50%,
+      var(--color-grey-600)       100%
+    );
+  }
+}
+
+@keyframes logs-skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes logs-skel-row-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logs-skel-row  { opacity: 1; animation: none; }
+  .logs-skel-pill { animation: none; }
 }
 </style>

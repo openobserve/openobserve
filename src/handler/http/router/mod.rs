@@ -550,19 +550,19 @@ pub fn basic_routes() -> Router {
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
     Router::new()
+        .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
 }
 
 #[cfg(feature = "enterprise")]
 pub fn config_routes() -> Router {
     Router::new()
+        .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(auth_middleware))
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
-        .route("/runtime", get(status::config_runtime))
-        .route("/reload", get(status::config_reload))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
         .route("/dex_refresh", get(status::refresh_token_with_dex))
@@ -609,6 +609,8 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/summary", get(organization::org::org_summary))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
+        .route("/{org_id}/ingestion-tokens", get(organization::ingestion_tokens::list_ingestion_tokens).post(organization::ingestion_tokens::create_ingestion_token))
+        .route("/{org_id}/ingestion-tokens/{name}", patch(organization::ingestion_tokens::enable_disable_ingestion_token))
         .route("/{org_id}/node/list", get(organization::org::node_list))
         .route("/{org_id}/cluster/info", get(organization::org::cluster_info))
         .route("/{org_id}/rename", put(organization::org::rename_org))
@@ -786,7 +788,8 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", post(anomaly_detection::train_model).delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/detect", post(anomaly_detection::detect_anomalies))
-            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history));
+            .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
+            .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history));
     }
 
     router = router
@@ -846,7 +849,35 @@ pub fn service_routes() -> Router {
         // sourcemaps
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
-        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace));
+        .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+
+        // LLM Providers (Online Eval Phase 2)
+        .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
+        .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
+        .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
+
+        // Score Configs (Online Eval Phase 2)
+        // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
+        .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+        .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
+        .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
+
+        // Scorers (Online Eval Phase 2)
+        // NOTE: static and nested routes must precede /{entity_id}
+        .route("/{org_id}/scorers", get(scorers::list_scorers).post(scorers::create_scorer))
+        .route("/{org_id}/scorers/test", post(scorers::test_scorer))
+        .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
+        .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
+        .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
+
+        // Online Eval Jobs (Online Eval Phase 2)
+        // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
+        .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
+        .route("/{org_id}/eval_jobs/{job_id}/activate", post(eval_jobs::activate_eval_job))
+        .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
+        .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
+        .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
+        .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
 
     #[cfg(feature = "enterprise")]
     {
@@ -895,11 +926,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
-
-            // Evaluation Templates
-            .route("/{org_id}/eval_templates", get(eval_templates::list).post(eval_templates::create))
-            .route("/{org_id}/eval_templates/{template_id}", get(eval_templates::get).put(eval_templates::update).delete(eval_templates::delete))
-            .route("/{org_id}/eval_templates/{template_id}/stats", get(eval_templates::get_stats))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -1011,6 +1037,27 @@ pub fn service_routes() -> Router {
             .route(
                 "/{org_id}/enable_org_storage",
                 put(organization::org::enable_org_storage),
+            )
+            .route(
+                "/{org_id}/billing_group/invites",
+                get(organization::billing_group::list_invites)
+                    .post(organization::billing_group::invite),
+            )
+            .route(
+                "/{org_id}/billing_group/invites/{token}/accept",
+                post(organization::billing_group::accept),
+            )
+            .route(
+                "/{org_id}/billing_group/invites/{token}/reject",
+                delete(organization::billing_group::reject),
+            )
+            .route(
+                "/{org_id}/billing_group/membership",
+                get(organization::billing_group::check_membership),
+            )
+            .route(
+                "/{org_id}/billing_group/members",
+                get(organization::billing_group::check_members),
             );
     }
 

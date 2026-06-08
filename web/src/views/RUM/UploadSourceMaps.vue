@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem] q-mt-xs">
+  <div class="upload-source-maps-page tw:w-full tw:h-full tw:px-[0.625rem]">
     <!-- Top Header Bar -->
     <div class="header-bar card-container tw:flex tw:items-center tw:justify-between tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]">
       <div class="tw:flex tw:items-center tw:gap-3">
         <div
           data-test="add-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
           style="
             border: 1.5px solid;
             border-radius: 50%;
@@ -31,58 +31,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Go Back"
           @click="navigateBack()"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
         <div>
-          <div class="text-h6 text-weight-medium">Upload Source Maps</div>
+          <div class="tw:text-xl tw:font-semibold text-weight-medium">Upload Source Maps</div>
         </div>
       </div>
     </div>
 
     <!-- Form Content Area -->
-    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 192px); overflow: auto">
-      <q-form @submit="uploadSourceMaps" class="upload-form">
+    <div class="form-content-area card-container tw:mb-[0.675rem] tw:p-6" style="height: calc(100vh - 172px); overflow: auto">
+      <div class="upload-form">
         <!-- Input Fields -->
         <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-3 tw:gap-4 tw:mb-6">
           <!-- Service Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Service *</div>
-            <q-input
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Service *</div>
+            <OInput
               v-model="formData.service"
               placeholder="Enter service name"
-              borderless
-              dense
-              :rules="[val => !!val || 'Service is required']"
+              :error="!!serviceError"
+              :error-message="serviceError"
+              @update:model-value="serviceError = ''"
             />
           </div>
 
           <!-- Version Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Version *</div>
-            <q-input
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Version *</div>
+            <OInput
               v-model="formData.version"
               placeholder="Enter version (e.g., 1.0.0)"
-              borderless
-              dense
-              :rules="[val => !!val || 'Version is required']"
+              :error="!!versionError"
+              :error-message="versionError"
+              @update:model-value="versionError = ''"
             />
           </div>
 
           <!-- Environment Input -->
           <div>
-            <div class="text-subtitle2 text-weight-medium tw:mb-2">Environment</div>
-            <q-input
+            <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Environment</div>
+            <OInput
               v-model="formData.environment"
               placeholder="Enter environment (optional)"
-              borderless
-              dense
             />
           </div>
         </div>
 
         <!-- File Upload Area -->
         <div class="tw:mb-6">
-          <div class="text-subtitle2 text-weight-medium tw:mb-2">Source Map ZIP File *</div>
+          <div class="tw:text-sm tw:font-medium text-weight-medium tw:mb-2">Source Map ZIP File *</div>
           <div
             class="upload-area"
             :class="{ 'drag-over': isDragging, 'has-file': formData.file }"
@@ -100,33 +98,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div v-if="!formData.file" class="upload-content">
-              <q-icon name="cloud_upload" size="3rem" color="grey-6" class="tw:mb-3" />
-              <div class="text-h6 text-grey-8 tw:mb-2">Drop your file here</div>
-              <div class="text-body2 text-grey-6 tw:mb-3">or click to browse</div>
-              <div class="text-caption text-grey-5">.zip files only</div>
+              <OIcon name="backup" size="xl" class="tw:mb-3" />
+              <div class="tw:text-xl tw:font-semibold tw:text-gray-500 tw:mb-2">Drop your file here</div>
+              <div class="tw:text-sm tw:text-gray-400 tw:mb-3">or click to browse</div>
+              <div class="tw:text-xs tw:text-gray-400">.zip files only</div>
             </div>
 
             <div v-else class="file-info">
               <div class="tw:flex tw:items-center tw:justify-between">
                 <div class="tw:flex tw:items-center tw:gap-3">
-                  <q-icon name="insert_drive_file" size="2rem" color="primary" />
+                  <OIcon name="draft" size="lg" />
                   <div>
-                    <div class="text-subtitle2 text-weight-medium">{{ formData.file.name }}</div>
-                    <div class="text-caption text-grey-6">{{ formatFileSize(formData.file.size) }}</div>
+                    <div class="tw:text-sm tw:font-medium text-weight-medium">{{ formData.file.name }}</div>
+                    <div class="tw:text-xs tw:text-gray-400">{{ formatFileSize(formData.file.size) }}</div>
                   </div>
                 </div>
                 <OButton
                   variant="ghost"
                   size="icon"
+                  icon-left="close"
                   @click.stop="removeFile"
-                >
-                  <q-icon name="close" size="16px" />
-                </OButton>
+                />
               </div>
             </div>
           </div>
         </div>
-      </q-form>
+      </div>
     </div>
 
     <!-- Bottom Action Bar -->
@@ -153,14 +150,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
-import { useQuasar } from "quasar";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
-const $q = useQuasar();
 
 // Form data
 const formData = ref({
@@ -173,6 +171,8 @@ const formData = ref({
 const isUploading = ref(false);
 const isDragging = ref(false);
 const fileInputRef = ref<HTMLInputElement | null>(null);
+const serviceError = ref("");
+const versionError = ref("");
 
 // Pre-fill form data from query parameters on mount
 onMounted(() => {
@@ -223,8 +223,8 @@ const handleDrop = (event: DragEvent) => {
 // Validate and set file
 const validateAndSetFile = (file: File) => {
   if (!file.name.endsWith('.zip')) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Only ZIP files are allowed",
     });
     return;
@@ -252,18 +252,16 @@ const formatFileSize = (bytes: number): string => {
 // Upload source maps
 const uploadSourceMaps = async () => {
   if (!formData.value.file) {
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please select a ZIP file to upload",
     });
     return;
   }
 
   if (!formData.value.service || !formData.value.version) {
-    $q.notify({
-      type: "negative",
-      message: "Please fill in all required fields",
-    });
+    serviceError.value = formData.value.service ? "" : "Service is required";
+    versionError.value = formData.value.version ? "" : "Version is required";
     return;
   }
 
@@ -281,8 +279,8 @@ const uploadSourceMaps = async () => {
       uploadData
     );
 
-    $q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: "Source maps uploaded successfully",
     });
 
@@ -290,8 +288,8 @@ const uploadSourceMaps = async () => {
     navigateBack();
   } catch (error: any) {
     console.error("Error uploading source maps:", error);
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.response?.data?.message || error?.message || "Failed to upload source maps",
     });
   } finally {
@@ -302,7 +300,6 @@ const uploadSourceMaps = async () => {
 
 <style lang="scss" scoped>
 .upload-source-maps-page {
-  height: calc(100vh - var(--navbar-height) - 1.25rem);
   display: flex;
   flex-direction: column;
   background-color: var(--q-background);
@@ -365,9 +362,6 @@ const uploadSourceMaps = async () => {
 }
 
 .file-info {
-  .q-icon {
-    flex-shrink: 0;
-  }
 }
 
 :deep(.q-dark) {

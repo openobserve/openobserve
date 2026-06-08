@@ -4,34 +4,29 @@ const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 
 test.describe("Metrics Configuration Tests", () => {
-  test.describe.configure({ mode: 'serial' });
-  let pm;
-
-  // Ensure metrics are ingested once for all test files
   test.beforeAll(async () => {
     await ensureMetricsIngested();
   });
 
-  test.beforeEach(async ({ page }, testInfo) => {
+  async function setupTest(page, testInfo) {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to metrics page
+    const pm = new PageManager(page);
     await pm.metricsPage.gotoMetricsPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
     testLogger.info('Test setup completed - navigated to metrics page');
-  });
+    return pm;
+  }
 
-  test.afterEach(async ({ page }, testInfo) => {
+  test.afterEach(async ({}, testInfo) => {
     testLogger.testEnd(testInfo.title, testInfo.status);
   });
 
   // CONSOLIDATED TEST 1: Time range configurations (date picker, presets, auto-refresh) (3 tests → 1 test)
   test("Configure time range settings (custom dates, presets, auto-refresh)", {
     tag: ['@metrics', '@config', '@datetime', '@timerange', '@refresh', '@P1', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing time range configuration features');
 
     // Test 1: Custom date range
@@ -42,13 +37,13 @@ test.describe("Metrics Configuration Tests", () => {
       testLogger.info('Date picker opened');
 
       const customRange = await pm.metricsPage.getCustomRangeOption();
-      if (await customRange.isVisible()) {
+      if (await customRange.isVisible().catch(() => false)) {
         await customRange.click();
         testLogger.info('Custom date range option selected');
       }
 
       const dateInput = await pm.metricsPage.getDateInput();
-      if (await dateInput.isVisible()) {
+      if (await dateInput.isVisible().catch(() => false)) {
         testLogger.info('Date input field is visible');
       }
     }
@@ -57,9 +52,8 @@ test.describe("Metrics Configuration Tests", () => {
     testLogger.info('Testing time range presets');
     const datePicker = await pm.metricsPage.getDateTimePicker();
 
-    if (await datePicker.isVisible()) {
+    if (await datePicker.isVisible().catch(() => false)) {
       await datePicker.click();
-      await page.waitForTimeout(500);
 
       const presets = [
         'Last 5 minutes',
@@ -76,7 +70,10 @@ test.describe("Metrics Configuration Tests", () => {
           testLogger.info(`Found preset: ${preset}`);
           foundPreset = true;
           if (preset === 'Last 1 hour') {
-            await presetOption.click();
+            // Clicking the preset triggers an immediate popover close + Vue re-render,
+            // which can detach the button mid-click. Use force:true to bypass the
+            // element-stability retry loop.
+            await presetOption.click({ force: true });
             testLogger.info('Selected "Last 1 hour" preset');
             break;
           }
@@ -86,7 +83,7 @@ test.describe("Metrics Configuration Tests", () => {
       // Should have found at least one preset option (or date picker may use different UI)
       if (!foundPreset) {
         testLogger.warn('No preset options found - date picker may use different UI pattern');
-        // Close the date picker if it's still open
+        // Close the date picker via keyboard
         await page.keyboard.press('Escape');
       } else {
         expect(foundPreset).toBe(true);
@@ -97,11 +94,12 @@ test.describe("Metrics Configuration Tests", () => {
     testLogger.info('Testing auto-refresh interval configuration');
     const refreshButton = await pm.metricsPage.getRefreshButton();
 
-    if (await refreshButton.isVisible()) {
+    if (await refreshButton.isVisible().catch(() => false)) {
       await refreshButton.click();
-      await page.waitForTimeout(500);
 
       const intervalOptions = await pm.metricsPage.getIntervalOptions();
+      // Wait briefly for the dropdown to populate; rely on count() poll.
+      await expect.poll(async () => intervalOptions.count(), { timeout: 5000 }).toBeGreaterThanOrEqual(0);
       const optionCount = await intervalOptions.count();
 
       if (optionCount > 0) {
@@ -117,11 +115,11 @@ test.describe("Metrics Configuration Tests", () => {
   // CONSOLIDATED TEST 2: Panel and display settings (panel settings, axis, threshold, export) (4 tests → 1 test)
   test("Configure panel display settings (settings, axis, threshold, export)", {
     tag: ['@metrics', '@config', '@panel', '@axis', '@threshold', '@export', '@P2', '@all']
-  }, async ({ page }) => {
+  }, async ({ page }, testInfo) => {
+    const pm = await setupTest(page, testInfo);
     testLogger.info('Testing panel display settings configuration');
 
     await pm.metricsPage.executeQuery('cpu_usage');
-    await page.waitForTimeout(2000);
 
     // Test 1: Panel display settings
     testLogger.info('Testing panel display settings');
@@ -129,7 +127,6 @@ test.describe("Metrics Configuration Tests", () => {
 
     if (await settingsButton.isVisible().catch(() => false)) {
       await settingsButton.click();
-      await page.waitForTimeout(500);
       testLogger.info('Settings button clicked');
 
       const settingsPanel = await pm.metricsPage.getSettingsPanel();
@@ -177,7 +174,6 @@ test.describe("Metrics Configuration Tests", () => {
 
     if (await axisButton.isVisible().catch(() => false)) {
       await axisButton.click();
-      await page.waitForTimeout(500);
       testLogger.info('Axis configuration button clicked');
 
       const axisOptions = ['Linear', 'Logarithmic', 'Min value', 'Max value', 'Auto scale'];
@@ -193,13 +189,11 @@ test.describe("Metrics Configuration Tests", () => {
     // Test 3: Threshold configuration
     testLogger.info('Testing threshold configuration');
     await pm.metricsPage.executeQuery('memory_usage');
-    await page.waitForTimeout(2000);
 
     const thresholdButton = await pm.metricsPage.getThresholdButton();
 
     if (await thresholdButton.isVisible().catch(() => false)) {
       await thresholdButton.click();
-      await page.waitForTimeout(500);
       testLogger.info('Threshold configuration button clicked');
 
       const thresholdInputs = await pm.metricsPage.getThresholdInputs();
@@ -216,13 +210,11 @@ test.describe("Metrics Configuration Tests", () => {
     // Test 4: Export configuration
     testLogger.info('Testing export configuration');
     await pm.metricsPage.executeQuery('up');
-    await page.waitForTimeout(2000);
 
     const exportButton = await pm.metricsPage.getExportButton();
 
     if (await exportButton.isVisible().catch(() => false)) {
       await exportButton.click();
-      await page.waitForTimeout(500);
       testLogger.info('Export button clicked');
 
       const exportOptions = await pm.metricsPage.getExportOptions();
@@ -231,7 +223,7 @@ test.describe("Metrics Configuration Tests", () => {
       if (optionCount > 0) {
         testLogger.info(`Found ${optionCount} export options`);
 
-        const csvOption = exportOptions.filter({ hasText: 'CSV' }).first();
+        const csvOption = await pm.metricsPage.getCsvExportOption();
         if (await csvOption.isVisible().catch(() => false)) {
           testLogger.info('CSV export option available');
         }

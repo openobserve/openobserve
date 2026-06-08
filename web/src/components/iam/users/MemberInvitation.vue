@@ -15,71 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
+  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
     <div
-      class="col-12 flex tw:ml-2"
+      class="tw:flex tw:items-center tw:gap-3"
       v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
     >
-
-
-      <div
-        class="row invite-user"
-        style="width: calc(100% - 110px); display: inline-flex"
-      >
-        <q-input
+      <div style="position: relative">
+        <OInput
           v-model="userEmail"
-          borderless
-          filled
-          dense
           :placeholder="t('user.inviteByEmail')"
-          style="width: calc(100% - 120px)"
-          class="q-pr-sm"
+          class="tw:w-56"
         />
-        <div class="flex justify-center">
-          <q-select
-            dense
-            filled
-            borderless
-            v-model="selectedRole"
-            option-label="label"
-            option-value="value"
-            emit-value
-            map-options
-            :options="options"
-            style="width: 120px"
-            class="q-pr-sm"
-          />
-        </div>
+        <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
       </div>
-      <span style="width: 100px; display: block; float: right; position: relative; top: 1px;">
-        <OButton
-          variant="primary"
-          size="xs"
-          :disabled="userEmail == ''"
-          @click="inviteUser()"
-        >
-          {{ t('user.sendInvite') }}
-        </OButton>
-      </span>
+      <OSelect
+        v-model="selectedRole"
+        :options="options"
+        labelKey="label"
+        valueKey="value"
+        style="width: 120px"
+      />
+      <OButton
+        variant="primary"
+        size="xs"
+        class="tw:!h-8"
+        :disabled="userEmail == ''"
+        @click="inviteUser()"
+      >
+        {{ t('user.sendInvite') }}
+      </OButton>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import { validateEmail } from "@/utils/zincutils";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "MemberInvitationPage",
-  components: { OButton },
+  components: { OButton, OInput, OSelect, OTooltip },
   props: {
     currentrole: {
       type: String,
@@ -90,7 +76,6 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const $q = useQuasar();
 
     const userEmail: any = ref("");
     const options = ref();
@@ -117,11 +102,11 @@ export default defineComponent({
       );
 
       if (!validationArray.includes(false)) {
-        const dismiss = $q.notify({
-          spinner: true,
+        const dismiss = toast({
+          variant: "loading",
           message: "Please wait...",
-          timeout: 2000,
-        });
+                  timeout: 0,
+});
 
         organizationsService
           .add_members(
@@ -134,14 +119,14 @@ export default defineComponent({
             if (data.data.invalid_members != null) {
               const message = `Error while member invitation: ${data.data.invalid_members.toString()}`;
 
-              $q.notify({
-                type: "negative",
+              toast({
+                variant: "error",
                 message: message,
                 timeout: 15000,
               });
             } else {
-              $q.notify({
-                type: "positive",
+              toast({
+                variant: "success",
                 message: data.message,
                 timeout: 5000,
               });
@@ -153,8 +138,8 @@ export default defineComponent({
           })
           .catch((error) => {
             dismiss();
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: error?.response?.data?.message || error.message,
               timeout: 5000,
             });
@@ -169,8 +154,8 @@ export default defineComponent({
           page: "Users",
         });
       } else {
-        $q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Please enter correct email id.`,
         });
       }
@@ -194,7 +179,6 @@ export default defineComponent({
       options,
       inviteUser,
       currentUserRole,
-      $q
     };
   },
 });

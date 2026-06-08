@@ -1,5 +1,9 @@
 <template>
-  <div v-if="shouldShowJoins" class="joins-container">
+  <div
+    v-if="shouldShowJoins"
+    class="joins-container"
+    data-test="dashboard-joins-container"
+  >
     <div class="joins-header">
       <div class="layout-name">{{ t("panel.joins") }}</div>
       <span class="layout-separator">:</span>
@@ -10,51 +14,54 @@
           class="join-item"
         >
           <OButtonGroup class="axis-field" radius="sm">
-            <OButton
-              variant="primary"
-              size="chip-12"
-              :data-test="`dashboard-join-item-${index}`"
-            >
-              <div class="join-btn-content">
-                <LeftJoinTypeSvg
-                  v-if="joinObj?.joinType === 'left'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <InnerJoinTypeSvg
-                  v-else-if="joinObj?.joinType === 'inner'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <RightJoinTypeSvg
-                  v-else-if="joinObj?.joinType === 'right'"
-                  :shouldFill="true"
-                  class="join-type-icon"
-                />
-                <span class="join-stream-label">{{ joinObj?.stream }}</span>
-              </div>
-              <q-menu
-                class="q-pa-md"
+            <ODropdown>
+              <template #trigger>
+                <OButton
+                  variant="primary"
+                  size="chip-12"
+                  :data-test="`dashboard-join-item-${index}`"
+                  icon-right="arrow-drop-down"
+                >
+                  <div class="join-btn-content">
+                    <LeftJoinTypeSvg
+                      v-if="joinObj?.joinType === 'left'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <InnerJoinTypeSvg
+                      v-else-if="joinObj?.joinType === 'inner'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <RightJoinTypeSvg
+                      v-else-if="joinObj?.joinType === 'right'"
+                      :shouldFill="true"
+                      class="join-type-icon"
+                    />
+                    <span class="join-stream-label">{{ joinObj?.stream }}</span>
+                  </div>
+                </OButton>
+              </template>
+              <div
+                class="tw:p-4"
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp
-                  :class="themeClass"
                   v-model="currentJoins[index]"
                   :joinIndex="index"
                   :mainStream="mainStreamName"
                 />
-              </q-menu>
-              <template #icon-right><q-icon name="arrow_drop_down" /></template>
-            </OButton>
+              </div>
+            </ODropdown>
             <OButton
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
+              icon-left="close"
             >
-              <template #icon-left><q-icon name="close" /></template>
-              <q-tooltip>{{ t("panel.removeJoin") }}</q-tooltip>
+              <OTooltip :content="t('panel.removeJoin')" />
             </OButton>
           </OButtonGroup>
         </div>
@@ -64,9 +71,9 @@
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
+          icon-left="add"
         >
-          <template #icon-left><q-icon name="add" /></template>
-          <q-tooltip>{{ t("panel.addJoin") }}</q-tooltip>
+          <OTooltip :content="t('panel.addJoin')" />
         </OButton>
       </div>
     </div>
@@ -77,8 +84,9 @@
 import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import AddJoinPopUp from "./AddJoinPopUp.vue";
@@ -142,7 +150,9 @@ export default defineComponent({
   components: {
     OButtonGroup,
     OButton,
+    ODropdown,
     AddJoinPopUp,
+    OTooltip,
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,
     RightJoinTypeSvg,
@@ -159,7 +169,6 @@ export default defineComponent({
     );
 
     const { t } = useI18n();
-    const store = useStore();
 
     /**
      * Determines if joins section should be displayed
@@ -186,13 +195,6 @@ export default defineComponent({
      */
     const mainStreamName = computed(() => {
       return getCurrentQuery()?.fields?.stream ?? "";
-    });
-
-    /**
-     * Returns theme class based on current theme
-     */
-    const themeClass = computed(() => {
-      return store.state.theme === "dark" ? "dark-mode" : "bg-white";
     });
 
     /**
@@ -347,12 +349,10 @@ export default defineComponent({
 
     return {
       t,
-      store,
       dashboardPanelData,
       shouldShowJoins,
       currentJoins,
       mainStreamName,
-      themeClass,
       handleAddJoin,
       handleRemoveJoin,
     };
@@ -368,7 +368,7 @@ export default defineComponent({
 .joins-header {
   display: flex;
   flex-direction: row;
-  padding-left: 16px;
+  padding-left: 0.75rem;
 }
 
 .layout-name {
@@ -390,7 +390,7 @@ export default defineComponent({
   margin: 5px;
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }

@@ -15,22 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 3px 16px 16px 16px; display: flex; gap: 16px">
-    <div>
-      <q-input
-        dense
-        filled
+  <div
+    data-test="dashboard-build-field-popup-container"
+    style="padding: 3px 16px 16px 16px; display: flex; gap: 16px"
+  >
+    <div data-test="dashboard-build-field-popup-left-section">
+      <OInput
         data-test="dashboard-x-item-input"
         :label="t('common.label')"
         v-model="modelValue.label"
-        :rules="[(val: any) => val.length > 0 || 'Required']"
+        :error="labelTouched && !modelValue.label"
+        :error-message="t('common.required') || 'Required'"
+        @blur="labelTouched = true"
       />
       <div v-if="!customQuery && modelValue.isDerived">
         <SortByBtnGrp :fieldObj="modelValue" />
       </div>
     </div>
-    <div>
-      <div v-if="!customQuery && !modelValue.isDerived" class="q-mr-xs q-mb-sm">
+    <div data-test="dashboard-build-field-popup-right-section">
+      <div v-if="!customQuery && !modelValue.isDerived" class="tw:mr-1 tw:mb-2">
         <DynamicFunctionPopUp
           :modelValue="modelValue"
           @update:modelValue="(newValue) => emit('update:modelValue', newValue)"
@@ -43,17 +46,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, inject } from "vue";
+import { defineComponent, inject, ref } from "vue";
 
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { useI18n } from "vue-i18n";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "BuildFieldPopUp",
   components: {
     SortByBtnGrp,
     DynamicFunctionPopUp,
+    OInput,
   },
   props: {
     modelValue: {
@@ -71,10 +76,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t } = useI18n();
+    const labelTouched = ref(false);
 
     return {
       t,
       emit,
+      labelTouched,
     };
   },
 });

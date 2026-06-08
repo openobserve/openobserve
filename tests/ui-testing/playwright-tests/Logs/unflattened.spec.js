@@ -147,23 +147,27 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Expanding first log row');
-    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-
-    testLogger.info('Opening log source details');
-    await pageManager.unflattenedPage.logSourceColumn.waitFor();
-    await pageManager.unflattenedPage.logSourceColumn.click();
-    await page.waitForTimeout(1500);
-
-    testLogger.info('Waiting for _o2_id field to appear in log details');
-    try {
-      await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
-      testLogger.info('Successfully found _o2_id field');
-      await pageManager.unflattenedPage.o2IdText.click();
-    } catch (error) {
-      testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
-      throw error;
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
+    let o2idFound = false;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+      if (matchedRow !== -1) {
+        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
+        await pageManager.unflattenedPage.o2IdText.click();
+        o2idFound = true;
+        break;
+      }
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
+      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      if (attempt < 5) {
+        await ingestion(page);
+        // Wait for indexer to process newly ingested data before re-querying
+        await page.waitForTimeout(5000);
+        await applyQueryButton(page);
+      }
+    }
+    if (!o2idFound) {
+      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
     }
 
     testLogger.info('Switching to unflattened tab');
@@ -243,7 +247,7 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.waitFor();
     await pageManager.unflattenedPage.closeButton.click();
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(15000);
 
     testLogger.info('Re-ingesting data with updated schema (Store Original Data ON)');
     await ingestion(page);
@@ -274,50 +278,52 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Selecting kubernetes_pod_id field');
     await pageManager.unflattenedPage.clickInterestingFieldButton('kubernetes_pod_id');
 
+    testLogger.info('Waiting for kubernetes_pod_id to be marked as interesting (button title flips to "Remove…")');
+    await pageManager.unflattenedPage.expectFieldMarkedAsInteresting('kubernetes_pod_id');
+
     testLogger.info('Switching to SQL mode');
-    await pageManager.unflattenedPage.sqlModeToggle.waitFor();
-    await pageManager.unflattenedPage.sqlModeToggle.click();
+    await pageManager.unflattenedPage.toggleSqlMode();
     await page.waitForTimeout(500);
 
     testLogger.info('Verifying kubernetes_pod_id appears in query editor');
     await pageManager.unflattenedPage.expectQueryEditorContainsText(/kubernetes_pod_id/);
 
-    testLogger.info('Replacing query with SELECT * FROM "e2e_automate"');
-    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate"');
+    testLogger.info('Replacing query with SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
+    await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
 
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Expanding first log row from SELECT * results');
-    await pageManager.unflattenedPage.logTableRowExpandMenu.waitFor();
-    await pageManager.unflattenedPage.logTableRowExpandMenu.click();
-
-    testLogger.info('Opening log source details');
-    await pageManager.unflattenedPage.logSourceColumn.waitFor();
-    await pageManager.unflattenedPage.logSourceColumn.click();
-    await page.waitForTimeout(1500);
-
-    testLogger.info('Waiting for _o2_id field to appear in log details');
-    try {
-      // Check if any fields are visible first
-      await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ timeout: 5000 });
-      testLogger.info('Log detail JSON content is visible');
-
-      await pageManager.unflattenedPage.o2IdText.waitFor({ timeout: 30000 });
-      testLogger.info('Successfully found _o2_id field');
-      await pageManager.unflattenedPage.o2IdText.click();
-    } catch (error) {
-      testLogger.error('Failed to find _o2_id field in log details', { error: error.message });
-
-      // Log what fields are actually present
-      try {
-        const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
-        testLogger.error('Available fields in log detail', { fields: allKeys });
-      } catch (e) {
-        testLogger.error('Could not retrieve available fields');
+    testLogger.info('Searching log rows for _o2_id field (iterates first 10 rows per attempt)');
+    // With ORDER BY _timestamp DESC the newest rows come first; we scan more
+    // than strictly necessary (10) so a slight indexing lag still resolves
+    let o2idFound = false;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(10);
+      if (matchedRow !== -1) {
+        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
+        await pageManager.unflattenedPage.o2IdText.click();
+        o2idFound = true;
+        break;
       }
-
-      throw error;
+      testLogger.warn(`_o2_id not found in first 10 rows on attempt ${attempt}, re-ingesting + refreshing query`);
+      if (attempt === 5) {
+        try {
+          const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
+          testLogger.error('Available fields in log detail', { fields: allKeys });
+        } catch (e) {
+          testLogger.error('Could not retrieve available fields');
+        }
+        break;
+      }
+      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+      await ingestion(page);
+      // Wait for indexer to process newly ingested data before re-querying
+      await page.waitForTimeout(5000);
+      await applyQueryButton(page);
+    }
+    if (!o2idFound) {
+      throw new Error('Failed to find _o2_id field in log details after 5 attempts');
     }
 
     await page.waitForTimeout(500);

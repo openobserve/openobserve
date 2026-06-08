@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div class="trace-combined-header-wrapper card-container">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container">
         <!-- New Modern Header -->
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
@@ -43,12 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:mr-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="arrow_back" size="16px" />
-              <q-tooltip>{{
-                areFiltersAdded
-                  ? t("traces.applyPendingFilters")
-                  : t("traces.backToTraces")
-              }}</q-tooltip>
+              <OIcon name="arrow-back" size="sm" />
+              <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
             </OButton>
 
             <div
@@ -61,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
-                <q-tooltip>{{ traceTree[0]?.operationName }}</q-tooltip>
+                <OTooltip :content="traceTree[0]?.operationName" />
               </div>
 
               <!-- Service, Timestamp, and Trace ID -->
@@ -94,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <q-icon
+                <OIcon
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content_copy"
-                  size="12px"
+                  name="content-copy"
+                  size="xs"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
@@ -118,10 +114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <q-icon
+                  <OIcon
                     data-test="trace-details-copy-session-id-btn"
-                    name="content_copy"
-                    size="12px"
+                    name="content-copy"
+                    size="xs"
                     class="tw:cursor-pointer hover:tw:text-[var(--o2-text-primary)]"
                     title="Copy Session ID"
                     @click="copySessionId"
@@ -129,12 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <q-icon
+                <OIcon
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
                   class="tw:cursor-pointer hover:tw:text-[var(--o2-theme-color)]"
-                  size="14px"
-                  name="open_in_new"
+                  size="xs"
+                  name="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
@@ -151,10 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span data-test="span-count-text">
                   {{ formatLargeNumber(effectiveSpanList.length) }}
                   {{ t("traces.spansLabel") }}
-                  <q-tooltip
-                    >{{ effectiveSpanList.length }}
-                    {{ t("traces.spansLabel") }}</q-tooltip
-                  >
+                  <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
                 </span>
               </div>
 
@@ -171,10 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ formatLargeNumber(errorSpansCount) }}
                   {{ t("traces.errorsLabel") }}</span
                 >
-                <q-tooltip
-                  >{{ errorSpansCount }}
-                  {{ t("traces.errorsLabel") }}</q-tooltip
-                >
+                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
               </div>
             </div>
           </div>
@@ -192,26 +182,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><q-icon name="filter_alt"
-size="14px"
+                ><OIcon name="filter-alt"
+size="xs"
               /></template>
-              <span class="tw:text-[0.75rem]">{{
-                t("traces.viewFilters")
-              }}</span>
-              <q-tooltip>{{ t("traces.reviewAndApplyFilters") }}</q-tooltip>
+              <span class="tw:text-[0.75rem]">{{ t("traces.viewFilters") }}</span>
+              <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
             <!-- Expand button (embedded mode) -->
             <OButton
               v-if="mode === 'embedded' && showExpandButton"
               data-test="trace-details-expand-btn"
-              variant="ghost-muted"
+              variant="outline"
               size="icon-xs"
-              class="tw:ml-1.5"
               @click="handleExpandToFullView"
             >
-              <q-icon name="open_in_new" size="14px" />
-              <q-tooltip>{{ t("traces.openInTraces") }}</q-tooltip>
+              <OIcon name="open-in-new" size="sm" />
+              <OTooltip :content="t('traces.openInTraces')" />
             </OButton>
 
             <!-- Share button (standalone mode) -->
@@ -220,6 +207,7 @@ size="14px"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
+              buttonClass="tw:mr-1!"
               size="icon-xs"
             />
 
@@ -227,13 +215,12 @@ size="14px"
             <OButton
               v-if="mode === 'standalone' && showCloseButton"
               data-test="trace-details-close-btn"
-              variant="ghost-muted"
+              variant="ghost"
               size="icon-xs"
-              class="tw:mx-1.5"
               @click="handleBackOrClose"
             >
-              <q-icon name="close" size="14px" />
-              <q-tooltip>{{ t("common.cancel") }}</q-tooltip>
+              <OIcon name="close" size="sm" />
+              <OTooltip :content="t('common.cancel')" />
             </OButton>
           </div>
         </header>
@@ -255,28 +242,28 @@ size="14px"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
-                  ><AlignLeft class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="align-left" size="sm" class="tw:shrink-0"
                 /></template>
                 Waterfall
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left
-                  ><Flame class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="flame" size="sm" />
+                </template>
                 Flame Graph
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
-                  ><Network class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
                 /></template>
                 Trace Graph
               </OToggleGroupItem>
               <OToggleGroupItem v-if="hasLLMSpans"
 value="dag"
 size="sm">
-                <template #icon-left
-                  ><GitBranch class="tw:size-3.5 tw:shrink-0"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
                 DAG
               </OToggleGroupItem>
               <!--
@@ -294,7 +281,7 @@ size="sm">
                 data-test="trace-details-thread-tab"
               >
                 <template #icon-left
-                  ><MessageSquare class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="chat" size="xs" class="tw:shrink-0"
                 /></template>
                 Thread
               </OToggleGroupItem>
@@ -304,7 +291,7 @@ size="sm">
                 size="sm"
               >
                 <template #icon-left
-                  ><ClipboardCheck class="tw:size-3.5 tw:shrink-0"
+                  ><OIcon name="assignment-turned-in" size="xs" class="tw:shrink-0"
                 /></template>
                 Evaluations
               </OToggleGroupItem>
@@ -319,26 +306,21 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-0!"
+              class="unified-search-group tw:mr-0! tw:gap-1 tw:flex tw:items-center"
             >
               <div class="log-stream-search-input">
-                <q-input
+                <OSearchInput
                   v-model="searchQuery"
                   data-test="trace-details-search-input"
-                  outlined
-                  dense
                   :placeholder="t('traces.searchInSpans')"
                   clearable
+                  size="sm"
                   class="tw:text-[12px]!"
                   @update:model-value="handleSearchQueryChange"
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="search" size="1rem" />
-                  </template>
-                </q-input>
+                />
               </div>
               <!-- Search Results Navigation -->
-              <div class="search-navigation-container">
+              <div class="search-navigation-container tw:h-8.2! tw:py-[0.125px]!">
                 <div
                   class="search-results-counter"
                   data-test="trace-details-search-results"
@@ -357,8 +339,8 @@ size="sm">
                     size="icon"
                     @click="prevMatch"
                   >
-                    <q-icon name="keyboard_arrow_up" size="16px" />
-                    <q-tooltip>{{ t("traces.previousMatch") }}</q-tooltip>
+                    <OIcon name="keyboard-arrow-up" size="sm" />
+                    <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
                   <div class="button-separator"></div>
                   <OButton
@@ -370,8 +352,8 @@ size="sm">
                     size="icon"
                     @click="nextMatch"
                   >
-                    <q-icon name="keyboard_arrow_down" size="16px" />
-                    <q-tooltip>{{ t("traces.nextMatch") }}</q-tooltip>
+                    <OIcon name="keyboard-arrow-down" size="sm" />
+                    <OTooltip :content="t('traces.nextMatch')" />
                   </OButton>
                 </div>
               </div>
@@ -381,7 +363,7 @@ size="sm">
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
               class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
             >
-              <q-select
+              <OSelect
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
                 :label="
@@ -390,61 +372,9 @@ size="sm">
                     : t('search.selectLogStream')
                 "
                 :options="filteredStreamOptions"
-                data-cy="stream-selection"
-                input-debounce="0"
-                behavior="menu"
-                filled
                 multiple
-                borderless
-                dense
-                fill-input
                 :title="selectedStreamsString"
-              >
-                <template #no-option>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input"
-                      v-model="streamSearchValue"
-                      borderless
-                      filled
-                      debounce="500"
-                      autofocus
-                      dense
-                      size="xs"
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                  <q-item>
-                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                  </q-item>
-                </template>
-                <template #before-options>
-                  <div class="log-stream-search-input">
-                    <q-input
-                      data-test="trace-details-stream-search-input-options"
-                      v-model="streamSearchValue"
-                      borderless
-                      debounce="500"
-                      filled
-                      dense
-                      autofocus
-                      @update:model-value="filterStreamFn"
-                      class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                      :placeholder="t('search.searchStream')"
-                    >
-                      <template #prepend>
-                        <q-icon name="search" class="cursor-pointer" />
-                      </template>
-                    </q-input>
-                  </div>
-                </template>
-              </q-select>
+              />
               <span class="traces-view-logs-btn">
                 <OButton
                   data-test="trace-details-view-logs-btn"
@@ -455,8 +385,8 @@ size="sm">
                   @click="redirectToLogs"
                 >
                   <template #icon-left
-                    ><q-icon name="search"
-size="14px"
+                    ><OIcon name="search"
+size="xs"
                   /></template>
                   {{
                     searchObj.meta.redirectedFromLogs
@@ -465,21 +395,20 @@ size="14px"
                   }}
                 </OButton>
               </span>
-              <OButton
-                v-if="hasRumSessionId"
+            </div>
+            <OButton
+                v-if="hasRumSessionId && !hideSessionReplayButton"
                 data-test="trace-details-view-session-replay-btn"
                 variant="outline"
                 size="sm"
                 class="tw:ml-2"
                 @click="redirectToSessionReplay"
               >
-                <template #icon-left
-                  ><q-icon :name="outlinedPlayCircle"
-size="14px"
-                /></template>
+                <template #icon-left>
+                  <OIcon name="play-circle" size="sm"/>
+                </template>
                 {{ t("rum.playSessionReplay") }}
-              </OButton>
-            </div>
+            </OButton>
           </div>
         </div>
         <div
@@ -528,18 +457,14 @@ size="14px"
                       <div
                         data-test="trace-details-resizer"
                         :style="{
-                          width: '1px',
                           left: `${leftWidth}px`,
                           backgroundColor:
                             store.state.theme === 'dark'
                               ? '#3c3c3c'
                               : '#ececec',
                           zIndex: 999,
-                          top: '-28px',
-                          height: `${spanPositionList.length * spanDimensions.height + 28}px`,
-                          cursor: 'col-resize',
                         }"
-                        class="absolute resize"
+                        class="tw:absolute resize tw:h-full tw:cursor-col-resize tw:top-0 tw:w-[1px]"
                         @mousedown="startResize"
                       />
                       <trace-tree
@@ -763,11 +688,10 @@ size="14px"
                   padding: 40px;
                 "
               >
-                <q-icon
-                  name="table_chart"
-                  size="48px"
-                  style="margin-bottom: 16px"
-                />
+                <OIcon
+                  name="table-chart"
+                  style="margin-bottom: 16px; width: 48px; height: 48px;"
+                 />
                 <div
                   style="font-size: 16px; font-weight: 600; margin-bottom: 8px"
                 >
@@ -825,79 +749,36 @@ size="14px"
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex column items-center justify-center"
+      class="tw:flex tw:flex-col tw:items-center tw:justify-center"
       :style="{ height: '100%' }"
     >
-      <q-spinner-hourglass
+      <OSpinner
         data-test="trace-details-loading-spinner"
-        color="primary"
-        size="3em"
-        :thickness="2"
+        size="lg"
       />
-      <div data-test="trace-details-loading-text" class="q-pt-sm">
+      <div data-test="trace-details-loading-text" class="tw:pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
     </div>
 
     <!-- Filters Sidebar -->
-    <q-dialog
-      v-model="showFilterPopover"
-      position="right"
-      maximized
-      transition-show="slide-left"
-      transition-hide="slide-right"
+    <ODrawer data-test="trace-details-filter-popover-drawer"
+      v-model:open="showFilterPopover"
+      :width="30"
+      :title="t('traces.traceFilters')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-label="t('traces.showTraces')"
+      @click:secondary="showFilterPopover = false"
+      @click:primary="applyAndViewTraces"
     >
-      <q-card
-        class="tw:w-[30vw]! tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-surface)]"
-      >
-        <q-card-section
-          class="tw:flex tw:items-center tw:justify-between tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:pt-3 tw:px-4"
-        >
-          <div
-            class="tw:text-lg tw:font-semibold tw:text-[var(--o2-text-primary)]"
-          >
-            {{ t("traces.traceFilters") }}
-          </div>
-          <OButton variant="ghost-muted"
-size="icon"
-v-close-popup>
-            <q-icon name="close" size="16px" />
-          </OButton>
-        </q-card-section>
-
-        <q-card-section class="tw:flex-1 tw:p-4 tw:flex tw:flex-col">
-          <div
-            class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded"
-          >
-            <CodeQueryEditor
-              v-model:query="localEditorValue"
-              language="sql"
-              class="tw:h-full tw:w-full"
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions
-          align="right"
-          class="tw:border-t tw:border-[var(--o2-border)] tw:p-4 tw:bg-[var(--o2-card-bg)]"
-        >
-          <div class="tw:flex tw:gap-2">
-            <OButton variant="outline"
-size="sm-action"
-v-close-popup>
-              {{ t("common.cancel") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="applyAndViewTraces"
-            >
-              {{ t("traces.showTraces") }}
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <div class="tw:flex-1 tw:border tw:border-[var(--o2-border)] tw:rounded">
+        <CodeQueryEditor
+          v-model:query="localEditorValue"
+          language="sql"
+          class="tw:h-full tw:w-full"
+        />
+      </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -945,13 +826,10 @@ import {
   SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
-import {
-  outlinedInfo,
-  outlinedPlayCircle,
-} from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
@@ -970,15 +848,14 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import {
-  AlignLeft,
-  Flame,
-  Network,
-  GitBranch,
-  ClipboardCheck,
-  MessageSquare,
-} from "lucide-vue-next";
+import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import pipelineService from "@/services/pipelines";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -1060,6 +937,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    hideSessionReplayButton: {
+      type: Boolean,
+      default: false,
+    },
     // Correlation-specific props
     enableCorrelationLinks: {
       type: Boolean,
@@ -1077,12 +958,8 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
-    AlignLeft,
-    Flame,
-    Network,
-    GitBranch,
-    ClipboardCheck,
-    MessageSquare,
+    ODrawer,
+    OIcon,
     ThreadView,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -1090,6 +967,10 @@ export default defineComponent({
     CodeQueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
+    OSpinner,
+    OTooltip,
+    OSearchInput,
+    OSelect,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1168,7 +1049,6 @@ export default defineComponent({
 
     const { t } = useI18n();
 
-    const $q = useQuasar();
 
     const router = useRouter();
 
@@ -1193,10 +1073,9 @@ export default defineComponent({
       localEditorValue.value = applyFilterTerm(term, localEditorValue.value);
       areFiltersAdded.value = true;
 
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: `Filter added: ${field} ${operator} '${value}'`,
-        timeout: 2000,
       });
     };
 
@@ -1671,11 +1550,9 @@ export default defineComponent({
         return;
       }
 
-      // Standalone mode - fetch from API
-      if (props.mode === "standalone") {
-        await loadLogStreams();
-        await getTraceMeta();
-      }
+      // Fetch from API — standalone mode, or embedded with no pre-fetched spans
+      await loadLogStreams();
+      await getTraceMeta();
     };
 
     onMounted(() => {
@@ -1857,144 +1734,8 @@ export default defineComponent({
       return req;
     };
 
-    /**
-     * Fetch RUM events that have the matching trace_id
-     */
-    const fetchRumEventsForTrace = async (
-      traceId: string,
-      startTime: number,
-      endTime: number,
-    ) => {
-      try {
-        // Check if _rumdata stream exists in logs
-        if (!logStreams.value.includes("_rumdata")) {
-          return [];
-        }
-
-        // Check if traceId is valid (indicating _oo_trace_id might be present)
-        if (!traceId) {
-          return [];
-        }
-
-        // Verify _oo_trace_id field exists in _rumdata stream schema
-        const rumStream = await getStream("_rumdata", "logs", true);
-        const hasTraceIdField = rumStream?.schema?.some(
-          (field: any) => field.name === "_oo_trace_id",
-        );
-
-        if (!hasTraceIdField) {
-          return [];
-        }
-
-        const req = {
-          query: {
-            sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-            start_time: startTime - 10000000,
-            end_time: endTime + 10000000,
-            from: 0,
-            size: 100,
-          },
-        };
-
-        const res = await searchService.search(
-          {
-            org_identifier:
-              (router.currentRoute.value.query?.org_identifier as string) ||
-              store.state.selectedOrganization.identifier,
-            query: req,
-            page_type: "logs",
-          },
-          "RUM",
-        );
-
-        return res.data?.hits || [];
-      } catch (error) {
-        console.error("Error fetching RUM events for trace:", error);
-        return [];
-      }
-    };
-
-    /**
-     * Format RUM events as trace spans
-     * This converts RUM event structure to span structure
-     */
-    const formatRumEventsAsSpans = (rumEvents: any[]) => {
-      if (!rumEvents || !rumEvents.length) return [];
-
-      return rumEvents.map((event: any) => {
-        // Calculate start_time and end_time from event timestamp and duration
-        const eventTimestamp = event.date * 1000000; // Convert to nanoseconds
-        const durationNs =
-          event.resource_duration || event.action_duration || 0; // in nanoseconds
-
-        const startTime = eventTimestamp;
-        const endTime = eventTimestamp + durationNs;
-
-        // Determine operation name based on event type
-        let operationName = "Unknown RUM Event";
-        if (event.type === "resource") {
-          operationName = `${event.resource_method || "GET"} ${event.resource_url || "Unknown URL"}`;
-        } else if (event.type === "action") {
-          operationName = `Action: ${event.action_type || "Unknown"} on ${event.action_target_name || "Unknown"}`;
-        } else if (event.type === "view") {
-          operationName = `View: ${event.view_url || "Unknown Page"}`;
-        } else if (event.type === "error") {
-          operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
-        }
-
-        // Generate a unique span_id for the RUM event
-        const spanId =
-          event._oo_span_id ||
-          event[`${event.type}_id`] ||
-          `rum_${event.type}_${event.date}_${Math.random().toString(36).substring(7)}`;
-
-        // Determine parent_span_id from _oo_span_id if available
-        const parentSpanId =
-          event._oo_parent_span_id || event._oo_span_id || "";
-
-        // Add service to selectedTrace if not already present
-        const serviceName = event.service || "Frontend";
-        const traceObj = searchObj.data.traceDetails.selectedTrace as any;
-        const existingService = traceObj.service_name.find(
-          (s: any) => s.service_name === serviceName,
-        );
-
-        if (!existingService) {
-          traceObj.service_name.push({
-            service_name: serviceName,
-            count: 1,
-          });
-        } else {
-          existingService.count = (existingService.count || 0) + 1;
-        }
-
-        return {
-          [store.state.zoConfig.timestamp_column]:
-            event[store.state.zoConfig.timestamp_column],
-          start_time: startTime,
-          end_time: endTime,
-          duration: durationNs / 1000,
-          span_id: spanId,
-          trace_id: event._oo_trace_id,
-          operation_name: operationName,
-          service_name: event.service || "Frontend",
-          span_status:
-            event.type === "error" ||
-            (event.type === "resource" && event.resource_status_code >= 400)
-              ? "ERROR"
-              : "OK",
-          span_kind:
-            event.type === "resource"
-              ? SPAN_KIND_CLIENT
-              : SPAN_KIND_UNSPECIFIED,
-          // Store original RUM event data for reference
-          rum_event_type: event.type,
-          rum_session_id: event.session_id,
-          events: JSON.stringify([event]),
-          rum_date: event.date,
-        };
-      });
-    };
+    const { fetchRumEventsForTrace, formatRumEventsAsSpans } =
+      useRumSpanBuilder(logStreams, searchObj);
 
     const getTraceDetails = async (data: any) => {
       try {
@@ -2004,8 +1745,7 @@ export default defineComponent({
 
         const tracePromise = searchService.search(
           {
-            org_identifier: router.currentRoute.value.query
-              ?.org_identifier as string,
+            org_identifier: effectiveOrgIdentifier.value,
             query: req,
             page_type: "traces",
           },
@@ -2019,15 +1759,34 @@ export default defineComponent({
         );
 
         Promise.all([tracePromise, rumPromise])
-          .then(([traceRes, rumEvents]) => {
+          .then(([traceRes, rumData]) => {
             if (!traceRes.data?.hits?.length) {
               showTraceDetailsError();
               return;
             }
 
             const traceSpans = traceRes.data?.hits || [];
-            const rumSpans = formatRumEventsAsSpans(rumEvents);
-            searchObj.data.traceDetails.spanList = [...rumSpans, ...traceSpans];
+            const {
+              tracedResources,
+              viewEvents,
+              actionEvents,
+              allViewEvents,
+            } = rumData;
+            const rumSpans = formatRumEventsAsSpans(
+              tracedResources,
+              viewEvents,
+              actionEvents,
+              allViewEvents,
+            );
+            // RUM spans take priority over trace spans with the same span_id
+            const rumSpanIds = new Set(rumSpans.map((s: any) => s.span_id));
+            const deduplicatedTraceSpans = traceSpans.filter(
+              (s: any) => !rumSpanIds.has(s.span_id),
+            );
+            searchObj.data.traceDetails.spanList = [
+              ...rumSpans,
+              ...deduplicatedTraceSpans,
+            ];
             updateServiceColors();
             buildTracesTree();
           })
@@ -2401,7 +2160,6 @@ export default defineComponent({
         spans: [],
         index: 0,
         style: {
-          color: "",
         },
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
@@ -2513,12 +2271,9 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      $q.notify({
-        type: "positive",
-        message: "Trace ID copied to clipboard",
-        timeout: 2000,
+      copyToClipboard(spanList.value[0]["trace_id"], {
+        successMessage: "Trace ID copied to clipboard",
       });
-      copyToClipboard(spanList.value[0]["trace_id"]);
     };
 
     const sessionId = computed<string>(() =>
@@ -2527,11 +2282,8 @@ export default defineComponent({
 
     const copySessionId = () => {
       if (!sessionId.value) return;
-      copyToClipboard(sessionId.value);
-      $q.notify({
-        type: "positive",
-        message: "Session ID copied to clipboard",
-        timeout: 2000,
+      copyToClipboard(sessionId.value, {
+        successMessage: "Session ID copied to clipboard",
       });
     };
 
@@ -2709,9 +2461,6 @@ export default defineComponent({
     };
 
     const handleExpandToFullView = () => {
-      // Navigate to full trace details page from embedded mode
-      if (props.mode !== "embedded") return;
-
       const query: any = {
         trace_id: effectiveTraceId.value,
         stream: effectiveStreamName.value,
@@ -2935,8 +2684,8 @@ export default defineComponent({
       sessionId,
       copySessionId,
       traceDetailsShareURL,
-      outlinedInfo,
-      outlinedPlayCircle,
+      "info": "info",
+      outlinedPlayCircle: "play-circle",
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
@@ -3108,20 +2857,9 @@ $traceChartCollapseHeight: 42px;
   &:hover {
     background-color: var(--o2-primary-btn-bg);
     color: #ffffff;
-
-    .q-icon {
-      color: #ffffff !important;
-    }
-  }
+}
 }
 
-.log-stream-search-input {
-  width: 20.2rem;
-
-  .q-field .q-field__control {
-    padding: 0px 8px;
-  }
-}
 
 .toolbar-operation-name {
   max-width: 225px;
@@ -3237,11 +2975,7 @@ html:has(.trace-details) {
   }
 
   .visual-selection-btn {
-    .q-icon {
-      padding-right: 5px;
-      font-size: 15px;
-    }
-  }
+}
 
   .visual-selector-container {
     backdrop-filter: blur(0.625rem);
@@ -3279,7 +3013,7 @@ html:has(.trace-details) {
 
 .trace-copy-icon {
   &:hover {
-    &.q-icon {
+    &.OIcon {
       text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
     }
   }
@@ -3309,119 +3043,24 @@ html:has(.trace-details) {
   }
 }
 
-.log-stream-search-input {
-  .q-field {
-    height: 1.875rem !important;
-    min-height: 1.875rem !important;
-  }
-
-  .q-field .q-field__control {
-    padding: 0px 4px;
-    border-radius: 0.2rem;
-  }
-
-  .q-field .q-field__control:before,
-  .q-field .q-field__control:after {
-    border: none !important;
-    content: none !important;
-  }
-
-  .q-field {
-    &.showLabelOnTop {
-      padding-top: 26px;
-    }
-
-    .q-field__inner {
-      align-self: center;
-      height: 1.875rem !important;
-      min-height: 1.875rem !important;
-    }
-
-    .q-field__control {
-      height: 1.875rem !important;
-      min-height: 1.875rem !important;
-      background-color: var(--o2-page-bg);
-      border: 1px solid var(--o2-border-color);
-      padding: 0 0.5rem !important;
-
-      .q-field__control-container {
-        height: calc(100% - 1px) !important;
-        padding-top: 0px;
-
-        .q-field__native {
-          min-height: calc(100% - 2px) !important;
-          height: 1.875rem !important;
-        }
-
-        .q-field__label {
-          top: 8px;
-        }
-      }
-
-      .q-field__marginal {
-        height: 1.875rem !important;
-
-        .q-icon {
-          font-size: 1.125rem;
-        }
-      }
-    }
-
-    &.q-field--dark .q-field__control {
-      background-color: var(--o2-dark-page-bg);
-    }
-
-    .q-field__bottom {
-      padding: 0.1rem 0 0;
-      min-height: fit-content !important;
-    }
-  }
-}
-
 // Unified Search Group - input and navigation as one element
 .unified-search-group {
   display: flex;
   align-items: stretch;
   width: fit-content;
-  border-radius: 0.2rem;
-  overflow: hidden;
-  border: 0.0625rem solid var(--o2-border-color);
-  background-color: var(--o2-page-bg);
+  border-radius: var(--radius-md);
   transition: border-color 0.2s ease;
-
-  &:hover,
-  &:focus-within {
-    border-color: var(--o2-theme-color);
-  }
-
-  // Remove borders from child elements
-  .log-stream-search-input {
-    border: none;
-
-    .q-field {
-      .q-field__control {
-        border: none !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-
-        &:before,
-        &:after {
-          border: none !important;
-        }
-      }
-    }
-  }
 }
 
 // Search Navigation Container - integrated with input
 .search-navigation-container {
   display: inline-flex;
   align-items: center;
-  height: 1.875rem;
-  border-left: 0.0625rem solid var(--o2-border-color);
   background-color: transparent;
   padding: 0 0.125rem;
   transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  border: 0.0625rem solid var(--color-input-border);
 
   .search-results-counter {
     display: flex;
@@ -3462,12 +3101,7 @@ html:has(.trace-details) {
       padding: 0;
       border-radius: 0.125rem;
       transition: all 0.2s ease;
-
-      .q-icon {
-        font-size: 1.125rem;
-      }
-
-      &:hover:not(:disabled) {
+&:hover:not(:disabled) {
         background-color: var(--o2-hover-accent);
       }
 
@@ -3520,23 +3154,6 @@ body.body--dark {
 
 .trace-search-container {
   border-radius: 0.5rem;
-}
-
-.q-menu .q-item.q-item--active {
-  background-color: rgba(25, 118, 210, 0.2) !important;
-  font-weight: 600 !important;
-}
-
-.q-dark .q-menu .q-item.q-item--active {
-  background-color: rgba(144, 202, 249, 0.2) !important;
-}
-
-.q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(25, 118, 210, 0.1) !important;
-}
-
-.q-dark .q-menu .q-item.q-manual-focusable--focused {
-  background-color: rgba(144, 202, 249, 0.1) !important;
 }
 
 .trace-back-btn {

@@ -441,13 +441,12 @@ async fn prepare_alert(
                 }
             }
         }
-        QueryType::PromQL => {
-            if alert.query_condition.promql.is_none()
+        QueryType::PromQL
+            if (alert.query_condition.promql.is_none()
                 || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()
-            {
-                return Err(AlertError::PromqlMissingQuery);
-            }
+                || alert.query_condition.promql_condition.is_none()) =>
+        {
+            return Err(AlertError::PromqlMissingQuery);
         }
         _ => {}
     }
@@ -869,9 +868,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -879,9 +877,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
@@ -949,9 +946,8 @@ pub async fn trigger_by_name(
         {
             Ok(Some(outcome)) => {
                 log::info!(
-                    "Manual trigger for alert {}/{} correlated to incident {} (service: {})",
-                    org_id,
-                    &alert.name,
+                    "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
+                    alert.name,
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
@@ -959,9 +955,8 @@ pub async fn trigger_by_name(
             }
             Ok(None) => {
                 log::debug!(
-                    "No incident correlation for manually triggered alert {}/{}",
-                    org_id,
-                    &alert.name
+                    "No incident correlation for manually triggered alert {org_id}/{}",
+                    alert.name
                 );
                 false
             }
@@ -1186,6 +1181,11 @@ async fn send_notification(
         )
     };
     let is_email = matches!(dest_type, DestinationType::Email(_));
+    let empty_meta = hashbrown::HashMap::new();
+    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
+        DestinationType::Http(endpoint) => &endpoint.metadata,
+        _ => &empty_meta,
+    };
     let msg: String = process_dest_template(
         &org_name,
         &template.body,
@@ -1198,6 +1198,7 @@ async fn send_notification(
             evaluation_timestamp,
             is_email,
         },
+        metadata,
     )
     .await;
 
@@ -1214,6 +1215,7 @@ async fn send_notification(
                 evaluation_timestamp,
                 is_email,
             },
+            metadata,
         )
         .await
     } else {
@@ -1527,6 +1529,7 @@ async fn process_dest_template(
     rows: &[Map<String, Value>],
     rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
+    metadata: &hashbrown::HashMap<String, String>,
 ) -> String {
     let cfg = get_config();
     let ProcessTemplateOptions {
@@ -1599,18 +1602,10 @@ async fn process_dest_template(
     };
 
     let mut alert_query = String::new();
-    let function_content = if alert.query_condition.vrl_function.is_none() {
-        "".to_owned()
+    let function_content = if let Some(v) = &alert.query_condition.vrl_function {
+        format!("&functionContent={}", v.replace('+', "%2B"))
     } else {
-        format!(
-            "&functionContent={}",
-            alert
-                .query_condition
-                .vrl_function
-                .as_ref()
-                .unwrap()
-                .replace('+', "%2B")
-        )
+        "".to_owned()
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
@@ -1838,6 +1833,12 @@ async fn process_dest_template(
         for (key, value) in attrs.iter() {
             process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
         }
+    }
+
+    // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
+    // credential_priority)
+    for (key, value) in metadata.iter() {
+        resp = resp.replace(&format!("{{{}}}", key), value);
     }
 
     resp
@@ -3111,9 +3112,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         // The result should be valid JSON with rows as a JSON array of objects
         let parsed: Value = serde_json::from_str(&result).unwrap();
@@ -3150,9 +3158,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let data = &parsed["data"];
@@ -3183,9 +3198,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["embeds"][0]["fields"];
@@ -3222,9 +3244,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         // String values should be joined with \n (non-email), not injected as JSON array
         assert!(result.contains("Alert 1: user Alice"));
@@ -3301,9 +3330,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["embeds"][0]["fields"];
@@ -3349,9 +3385,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let fields = &parsed["fields"];
@@ -3384,9 +3427,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         let data = &parsed["data"];
@@ -3906,9 +3956,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["text"], "stacktrace: NullPointe");
@@ -3932,9 +3989,16 @@ mod tests {
             is_email: false,
         };
 
-        let result =
-            process_dest_template("test_org", dest_tpl, &alert, &rows, &rows_tpl_val, options)
-                .await;
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &alert,
+            &rows,
+            &rows_tpl_val,
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
 
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["full"], "hello world");

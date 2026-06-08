@@ -15,35 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="column full-height">
+  <div class="tw:flex tw:flex-col tw:h-full">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
-      <q-form ref="addDashboardForm" @submit="onSubmit">
-        <q-input
+    <OForm ref="formRef" :default-values="{ name: '' }" @submit="saveDashboardApi.execute()">
+    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3">
+        <OFormInput
+          name="name"
           v-model="dashboardData.title"
           :label="t('dashboard.name') + ' *'"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
           data-test="dashboard-general-setting-name"
-          borderless
-          hide-bottom-space
+          :validators="[(val) => !String(val ?? '').trim() ? t('dashboard.nameRequired') : undefined]"
         />
-        <span>&nbsp;</span>
-        <q-input
+        <OInput
           v-model="dashboardData.description"
           :label="t('dashboard.typeDesc')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          dense
           data-test="dashboard-general-setting-description"
-          borderless
-          hide-bottom-space
         />
         <div
           v-if="dateTimeValue"
@@ -53,28 +40,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons q-my-sm"
+            class="dashboard-icons tw:my-2"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
             :auto-apply-dashboard="true"
+            menu-align="start"
           />
         </div>
-        <q-toggle
+        <OSwitch
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
           data-test="dashboard-general-setting-dynamic-filter"
-          class="tw:h-[36px] -tw:ml-3 o2-toggle-button-lg"
           size="lg"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-toggle-button-lg-dark'
-              : 'o2-toggle-button-lg-light'
-          "
         />
-        <div class="flex justify-center q-mt-lg tw:gap-2">
+        <div class="tw:flex tw:justify-center tw:gap-2">
           <OButton
-            v-close-popup="true"
+            @click="$emit('close')"
             variant="outline"
             size="sm-action"
             data-test="dashboard-general-setting-cancel-btn"
@@ -84,19 +66,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="dashboardData.title.trim() === ''"
             variant="primary"
             size="sm-action"
-            type="submit"
+            @click="formRef?.submit()"
             :loading="saveDashboardApi.isLoading.value"
             data-test="dashboard-general-setting-save-btn"
             >{{ t("dashboard.save") }}</OButton
           >
         </div>
-      </q-form>
+      </div>
+    </OForm>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, onMounted, ref, watch, type Ref } from "vue";
+import { defineComponent, onMounted, ref, watch, nextTick, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { reactive } from "vue";
@@ -107,6 +90,10 @@ import { useLoading } from "@/composables/useLoading";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 export default defineComponent({
   name: "GeneralSettings",
@@ -114,8 +101,12 @@ export default defineComponent({
     DashboardHeader,
     DateTimePickerDashboard,
     OButton,
+    OInput,
+    OSwitch,
+    OForm,
+    OFormInput,
   },
-  emits: ["save"],
+  emits: ["save", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
     const { t } = useI18n();
@@ -127,6 +118,7 @@ export default defineComponent({
     } = useNotifications();
 
     const addDashboardForm: Ref<any> = ref(null);
+    const formRef = ref(null);
     const closeBtn: Ref<any> = ref(null);
     // initial timezone, which will come from the route query
     const initialTimezone: any = ref(store.state.timezone ?? null);
@@ -155,6 +147,10 @@ export default defineComponent({
       dashboardData.description = data.description;
       dashboardData.showDynamicFilters =
         data.variables?.showDynamicFilters ?? false;
+
+      // sync loaded title into OForm field state
+      await nextTick();
+      formRef.value?.form.setFieldValue('name', data.title);
 
       dateTimeValue.value = {
         startTime: data?.defaultDatetimeDuration?.startTime,
@@ -246,13 +242,12 @@ export default defineComponent({
     return {
       t,
       dashboardData,
-      addDashboardForm,
       store,
       saveDashboardApi,
-      onSubmit,
       closeBtn,
       initialTimezone,
       dateTimeValue,
+      formRef,
     };
   },
 });

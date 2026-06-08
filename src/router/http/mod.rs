@@ -55,11 +55,24 @@ fn get_http_client() -> &'static reqwest::Client {
     })
 }
 
-/// Details about the target URL for proxying requests.
+/// Details about the target URL for proxying a request to one node.
 struct ProxyTarget {
     path: String,
     full_url: String,
     node_addr: String,
+}
+
+impl ProxyTarget {
+    fn new(path: &str, node: &Node) -> Self {
+        ProxyTarget {
+            path: path.to_string(),
+            full_url: format!("{}{}", node.http_addr, path),
+            node_addr: node
+                .http_addr
+                .replace("http://", "")
+                .replace("https://", ""),
+        }
+    }
 }
 
 /// Payload types for querier requests that need body-based routing.
@@ -91,9 +104,10 @@ pub async fn dispatch(req: Request) -> Response {
         .unwrap_or("")
         .to_string();
 
-    // Resolve target node
-    let target = match resolve_target(&path, &cfg.common.base_uri).await {
-        Ok(target) => target,
+    // Resolve the candidate nodes (preferred node first, the rest are fail-over
+    // targets used when the preferred node can't be reached).
+    let (full_path, nodes) = match resolve_candidates(&path, &cfg.common.base_uri).await {
+        Ok(v) => v,
         Err(error) => {
             log::error!(
                 "dispatch: {}, resolve target error: {}, took: {} ms",
@@ -107,14 +121,19 @@ pub async fn dispatch(req: Request) -> Response {
 
     // Route based on request type
     if cfg.common.result_cache_enabled && is_querier_route_by_body(&path) {
-        proxy_with_body_routing(req, target, start).await
+        proxy_with_body_routing(req, full_path, nodes, start).await
     } else {
-        proxy_request(req, target, start).await
+        proxy_request(req, full_path, nodes, start).await
     }
 }
 
-/// Resolves the target node for a given request path.
-async fn resolve_target(path: &str, base_uri: &str) -> Result<ProxyTarget, String> {
+/// Resolves the candidate nodes for a given request path.
+///
+/// Returns the full proxied path together with the ordered list of nodes that
+/// can serve it. The first node is the preferred pick (per the dispatch
+/// strategy); the remaining nodes are fail-over candidates the proxy retries on
+/// when the preferred node is unreachable (e.g. while it is being restarted).
+async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<Node>), String> {
     // Strip base URI if present
     let api_path = if !base_uri.is_empty() {
         path.strip_prefix(base_uri).unwrap_or(path)
@@ -136,16 +155,33 @@ async fn resolve_target(path: &str, base_uri: &str) -> Result<ProxyTarget, Strin
         return Err(format!("No online {node_type} nodes"));
     }
 
-    let node = select_node(&nodes);
-    let path = format!("{}{}", base_uri, path);
-    Ok(ProxyTarget {
-        path: path.to_string(),
-        full_url: format!("{}{}", node.http_addr, path),
-        node_addr: node
-            .http_addr
-            .replace("http://", "")
-            .replace("https://", ""),
-    })
+    let nodes = order_nodes(nodes);
+    let full_path = format!("{}{}", base_uri, path);
+    Ok((full_path, nodes))
+}
+
+/// Orders the candidate nodes so the preferred node (per dispatch strategy) is
+/// first and the remaining nodes follow as fail-over candidates.
+fn order_nodes(nodes: Vec<Node>) -> Vec<Node> {
+    if nodes.len() <= 1 {
+        return nodes;
+    }
+    let primary_uuid = select_node(&nodes).uuid.clone();
+    let (primary, rest): (Vec<Node>, Vec<Node>) =
+        nodes.into_iter().partition(|n| n.uuid == primary_uuid);
+    primary.into_iter().chain(rest).collect()
+}
+
+/// Number of nodes to try for a single request: the preferred node plus up to
+/// `ZO_ROUTE_MAX_RETRIES` fail-over nodes, bounded by how many nodes exist.
+/// With no candidate nodes this is 0, so the caller returns "No online nodes".
+fn max_attempts(node_count: usize) -> usize {
+    node_count.min(1 + get_config().route.max_retries)
+}
+
+/// A connect error guarantees the upstream never received the request
+fn is_retryable_send_error(e: &reqwest::Error) -> bool {
+    e.is_connect()
 }
 
 /// Gets available querier nodes for the request.
@@ -179,16 +215,25 @@ fn select_node(nodes: &[Node]) -> &Node {
     }
 }
 
-/// Proxies a request to the target node.
-async fn proxy_request(req: Request, target: ProxyTarget, start: std::time::Instant) -> Response {
-    let query_path = extract_path_without_query(&target.path);
+/// Proxies a request to the target node, failing over to other candidate nodes
+/// when the selected node can't be reached.
+async fn proxy_request(
+    req: Request,
+    path: String,
+    nodes: Vec<Node>,
+    start: std::time::Instant,
+) -> Response {
+    let query_path = extract_path_without_query(&path);
     let is_streaming = is_streaming_endpoint(query_path);
 
     // Extract method and headers before consuming the request
     let method = req.method().clone();
     let headers = build_request_headers(req.headers(), is_streaming);
 
-    // Read request body
+    // Read the request body once and keep it buffered so it can be re-sent on
+    // each fail-over attempt. The body is held fully in memory (bounded by the
+    // usual request size limits); buffering is required because a consumed
+    // stream cannot be replayed onto another node.
     let body = match req.into_body().collect().await {
         Ok(collected) => collected.to_bytes(),
         Err(e) => {
@@ -201,39 +246,83 @@ async fn proxy_request(req: Request, target: ProxyTarget, start: std::time::Inst
         }
     };
 
-    // Build upstream request
     let client = get_http_client();
-    let upstream_req = match method {
-        Method::GET => client.get(&target.full_url).headers(headers),
-        Method::POST => client
-            .post(&target.full_url)
-            .headers(headers)
-            .body(body.to_vec()),
-        Method::PUT => client
-            .put(&target.full_url)
-            .headers(headers)
-            .body(body.to_vec()),
-        Method::DELETE => client
-            .delete(&target.full_url)
-            .headers(headers)
-            .body(body.to_vec()),
-        Method::PATCH => client
-            .patch(&target.full_url)
-            .headers(headers)
-            .body(body.to_vec()),
-        _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
-    };
+    let attempts = max_attempts(nodes.len());
+    let mut last_error: Option<(String, reqwest::Error)> = None;
 
-    send_and_respond(upstream_req, &target, is_streaming, start).await
+    for (i, node) in nodes.iter().take(attempts).enumerate() {
+        let target = ProxyTarget::new(&path, node);
+        let mut upstream_req = client
+            .request(method.clone(), &target.full_url)
+            .headers(headers.clone());
+        // Forward the buffered body for methods that carry one. `body` is
+        // `Bytes`, so `clone()` is a cheap ref-count bump, not a copy.
+        match method {
+            Method::HEAD | Method::GET | Method::OPTIONS => {}
+            Method::POST | Method::PUT | Method::DELETE | Method::PATCH => {
+                upstream_req = upstream_req.body(body.clone());
+            }
+            _ => return (StatusCode::METHOD_NOT_ALLOWED).into_response(),
+        }
+
+        match upstream_req.send().await {
+            Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
+            Err(e) => {
+                let is_last = i + 1 >= attempts;
+                if is_retryable_send_error(&e) && !is_last {
+                    log::warn!(
+                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
+                        target.path,
+                        target.node_addr,
+                    );
+                    last_error = Some((target.node_addr, e));
+                    continue;
+                }
+                last_error = Some((target.node_addr, e));
+                break;
+            }
+        }
+    }
+
+    proxy_error_response(&path, last_error, start)
+}
+
+/// Builds the 502 response after all proxy attempts have failed.
+fn proxy_error_response(
+    path: &str,
+    last_error: Option<(String, reqwest::Error)>,
+    start: std::time::Instant,
+) -> Response {
+    match last_error {
+        Some((node_addr, e)) => {
+            log::error!(
+                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
+                path,
+                node_addr,
+                start.elapsed().as_millis()
+            );
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Proxy request failed: {e}"),
+            )
+                .into_response()
+        }
+        None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
+    }
 }
 
 /// Proxies a querier request with body-based routing for consistent hashing.
+///
+/// The consistent-hash node is preferred (for result-cache affinity); if it is
+/// unreachable the request fails over to the other online querier nodes, which
+/// only costs a cache miss.
 async fn proxy_with_body_routing(
     req: Request,
-    mut target: ProxyTarget,
+    path: String,
+    nodes: Vec<Node>,
     start: std::time::Instant,
 ) -> Response {
-    let query_path = extract_path_without_query(&target.path);
+    let query_path = extract_path_without_query(&path);
     let headers = req.headers().clone();
 
     // Parse request payload based on endpoint type
@@ -256,53 +345,86 @@ async fn proxy_with_body_routing(
         cluster::get_node_from_consistent_hash(&routing_key, &Role::Querier, None).await
     else {
         log::error!(
-            "dispatch: {} to {}, get node from consistent hash error: {:?}, took: {} ms",
-            target.path,
-            target.node_addr,
+            "dispatch: {} consistent hash error: {:?}, took: {} ms",
+            path,
             "No online querier nodes",
             start.elapsed().as_millis()
         );
         return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
     };
     // get node by name
-    let Some(node) = cluster::get_cached_node_by_name(&node_name).await else {
+    let Some(primary) = cluster::get_cached_node_by_name(&node_name).await else {
         log::error!(
-            "dispatch: {} to {}, get node from cache error: {:?}, took: {} ms",
-            target.path,
-            target.node_addr,
+            "dispatch: {} get node {} from cache error: {:?}, took: {} ms",
+            path,
+            node_name,
             "No online querier nodes",
             start.elapsed().as_millis()
         );
         return (StatusCode::SERVICE_UNAVAILABLE, "No online querier nodes").into_response();
     };
-    target.full_url = format!("{}{}", node.http_addr, target.path);
-    target.node_addr = node
-        .http_addr
-        .replace("http://", "")
-        .replace("https://", "");
+
+    // Preferred (consistent-hash) node first, then the other online queriers as
+    // fail-over candidates.
+    let mut candidates = Vec::with_capacity(nodes.len() + 1);
+    candidates.push(primary.clone());
+    candidates.extend(nodes.into_iter().filter(|n| n.uuid != primary.uuid));
 
     let is_streaming = is_streaming_endpoint(query_path);
-    let headers = build_request_headers(&headers, is_streaming);
+    let req_headers = build_request_headers(&headers, is_streaming);
     let client = get_http_client();
+    let attempts = max_attempts(candidates.len());
+    let mut last_error: Option<(String, reqwest::Error)> = None;
 
-    // Build upstream request based on payload type
-    let upstream_req = match querier_payload {
-        QuerierPayload::Empty => client.get(&target.full_url).headers(headers),
-        QuerierPayload::PromQL(form) => client.post(&target.full_url).headers(headers).form(&form),
-        QuerierPayload::Search(json) => client.post(&target.full_url).headers(headers).json(&*json),
-        QuerierPayload::MultiSearch(json) => {
-            client.post(&target.full_url).headers(headers).json(&*json)
+    for (i, node) in candidates.iter().take(attempts).enumerate() {
+        let target = ProxyTarget::new(&path, node);
+        let upstream_req = build_payload_request(
+            client,
+            &target.full_url,
+            req_headers.clone(),
+            &querier_payload,
+        );
+
+        match upstream_req.send().await {
+            Ok(resp) => return build_response(resp, &target, is_streaming, start).await,
+            Err(e) => {
+                let is_last = i + 1 >= attempts;
+                if is_retryable_send_error(&e) && !is_last {
+                    log::warn!(
+                        "proxy request failed: {} -> {}, error: {e}, retrying on another node",
+                        target.path,
+                        target.node_addr,
+                    );
+                    last_error = Some((target.node_addr, e));
+                    continue;
+                }
+                last_error = Some((target.node_addr, e));
+                break;
+            }
         }
-        QuerierPayload::SearchPartition(json) => {
-            client.post(&target.full_url).headers(headers).json(&*json)
-        }
+    }
+
+    proxy_error_response(&path, last_error, start)
+}
+
+/// Builds the upstream request for a parsed querier payload against `url`.
+fn build_payload_request(
+    client: &reqwest::Client,
+    url: &str,
+    headers: reqwest::header::HeaderMap,
+    payload: &QuerierPayload,
+) -> reqwest::RequestBuilder {
+    match payload {
+        QuerierPayload::Empty => client.get(url).headers(headers),
+        QuerierPayload::PromQL(form) => client.post(url).headers(headers).form(form),
+        QuerierPayload::Search(json) => client.post(url).headers(headers).json(&**json),
+        QuerierPayload::MultiSearch(json) => client.post(url).headers(headers).json(&**json),
+        QuerierPayload::SearchPartition(json) => client.post(url).headers(headers).json(&**json),
         QuerierPayload::MultiSearchPartition(json) => {
-            client.post(&target.full_url).headers(headers).json(&*json)
+            client.post(url).headers(headers).json(&**json)
         }
-        QuerierPayload::Values(json) => client.post(&target.full_url).headers(headers).json(&*json),
-    };
-
-    send_and_respond(upstream_req, &target, is_streaming, start).await
+        QuerierPayload::Values(json) => client.post(url).headers(headers).json(&**json),
+    }
 }
 
 /// Parses the request payload for querier routing.
@@ -443,30 +565,13 @@ async fn parse_promql_payload(req: Request) -> Result<Option<(String, QuerierPay
     }
 }
 
-/// Sends the upstream request and builds the response.
-async fn send_and_respond(
-    upstream_req: reqwest::RequestBuilder,
+/// Builds the proxied client response from an upstream response.
+async fn build_response(
+    resp: reqwest::Response,
     target: &ProxyTarget,
     is_streaming: bool,
     start: std::time::Instant,
 ) -> Response {
-    let resp = match upstream_req.send().await {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!(
-                "proxy request failed: {} -> {}, error: {e:?}, took: {} ms",
-                target.path,
-                target.node_addr,
-                start.elapsed().as_millis()
-            );
-            return (
-                StatusCode::BAD_GATEWAY,
-                format!("Proxy request failed: {e}"),
-            )
-                .into_response();
-        }
-    };
-
     let status =
         StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     let mut builder = Response::builder().status(status);
@@ -753,15 +858,74 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_resolve_target_with_base_uri() {
-        let result = resolve_target("/base/api/default/summary", "/base").await;
+    async fn test_resolve_candidates_with_base_uri() {
+        let result = resolve_candidates("/base/api/default/summary", "/base").await;
         match result {
-            Ok(target) => {
-                assert!(target.path.contains("/api/default/summary"));
+            Ok((full_path, nodes)) => {
+                assert!(full_path.contains("/api/default/summary"));
+                assert!(!nodes.is_empty());
             }
             Err(e) => {
                 assert!(e.contains("No online"));
             }
         }
+    }
+
+    fn test_node(id: i32) -> Node {
+        use config::meta::cluster::NodeStatus;
+        Node {
+            id,
+            uuid: format!("uuid-{id}"),
+            name: format!("node-{id}"),
+            http_addr: format!("http://10.0.0.{id}:5080"),
+            grpc_addr: format!("http://10.0.0.{id}:5081"),
+            role: vec![Role::Querier],
+            role_group: RoleGroup::Interactive,
+            cpu_num: 4,
+            scheduled: true,
+            broadcasted: true,
+            status: NodeStatus::Online,
+            metrics: Default::default(),
+            version: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_order_nodes_single_node_unchanged() {
+        let nodes = vec![test_node(1)];
+        let ordered = order_nodes(nodes);
+        assert_eq!(ordered.len(), 1);
+        assert_eq!(ordered[0].uuid, "uuid-1");
+    }
+
+    #[test]
+    fn test_order_nodes_primary_first_and_preserves_set() {
+        let nodes = vec![test_node(1), test_node(2), test_node(3)];
+        let primary = select_node(&nodes).uuid.clone();
+        let ordered = order_nodes(nodes.clone());
+
+        // length preserved, preferred node first
+        assert_eq!(ordered.len(), nodes.len());
+        assert_eq!(ordered[0].uuid, primary);
+
+        // every original node is still present exactly once
+        let mut got: Vec<_> = ordered.iter().map(|n| n.uuid.clone()).collect();
+        got.sort();
+        let mut want: Vec<_> = nodes.iter().map(|n| n.uuid.clone()).collect();
+        want.sort();
+        assert_eq!(got, want);
+    }
+
+    #[test]
+    fn test_max_attempts_bounds() {
+        let max_retries = get_config().route.max_retries;
+        // no candidates -> no attempts (caller returns "No online nodes")
+        assert_eq!(max_attempts(0), 0);
+        // a single node can't fail over
+        assert_eq!(max_attempts(1), 1);
+        // capped by 1 + max_retries when there are enough nodes
+        assert_eq!(max_attempts(100), 1 + max_retries);
+        // capped by the number of available nodes
+        assert!(max_attempts(2) <= 2);
     }
 }

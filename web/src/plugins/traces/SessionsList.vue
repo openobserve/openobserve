@@ -20,30 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Toolbar: stream selector + count pill + pagination -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
-      <!-- Stream selector -->
+      <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
       <div
+        v-if="availableStreams.length > 0"
         data-test="sessions-list-stream-selector"
         class="tw:w-[14rem] tw:flex-shrink-0"
       >
-        <q-select
+        <OSelect
           v-model="activeStream"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
-          dense
-          borderless
-          emit-value
-          map-options
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          size="sm"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
           @update:model-value="onStreamChange"
-          :disable="availableStreams.length === 0"
-        >
-          <q-tooltip v-if="availableStreams.length === 0">
-            {{ t('traces.sessionsList.noStreamsTooltip') }}
-          </q-tooltip>
-        </q-select>
+        />
       </div>
 
       <!-- Count pill -->
@@ -59,31 +48,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pagination controls -->
       <div
         v-if="total > 0"
-        class="row items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
+        class="tw:flex tw:items-center tw:justify-end tw:px-[0.5rem] tw:py-[0.25rem] tw:ml-auto"
         data-test="sessions-list-pagination-bar"
       >
-        <q-select
+        <OSelect
           v-model="rowsPerPage"
           :options="rowsPerPageOptions"
           class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
           size="sm"
-          dense
-          borderless
           data-test="sessions-list-records-per-page"
           @update:model-value="changeRowsPerPage"
         />
-        <q-pagination
+        <OPagination
           v-model="currentPage"
           :max="totalPages"
-          :input="false"
-          direction-links
-          :boundary-numbers="false"
           :max-pages="5"
-          :ellipses="false"
-          icon-first="skip_previous"
-          icon-last="skip_next"
-          icon-prev="fast_rewind"
-          icon-next="fast_forward"
           class="float-right paginator-section tw:mt-0!"
           data-test="sessions-list-pagination"
           @update:model-value="changePage"
@@ -96,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="streamsLoaded && availableStreams.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-[var(--o2-text-secondary)] tw:text-center"
     >
-      <q-icon name="forum" size="3rem" class="tw:mb-3 tw:opacity-40" />
+      <OIcon name="forum" size="xl" class="tw:mb-3 tw:opacity-40" />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
         {{ t('traces.sessionsList.noStreamsFound') }}
       </div>
@@ -110,9 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="error && hasLoadedOnce"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
     >
-      <q-icon
-        name="error_outline"
-        size="3rem"
+      <OIcon
+        name="error-outline"
+        size="xl"
         class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
@@ -133,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="hasLoadedOnce && !loading && sessions.length === 0"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
     >
-      <q-icon
+      <OIcon
         name="forum"
-        size="3rem"
+        size="xl"
         class="tw:mb-3 tw:opacity-40 tw:text-[var(--o2-text-muted)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
@@ -178,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-sessionId="{ item }">
           <span class="tw:font-mono tw:text-[0.75rem]">
             {{ shortId(item.sessionId) }}
-            <q-tooltip>{{ item.sessionId }}</q-tooltip>
+            <OTooltip :content="item.sessionId" />
           </span>
         </template>
 
@@ -202,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:text-[0.75rem] tw:text-[var(--o2-text-secondary)]"
           >
             {{ item.firstUserMessage.length > 30 ? item.firstUserMessage.slice(0, 30) + '…' : item.firstUserMessage }}
-            <q-tooltip v-if="item.firstUserMessage.length > 30">{{ item.firstUserMessage }}</q-tooltip>
+            <OTooltip v-if="item.firstUserMessage.length > 30" :content="item.firstUserMessage" />
           </span>
           <span v-else class="tw:text-[0.75rem] tw:text-[var(--o2-text-muted)]">—</span>
         </template>
@@ -216,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-durationNanos="{ item }">
           <span class="tw:text-[0.75rem]">
             {{ formatDuration(item.durationNanos) }}
-            <q-tooltip>{{ item.durationNanos.toLocaleString() }} {{ t('traces.sessionsList.durationNs') }}</q-tooltip>
+            <OTooltip :content="`${item.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
         </template>
 
@@ -224,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-tokens="{ item }">
           <span class="tw:text-[0.75rem] tw:tabular-nums">
             {{ formatTokens(item.inputTokens) }} → {{ formatTokens(item.outputTokens) }} (Σ {{ formatTokens(item.tokens) }})
-            <q-tooltip>{{ t('traces.sessionsList.tokenTooltip', { input: item.inputTokens.toLocaleString(), output: item.outputTokens.toLocaleString(), total: item.tokens.toLocaleString() }) }}</q-tooltip>
+            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: item.inputTokens.toLocaleString(), output: item.outputTokens.toLocaleString(), total: item.tokens.toLocaleString() })" />
           </span>
         </template>
 
@@ -252,11 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #loading>
           <div
             data-test="sessions-list-loading"
-            class="row no-wrap items-center q-px-sm tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
+            class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="1.25rem"
+            <OSpinner
+              size="sm"
               class="tw:mr-[0.25rem]"
             />
             <span
@@ -277,12 +255,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import TenstackTable from "@/components/TenstackTable.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -416,7 +399,7 @@ const tableColumns = computed(() => [
 function formatTimestamp(nanos: number): string {
   if (!nanos) return "—";
   // Backend ships timestamps as nanoseconds — quasar's date wants ms.
-  return date.formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
 }
 
 function shortId(id: string): string {

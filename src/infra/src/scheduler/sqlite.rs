@@ -178,7 +178,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
+                trigger.module, trigger.org, trigger.module_key
             );
 
             // TODO: For sqlite cluster coordinator, the alert triggers are put
@@ -311,7 +311,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
+                trigger.module, trigger.org, trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator

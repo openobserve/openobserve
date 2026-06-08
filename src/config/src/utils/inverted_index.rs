@@ -17,12 +17,12 @@ use std::borrow::Cow;
 
 use crate::{FILE_EXT_PARQUET, FILE_EXT_TANTIVY, FILE_EXT_VORTEX, meta::stream::StreamType};
 
-/// tantivy inverted index solution has a 1:1 mapping between parquet and idx files.
-/// This is a helper function to convert the parquet file name to tantivy file name.
+/// Converts a parquet or vortex file name to the corresponding tantivy index file name.
+/// Returns `None` for unrecognized stream types, unsupported extensions, or short paths.
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
 /// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv
-pub fn convert_parquet_file_name_to_tantivy_file(from: &str) -> Option<String> {
+pub fn to_tantivy_name(from: &str) -> Option<String> {
     let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
 
     if parts.len() < 4 {
@@ -64,7 +64,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_convert_parquet_file_name_to_tantivy_file() {
+    fn test_to_tantivy_name() {
         let test_cases = vec![
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
@@ -101,36 +101,30 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            assert_eq!(convert_parquet_file_name_to_tantivy_file(input), expected);
+            assert_eq!(to_tantivy_name(input), expected);
         }
     }
 
     #[test]
-    fn test_convert_vortex_file_name_to_tantivy_file() {
+    fn test_to_tantivy_name_vortex() {
         let input = "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.vortex";
         let expected = "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.ttv";
-        assert_eq!(
-            convert_parquet_file_name_to_tantivy_file(input),
-            Some(expected.to_string())
-        );
+        assert_eq!(to_tantivy_name(input), Some(expected.to_string()));
     }
 
     #[test]
     fn test_convert_returns_none_for_unsupported_extension() {
         // Files that are neither .parquet nor .vortex should return None.
         let input = "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.json";
-        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+        assert_eq!(to_tantivy_name(input), None);
     }
 
     #[test]
     fn test_convert_returns_none_for_short_path() {
         // Paths shorter than 4 segments are rejected — there is no stream_type slot.
-        assert_eq!(
-            convert_parquet_file_name_to_tantivy_file("files/default/logs"),
-            None
-        );
-        assert_eq!(convert_parquet_file_name_to_tantivy_file(""), None);
-        assert_eq!(convert_parquet_file_name_to_tantivy_file("a/b/c"), None);
+        assert_eq!(to_tantivy_name("files/default/logs"), None);
+        assert_eq!(to_tantivy_name(""), None);
+        assert_eq!(to_tantivy_name("a/b/c"), None);
     }
 
     #[test]
@@ -138,16 +132,16 @@ mod tests {
         // service_graph / enrichment_tables / file_list are not handled by this
         // converter — only logs/metrics/traces/metadata map to a tantivy index.
         let input = "files/default/service_graph/x/2024/02/16/16/1.parquet";
-        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+        assert_eq!(to_tantivy_name(input), None);
 
         let input = "files/default/enrichment_tables/x/2024/02/16/16/1.parquet";
-        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+        assert_eq!(to_tantivy_name(input), None);
     }
 
     #[test]
     fn test_convert_path_without_extension_returns_none() {
         // Final segment without a recognized extension is rejected.
         let input = "files/default/logs/quickstart1/2024/02/16/16/no_extension";
-        assert_eq!(convert_parquet_file_name_to_tantivy_file(input), None);
+        assert_eq!(to_tantivy_name(input), None);
     }
 }

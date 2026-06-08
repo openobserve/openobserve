@@ -1,5 +1,5 @@
 <template>
-  <q-card flat class="tw:h-full tw:flex tw:flex-col">
+  <OCard class="tw:h-full tw:flex tw:flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
     <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
       <!-- Stream selector -->
@@ -7,43 +7,27 @@
         data-test="service-graph-stream-selector"
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
-        <q-select
+        <OSelect
           v-model="streamFilter"
-          :options="
-            availableStreams.length > 0
-              ? availableStreams.map((s) => ({ label: s, value: s }))
-              : []
-          "
-          dense
-          borderless
-          emit-value
-          map-options
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          labelKey="label"
+          valueKey="value"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
-          :disable="availableStreams.length === 0"
-        >
-          <q-tooltip v-if="availableStreams.length === 0">
-            No streams detected. Ensure service graph metrics include
-            stream_name labels.
-          </q-tooltip>
-        </q-select>
+        />
+        <OTooltip v-if="availableStreams.length === 0" content="No streams detected. Ensure service graph metrics include stream_name labels." />
       </div>
       <!-- Search input -->
       <div data-test="service-graph-search-input">
-        <q-input
+        <OSearchInput
           v-model="searchFilter"
-          borderless
-          dense
-          class="no-border tw:w-[14rem]! tw:h-[36px] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+          class="tw:w-[14rem]!"
           placeholder="Search Services"
-          debounce="300"
+          :debounce="300"
           @update:model-value="applyFilters"
           clearable
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
-          </template>
-        </q-input>
+        />
       </div>
       <!-- Spacer -->
       <div class="tw:flex-1" />
@@ -118,7 +102,7 @@
             </div>
           </div>
         </div>
-        <q-separator
+        <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           class="tw:self-stretch tw:mx-1"
@@ -163,32 +147,32 @@
         </div>
       </div>
     </div>
-    <q-card-section
-      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0 card-container service-graph-container"
+    <OCardSection
+      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0  service-graph-container"
     >
       <!-- Graph Visualization -->
-      <q-card flat bordered class="graph-card tw:h-full">
-        <q-card-section class="q-pa-none tw:h-full" style="height: 100%">
+      <OCard class="graph-card tw:h-full">
+        <OCardSection class="tw:p-0 tw:h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
             class="graph-container tw:h-full tw:bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div v-if="loading" class="flex flex-center tw:h-full">
-              <div class="text-center tw:flex tw:flex-col tw:items-center">
-                <q-spinner-hourglass color="primary" size="4em" />
-                <div class="text-subtitle1 q-mt-md text-grey-7">
+            <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:h-full">
+              <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
+                <OSpinner size="xl" />
+                <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
                   Loading service graph...
                 </div>
               </div>
             </div>
             <div
               v-else-if="error"
-              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
             >
               <div>
-                <q-icon name="error_outline" size="4em" color="negative" />
-                <div class="text-h6 q-mt-md tw:text-[var(--o2-text-primary)]">
+                <OIcon name="error-outline" style="width: 4em; height: 4em;" />
+                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
                 <OButton
@@ -196,22 +180,22 @@
                   size="sm-action"
                   @click="loadServiceGraph"
                   class="tw:mt-4"
+                  icon-left="refresh"
                 >
-                  <template #icon-left><q-icon name="refresh" size="14px" /></template>
                   Retry
                 </OButton>
               </div>
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="flex flex-center tw:h-full text-center tw:p-[0.675rem]"
+              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
             >
-              <div>
-                <q-icon name="hub" size="5em" color="grey-4" />
-                <div class="text-h6 q-mt-md text-grey-7">
+              <div class="tw:text-center">
+                <OIcon name="hub" style="width: 5em; height: 5em;" />
+                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">
                   No Service Graph Data
                 </div>
-                <div class="text-body2 text-grey-6 q-mt-sm">
+                <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
                   Try querying a longer duration
                 </div>
               </div>
@@ -239,47 +223,34 @@
                 :time-range="searchObj.data.datetime"
                 :visible="showSidePanel"
                 :stream-filter="streamFilter"
+                :container-el="graphContainerRef"
                 @close="handleCloseSidePanel"
                 @view-traces="$emit('view-traces', $event)"
               />
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-card-section>
-  </q-card>
+        </OCardSection>
+      </OCard>
+    </OCardSection>
+  </OCard>
 
   <!-- Enhanced Settings Dialog -->
-  <q-dialog v-model="showSettings">
-    <q-card style="min-width: 450px">
-      <q-card-section>
-        <div class="text-h6">Service Graph Settings</div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section>
-        <div class="q-gutter-md">
-          <div class="text-caption text-grey-7">
-            Stream-based topology - all data persisted to storage
-            <q-tooltip
-              >Service graph uses stream-only architecture with zero in-memory
-              state</q-tooltip
-            >
-          </div>
-        </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-actions align="right">
-        <div class="tw:flex tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-          <OButton variant="primary" size="sm-action" @click="resetSettings">
-            Reset
-          </OButton>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog data-test="service-graph-settings-dialog"
+    v-model:open="showSettings"
+    size="sm"
+    title="Service Graph Settings"
+    secondary-button-label="Close"
+    primary-button-label="Reset"
+    @click:secondary="showSettings = false"
+    @click:primary="resetSettings"
+  >
+    <div class="tw:gap-3">
+      <div class="tw:text-xs tw:text-gray-400">
+        Stream-based topology - all data persisted to storage
+        <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -295,7 +266,6 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -315,18 +285,35 @@ import {
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "ServiceGraph",
   components: {
+    OSeparator,
     ChartRenderer,
     ServiceGraphSidePanel,
     OButton,
-  },
+    ODialog,
+    OSpinner,
+    OTooltip,
+    OSelect,
+    OSearchInput,
+    OIcon,
+    OCard,
+    OCardSection,
+},
   emits: ["view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
@@ -403,13 +390,13 @@ export default defineComponent({
           ? convertServiceGraphToTree(
               filteredGraphData.value,
               layoutType,
-              $q.dark.isActive,
+              store.state.theme === 'dark',
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
               layoutType,
               new Map(),
-              $q.dark.isActive,
+              store.state.theme === 'dark',
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
@@ -581,7 +568,7 @@ export default defineComponent({
 
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
-      const isDarkInit = $q.dark.isActive;
+      const isDarkInit = store.state.theme === 'dark';
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -798,7 +785,7 @@ export default defineComponent({
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
-        tooltipEl.style.color = $q.dark.isActive
+        tooltipEl.style.color = store.state.theme === 'dark'
           ? "rgba(255,255,255,0.88)"
           : "rgba(0,0,0,0.82)";
       };
@@ -1700,7 +1687,7 @@ export default defineComponent({
 
 .graph-with-panel-container {
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 code {
@@ -1726,7 +1713,7 @@ code {
 /*
  * Target dashed edge paths rendered by ECharts graph series.
  * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an inline style depending on the version — we cover both.
+ * an tw:inline style depending on the version — we cover both.
  */
 .graph-container svg path[stroke-dasharray],
 .graph-container svg path[style*="stroke-dasharray"] {

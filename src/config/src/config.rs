@@ -50,7 +50,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 42;
+pub const DB_SCHEMA_VERSION: u64 = 45;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -213,24 +213,20 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = chain(
-        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
-            .bloom_filter_default_fields
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }),
-    )
-    .collect::<Vec<_>>();
+    let mut fields = get_config()
+        .common
+        .bloom_filter_default_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -380,7 +376,7 @@ pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Erro
 pub fn load_config() -> Result<(), anyhow::Error> {
     match crate::config_path_manager::get_config_file_path() {
         Some(path) => {
-            log::info!("Loading config from file {:?}", &path);
+            log::info!("Loading config from file {:?}", path);
             if dotenvy::from_path_override(&path).is_err() {
                 return Err(anyhow::anyhow!("Config loading from file failed"));
             }
@@ -780,7 +776,7 @@ pub struct Http {
     pub access_log_format: String,
     #[env_config(
         name = "ZO_HTTP_REAL_IP_SOURCE",
-        default = "XEnvoyExternalAddress,XRealIp",
+        default = "XEnvoyExternalAddress,XRealIp,RightmostXForwardedFor",
         help = "Comma-separated list of sources to resolve the real client IP; tried in \
                 order, first match wins. TCP peer (ConnectInfo) is always used as the final \
                 fallback. Supported entries: XEnvoyExternalAddress (Envoy/Istio), \
@@ -809,8 +805,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 32,
+        help = "Max grpc message size in MB, default is 32 MB"
     )]
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
@@ -892,6 +888,12 @@ pub struct Route {
     pub timeout: u64,
     #[env_config(name = "ZO_ROUTE_MAX_CONNECTIONS", default = 1024)]
     pub max_connections: usize,
+    #[env_config(
+        name = "ZO_ROUTE_MAX_RETRIES",
+        default = 2,
+        help = "Max number of other nodes the router will fail over to when a proxied request can't reach the selected node (e.g. during a restart/redeploy). 0 disables retry."
+    )]
+    pub max_retries: usize,
     #[env_config(name = "ZO_ROUTE_STRATEGY", parse, default = "workload")]
     pub dispatch_strategy: RouteDispatchStrategy,
 }
@@ -916,6 +918,19 @@ pub struct Common {
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_POSTGRES_RO_DSN", default = "")]
     pub meta_postgres_ro_dsn: String, // postgres://postgres:12345678@readonly:5432/openobserve
+    // Individual connection vars — alternative to ZO_META_POSTGRES_DSN for environments
+    // where host and password must be injected separately (e.g. ECS/K8s secrets managers).
+    // Used to compose meta_postgres_dsn at startup; ignored when ZO_META_POSTGRES_DSN is set.
+    #[env_config(name = "ZO_META_POSTGRES_HOST", default = "")]
+    pub meta_postgres_host: String,
+    #[env_config(name = "ZO_META_POSTGRES_PORT", default = 5432)]
+    pub meta_postgres_port: u16,
+    #[env_config(name = "ZO_META_POSTGRES_USER", default = "")]
+    pub meta_postgres_user: String,
+    #[env_config(name = "ZO_META_POSTGRES_PASSWORD", default = "")]
+    pub meta_postgres_password: String,
+    #[env_config(name = "ZO_META_POSTGRES_DBNAME", default = "")]
+    pub meta_postgres_dbname: String,
     #[env_config(name = "ZO_META_DDL_DSN", default = "")]
     pub meta_ddl_dsn: String, // same db as meta store, but user with ddl perms
     #[env_config(name = "ZO_META_PARTITION_MODE", default = "auto")]
@@ -1043,7 +1058,7 @@ pub struct Common {
     pub feature_enrichment_broadcast_join_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = false,
+        default = true,
         help = "Enable pushdown filter"
     )]
     pub feature_pushdown_filter_enabled: bool,
@@ -1065,6 +1080,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1091,16 +1112,20 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
-    #[env_config(name = "ZO_BLOOM_FILTER_DISABLED_ON_SEARCH", default = false)]
-    pub bloom_filter_disabled_on_search: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
-        name = "ZO_BLOOM_FILTER_NDV_RATIO",
-        default = 100,
-        help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
+        name = "ZO_BLOOM_FILTER_FPP",
+        default = 0.01,
+        help = "Target false-positive probability for the bloom filter layer. Smaller = fewer false survivors but larger `.bf` files (sizes the SBBF block count). Must be in (0, 1); out-of-range falls back to 0.01."
     )]
-    pub bloom_filter_ndv_ratio: u64,
+    pub bloom_filter_fpp: f64,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_MAX_FILES_PER_BF",
+        default = 256,
+        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). One hour bucket is split into ceil(files / this) `.bf` files."
+    )]
+    pub bloom_filter_max_files_per_bf: usize,
     #[env_config(
         name = "ZO_SEARCH_AROUND_DEFAULT_FIELDS",
         default = "",
@@ -1174,7 +1199,7 @@ pub struct Common {
     pub print_key_config: bool,
     #[env_config(name = "ZO_PRINT_KEY_EVENT", default = false)]
     pub print_key_event: bool,
-    #[env_config(name = "ZO_PRINT_KEY_SQL", default = false)]
+    #[env_config(name = "ZO_PRINT_KEY_SQL", default = true)]
     pub print_key_sql: bool,
     // usage reporting
     #[env_config(name = "ZO_USAGE_REPORTING_ENABLED", default = false)]
@@ -1367,6 +1392,12 @@ pub struct Common {
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."
     )]
     pub model_pricing_enabled: bool,
+    #[env_config(
+        name = "ZO_ONLINE_EVALS_ENABLED",
+        default = false,
+        help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
+    )]
+    pub online_evals_enabled: bool,
     #[env_config(
         name = "ZO_MODEL_PRICING_SOURCE_URL",
         default = "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/llm_pricing.json",
@@ -1806,7 +1837,13 @@ pub struct Limit {
         default = 0, // MB, default is 5% of total memory
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
-    pub footer_cache_max_size: usize,
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -1894,6 +1931,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
     // file_size, file_time, time_range
     pub strategy: String,
+    #[env_config(name = "ZO_COMPACT_FAST_MODE", default = false)]
+    pub fast_mode: bool,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
@@ -1958,6 +1997,12 @@ pub struct Compact {
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
     )]
     pub retention_allowed_hours: String,
+    #[env_config(
+        name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
+        default = 2,
+        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. less than or equal to 1 disables (single-threaded)"
+    )]
+    pub tantivy_builder_thread_num: usize,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2845,9 +2890,30 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
     if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Meta store is PostgreSQL, you must set ZO_META_POSTGRES_DSN"
-        ));
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
     }
 
     if cfg.common.meta_store.starts_with("mysql") {
@@ -2866,9 +2932,13 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
-    // check bloom filter ndv ratio
-    if cfg.common.bloom_filter_ndv_ratio == 0 {
-        cfg.common.bloom_filter_ndv_ratio = 100;
+    // check bloom filter fpp: must be a probability in (0, 1)
+    if cfg.common.bloom_filter_fpp <= 0.0 || cfg.common.bloom_filter_fpp >= 1.0 {
+        log::warn!(
+            "ZO_BLOOM_FILTER_FPP={} is out of range (0, 1); falling back to default 0.01",
+            cfg.common.bloom_filter_fpp
+        );
+        cfg.common.bloom_filter_fpp = 0.01;
     }
 
     // check for join match one
@@ -3100,12 +3170,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.footer_cache_max_size == 0 {
-        cfg.limit.footer_cache_max_size =
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+    if cfg.limit.bloom_footer_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
+        // order of magnitude smaller than tantivy footers (footer payload
+        // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
+        // `.bf`), so the cache holds 4-32 K entries at this size.
+        cfg.limit.bloom_footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
@@ -3208,7 +3289,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     if cfg.disk_cache.bucket_num == 0 {
         // because we validate cpu_num before this
-        // we can be sure here that that value is sane.
+        // we can be sure here that value is sane.
 
         // following numbers are imperically decided, users can set the value
         // directly if they know better, otherwise this was the best numbers
@@ -3278,16 +3359,17 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
     }
-
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
     }
-
     if cfg.compact.batch_size < 1 {
         cfg.compact.batch_size = 100;
     }
     if cfg.compact.pending_jobs_metric_interval == 0 {
         cfg.compact.pending_jobs_metric_interval = 300;
+    }
+    if !cfg.compact.fast_mode && cfg.common.local_mode {
+        cfg.compact.fast_mode = true;
     }
 
     Ok(())

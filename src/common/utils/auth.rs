@@ -187,11 +187,11 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
             // So we can return here
             log::debug!(
                 "folder tuples already exists for org: {org_id}; folder: {}",
-                &obj.obj_id
+                obj.obj_id
             );
             return;
         } else if obj.parent_type.eq("folders") {
-            log::debug!("checking parent folder tuples for folder: {}", &obj.parent);
+            log::debug!("checking parent folder tuples for folder: {}", obj.parent);
             // In case of dashboard, we need to check if the tuples for its folder exist
             // If not, the below function creates the proper tuples for the folder
             authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
@@ -404,7 +404,7 @@ where
         if resolved.bypass_check {
             return Ok(AuthExtractor {
                 auth: auth_str,
-                method: String::new(),
+                method: resolved.method,
                 o2_type: String::new(),
                 org_id: String::new(),
                 bypass_check: true,
@@ -615,8 +615,8 @@ pub fn generate_presigned_url(
 ) -> String {
     // let time = chrono::Utc::now().timestamp();
     let stage1 = get_hash(password, salt);
-    let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
-    let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
+    let stage2 = get_hash(&format!("{}{}", stage1, time), salt);
+    let stage3 = get_hash(&format!("{}{}", stage2, exp_in), salt);
 
     let user_pass = format!("{username}:{stage3}");
     let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);

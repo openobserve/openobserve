@@ -13,7 +13,15 @@ export class LogsQueryPage {
     this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
     this.resultDetail = '[data-test="logs-search-result-detail-undefined"]';
     this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
-    this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+    // OSwitch renders the wrapper data-test on a div and the state on an inner
+    // <button data-state="checked|unchecked"> — drill into that button. Note: a sibling
+    // OTooltip grace-area span also carries `data-state="closed"`, so we filter on the
+    // OSwitch states explicitly to avoid the strict-mode collision.
+    this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
+    this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
+    this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
+    this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
     this.autoRunDropdownBtn = '[data-test="logs-search-bar-refresh-btn"] ~ button';
     this.autoRunToggleItem = '[data-test="logs-search-bar-live-mode-toggle-btn"]';
     this._autoQueryEnabledCache = undefined;
@@ -45,19 +53,16 @@ export class LogsQueryPage {
   }
 
   async clickNoDataFound() {
-    // Page-level search — the "No data" text may be in:
-    //   SearchResult.vue  histogram-empty span (warning icon + "No data found for histogram.")
-    //   Index.vue         h6[data-test="logs-search-error-message"] (info icon + "No events found…")
-    //   Index.vue         div[data-test="logs-search-result-not-found-text"] ("Result not found.")
-    // Use specific enough substrings to avoid matching unrelated empty-states.
-    const patterns = [
-      'No data found for',
-      'No events found',
-      'Result not found',
-      'No data found',
+    // Try data-test selectors in priority order:
+    //   logs-search-no-data-histogram — SearchResult.vue histogram empty state
+    //   logs-search-error-message     — Index.vue "No events found" heading
+    //   logs-search-result-not-found-text — Index.vue "Result not found" div
+    const locators = [
+      this.page.locator('[data-test="logs-search-no-data-histogram"]'),
+      this.page.locator('[data-test="logs-search-error-message"]'),
+      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
     ];
-    for (const pattern of patterns) {
-      const locator = this.page.getByText(pattern).first();
+    for (const locator of locators) {
       try {
         await locator.waitFor({ state: 'visible', timeout: 10000 });
         await locator.click({ force: true });
@@ -66,7 +71,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message matched — expected one of: ' + patterns.join(', '));
+    throw new Error('No "no data" message found — checked: logs-search-no-data-histogram, logs-search-error-message, logs-search-result-not-found-text');
   }
 
   async clickResultDetail() {
@@ -78,15 +83,40 @@ export class LogsQueryPage {
   }
 
   async toggleHistogram() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    await this.page.locator(this.histogramToggle).click();
+    // In normal viewport the histogram is a standalone toolbar button (inline).
+    // In narrow viewport it moves into the More menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      await inlineBtn.click();
+      return;
+    }
+    // Narrow-viewport fallback: open utilities menu and click the menu item.
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 });
+    await histogramMenuItem.click();
   }
 
   async isHistogramOn() {
-    // Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
-    const histogramToggle = this.page.locator(this.histogramToggle);
-    const isChecked = await histogramToggle.getAttribute('aria-checked');
-    return isChecked === 'true';
+    // In normal viewport the histogram is a standalone inline toolbar button.
+    // Check its OSwitch state directly without opening the More menu.
+    await this.page.keyboard.press('Escape').catch(() => {});
+    const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+    const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isInline) {
+      const switchChecked = inlineBtn.locator('[data-state="checked"]');
+      return (await switchChecked.count()) > 0;
+    }
+    // Narrow-viewport fallback: check state via the More menu item.
+    await this.page.locator(this.utilitiesMenuButton).click();
+    const histogramMenuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
+    await histogramMenuItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const switchChecked = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"] [data-state="checked"]');
+    const count = await switchChecked.count();
+    await this.page.keyboard.press('Escape').catch(() => {});
+    return count > 0;
   }
 
   async ensureHistogramState(desiredState) {
@@ -96,23 +126,40 @@ export class LogsQueryPage {
     }
   }
 
+  /** SQL mode toggle was removed from the UI — no-op, always returns false. */
+  async _openUtilitiesMenuForSqlMode() {
+    // SQL mode is now auto-detected from query content (SELECT...FROM = SQL ON, else OFF).
+    // There is no longer a dedicated SQL mode toggle button in the utilities menu.
+    return false;
+  }
+
   async isSQLModeOn() {
-    const sw = this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name });
-    return await sw.isChecked();
+    // SQL mode is auto-detected: if the Monaco editor contains SELECT...FROM, SQL mode is ON.
+    const text = await this.page.evaluate((selector) => {
+      const host = document.querySelector(selector);
+      if (!host) return null;
+      const editors = window.monaco?.editor?.getEditors?.() ?? [];
+      for (const ed of editors) {
+        const node = ed.getDomNode?.();
+        if (node && host.contains(node)) return ed.getValue();
+      }
+      return null;
+    }, '[data-test="logs-search-bar-query-editor"]');
+    if (!text) return false;
+    const lower = text.toLowerCase().trim();
+    return lower.includes('select') && lower.includes('from');
   }
 
   async ensureSQLMode() {
-    if (!(await this.isSQLModeOn())) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need SQL mode should set a SELECT query via the editor after this call.
+    testLogger.info('ensureSQLMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async ensureFTSMode() {
-    if (await this.isSQLModeOn()) {
-      await this.page.getByRole(this.sqlModeSwitch.role, { name: this.sqlModeSwitch.name }).click();
-      await this.page.waitForTimeout(500);
-    }
+    // SQL mode toggle removed from UI. SQL mode is auto-detected from SELECT...FROM in query.
+    // Callers that need FTS mode should set a non-SELECT query via the editor after this call.
+    testLogger.info('ensureFTSMode: SQL mode toggle removed — SQL mode is auto-detected from query content');
   }
 
   async _isAutoQueryEnabled() {
@@ -140,10 +187,12 @@ export class LogsQueryPage {
     await expect(toggle).toBeVisible({ timeout: 5000 });
     if (((await toggle.textContent()) || '').includes(expectedLabel)) {
       await toggle.click();
+      // After clicking, the toggle menu closes — wait for it to be detached/hidden.
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     } else {
       await this.page.keyboard.press('Escape');
+      await toggle.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
-    await this.page.waitForTimeout(300);
   }
 
   async disableAutoRun() {

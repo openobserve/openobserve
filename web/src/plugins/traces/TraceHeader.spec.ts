@@ -15,16 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import TraceHeader from "@/plugins/traces/TraceHeader.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
-
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
 
 const mockStore = createStore({
   state: {
@@ -164,14 +158,18 @@ describe("TraceHeader", () => {
 
     it("should have drag indicator icon", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.find(".material-icons").exists()).toBe(true);
-      expect(resizeBtn.find(".material-icons").text()).toBe("drag_indicator");
+      const icon = resizeBtn.findComponent({ name: "OIcon" });
+      expect(icon.exists()).toBe(true);
+      expect(icon.props("name")).toBe("drag-indicator");
     });
 
     it("should have correct avatar properties", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("bg-primary");
-      expect(resizeBtn.classes()).toContain("text-white");
+      expect(resizeBtn.classes()).toContain("resize-btn");
+      expect(resizeBtn.classes()).toContain("tw:bg-[var(--o2-primary)]");
+      // tw:text-white was removed from the resize button in favour of inheriting
+      // the icon colour — assert the remaining identity classes instead.
+      expect(resizeBtn.classes()).toContain("tw:rounded-full");
     });
   });
 
@@ -246,7 +244,7 @@ describe("TraceHeader", () => {
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("bg-grey-2");
+      expect(headerContainer.classes()).toContain("tw:bg-gray-100");
       expect(headerContainer.classes()).toContain("trace-header-container");
     });
 
@@ -282,7 +280,7 @@ describe("TraceHeader", () => {
       });
 
       const headerContainer = darkWrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("bg-grey-9");
+      expect(headerContainer.classes()).toContain("tw:bg-gray-700");
       expect(headerContainer.classes()).toContain("trace-header-container");
 
       darkWrapper.unmount();
@@ -449,9 +447,9 @@ describe("TraceHeader", () => {
   describe("CSS classes and styling", () => {
     it("should have correct flex classes", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("flex");
-      expect(headerContainer.classes()).toContain("justify-start");
-      expect(headerContainer.classes()).toContain("items-center");
+      expect(headerContainer.classes()).toContain("tw:flex");
+      expect(headerContainer.classes()).toContain("tw:justify-start");
+      expect(headerContainer.classes()).toContain("tw:items-center");
     });
 
     it("should have correct header background class", () => {
@@ -464,29 +462,28 @@ describe("TraceHeader", () => {
         '[data-test="trace-header-operation-name"]',
       );
       expect(operationNameSection.classes()).toContain("tw:relative");
-      expect(operationNameSection.classes()).toContain("flex");
-      expect(operationNameSection.classes()).toContain("justify-start");
-      expect(operationNameSection.classes()).toContain("items-center");
-      expect(operationNameSection.classes()).toContain("no-wrap");
-      expect(operationNameSection.classes()).toContain("row");
-      expect(operationNameSection.classes()).toContain("q-px-sm");
+      expect(operationNameSection.classes()).toContain("tw:flex");
+      expect(operationNameSection.classes()).toContain("tw:justify-start");
+      expect(operationNameSection.classes()).toContain("tw:items-center");
+      expect(operationNameSection.classes()).toContain("tw:flex-nowrap");
+      expect(operationNameSection.classes()).toContain("tw:px-2");
     });
 
     it("should have correct tics section classes", () => {
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.classes()).toContain("flex");
-      expect(ticsSection.classes()).toContain("justify-start");
-      expect(ticsSection.classes()).toContain("items-center");
-      expect(ticsSection.classes()).toContain("no-wrap");
-      expect(ticsSection.classes()).toContain("row");
-      expect(ticsSection.classes()).toContain("relative-position");
+      expect(ticsSection.classes()).toContain("tw:flex");
+      expect(ticsSection.classes()).toContain("tw:justify-start");
+      expect(ticsSection.classes()).toContain("tw:items-center");
+      expect(ticsSection.classes()).toContain("tw:flex-nowrap");
+      // Component was migrated from Quasar's `relative-position` to Tailwind `tw:relative`.
+      expect(ticsSection.classes()).toContain("tw:relative");
     });
 
     it("should have correct tic label classes", () => {
       const tic0 = wrapper.find('[data-test="trace-header-tic-label-0"]');
-      expect(tic0.classes()).toContain("col-3");
-      expect(tic0.classes()).toContain("text-caption");
-      expect(tic0.classes()).toContain("q-pl-md");
+      expect(tic0.classes()).toContain("tw:w-1/4");
+      expect(tic0.classes()).toContain("tw:text-xs");
+      expect(tic0.classes()).toContain("tw:pl-3");
     });
 
     it("should have correct tic line classes", () => {

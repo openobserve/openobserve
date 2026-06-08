@@ -19,33 +19,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
-    <div>
-      <div class="card-container tw:mb-[0.625rem]">
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+    <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
       >
 
         <div
-            class="q-table__title full-width tw:font-[600]"
+            class="tw:text-xl tw:tracking-[0.005em] tw:w-full tw:font-[600]"
             data-test="service-accounts-title-text"
           >
             {{ t("serviceAccounts.header") }}
           </div>
-          <div class="full-width tw:flex tw:justify-end tw:gap-3">
-            <q-input
+          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
+            <OSearchInput
                 v-model="filterQuery"
-                borderless
-                dense
-                class="q-ml-auto no-border o2-search-input tw:h-[36px]"
+                class="tw:w-[12.5rem]"
                 :placeholder="t('serviceAccounts.search')"
-              >
-                <template #prepend>
-                  <q-icon class="o2-search-input-icon" name="search" />
-                </template>
-              </q-input>
+              />
               <OButton
+                data-test="service-accounts-add-btn"
                 variant="primary"
                 size="sm"
+                class="tw:!h-8"
                 @click="addRoutePush({})"
               >
                 {{ t('serviceAccounts.add') }}
@@ -53,301 +48,204 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
       </div>
       </div>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-[calc(100vh-127px)]">
-          <q-table
-            ref="qTable"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-            :rows="visibleRows"
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:h-full">
+          <OTable
+            :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
             row-key="email"
+            :loading="loading"
+            pagination="client"
+            :page-size="20"
+            :page-size-options="[20, 50, 100, 250, 500]"
+            :footer-title="t('serviceAccounts.header')"
+            sorting="client"
             selection="multiple"
-            v-model:selected="selectedAccounts"
-            :pagination="pagination"
-            :filter="filterQuery"
-            :style="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
+            :selected-ids="selectedAccountEmails"
+            :global-filter="filterQuery"
+            filter-mode="client"
+            :default-columns="false"
+            :show-global-filter="false"
+            @update:selected-ids="handleSelectedIdsUpdate"
           >
-            <template #no-data>
-              <NoData></NoData>
+            <template #empty>
+              <NoData />
             </template>
 
-            <template v-slot:body-selection="scope">
-              <q-td auto-width>
-                <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" :disable="scope.row.is_system" />
-              </q-td>
+            <template #cell-email="{ row }">
+              <template v-if="row.is_system">
+                <span data-test="service-accounts-system-account-label" class="text-weight-medium">AI SRE Agent</span>
+                <OBadge data-test="service-accounts-system-badge" variant="primary-outline" size="sm" class="tw:ml-2">system</OBadge>
+              </template>
+              <template v-else>
+                <span :data-test="`service-accounts-email-${row.email}`">{{ row.email }}</span>
+              </template>
             </template>
 
-            <template #body-cell-email="props">
-              <q-td :props="props">
-                <template v-if="props.row.is_system">
-                  <span class="text-weight-medium">AI SRE Agent</span>
-                  <q-badge color="blue-2" text-color="blue-8" label="system" class="q-ml-sm q-px-xs" style="font-size: 10px;" />
-                </template>
-                <template v-else>{{ props.row.email }}</template>
-              </q-td>
+            <template #cell-first_name="{ row }">
+              <template v-if="row.is_system && row.description">{{ row.description }}</template>
+              <template v-else>{{ row.first_name }}</template>
             </template>
 
-            <template #body-cell-first_name="props">
-              <q-td :props="props">
-                <template v-if="props.row.is_system && props.row.description">{{ props.row.description }}</template>
-                <template v-else>{{ props.row.first_name }}</template>
-              </q-td>
+            <template #cell-token="{ row }">
+              <span class="tw:font-mono">{{ row.token || '************' }}</span>
             </template>
 
-            <template #body-cell-token="props">
-            <q-td :props="props" side>
-              <span class="tw:font-mono">{{ props.row.token || '************' }}</span>
-            </q-td>
-          </template>
-
-            <template #body-cell-actions="props">
-              <q-td :props="props" side>
-                <template v-if="props.row.is_system">
-                  <q-badge color="grey-6" :label="t('serviceAccounts.systemManaged', 'System Managed')" class="q-px-sm q-py-xs">
-                    <q-tooltip v-if="props.row.description">{{ props.row.description }}</q-tooltip>
-                  </q-badge>
-                </template>
-                <template v-else>
-                  <OButton
-                    data-test="service-accounts-refresh"
-                    :title="t('serviceAccounts.refresh')"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    @click="confirmRefreshAction(props.row)"
-                  >
-                    <q-icon name="refresh" />
-                  </OButton>
-                  <OButton
-                    data-test="service-accounts-edit"
-                    :title="t('serviceAccounts.update')"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    @click="addRoutePush(props)"
-                  >
-                    <q-icon name="edit" />
-                  </OButton>
-                  <OButton
-                    data-test="service-accounts-delete"
-                    :title="t('serviceAccounts.delete')"
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    @click="confirmDeleteAction(props)"
-                  >
-                    <q-icon :name="outlinedDelete" />
-                  </OButton>
-                </template>
-              </q-td>
-            </template>
-            <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                  {{ resultTotal }} {{ t('serviceAccounts.header') }}
-                </div>
+            <template #cell-actions="{ row }">
+              <template v-if="row.is_system">
+                <OBadge data-test="service-accounts-system-managed-badge" variant="default-outline">
+                    {{ t('serviceAccounts.systemManaged', 'System Managed') }}
+                  <OTooltip v-if="row.description" :content="row.description" />
+                </OBadge>
+              </template>
+              <template v-else>
                 <OButton
-                  v-if="selectedAccounts.length > 0"
-                  data-test="service-accounts-list-delete-accounts-btn"
-                  variant="outline"
-                  size="sm"
-                  class="tw:mr-2"
-                  @click="openBulkDeleteDialog"
-                >
-                  <template #icon-left><q-icon name="delete" /></template>
-                  Delete
-                </OButton>
-                <QTablePagination
-                  :scope="scope"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  position="bottom"
-                  @update:changeRecordPerPage="changePagination"
+                  data-test="service-accounts-refresh"
+                  :title="t('serviceAccounts.refresh')"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  @click="confirmRefreshAction(row)"
                 />
-              </div>
+                <OButton
+                  data-test="service-accounts-edit"
+                  :title="t('serviceAccounts.update')"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="edit"
+                  @click="addRoutePush(row)"
+                />
+                <OButton
+                  data-test="service-accounts-delete"
+                  :title="t('serviceAccounts.delete')"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="delete"
+                  @click="confirmDeleteAction(row)"
+                />
+              </template>
             </template>
 
-            <template v-slot:header="props">
-                  <q-tr :props="props">
-                    <!-- Adding this block to render the select-all checkbox -->
-                    <q-th v-if="columns.length > 0" auto-width>
-                      <q-checkbox
-                        v-model="props.selected"
-                        size="sm"
-                        :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                        class="o2-table-checkbox"
-                      />
-                    </q-th>
-
-                    <!-- Rendering the rest of the columns -->
-                    <q-th
-                      v-for="col in props.cols"
-                      :key="col.name"
-                      :props="props"
-                      :class="col.classes"
-                      :style="col.style"
-                    >
-                      {{ col.label }}
-                    </q-th>
-                  </q-tr>
-                </template>
-          </q-table>
+            <template #bottom>
+              <span class="o2-table-footer-title tw:text-text-primary">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <OButton
+                v-if="selectedAccounts.length > 0"
+                data-test="service-accounts-list-delete-accounts-btn"
+                variant="outline-destructive"
+                size="sm"
+                @click="openBulkDeleteDialog"
+                icon-left="delete"
+              >
+                Delete
+              </OButton>
+            </template>
+          </OTable>
       </div>
-      </div>
-  </div>
-    <q-dialog
-      v-model="showAddUserDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-service-account
-        style="width: 30vw"
-        v-model="selectedUser"
-        :isUpdated="isUpdated"
-        @updated="addMember"
-        @cancel:hideform="hideForm"
-      />
-    </q-dialog>
-
-    <q-dialog v-model="confirmRefresh">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmRefreshHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmRefreshMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton
-            v-close-popup="true"
-            variant="outline"
-            size="sm-action"
-            data-test="cancel-button"
-          >
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            data-test="confirm-button"
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="refreshServiceToken(toBeRefreshed)"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-    <q-dialog v-model="confirmDelete">
-      <q-card style="width: 240px">
-        <q-card-section class="confirmBody">
-          <div class="head">{{ t("serviceAccounts.confirmDeleteHead") }}</div>
-          <div class="para">{{ t("serviceAccounts.confirmDeleteMsg") }}</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action" data-test="cancel-button">
-            {{ t("user.cancel") }}
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            data-test="confirm-button"
-            @click="deleteUser"
-          >
-            {{ t("user.ok") }}
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="confirmBulkDelete">
-      <q-card style="width: 280px">
-        <q-card-section class="confirmBody">
-          <div class="head">Delete Service Accounts</div>
-          <div class="para">Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</div>
-        </q-card-section>
-
-        <q-card-actions class="confirmActions">
-          <OButton v-close-popup="true" variant="outline" size="sm-action">
-            Cancel
-          </OButton>
-          <OButton
-            v-close-popup="true"
-            variant="primary"
-            size="sm-action"
-            @click="bulkDeleteServiceAccounts"
-          >
-            OK
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="isShowToken"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section  class="text-h6 dialog-heading tw:flex tw:justify-between tw:items-center" >
-      <div>Service Account Token </div>
-          <OButton data-test="sa-cancel-button" variant="ghost" size="icon-circle-sm" @click="isShowToken = false">
-            <q-icon name="cancel" />
-          </OButton>
-    </q-card-section>
-
-    <q-card-section>
-
-      <div class="tw:flex tw:items-center tw:gap-2" style="padding: 0rem 1rem;  border-radius: 8px;">
-  <!-- Token section taking 75% of the width -->
-  <div
-    class="text-h6 text-center tw:truncate el-border"
-    style="flex: 3;  padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
-  >
-    {{  serviceToken }}
-  </div>
-  <!-- Buttons section taking 25% of the width -->
-  <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.copyToken')"
-      class="tw:mr-1"
-      @click.stop="copyToClipboard(serviceToken)"
-    >
-      <q-icon name="content_copy" />
-    </OButton>
-    <OButton
-      variant="outline"
-      size="icon-md"
-      :title="t('serviceAccounts.downloadToken')"
-      @click.stop="downloadTokenAsFile(serviceToken)"
-    >
-      <q-icon name="file_download" />
-    </OButton>
-  </div>
-  
-</div>
-
-    <div class="q-pt-md flex items-center warning-text">
-      <q-icon name="info" class="q-mr-xs " size="16px" />
-      <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.
-      </span>
     </div>
-   
-    </q-card-section>
+    <add-service-account
+      v-model:open="showAddUserDialog"
+      v-model="selectedUser"
+      :isUpdated="isUpdated"
+      @updated="addMember"
+    />
 
-  </q-card>
-</q-dialog>
-  </q-page>
+    <ODialog data-test="service-accounts-list-refresh-dialog"
+      v-model:open="confirmRefresh"
+      :title="t('serviceAccounts.confirmRefreshHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmRefresh = false"
+      @click:primary="refreshServiceToken(toBeRefreshed)"
+    >
+      <p>{{ t('serviceAccounts.confirmRefreshMsg') }}</p>
+    </ODialog>
+
+    <ODialog data-test="service-accounts-list-delete-dialog"
+      v-model:open="confirmDelete"
+      :title="t('serviceAccounts.confirmDeleteHead')"
+      :secondary-button-label="t('user.cancel')"
+      :primary-button-label="t('user.ok')"
+      @click:secondary="confirmDelete = false"
+      @click:primary="deleteUser"
+      size="sm"
+    >
+      <p>{{ t('serviceAccounts.confirmDeleteMsg') }}</p>
+    </ODialog>
+
+    <ODialog data-test="service-accounts-list-bulk-delete-dialog"
+      v-model:open="confirmBulkDelete"
+      size="sm"
+      title="Delete Service Accounts"
+      secondary-button-label="Cancel"
+      primary-button-label="OK"
+      @click:secondary="confirmBulkDelete = false"
+      @click:primary="bulkDeleteServiceAccounts"
+    >
+      <p>Are you sure you want to delete {{ selectedAccounts.length }} service account(s)?</p>
+    </ODialog>
+
+    <ODialog data-test="service-accounts-list-token-dialog"
+      v-model:open="isShowToken"
+      persistent
+      size="md"
+      title="Service Account Token"
+    >
+
+      <div class="tw:flex tw:items-center tw:gap-2 tw:rounded-lg" style="padding: 0rem 0.5rem;">
+        <!-- Token section taking 75% of the width -->
+        <div
+          class="tw:text-xl tw:font-semibold tw:text-center tw:truncate el-border"
+          style="flex: 3; padding: 0.5rem; border-radius: 6px; font-family: monospace; text-align: center; overflow: hidden;"
+        >
+          {{ serviceToken }}
+        </div>
+        <!-- Buttons section taking 25% of the width -->
+        <div class="tw:flex tw:justify-end tw:gap-1" style="flex: 1; max-width: 25%;">
+          <OButton
+            data-test="service-accounts-list-token-copy-btn"
+            variant="outline"
+            size="icon-md"
+            :title="t('serviceAccounts.copyToken')"
+            class="tw:mr-1"
+            @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
+          >
+            <OIcon name="content-copy" size="sm" />
+          </OButton>
+          <OButton
+            data-test="service-accounts-list-token-download-btn"
+            variant="outline"
+            size="icon-md"
+            :title="t('serviceAccounts.downloadToken')"
+            @click.stop="downloadTokenAsFile(serviceToken)"
+          >
+            <OIcon name="file-download" size="sm" />
+          </OButton>
+        </div>
+      </div>
+
+      <div class="tw:pt-3 tw:flex tw:items-center warning-text">
+        <OIcon name="info" class="tw:mr-1" size="sm" />
+        <span class="text-p">Make sure to copy / download the token. You will not be able to see it again.</span>
+      </div>
+    </ODialog>
+  </div>
 </template>
 
 <script lang="ts">
 
-import { defineComponent, ref, onActivated, onBeforeMount, onMounted, watch } from "vue";
+import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps, date } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import usersService from "@/services/users";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
@@ -357,7 +255,8 @@ import {
   verifyOrganizationStatus,
   maskText,
 } from "@/utils/zincutils";
-import { outlinedDelete,outlinedVisibility } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -365,15 +264,15 @@ import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { QTablePagination, NoData, AddServiceAccount, OButton },
+  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OSearchInput, OTooltip, OTable, OBadge },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const { track } = useReo();
     const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
@@ -398,97 +297,97 @@ export default defineComponent({
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
 
-    onBeforeMount(()=>{
-      getServiceAccountsUsers();
-    })
+    onBeforeMount(async () => {
+      await getServiceAccountsUsers();
 
-    const columns: any = ref<QTableProps["columns"]>([
+      // Only `action=update&email=…` auto-opens the edit dialog so a shared
+      // edit link still lands directly on the user's form. `action=add` is
+      // intentionally NOT handled here — the dialog only opens via the
+      // "Add Service Account" button click; refreshing on an `action=add`
+      // URL should leave the user on the list view.
+      const query = router.currentRoute.value.query;
+      if (query.action === "update" && query.email) {
+        const match = serviceAccountsState.service_accounts_users.find(
+          (m: any) => m.email === query.email,
+        );
+        if (match) addUser({ row: match }, true);
+      }
+    });
+
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px;",
+        id: "#",
+        header: "#",
+        accessorKey: "#",
+        size: 36,
+        minSize: 32,
+        maxSize: 40,
+        meta: { align: "left", compactPadding: true },
       },
       {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
-        align: "left",
+        id: "email",
+        header: t("user.email"),
+        accessorKey: "email",
         sortable: true,
+        size: 550,
+        meta: { align: "left" },
       },
       {
-        name: "first_name",
-        field: "first_name",
-        label: t("user.description"),
-        align: "left",
+        id: "first_name",
+        header: t("user.description"),
+        accessorKey: "first_name",
         sortable: true,
-        style: "width: 150px;",
+        meta: { align: "left", autoWidth: true },
       },
       {
-        name: "token",
-        field: "token",
-        label: t("serviceAccounts.token"),
-        align: "left",
+        id: "token",
+        header: t("serviceAccounts.token"),
+        accessorKey: "token",
         sortable: false,
-        style: "width: 230px;", //because token might take more space for displaying the token , eye button and copy button
+        size: 200,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("user.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
+        id: "actions",
+        header: t("user.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 130,
+        meta: { align: "center", actionCount: 3 },
       },
-    ]);
+    ];
     const userEmail: any = ref("");
     const options = ref([{ label: "Admin", value: "admin" }]);
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
 
-    interface OptionType {
-      label: String;
-      value: number | String;
-    }
-    const perPageOptions: any = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-
     const currentUser = computed(() => store.state.userInfo.email);
 
+    const selectedAccountEmails = computed(() =>
+      selectedAccounts.value.map((a: any) => a.email),
+    );
 
-
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const accountsMap = new Map(
+        serviceAccountsState.service_accounts_users.map((a: any) => [a.email, a]),
+      );
+      selectedAccounts.value = ids.map((id) => accountsMap.get(id)).filter(Boolean);
     };
 
-    const confirmDeleteAction = (props: any) => {
+    const confirmDeleteAction = (row: any) => {
       confirmDelete.value = true;
-      deleteUserEmail = props.row.email;
+      deleteUserEmail = row.email;
     };
+    const loading = ref(false);
     const getServiceAccountsUsers = async () =>{
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading service accounts...",
-      });
+              timeout: 0,
+});
 
+      loading.value = true;
       return new Promise((resolve, reject) => {
         service_accounts
           .list(
@@ -518,6 +417,9 @@ export default defineComponent({
           .catch((err) => {
             dismiss();
             reject(false);
+          })
+          .finally(() => {
+            loading.value = false;
           });
       });
     }
@@ -535,22 +437,17 @@ export default defineComponent({
         showAddUserDialog.value = true;
       }, 100);
     };
-    const addRoutePush = (props: any) => {
-      if (props.row != undefined) {
+    const addRoutePush = (row: any) => {
+      if (row?.email) {
         router.push({
           name: "serviceAccounts",
           query: {
             action: "update",
             org_identifier: store.state.selectedOrganization.identifier,
-            email: props.row.email,
+            email: row.email,
           },
         });
-        addUser(
-          {
-            row: props.row,
-          },
-          true
-        );
+        addUser({ row }, true);
       } else {
         track("Button Click", {
           button: "Add Service Account",
@@ -591,9 +488,9 @@ export default defineComponent({
       showAddUserDialog.value = false;
       if (res.code == 200 ) {
         if (operationType == "created") {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account created successfully.",
+              variant: "success",
             });
 
           serviceToken.value = res.token;
@@ -612,23 +509,21 @@ export default defineComponent({
               token: res.token ? redactToken(res.token) : '',
             };
 
-            serviceAccountsState.service_accounts_users.push(user);
+            serviceAccountsState.service_accounts_users = [...serviceAccountsState.service_accounts_users, user];
             resultTotal.value = serviceAccountsState.service_accounts_users.length;
           }
         } else {
           setTimeout(() => {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account updated successfully.",
+              variant: "success",
             });
           }, 2000);
-          serviceAccountsState.service_accounts_users.forEach((member: any, key: number) => {
+          serviceAccountsState.service_accounts_users = serviceAccountsState.service_accounts_users.map((member: any) => {
             if (member.email == data.email) {
-              serviceAccountsState.service_accounts_users[key] = {
-                ...serviceAccountsState.service_accounts_users[key],
-                ...data,
-              };
+              return { ...member, ...data };
             }
+            return member;
           });
         }
       }
@@ -641,22 +536,23 @@ export default defineComponent({
     };
 
     const deleteUser = async () => {
+      confirmDelete.value = false;
       service_accounts
         .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
         .then(async (res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
+            toast({
               message: "Service Account deleted successfully.",
+              variant: "success",
             });
             await getServiceAccountsUsers();
           }
         })
         .catch((err: any) => {
           if(err.response?.status != 403){
-            $q.notify({
-            color: "negative",
+            toast({
             message: err.response?.data?.message || "Error while deleting user.",
+            variant: "error",
             });
           }
 
@@ -680,22 +576,19 @@ export default defineComponent({
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
-          $q.notify({
-            color: "positive",
+          toast({
             message: `Successfully deleted ${successful.length} service account(s)`,
-            timeout: 2000,
+            variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
-          $q.notify({
-            color: "warning",
+          toast({
             message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
-            timeout: 3000,
+            variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: `Failed to delete ${unsuccessful.length} service account(s)`,
-            timeout: 2000,
+            variant: "error",
           });
         }
 
@@ -704,32 +597,32 @@ export default defineComponent({
         await getServiceAccountsUsers();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
-          $q.notify({
-            color: "negative",
+          toast({
             message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
-            timeout: 2000,
+            variant: "error",
           });
         }
       }
     };
 
     const refreshServiceToken = async (row:any) =>{
+      confirmRefresh.value = false;
       row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
           serviceToken.value = res.data.token;
           isShowToken.value = true;
 
-        $q.notify({
-          color: "positive",
+        toast({
           message: "Service token refreshed successfully.",
+          variant: "success",
         });
 
         getServiceAccountsUsers();
       }).catch((err)=>{
         if(err.response?.status != 403){
-          $q.notify({
-          color: "negative",
+          toast({
           message: err.response?.data?.message || "Error while refreshing token.",
+          variant: "error",
           });
         }
 
@@ -738,22 +631,6 @@ export default defineComponent({
       });
 
     }
-    const  copyToClipboard = (text:string) => {
-      navigator.clipboard.writeText(text).then(() => {
-        $q.notify({
-            type: "positive",
-            message: `token Copied Successfully!`,
-            timeout: 5000,
-          });
-      }).catch(() => {
-          $q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-      });
-    }
-
     const downloadTokenAsFile = (token:string) => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");
@@ -772,41 +649,15 @@ export default defineComponent({
       toBeRefreshed.value = row;
     };
 
-    const filterData = (rows: any, terms: any) => {
-      var filtered = [];
-      terms = terms.toLowerCase();
-      for (var i = 0; i < rows.length; i++) {
-        if (
-          rows[i]["first_name"]?.toLowerCase().includes(terms) ||
-          rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-          rows[i]["email"]?.toLowerCase().includes(terms)
-        ) {
-          filtered.push(rows[i]);
-        }
-      }
-      return filtered;
-    };
-
-    const visibleRows = computed(() => {
-      if (!filterQuery.value) return serviceAccountsState.service_accounts_users || []
-      return filterData(serviceAccountsState.service_accounts_users || [], filterQuery.value)
-    });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
 
     return {
-      $q,
       t,
-      qTable,
       router,
       store,
       config,
       serviceAccountsState,
       columns,
+      loading,
       orgData,
       confirmDelete,
       serviceAccounts,
@@ -817,18 +668,10 @@ export default defineComponent({
       hideForm,
       addUser,
       confirmDeleteAction,
-      outlinedVisibility,
+      "visibility": "visibility",
       deleteUser,
       getServiceAccountsUsers,
-      pagination,
-      resultTotal,
       selectedUser,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
-      changeMaxRecordToReturn,
-      outlinedDelete,
       refreshServiceToken,
       copyToClipboard,
       downloadTokenAsFile,
@@ -836,7 +679,6 @@ export default defineComponent({
       serviceToken,
       confirmRefreshAction,
       filterQuery,
-      filterData,
       userEmail,
       selectedRole,
       options,
@@ -847,9 +689,9 @@ export default defineComponent({
       isCurrentUserInternal,
       toBeRefreshed,
       confirmRefresh,
-      visibleRows,
-      hasVisibleRows,
       selectedAccounts,
+      selectedAccountEmails,
+      handleSelectedIdsUpdate,
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteServiceAccounts,

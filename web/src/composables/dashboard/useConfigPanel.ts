@@ -240,6 +240,14 @@ export function useConfigPanel(
         label: t("dashboard.noValueReplacement"),
         visible: shouldShowNoValueReplacement(dashboardPanelData, promqlMode.value),
       },
+      "query-label": {
+        label: t("dashboard.multiSqlQueryLabel"),
+        visible:
+          !promqlMode.value &&
+          dashboardPanelData.data.queries.length > 1 &&
+          dashboardPanelData.data.type !== "geomap" &&
+          dashboardPanelData.data.type !== "maps",
+      },
     },
     axis: {
       "axis-width": {

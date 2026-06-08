@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-py-sm">
-    <div class="row tw:gap-1">
+  <div>
+    <div class="tw:flex tw:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-sql-query-type"
         >
-          <template #icon-left><Database class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="database" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.SQL") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-promql-query-type"
         >
-          <template #icon-left><ChartLine class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="show-chart" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.promQL") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-builder-query-type"
         >
-          <template #icon-left><Wrench class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="build" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.builder") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-custom-query-type"
         >
-          <template #icon-left><Code2 class="tw:size-3.5 tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="code" size="xs" class="tw:shrink-0" /></template>
           {{ t("panel.custom") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -91,13 +91,12 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { Database, ChartLine, Wrench, Code2 } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -112,7 +111,6 @@ export default defineComponent({
   setup() {
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -185,6 +183,14 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery,
       ],
+      () => {
+        initializeSelectedButtonType();
+      },
+    );
+
+    // re-sync the toggle when switching between query tabs
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
       () => {
         initializeSelectedButtonType();
       },
@@ -286,29 +292,17 @@ export default defineComponent({
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
 
-      const queryIdx = dashboardPanelData.layout.currentQueryIndex;
-
-      // Clear query when switching query types (SQL <-> PromQL)
+      // Clear queries for all tabs when switching query types (SQL <-> PromQL)
+      // since the syntax is incompatible between modes
       if (
         isQueryTypeChange &&
         dashboardPanelData.data.type !== "custom_chart"
       ) {
-        dashboardPanelData.data.queries[queryIdx].query = "";
+        dashboardPanelData.data.queries.forEach((q: any) => {
+          q.query = "";
+        });
       }
 
-
-      // When switching to SQL mode, multi-query is not supported.
-      // Keep only the current query, remove others, and reset index to 0.
-      if (
-        isQueryTypeChange &&
-        popupSelectedButtonType.value === "sql" &&
-        dashboardPanelData.data.queries.length > 1
-      ) {
-        const currentQuery = dashboardPanelData.data.queries[queryIdx];
-        dashboardPanelData.data.queries = [currentQuery];
-        dashboardPanelData.layout.currentQueryIndex = 0;
-        dashboardPanelData.layout.hiddenQueries = [];
-      }
 
       // For metrics page: when switching from custom to builder in PromQL, set sample query
       if (
@@ -418,7 +412,7 @@ export default defineComponent({
       selectedButtonQueryType,
     };
   },
-  components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, Database, ChartLine, Wrench, Code2 },
+  components: { ConfirmDialog, OToggleGroup, OToggleGroupItem, OIcon },
 });
 </script>
 

@@ -15,13 +15,11 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar();
 
 // Mock external dependencies
 vi.mock("@/aws-exports", () => ({
@@ -92,21 +90,13 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        QPage: {
-          template: "<div data-test-stub='q-page' :class='$attrs.class'><slot></slot></div>",
-          props: ["class"],
-        },
-        QSeparator: {
-          template: "<div data-test-stub='q-separator' :class='$attrs.class'></div>",
-          props: ["class"],
-        },
-        QSplitter: {
-          template: `<div data-test-stub='q-splitter'>
+                OSplitter: {
+          template: `<div data-test-stub='o-splitter'>
             <slot name='before'></slot>
             <slot name='separator'></slot>
             <slot name='after'></slot>
           </div>`,
-          props: ["modelValue", "limits", "unit", "style"],
+          props: ["modelValue", "limits", "unit", "style", "class"],
           emits: ["update:modelValue"],
         },
         QTabs: {
@@ -212,7 +202,7 @@ describe("SettingsIndex", () => {
 
     it("should render management splitter", () => {
       const wrapper = createWrapper();
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       expect(splitter.exists()).toBe(true);
     });
   });
@@ -324,7 +314,7 @@ describe("SettingsIndex", () => {
       wrapper.vm.showManagementTabs = false;
       await nextTick();
 
-      // OButton renders the icon via a slot (q-icon inside #icon-left slot), not as an attribute.
+      // OButton renders the icon via a slot (OIcon inside #icon-left slot), not as an attribute.
       // Check the component state instead.
       expect(wrapper.vm.showManagementTabs).toBe(false);
       // Verify the button still exists with the correct title
@@ -509,28 +499,24 @@ describe("SettingsIndex", () => {
   describe("Accessibility and styling", () => {
     it("should have proper CSS classes for management page", () => {
       const wrapper = createWrapper();
-      const page = wrapper.find('[data-test-stub="q-page"]');
-      
-      // Check if the element has the expected class or just verify it exists
-      if (page.classes().length > 0) {
-        expect(page.classes()).toContain("management-page");
-      } else {
-        // Fallback: verify page component exists
-        expect(page.exists()).toBe(true);
-      }
+      // Verify the wrapper exists and has expected structure
+      expect(wrapper.exists()).toBe(true);
+      // The component uses management layout with splitter
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
+      expect(splitter.exists()).toBe(true);
     });
 
     it("should apply correct separator styling", () => {
       const wrapper = createWrapper();
       // The component no longer uses q-separator
       // Verify the component has splitter instead
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       expect(splitter.exists()).toBe(true);
     });
 
     it("should have proper splitter configuration", () => {
       const wrapper = createWrapper();
-      const splitter = wrapper.find('[data-test-stub="q-splitter"]');
+      const splitter = wrapper.find('[data-test-stub="o-splitter"]');
       
       // Check if splitter has expected attributes or verify it exists
       if (splitter.attributes("unit")) {

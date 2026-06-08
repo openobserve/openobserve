@@ -28,7 +28,7 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
-        inverted_index::convert_parquet_file_name_to_tantivy_file,
+        inverted_index::to_tantivy_name,
         size::bytes_to_human_readable,
         tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
         time::BASE_TIME,
@@ -47,6 +47,12 @@ use tantivy::{
     Directory, Term,
     query::{BooleanQuery, Occur, Query, RangeQuery},
 };
+use tantivy_utils::puffin_directory::{
+    PROP_ROW_GROUP_SIZE,
+    caching_directory::CachingDirectory,
+    footer_cache::FooterCache,
+    reader::{PuffinDirReader, warm_up_terms},
+};
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
 use tracing::Instrument;
@@ -54,18 +60,13 @@ use tracing::Instrument;
 use crate::service::{
     file_list,
     search::{
+        bloom_pruner,
         grpc::{
             tantivy::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult},
             tantivy_result_cache::{self, CacheEntry},
         },
         index::IndexCondition,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
-    tantivy::puffin_directory::{
-        PROP_ROW_GROUP_SIZE,
-        caching_directory::CachingDirectory,
-        footer_cache::FooterCache,
-        reader::{PuffinDirReader, warm_up_terms},
     },
 };
 
@@ -80,6 +81,7 @@ pub async fn search(
     file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
+    bloom_indexed_fields: Vec<String>,
     idx_optimize_rule: Option<IndexOptimizeMode>,
 ) -> super::SearchTable {
     let super::QueryParams {
@@ -106,6 +108,38 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if *use_inverted_index && !index_condition.as_ref().unwrap().is_condition_all() {
+        // check bloom filter first
+        let (bloom_took, ok) = check_bloom_filter(
+            query.clone(),
+            &mut files,
+            index_condition.clone(),
+            bloom_indexed_fields,
+        )
+        .await?;
+        if ok {
+            log::info!(
+            "{}",
+            search_inspector_fields(
+                format!(
+                    "[trace_id {trace_id}] search->bloom: stream {org_id}/{stream_type}/{stream_name}, bloom filter reduced file_list num to {} in {bloom_took} ms",
+                    files.len(),
+                ),
+                SearchInspectorFieldsBuilder::new()
+                    .trace_id(trace_id.to_string())
+                    .node_name(LOCAL_NODE.name.clone())
+                    .component("storage bloom filter reduced file_list num".to_string())
+                    .search_role("follower".to_string())
+                    .duration(idx_took)
+                    .desc(format!(
+                        "bloom filter reduced file_list from {original_files_len} to {} in {bloom_took} ms",
+                        files.len(),
+                    ))
+                    .build()
+                )
+            );
+        }
+
+        // check tantivy index
         (idx_took, is_add_filter_back, ..) = tantivy_search(
             query.clone(),
             &mut files,
@@ -118,7 +152,7 @@ pub async fn search(
             "{}",
             search_inspector_fields(
                 format!(
-                    "[trace_id {trace_id}] search->storage: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
+                    "[trace_id {trace_id}] search->tantivy: stream {org_id}/{stream_type}/{stream_name}, inverted index reduced file_list num to {} in {idx_took} ms",
                     files.len(),
                 ),
                 SearchInspectorFieldsBuilder::new()
@@ -414,6 +448,53 @@ pub async fn cache_files(
     }
 }
 
+/// Check bloom filter for the file list
+#[tracing::instrument(name = "service:search:grpc:storage:check_bloom_filter", skip_all)]
+pub async fn check_bloom_filter(
+    query: Arc<super::QueryParams>,
+    file_list: &mut Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    bloom_indexed_fields: Vec<String>,
+) -> Result<(usize, bool), Error> {
+    let cfg = get_config();
+    if !cfg.common.bloom_filter_enabled
+        || file_list.is_empty()
+        || bloom_indexed_fields.is_empty()
+        || index_condition.is_none()
+    {
+        return Ok((0, false));
+    }
+
+    let start = std::time::Instant::now();
+    let before_num = file_list.len();
+    // The pruner pulls the bloom-decidable predicates out of the
+    // IndexCondition itself; if none are decidable it returns the
+    // input untouched (no `.bf` is touched).
+    *file_list = bloom_pruner::prune(
+        &query.trace_id,
+        &query.org_id,
+        query.stream_type,
+        &query.stream_name,
+        file_list.to_vec(),
+        index_condition.as_ref().unwrap(),
+        bloom_indexed_fields,
+    )
+    .await;
+
+    // metrics
+    let elapsed = start.elapsed();
+    let after_num = file_list.len();
+    config::metrics::BLOOM_PRUNE_KEEP_RATIO
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str()])
+        .observe(after_num as f64 / before_num as f64);
+
+    config::metrics::BLOOM_PRUNE_DURATION
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str()])
+        .observe(elapsed.as_secs_f64());
+
+    Ok((elapsed.as_millis() as usize, true))
+}
+
 /// Filter file list using tantivy index
 #[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
 pub async fn tantivy_search(
@@ -437,8 +518,7 @@ pub async fn tantivy_search(
         .filter_map(|(_, f)| {
             scan_stats.compressed_size += f.meta.index_size;
             if f.meta.index_size > 0 {
-                convert_parquet_file_name_to_tantivy_file(&f.key)
-                    .map(|ttv_file| (ttv_file, f.clone()))
+                to_tantivy_name(&f.key).map(|ttv_file| (ttv_file, f.clone()))
             } else {
                 None
             }
@@ -727,7 +807,7 @@ async fn search_tantivy_index(
     parquet_file: &FileKey,
 ) -> anyhow::Result<(String, TantivyResult, bool)> {
     let file_account = parquet_file.account.clone();
-    let Some(ttv_file_name) = convert_parquet_file_name_to_tantivy_file(&parquet_file.key) else {
+    let Some(ttv_file_name) = to_tantivy_name(&parquet_file.key) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
             parquet_file.key.clone()
@@ -818,7 +898,7 @@ async fn search_tantivy_index(
     let need_all_term_fields = condition
         .need_all_term_fields()
         .into_iter()
-        .chain(get_simple_distinct_field(&idx_optimize_rule).into_iter())
+        .chain(get_simple_distinct_field(&idx_optimize_rule))
         .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
         .collect::<HashSet<_>>();
 

@@ -19,17 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="tag-input-wrapper" class="tag-input-wrapper" :class="{ 'has-content': hasContent }">
       <label v-if="label" data-test="tag-input-label" class="tag-input-label">{{ label }}</label>
       <div data-test="tags-and-input" class="tags-and-input">
-        <q-chip
+        <OBadge
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
-          removable
-          @remove="removeTag(index)"
-          size="12px"
+          variant="default"
+          size="sm"
           class="tag-chip"
         >
           {{ tag }}
-        </q-chip>
+          <template #trailing>
+            <button
+              type="button"
+              :aria-label="`Remove ${tag}`"
+              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              @click="removeTag(index)"
+            >
+              <OIcon name="close" size="xs" />
+            </button>
+          </template>
+        </OBadge>
         <input
           data-test="tag-input-field"
           ref="inputRef"
@@ -49,6 +58,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Props {
   modelValue: string[];

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="overflow-hidden tw:h-full">
+  <div data-test="traces-search-result" class="tw:overflow-hidden tw:h-full">
     <div
       class="card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
     >
@@ -29,24 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.searchApplied
         "
         data-test="traces-section-header"
-        class="row items-center tw:px-[0.5rem]! q-py-xs tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:py-1 tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
-        <q-badge
+        <OBadge
           data-test="traces-count-badge"
-          rounded
-          :label="`${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
-        />
-        <q-badge
+          variant="default"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-text-4)]! tw:mr-[0.6rem]"
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OBadge>
+        <OBadge
           v-if="
             searchObj.data.queryResults.errorCount != null &&
             searchObj.data.queryResults.errorCount > 0
           "
           data-test="traces-error-count-badge"
-          rounded
-          :label="`${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}`"
-          class="text-caption tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
-        />
+          variant="error"
+          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
+        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
         <!-- Insights Button -->
         <OButton
           variant="outline"
@@ -55,10 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="insights-button"
         >
           <template #icon-left>
-            <q-icon name="timeline" size="12px" />
+            <OIcon name="timeline" size="xs" />
           </template>
           {{ t("volumeInsights.insightsButtonLabel") }}
-          <q-tooltip>{{ t("volumeInsights.analyzeTooltipTraces") }}</q-tooltip>
+          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <ORefreshButton
           :last-run-at="searchObj.meta.lastRunAt"
@@ -68,32 +66,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:ml-2"
         />
 
-        <q-space />
+        <div class="tw:flex-1" />
         <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
-          <q-select
+          <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
             class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
             size="sm"
-            dense
-            borderless
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
-          <q-pagination
+          <OPagination
             :disable="searchObj.loading"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            :input="false"
-            direction-links
-            :boundary-numbers="false"
-            :max-pages="5"
-            :ellipses="false"
-            icon-first="skip_previous"
-            icon-last="skip_next"
-            icon-prev="fast_rewind"
-            icon-next="fast_forward"
             class="float-right paginator-section tw:mt-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="changePage"
@@ -172,7 +159,6 @@ import {
   ref,
   watch,
 } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
@@ -182,17 +168,27 @@ import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import { formatLargeNumber } from "../../utils/zincutils";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
     ORefreshButton,
     OButton,
+    OTooltip,
+    OSelect,
+    OPagination,
+    OBadge,
     TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
-  },
+    OIcon,
+},
   emits: [
     "update:scroll",
     "update:datetime",
@@ -226,7 +222,6 @@ export default defineComponent({
   setup(_props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    useQuasar();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();

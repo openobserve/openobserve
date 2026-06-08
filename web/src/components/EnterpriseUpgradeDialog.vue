@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onDialogHide">
-    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
+  <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
+    <div class="enterprise-dialog-v3">
       <!-- Close Button -->
       <div class="close-btn-top-right">
         <OButton
           variant="ghost"
           size="icon"
-          v-close-popup
+          @click="showDialog = false"
         >
-          <q-icon name="cancel" size="16px" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
         </OButton>
       </div>
 
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="hero-content">
             <div class="hero-icon">
-              <q-icon name="workspace_premium" size="48px" />
+              <OIcon name="workspace-premium" size="xl" />
             </div>
 
             <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
@@ -46,27 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="hero-offer">
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
-                <q-skeleton
-                  type="circle"
-                  size="40px"
-                  class="usage-indicator"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2);"
+                <OSkeleton
+                  class="usage-indicator tw:rounded-full"
+                  style="width: 40px; height: 40px;"
+                  data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
-                <q-skeleton
-                  type="rect"
-                  width="200px"
-                  height="44px"
-                  class="offer-badge-skeleton"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2); border-radius: 24px;"
+                <OSkeleton
+                  class="offer-badge-skeleton tw:rounded-3xl"
+                  style="width: 200px; height: 44px;"
+                  data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
                 <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="tw:mr-1" />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
@@ -76,12 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="dialogConfig.isLicensed" class="usage-chart-section">
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
-                <q-skeleton
-                  type="rect"
-                  height="150px"
-                  class="chart-skeleton"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.1); border-radius: 8px;"
+                <OSkeleton
+                  class="chart-skeleton tw:rounded-lg"
+                  style="height: 150px;"
+                  data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
               <!-- Loaded chart -->
@@ -93,17 +86,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data="chartData"
                     />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="text-caption" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
+                  <div v-if="isIngestionUnlimited" class="tw:text-xs" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
                     {{ t('about.usage_shows_zero_unlimited') }}
                   </div>
                 </div>
               </template>
-            </div>
-
-            <!-- License Limit Note (only for Enterprise without license) -->
-            <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
-              <span>{{ dialogConfig.licenseNoteText }}</span>
             </div>
 
             <div class="hero-actions">
@@ -116,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
-                  <q-icon :name="dialogConfig.primaryButtonIcon" />
+                  <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
                 </template>
               </OButton>
               <OButton
@@ -159,12 +146,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
               </div>
@@ -180,12 +167,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -197,24 +184,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="features-list">
             <div
               v-for="feature in enterpriseFeatures"
+              v-show="!feature.cloudOnly"
               :key="feature.name"
               class="feature-list-item"
               :class="{ 'has-link': feature.link }"
               @click="feature.link && openFeatureLink(feature.link)"
             >
               <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+                <OIcon :name="feature.icon" size="sm" />
               </div>
               <div class="feature-content">
                 <div class="feature-name">
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="external-link-icon" />
                   <span v-if="feature.beta" class="beta-badge">BETA</span>
                   <span v-if="feature.requiresHA" class="ha-badge">
                     HA
-                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                      {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
-                    </q-tooltip>
+                    <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
                   </span>
                 </div>
                 <div class="feature-desc">{{ feature.note }}</div>
@@ -223,19 +209,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue")
@@ -279,13 +269,18 @@ const FEATURE_LINKS = {
   broadcast_join: "broadcast_join",
   logs_metrics_traces_correlation: "telemetry_corr",
   service_maps: "service_maps",
+  byob: "byob",
 };
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
   components: {
+    OIcon,
     ChartRenderer,
     OButton,
+    ODialog,
+    OSkeleton,
+    OTooltip,
   },
   props: {
     modelValue: {
@@ -298,7 +293,6 @@ export default defineComponent({
     const showDialog = ref(props.modelValue);
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
     const { t } = useI18n();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
@@ -346,7 +340,7 @@ export default defineComponent({
 
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
-      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 200; // Use nullish coalescing to allow 0
+      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 50; // Use nullish coalescing to allow 0
 
       // Get usage percentage for circular indicator (this is already a percentage)
       const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
@@ -443,7 +437,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.alerts.name"),
         note: t("about.enterprise_offer.core_features.alerts.note"),
-        icon: "notifications_active",
+        icon: "notifications-active",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.alerts,
       },
       {
@@ -467,19 +461,19 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.pipelines.name"),
         note: t("about.enterprise_offer.core_features.pipelines.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipelines,
       },
       {
         name: t("about.enterprise_offer.core_features.high_availability.name"),
         note: t("about.enterprise_offer.core_features.high_availability.note"),
-        icon: "cloud_done",
+        icon: "cloud-done",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.high_availability,
       },
       {
         name: t("about.enterprise_offer.core_features.multitenancy.name"),
         note: t("about.enterprise_offer.core_features.multitenancy.note"),
-        icon: "corporate_fare",
+        icon: "corporate-fare",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multitenancy,
       },
       {
@@ -508,7 +502,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.rbac.name"),
         note: t("about.enterprise_offer.enterprise_features.rbac.note"),
-        icon: "admin_panel_settings",
+        icon: "admin-panel-settings",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rbac,
       },
@@ -536,7 +530,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
         note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
-        icon: "fact_check",
+        icon: "fact-check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
       },
@@ -550,7 +544,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
         note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
-        icon: "alt_route",
+        icon: "alt-route",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipeline_remote_destinations,
       },
@@ -572,7 +566,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
-        icon: "smart_toy",
+        icon: "smart-toy",
         requiresHA: true,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
@@ -588,7 +582,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
-        icon: "query_stats",
+        icon: "query-stats",
         requiresHA: false,
         beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
@@ -624,23 +618,32 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
         note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
-        icon: "call_merge",
+        icon: "call-merge",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.broadcast_join,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
         note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
-        icon: "auto_graph",
+        icon: "auto-graph",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces_correlation,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
         note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
+      },
+      {
+        name: t("about.enterprise_offer.enterprise_features.byob.name"),
+        note: t("about.enterprise_offer.enterprise_features.byob.note"),
+        icon: "database",
+        requiresHA: false,
+        beta: true,
+        cloudOnly: true,
+        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.byob,
       },
     ];
 
@@ -712,10 +715,9 @@ export default defineComponent({
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-        $q.notify({
+        toast({
           message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
-          color: 'negative',
-          timeout: 5000,
+          variant: "error",
         });
       }
     };
@@ -1042,6 +1044,7 @@ export default defineComponent({
 .enterprise-dialog-v3 {
   overflow: hidden;
   position: relative;
+  margin: calc(-1 * var(--spacing-dialog-content-py, 1.25rem)) calc(-1 * var(--spacing-dialog-content-px, 1.25rem));
 }
 
 .close-btn-top-right {
@@ -1077,7 +1080,8 @@ export default defineComponent({
   flex-direction: column;
   position: relative;
   color: white;
-  overflow: hidden;
+  overflow-y: auto; // independent scroll when content exceeds dialog height
+  min-height: 0;
 
   .hero-content {
     flex: 1;
@@ -1087,6 +1091,7 @@ export default defineComponent({
     align-items: center;
     max-width: 400px;
     width: 100%;
+    margin: auto; // vertically centered when it fits, lets panel scroll when it doesn't
   }
 
   .hero-icon {
@@ -1099,11 +1104,7 @@ export default defineComponent({
     justify-content: center;
     margin-bottom: 24px;
     backdrop-filter: blur(10px);
-
-    .q-icon {
-      color: white;
-    }
-  }
+}
 
   .hero-title {
     font-size: 32px;
@@ -1111,6 +1112,7 @@ export default defineComponent({
     margin: 0 0 16px 0;
     line-height: 1.2;
     text-align: center;
+    color: white; // override global h1-h6 { color: var(--o2-text-heading) } from app.scss
   }
 
   .offer-text {
@@ -1119,6 +1121,7 @@ export default defineComponent({
     line-height: 1.6;
     opacity: 0.95;
     text-align: center;
+    color: white;
   }
 
   .hero-offer {
@@ -1148,22 +1151,12 @@ export default defineComponent({
       backdrop-filter: blur(10px);
       color: white;
       box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-
-      .q-icon {
-        color: white;
-        font-size: 20px;
-      }
-
-      // Licensed badge styling - neutral white/transparent for users who already have license
+// Licensed badge styling - neutral white/transparent for users who already have license
       &.licensed-badge {
         background: rgba(255, 255, 255, 0.2);
         color: white;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-
-        .q-icon {
-          color: white;
-        }
-      }
+}
     }
   }
 
@@ -1209,11 +1202,7 @@ export default defineComponent({
     font-weight: 500;
     backdrop-filter: blur(10px);
     white-space: nowrap;
-
-    .q-icon {
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
+}
 
   .hero-actions {
     display: flex;
@@ -1365,11 +1354,7 @@ export default defineComponent({
       align-items: center;
       justify-content: center;
       color: var(--q-primary);
-
-      .q-icon {
-        font-size: 15px;
-      }
-    }
+}
 
     .feature-content {
       flex: 1;

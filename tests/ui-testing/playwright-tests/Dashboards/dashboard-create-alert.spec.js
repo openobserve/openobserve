@@ -468,7 +468,7 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Verify alert saved successfully
       await expect(
-        page.getByText("Alert saved successfully.")
+        page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Alert saved successfully.' })
       ).toBeVisible({ timeout: 30000 });
       testLogger.info("Alert created successfully from dashboard panel", {
         alertName,
@@ -495,7 +495,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await kebabButton.click();
       await page.getByText("Delete", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText("Delete", { exact: true }).click();
-      await page.locator('[data-test="confirm-button"]').click();
+      await page.locator('[data-test="o-dialog-primary-btn"]').click();
       await expect(page.getByText("Alert deleted")).toBeVisible({ timeout: 10000 });
       testLogger.info("Alert deleted", { alertName });
 

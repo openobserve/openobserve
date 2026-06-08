@@ -4,7 +4,66 @@ const { expect } = require('@playwright/test');
 export class CreateOrgPage {
     constructor(page) {
         this.page = page;
+
+        // ── IAM navigation ────────────────────────────────────────────────
+        this.iamMenuLink = page.locator('[data-test="menu-link-\\/iam-item"]');
+        this.iamOrganizationsTab = page.locator('[data-test="iam-organizations-tab"]');
+        this.iamPage = page.locator('[data-test="iam-page"]');
+
+        // ── Add / Edit drawer ─────────────────────────────────────────────
+        this.addOrgButton = page.locator('[data-test="Add Organization"]');
+        this.addUpdateDialog = page.locator('[data-test="add-update-organization-dialog"]');
+
+        // OInput wrapper carries `org-name`; the native input is `org-name-field`.
+        this.orgNameWrapper = page.locator('[data-test="org-name"]');
+        this.orgNameInput = page.locator('[data-test="org-name-field"]');
+        this.orgNameError = page.locator('[data-test="org-name-error"]');
+
+        // ODrawer footer buttons exposed via o-drawer-{primary|secondary}-btn,
+        // scoped under the dialog wrapper data-test for uniqueness.
+        this.saveOrgButton = page.locator(
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-primary-btn"]'
+        );
+        this.cancelOrgButton = page.locator(
+            '[data-test="add-update-organization-dialog"] [data-test="o-dialog-secondary-btn"]'
+        );
+
+        // ── Search input ──────────────────────────────────────────────────
+        // OInput wrapper data-test="organizations-search-input"; native input
+        // resolves to data-test="organizations-search-input-field".
+        this.searchOrgInput = page.locator('[data-test="organizations-search-input-field"]');
+
+        // ── Table / rows ──────────────────────────────────────────────────
+        this.tableRows = page.locator('[data-test^="o2-table-row-"]');
+        this.firstTableRow = this.tableRows.first();
+        this.tableCells = page.locator('[data-test^="o2-table-cell-"]');
+
+        // Edit action exposed per row in ListOrganizations.vue (#cell-actions).
+        // The current UI does NOT expose a delete button — used only for
+        // UI-deletion-attempt diagnostics.
+        this.orgEditButtons = page.locator('[data-test="organization-name-edit"]');
     }
+
+    /**
+     * Returns the row locator whose name-cell text matches the given org name.
+     * Uses the o2-table-cell-name column (per OTable convention) plus an
+     * ancestor-axis jump back to the row container — no element-tag XPath.
+     */
+    getOrgRowByName(orgName) {
+        // Escape regex special chars in the org name for the XPath text comparison.
+        const safe = orgName.replace(/'/g, "\\'");
+        return this.page.locator(
+            `xpath=//*[@data-test="o2-table-cell-name" and normalize-space()='${safe}']/ancestor::*[starts-with(@data-test,'o2-table-row-')]`
+        );
+    }
+
+    getOrgIdentifierCell(orgName) {
+        const safe = orgName.replace(/'/g, "\\'");
+        return this.page.locator(
+            `xpath=//*[@data-test="o2-table-cell-name" and normalize-space()='${safe}']/ancestor::*[starts-with(@data-test,'o2-table-row-')]//*[@data-test="o2-table-cell-identifier"]`
+        );
+    }
+
     async createOrg(newOrgName) {
         const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
         const headers = {
@@ -46,72 +105,122 @@ export class CreateOrgPage {
     }
 
     async navigateToOrg() {
-
-        await this.page.locator('[data-test="menu-link-\\/iam-item"]').click();
-        await this.page.locator('[data-test="iam-organizations-tab"]').click();        
+        await this.iamMenuLink.click();
+        await this.iamOrganizationsTab.click();
     }
 
 
     async clickAddOrg() {
-        await this.page.locator('[data-test="Add Organization"]').click();
+        // The parent ListOrganizations.vue toggles the drawer via the router query
+        // ?action=add. Its watcher only fires when the value CHANGES, so if the
+        // drawer was closed via Cancel (which leaves the query alone), a second
+        // click on "Add Organization" pushes the same query and the watcher does
+        // not re-open the drawer. Guard against that by waiting for the org-name
+        // input to be visible, and if it never appears, re-navigate to clear the
+        // route query and try once more.
+        await this.addOrgButton.click();
+        try {
+            await this.orgNameWrapper.waitFor({ state: 'visible', timeout: 5000 });
+        } catch {
+            await this.navigateToOrg();
+            await this.addOrgButton.waitFor({ state: 'visible' });
+            await this.addOrgButton.click();
+            await this.orgNameWrapper.waitFor({ state: 'visible', timeout: 10000 });
+        }
     }
 
     async fillOrgName(orgName) {
         //check if element is visible before filling
-        const orgNameField = this.page.locator('[data-test="org-name"]');
-        await orgNameField.waitFor({ state: 'visible' });
-        await orgNameField.fill(orgName);
+        await this.orgNameInput.waitFor({ state: 'visible' });
+        await this.orgNameInput.fill(orgName);
+    }
+
+    async clearOrgName() {
+        await this.orgNameInput.waitFor({ state: 'visible' });
+        await this.orgNameInput.fill('');
+    }
+
+    async isDrawerOpen() {
+        return await this.orgNameWrapper.isVisible({ timeout: 2000 }).catch(() => false);
     }
 
     async clickSaveOrg() {
-        await this.page.locator('[data-test="add-org"]').click();
+        await this.saveOrgButton.click();
+    }
+
+    /**
+     * Click Save and wait until either the drawer closes (successful create
+     * / update) or the org-name field still shows — meaning onSubmit() bailed
+     * because the value failed isValidOrgName. Use this when the spec needs
+     * deterministic settling after a Save click instead of a fixed timeout.
+     */
+    async clickSaveOrgAndWaitForResult({ timeout = 10000 } = {}) {
+        await this.saveOrgButton.click();
+        await Promise.race([
+            this.orgNameWrapper.waitFor({ state: 'hidden', timeout }).catch(() => {}),
+            this.orgNameError.waitFor({ state: 'visible', timeout }).catch(() => {}),
+        ]);
     }
 
     async checkSaveEnabled() {
-        const saveButton = this.page.locator('[data-test="add-org"]');
-        
         // Check if the button is enabled
-        const isEnabled = await saveButton.isEnabled();
-        
+        const isEnabled = await this.saveOrgButton.isEnabled();
+
         if (!isEnabled) {
             console.error('The "Add Organization" button is not enabled.');
             return false; // Return false to indicate the button is not enabled
         }
-        
+
         return true; // Return true if the button is enabled
     }
-    
+
     async clickCancelButton() {
-        const cancelButton = this.page.locator('[data-test="cancel-organizations-modal"]');
-        
         // Check if the button is visible and enabled before clicking
-        const isVisible = await cancelButton.isVisible();
-        const isEnabled = await cancelButton.isEnabled();
-        
+        const isVisible = await this.cancelOrgButton.isVisible();
+        const isEnabled = await this.cancelOrgButton.isEnabled();
+
         if (isVisible && isEnabled) {
-            await cancelButton.click();
+            await this.cancelOrgButton.click();
         } else {
             console.error('The "Cancel" button is not visible or enabled.');
             throw new Error('Attempted to click "Cancel" button, but it is not visible or enabled.');
         }
     }
-    
+
 
     async searchOrg(orgName) {
-        await this.page.getByPlaceholder('Search Organization').click();
-        await this.page.getByPlaceholder('Search Organization').fill(orgName);
-        await this.page.waitForTimeout(5000);
+        await this.searchOrgInput.click();
+        await this.searchOrgInput.fill(orgName);
+        // Wait for the table to settle after the global-filter change: either
+        // a matching row is rendered, or the "No data available" empty state
+        // appears. Whichever resolves first is fine — we just don't want to
+        // race the OTable's client-side filter.
+        await Promise.race([
+            this.firstTableRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {}),
+            expect(this.iamPage).toContainText('No data available', { timeout: 5000 }).catch(() => {}),
+        ]);
     }
-    
+
+    async clearSearchOrg() {
+        await this.searchOrgInput.fill('');
+        await expect(this.firstTableRow).toBeVisible({ timeout: 5000 }).catch(() => {});
+    }
+
     async verifyOrgNotExists() {
-        const mainSection = this.page.locator('[data-test="iam-page"]').getByRole('main');
-        const textContent = await mainSection.textContent();
-        console.log('Main section text:', textContent); // Debugging line
-        await expect(mainSection).toContainText('No data available');
+        await expect(this.iamPage).toContainText('No data available');
     }
-    
+
     async verifyOrgExists(orgName) {
-        await expect(this.page.locator('tbody')).toContainText(orgName);
+        await expect(this.getOrgRowByName(orgName)).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Returns the locator of the validation error message rendered by OInput
+     * for the org-name field. Use this for assertions in the spec rather than
+     * scraping by text — the data-test is derived from the parent's data-test.
+     */
+    getOrgNameError() {
+        return this.orgNameError;
     }
 
     async getAdminOrgs(orgId = '_meta') {
@@ -144,7 +253,7 @@ export class CreateOrgPage {
 
     async deleteOrgViaAPI(orgIdentifier) {
         console.log(`⚠️  WARNING: Organization deletion may not be supported in this environment`);
-        
+
         const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
         const headers = {
             "Authorization": `Basic ${basicAuthCredentials}`,
@@ -159,11 +268,11 @@ export class CreateOrgPage {
                     headers: headers,
                 }
             );
-            
+
             console.log(`Delete org API response - Status: ${fetchResponse.status}`);
             const responseText = await fetchResponse.text();
             console.log(`Delete org API response - Body: ${responseText}`);
-            
+
             if (fetchResponse.ok) {
                 console.log(`✓ Organization ${orgIdentifier} deletion API call succeeded`);
                 return true;
@@ -185,61 +294,19 @@ export class CreateOrgPage {
 
     async deleteOrgViaUI(orgName) {
         console.log(`⚠️  WARNING: UI deletion may not be supported - delete buttons might not exist`);
-        
+
         try {
             // Search for the organization first
             await this.searchOrg(orgName);
-            await this.page.waitForTimeout(1000);
-            
-            // Check if any delete buttons exist in the table at all
-            const anyDeleteButtons = this.page.locator('[data-test*="delete"]', '[title*="delete" i]', 'button:has-text("Delete")');
-            const deleteButtonCount = await anyDeleteButtons.count();
-            console.log(`Found ${deleteButtonCount} delete buttons in the organization table`);
-            
-            if (deleteButtonCount === 0) {
-                console.log(`✗ No delete buttons found in organization table - deletion likely not supported in UI`);
-                return false;
-            }
-            
-            // Look for delete button in the organization row
-            const deleteButton = this.page.locator(`[data-test="org-delete-${orgName}"]`).or(
-                this.page.locator('tbody tr').filter({ hasText: orgName }).locator('[data-test*="delete"]')
-            );
-            
-            if (await deleteButton.isVisible({ timeout: 5000 })) {
-                console.log(`Found delete button for organization ${orgName}, attempting to click...`);
-                await deleteButton.click();
-                await this.page.waitForTimeout(1000);
-                
-                // Confirm deletion if confirmation dialog appears
-                const confirmButton = this.page.locator('[data-test="confirm-delete"]').or(
-                    this.page.getByRole('button', { name: /delete|confirm|yes/i })
-                );
-                
-                if (await confirmButton.isVisible({ timeout: 3000 })) {
-                    console.log(`Confirmation dialog appeared, confirming deletion...`);
-                    await confirmButton.click();
-                    await this.page.waitForTimeout(2000);
-                    
-                    // Check if organization is actually gone
-                    await this.searchOrg(orgName);
-                    const stillExists = await this.page.locator('tbody tr').filter({ hasText: orgName }).isVisible({ timeout: 2000 });
-                    
-                    if (stillExists) {
-                        console.log(`✗ Organization ${orgName} still exists after UI deletion - deletion may be restricted`);
-                        return false;
-                    } else {
-                        console.log(`✓ Organization ${orgName} successfully deleted via UI`);
-                        return true;
-                    }
-                } else {
-                    console.log(`✗ No confirmation dialog appeared for ${orgName} deletion`);
-                    return false;
-                }
-            } else {
-                console.log(`✗ Delete button not found for organization ${orgName}`);
-                return false;
-            }
+
+            // The current ListOrganizations.vue exposes only an edit action
+            // (data-test="organization-name-edit") — there is no delete button
+            // in the rendered row. So we report unsupported and bail out.
+            const editCount = await this.orgEditButtons.count();
+            console.log(`Found ${editCount} edit buttons in the organization table`);
+
+            console.log(`✗ Delete action is not exposed in the organization table UI`);
+            return false;
         } catch (error) {
             console.error(`✗ Failed to delete organization ${orgName} via UI:`, error);
             return false;
@@ -248,99 +315,41 @@ export class CreateOrgPage {
 
     async getOrgIdentifierFromTable(orgName) {
         const maxRetries = 3;
-        const retryDelay = 1000;
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 console.log(`Attempting to get identifier for ${orgName} (attempt ${attempt}/${maxRetries})`);
-                
+
                 // Ensure we search for the organization first to make it visible
                 await this.searchOrg(orgName);
                 await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-                
+
                 // Wait for table to be stable
-                await this.page.locator('tbody tr').first().waitFor({ state: 'visible', timeout: 5000 });
-                
-                // Find the row containing the organization name with exact match
-                const orgRow = this.page.locator('tbody tr').filter({ hasText: new RegExp(`\\b${orgName}\\b`) });
-                
-                if (!(await orgRow.isVisible({ timeout: 3000 }))) {
+                const row = this.getOrgRowByName(orgName);
+                if (!(await row.isVisible({ timeout: 5000 }))) {
                     console.log(`Organization row not visible for ${orgName} on attempt ${attempt}`);
                     if (attempt < maxRetries) {
-                        await this.page.waitForTimeout(retryDelay);
+                        await row.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
                         continue;
                     }
                     return null;
                 }
-                
-                // Get all cell text content at once for analysis
-                const cellTexts = await orgRow.locator('td').allTextContents();
-                console.log(`Row data for ${orgName}:`, cellTexts);
-                
-                // Find identifier using multiple strategies with improved patterns
-                let identifier = null;
-                
-                // Strategy 1: Look for UUID pattern (32 chars, alphanumeric)
-                for (let i = 0; i < cellTexts.length; i++) {
-                    const text = cellTexts[i]?.trim();
-                    if (!text || text === orgName) continue;
-                    
-                    // Check for standard UUID pattern (32 chars, alphanumeric)
-                    if (/^[a-zA-Z0-9]{32}$/.test(text)) {
-                        identifier = text;
-                        console.log(`Found UUID identifier: ${identifier}`);
-                        break;
-                    }
-                }
-                
-                // Strategy 2: Look for shorter hash pattern (16-24 chars)
-                if (!identifier) {
-                    for (let i = 0; i < cellTexts.length; i++) {
-                        const text = cellTexts[i]?.trim();
-                        if (!text || text === orgName) continue;
-                        
-                        // Check for shorter hash pattern
-                        if (/^[a-zA-Z0-9]{16,24}$/.test(text)) {
-                            identifier = text;
-                            console.log(`Found hash identifier: ${identifier}`);
-                            break;
-                        }
-                    }
-                }
-                
-                // Strategy 3: Use positional approach - identifier typically in second column
-                if (!identifier && cellTexts.length >= 2) {
-                    const secondCol = cellTexts[1]?.trim();
-                    // Validate it's not a common non-identifier value
-                    if (secondCol && 
-                        secondCol !== orgName && 
-                        secondCol.length >= 8 && 
-                        secondCol.length <= 50 &&
-                        !/^(active|inactive|enabled|disabled|default|admin|user|root|true|false|\d{4}-\d{2}-\d{2})$/i.test(secondCol) &&
-                        !/\s/.test(secondCol)) {
-                        identifier = secondCol;
-                        console.log(`Using positional identifier: ${identifier}`);
-                    }
-                }
-                
-                if (identifier) {
-                    console.log(`Successfully found identifier for ${orgName}: ${identifier}`);
+
+                const identifierCell = this.getOrgIdentifierCell(orgName);
+                const identifier = (await identifierCell.textContent({ timeout: 3000 }).catch(() => null))?.trim();
+
+                if (identifier && /^[a-zA-Z0-9]{8,64}$/.test(identifier)) {
+                    console.log(`Found identifier via column cell: ${identifier}`);
                     return identifier;
                 }
-                
+
                 console.log(`No suitable identifier found for ${orgName} on attempt ${attempt}`);
-                if (attempt < maxRetries) {
-                    await this.page.waitForTimeout(retryDelay);
-                }
-                
+
             } catch (error) {
                 console.error(`Error getting identifier for ${orgName} on attempt ${attempt}:`, error.message);
-                if (attempt < maxRetries) {
-                    await this.page.waitForTimeout(retryDelay);
-                }
             }
         }
-        
+
         console.warn(`Failed to get identifier for ${orgName} after ${maxRetries} attempts`);
         return null;
     }

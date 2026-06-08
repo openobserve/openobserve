@@ -70,7 +70,7 @@ export interface GroupedMetricStreams {
  * - Socket and connection metrics
  * - Bandwidth and throughput
  */
-const NETWORK_PATTERNS: RegExp[] = [
+export const NETWORK_PATTERNS: RegExp[] = [
   // Keyword "network" (catches container_network_*, node_network_*, etc.)
   /network/,
   // Packet metrics
@@ -202,7 +202,7 @@ export const K8S_METRIC_GROUP_DEFINITIONS: MetricGroupDefinition[] = [
   {
     id: "pods",
     label: "Pods",
-    icon: "view_in_ar",
+    icon: "view-in-ar",
     defaultMetrics: [
       { streamName: "k8s_pod_cpu_usage" },
       { streamName: "k8s_pod_memory_usage" },

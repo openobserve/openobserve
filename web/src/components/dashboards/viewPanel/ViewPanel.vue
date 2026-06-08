@@ -15,23 +15,18 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px)" data-test="view-panel-screen">
-    <div class="flex justify-between items-center q-pa-md">
-      <div class="flex items-center q-table__title q-mr-md">
+  <div style="height: calc(100vh - 57px); margin: calc(-1 * var(--spacing-3)) calc(-1 * var(--spacing-5))" data-test="view-panel-screen">
+    <div class="tw:flex tw:justify-between tw:items-center tw:p-3">
+      <div class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mr-3">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex items-center" style="gap: 0.5rem">
+      <div class="tw:flex tw:items-center" style="gap: 0.5rem">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          @update:modelValue="
-            (newValue: any) => {
-              histogramInterval = newValue.value;
-            }
-          "
           class="viewpanel-icons"
           style="width: 150px"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
@@ -51,7 +46,6 @@
           :min-refresh-interval="
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
-          style="padding-left: 0px; padding-right: 0px"
           @trigger="refreshData"
           class="viewpanel-icons"
           data-test="dashboard-viewpanel-refresh-interval"
@@ -63,44 +57,40 @@
             disable
           "
           variant="outline-destructive"
-          size="icon-xs"
+          size="icon-sm"
           @click="cancelViewPanelQuery"
           data-test="dashboard-viewpanel-cancel-btn"
+          icon-left="cancel"
         >
-          <template #icon-left><q-icon name="cancel" /></template>
-          <q-tooltip>{{ t("panel.cancel") }}</q-tooltip>
+          <OTooltip :content="t('panel.cancel')" />
         </OButton>
         <OButton
           v-else
           :variant="isVariablesChanged ? 'outline' : 'warning'"
-          size="icon-xs"
+          size="icon-sm"
           @click="refreshData"
           :disabled="disable"
           data-test="dashboard-viewpanel-refresh-data-btn"
+          icon-left="refresh"
         >
-          <template #icon-left><q-icon name="refresh" /></template>
-          <q-tooltip>{{
-            isVariablesChanged
-              ? "Refresh"
-              : "Refresh to apply latest variable changes"
-          }}</q-tooltip>
+          <OTooltip :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'" />
         </OButton>
         <OButton
           variant="outline"
-          size="icon-xs"
+          size="icon-sm"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
+          icon-left="close"
         >
-          <template #icon-left><q-icon name="close" /></template>
         </OButton>
       </div>
     </div>
-    <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 130px); overflow: hidden">
-      <div class="col" style="width: 100%; height: 100%">
-        <div class="row" style="height: 100%">
-          <div class="col" style="height: 100%">
-            <div class="layout-panel-container col" style="height: 100%">
+    <OSeparator />
+    <div class="tw:flex" style="height: calc(100vh - 130px); overflow: hidden">
+      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
+        <div class="tw:flex" style="height: 100%; width: 100%">
+          <div class="tw:flex tw:flex-col" style="height: 100%; width: 100%">
+            <div class="layout-panel-container tw:flex tw:flex-col" style="height: 100%">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="
@@ -179,12 +169,10 @@
         </div>
       </div>
     </div>
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+    />
   </div>
 </template>
 
@@ -226,12 +214,13 @@ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
-import { outlinedWarning } from "@quasar/extras/material-icons-outlined";
-import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -243,6 +232,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
     VariablesValueSelector,
@@ -253,7 +243,9 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
-  },
+    OIcon,
+    OTooltip,
+},
   props: {
     panelId: {
       type: String,
@@ -397,6 +389,9 @@ export default defineComponent({
     watch(
       () => histogramInterval.value,
       async () => {
+        // Capture the flag BEFORE any await — it may change while we're paused
+        const wasInitialSetup = isInitialHistogramSetup;
+
         // import sql parser if not imported
         if (!parser) {
           await importSqlParser();
@@ -417,7 +412,7 @@ export default defineComponent({
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
         // Note: false means changes need to be applied (flag logic is inverted)
-        if (!isInitialHistogramSetup) {
+        if (!wasInitialSetup) {
           isVariablesChanged.value = false;
         }
       },
@@ -569,7 +564,18 @@ export default defineComponent({
     );
     const refreshData = () => {
       if (!disable.value) {
-        // Apply any pending histogram interval changes
+        // Apply histogram interval to ALL queries before copying to chartData
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(
+            originalQuery,
+            histogramInterval.value,
+          );
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
+        });
+
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(
@@ -889,8 +895,7 @@ export default defineComponent({
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      outlinedWarning,
-      symOutlinedDataInfoAlert,
+      "warning": "warning",
       currentTabId,
       currentPanelId,
       showLegendsDialog,
@@ -918,7 +923,7 @@ export default defineComponent({
 }
 
 .viewpanel-icons {
-  height: 30px;
+  height: 32px;
   transition: all 0.2s ease;
 
   &:hover {
@@ -926,13 +931,13 @@ export default defineComponent({
   }
 
   :deep(.date-time-button) {
-    height: 30px;
-    min-height: 30px;
+    height: 32px;
+    min-height: 32px;
   }
 
   :deep(.q-btn-dropdown) {
-    height: 30px;
-    min-height: 30px;
+    height: 32px;
+    min-height: 32px;
     padding: 0 8px;
 
     .q-btn__content {

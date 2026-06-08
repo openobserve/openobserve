@@ -1,5 +1,6 @@
 import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
 
 // will find first valid mapped value based on given fieldToCheck
 export const findFirstValidMappedValue = (
@@ -23,11 +24,16 @@ export const findFirstValidMappedValue = (
         isMatch = +v?.from <= +value && +v?.to >= +value;
       }
     } else if (v?.type == "regex") {
-      isMatch = new RegExp(v?.pattern ?? "").test(value);
+      try {
+        const { pattern, flags } = parseRegexPattern(v?.pattern ?? "");
+        isMatch = new RegExp(pattern, flags).test(value);
+      } catch {
+        // invalid regex pattern, skip
+      }
     }
 
     // If a match is found, check if the required field (color or text) is valid
-    if (isMatch && v[fieldToCheck]) {
+    if (isMatch && v[fieldToCheck] != null && v[fieldToCheck] !== "") {
       return true;
     }
 
@@ -639,7 +645,7 @@ export const validateSQLPanelFields = (
   const isPromQLMode = panelData?.queryType === "promql";
   if (
     !isPromQLMode &&
-    !panelData?.queries?.[0]?.customQuery &&
+    !panelData?.queries?.[queryIndex]?.customQuery &&
     isFieldsValidationRequired
   ) {
     // Validate fields configuration based on chart type
@@ -996,22 +1002,39 @@ export const validatePanel = (
           ? "X-Axis"
           : "Y-Axis";
 
-    // Validate panel fields based on chart type
-    validateSQLPanelFields(
-      panelData?.data,
-      currentQueryIndex,
-      currentXLabel,
-      currentYLabel,
-      errors,
-      isFieldsValidationRequired,
-      pageKey,
-    );
+    // Validate panel fields based on chart type for all queries
+    const queries = panelData?.data?.queries ?? [];
+    const hasMultipleQueries = queries.length > 1;
 
-    // validate join fields
-    validateJoinFields(
-      panelData?.data?.queries?.[currentQueryIndex]?.joins,
-      errors,
-    );
+    // Validate ALL queries (not just the active tab) so that errors are shown
+    // consistently regardless of which query tab is currently selected.
+    // In multi-query mode each query's errors are prefixed with "Query N:".
+    queries.forEach((query: any, queryIndex: number) => {
+      const queryErrors: string[] = [];
+
+      // Validate panel fields based on chart type
+      validateSQLPanelFields(
+        panelData?.data,
+        queryIndex,
+        currentXLabel,
+        currentYLabel,
+        queryErrors,
+        isFieldsValidationRequired,
+        pageKey,
+      );
+
+      // validate join fields for this query
+      validateJoinFields(query?.joins, queryErrors);
+
+      // Prefix errors with query number when multiple queries exist
+      if (hasMultipleQueries) {
+        queryErrors.forEach((err) =>
+          errors.push(`Query ${queryIndex + 1}: ${err}`),
+        );
+      } else {
+        errors.push(...queryErrors);
+      }
+    });
   }
 
   return errors;

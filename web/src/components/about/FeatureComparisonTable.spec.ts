@@ -16,11 +16,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FeatureComparisonTable from "./FeatureComparisonTable.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
+import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Mock feature constants
 vi.mock("@/constants/features", () => ({
@@ -70,7 +69,7 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const table = wrapper.findComponent({ name: "QTable" });
+    const table = wrapper.findComponent(OTable);
     expect(table.exists()).toBe(true);
   });
 
@@ -111,9 +110,9 @@ describe("FeatureComparisonTable", () => {
     });
 
     expect(wrapper.vm.columns).toHaveLength(4); // name + 3 editions
-    expect(wrapper.vm.columns[1].name).toBe("opensource");
-    expect(wrapper.vm.columns[2].name).toBe("enterprise");
-    expect(wrapper.vm.columns[3].name).toBe("cloud");
+    expect(wrapper.vm.columns[1].id).toBe("opensource");
+    expect(wrapper.vm.columns[2].id).toBe("enterprise");
+    expect(wrapper.vm.columns[3].id).toBe("cloud");
   });
 
   it("should load features from registry", () => {
@@ -217,7 +216,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const icon = wrapper.find(".icon-wrapper .q-icon");
+    const iconWrapper = wrapper.find(".icon-wrapper");
+    expect(iconWrapper.exists()).toBe(true);
+    const icon = iconWrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
   });
 
@@ -238,7 +239,8 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.vm.pagination.rowsPerPage).toBe(0);
+    const table = wrapper.findComponent(OTable);
+    expect(table.props("pagination")).toBe("none");
   });
 
   it("should display feature comparison wrapper", () => {
@@ -407,10 +409,10 @@ describe("FeatureComparisonTable", () => {
     });
 
     const vm = wrapper.vm as any;
-    expect(vm.columns[0].align).toBe("left");   // name column
-    expect(vm.columns[1].align).toBe("center"); // opensource
-    expect(vm.columns[2].align).toBe("center"); // enterprise
-    expect(vm.columns[3].align).toBe("center"); // cloud
+    expect(vm.columns[0].meta.align).toBe("left");   // name column
+    expect(vm.columns[1].meta.align).toBe("center"); // opensource
+    expect(vm.columns[2].meta.align).toBe("center"); // enterprise
+    expect(vm.columns[3].meta.align).toBe("center"); // cloud
   });
 
   it("should have correct column sortable settings", () => {
@@ -460,9 +462,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const table = wrapper.findComponent({ name: "QTable" });
+    const table = wrapper.findComponent(OTable);
     expect(table.exists()).toBe(true);
-    // rowsPerPage: 0 means show all
-    expect((wrapper.vm as any).pagination.rowsPerPage).toBe(0);
+    // pagination="none" means show all rows
+    expect(table.props("pagination")).toBe("none");
   });
 });

@@ -6,7 +6,7 @@ on:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
   merge_group:
 
 concurrency:
@@ -56,7 +56,9 @@ jobs:
     name: api_integration_tests
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
+    permissions:
+      contents: read  # only need to checkout the repo
     steps:
       - name: Remove unused tools
         run: |
@@ -73,7 +75,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -101,20 +103,99 @@ jobs:
           working-directory: "tests/api-testing/"
           version: "0.27.0"
 
-      - name: Start OpenObserve
-        run: target/debug/openobserve &
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
 
-      - name: Wait for start
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run default-set tests
+        # Phase 6.b: regression matrix tests moved to their own
+        # api_regression_tests job below — they now run in parallel
+        # with this default-set job instead of sequentially within it.
+        # Cuts ~8 min off CI wall time at the cost of more runner minutes.
+        # NB: --force-sugar is intentionally omitted. pytest-sugar is already
+        # auto-loaded via the entry point; passing --force-sugar registers it
+        # a second time, which inflates the progress counter (CI displayed
+        # ~3x the real test count). Letting the plugin load via discovery
+        # alone keeps the counter honest.
         run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_default.log 2>&1 &
+          SERVER_PID_DEFAULT=$!
+          echo "OpenObserve PID for default tests: $SERVER_PID_DEFAULT"
           for i in $(seq 1 60); do
             if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
-              echo "Server ready after ${i}s"
-              exit 0
+              echo "Server ready after ${i}s"; break
             fi
             sleep 1
           done
-          echo "Server failed to start in 60s"
-          exit 1
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex
+          kill $SERVER_PID_DEFAULT || true
+        working-directory: tests/api-testing/
+
+      - name: Upload OpenObserve server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-server-logs
+          path: tests/api-testing/o2_*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Dedicated query agent SQL regression suite. Runs in parallel with
+  # the default-set and regression jobs so the 310-case (155 queries ×
+  # 2 phases: memtable + parquet) suite doesn't extend CI wall time.
+  api_query_agent_tests:
+    name: api_query_agent_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      contents: read
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # main api_integration_tests job writes the cache
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
 
       - name: Pin cpython
         run: rye pin cpython@3.11.6
@@ -124,89 +205,259 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run tests
+      - name: Regenerate query-agent expected values
         run: |
-          wait_for_server() {
-            for i in $(seq 1 60); do
-              if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
-                echo "Server ready after ${i}s"
-                return 0
-              fi
-              sleep 1
-            done
-            echo "Server failed to start in 60s"
-            return 1
-          }
+          cd ${{ github.workspace }}/tests/test-data/query-agent
+          ${{ github.workspace }}/tests/api-testing/.venv/bin/python compute_counts.py
 
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false target/debug/openobserve > o2_utf8_false.log 2>&1 &
-          SERVER_PID_FALSE=$!
-          echo "OpenObserve PID for UTF8_VIEW=false: $SERVER_PID_FALSE"
-          wait_for_server
-
-          # Run regression tests with UTF8_VIEW=false
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_FALSE || true
-          sleep 5
-
-          echo "=== Running regression tests with ZO_UTF8_VIEW_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true target/debug/openobserve > o2_utf8_true.log 2>&1 &
-          SERVER_PID_TRUE=$!
-          echo "OpenObserve PID for UTF8_VIEW=true: $SERVER_PID_TRUE"
-          wait_for_server
-
-          # Run regression tests with UTF8_VIEW=true
-          rye run pytest tests/test_subquery_join_match.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_TRUE || true
-          sleep 5
-
-          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true target/debug/openobserve > o2_join_match_one_true.log 2>&1 &
-          SERVER_PID_JOIN_TRUE=$!
-          echo "OpenObserve PID for JOIN_MATCH_ONE=true: $SERVER_PID_JOIN_TRUE"
-          wait_for_server
-
-          # Run logs-to-logs join tests with JOIN_MATCH_ONE=true
-          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_JOIN_TRUE || true
-          sleep 5
-
-          echo "=== Running logs-to-logs join tests with ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false ==="
-          ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false target/debug/openobserve > o2_join_match_one_false.log 2>&1 &
-          SERVER_PID_JOIN_FALSE=$!
-          echo "OpenObserve PID for JOIN_MATCH_ONE=false: $SERVER_PID_JOIN_FALSE"
-          wait_for_server
-
-          # Run logs-to-logs join tests with JOIN_MATCH_ONE=false
-          rye run pytest tests/test_logs_to_logs_join.py --force-sugar -v
-
-          # Kill the server
-          kill $SERVER_PID_JOIN_FALSE || true
-          sleep 5
-
-          echo "=== Running all other API tests with default settings ==="
-          target/debug/openobserve > o2_default.log 2>&1 &
-          SERVER_PID_DEFAULT=$!
-          echo "OpenObserve PID for other tests: $SERVER_PID_DEFAULT"
-          wait_for_server
-
-          # Run all other tests (excluding regression and feature flag tests)
-          rye run pytest --ignore=tests/test_subquery_join_match.py --ignore=tests/test_logs_to_logs_join.py --force-sugar
-
-          # Kill the server
-          kill $SERVER_PID_DEFAULT || true
+      - name: Run query agent tests
+        run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_query_agent.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest tests/query_agent/ -v
+          kill $SERVER_PID || true
         working-directory: tests/api-testing/
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-query-agent-log
+          path: tests/api-testing/o2_query_agent.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Phase 6.b: regression matrix split. The 4 env-flag-sensitive test
+  # configurations now run as 4 parallel jobs instead of 4 sequential
+  # restarts in one job. Each job builds OO once and runs its single
+  # configured pytest target.
+  api_regression_tests:
+    name: "api_regression / ${{ matrix.config.label }}"
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      contents: read  # only need to checkout the repo
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - label: utf8_view_false
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=false"
+            target: tests/regression/test_subquery_join_match.py
+          - label: utf8_view_true
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true ZO_UTF8_VIEW_ENABLED=true"
+            target: tests/regression/test_subquery_join_match.py
+          - label: join_match_one_true
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=true"
+            target: tests/regression/test_logs_to_logs_join.py
+          - label: join_match_one_false
+            env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
+            target: tests/regression/test_logs_to_logs_join.py
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # main api_integration_tests job writes the cache
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11.6" }
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: "Run ${{ matrix.config.label }} regression test"
+        # Server binary lives at the repo root (target/debug/openobserve);
+        # this step uses working-directory: tests/api-testing/, so we must
+        # invoke it via ${{ github.workspace }} or the shell will fail with
+        # "No such file or directory". --force-sugar omitted on purpose —
+        # pytest-sugar auto-loads via entry point, and passing the flag
+        # registers it twice and inflates the progress counter ~3x.
+        run: |
+          ${{ matrix.config.env }} ${{ github.workspace }}/target/debug/openobserve > "o2_${{ matrix.config.label }}.log" 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest ${{ matrix.config.target }} -v
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "openobserve-regression-${{ matrix.config.label }}-log"
+          path: "tests/api-testing/o2_${{ matrix.config.label }}.log"
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Phase 5: schemathesis fuzz job — informational (continue-on-error),
+  # surfaces 5xx panics across the 150 OpenAPI endpoints. Decoupled from
+  # api_integration_tests so its findings don't block merges yet; teams
+  # can promote it to blocking after the noise floor is understood.
+  api_fuzz_tests:
+    name: api_fuzz_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    continue-on-error: true
+    permissions:
+      contents: read  # only need to checkout the repo
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: backend-debug-mimalloc
+          save-if: false  # don't write cache from this job (the main job does)
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@v4
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync (schemathesis dep installed)
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Start OpenObserve
+        run: target/debug/openobserve > o2_fuzz.log 2>&1 &
+
+      - name: Wait for /healthz
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Run schemathesis fuzz tests
+        # Schemathesis 4.x CLI flag renames vs the 3.x originals:
+        #   --base-url               -> --url / -u
+        #   --auth-type basic        -> removed (USER:PASS implies basic)
+        #   --hypothesis-max-examples -> --max-examples / -n
+        #   --hypothesis-deadline    -> no equivalent; use --request-timeout
+        #                               (seconds, not ms) to bound per-request
+        #   --data-generation-method -> --mode / -m
+        # `--checks not_a_server_error` keeps focus on 5xx panics (actual
+        # backend bugs, not spec-conformance nits). `-n 20` bounds runtime;
+        # `--mode positive` keeps inputs realistic (negative inputs are a
+        # separate exercise once the noise floor here is understood).
+        run: |
+          rye run schemathesis run \
+            -u http://localhost:5080 \
+            --auth "$ZO_ROOT_USER_EMAIL:$ZO_ROOT_USER_PASSWORD" \
+            --checks not_a_server_error \
+            -n 20 \
+            --request-timeout 5 \
+            -m positive \
+            --suppress-health-check=filter_too_much \
+            --exclude-path "/api/{org_id}/v1/logs" \
+            --exclude-path "/api/{org_id}/v1/metrics" \
+            --exclude-path "/api/{org_id}/v1/traces" \
+            --exclude-path "/api/{org_id}/loki/api/v1/push" \
+            --exclude-path "/api/{org_id}/prometheus/api/v1/write" \
+            --exclude-path "/api/{org_id}/dashboards" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels" \
+            --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}" \
+            --exclude-path "/api/{org_id}/pipelines/history" \
+            --exclude-path "/api/{org_id}/organizations/assume_service_account" \
+            http://localhost:5080/api-doc/openapi.json
+        working-directory: tests/api-testing/
+
+      - name: Upload OpenObserve server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-fuzz-log
+          path: tests/api-testing/o2_fuzz.log
+          if-no-files-found: warn
+          retention-days: 14
 
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, api_integration_tests]
+    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
     if: always()
     steps:
       - name: Check test results
@@ -215,10 +466,12 @@ jobs:
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
             exit 1
           fi
-          if [ "${{ needs.api_integration_tests.result }}" == "success" ] || [ "${{ needs.api_integration_tests.result }}" == "skipped" ]; then
-            echo "API tests passed or skipped"
+          # All three test jobs must pass (or be skipped).
+          ok() { [ "$1" == "success" ] || [ "$1" == "skipped" ]; }
+          if ok "${{ needs.api_integration_tests.result }}" && ok "${{ needs.api_query_agent_tests.result }}" && ok "${{ needs.api_regression_tests.result }}"; then
+            echo "All API test jobs passed or skipped"
             exit 0
           else
-            echo "API tests failed"
+            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi

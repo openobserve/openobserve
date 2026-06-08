@@ -16,9 +16,7 @@ test.describe("dashboard maps testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
-    await page.waitForTimeout(1000);
     await ingestionForMaps(page);
-    await page.waitForTimeout(2000);
   });
 
   test("Should display the correct location when entering latitude and longitude values", async ({
@@ -52,12 +50,16 @@ test.describe("dashboard maps testcases", () => {
       '[data-test="dashboard-add-condition-label-0-country"]'
     );
     await conditionLabel.click();
-    const conditionList = page.locator(
-      '[data-test="dashboard-add-condition-list-tab"]'
-    );
+    const conditionList = page.locator('[data-test="dashboard-add-condition-list-tab"]');
     await conditionList.click();
-    await conditionList.fill("India");
-    await page.getByRole("option", { name: "India" }).click();
+    // Fill the search input inside the OSelect popover
+    const conditionSearch = page.locator('[data-test="dashboard-add-condition-list-tab-search"]');
+    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
+    await conditionSearch.fill("India");
+    // Select the matching option via data-test-value
+    const indiaOption = page.locator('[data-test="dashboard-add-condition-list-tab-option"][data-test-value="India"]');
+    await indiaOption.waitFor({ state: "visible", timeout: 5000 });
+    await indiaOption.click();
 
     // Apply Dashboard Changes
 

@@ -53,6 +53,21 @@ impl MemorySize for Organization {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
+pub struct OrgCreateRequest {
+    #[serde(default)]
+    pub identifier: String,
+    #[serde(alias = "label")]
+    pub name: String,
+    #[serde(default)]
+    pub org_type: String,
+    #[serde(default)]
+    pub service_account: Option<String>,
+    // make this new org a billing group member of this org
+    #[serde(default)]
+    pub make_billed_member_of: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct ServiceAccountTokenInfo {
     pub email: String,
     /// Token is no longer returned directly for security reasons
@@ -300,6 +315,41 @@ pub struct RumIngestionToken {
 #[derive(Serialize, ToSchema)]
 pub struct RumIngestionResponse {
     pub data: RumIngestionToken,
+}
+
+// --- Org-level ingestion tokens ---
+
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+pub struct OrgIngestionToken {
+    pub name: String,
+    pub token: String,
+    pub description: String,
+    pub is_default: bool,
+    pub enabled: bool,
+    pub created_by: String,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrgIngestionTokenListResponse {
+    pub data: Vec<OrgIngestionToken>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateOrgIngestionTokenRequest {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct OrgIngestionTokenEnableRequest {
+    pub enabled: bool,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct OrgIngestionTokenResponse {
+    pub data: OrgIngestionToken,
 }
 
 fn default_scrape_interval() -> u32 {

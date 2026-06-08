@@ -17,10 +17,6 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-
-installQuasar({ plugins: [Dialog, Notify] });
 
 vi.mock("@vueuse/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@vueuse/core")>();
@@ -45,8 +41,8 @@ vi.mock("@/components/icons/NotEqualIcon.vue", () => ({
 }));
 
 vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  outlinedArrowBackIos: "arrow_back_ios",
-  outlinedArrowForwardIos: "arrow_forward_ios",
+  "arrow-back-ios": "arrow_back_ios",
+  "arrow-forward-ios": "arrow_forward_ios",
 }));
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -122,8 +118,7 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      // q-inner-loading has showing=true
-      const loading = wrapper.findComponent({ name: "QInnerLoading" });
+      const loading = wrapper.find('[data-test="field-values-panel-loading-indicator"]');
       expect(loading.exists()).toBe(true);
     });
 
@@ -131,7 +126,11 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      expect(wrapper.findAll("q-list").length).toBe(0);
+      // After Quasar -> native HTML migration the values list is a <ul> that's
+      // always rendered, but its <li> children come from v-for over displayValues.
+      // With no cached values during loading, no row items should be present.
+      const valueRows = wrapper.findAll('[data-test^="logs-search-subfield-add-"]');
+      expect(valueRows.length).toBe(0);
     });
   });
 
@@ -208,12 +207,12 @@ describe("FieldValuesPanel.vue", () => {
   describe("Multi-select controls", () => {
     it("renders checkboxes when showMultiSelect is true", () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(2) });
-      expect(wrapper.findAllComponents({ name: "QCheckbox" }).length).toBeGreaterThan(0);
+      expect(wrapper.findAllComponents({ name: "OCheckbox" }).length).toBeGreaterThan(0);
     });
 
     it("does not render checkboxes when showMultiSelect is false", () => {
       wrapper = createWrapper({ showMultiSelect: false, fieldValues: buildFieldValues(2) });
-      expect(wrapper.findAllComponents({ name: "QCheckbox" }).length).toBe(0);
+      expect(wrapper.findAllComponents({ name: "OCheckbox" }).length).toBe(0);
     });
 
     it("does not render include/exclude buttons when showMultiSelect is false", () => {

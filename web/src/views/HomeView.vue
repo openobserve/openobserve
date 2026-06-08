@@ -14,9 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-page class="tw:px-[0.625rem] q-pt-xs home-page" :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view q-pb-sm' : ''">
-
-    <div class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-auto" style="max-height: calc(100vh - var(--navbar-height) - 18px)">
+  <div
+    class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
+    data-test="home-page"
+  >
+    <div
+      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+    >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
       <div
         v-if="tabOrder.length > 1"
@@ -28,22 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="tab in tabOrder"
           :key="tab.id"
           variant="ghost"
-        class="home-tab-btn"
+          class="home-tab-btn"
           :class="{
-          'home-tab-active': activeHomeTab === tab.id,
-          'home-tab-dragging': draggingTab === tab.id,
-        }"
+            'home-tab-active': activeHomeTab === tab.id,
+            'home-tab-dragging': draggingTab === tab.id,
+          }"
           draggable="true"
           @click="activeHomeTab = tab.id"
           @dragstart="onTabDragStart($event, tab.id)"
           @dragend="onTabDragEnd"
           @dragenter.prevent="onTabDragEnter(tab.id)"
         >
-          <q-icon
-          name="drag_indicator"
-          class="home-tab-drag-handle"
-          size="0.875em"
-        />
+          <OIcon
+            name="drag-indicator"
+            class="home-tab-drag-handle"
+            size="sm"
+          />
           {{ tab.label }}
         </OButton>
       </div>
@@ -52,15 +57,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
         <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
         <O2AIChat
-        ref="homeChat"
-        :is-open="true"
-        :header-height="0"
-        :centered-start="true"
-      />
+          ref="homeChat"
+          :is-open="true"
+          :header-height="0"
+          :centered-start="true"
+        />
       </div>
 
       <!-- Overview tab -->
-      <div v-if="activeHomeTab === 'overview'" class="card-container home-tab-panel">
+      <div
+        v-if="activeHomeTab === 'overview'"
+        class="card-container home-tab-panel"
+      >
         <OverviewTab />
       </div>
 
@@ -69,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <UsageTab />
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -89,6 +97,7 @@ import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -120,10 +129,12 @@ export default defineComponent({
         if (saved) {
           const ids: string[] = JSON.parse(saved);
           const ordered = ids
-            .map(id => DEFAULT_TABS.value.find(t => t.id === id))
+            .map((id) => DEFAULT_TABS.value.find((t) => t.id === id))
             .filter(Boolean) as { id: string; label: string }[];
           // append any new tabs not yet in saved order
-          DEFAULT_TABS.value.forEach(t => { if (!ordered.find(o => o.id === t.id)) ordered.push(t); });
+          DEFAULT_TABS.value.forEach((t) => {
+            if (!ordered.find((o) => o.id === t.id)) ordered.push(t);
+          });
           return ordered;
         }
       } catch {}
@@ -132,8 +143,34 @@ export default defineComponent({
 
     const tabOrder = ref(loadTabOrder());
 
+    // DEFAULT_TABS depends on zoConfig.ai_enabled, which arrives asynchronously
+    // from the backend /config response. Re-sync tabOrder whenever the set of
+    // available tabs changes so the AI tab appears once the backend confirms
+    // it's enabled.
+    watch(
+      () => DEFAULT_TABS.value.map((t) => t.id).join(","),
+      () => {
+        const current = tabOrder.value;
+        const merged: { id: string; label: string }[] = [];
+        // Preserve existing user-defined order, drop tabs no longer available
+        current.forEach((t) => {
+          const match = DEFAULT_TABS.value.find((d) => d.id === t.id);
+          if (match) merged.push(match);
+        });
+        // Append any newly available tabs
+        DEFAULT_TABS.value.forEach((d) => {
+          if (!merged.find((m) => m.id === d.id)) merged.push(d);
+        });
+        tabOrder.value = merged;
+      },
+    );
+
     const savedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
-    const activeHomeTab = ref(savedActiveTab && DEFAULT_TABS.value.find(t => t.id === savedActiveTab) ? savedActiveTab : tabOrder.value[0].id);
+    const activeHomeTab = ref(
+      savedActiveTab && DEFAULT_TABS.value.find((t) => t.id === savedActiveTab)
+        ? savedActiveTab
+        : tabOrder.value[0].id,
+    );
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
@@ -189,7 +226,7 @@ export default defineComponent({
 
     function onSwitchTab(e: Event) {
       const tab = (e as CustomEvent).detail;
-      if (DEFAULT_TABS.value.find(t => t.id === tab)) {
+      if (DEFAULT_TABS.value.find((t) => t.id === tab)) {
         activeHomeTab.value = tab;
       }
     }
@@ -222,6 +259,7 @@ export default defineComponent({
     O2AIChat,
     HomeChatHistory,
     OButton,
+    OIcon,
   },
 });
 </script>
@@ -265,26 +303,12 @@ export default defineComponent({
   align-items: center;
   gap: 0.25rem;
   user-select: none;
-
-  &:hover {
-    color: var(--color-tabs-hover-text);
-    background: var(--color-tabs-hover-bg);
-
-    .home-tab-drag-handle {
-      opacity: 0.6;
-    }
-  }
 }
 
 .home-tab-drag-handle {
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity 0.15s;
   cursor: grab;
-  flex-shrink: 0;
-
-  &:active {
-    cursor: grabbing;
-  }
 }
 
 .home-tab-dragging {
@@ -298,7 +322,8 @@ export default defineComponent({
 }
 
 .home-tab-panel {
-  height: calc(100% - 41px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -316,21 +341,94 @@ export default defineComponent({
   box-shadow: none;
   border-radius: 0;
   min-width: 0;
+  overflow: visible;
+}
+
+/* Allow the input's gradient glow + shadow to spill outside the container.
+   messages-container has its own overflow-y, so the page itself won't grow. */
+.home-ai-panel :deep(.chat-content-wrapper),
+.home-ai-panel :deep(.chat-content) {
+  overflow: visible;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
 .home-ai-panel :deep(.chat-header),
-.home-ai-panel :deep(.chat-content-wrapper > .q-separator) {
+.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
+}
+
+/* Gradient border on the prompt input — home tab only.
+   Uses the dual-background trick: bg color for padding-box, gradient for border-box.
+   2px border for stronger presence + layered shadows for depth. */
+.home-ai-panel :deep(.unified-input-box) {
+  position: relative;
+  border: 2px solid transparent !important;
+  background:
+    linear-gradient(
+        var(--o2-ai-input-bg, #ffffff),
+        var(--o2-ai-input-bg, #ffffff)
+      )
+      padding-box,
+    linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 8px 20px -2px rgba(15, 23, 42, 0.12),
+    0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box.light-mode) {
+  --o2-ai-input-bg: #ffffff;
+}
+
+.home-ai-panel :deep(.unified-input-box.dark-mode) {
+  --o2-ai-input-bg: #191919;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    0 8px 22px -2px rgba(0, 0, 0, 0.55),
+    0 20px 48px -10px rgba(123, 97, 255, 0.45) !important;
+}
+
+/* Soft ambient glow behind the input */
+.home-ai-panel :deep(.unified-input-box)::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  opacity: 0.22;
+  filter: blur(22px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Stronger glow + shadow on focus, no harsh ring */
+.home-ai-panel :deep(.unified-input-box:focus-within) {
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 6px 16px -2px rgba(15, 23, 42, 0.1),
+    0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box.dark-mode:focus-within) {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 6px 20px -2px rgba(0, 0, 0, 0.55),
+    0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
+}
+
+.home-ai-panel :deep(.unified-input-box:focus-within)::before {
+  opacity: 0.4;
 }
 
 .home-page {
   overflow: hidden;
-  min-height: unset;
-  height: calc(100vh - 2.5em);
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-enabled-home-view {
-  height: calc(100vh - 120px);
+  height: 100%;
 }
 </style>

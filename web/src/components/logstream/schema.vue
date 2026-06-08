@@ -15,137 +15,188 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    style="width: 60vw"
-    class="column full-height no-wrap"
-    v-if="indexData.schema"
+  <ODrawer
+    data-test="schema-drawer"
+    :open="open"
+    :width="60"
+    :title="t('logStream.schemaHeader')"
+    @update:open="$emit('update:open', $event)"
   >
-    <q-card-section class="q-ma-none">
-      <div class="row items-center no-wrap">
-        <div class="col">
+    <!-- #header override: complex stream header with name badge, timeline info,
+         and close button — cannot be expressed with title + sub-slots -->
+    <template #header-left>
+      <div class="tw:flex tw:items-center tw:flex-nowrap">
+        <div class="tw:flex tw:flex-col">
           <div
             class="tw:text-[18px] tw:flex tw:items-center"
             data-test="schema-title-text"
           >
-            {{ t("logStream.schemaHeader") }}
             <!-- introduced name at the top  -->
-            <span 
+            <span
+              v-if="indexData.name"
               :class="[
                 'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
-                store.state.theme === 'dark' 
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50' 
-                  : 'tw:text-blue-600 tw:bg-blue-50'
+                store.state.theme === 'dark'
+                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
+                  : 'tw:text-blue-600 tw:bg-blue-50',
               ]"
             >
               {{ indexData.name }}
-              <q-tooltip v-if="indexData.name.length > 35" class="tw:text-xs">
-                {{ indexData.name }}
-              </q-tooltip>
+              <OTooltip
+                v-if="indexData.name && indexData.name.length > 35"
+                :content="indexData.name"
+                side="top"
+              />
             </span>
-            <div 
+            <div
               :class="[
                 'tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:border',
-                store.state.theme === 'dark' 
-                  ? 'tw:bg-gray-800/50 tw:border-gray-600' 
-                  : 'tw:bg-gray-50 tw:border-gray-200'
+                store.state.theme === 'dark'
+                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
+                  : 'tw:bg-gray-50 tw:border-gray-200',
               ]"
             >
-              <img :src="getTimelineIcon" alt="Timeline Icon" class="tw:w-[14px] tw:h-[14px] tw:opacity-70" />
+              <img
+                :src="getTimelineIcon"
+                alt="Timeline Icon"
+                class="tw:w-[14px] tw:h-[14px] tw:opacity-70"
+              />
               <div class="tw:flex tw:items-center tw:gap-1.5">
-                <span 
+                <span
                   :class="[
                     'tw:text-[10px] tw:font-medium tw:px-1.5 tw:py-0.5 tw:rounded',
-                    store.state.theme === 'dark' 
-                      ? 'tw:text-gray-300 tw:bg-gray-700/50' 
-                      : 'tw:text-gray-600 tw:bg-gray-100'
+                    store.state.theme === 'dark'
+                      ? 'tw:text-gray-300 tw:bg-gray-700/50'
+                      : 'tw:text-gray-600 tw:bg-gray-100',
                   ]"
                 >
                   UTC
                 </span>
-                <div 
+                <div
                   :class="[
                     'tw:text-xs tw:font-semibold',
-                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'
+                    store.state.theme === 'dark'
+                      ? 'tw:text-gray-200'
+                      : 'tw:text-gray-800',
                   ]"
                 >
-                  {{ indexData.stats.doc_time_min }} ? {{ indexData.stats.doc_time_max }}
+                  {{ indexData.stats.doc_time_min }}
+                  <span class="tw:text-base tw:leading-none">→</span>
+                  {{ indexData.stats.doc_time_max }}
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="col-auto">
-          <OButton variant="ghost" size="icon-sm" v-close-popup="true">
-            <X :size="14" />
-          </OButton>
-        </div>
       </div>
-    </q-card-section>
-    <q-separator />
+    </template>
 
-    <q-card-section class="q-ma-none q-pa-none">
-      <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
-        <!-- we will show loading state here -->
-        <div
-          v-if="loadingState"
-          class="q-pt-md text-center q-w-md q-mx-lg tw:flex tw:justify-center"
-          style="max-width: 450px"
-        >
-          <q-spinner-hourglass color="primary" size="lg" />
-        </div>
-        <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
-        <div v-else class="indexDetailsContainer" style="height: calc(100vh - 120px)">
-          <!-- this the grid section the tiles section -->
-          <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
+    <div v-if="indexData.schema">
+      <div class="tw:m-0 tw:p-0">
+        <div @submit.prevent="onSubmit">
+          <!-- we will show loading state here -->
+          <div
+            v-if="loadingState"
+            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full"
+            style="min-height: calc(100vh - 3.75rem)"
+          >
+            <OSpinner size="md" />
+          </div>
+          <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
+          <div
+            v-else
+            class="indexDetailsContainer tw:flex tw:flex-col tw:min-h-0"
+            style="height: calc(100vh - 3.75rem)"
+          >
+            <!-- this the grid section the tiles section -->
+            <div class="stats-grid tw:grid tw:grid-cols-4 tw:gap-2 tw:mb-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 class="tile"
                 data-test="docs-count-tile"
               >
-                <div 
+                <div
                   class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tile-content-dark tw:border-gray-700'
+                      : 'tile-content-light tw:border-gray-200'
+                  "
                 >
-                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
-                    <div 
+                  <div
+                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                  >
+                    <div
                       class="tile-title tw:text-xs tw:font-bold tw:text-left"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
                     >
-                    Events
+                      Events
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/records.svg" alt="Records Icon" class="tw:h-6 tw:w-6" />
+                      <img
+                        src="@/assets/images/home/records.svg"
+                        alt="Records Icon"
+                        class="tw:h-6 tw:w-6"
+                      />
                     </div>
                   </div>
-                  <div 
+                  <div
                     class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-white'
+                        : 'tw:text-gray-900'
+                    "
                   >
-                    {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}
+                    {{
+                      parseInt(indexData.stats.doc_num).toLocaleString("en-US")
+                    }}
                   </div>
                 </div>
               </div>
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
-                <div 
+                <div
                   class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tile-content-dark tw:border-gray-700'
+                      : 'tile-content-light tw:border-gray-200'
+                  "
                 >
-                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
-                    <div 
+                  <div
+                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                  >
+                    <div
                       class="tile-title tw:text-xs tw:font-bold tw:text-left"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
                     >
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/ingested_size.svg" alt="Ingested Size Icon" class="tw:h-6 tw:w-6" />
+                      <img
+                        src="@/assets/images/home/ingested_size.svg"
+                        alt="Ingested Size Icon"
+                        class="tw:h-6 tw:w-6"
+                      />
                     </div>
                   </div>
-                  <div 
-                    class="tile-value tw:text-lg  tw:flex tw:items-end tw:justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                  <div
+                    class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-white'
+                        : 'tw:text-gray-900'
+                    "
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -157,24 +208,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tile"
                 data-test="compressed-size-tile"
               >
-                <div 
+                <div
                   class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tile-content-dark tw:border-gray-700'
+                      : 'tile-content-light tw:border-gray-200'
+                  "
                 >
-                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
-                    <div 
+                  <div
+                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                  >
+                    <div
                       class="tile-title tw:text-xs tw:font-bold tw:text-left"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
                     >
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/compressed_size.svg" alt="Compressed Size Icon" class="tw:h-6 tw:w-6" />
+                      <img
+                        src="@/assets/images/home/compressed_size.svg"
+                        alt="Compressed Size Icon"
+                        class="tw:h-6 tw:w-6"
+                      />
                     </div>
                   </div>
-                  <div 
+                  <div
                     class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-white'
+                        : 'tw:text-gray-900'
+                    "
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -186,101 +255,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tile"
                 data-test="index-size-tile"
               >
-                <div 
+                <div
                   class="tile-content tw:rounded-lg tw:p-3 tw:text-center tw:border tw:shadow-sm tw:h-20 tw:flex tw:flex-col tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'tile-content-dark tw:border-gray-700' : 'tile-content-light tw:border-gray-200'"
+                  :class="
+                    store.state.theme === 'dark'
+                      ? 'tile-content-dark tw:border-gray-700'
+                      : 'tile-content-light tw:border-gray-200'
+                  "
                 >
-                  <div class="tile-header tw:flex tw:justify-between tw:items-start">
-                    <div 
+                  <div
+                    class="tile-header tw:flex tw:justify-between tw:items-start"
+                  >
+                    <div
                       class="tile-title tw:text-xs tw:font-bold tw:text-left"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'tw:text-gray-400'
+                          : 'tw:text-gray-500'
+                      "
                     >
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon tw:opacity-80">
-                      <img src="@/assets/images/home/index_size.svg" alt="Index Size Icon" class="tw:h-6 tw:w-6" />
+                      <img
+                        src="@/assets/images/home/index_size.svg"
+                        alt="Index Size Icon"
+                        class="tw:h-6 tw:w-6"
+                      />
                     </div>
                   </div>
-                  <div 
+                  <div
                     class="tile-value tw:text-lg tw:flex tw:items-end tw:justify-start"
-                    :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
+                    :class="
+                      store.state.theme === 'dark'
+                        ? 'tw:text-white'
+                        : 'tw:text-gray-900'
+                    "
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
                 </div>
               </div>
-          </div>
-          <div class="tw:w-full tw:flex tw:gap-2">
-          <!--  left section(includes tabs and schema settings) -->
-            <div 
-              :class="[
-                'tw:w-[100%] tw:h-[calc(100vh-200px)] tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:h-full',
-                store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'
-              ]"
-            >
-            <div>
-              <div class="flex justify-start">
-                <OTabs v-model="activeMainTab" dense>
-                  <!-- Schema Settings Tab with conditional class -->
-                  <OTab
-                    name="schemaSettings"
-                    icon="settings"
-                    label="Schema Settings"
-                  />
-
-                  <!-- Red Button Tab -->
-                  <OTab
-                    name="redButton"
-                    icon="backup"
-                    label="Extended Retention"
-                  />
-
-                    <!-- Configuration Tab -->
-                    <OTab
-                    name="configuration"
-                    icon="tune"
-                    label="Configuration"
-                  />
-                  <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
-                  <OTab
-                    v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && indexData.stream_type === 'traces'"
-                    name="llmEvaluation"
-                    icon="psychology"
-                    :label="t('pipeline.llmEvaluation')"
-                    data-test="stream-llm-evaluation-tab"
-                  />
-
-                  <!-- Cross-Linking Tab -->
-                  <OTab
-                    v-if="store.state.zoConfig?.enable_cross_linking"
-                    name="crossLinking"
-                    icon="link"
-                    :label="t('crossLinks.header')"
-                    data-test="schema-cross-linking-tab"
-                  />
-                </OTabs>
-              </div>
             </div>
-            <!-- schema settings tab -->
-            <div v-if="activeMainTab == 'schemaSettings'">
+            <div class="tw:w-full tw:flex tw:flex-1 tw:min-h-0 tw:gap-2">
+              <!--  left section(includes tabs and schema settings) -->
               <div
-                class="flex tw:justify-between tw:items-center"
-                data-test="schema-log-stream-mapping-title-text"
+                :class="[
+                  'tw:w-[100%] tw:h-full tw:min-h-0 tw:rounded-lg tw:border tw:shadow-sm tw:p-2 tw:flex tw:flex-col tw:overflow-hidden',
+                  store.state.theme === 'dark'
+                    ? 'tw:bg-[#181A1B] tw:border-gray-700'
+                    : 'tw:bg-white tw:border-gray-200',
+                ]"
               >
-                <div  v-if="indexData.defaultFts" style="font-weight: 400" class="tw:mt-[12px]">
-                  <label
-                    style="font-weight: 600"
-                    class="mapping-warning-msg"
-                  >
-                    {{ t("logStream.mapping") }} Default FTS keys used (no custom
-                    keys set).</label
-                  >
+                <div>
+                  <div class="tw:flex tw:justify-start">
+                    <OTabs v-model="activeMainTab" dense>
+                      <!-- Schema Settings Tab with conditional class -->
+                      <OTab
+                        name="schemaSettings"
+                        icon="settings"
+                        label="Schema Settings"
+                        data-test="schema-settings-tab"
+                      />
+
+                      <!-- Red Button Tab -->
+                      <OTab
+                        name="redButton"
+                        icon="backup"
+                        label="Extended Retention"
+                        data-test="schema-extended-retention-tab"
+                      />
+
+                      <!-- Configuration Tab -->
+                      <OTab
+                        name="configuration"
+                        icon="tune"
+                        label="Configuration"
+                        data-test="schema-configuration-tab"
+                      />
+                      <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
+                      <OTab
+                        v-if="
+                          config.isEnterprise == 'true' &&
+                          store.state.zoConfig.ai_enabled &&
+                          indexData.stream_type === 'traces'
+                        "
+                        name="llmEvaluation"
+                        icon="psychology"
+                        :label="t('pipeline.llmEvaluation')"
+                        data-test="stream-llm-evaluation-tab"
+                      />
+
+                      <!-- Cross-Linking Tab -->
+                      <OTab
+                        v-if="store.state.zoConfig?.enable_cross_linking"
+                        name="crossLinking"
+                        icon="link"
+                        :label="t('crossLinks.header')"
+                        data-test="schema-cross-linking-tab"
+                      />
+                    </OTabs>
+                  </div>
                 </div>
-              </div>
-                <div class="flex justify-between items-center full-width">
-                  <div class="flex items-center">
-                    <div class="app-tabs-container">
-                    <OToggleGroup
+                <!-- Tab content wrapper — fills remaining height, pushes the footer to the bottom -->
+                <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+                <!-- schema settings tab -->
+                <div v-if="activeMainTab == 'schemaSettings'" class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden">
+                  <div
+                    class="tw:flex tw:justify-between tw:items-center"
+                    data-test="schema-log-stream-mapping-title-text"
+                  >
+                    <div
+                      v-if="indexData.defaultFts"
+                      style="font-weight: 400"
+                      class="tw:mt-[12px]"
+                    >
+                      <label
+                        style="font-weight: 600"
+                        class="mapping-warning-msg"
+                      >
+                        {{ t("logStream.mapping") }} Default FTS keys used (no
+                        custom keys set).</label
+                      >
+                    </div>
+                  </div>
+                  <div class="tw:flex tw:justify-between tw:items-center tw:w-full">
+                    <div class="tw:flex tw:items-center">
+                      <div class="app-tabs-container">
+                        <OToggleGroup
                           v-if="isSchemaUDSEnabled"
                           data-test="schema-fields-tabs"
                           :model-value="activeTab"
@@ -291,745 +393,576 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             value="schemaFields"
                             size="sm"
                           >
-                            <template #icon-left><UserCheck class="tw:size-3.5 tw:shrink-0" /></template>
-                            User Defined Schema ({{ indexData.defined_schema_fields.length }})
+                            <template #icon-left
+                              ><OIcon name="verified-user" size="sm"
+                            /></template>
+                            User Defined Schema ({{
+                              indexData.defined_schema_fields.length
+                            }})
                           </OToggleGroupItem>
                           <OToggleGroupItem value="allFields" size="sm">
-                            <template #icon-left><LayoutList class="tw:size-3.5 tw:shrink-0" /></template>
-                            {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
+                            <template #icon-left
+                              ><OIcon name="format-list-bulleted" size="sm"
+                            /></template>
+                            {{ computedSchemaFieldsName }} ({{
+                              indexData.schema.length
+                            }})
                           </OToggleGroupItem>
                         </OToggleGroup>
-                    </div>
-                   
-                    <div v-if="hasUserDefinedSchema" class="q-ml-sm">
-                      <q-icon
-                        name="info"
-                        class="q-mr-xs"
-                        size="16px"
-                        style="color: #f5a623; cursor: pointer"
-                      >
-                        <q-tooltip style="font-size: 14px; width: 250px">
-                          Other fields show only the schema fields that existed
-                          before the stream was configured to use a user-defined
-                          schema.
-                        </q-tooltip>
-                      </q-icon>
-                    </div>
-                  </div>
+                      </div>
 
-                  <div class="flex items-center tw:gap-2">
-                    <q-input
-                      data-test="schema-field-search-input"
-                      v-model="filterField"
-                      data-cy="schema-index-field-search-input"
-                      borderless
-                      debounce="1"
-                      class="q-ml-auto no-border o2-search-input"
-                      :placeholder="t('search.searchField')"
-                      :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-                    >
-                      <template #prepend>
-                        <q-icon class="o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" name="search" />
-                      </template>
-                    </q-input>
-                    <OButton
-                      v-if="isSchemaUDSEnabled"
-                      data-test="schema-add-fields-title"
-                      :disabled="isDialogOpen"
-                      variant="outline"
-                      size="icon-sm"
-                      class="q-my-sm"
-                      @click.stop="openDialog"
-                      title="Add Field(s)"
-                    >
-                      <Plus :size="14" />
-                    </OButton>
-                  </div>
-                </div>
-
-              <div class="q-mb-md" v-if="isDialogOpen">
-                <q-card class="add-fields-card">
-                  <!-- Header Section -->
-                  <q-card-section
-                    class="q-pa-none"
-                    style="padding: 4px 16px 4px 16px"
-                  >
-                    <div class="tw:flex tw:justify-between tw:items-center">
-                      <div class="text-h6">Add Field(s)</div>
-                      <div>
-                        <OButton
-                          data-test="add-stream-cancel-btn"
-                          variant="ghost"
-                          size="icon-sm"
-                          @click="closeDialog"
-                        >
-                          <X :size="14" />
-                        </OButton>
+                      <div v-if="hasUserDefinedSchema" class="tw:ml-2 tw:flex tw:items-center">
+                        <OIcon
+                          name="info"
+                          size="sm"
+                          style="color: #f5a623; cursor: pointer"
+                        />
+                        <OTooltip
+                          side="right"
+                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                        />
                       </div>
                     </div>
-                  </q-card-section>
-                  <!-- Main Content (Scrollable if necessary) -->
-                  <q-card-section
 
-                    class="q-pa-none"
-                    style="flex: 1; overflow-y: auto; padding: 0px 16px 0px 16px; margin-bottom: 2px;"
-                  >
-                    <StreamFieldsInputs
-                      :fields="newSchemaFields"
-                      :showHeader="false"
-                      :visibleInputs="{
-                        name: true,
-                        data_type: true,
-                        index_type: false,
-                      }"
-                      @add="addSchemaField"
-                      @remove="removeSchemaField"
-                    />
-                  </q-card-section>
-                </q-card>
-              </div>
-
-              <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-              <div
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'dark-theme-table'
-                    : 'light-theme-table'
-                "
-                style="margin-bottom: 10px"
-              >
-                <q-table
-                  ref="qTable"
-                  data-test="schema-log-stream-field-mapping-table"
-                  :rows="indexData.schema"
-                  :columns="columns"
-                  :row-key="(row) => 'tr_' + row.name"
-                  :filter="`${filterField}@${activeTab}`"
-                  :filter-method="filterFieldFn"
-                  :pagination="pagination"
-                  selection="multiple"
-                  v-model:selected="selectedFields"
-                  class="q-table o2-quasar-table o2-row-md o2-schema-table"
-                  id="schemaFieldList"
-                  :style="{
-                    height: `${indexData.defaultFts ? 'calc(100vh - 363px)' : 'calc(100vh - 330px)'}`,
-                    width: '100%'
-                  }"
-                  :rows-per-page-options="[]"
-                  dense
-                >
-                  <template v-slot:header="props">
-                    <q-tr :props="props">
-                      <q-th>
-                        <q-checkbox size="xs" v-model="props.selected" color="primary" />
-                      </q-th>
-                      <q-th
-                        v-for="col in props.cols"
-                        :key="col.name"
-                        :props="props"
-                      >
-                        <span v-if="col.icon" class="tw:ml-[5px]">
-                          <q-icon  size="12px" :name="outlinedPerson"></q-icon>
-                          <q-icon  size="12px" :name="outlinedSchema"></q-icon>
-                        </span>
-                        <span class="tw:pl-7" v-else-if="col.name === 'patterns'">
-                          {{ col.label }}
-                          <q-tooltip class="bg-grey-8" anchor="top middle" self="bottom middle">
-                            {{ t('logStream.sdr') }}
-                          </q-tooltip>
-                        </span>
-                        <span v-else>
-                          {{ col.label }}
-                        </span>
-                      </q-th>
-                    </q-tr>
-                  </template>
-                  <template v-slot:header-selection="scope">
-                    <q-td class="text-center">
-                      <q-checkbox
-                        v-if="
-                          !(
-                            scope.name == store.state.zoConfig.timestamp_column ||
-                            scope.name == allFieldsName
-                          )
-                        "
-                        :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                        v-model="scope.selected"
-                        size="sm"
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <OSearchInput
+                        data-test="schema-field-search-input"
+                        v-model="filterField"
+                        data-cy="schema-index-field-search-input"
+                        class="tw:ml-auto no-border o2-search-input"
+                        :placeholder="t('search.searchField')"
                       />
-                    </q-td>
-                  </template>
+                      <OButton
+                        v-if="isSchemaUDSEnabled"
+                        data-test="schema-add-fields-title"
+                        :disabled="isDialogOpen"
+                        variant="outline"
+                        size="icon-sm"
+                        class="tw:my-2"
+                        @click.stop="openDialog"
+                        title="Add Field(s)"
+                        icon-left="add"
+                      />
+                    </div>
+                  </div>
 
-                  <template v-slot:body-selection="scope">
-                    <q-checkbox
-                      v-if="
-                        !(
-                          scope.row.name ==
-                            store.state.zoConfig.timestamp_column ||
-                          scope.row.name == allFieldsName
-                        )
-                      "
+                  <div class="tw:mb-3" v-if="isDialogOpen">
+                    <OCard class="add-fields-card">
+                      <!-- Header Section -->
+                      <OCardSection
+                        class="tw:p-0"
+                        style="padding: 4px 16px 4px 16px"
+                      >
+                        <div class="tw:flex tw:justify-between tw:items-center">
+                          <div class="tw:text-xl tw:font-semibold">Add Field(s)</div>
+                          <div>
+                            <OButton
+                              data-test="add-stream-cancel-btn"
+                              variant="ghost"
+                              size="icon-sm"
+                              @click="closeDialog"
+                              icon-left="close"
+                            />
+                          </div>
+                        </div>
+                      </OCardSection>
+                      <!-- Main Content (Scrollable if necessary) -->
+                      <OCardSection
+                        class="tw:p-0"
+                        style="
+                          flex: 1;
+                          overflow-y: auto;
+                          padding: 0px 16px 0px 16px;
+                          margin-bottom: 2px;
+                        "
+                      >
+                        <StreamFieldsInputs
+                          :fields="newSchemaFields"
+                          :showHeader="false"
+                          :visibleInputs="{
+                            name: true,
+                            data_type: true,
+                            index_type: false,
+                          }"
+                          @add="addSchemaField"
+                          @remove="removeSchemaField"
+                        />
+                      </OCardSection>
+                    </OCard>
+                  </div>
+
+                  <!-- OTable fills the remaining height inside the schemaSettings flex column -->
+                  <div
+                    :class="[
+                      'tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden',
+                      store.state.theme === 'dark'
+                        ? 'dark-theme-table'
+                        : 'light-theme-table',
+                    ]"
+                  >
+                    <OTable
+                      data-test="schema-log-stream-field-mapping-table"
+                      :data="filteredSchemaData"
+                      :columns="columns"
+                      row-key="name"
+                      selection="multiple"
+                      :selected-ids="selectedSchemaIds"
+                      @update:selected-ids="handleSchemaSelectedIdsUpdate"
+                      @selection-change="handleSchemaSelectionChange"
+                      pagination="client"
+                      :page-size="selectedPerPage"
+                      :page-size-options="perPageOptionsList"
+                      :show-global-filter="false"
                       dense
-                      :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                      v-model="scope.selected"
-                      size="xs"
-                      class="tw:flex tw:items-center tw:justify-center tw:w-full"
-                    />
-                  </template>
-
-                  <template v-slot:body-cell-name="props">
-                    <q-td class="q-td--no-hover field-name field-name-ellipsis">
-                      <div class="tw:flex tw:items-center">
-                        <span class="field-name-text">
-                          {{ props.row.name }}
-                          <q-tooltip v-if="props.row.name.length > 30" class="tw:text-[12px]">
-                            {{ props.row.name }}
-                          </q-tooltip>
-                        </span>
-                        <span v-if="isEnvQuickModeField(props.row.name)" class="tw:flex tw:items-center tw:ml-1">
-                          <img
-                            :src="quickModeIcon"
-                            :alt="t('logStream.envQuickModeMsg')"
-                            class="tw:w-[20px] tw:h-[20px]"
-                          />
-                          <q-tooltip
-                          class="tw:text-[12px] tw:w-[200px]"
+                      class="o2-schema-table"
+                      :style="{ height: '100%', width: '100%' }"
+                    >
+                      <template #cell-name="{ row }">
+                        <div class="tw:flex tw:items-center">
+                          <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
+                            {{ row.name }}
+                            <OTooltip
+                              v-if="row.name.length > 30"
+                              class="tw:text-[12px]"
+                            >
+                              {{ row.name }}
+                            </OTooltip>
+                          </span>
+                          <span
+                            v-if="isEnvQuickModeField(row.name)"
+                            class="tw:flex tw:items-center tw:ml-1"
+                          >
+                            <img
+                              :src="quickModeIcon"
+                              :alt="t('logStream.envQuickModeMsg')"
+                              class="tw:w-[20px] tw:h-[20px]"
+                            />
+                            <OTooltip class="tw:text-[12px] tw:w-[200px]">
+                              {{ t("logStream.envQuickModeMsg") }}
+                            </OTooltip>
+                          </span>
+                        </div>
+                      </template>
+                      <template #cell-settings="{ row }">
+                        <template v-if="row.isUserDefined">
+                          <OIcon name="person" size="xs" />
+                          <OIcon name="schema" size="xs" />
+                        </template>
+                      </template>
+                      <template #cell-type="{ row }">
+                        <span
+                          class="field-type-badge"
+                          :class="{
+                            'badge-int64': row.type === 'Int64',
+                            'badge-float64': row.type === 'Float64',
+                            'badge-utf8': row.type === 'Utf8',
+                            'badge-bool': row.type === 'Boolean',
+                          }"
                         >
-                          {{ t('logStream.envQuickModeMsg') }}
-                        </q-tooltip>
+                          {{ row.type }}
                         </span>
-                      </div>
-                    </q-td>
-                  </template>
-                  <template v-slot:body-cell-type="props">
-                    <q-td>
-                      <span
-                        class="field-type-badge"
-                        :class="{
-                          'badge-int64': props.row.type === 'Int64',
-                          'badge-float64': props.row.type === 'Float64',
-                          'badge-utf8': props.row.type === 'Utf8',
-                          'badge-bool': props.row.type === 'Boolean'
-                        }"
-                      >
-                        {{ props.row.type }}
-                      </span>
-                    </q-td>
-                  </template>
-                  <template v-slot:body-cell-settings="props">
-                    <q-td class="text-left" v-if="props.row.isUserDefined">
-                      <q-icon size="12px"  :name="outlinedPerson"></q-icon>
-                      <q-icon size="12px" :name="outlinedSchema"></q-icon>
-                    </q-td>
-                    <q-td v-else> </q-td>
-                  </template>
-                  <template v-slot:body-cell-index_type="props">
-                    <q-td data-test="schema-stream-index-select">
-                        <q-select
-                        v-if="
-                          !(
-                            props.row.name ==
-                              store.state.zoConfig.timestamp_column ||
-                            props.row.name == allFieldsName
-                          )
-                        "
-                        :model-value="computedIndexType(props).value"
-                        :options="streamIndexType"
-                        option-label="label"
-                        option-value="value"
-                        :popup-content-style="{ textTransform: 'capitalize' }"
-                        color="input-border"
-                        bg-color="input-bg"
-                        class="mini-select"
-                        input-class="mini-select"
-                        :option-disable="
-                          (_option) => disableOptions(props.row, _option)
-                        "
-                        multiple
-                        :max-values="2"
-                        map-options
-                        emit-value
-                        autoclose
-                        borderless
-                        dense
-                        input-style="height: 12px !important; min-height: 8px !important; margin: 0px; width: 120px;"
-                        style="width: 190px;"
-                        @update:model-value="val => updateIndexType(props, val)"
-                      >
-                      <template v-slot:append>
-                        <q-icon 
-                          v-if="props.row.index_type && props.row.index_type.length > 0"
-                          name="cancel" 
-                          size="14px"
-                          style="cursor: pointer; display: flex; align-items: center; font-weight: bold; margin-top: 8px;"
-                          @click.stop="updateIndexType(props, [])"
-                        />
                       </template>
-                      <template v-slot:option="scope">
-                        <q-item style="margin: 0px !important; border-radius: 0px !important;" v-bind="scope.itemProps" :disable="disableOptions(props.row, scope.opt)">
-                          <q-item-section>
-                            <q-item-label>
-                              {{ scope.opt.label }}
-                            </q-item-label>
-                          </q-item-section>
-                          <q-tooltip class="tw:text-[12px] tw:w-[200px]" v-if="checkIfOptionPresentInDefaultEnv(props.row.name, scope.opt) == true">
-                            This is a predefined environment setting and cannot be changed.
-                          </q-tooltip>
-                        </q-item>
+                      <template #cell-index_type="{ row }">
+                        <div
+                          v-if="
+                            !(
+                              row.name ==
+                                store.state.zoConfig.timestamp_column ||
+                              row.name == allFieldsName
+                            )
+                          "
+                          class="tw:flex tw:items-center tw:gap-1"
+                        >
+                          <OSelect
+                            :model-value="computedIndexType({ row }).value"
+                            :options="indexTypeOptionsForRow(row)"
+                            label-key="label"
+                            value-key="value"
+                            class="mini-select"
+                            multiple
+                            clearable
+                            size="sm"
+                            :data-test="`schema-field-${row.name}-index-type-select`"
+                            style="width: 190px;"
+                            @update:model-value="(val) => updateIndexType({ row }, enforceMaxIndexTypes(val))"
+                          />
+                          <OTooltip
+                            v-if="row.index_type && row.index_type.length > 0"
+                            :content="streamIndexType.filter(opt => row.index_type.includes(opt.value)).map(opt => opt.label).join(', ')"
+                          />
+                        </div>
                       </template>
-                      <q-tooltip 
-                        v-if="props.row.index_type && props.row.index_type.length > 0" 
-                        class="tw:text-[12px]"
-                      >
-                        {{ streamIndexType.filter(opt => props.row.index_type.includes(opt.value)).map(opt => opt.label).join(', ') }}
-                      </q-tooltip>
-                      </q-select>
-                    </q-td>
-                  </template>
-                  <!-- here we will render the number of regex patterns associated with the specific field -->
-                  <template v-slot:body-cell-patterns="props">
-                    <q-td v-if="config.isEnterprise == 'true' && !(props.row.name == store.state.zoConfig.timestamp_column) && (props.row.type == 'Utf8' || props.row.type == 'utf8')" class="field-name text-left tw:text-[#5960B2] tw:cursor-pointer " style="padding-left: 12px !important;" @click="openPatternAssociationDialog(props.row.name)">
-                      {{ patternAssociations[props.row.name]?.length ? `View ${patternAssociations[props.row.name]?.length} Patterns` : 'Add Pattern' }}
-                      <span>
-                        <q-icon name="arrow_forward" size="xs" />
-                      </span>
-                    </q-td>
-                    <q-td v-else>
-                    </q-td>
-                  </template>
+                      <template #cell-patterns="{ row }">
+                        <template
+                          v-if="
+                            config.isEnterprise == 'true' &&
+                            !(
+                              row.name == store.state.zoConfig.timestamp_column
+                            ) &&
+                            (row.type == 'Utf8' || row.type == 'utf8')
+                          "
+                        >
+                          <span
+                            class="tw:text-[#5960B2] tw:cursor-pointer"
+                            :data-test="`schema-field-${row.name}-pattern-action`"
+                            @click="openPatternAssociationDialog(row.name)"
+                          >
+                            {{
+                              patternAssociations[row.name]?.length
+                                ? `View ${patternAssociations[row.name]?.length} Patterns`
+                                : "Add Pattern"
+                            }}
+                            <OIcon name="arrow-forward" size="xs" />
+                          </span>
+                        </template>
+                      </template>
+                    </OTable>
+                  </div>
+                </div>
 
-                  <template #bottom="scope">
-                    <div class="schema-table-pagination-wrapper">
-                      <QTablePagination
-                        :scope="scope"
-                        :position="'bottom'"
-                        :resultTotal="resultTotal"
-                        :perPageOptions="perPageOptions"
-                        @update:changeRecordPerPage="changePagination"
-                      />
-                    </div>
-                  </template>
-                </q-table>
-              </div>
-            </div>
-            
-            <!-- Configuration tab -->
-            <div v-if="activeMainTab == 'configuration'">
-              <div class="tw:w-full tw:h-[calc(100vh-267px)] tw:flex tw:flex-col tw:gap-4 tw:h-full tw:overflow-y-auto tw:p-4">
-                <!-- Configuration Settings Card -->
-                <div 
-                  :class="[
-                    'tw:rounded-lg tw:p-2 tw:border tw:shadow-sm tw:flex tw:flex-col tw:justify-evenly',
-                    store.state.theme === 'dark' ? 'dark:tw:bg-[#181A1B] dark:tw:border-gray-700' : 'tw:border-gray-200'
-                  ]"
-                >
-                  
-                  <div class="tw:flex tw:flex-col tw:gap-2 tw:flex-1">
-                    <!-- Data Retention -->
-                    <div v-if="showDataRetention" class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Data Retention (days)
-                      </label>
-                      <q-input
-                        data-test="stream-details-data-retention-input"
-                        v-model="dataRetentionDays"
-                        type="number"
-                        dense
-                        min="1"
-                        borderless
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                          v-if="dataRetentionDays > 0 && dataRetentionDays != ''"
-                          :class="[
-                            'tw:block tw:text-xs tw:mt-1 tw:italic',
-                            store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                          ]"
-                      >
-                        Global retention is {{ store.state.zoConfig.data_retention_days }} days
-                        
-                      </small>
-                      <!-- Error Message -->
-                      <div class="tw:text-red-500 tw:text-sm">
-                        <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
+                <!-- Configuration tab -->
+                <div v-if="activeMainTab == 'configuration'">
+                  <div class="tw:w-full tw:h-full tw:overflow-y-auto tw:p-4 tw:flex tw:flex-col tw:gap-4">
+                    <!-- Configuration Settings Card -->
+                    <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:divide-y tw:divide-[var(--o2-border-color)]">
+
+                      <!-- Data Retention -->
+                      <div v-if="showDataRetention" class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                          Data Retention (days)
+                        </label>
+                        <OInput
+                          data-test="stream-details-data-retention-input"
+                          v-model="dataRetentionDays"
+                          type="number"
+                          min="1"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
+                          Global retention is {{ store.state.zoConfig.data_retention_days }} days
+                        </small>
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="tw:text-[var(--o2-status-error-text)]">
                           Retention period must be at least 1 day
-                        </span>
+                        </small>
+                      </div>
+
+                      <!-- Max Query Range -->
+                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                          Max Query Range (hours)
+                        </label>
+                        <OInput
+                          data-test="stream-details-max-query-range-input"
+                          v-model="maxQueryRange"
+                          type="number"
+                          min="0"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
+                      </div>
+
+                      <!-- Flatten Level -->
+                      <div class="tw:flex tw:flex-col tw:gap-1 tw:p-3">
+                        <label class="tw:text-[0.8125rem] tw:font-[500]" style="color: var(--o2-text-heading)">
+                          {{ t("logStream.flattenLevel") }}
+                        </label>
+                        <OInput
+                          data-test="stream-details-flatten-level-input"
+                          v-model="flattenLevel"
+                          type="number"
+                          min="0"
+                          class="tw:max-w-[220px]"
+                          @update:model-value="markFormDirty"
+                        />
+                        <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
+                      </div>
+
+                      <!-- Toggles -->
+                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Use Stream Stats for Partitioning</span>
+                        <OSwitch
+                          data-test="log-stream-use_approx-toggle-btn"
+                          v-model="approxPartition"
+                          @update:model-value="formDirtyFlag = true"
+                        />
+                      </div>
+
+                      <div v-if="showStoreOriginalDataToggle" class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Store Original Data</span>
+                        <OSwitch
+                          data-test="log-stream-store-original-data-toggle-btn"
+                          v-model="storeOriginalData"
+                          @update:model-value="formDirtyFlag = true"
+                        />
+                      </div>
+
+                      <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2.5 tw:text-[13px]">
+                        <span>Enable Distinct Values</span>
+                        <OSwitch
+                          data-test="log-stream-enabled-distinct-values-toggle-btn"
+                          v-model="enableDistinctFields"
+                          @update:model-value="formDirtyFlag = true"
+                        />
                       </div>
                     </div>
-
-                    <!-- Max Query Range -->
-                    <div class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Max Query Range (hours)
-                      </label>
-                      <q-input
-                        data-test="stream-details-max-query-range-input"
-                        v-model="maxQueryRange"
-                        type="number"
-                        dense
-                        borderless
-                        min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @wheel.prevent
-                        @change="formDirtyFlag = true"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                        :class="[
-                          'tw:block tw:text-xs tw:mt-1 tw:italic',
-                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                        ]"
-                      >
-                        Maximum time range allowed for queries. Set 0 for unlimited range.
-                      </small>
-                    </div>
-
-                    <!-- Flatten Level -->
-                    <div class="setting-group">
-                      <label 
-                        :class="[
-                          'tw:block tw:text-sm tw:font-semibold tw:mb-1',
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        {{ t("logStream.flattenLevel") }}
-                      </label>
-                      <q-input
-                        data-test="stream-details-flatten-level-input"
-                        v-model="flattenLevel"
-                        type="number"
-                        dense
-                        borderless
-                        min="0"
-                        :class="[
-                          'tw:w-full',
-                          store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'
-                        ]"
-                        class="o2-search-input no-border"
-                        hide-bottom-space
-                        @change="formDirtyFlag = true"
-                        @update:model-value="markFormDirty"
-                      />
-                      <small 
-                        :class="[
-                          'tw:block tw:text-xs tw:mt-1 tw:italic',
-                          store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'
-                        ]"
-                      >
-                        Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}
-                      </small>
-                    </div>
-
-                    <!-- Toggles -->
-                    <div 
-                      :class="[
-                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                        store.state.theme === 'dark' ? 'tw:border-gray-600' : 'tw:border-gray-200'
-                      ]"
-                    >
-                      <span 
-                        :class="[
-                          store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-700'
-                        ]"
-                      >
-                        Use Stream Stats for Partitioning
-                      </span>
-                      <q-toggle
-                        data-test="log-stream-use_approx-toggle-btn"
-                        v-model="approxPartition"
-                        size="lg"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        @click="formDirtyFlag = true"
-                      />
-                    </div>
-
-                    <div 
-                      :class="[
-                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                        store.state.theme === 'dark' ? 'tw:border-gray-600 tw:text-gray-200' : 'tw:border-gray-200 tw:text-gray-700'
-                      ]"
-                    >
-                      <span>Store Original Data</span>
-                      <q-toggle
-                        v-if="showStoreOriginalDataToggle"
-                        data-test="log-stream-store-original-data-toggle-btn"
-                        v-model="storeOriginalData"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
-                      />
-                    </div>
-
-                    <div
-                      :class="[
-                        'tw:flex tw:items-center tw:justify-between tw:border-b tw:text-sm',
-                        store.state.theme === 'dark' ? 'tw:border-gray-600 tw:text-gray-200' : 'tw:border-gray-200 tw:text-gray-700'
-                      ]"
-                    >
-                      <span>Enable Distinct Values</span>
-                      <q-toggle
-                        data-test="log-stream-enabled-distinct-values-toggle-btn"
-                        v-model="enableDistinctFields"
-                        class="o2-toggle-button-lg"
-                        :class="store.state.theme === 'dark' ? 'o2-toggle-button-lg-dark' : 'o2-toggle-button-lg-light'"
-                        size="lg"
-                        @click="formDirtyFlag = true"
-                      />
-                    </div>
                   </div>
-
                 </div>
-              </div>
-            </div>
 
-            <!-- red button tab -->
-            <div v-else-if="activeMainTab == 'redButton'">
-              <div
-                class="mapping-warning-msg q-mt-sm"
-                style="width: fit-content"
-              >
-                <span style="font-weight: 600">
-                  <q-icon name="info" class="q-mr-xs" size="16px" />
-
-                  Additional
-                  {{ store.state.zoConfig.extended_data_retention_days }} days of
-                  extension will be applied to the selected date ranges</span
+                <!-- red button tab -->
+                <div
+                  v-else-if="activeMainTab == 'redButton'"
+                  class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
                 >
-              </div>
-              <div class="q-mt-sm">
-                <div class="text-center q-mt-sm tw:flex items-center">
-                  <div class="flex items-center">
-                    <span class="text-bold"> Select Date</span>
-                    <date-time
-                      class="q-mx-sm"
-                      @on:date-change="dateChangeValue"
-                      disable-relative
-                      hide-relative-time
-                      hide-relative-timezone
-                      :minDate="minDate"
-                    />
-                  </div>
-                  <span class="text-bold"> (UTC Timezone) </span>
-                </div>
-
-                <div class="q-mt-sm" style="margin-bottom: 10px">
-                  <q-table
-                    ref="qTable"
-                    :row-key="(row, index) => 'tr_' + row.index"
-                    data-test="schema-log-stream-field-mapping-table"
-                    :rows="redBtnRows"
-                    :columns="redBtnColumns"
-                    :pagination="pagination"
-                    selection="multiple"
-                    v-model:selected="selectedDateFields"
-                    class="q-table o2-quasar-table o2-row-md o2-schema-table"
-                    id="schemaFieldList"
-                    :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark' : 'o2-last-row-border-light o2-schema-table-header-sticky-light'"
-                    style="height: calc(100vh - 363px);"
-                    :rows-per-page-options="[]"
-                    dense
+                  <div
+                    class="mapping-warning-msg tw:mt-2"
+                    style="width: fit-content"
                   >
-                    <template v-slot:header-selection="scope">
-                        <q-checkbox
-                          :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                          v-model="scope.selected"
-                          size="xs"
-                        />
-                    </template>
+                    <span style="font-weight: 600">
+                      <OIcon name="info" class="tw:mr-1" size="sm" />
 
-                    <!-- Body Slot for Selection -->
-                    <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                          v-model="scope.selected"
-                          size="xs"
-                          class="o2-table-checkbox"
+                      Additional
+                      {{
+                        store.state.zoConfig.extended_data_retention_days
+                      }}
+                      days of extension will be applied to the selected date
+                      ranges</span
+                    >
+                  </div>
+                  <div class="tw:mt-2 tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+                    <div class="tw:text-center tw:mt-2 tw:flex tw:items-center">
+                      <div class="tw:flex tw:items-center">
+                        <span class="tw:font-bold"> Select Date</span>
+                        <date-time
+                          class="tw:mx-2"
+                          @on:date-change="dateChangeValue"
+                          disable-relative
+                          hide-relative-time
+                          hide-relative-timezone
+                          :minDate="minDate"
                         />
-                    </template>
+                      </div>
+                      <span class="tw:font-bold"> (UTC Timezone) </span>
+                    </div>
 
-                    <template #bottom="scope">
-                      <QTablePagination
-                        :scope="scope"
-                        :position="'bottom'"
-                        :resultTotal="redBtnRows.length"
-                        :perPageOptions="perPageOptions"
-                        @update:changeRecordPerPage="changePagination"
+                    <div class="tw:mt-2 tw:flex-1 tw:min-h-0 tw:flex tw:flex-col">
+                      <OTable
+                        data-test="schema-log-stream-field-mapping-table"
+                        :data="redBtnRows"
+                        :columns="redBtnColumns"
+                        row-key="index"
+                        selection="multiple"
+                        v-model:selected-ids="selectedDateIds"
+                        @selection-change="handleDateSelectionChange"
+                        pagination="client"
+                        :page-size="selectedPerPage"
+                        :page-size-options="perPageOptionsList"
+                        :show-global-filter="false"
+                        dense
+                        :class="
+                          store.state.theme == 'dark'
+                            ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark'
+                            : 'o2-last-row-border-light o2-schema-table-header-sticky-light'
+                        "
+                        :style="{ height: '100%' }"
                       />
-                    </template>
-                  </q-table>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <!-- LLM Evaluation tab -->
-            <LlmEvaluationSettings
-              v-if="activeMainTab == 'llmEvaluation'"
-              ref="llmEvalSettingsRef"
-              :stream-name="indexData.name"
-              :stream-fields="llmEvalStreamFields"
-              @dirty="llmEvalFormDirty = true"
-            />
-
-            <!-- cross-linking tab -->
-            <div v-if="activeMainTab == 'crossLinking'">
-              <div class="tw:p-4">
-                <!-- Stream-level cross-links (editable) -->
-                <CrossLinkManager
-                  v-model="streamCrossLinks"
-                  :title="t('crossLinks.streamCrossLinks')"
-                  :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
-                  :availableFields="streamFieldNames"
-                  @change="formDirtyFlag = true"
+                <!-- LLM Evaluation tab -->
+                <LlmEvaluationSettings
+                  v-if="activeMainTab == 'llmEvaluation'"
+                  ref="llmEvalSettingsRef"
+                  :stream-name="indexData.name"
+                  :stream-fields="llmEvalStreamFields"
+                  @dirty="llmEvalFormDirty = true"
                 />
 
-                <!-- Organization-level cross-links (read-only, hidden when empty) -->
-                <template v-if="orgCrossLinks.length > 0">
-                  <q-separator class="tw:my-4" />
-                  <CrossLinkManager
-                    :modelValue="orgCrossLinks"
-                    :title="t('crossLinks.orgCrossLinks')"
-                    :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
-                    readonly
-                  />
-                </template>
-              </div>
-            </div>
+                <!-- cross-linking tab -->
+                <div v-if="activeMainTab == 'crossLinking'">
+                  <div class="tw:p-4">
+                    <!-- Stream-level cross-links (editable) -->
+                    <CrossLinkManager
+                      v-model="streamCrossLinks"
+                      :title="t('crossLinks.streamCrossLinks')"
+                      :subtitle="t('crossLinks.streamCrossLinksSubtitle')"
+                      :availableFields="streamFieldNames"
+                      @change="formDirtyFlag = true"
+                    />
 
-            <!-- floating footer for the table -->
-            <div
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-theme-floating-buttons'
-                  : 'light-theme-floating-buttons'
-              "
-              class="floating-buttons q-px-sm q-py-xs"
-            >
-              <!-- LLM Evaluation tab footer -->
-              <div
-                v-if="activeMainTab === 'llmEvaluation'"
-                class="flex items-center justify-end tw:gap-2"
-              >
-                <OButton
-                  v-close-popup="true"
-                  data-test="schema-cancel-button"
-                  variant="outline"
-                  size="sm-action"
-                  @click="llmEvalFormDirty = false"
-                >
-                  {{ t('logStream.cancel') }}
-                </OButton>
-                <OButton
-                  :disabled="!llmEvalFormDirty"
-                  data-test="schema-update-settings-button"
-                  variant="primary"
-                  size="sm-action"
-                  @click="llmEvalSettingsRef?.save()"
-                >
-                  {{ t('logStream.updateSettings') }}
-                </OButton>
-              </div>
+                    <!-- Organization-level cross-links (read-only, tw:hidden when empty) -->
+                    <template v-if="orgCrossLinks.length > 0">
+                      <OSeparator class="tw:my-4" />
+                      <CrossLinkManager
+                        :modelValue="orgCrossLinks"
+                        :title="t('crossLinks.orgCrossLinks')"
+                        :subtitle="t('crossLinks.orgCrossLinksSubtitle')"
+                        readonly
+                      />
+                    </template>
+                  </div>
+                </div>
 
-              <div
-                v-else-if="indexData.schema.length > 0"
-                class="flex items-center justify-between"
-              >
-                <div class="flex items-center tw:gap-2">
-                  <span
-                    v-if="activeMainTab == 'schemaSettings'"
-                    class="q-px-sm q-py-sm"
-                    ><strong> {{ selectedFields.length }}</strong> fields
-                    selected</span
-                  >
-                  <OButton
-                    v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
-                    data-test="schema-add-field-button"
-                    variant="outline"
-                    size="sm-action"
-                    :disabled="!selectedFields.length || hasUDSFieldInSelection"
-                    @click="updateDefinedSchemaFields"
-                  >
-                    <span class="flex items-center justify-start tw:gap-1 tw:mr-1">
-                      <UserCheck :size="13" />
-                      <LayoutList :size="13" />
-                    </span>
-                    {{
-                      activeTab === "schemaFields"
-                        ? t("logStream.removeSchemaField")
-                        : t("logStream.addSchemaField")
-                    }}
-                    <q-tooltip v-if="hasUDSFieldInSelection">
-                      {{ t("logStream.udsFieldAlreadyInSchema") }}
-                    </q-tooltip>
-                  </OButton>
-                  <OButton
-                    v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
-                    :disabled="!selectedFields.length && !selectedDateFields.length"
-                    data-test="schema-delete-button"
-                    variant="outline"
-                    size="sm-action"
-                    @click="activeMainTab == 'schemaSettings' ? (confirmQueryModeChangeDialog = true) : (confirmDeleteDatesDialog = true)"
-                  >
-                    <Trash2 :size="14" class="tw:mr-1" />
-                    {{ t("logStream.delete") }}
-                  </OButton>
                 </div>
-                <div class="flex justify-end tw:gap-2">
-                  <OButton
-                    v-close-popup="true"
-                    data-test="schema-cancel-button"
-                    variant="outline"
-                    size="sm-action"
+                <!-- floating footer for the table -->
+                <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
+                  <!-- LLM Evaluation tab footer -->
+                  <div
+                    v-if="activeMainTab === 'llmEvaluation'"
+                    class="tw:flex tw:items-center tw:justify-end tw:gap-2"
                   >
-                    {{ t('logStream.cancel') }}
-                  </OButton>
-                  <OButton
-                    :disabled="!formDirtyFlag"
-                    data-test="schema-update-settings-button"
-                    variant="primary"
-                    size="sm-action"
-                    type="submit"
+                    <OButton
+                      data-test="schema-cancel-button"
+                      variant="outline"
+                      size="sm-action"
+                      @click="llmEvalFormDirty = false; $emit('close')"
+                    >
+                      {{ t("logStream.cancel") }}
+                    </OButton>
+                    <OButton
+                      :disabled="!llmEvalFormDirty"
+                      data-test="schema-update-settings-button"
+                      variant="primary"
+                      size="sm-action"
+                      @click="llmEvalSettingsRef?.save()"
+                    >
+                      {{ t("logStream.updateSettings") }}
+                    </OButton>
+                  </div>
+
+                  <div
+                    v-else-if="indexData.schema.length > 0"
+                    class="tw:flex tw:items-center tw:justify-between"
                   >
-                    {{ t('logStream.updateSettings') }}
-                  </OButton>
+                    <div class="tw:flex tw:items-center tw:gap-2">
+                      <span
+                        v-if="activeMainTab == 'schemaSettings'"
+                        class="tw:px-2 tw:py-2"
+                        ><strong> {{ selectedFields.length }}</strong> fields
+                        selected</span
+                      >
+                      <OButton
+                        v-if="
+                          isSchemaUDSEnabled &&
+                          activeMainTab == 'schemaSettings'
+                        "
+                        data-test="schema-add-field-button"
+                        variant="outline"
+                        size="sm-action"
+                        :disabled="
+                          !selectedFields.length || hasUDSFieldInSelection
+                        "
+                        @click="updateDefinedSchemaFields"
+                      >
+                        <span
+                          class="tw:flex tw:items-center tw:justify-start tw:gap-1 tw:mr-1"
+                        >
+                          <OIcon name="verified-user" size="sm" />
+                          <OIcon name="format-list-bulleted" size="sm" />
+                        </span>
+                        {{
+                          activeTab === "schemaFields"
+                            ? t("logStream.removeSchemaField")
+                            : t("logStream.addSchemaField")
+                        }}
+                        <OTooltip
+                          v-if="hasUDSFieldInSelection"
+                          :content="t('logStream.udsFieldAlreadyInSchema')"
+                          side="top"
+                        />
+                      </OButton>
+                      <OButton
+                        v-if="
+                          activeMainTab != 'configuration' &&
+                          activeMainTab != 'crossLinking'
+                        "
+                        :disabled="
+                          !selectedFields.length && !selectedDateFields.length
+                        "
+                        data-test="schema-delete-button"
+                        variant="outline"
+                        size="sm-action"
+                        @click="
+                          activeMainTab == 'schemaSettings'
+                            ? (confirmQueryModeChangeDialog = true)
+                            : (confirmDeleteDatesDialog = true)
+                        "
+                        icon-left="delete"
+                      >
+                        {{ t("logStream.delete") }}
+                      </OButton>
+                    </div>
+                    <div class="tw:flex tw:justify-end tw:gap-2">
+                      <OButton
+                        data-test="schema-cancel-button"
+                        variant="outline"
+                        size="sm-action"
+                        @click="$emit('close')"
+                      >
+                        {{ t("logStream.cancel") }}
+                      </OButton>
+                      <OButton
+                        :disabled="!formDirtyFlag"
+                        data-test="schema-update-settings-button"
+                        variant="primary"
+                        size="sm-action"
+                        @click="onSubmit"
+                      >
+                        {{ t("logStream.updateSettings") }}
+                      </OButton>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           </div>
         </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
-  <q-card v-else class="column q-pa-md full-height no-wrap">
-    <h5>Wait while loading...</h5>
-  </q-card>
-  <q-dialog v-model="patternAssociationDialog.show" position="right" full-height maximized>
-    <AssociatedRegexPatterns :data="patternAssociationDialog.data" :fieldName="patternAssociationDialog.fieldName" @closeDialog="patternAssociationDialog.show = false" @addPattern="handleAddPattern" @removePattern="handleRemovePattern" @updateSettings="onSubmit" @updateAppliedPattern="handleUpdateAppliedPattern" />
-  </q-dialog>
+      </div>
+    </div>
+    <div v-else class="tw:p-3">
+      <h5>Wait while loading...</h5>
+    </div>
+  </ODrawer>
+  <ODrawer
+    data-test="schema-pattern-association-drawer"
+    v-model:open="patternAssociationDialog.show"
+    :width="60"
+    :show-close="false"
+  >
+    <AssociatedRegexPatterns
+      ref="assocPatternsRef"
+      :data="patternAssociationDialog.data"
+      :fieldName="patternAssociationDialog.fieldName"
+      @closeDialog="patternAssociationDialog.show = false"
+      @addPattern="handleAddPattern"
+      @removePattern="handleRemovePattern"
+      @updateSettings="onSubmit"
+      @updateAppliedPattern="handleUpdateAppliedPattern"
+    />
+    <template #footer>
+      <div class="tw:flex tw:items-center tw:justify-end tw:gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="schema-pattern-association-cancel-btn"
+          @click="patternAssociationDialog.show = false"
+        >
+          Cancel
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="schema-pattern-association-update-btn"
+          :disabled="!assocPatternsRef?.isFormDirty"
+          @click="assocPatternsRef?.updateRegexPattern()"
+        >
+          Update Changes
+        </OButton>
+      </div>
+    </template>
+  </ODrawer>
 
   <ConfirmDialog
     title="Delete Action"
@@ -1055,8 +988,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import {
   computed,
@@ -1069,7 +1002,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar, date, format } from "quasar";
+import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import "../../styles/schema.scss";
@@ -1086,22 +1019,28 @@ import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { UserCheck, LayoutList } from "lucide-vue-next";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, Plus, Trash2 } from "lucide-vue-next";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
-import {
-  outlinedSchema,
-  outlinedPerson,
-  outlinedDelete,
-} from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import DateTime from "@/components/DateTime.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const defaultValue: any = () => {
   return {
@@ -1115,31 +1054,43 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "SchemaIndex",
+  emits: ["close", "update:open"],
   props: {
-     
     modelValue: {
       type: Object,
       default: () => defaultValue(),
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
-    OTabs, OTab,
+    OSeparator,
+    OTabs,
+    OTab,
     ConfirmDialog,
     StreamFieldsInputs,
     OToggleGroup,
     OToggleGroupItem,
-    UserCheck,
-    LayoutList,
-    QTablePagination,
+    OTable,
     DateTime,
     AssociatedRegexPatterns,
+    ODrawer,
     PerformanceFieldsDialog,
     LlmEvaluationSettings,
     CrossLinkManager,
     OButton,
-    X,
-    Plus,
-    Trash2,
+    OIcon,
+    OSpinner,
+    OInput,
+    OSearchInput,
+    OSelect,
+    OSwitch,
+    OTooltip,
+    OCheckbox,
+    OCard,
+    OCardSection,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1151,7 +1102,6 @@ export default defineComponent({
     };
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -1184,13 +1134,17 @@ export default defineComponent({
     const approxPartition = ref(false);
 
     const llmEvalStreamFields = computed(() =>
-      (indexData.value.schema || []).map((f: any) => ({ label: f.name, value: f.name }))
+      (indexData.value.schema || []).map((f: any) => ({
+        label: f.name,
+        value: f.name,
+      })),
     );
     const llmEvalSettingsRef = ref<any>(null);
     const llmEvalFormDirty = ref(false);
     const streamCrossLinks = ref<any[]>([]);
-    const orgCrossLinks = computed(() =>
-      store.state?.organizationData?.organizationSettings?.cross_links || [],
+    const orgCrossLinks = computed(
+      () =>
+        store.state?.organizationData?.organizationSettings?.cross_links || [],
     );
     const streamFieldNames = computed(() =>
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
@@ -1207,10 +1161,10 @@ export default defineComponent({
       { label: "500", value: 500 },
     ];
 
+    const perPageOptionsList = [20, 50, 100, 250, 500];
+
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
     };
 
     const selectedPerPage = ref<number>(20);
@@ -1223,7 +1177,73 @@ export default defineComponent({
       fieldName: "",
     });
 
+    const assocPatternsRef = ref<any>(null);
+
     const selectedFields = ref([]);
+
+    const filteredSchemaData = computed(() => {
+      const rows = indexData.value.schema || [];
+      if (!filterField.value && activeTab.value !== "schemaFields") return rows;
+
+      const searchTerm = filterField.value?.toLowerCase() || "";
+      const labelToValueMap: Record<string, string> = {};
+      streamIndexType.forEach(({ label, value }: any) => {
+        labelToValueMap[label.toLowerCase()] = value;
+      });
+
+      return rows.filter((row: any) => {
+        if (activeTab.value === "schemaFields") {
+          if (!indexData.value.defined_schema_fields.includes(row.name))
+            return false;
+        }
+        if (!searchTerm) return true;
+        if (row.name.toLowerCase().includes(searchTerm)) return true;
+        return (row.index_type || []).some(
+          (t: string) =>
+            t.toLowerCase().includes(searchTerm) ||
+            labelToValueMap[searchTerm] === t,
+        );
+      });
+    });
+
+    const selectedSchemaIds = computed({
+      get: () => selectedFields.value.map((f: any) => f.name),
+      set: (ids: string[]) => {
+        const filteredIds = ids.filter(
+          (id) =>
+            id !== store.state.zoConfig.timestamp_column &&
+            id !== allFieldsName.value,
+        );
+        selectedFields.value = (indexData.value.schema || []).filter(
+          (row: any) => filteredIds.includes(row.name),
+        );
+      },
+    });
+
+    const handleSchemaSelectedIdsUpdate = (ids: string[]) => {
+      selectedSchemaIds.value = ids;
+    };
+
+    const handleSchemaSelectionChange = (rows: any[]) => {
+      selectedFields.value = rows.filter(
+        (row: any) =>
+          row.name !== store.state.zoConfig.timestamp_column &&
+          row.name !== allFieldsName.value,
+      );
+    };
+
+    const selectedDateIds = computed({
+      get: () => selectedDateFields.value.map((f: any) => f.index),
+      set: (ids: any[]) => {
+        selectedDateFields.value = redBtnRows.value.filter((row: any) =>
+          ids.includes(row.index),
+        );
+      },
+    });
+
+    const handleDateSelectionChange = (rows: any[]) => {
+      selectedDateFields.value = rows;
+    };
 
     const hasUserDefinedSchema = computed(() => {
       return !!indexData.value.defined_schema_fields?.length;
@@ -1322,13 +1342,18 @@ export default defineComponent({
     // Watch activeTab and update resultTotal accordingly
     // This ensures resultTotal is always in sync with the active tab
     // If selected tab is schemaFields we will show the uds length otherwise we will show the actual schema length
-    watch(activeTab, (newTab) => {
-      if (newTab === "schemaFields") {
-        resultTotal.value = indexData.value.defined_schema_fields?.length || 0;
-      } else {
-        resultTotal.value = indexData.value.schema?.length || 0;
-      }
-    }, { immediate: true });
+    watch(
+      activeTab,
+      (newTab) => {
+        if (newTab === "schemaFields") {
+          resultTotal.value =
+            indexData.value.defined_schema_fields?.length || 0;
+        } else {
+          resultTotal.value = indexData.value.schema?.length || 0;
+        }
+      },
+      { immediate: true },
+    );
 
     const isSchemaUDSEnabled = computed(() => {
       return store.state.zoConfig.user_defined_schemas_enabled;
@@ -1349,10 +1374,9 @@ export default defineComponent({
         .then(async (res) => {
           loadingState.value = false;
           if (res.data.code == 200) {
-            q.notify({
-              color: "positive",
+            toast({
               message: "Field(s) deleted successfully.",
-              timeout: 2000,
+              variant: "success",
             });
             confirmQueryModeChangeDialog.value = false;
             selectedFields.value = [];
@@ -1364,28 +1388,27 @@ export default defineComponent({
             );
             getSchema();
           } else {
-            q.notify({
-              color: "negative",
+            toast({
               message: res.data.message,
-              timeout: 2000,
+              variant: "error",
             });
           }
         })
         .catch((err: any) => {
           loadingState.value = false;
           console.log(err);
-          q.notify({
-            color: "negative",
+          toast({
             message: err.message,
-            timeout: 2000,
+            variant: "error",
           });
         });
     };
 
     const getFieldIndices = (property, settings) => {
       const fieldIndices = [];
-      if (settings.full_text_search_keys.length > 0 &&
-          settings.full_text_search_keys.includes(property.name)
+      if (
+        settings.full_text_search_keys.length > 0 &&
+        settings.full_text_search_keys.includes(property.name)
       ) {
         fieldIndices.push("fullTextSearchKey");
       }
@@ -1431,11 +1454,11 @@ export default defineComponent({
     };
 
     const setSchema = (streamResponse) => {
-
       const schemaMapping = new Set([]);
 
       //here lets add the pattern associations to the streamResponse
-      streamResponse.settings.pattern_associations = streamResponse.pattern_associations;
+      streamResponse.settings.pattern_associations =
+        streamResponse.pattern_associations;
       if (streamResponse?.settings) {
         previousSchemaVersion = JSON.parse(
           JSON.stringify(streamResponse.settings),
@@ -1443,9 +1466,15 @@ export default defineComponent({
       }
       //after this we need to have a map of pattern_id and according to field as well
       //so that we can easily access the apply_at value for a pattern if it is undefined or null
-      previousSchemaVersion.pattern_associations && previousSchemaVersion.pattern_associations.forEach((pattern: PatternAssociation) => {
-        patternIdToApplyAtMap.set(pattern.field + pattern.pattern_id, pattern);
-      });
+      previousSchemaVersion.pattern_associations &&
+        previousSchemaVersion.pattern_associations.forEach(
+          (pattern: PatternAssociation) => {
+            patternIdToApplyAtMap.set(
+              pattern.field + pattern.pattern_id,
+              pattern,
+            );
+          },
+        );
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -1464,7 +1493,7 @@ export default defineComponent({
         streamResponse.settings.extended_retention_days.forEach(
           (field, index) => {
             redBtnRows.value.push({
-              index: index,
+              index: String(index),
               original_start: field.start,
               original_end: field.end,
               start: convertUnixToQuasarFormat(field.start),
@@ -1473,8 +1502,10 @@ export default defineComponent({
           },
         );
       }
-      if(streamResponse.pattern_associations){
-        patternAssociations.value = groupPatternAssociationsByField(streamResponse.pattern_associations);
+      if (streamResponse.pattern_associations) {
+        patternAssociations.value = groupPatternAssociationsByField(
+          streamResponse.pattern_associations,
+        );
         // Now you can quickly access patterns by field
       }
 
@@ -1490,18 +1521,19 @@ export default defineComponent({
       indexData.value.schema = streamResponse.schema || [];
       indexData.value.stats = JSON.parse(JSON.stringify(streamResponse.stats));
 
-      indexData.value.stats.original_doc_time_max = streamResponse.stats.doc_time_max;
-      indexData.value.stats.original_doc_time_min = streamResponse.stats.doc_time_min;
+      indexData.value.stats.original_doc_time_max =
+        streamResponse.stats.doc_time_max;
+      indexData.value.stats.original_doc_time_min =
+        streamResponse.stats.doc_time_min;
 
-      indexData.value.stats.doc_time_max = date.formatDate(
-        parseInt(streamResponse.stats.doc_time_max) / 1000,
+      indexData.value.stats.doc_time_max = formatTimestamp(
+        parseInt(streamResponse.stats.doc_time_max),
         "YYYY-MM-DDTHH:mm:ss:SS",
       );
-      indexData.value.stats.doc_time_min = date.formatDate(
-        parseInt(streamResponse.stats.doc_time_min) / 1000,
+      indexData.value.stats.doc_time_min = formatTimestamp(
+        parseInt(streamResponse.stats.doc_time_min),
         "YYYY-MM-DDTHH:mm:ss:SS",
       );
-
 
       indexData.value.defined_schema_fields =
         streamResponse.settings.defined_schema_fields || [];
@@ -1519,7 +1551,8 @@ export default defineComponent({
       flattenLevel.value = streamResponse.settings.flatten_level || null;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
-      enableDistinctFields.value = streamResponse.settings.enable_distinct_fields || false;
+      enableDistinctFields.value =
+        streamResponse.settings.enable_distinct_fields || false;
       approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
@@ -1558,10 +1591,11 @@ export default defineComponent({
     };
 
     const getSchema = async () => {
-      const dismiss = q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading stats...",
-      });
+              timeout: 0,
+});
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
@@ -1583,7 +1617,9 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
-      patternAssociations.value = ungroupPatternAssociations(patternAssociations.value);
+      patternAssociations.value = ungroupPatternAssociations(
+        patternAssociations.value,
+      );
       let settings = {
         fields: [], // only used for add new fields
         partition_keys: [],
@@ -1596,11 +1632,10 @@ export default defineComponent({
       };
 
       if (showDataRetention.value && dataRetentionDays.value < 1) {
-        q.notify({
-          color: "negative",
+        toast({
           message:
             "Invalid Data Retention Period: Retention period must be at least 1 day.",
-          timeout: 4000,
+          variant: "error",
         });
         return;
       }
@@ -1626,15 +1661,19 @@ export default defineComponent({
       const newSchemaFieldSet = new Set(
         newSchemaFields.value.map((field) => {
           return {
-            name: field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+            name: field.name
+              .trim()
+              .toLowerCase()
+              .replace(/ /g, "_")
+              .replace(/-/g, "_"),
             type: field.type,
-          }
+          };
         }),
       );
       const newSchemaFieldNameSet = new Set(
         newSchemaFields.value.map((field) =>
-           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_")
-         ),
+          field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
+        ),
       );
       // Push unique and normalized field names to settings.defined_schema_fields
       settings.fields.push(...newSchemaFieldSet);
@@ -1735,11 +1774,19 @@ export default defineComponent({
       // Add cross_links diff
       const prevCrossLinks = previousSchemaVersion?.cross_links || [];
       const currCrossLinks = streamCrossLinks.value || [];
-      const prevCrossLinkNames = new Set(prevCrossLinks.map((l: any) => l.name));
-      const currCrossLinkNames = new Set(currCrossLinks.map((l: any) => l.name));
+      const prevCrossLinkNames = new Set(
+        prevCrossLinks.map((l: any) => l.name),
+      );
+      const currCrossLinkNames = new Set(
+        currCrossLinks.map((l: any) => l.name),
+      );
 
-      const crossLinksToAdd = currCrossLinks.filter((l: any) => !prevCrossLinkNames.has(l.name));
-      const crossLinksToRemove = prevCrossLinks.filter((l: any) => !currCrossLinkNames.has(l.name));
+      const crossLinksToAdd = currCrossLinks.filter(
+        (l: any) => !prevCrossLinkNames.has(l.name),
+      );
+      const crossLinksToRemove = prevCrossLinks.filter(
+        (l: any) => !currCrossLinkNames.has(l.name),
+      );
 
       // Check for modified links (same name but different url or fields)
       for (const curr of currCrossLinks) {
@@ -1786,10 +1833,9 @@ export default defineComponent({
             setSchema(streamResponse);
             loadingState.value = false;
             isDialogOpen.value = false;
-            q.notify({
-              color: "positive",
+            toast({
+              variant: "success",
               message: "Stream settings updated successfully.",
-              timeout: 2000,
             });
           });
 
@@ -1803,10 +1849,9 @@ export default defineComponent({
         })
         .catch((err: any) => {
           loadingState.value = false;
-          q.notify({
-            color: "negative",
+          toast({
+            variant: "error",
             message: err.response.data.message,
-            timeout: 2000,
           });
         });
     };
@@ -1865,19 +1910,19 @@ export default defineComponent({
         option.value.includes("hashPartition")
       )
         return true;
-            //handle if fulltextsearchkey or secondaryindexkey is selected by env then we need to disable the option
-            if (
+      //handle if fulltextsearchkey or secondaryindexkey is selected by env then we need to disable the option
+      if (
         store.state.zoConfig.default_fts_keys.includes(schema.name) &&
         option.value.includes("fullTextSearchKey")
-      )
-      {
+      ) {
         return true;
       }
       if (
-        store.state.zoConfig.default_secondary_index_fields.includes(schema.name) &&
+        store.state.zoConfig.default_secondary_index_fields.includes(
+          schema.name,
+        ) &&
         option.value.includes("secondaryIndexKey")
-      )
-      {
+      ) {
         return true;
       }
       return false;
@@ -1955,61 +2000,60 @@ export default defineComponent({
 
     const columns = [
       {
-        name: "name",
-        label: t("logStream.propertyName"),
-        align: "center",
+        id: "name",
+        header: t("logStream.propertyName"),
+        accessorKey: "name",
         sortable: true,
-        field: "name",
+        meta: { align: "left" },
       },
       {
-        name: "settings",
-        align: "left",
+        id: "settings",
+        accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
-        field: "isUserDefined",
-        icon: "settings",
-        sort: (a, b) => {
-          // Ensure `isUserDefined` is properly handled
-          if (a && !b) return -1; // `a` comes first
-          if (!a && b) return 1; // `b` comes first
-          return 0; // No change in order
-        },
+        meta: { align: "left" },
       },
       {
-        name: "type",
-        label: t("logStream.propertyType"),
-        align: "left",
+        id: "type",
+        header: t("logStream.propertyType"),
+        accessorKey: "type",
         sortable: true,
-        field: "type",
+        meta: { align: "left" },
       },
       {
-        name: "index_type",
-        label: t("logStream.indexType"),
-        align: "left",
+        id: "index_type",
+        header: t("logStream.indexType"),
+        accessorKey: "index_type",
         sortable: false,
+        meta: { align: "left" },
       },
       // Only show patterns column for enterprise builds
-      ...(config.isEnterprise == 'true' ? [{
-        name: "patterns",
-        label: t("logStream.regexPatterns"),
-        align: "left",
-        sortable: false,
-      }] : []),
+      ...(config.isEnterprise == "true"
+        ? [
+            {
+              id: "patterns",
+              header: t("logStream.regexPatterns"),
+              accessorKey: "patterns",
+              sortable: false,
+              meta: { align: "left" },
+            },
+          ]
+        : []),
     ];
 
     const redBtnColumns = [
       {
-        name: "start",
-        label: t("logStream.extendedStartDate"),
-        align: "center",
+        id: "start",
+        header: t("logStream.extendedStartDate"),
+        accessorKey: "start",
         sortable: true,
-        field: "start",
+        meta: { align: "left" },
       },
       {
-        name: "end",
-        label: t("logStream.extendedEndDate"),
-        align: "center",
+        id: "end",
+        header: t("logStream.extendedEndDate"),
+        accessorKey: "end",
         sortable: true,
-        field: "end",
+        meta: { align: "left" },
       },
     ];
 
@@ -2055,7 +2099,9 @@ export default defineComponent({
     const getMissingPerformanceFields = (selectedFieldsSet) => {
       const missingFields = [];
       const currentSchema = indexData.value.schema;
-      const currentSchemaFieldNames = new Set(currentSchema.map(field => field.name));
+      const currentSchemaFieldNames = new Set(
+        currentSchema.map((field) => field.name),
+      );
 
       // Get FTS fields from settings
       const ftsFieldsFromSettings = new Set();
@@ -2084,9 +2130,10 @@ export default defineComponent({
       });
 
       // Get default Secondary Index keys from BE config (only if they exist in schema)
-          // iterate over all the be default secondary keys and check if they pressent in currentschemafieldnames if they are there
+      // iterate over all the be default secondary keys and check if they pressent in currentschemafieldnames if they are there
       // we should add them to secondarykeys from settings
-      const defaultSecondaryIndexKeys = store.state.zoConfig.default_secondary_index_fields || [];
+      const defaultSecondaryIndexKeys =
+        store.state.zoConfig.default_secondary_index_fields || [];
       defaultSecondaryIndexKeys.forEach((key) => {
         if (currentSchemaFieldNames.has(key)) {
           secondaryIndexFieldsFromSettings.add(key);
@@ -2098,7 +2145,7 @@ export default defineComponent({
         if (!selectedFieldsSet.has(field)) {
           missingFields.push({
             name: field,
-            type: "Full Text Search"
+            type: "Full Text Search",
           });
         }
       });
@@ -2108,7 +2155,7 @@ export default defineComponent({
         if (!selectedFieldsSet.has(field)) {
           missingFields.push({
             name: field,
-            type: "Secondary Index"
+            type: "Secondary Index",
           });
         }
       });
@@ -2123,7 +2170,7 @@ export default defineComponent({
       // Add missing performance fields to the selected fields
       const combinedFieldsSet = new Set([
         ...pendingSelectedFields.value,
-        ...missingPerformanceFields.value.map(f => f.name)
+        ...missingPerformanceFields.value.map((f) => f.name),
       ]);
 
       // Proceed with adding fields
@@ -2147,10 +2194,13 @@ export default defineComponent({
     };
 
     // Function to remove a specific field from the missing fields list
-    const removeFieldFromList = (type: 'fts' | 'secondaryIndex', fieldName: string) => {
+    const removeFieldFromList = (
+      type: "fts" | "secondaryIndex",
+      fieldName: string,
+    ) => {
       // Remove from missingPerformanceFields
       missingPerformanceFields.value = missingPerformanceFields.value.filter(
-        field => field.name !== fieldName
+        (field) => field.name !== fieldName,
       );
 
       // If no more fields left, close the dialog and proceed
@@ -2190,15 +2240,17 @@ export default defineComponent({
       //  We need to check store.state.zoConfig.user_defined_schema_max_fields this config value before adding to UDS
       //  Because it should not exceed this value
       if (activeTab.value !== "schemaFields") {
-        const maxFieldsLength = store.state.zoConfig?.user_defined_schema_max_fields;
-        const currentDefinedSchemaLength = indexData.value.defined_schema_fields.length;
-        const newSchemaFieldLength = currentDefinedSchemaLength + selectedFieldsSet.size;
+        const maxFieldsLength =
+          store.state.zoConfig?.user_defined_schema_max_fields;
+        const currentDefinedSchemaLength =
+          indexData.value.defined_schema_fields.length;
+        const newSchemaFieldLength =
+          currentDefinedSchemaLength + selectedFieldsSet.size;
 
         if (maxFieldsLength && newSchemaFieldLength > maxFieldsLength) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: `Cannot add fields. Maximum allowed fields in User Defined Schema is ${maxFieldsLength}. Current: ${currentDefinedSchemaLength}, Attempting to add: ${selectedFieldsSet.size}`,
-            timeout: 3000,
           });
           selectedFields.value = [];
           return;
@@ -2219,10 +2271,9 @@ export default defineComponent({
             return; // Don't proceed yet, wait for user response
           }
         }
-      };
+      }
 
       markFormDirty();
-
 
       if (selectedFieldsSet.has(allFieldsName.value))
         selectedFieldsSet.delete(allFieldsName.value);
@@ -2278,7 +2329,7 @@ export default defineComponent({
       updateResultTotal(streamResponse);
       return streamResponse;
     };
-    
+
     const closeDialog = () => {
       isDialogOpen.value = false;
       newSchemaFields.value = [];
@@ -2308,7 +2359,7 @@ export default defineComponent({
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
       const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "DD-MM-YYYY");
+      return formatDateUtil(formattedDate, "DD-MM-YYYY");
     }
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
@@ -2380,132 +2431,195 @@ export default defineComponent({
       onSubmit();
     };
 
-    const  groupPatternAssociationsByField = (associations: PatternAssociation[]): Record<string, PatternAssociation[]> => {
-        return associations.reduce((acc, item) => {
+    const groupPatternAssociationsByField = (
+      associations: PatternAssociation[],
+    ): Record<string, PatternAssociation[]> => {
+      return associations.reduce(
+        (acc, item) => {
           if (!acc[item.field]) {
             acc[item.field] = [];
           }
           acc[item.field].push(item);
           return acc;
-        }, {} as Record<string, PatternAssociation[]>);
-      }
-      const ungroupPatternAssociations = (grouped: Record<string, PatternAssociation[]>): PatternAssociation[] => {
-          return Object.values(grouped).flat();
-        };
+        },
+        {} as Record<string, PatternAssociation[]>,
+      );
+    };
+    const ungroupPatternAssociations = (
+      grouped: Record<string, PatternAssociation[]>,
+    ): PatternAssociation[] => {
+      return Object.values(grouped).flat();
+    };
 
     const openPatternAssociationDialog = (field: string) => {
       patternAssociationDialog.value.show = true;
-      patternAssociationDialog.value.data = patternAssociations.value[field] || [];
+      patternAssociationDialog.value.data =
+        patternAssociations.value[field] || [];
       patternAssociationDialog.value.fieldName = field;
-    }
+    };
     //this is used to add a new pattern to the field
     //completely new pattern not an update
     const handleAddPattern = (pattern: PatternAssociation) => {
       formDirtyFlag.value = true;
-      if(patternAssociations.value[pattern.field]){
+      if (patternAssociations.value[pattern.field]) {
         patternAssociations.value[pattern.field].push(pattern);
-      }
-      else{
+      } else {
         patternAssociations.value[pattern.field] = [pattern];
       }
-      patternAssociationDialog.value.data = patternAssociations.value[pattern.field];
-    }
+      patternAssociationDialog.value.data =
+        patternAssociations.value[pattern.field];
+    };
 
     //this is used to remove a pattern from the field
     const handleRemovePattern = (patternId: string, fieldName: string) => {
       formDirtyFlag.value = true;
-      let filteredData = patternAssociations.value[fieldName] && patternAssociations.value[fieldName].filter((pattern: PatternAssociation) => {
-        return pattern.pattern_id !== patternId;
-      });
+      let filteredData =
+        patternAssociations.value[fieldName] &&
+        patternAssociations.value[fieldName].filter(
+          (pattern: PatternAssociation) => {
+            return pattern.pattern_id !== patternId;
+          },
+        );
       patternAssociations.value[fieldName] = [...filteredData];
       patternAssociationDialog.value.data = [...filteredData];
-    }
+    };
 
     //this is used to update an already applied pattern in the field
     //for suppose user wants to update policy or apply_at for a pattern
-    const handleUpdateAppliedPattern = (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
-      patternAssociations.value[pattern.field] && patternAssociations.value[fieldName].forEach((p: PatternAssociation) => {
-        if(p.pattern_id === pattern.pattern_id && p.pattern_name === pattern.pattern_name){
-          if(attribute === "policy"){
-            p.policy = pattern.policy;
-          }
-          else if(attribute === "apply_at"){
-            if(pattern.apply_at != undefined && pattern.apply_at != null){
-              p.apply_at = pattern.apply_at;
+    const handleUpdateAppliedPattern = (
+      pattern: PatternAssociation,
+      fieldName: string,
+      patternId: string,
+      attribute: string,
+    ) => {
+      patternAssociations.value[pattern.field] &&
+        patternAssociations.value[fieldName].forEach(
+          (p: PatternAssociation) => {
+            if (
+              p.pattern_id === pattern.pattern_id &&
+              p.pattern_name === pattern.pattern_name
+            ) {
+              if (attribute === "policy") {
+                p.policy = pattern.policy;
+              } else if (attribute === "apply_at") {
+                if (pattern.apply_at != undefined && pattern.apply_at != null) {
+                  p.apply_at = pattern.apply_at;
+                } else {
+                  p.apply_at = patternIdToApplyAtMap.get(
+                    fieldName + patternId,
+                  )?.apply_at;
+                }
+              }
             }
-            else{
-              p.apply_at = patternIdToApplyAtMap.get(fieldName + patternId)?.apply_at;
-            }
-          }
-        }
-      });
-      if(patternAssociations.value[fieldName]){
-        patternAssociationDialog.value.data = [...patternAssociations.value[fieldName]];
+          },
+        );
+      if (patternAssociations.value[fieldName]) {
+        patternAssociationDialog.value.data = [
+          ...patternAssociations.value[fieldName],
+        ];
       }
     };
 
-
-  //this is used to compute the index_type value based on the env
-  //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
-  //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
-  const computedIndexType = (props) => {
-    return computed(() => {
-      let keysToBeDisplayed = props.row.index_type || [];
-      // return the actual index_type value from the row
-      //merge env fts and secondary index keys
-      //check for the props.row.name is in the env fts and secondary index keys
-      if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
+    //this is used to compute the index_type value based on the env
+    //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
+    //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
+    const computedIndexType = (props) => {
+      return computed(() => {
+        let keysToBeDisplayed = props.row.index_type || [];
+        // return the actual index_type value from the row
+        //merge env fts and secondary index keys
+        //check for the props.row.name is in the env fts and secondary index keys
+        if (
+          store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1
         ) {
-        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
-      }
-      if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1
+          keysToBeDisplayed = [
+            ...new Set([...keysToBeDisplayed, "fullTextSearchKey"]),
+          ];
+        }
+        if (
+          store.state.zoConfig.default_secondary_index_fields.indexOf(
+            props.row.name,
+          ) > -1
+        ) {
+          keysToBeDisplayed = [
+            ...new Set([...keysToBeDisplayed, "secondaryIndexKey"]),
+          ];
+        }
+        return keysToBeDisplayed || [];
+      });
+    };
+    //this function is used to check if the option is present in the default env
+    //if present then we will return true else false
+    //this is used to show the tooltip in the q-select for disabled options
+    //why there are disabled
+    const checkIfOptionPresentInDefaultEnv = (name, option) => {
+      if (
+        store.state.zoConfig.default_fts_keys.indexOf(name) > -1 &&
+        option.value == "fullTextSearchKey"
       ) {
-        keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
+        return true;
       }
-      return keysToBeDisplayed || []
-    })
-  };
-  //this function is used to check if the option is present in the default env
-  //if present then we will return true else false
-  //this is used to show the tooltip in the q-select for disabled options
-  //why there are disabled
-  const checkIfOptionPresentInDefaultEnv = (name, option) => {
-    if (store.state.zoConfig.default_fts_keys.indexOf(name) > -1 && option.value == "fullTextSearchKey") {
-      return true;
-    }
-    if (store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 && option.value == "secondaryIndexKey") {
-      return true;
-  }
-  return false;
-  };
-  //this is used to upate the model value of the index_type
-  const updateIndexType = (props, value) => {
-    props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
-    markFormDirty(props.row.name, 'fts');
-  };
-  //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because 
-  //we don't give access to the user to change the value of the env set by the env
-  //and if it is empty then we will return empty array 
-  //if the value is not empty then we will remove the value if it is set by the env
-  const filterValueBasedOnEnv = (props, value) => {
-    if(value.length == 0){
-      return [];
-    }
-    let filteredValue = value;
-    if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 && value.includes("fullTextSearchKey")) {
-      filteredValue = value.filter(item => item !== "fullTextSearchKey");
-    }
-    if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 && value.includes("secondaryIndexKey")) {
-      filteredValue = value.filter(item => item !== "secondaryIndexKey");
-    }
-    return filteredValue;
-  };
+      if (
+        store.state.zoConfig.default_secondary_index_fields.indexOf(name) >
+          -1 &&
+        option.value == "secondaryIndexKey"
+      ) {
+        return true;
+      }
+      return false;
+    };
+    //this is used to upate the model value of the index_type
+    const updateIndexType = (props, value) => {
+      props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
+      markFormDirty(props.row.name, "fts");
+    };
+
+    // Builds the per-row options array for the index-type OSelect, with the
+    // `disabled` flag computed via disableOptions() for that row.
+    const indexTypeOptionsForRow = (row: any) => {
+      return streamIndexType.map((opt: any) => ({
+        ...opt,
+        disabled: disableOptions(row, opt),
+      }));
+    };
+
+    // OSelect doesn't have a max-values prop; enforce it client-side instead.
+    // Trims the selection to the last 2 values picked (matches old q-select
+    // :max-values="2" behaviour: silently caps at 2).
+    const MAX_INDEX_TYPES = 2;
+    const enforceMaxIndexTypes = (value: any) => {
+      if (!Array.isArray(value)) return value;
+      return value.length > MAX_INDEX_TYPES ? value.slice(-MAX_INDEX_TYPES) : value;
+    };
+    //this function is used while we update the index_type value so if the value is set by the env then we need to remove it from the value because
+    //we don't give access to the user to change the value of the env set by the env
+    //and if it is empty then we will return empty array
+    //if the value is not empty then we will remove the value if it is set by the env
+    const filterValueBasedOnEnv = (props, value) => {
+      if (value.length == 0) {
+        return [];
+      }
+      let filteredValue = value;
+      if (
+        store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1 &&
+        value.includes("fullTextSearchKey")
+      ) {
+        filteredValue = value.filter((item) => item !== "fullTextSearchKey");
+      }
+      if (
+        store.state.zoConfig.default_secondary_index_fields.indexOf(
+          props.row.name,
+        ) > -1 &&
+        value.includes("secondaryIndexKey")
+      ) {
+        filteredValue = value.filter((item) => item !== "secondaryIndexKey");
+      }
+      return filteredValue;
+    };
 
     // store.state.zoConfig.default_quick_mode_fields: ["field1", "job", "log"]
     const isEnvQuickModeField = (fieldName: string) => {
-      return (
-        store.state.zoConfig.default_quick_mode_fields.includes(fieldName)
-      );
+      return store.state.zoConfig.default_quick_mode_fields.includes(fieldName);
     };
 
     const quickModeIcon = computed(() => {
@@ -2527,7 +2641,6 @@ export default defineComponent({
 
     return {
       t,
-      q,
       store,
       config,
       dateChangeValue,
@@ -2536,7 +2649,6 @@ export default defineComponent({
       getSchema,
       onSubmit,
       updateSettingsForm,
-      format,
       showPartitionColumn,
       showFullTextSearchColumn,
       getImageURL,
@@ -2586,13 +2698,17 @@ export default defineComponent({
       closeDialog,
       resultTotal,
       perPageOptions,
+      perPageOptionsList,
+      filteredSchemaData,
+      selectedSchemaIds,
+      handleSchemaSelectedIdsUpdate,
+      handleSchemaSelectionChange,
+      selectedDateIds,
+      handleDateSelectionChange,
       changePagination,
       selectedPerPage,
       pagination,
       qTable,
-      outlinedPerson,
-      outlinedSchema,
-      outlinedDelete,
       openDialog,
       calculateDateRange,
       minDate,
@@ -2611,6 +2727,7 @@ export default defineComponent({
       showStoreOriginalDataToggle,
       patternAssociations,
       patternAssociationDialog,
+      assocPatternsRef,
       openPatternAssociationDialog,
       handleAddPattern,
       handleRemovePattern,
@@ -2625,6 +2742,8 @@ export default defineComponent({
       computedIndexType,
       checkIfOptionPresentInDefaultEnv,
       updateIndexType,
+      indexTypeOptionsForRow,
+      enforceMaxIndexTypes,
       isEnvQuickModeField,
       quickModeIcon,
       getConfigIcon,
@@ -2642,6 +2761,7 @@ export default defineComponent({
 
       this.getSchema();
     } else {
+      /* v8 ignore next */ // unreachable in tests: Vue 3 Options API auto-unwraps refs on `this`, so loadingState here is a primitive boolean not a Ref
       this.loadingState.value = false;
     }
   },
@@ -2667,33 +2787,10 @@ export default defineComponent({
     padding: 1rem;
   }
 
-
-
   .o2-schema-table {
     border-radius: 0.5rem;
     position: relative;
     border: 0.0625rem solid var(--o2-border-color);
-
-    // Custom pagination wrapper styling
-    .schema-table-pagination-wrapper {
-      display: flex;
-      justify-content: flex-end;
-      width: 100%;
-
-      // Override the QTablePagination component's justify-between
-      :deep(.q-table__control) {
-        justify-content: flex-end !important;
-
-        &.row.justify-between {
-          justify-content: flex-end !important;
-        }
-      }
-
-      // Prevent pagination text from wrapping
-      :deep(.q-table__bottom-item) {
-        white-space: nowrap;
-      }
-    }
 
     thead tr {
       height: 2.5rem;
@@ -2704,10 +2801,7 @@ export default defineComponent({
         // font-weight: 700;
         height: 35px;
       }
-
-
     }
-    
 
     .o2-schema-table tbody td:after {
       background: none !important;
@@ -2723,7 +2817,6 @@ export default defineComponent({
         padding: 0px 5px;
       }
     }
-    
   }
 
   .q-list {
@@ -2824,7 +2917,7 @@ export default defineComponent({
 .single-line-tab {
   display: inline-flex;
 }
-.mini-select{
+.mini-select {
   min-height: 24px !important;
   max-height: 24px !important;
   height: 24px !important;

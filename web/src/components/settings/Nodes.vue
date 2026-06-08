@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,775 +16,627 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page>
-    <q-splitter
-      v-model="splitterModel"
+  <div class="tw:rounded-md">
+    <OSplitter
+      :model-value="splitterModel"
+      @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
-      style="overflow: hidden; height: calc(100vh - 40px)"
+      style="overflow: hidden; height: calc(100vh - 64px)"
     >
-      <template v-slot:before>
-        <div class="q-pt-sm tw:mt-4" style="height: calc(100vh - 80px)">
-          <div class="sticky-header q-px-sm">
-            <span class="q-ma-none q-pa-sm" style="font-size: 18px">
-              {{ t("nodes.filter_header") }} <q-icon name="filter_list" />
-              <div class="float-right">
-                <a
-                  class="cursor-pointer text-caption tw:underline"
-                  :class="filterApplied ? 'text-primary' : ''"
-                  @click="clearAll()"
-                  >{{ t("nodes.clear_all") }}</a
-                >
-              </div>
-            </span>
+      <template #before>
+        <div class="tw:pt-6 tw:flex tw:flex-col" style="height: 100%">
+          <div class="sticky-header tw:px-2 tw:shrink-0">
+            <div class="tw:flex tw:items-center tw:justify-between tw:p-2" style="font-size: 18px">
+              <span class="tw:flex tw:items-center tw:gap-1">
+                {{ t("nodes.filter_header") }}
+                <OIcon name="filter-list" size="sm" />
+              </span>
+              <a
+                class="tw:cursor-pointer tw:text-xs tw:underline"
+                :class="filterApplied ? 'text-primary' : ''"
+                @click="clearAll()"
+                >{{ t("nodes.clear_all") }}</a
+              >
+            </div>
           </div>
 
-          <div class="tw:h-[calc(100vh-110px)] tw:overflow-y-auto">
-            <q-list>
-              <q-expansion-item
+          <div class=" tw:min-h-0 tw:overflow-y-auto">
+            <div class="tw:flex tw:flex-col tw:pb-2 tw:px-2">
+              <OCollapsible
                 v-if="
                   regionRows.length > 0 &&
                   store.state.zoConfig.super_cluster_enabled
                 "
-                expand-separator
+                variant="sidebar"
+                :model-value="sectionOpen.region"
+                @update:model-value="(v) => (sectionOpen.region = v)"
                 :label="t('nodes.region')"
-                class="text-subtitle1 nodes-filter-list"
               >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <q-table
+                <div class="tw:p-0">
+                  <OSearchInput
+                    data-test="nodes-region-filter-search-input"
+                    v-model="filterRegionQuery"
+                    clearable
+                    :debounce="1"
+                    :placeholder="t('nodes.searchRegion')"
+                    class="tw:w-full filter-input"
+                  />
+                  <OTable
                       data-test="nodes-region-table"
-                      :visible-columns="['name']"
-                      :rows="regionRows"
-                      :row-key="(row: any) => 'node_region_' + row.name"
-                      :columns="filterColumns"
-                      :rows-per-page-options="[0]"
-                      hide-header
-                      hide-bottom
-                      dense
+                      :data="visibleRegionRows"
+                      :columns="filterOTableColumns"
+                      row-key="name"
+                      :selected-ids="selectedRegionIds"
                       selection="multiple"
-                      v-model:selected="selectedRegions"
-                      id="nodesRegionFilter"
-                      class="q-pa-none q-ma-none node-list-filter-table"
-                      :filter="filterRegionQuery"
-                      :filter-method="filterRegionData"
+                      pagination="none"
+                      :show-global-filter="false"
+                      :default-columns="false"
+                      @update:selected-ids="handleSelectedRegionIdsUpdate"
                     >
-                      <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
-                      </template>
-
-                      <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :model-value="scope.selected"
-                          size="xs"
-                          @update:model-value="
-                            (val, evt) => {
-                              if (Object.hasOwn(scope, 'selected')) {
-                                Object.getOwnPropertyDescriptor(
-                                  scope,
-                                  'selected',
-                                )?.set?.(val);
-                              }
-                            }
-                          "
-                        />
-                      </template>
-                      <template #top-right>
-                        <q-input
-                          data-test="nodes-region-filter-search-input"
-                          v-model="filterRegionQuery"
-                          filled
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          :placeholder="t('nodes.searchRegion')"
-                          class="full-width q-pa-none q-ma-none filter-input"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </template>
-                      <template v-slot:no-data>
-                        <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
-                          <span class="q-ml-sm">No data available</span>
+                      <template #empty>
+                        <div class="tw:w-full tw:text-center tw:p-3">
+                          <OIcon name="warning" size="md" />
+                          <span class="tw:ml-2">No data available</span>
                         </div>
                       </template>
-                    </q-table>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                    </OTable>
+                  </div>
+                </OCollapsible>
+                <OSeparator v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.region" class="tw:my-2" />
 
-              <q-expansion-item
-                v-if="
-                  clusterRows.length > 0 &&
-                  store.state.zoConfig.super_cluster_enabled
-                "
-                expand-separator
-                :label="t('nodes.cluster')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <q-table
+                <OCollapsible
+                  v-if="
+                    clusterRows.length > 0 &&
+                    store.state.zoConfig.super_cluster_enabled
+                  "
+                  variant="sidebar"
+                  :model-value="sectionOpen.cluster"
+                  @update:model-value="(v) => (sectionOpen.cluster = v)"
+                  :label="t('nodes.cluster')"
+                >
+                  <div class="tw:p-0">
+                    <OSearchInput
+                      data-test="nodes-cluster-filter-search-input"
+                      v-model="filterClusterQuery"
+                      clearable
+                      :debounce="1"
+                      :placeholder="t('nodes.searchCluster')"
+                      class="tw:w-full filter-input"
+                    />
+                    <OTable
                       data-test="nodes-cluster-table"
-                      :visible-columns="['name']"
-                      :rows="clusterRows"
-                      :row-key="(row: any) => 'node_cluster_' + row.name"
-                      :columns="filterColumns"
-                      :rows-per-page-options="[0]"
-                      hide-header
-                      hide-bottom
-                      dense
+                      :data="visibleClusterRows"
+                      :columns="filterOTableColumns"
+                      row-key="name"
+                      :selected-ids="selectedClusterIds"
                       selection="multiple"
-                      v-model:selected="selectedClusters"
-                      id="nodesClusterFilter"
-                      class="q-pa-none q-ma-none node-list-filter-table"
-                      :filter="filterClusterQuery"
-                      :filter-method="filterClusterData"
+                      pagination="none"
+                      :show-global-filter="false"
+                      :default-columns="false"
+                      @update:selected-ids="handleSelectedClusterIdsUpdate"
                     >
-                      <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
-                      </template>
-
-                      <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :model-value="scope.selected"
-                          size="xs"
-                          @update:model-value="
-                            (val, evt) => {
-                              if (Object.hasOwn(scope, 'selected')) {
-                                Object.getOwnPropertyDescriptor(
-                                  scope,
-                                  'selected',
-                                )?.set?.(val);
-                              }
-                            }
-                          "
-                        />
-                      </template>
-                      <template #top-right>
-                        <q-input
-                          data-test="nodes-cluster-filter-search-input"
-                          v-model="filterClusterQuery"
-                          filled
-                          borderless
-                          dense
-                          clearable
-                          debounce="1"
-                          :placeholder="t('nodes.searchCluster')"
-                          class="full-width q-pa-none q-ma-none filter-input"
-                        >
-                          <template #prepend>
-                            <q-icon name="search" />
-                          </template>
-                        </q-input>
-                      </template>
-                      <template v-slot:no-data>
-                        <div class="full-width text-center q-pa-md">
-                          <q-icon name="warning" color="grey" size="md" />
-                          <span class="q-ml-sm">No data available</span>
+                      <template #empty>
+                        <div class="tw:w-full tw:text-center tw:p-3">
+                          <OIcon name="warning" size="md" />
+                          <span class="tw:ml-2">No data available</span>
                         </div>
                       </template>
-                    </q-table>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                    </OTable>
+                  </div>
+                </OCollapsible>
+                <OSeparator v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.cluster" class="tw:my-2" />
 
-              <q-expansion-item
-                v-if="nodetypeRows.length > 0"
-                expand-separator
-                :label="t('nodes.nodetype')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <q-table
+                <OCollapsible
+                  v-if="nodetypeRows.length > 0"
+                  variant="sidebar"
+                  :model-value="sectionOpen.nodetype"
+                  @update:model-value="(v) => (sectionOpen.nodetype = v)"
+                  :label="t('nodes.nodetype')"
+                >
+                  <div class="tw:px-1">
+                    <OTable
                       data-test="nodes-nodetype-table"
-                      :visible-columns="['name']"
-                      :rows="nodetypeRows"
-                      :row-key="(row: any) => 'node_nodetype_' + row.name"
-                      :columns="filterColumns"
-                      :rows-per-page-options="[0]"
-                      hide-header
-                      hide-bottom
-                      dense
+                      :data="nodetypeRows"
+                      :columns="filterOTableColumns"
+                      row-key="name"
+                      :selected-ids="selectedNodetypeIds"
                       selection="multiple"
-                      v-model:selected="selectedNodetypes"
-                      id="nodesNodetypeFilter"
-                      class="q-pa-none q-ma-none node-list-filter-table"
-                    >
-                      <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
-                      </template>
+                      pagination="none"
+                      :show-global-filter="false"
+                      :default-columns="false"
+                      @update:selected-ids="handleSelectedNodetypeIdsUpdate"
+                    />
+                  </div>
+                </OCollapsible>
 
-                      <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :model-value="scope.selected"
-                          size="xs"
-                          @update:model-value="
-                            (val, evt) => {
-                              if (Object.hasOwn(scope, 'selected')) {
-                                Object.getOwnPropertyDescriptor(
-                                  scope,
-                                  'selected',
-                                )?.set?.(val);
-                              }
-                            }
-                          "
-                        />
-                      </template>
-                    </q-table>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
-
-              <q-expansion-item
-                v-if="statusesRows.length > 0"
-                expand-separator
-                :label="t('nodes.status')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <q-table
+                <OCollapsible
+                  v-if="statusesRows.length > 0"
+                  variant="sidebar"
+                  :model-value="sectionOpen.status"
+                  @update:model-value="(v) => (sectionOpen.status = v)"
+                  :label="t('nodes.status')"
+                >
+                  <div class="tw:px-1">
+                    <OTable
                       data-test="nodes-status-table"
-                      :visible-columns="['name']"
-                      :rows="statusesRows"
-                      :row-key="(row: any) => 'node_status_' + row.name"
-                      :columns="filterColumns"
-                      :rows-per-page-options="[0]"
-                      hide-header
-                      hide-bottom
-                      dense
+                      :data="statusesRows"
+                      :columns="filterOTableColumns"
+                      row-key="name"
+                      :selected-ids="selectedStatusIds"
                       selection="multiple"
-                      v-model:selected="selectedStatuses"
-                      id="nodesStatusFilter"
-                      class="q-pa-none q-ma-none node-list-filter-table"
-                      :style="
-                        hasVisibleRows
-                          ? 'width: 100%; height: calc(100vh - 115px); overflow-y: auto;'
-                          : 'width: 100%'
-                      "
+                      pagination="none"
+                      :show-global-filter="false"
+                      :default-columns="false"
+                      @update:selected-ids="handleSelectedStatusIdsUpdate"
                     >
-                      <template v-slot:header-selection="scope">
-                        <q-checkbox v-model="scope.selected" size="xs" />
+                      <template #cell-name="{ row }">
+                        <span
+                          :class="`status-${row.name.toLowerCase()}`"
+                          class="tw:self-stretch tw:mr-1"
+                        ></span
+                        >{{ row.name }}
                       </template>
+                    </OTable>
+                  </div>
+                </OCollapsible>
 
-                      <template v-slot:body-selection="scope">
-                        <q-checkbox
-                          :model-value="scope.selected"
-                          size="xs"
-                          @update:model-value="
-                            (val, evt) => {
-                              if (Object.hasOwn(scope, 'selected')) {
-                                Object.getOwnPropertyDescriptor(
-                                  scope,
-                                  'selected',
-                                )?.set?.(val);
-                              }
-                            }
-                          "
-                        />
-                      </template>
-                      <template v-slot:body-cell-name="props">
-                        <q-td :props="props">
-                          <span
-                            :class="`status-${props.row.name.toLowerCase()}`"
-                            class="q-mr-xs"
-                          ></span
-                          >{{ props.row.name }}
-                        </q-td>
-                      </template>
-                    </q-table>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
-
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.cpuusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.cpu"
+                  @update:model-value="(v) => (sectionOpen.cpu = v)"
+                  :label="t('nodes.cpuusage')"
+                >
+                  <div class="tw:px-1 tw:pb-2">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                      <OInput
                         data-test="nodes-filter-cpuusage-min"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
-                      <q-input
+                      <span class="tw:px-1 tw:text-center">to</span>
+                      <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.max"
                       />
                     </div>
-                    <q-range
+                    <ORange
                       data-test="nodes-filter-cpuusage-range-slider"
                       :model-value="cpuUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           cpuUsage = val;
                         }
                       "
                       :min="0"
                       :max="maxCPUUsage"
-                      label-side
-                      size="25px"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
+                <OSeparator v-if="sectionOpen.cpu" class="tw:my-2" />
 
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.memoryusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.memory"
+                  @update:model-value="(v) => (sectionOpen.memory = v)"
+                  :label="t('nodes.memoryusage')"
+                >
+                  <div class="tw:px-1 tw:pb-2">
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                      <OInput
                         data-test="nodes-filter-memoryusage-min"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
-                      <q-input
+                      <span class="tw:px-1 tw:text-center">to</span>
+                      <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.max"
                       />
                     </div>
-                    <q-range
+                    <ORange
                       data-test="nodes-filter-memoryusage-range-slider"
                       :model-value="memoryUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           memoryUsage = val;
                         }
                       "
                       :min="0"
                       :max="maxMemoryUsage"
-                      label-side
-                      size="25px"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
+                <OSeparator v-if="sectionOpen.memory" class="tw:my-2" />
 
-              <q-expansion-item
-                expand-separator
-                :label="t('nodes.tcpusage')"
-                class="q-mt-sm text-subtitle1 nodes-filter-list"
-              >
-                <q-card>
-                  <q-card-section class="q-pa-none q-ma-none">
-                    <q-checkbox
+                <OCollapsible
+                  variant="sidebar"
+                  :model-value="sectionOpen.tcp"
+                  @update:model-value="(v) => (sectionOpen.tcp = v)"
+                  :label="t('nodes.tcpusage')"
+                >
+                  <div class="tw:px-1 tw:pb-2">
+                    <OCheckbox
                       type="checkbox"
-                      size="xs"
                       v-model="establishedToggle"
                       :label="t('nodes.establishedLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                      <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-min"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
-                      <q-input
+                      <span class="tw:px-1 tw:text-center">to</span>
+                      <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!establishedToggle"
+                    <ORange
+                      :disabled="!establishedToggle"
                       data-test="nodes-filter-tcp-established-range-slider"
                       :model-value="establishedUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           establishedUsage = val;
                         }
                       "
                       :min="0"
                       :max="maxEstablished"
-                      label-side
-                      size="25px"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
 
-                    <q-checkbox
+                    <OCheckbox
                       type="checkbox"
-                      class="q-mt-sm"
-                      size="xs"
+                      class="tw:mt-6"
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                      <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-min"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
-                      <q-input
+                      <span class="tw:px-1 tw:text-center">to</span>
+                      <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!closewaitToggle"
+                    <ORange
+                      :disabled="!closewaitToggle"
                       data-test="nodes-filter-tcp-closewait-range-slider"
                       :model-value="closewaitUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           closewaitUsage = val;
                         }
                       "
                       :min="0"
                       :max="maxClosewait"
-                      label-side
-                      size="25px"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
 
-                    <q-checkbox
+                    <OCheckbox
                       type="checkbox"
-                      class="q-mt-sm"
-                      size="xs"
+                      class="tw:mt-6"
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
-                    <div class="row items-center q-gutter-sm q-ml-xs">
-                      <q-input
+                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                      <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-min"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
-                      <span class="q-px-sm">to</span>
-                      <q-input
+                      <span class="tw:px-1 tw:text-center">to</span>
+                      <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
                         type="number"
-                        dense
-                        class="tw:w-[35%]"
+                        class="tw:w-full tw:min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.max"
                       />
                     </div>
-                    <q-range
-                      :disable="!waittimeToggle"
+                    <ORange
+                      :disabled="!waittimeToggle"
                       data-test="nodes-filter-tcp-waittime-range-slider"
                       :model-value="waittimeUsage"
-                      @change="
+                      @update:model-value="
                         (val) => {
                           waittimeUsage = val;
                         }
                       "
                       :min="0"
                       :max="maxWaittime"
-                      label-side
-                      size="25px"
-                      class="tw:w-[85%] q-mt-md q-ml-md"
+                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
                     />
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
+                  </div>
+                </OCollapsible>
 
-              <span class="tw:float-right tw:mr-2 tw:mb-2 tw:mt-2">
-                <OButton
-                  variant="primary"
-                  size="sm-action"
-                  @click="applyFilter()"
-                >
-                  {{ t("nodes.applyFilter") }}
-                </OButton>
-              </span>
-            </q-list>
+            </div>
+          </div>
+          <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0 tw:border-t">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="applyFilter()"
+            >
+              {{ t("nodes.applyFilter") }}
+            </OButton>
           </div>
         </div>
       </template>
-      <template v-slot:after>
-        <div class="row full-width q-pt-sm flex items-center q-pl-md">
+      <template #after>
+        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
+        <div class="tw:flex tw:justify-between tw:w-full tw:pt-2 tw:items-center tw:shrink-0">
           <div
-            class="col q-table__title items-start"
+            class="tw:flex tw:flex-col tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
             data-test="cipher-keys-list-title"
           >
             {{ t("nodes.header") }}
           </div>
           <div class="tw:flex tw:h-[36px] tw:mb-2">
-            <q-input
+            <OSearchInput
+              data-test="nodes-search-input"
               v-model="filterQuery"
-              dense
-              class="q-ml-none q-mb-xs q-mr-sm o2-search-input"
-              borderless
-              style="width: 400px"
+              class="tw:ml-0 tw:mb-1 tw:mr-2 no-border o2-search-input"
               :placeholder="t('nodes.search')"
-            >
-              <template #prepend>
-                <q-icon name="search" class="o2-search-input-icon" />
-              </template>
-            </q-input>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              @click="getData(true)"
-            >
+            />
+            <OButton variant="outline" size="sm-action" @click="getData(true)">
               {{ t("common.refresh") }}
             </OButton>
           </div>
         </div>
-        <q-table
+        <OTable
+          class="tw:flex-1 tw:min-h-0"
           ref="qTable"
-          :rows="tabledata"
-          :columns="computedColumns"
-          :row-key="(row: any) => 'node_data_row_key_' + row.name"
-          :pagination="pagination"
-          :filter="filterQuery"
-          :filter-method="filterData"
+          data-test="nodes-main-table"
+          :data="visibleRows"
+          :columns="computedOTableColumns"
+          row-key="name"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('nodes.header')"
+          :row-class="(row) => `status-row status-${row.status?.toLowerCase()}`"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
           :loading="loading"
-          class="nodes-list-table tw:border-l tw:border-solid tw:border-gray-1200 tw:rounded-none"
-          dense
-          style="width: 100%; height: calc(100vh - 104px); overflow-y: auto"
-          hide-top
         >
-          <template #no-data><NoData /></template>
+          <template #empty><NoData /></template>
 
-          <template v-slot:body-cell-id="props">
-            <q-td
-              :props="props"
-              :class="`status-${props.row.status.toLowerCase()}`"
-            >
-              {{ props.row.id }}
-            </q-td>
+          <template #cell-id="{ row }">
+            {{ row.id }}
           </template>
 
-          <template v-slot:body-cell-name="props">
-            <q-td :props="props">
-              {{
-                props.row.name.length > 40
-                  ? props.row.name.substring(0, 40) + "..."
-                  : props.row.name
-              }}
-              <q-tooltip>{{ props.row.name }}</q-tooltip>
-            </q-td>
+          <template #cell-name="{ row }">
+            {{
+              row.name.length > 40
+                ? row.name.substring(0, 40) + "..."
+                : row.name
+            }}
+            <OTooltip :content="row.name" />
           </template>
 
           <template
             v-if="store.state.zoConfig.super_cluster_enabled"
-            v-slot:body-cell-region="props"
+            #cell-region="{ row }"
           >
-            <q-td :props="props">
-              <q-badge class="badge-region q-mr-xs"
-                >{{ props.row.region }}
-                <q-tooltip>{{ t("nodes.region") }}</q-tooltip>
-              </q-badge>
-              <q-badge class="badge-cluster"
-                >{{ props.row.cluster }}
-                <q-tooltip>{{ t("nodes.cluster") }}</q-tooltip>
-              </q-badge>
-            </q-td>
-          </template>
-          <template v-slot:body-cell-tcp="props">
-            <q-td :props="props" class="tcp-cell">
-              {{ props.row.tcp_conns }} (E:{{
-                props.row.tcp_conns_established
-              }}, C:{{ props.row.tcp_conns_close_wait }}, T:{{
-                props.row.tcp_conns_time_wait
-              }})
-            </q-td>
+            <OBadge variant="default" class="badge-region tw:mr-1"
+              >{{ row.region }}
+              <OTooltip :content="t('nodes.region')" />
+            </OBadge>
+            <OBadge variant="default" class="badge-cluster"
+              >{{ row.cluster }}
+              <OTooltip :content="t('nodes.cluster')" />
+            </OBadge>
           </template>
 
-          <template v-slot:body-cell-cpu="props">
-            <q-td :props="props">
-              <q-linear-progress
-                dark
-                size="10px"
-                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
-                rounded
-                :value="props.row.cpu_usage / 100"
-                :color="props.row.cpu_usage > 85 ? 'red-9' : 'primary'"
-              />
-              {{ props.row.cpu_usage }}%
-            </q-td>
+          <template #cell-tcp="{ row }">
+            {{ row.tcp_conns }} (E:{{ row.tcp_conns_established }}, C:{{
+              row.tcp_conns_close_wait
+            }}, T:{{ row.tcp_conns_time_wait }})
           </template>
 
-          <template v-slot:body-cell-memory="props">
-            <q-td :props="props">
-              <q-linear-progress
-                dark
-                size="10px"
-                class="progresbar tw:w-[80%]! tw:max-w-[80%] inline-block"
-                rounded
-                :value="props.row.percentage_memory_usage / 100"
-                :color="
-                  props.row.percentage_memory_usage > 85 ? 'red-9' : 'primary'
-                "
-              />
-              {{ props.row.percentage_memory_usage }}%
-            </q-td>
-          </template>
-
-          <template #bottom="scope">
-            <QTablePagination
-              v-if="resultTotal > 0"
-              :scope="scope"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              position="bottom"
-              @update:changeRecordPerPage="changePagination"
+          <template #cell-cpu="{ row }">
+            <OProgressBar
+              size="sm"
+              class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              :value="row.cpu_usage / 100"
+              :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
             />
+            {{ row.cpu_usage }}%
           </template>
-        </q-table>
+
+          <template #cell-memory="{ row }">
+            <OProgressBar
+              size="sm"
+              class="progresbar tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              :value="row.percentage_memory_usage / 100"
+              :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
+            />
+            {{ row.percentage_memory_usage }}%
+          </template>
+        </OTable>
+        </div>
       </template>
-    </q-splitter>
-  </q-page>
+    </OSplitter>
+  </div>
 </template>
 
 <script lang="ts">
 import {
   defineComponent,
+  reactive,
   ref,
   onMounted,
-  onUpdated,
   watch,
   Ref,
   computed,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, date, copyToClipboard, QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORange from "@/lib/forms/Range/ORange.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CommonService from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    QTablePagination,
     NoData,
     OButton,
+    OProgressBar,
+    OInput,
+    OCheckbox,
+    OTooltip,
+    ORange,
+    OIcon,
+    OSearchInput,
+    OBadge,
+    OCollapsible,
+    OSeparator,
+    OSplitter,
+    OTable,
   },
   setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
+
+    const sectionOpen = reactive({
+      region: false,
+      cluster: false,
+      nodetype: false,
+      status: false,
+      cpu: false,
+      memory: false,
+      tcp: false,
+    });
+
     const tabledata: any = ref([]);
     const originalData: any = ref([]);
-    const qTable: any = ref(null);
     const loading = ref(false);
     const splitterModel = ref(250);
     const filterQuery = ref("");
-    const computedColumns = computed(() => {
-      const columns = [
+
+    const filterOTableColumns: OTableColumnDef[] = [
+      {
+        id: "name",
+        header: "Name",
+        accessorKey: "name",
+        meta: { align: "left" },
+      },
+    ];
+
+    const computedOTableColumns = computed(() => {
+      const columns: OTableColumnDef[] = [
+        { id: "id", header: "#", accessorKey: "id", size: 67, meta: { align: "center" } },
         {
-          name: "id",
-          field: "id",
-          label: "#",
-          align: "center",
-          sortable: false,
-        },
-        {
-          name: "name",
-          field: "name",
-          label: t("nodes.name"),
-          align: "left",
+          id: "name",
+          header: t("nodes.name"),
+          accessorKey: "name",
           sortable: true,
+          meta: { align: "left" , autoWidth: true },
         },
         {
-          name: "region",
-          field: "region",
-          label: t("nodes.region"),
-          align: "left",
-          style: "width: 50px",
+          id: "region",
+          header: t("nodes.region"),
+          accessorKey: "region",
+          size: 50,
+          meta: { align: "left" },
         },
         {
-          name: "version",
-          field: "version",
-          label: t("nodes.version"),
-          align: "center",
+          id: "version",
+          header: t("nodes.version"),
+          accessorKey: "version",
           sortable: true,
-          style: "width: 100px;",
+          size: 100,
+          meta: { align: "center" },
         },
         {
-          name: "cpu",
-          field: "cpu_usage",
-          label: t("nodes.cpu"),
-          align: "left",
+          id: "cpu",
+          header: t("nodes.cpu"),
+          accessorKey: "cpu_usage",
           sortable: true,
-          style: "width: 200px;",
+          size: 200,
+          meta: { align: "left" },
         },
         {
-          name: "memory",
-          field: "percentage_memory_usage",
-          label: t("nodes.memory"),
-          align: "left",
-          sortable: false,
-          style: "width: 200px;",
+          id: "memory",
+          header: t("nodes.memory"),
+          accessorKey: "percentage_memory_usage",
+          sortable: true,
+          size: 200,
+          meta: { align: "left" },
         },
         {
-          name: "tcp",
-          field: "tcp_conns",
-          label: t("nodes.tcp"),
-          align: "left",
-          sortable: false,
-          style: "width: 150px;",
+          id: "tcp",
+          header: t("nodes.tcp"),
+          accessorKey: "tcp_conns",
+          size: 150,
+          meta: { align: "left" },
         },
       ];
       if (!store.state.zoConfig.super_cluster_enabled) {
@@ -792,19 +644,9 @@ export default defineComponent({
       }
       return columns;
     });
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
+
     const resultTotal = ref<number>(0);
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+
     const regionRows: any = ref([]);
     const selectedRegions: any = ref([]);
 
@@ -816,6 +658,43 @@ export default defineComponent({
 
     const statusesRows: any = ref([]);
     const selectedStatuses: any = ref([]);
+
+    // Selection ID computeds for sidebar filter tables
+    const selectedRegionIds = computed(() =>
+      selectedRegions.value.map((r: any) => r.name),
+    );
+    const selectedClusterIds = computed(() =>
+      selectedClusters.value.map((c: any) => c.name),
+    );
+    const selectedNodetypeIds = computed(() =>
+      selectedNodetypes.value.map((n: any) => n.name),
+    );
+    const selectedStatusIds = computed(() =>
+      selectedStatuses.value.map((s: any) => s.name),
+    );
+
+    const handleSelectedRegionIdsUpdate = (ids: string[]) => {
+      const map = new Map(regionRows.value.map((r: any) => [r.name, r]));
+      selectedRegions.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+    };
+    const handleSelectedClusterIdsUpdate = (ids: string[]) => {
+      const map = new Map(clusterRows.value.map((c: any) => [c.name, c]));
+      selectedClusters.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
+    };
+    const handleSelectedNodetypeIdsUpdate = (ids: string[]) => {
+      const map = new Map(nodetypeRows.value.map((n: any) => [n.name, n]));
+      selectedNodetypes.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
+    };
+    const handleSelectedStatusIdsUpdate = (ids: string[]) => {
+      const map = new Map(statusesRows.value.map((s: any) => [s.name, s]));
+      selectedStatuses.value = ids
+        .map((id: any) => map.get(id))
+        .filter(Boolean);
+    };
 
     const cpuUsage = ref({
       min: 0,
@@ -853,12 +732,6 @@ export default defineComponent({
       max: 60,
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-
     function flattenObject(data: any) {
       const result: any = [];
       const uniqueValues = {
@@ -875,8 +748,6 @@ export default defineComponent({
         percentageMemoryUsage: { value: 0 },
         cpuUsage: { value: 0 },
       };
-      //gloabal index is used to assign the id to the node
-      //the global index should continue from the last id of the previous node and previous cluster
       let globalIndex = 1;
 
       for (const region in data) {
@@ -886,7 +757,6 @@ export default defineComponent({
           uniqueValues.clusters.add(cluster);
 
           data[region][cluster].forEach((node: any) => {
-            // Calculate memory usage percentage
             const percentageMemoryUsage =
               node.metrics.memory_usage > 0
                 ? Math.round(
@@ -895,16 +765,12 @@ export default defineComponent({
                   )
                 : 0;
 
-            // Round CPU usage
-            const cpuUsage = Math.round(node.metrics.cpu_usage);
+            const cpuUsageVal = Math.round(node.metrics.cpu_usage);
 
-            // Extract unique node types from role array
             node.role.forEach((r: any) => uniqueValues.nodeTypes.add(r));
 
-            // Extract unique statuses
             uniqueValues.statuses.add(node.status);
 
-            // Update max values
             maxValues.tcpConnsEstablished.value = Math.max(
               maxValues.tcpConnsEstablished.value,
               node.metrics.tcp_conns_established,
@@ -923,11 +789,9 @@ export default defineComponent({
             );
             maxValues.cpuUsage.value = Math.max(
               maxValues.cpuUsage.value,
-              cpuUsage,
+              cpuUsageVal,
             );
-            //this is done because the id should be 2 digits to maintain consistency with other tables
             node.id = globalIndex < 10 ? `0${globalIndex}` : globalIndex;
-            //increment the global index
             globalIndex++;
 
             result.push({
@@ -938,7 +802,7 @@ export default defineComponent({
               ...node,
               ...node.metrics,
               percentage_memory_usage: percentageMemoryUsage,
-              cpu_usage: cpuUsage,
+              cpu_usage: cpuUsageVal,
             });
           });
         }
@@ -958,10 +822,11 @@ export default defineComponent({
 
     const getData = (filterFlag: boolean = false) => {
       loading.value = true;
-      const dismiss = $q.notify({
-        spinner: true,
+      const dismiss = toast({
+        variant: "loading",
         message: "Please wait while loading data...",
-      });
+              timeout: 0,
+});
 
       CommonService.list_nodes(store.state.selectedOrganization.identifier)
         .then((response) => {
@@ -994,8 +859,8 @@ export default defineComponent({
           loading.value = false;
           dismiss();
           if (error.status != 403) {
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message:
                 error.response?.data?.message ||
                 "Failed to fetch nodes. Please try again.",
@@ -1004,10 +869,11 @@ export default defineComponent({
           }
         });
     };
-    //only call getData if the org is meta org otherwise we can ignore as the api is only allowed for meta org
+
     if (isMetaOrg.value) {
       getData(false);
     }
+
     const applyFilter = () => {
       let terms = filterQuery.value.toLowerCase();
       const data = originalData.value.filter((row: any) => {
@@ -1079,6 +945,7 @@ export default defineComponent({
       tabledata.value = originalData.value;
       resultTotal.value = originalData.value.length;
     };
+
     const filterApplied = computed(() => {
       return (
         selectedRegions.value.length > 0 ||
@@ -1088,22 +955,73 @@ export default defineComponent({
       );
     });
 
+    // Pre-filter for main table
+    const filterData = (rows: any, terms: string) => {
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (
+          rows[i]["name"].toLowerCase().includes(terms) ||
+          rows[i]["version"].toLowerCase().includes(terms)
+        ) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+
+    const visibleRows = computed(() => {
+      if (!filterQuery.value) return tabledata.value || [];
+      return filterData(tabledata.value || [], filterQuery.value);
+    });
+
+    // Pre-filter for sidebar region table
+    const filterRegionQuery = ref("");
+    const filterRegionData = (rows: string | any[], terms: string) => {
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+    const visibleRegionRows = computed(() => {
+      if (!filterRegionQuery.value) return regionRows.value || [];
+      return filterRegionData(regionRows.value || [], filterRegionQuery.value);
+    });
+
+    // Pre-filter for sidebar cluster table
+    const filterClusterQuery = ref("");
+    const filterClusterData = (rows: string | any[], terms: string) => {
+      const filtered = [];
+      terms = terms.toLowerCase();
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
+        }
+      }
+      return filtered;
+    };
+    const visibleClusterRows = computed(() => {
+      if (!filterClusterQuery.value) return clusterRows.value || [];
+      return filterClusterData(
+        clusterRows.value || [],
+        filterClusterQuery.value,
+      );
+    });
+
     return {
       t,
       store,
       router,
-      qTable,
       loading,
       tabledata,
-      computedColumns,
+      computedOTableColumns,
       splitterModel,
       getData,
-      pagination,
       resultTotal,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
       cpuUsage,
       memoryUsage,
       regionRows,
@@ -1114,6 +1032,14 @@ export default defineComponent({
       selectedClusters,
       selectedNodetypes,
       selectedStatuses,
+      selectedRegionIds,
+      selectedClusterIds,
+      selectedNodetypeIds,
+      selectedStatusIds,
+      handleSelectedRegionIdsUpdate,
+      handleSelectedClusterIdsUpdate,
+      handleSelectedNodetypeIdsUpdate,
+      handleSelectedStatusIdsUpdate,
       establishedToggle,
       filterApplied,
       closewaitToggle,
@@ -1128,59 +1054,24 @@ export default defineComponent({
       maxWaittime,
       applyFilter,
       clearAll,
-      filterColumns: [
-        { name: "name", label: "Name", field: "name", align: "left" },
-      ],
+      filterOTableColumns,
       filterQuery,
-      filterData(rows: any, terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["version"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
-      filterRegionQuery: ref(""),
-      filterRegionData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
-      filterClusterQuery: ref(""),
-      filterClusterData(rows: string | any[], terms: string) {
-        const filtered = [];
-        terms = terms.toLowerCase();
-        for (let i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      filterData,
+      visibleRows,
+      filterRegionQuery,
+      filterRegionData,
+      visibleRegionRows,
+      filterClusterQuery,
+      filterClusterData,
+      visibleClusterRows,
       flattenObject,
+      sectionOpen,
     };
   },
 });
 </script>
 
 <style lang="scss" scoped>
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
 .badge-region {
   background-color: #ede9fe;
   line-height: 23px;
@@ -1243,48 +1134,36 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
-.nodes-list-table .q-table tr th {
-  background-color: #f2f2f2 !important;
-  color: #000000;
+tr.status-row > td:first-child {
+  position: relative;
+}
+tr.status-row > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+}
+tr.status-online > td:first-child::before {
+  background: #00a76f;
+}
+tr.status-offline > td:first-child::before {
+  background: #ce2528;
+}
+tr.status-prepare > td:first-child::before {
+  background: #ffab00;
 }
 
-.status-online {
+/* Legacy span-based status indicator (still used by status filter list) */
+span.status-online {
   border-left: #00a76f 5px solid !important;
 }
-
-.status-offline {
+span.status-offline {
   border-left: 5px solid #ce2528 !important;
 }
-
-.status-prepare {
+span.status-prepare {
   border-left: 5px solid #ffab00 !important;
 }
 
-.node-list-filter-table {
-  max-height: 200px;
-  overflow: auto;
-
-  .q-table__top {
-    padding: 0px !important;
-  }
-
-  .q-table__control {
-    width: 100% !important;
-  }
-
-  td {
-    padding: 0 0 0 7px !important;
-
-    &::before {
-      background: none !important;
-    }
-  }
-}
-
-.nodes-filter-list .q-item__label {
-  font-weight: 500 !important;
-}
-.text-subtitle1 {
-  font-size: 14px !important;
-}
 </style>

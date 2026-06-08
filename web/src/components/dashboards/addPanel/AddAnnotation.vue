@@ -1,133 +1,73 @@
 <template>
-  <q-dialog v-model="isOpen" persistent>
-    <q-card style="min-width: 700px">
-      <q-card-section class="q-pa-md">
-        <div class="text-h6">{{ isEditMode ? "Edit" : "Add" }} Annotation</div>
-      </q-card-section>
-      <q-card-section class="q-pa-md">
-        <q-input
+  <ODialog data-test="add-annotation-dialog" v-model:open="isOpen" persistent size="lg" :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'">
+    <OForm id="add-annotation-form" :default-values="{ title: annotationData.title }" @submit="saveAnnotation.execute()">
+    <div class="tw:flex tw:flex-col">
+        <OFormInput
+          name="title"
           v-model="annotationData.title"
           label="Title *"
-          stack-label
-          class="q-py-md showLabelOnTop"
-          dense
-          borderless
-          hide-bottom-space
-          style="margin-bottom: 10px"
-          :rules="[(val) => !!val || 'Title is required.']"
+          :validators="[(val) => !val ? 'Title is required.' : undefined]"
         />
-        <q-input
+        <OTextarea
           v-model="annotationData.text"
           label="Description"
-          stack-label
-          class="q-py-md showLabelOnTop"
-          dense
-          type="textarea"
           :rows="3"
-          borderless
-          hide-bottom-space
         />
 
-        <div class="q-mt-md">
-          <q-select
+        <OSelect
             hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
             v-model="selectedPanels"
             :options="groupedPanelsOptions"
             multiple
-            stack-label
-            emit-value
-            map-options
             @update:model-value="updateSelectedPanels"
-            :display-value="displayValue"
             style="min-width: 150px"
-            dense
             label="Select Panels"
-            input-debounce="0"
-            behavior="menu"
-            use-input
-            class="textbox col no-case showLabelOnTop"
-            popup-no-route-dismiss
-            popup-content-style="z-index: 10001"
-            borderless
-            hide-bottom-space
-          >
-            <template v-slot:option="{ opt, selected, toggleOption }">
-              <q-item
-                v-if="opt.isTab"
-                class="bg-grey-3 text-bold text-dark"
-                style="pointer-events: none"
-              >
-                <q-item-section>{{ opt.label }}</q-item-section>
-              </q-item>
-
-              <q-item v-else v-ripple clickable @click="toggleOption(opt)">
-                <q-item-section side>
-                  <q-checkbox
-                    :model-value="selected"
-                    @update:model-value="() => toggleOption(opt)"
-                    dense
-                    class="q-ma-none"
-                  />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>{{ opt.label }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-        </div>
-        <div class="text-caption q-mt-md">
+            class="textbox tw:flex tw:flex-col no-case showLabelOnTop"
+          />
+        <div class="tw:text-xs tw:mt-3">
           Timestamp: {{ annotationDateString }}
         </div>
-      </q-card-section>
-      <q-card-actions align="right">
-        <div class="tw:w-full tw:flex tw:gap-2">
-          <OButton
-            v-if="annotationData.annotation_id"
-            variant="destructive"
-            size="sm-action"
-            @click="handleDeleteWithConfirm"
-            >Delete</OButton
-          >
-          <div class="tw:flex-1"></div>
-          <OButton variant="outline" size="sm-action" @click="handleClose"
-            >Cancel</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="saveAnnotation.execute()"
-            :loading="saveAnnotation.isLoading?.value"
-            :disabled="!annotationData.title"
-            >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
-          >
-        </div>
-      </q-card-actions>
-    </q-card>
+    </div>
+    </OForm>
+    <template #footer>
+      <div class="tw:w-full tw:flex tw:gap-2">
+        <OButton
+          v-if="annotationData.annotation_id"
+          variant="destructive"
+          size="sm-action"
+          @click="handleDeleteWithConfirm"
+          >Delete</OButton
+        >
+        <div class="tw:flex-1"></div>
+        <OButton variant="outline" size="sm-action" @click="handleClose"
+          >Cancel</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          form="add-annotation-form"
+          :loading="saveAnnotation.isLoading?.value"
+          :disabled="!annotationData.title"
+          >{{ annotationData.annotation_id ? "Update" : "Save" }}</OButton
+        >
+      </div>
+    </template>
 
-    <q-dialog v-model="showDeleteConfirm">
-      <q-card>
-        <q-card-section>
-          <div class="text-h6">Confirm Delete</div>
-        </q-card-section>
-        <q-card-section>
-          Are you sure you want to delete this annotation?
-        </q-card-section>
-        <q-card-actions align="right" class="tw:gap-2">
-          <OButton variant="outline" size="sm-action" v-close-popup
-            >Cancel</OButton
-          >
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            :loading="deleteAnnotation.isLoading.value"
-            @click="deleteAnnotation.execute()"
-            >Delete</OButton
-          >
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </q-dialog>
+    <ODialog data-test="add-annotation-delete-confirm-dialog"
+      v-model:open="showDeleteConfirm"
+      size="xs"
+      title="Confirm Delete"
+      secondary-button-label="Cancel"
+      primary-button-label="Delete"
+      primary-button-variant="destructive"
+      :primary-button-loading="deleteAnnotation.isLoading.value"
+      @click:secondary="showDeleteConfirm = false"
+      @click:primary="deleteAnnotation.execute()"
+    >
+      <p>Are you sure you want to delete this annotation?</p>
+    </ODialog>
+  </ODialog>
 </template>
 
 <script setup>
@@ -137,7 +77,12 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
-
+import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },
@@ -167,7 +112,7 @@ const selectedPanels = ref([]);
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
-    { label: tab, isTab: true },
+    { label: tab, isTab: true, disable: true },
     ...panels.map((panel) => ({
       label: panel.title,
       value: panel.id,

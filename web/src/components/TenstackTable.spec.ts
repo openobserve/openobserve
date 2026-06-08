@@ -16,7 +16,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { h } from "vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Hoist copyToClipboard mock so it can be referenced inside vi.mock factory below.
 const { mockCopyToClipboard } = vi.hoisted(() => ({
@@ -46,8 +45,12 @@ vi.mock("@tanstack/vue-virtual", () => ({
 
 vi.mock("quasar", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn, copyToClipboard: mockCopyToClipboard };
+  return { ...actual, debounce: (fn: any) => fn };
 });
+
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: mockCopyToClipboard,
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => ({
@@ -102,7 +105,6 @@ vi.stubGlobal("CSS", { supports: () => false });
 
 import TenstackTable from "@/components/TenstackTable.vue";
 
-installQuasar();
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -265,7 +267,9 @@ describe("TenstackTable", () => {
         sortFieldMap: {},
       });
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper
+          .find('[data-test-sort-state="active"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -279,7 +283,7 @@ describe("TenstackTable", () => {
       });
       // timestamp column is not active
       const inactiveIcons = wrapper.findAll(
-        '[data-test="tenstack-table-sort-icon-inactive"]',
+        '[data-test-sort-state="inactive"]',
       );
       expect(inactiveIcons.length).toBeGreaterThan(0);
     });
@@ -290,14 +294,10 @@ describe("TenstackTable", () => {
         rows: [],
       });
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-active"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(false);
       expect(
-        wrapper
-          .find('[data-test="tenstack-table-sort-icon-inactive"]')
-          .exists(),
+        wrapper.find('[data-test-sort-state="inactive"]').exists(),
       ).toBe(false);
     });
 
@@ -318,7 +318,7 @@ describe("TenstackTable", () => {
       });
       // timestamp maps to start_time which equals sortBy → active icon
       expect(
-        wrapper.find('[data-test="tenstack-table-sort-icon-active"]').exists(),
+        wrapper.find('[data-test-sort-state="active"]').exists(),
       ).toBe(true);
     });
   });
@@ -327,11 +327,11 @@ describe("TenstackTable", () => {
   describe("loading state", () => {
     it("should show the default loading indicator when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
-      // Quasar renders q-spinner-hourglass as an SVG with class q-spinner
-      const tableHtml = wrapper.html();
-      expect(tableHtml).toContain("q-spinner");
+      expect(
+        wrapper.find('[data-test="tenstack-table-loading-indicator"]').exists(),
+      ).toBe(true);
       // i18n key is rendered as-is by the mock
-      expect(tableHtml).toContain("confirmDialog.loading");
+      expect(wrapper.html()).toContain("confirmDialog.loading");
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {
@@ -663,6 +663,37 @@ describe("TenstackTable", () => {
       wrapper = mountTable({ rows: [] });
       const table = wrapper.find('[data-test="o2-table"]');
       expect(table.attributes("style")).toContain("min-height: 22px");
+    });
+  });
+
+  // ── column resizer element ────────────────────────────────────────────────
+  describe("column resizer element", () => {
+    it("should render a resizer div inside each resizable column header", () => {
+      wrapper = mountTable();
+      const resizers = wrapper.findAll(".resizer");
+      // Both baseColumns have no explicit enableResizing=false so they get resizers
+      expect(resizers.length).toBeGreaterThan(0);
+    });
+
+    it("should give the resizer an always-visible border-color background", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).toContain("tw:bg-[var(--o2-border-color)]!");
+    });
+
+    it("should not carry a transparent background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:bg-transparent");
+    });
+
+    it("should not carry a hover-only background class on the resizer", () => {
+      wrapper = mountTable();
+      const resizer = wrapper.find(".resizer");
+      expect(resizer.exists()).toBe(true);
+      expect(resizer.classes()).not.toContain("tw:hover:bg-[var(--o2-border-color)]");
     });
   });
 
@@ -1403,7 +1434,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT pass the raw ISO 'T' separator to the clipboard when a timestamp format function is defined", async () => {
@@ -1456,7 +1489,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should copy the raw value unchanged when the column has no format function", async () => {
@@ -1474,7 +1509,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text");
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("plain-text", {
+        silent: true,
+      });
     });
 
     it("should copy the formatted value for a center-aligned timestamp column", async () => {
@@ -1498,7 +1535,9 @@ describe("TenstackTable", () => {
       await wrapper.find(".copy-btn button").trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 
@@ -1554,7 +1593,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
 
     it("should NOT contain the ISO 'T' separator in the copied pivot timestamp value", async () => {
@@ -1631,7 +1672,9 @@ describe("TenstackTable", () => {
       await wrapper.findAll(".copy-btn button")[1].trigger("click");
       await flushPromises();
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED);
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(FORMATTED, {
+        silent: true,
+      });
     });
   });
 });

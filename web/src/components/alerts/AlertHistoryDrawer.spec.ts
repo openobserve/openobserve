@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
@@ -30,13 +28,89 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 
+vi.mock("@/services/anomaly_detection", () => ({
+  default: {
+    getConfig: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}));
+
+vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
+  buildAnomalyPreviewSql: vi.fn(() => "SELECT * FROM anomalies"),
+}));
+
 import alertsService from "@/services/alerts";
 
-installQuasar({ plugins: [Notify] });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
+
+// Lightweight stubs for the in-house O* components. Each renders the slots
+// the component relies on so children remain queryable in tests, and re-emits
+// the events the test suite drives state through.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
+      <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
+
+const OButtonStub = {
+  name: "OButton",
+  props: ["variant", "size", "disabled", "loading"],
+  emits: ["click"],
+  template: `<button data-test-stub="o-button" :data-test="$attrs['data-test']" @click="$emit('click', $event)"><slot /></button>`,
+  inheritAttrs: false,
+};
+
+const OToggleGroupStub = {
+  name: "OToggleGroup",
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template: `<div data-test-stub="o-toggle-group"><slot /></div>`,
+};
+
+const OToggleGroupItemStub = {
+  name: "OToggleGroupItem",
+  props: ["value", "size"],
+  emits: ["click"],
+  template: `<button data-test-stub="o-toggle-group-item" :data-test="$attrs['data-test']" :data-value="value" @click="$parent.$emit('update:modelValue', value)"><slot name="icon-left" /><slot /></button>`,
+  inheritAttrs: false,
+};
+
+const OTabPanelsStub = {
+  name: "OTabPanels",
+  props: ["modelValue", "animated"],
+  emits: ["update:modelValue"],
+  template: `<div data-test-stub="o-tab-panels" :data-active="modelValue"><slot /></div>`,
+};
+
+const OTabPanelStub = {
+  name: "OTabPanel",
+  props: ["name"],
+  // Render only the active panel's slot — mirrors real behaviour and avoids
+  // mounting both tabs simultaneously (the SQL/PromQL labels otherwise duplicate).
+  template: `<div data-test-stub="o-tab-panel" :data-name="name" v-show="$parent.modelValue === name"><slot v-if="$parent.modelValue === name" /></div>`,
+};
+
+function buildStubs() {
+  return {
+    ODrawer: ODrawerStub,
+    OButton: OButtonStub,
+    OToggleGroup: OToggleGroupStub,
+    OToggleGroupItem: OToggleGroupItemStub,
+    OTabPanels: OTabPanelsStub,
+    OTabPanel: OTabPanelStub,
+  };
+}
 
 describe("AlertHistoryDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
@@ -110,16 +184,18 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   const mountComponent = async (
-    propsData: { alertDetails?: any; alertId?: string } = {},
+    propsData: { alertDetails?: any; alertId?: string; open?: boolean } = {},
   ) => {
     wrapper = mount(AlertHistoryDrawer, {
       attachTo: node,
       props: {
         alertDetails: "alertDetails" in propsData ? propsData.alertDetails : mockAlertDetails,
         alertId: propsData.alertId ?? "alert-123",
+        open: propsData.open ?? true,
       },
       global: {
         plugins: [i18n, store, router],
+        stubs: buildStubs(),
       },
     });
     await flushPromises();
@@ -131,13 +207,15 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("should render the ODrawer wrapper", async () => {
+      await mountComponent();
+      expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
+    });
+
     it("should have correct data-test attributes", async () => {
       await mountComponent();
       expect(
         wrapper.find('[data-test="alert-details-title"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="alert-details-close-btn"]').exists(),
       ).toBe(true);
       expect(
         wrapper
@@ -156,6 +234,18 @@ describe("AlertHistoryDrawer.vue", () => {
           from: 0,
         }),
       );
+    });
+  });
+
+  describe("Close Button", () => {
+    it("should propagate ODrawer's update:open emit to the parent", async () => {
+      await mountComponent();
+      const drawer = wrapper.findComponent({ name: "ODrawer" });
+      drawer.vm.$emit("update:open", false);
+      await flushPromises();
+      const events = wrapper.emitted("update:open");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
     });
   });
 
@@ -181,7 +271,9 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Query/Conditions Block", () => {
     const switchToConditionTab = async () => {
-      const conditionBtn = wrapper.find('[data-test="alert-history-tab-condition"]');
+      const conditionBtn = wrapper.find(
+        '[data-test="alert-history-tab-condition"]',
+      );
       await conditionBtn.trigger("click");
       await flushPromises();
     };
@@ -194,7 +286,11 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should display PromQL label for promql type alerts", async () => {
       await mountComponent({
-        alertDetails: { ...mockAlertDetails, type: "promql", conditions: "rate(http_errors[5m])" },
+        alertDetails: {
+          ...mockAlertDetails,
+          type: "promql",
+          conditions: "rate(http_errors[5m])",
+        },
         alertId: "alert-123",
       });
       await switchToConditionTab();
@@ -222,9 +318,7 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should display the description when provided", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(wrapper.text()).toContain(
-        "Fires when CPU usage exceeds 80%",
-      );
+      expect(wrapper.text()).toContain("Fires when CPU usage exceeds 80%");
     });
 
     it("should hide the description section when not provided", async () => {
@@ -232,9 +326,9 @@ describe("AlertHistoryDrawer.vue", () => {
         alertDetails: { ...mockAlertDetails, description: "" },
         alertId: "alert-123",
       });
-      // Description label should not be present when description is empty
-      const text = wrapper.text();
-      expect(text).not.toContain("Fires when CPU usage exceeds 80%");
+      await flushPromises();
+      // Description text should not be present when description is empty
+      expect(wrapper.text()).not.toContain("Fires when CPU usage exceeds 80%");
     });
   });
 
@@ -252,9 +346,10 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.alertHistory.length).toBe(3);
     });
 
-    it("should display result total", async () => {
+    it("should display result total in component state", async () => {
       await mountComponent();
-      expect(wrapper.text()).toContain("3");
+      const vm = wrapper.vm as any;
+      expect(vm.resultTotal).toBe(3);
     });
   });
 
@@ -270,9 +365,11 @@ describe("AlertHistoryDrawer.vue", () => {
         props: {
           alertDetails: mockAlertDetails,
           alertId: "alert-123",
+          open: true,
         },
         global: {
           plugins: [i18n, store, router],
+          stubs: buildStubs(),
         },
       });
 
@@ -373,7 +470,6 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should reset pagination to page 1 on date change", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      vm.pagination.page = 3;
       vm.currentPage = 3;
 
       const dateTimeComponent = wrapper.findComponent(DateTime);
@@ -385,7 +481,6 @@ describe("AlertHistoryDrawer.vue", () => {
       await flushPromises();
 
       expect(vm.currentPage).toBe(1);
-      expect(vm.pagination.page).toBe(1);
     });
   });
 
@@ -393,12 +488,11 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should have pagination data initialized", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.pagination).toBeDefined();
-      expect(vm.pagination.rowsPerPage).toBe(50);
-      expect(vm.pagination.page).toBe(1);
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.currentPage).toBe(1);
     });
 
-    it("should call getHistory when table requests data", async () => {
+    it("should call getHistory when pagination changes", async () => {
       await mountComponent();
       vi.clearAllMocks();
 
@@ -406,13 +500,8 @@ describe("AlertHistoryDrawer.vue", () => {
         data: mockHistoryData,
       } as any);
 
-      const qTable = wrapper.findComponent({ name: "QTable" });
-      await qTable.vm.$emit("request", {
-        pagination: {
-          page: 2,
-          rowsPerPage: 50,
-        },
-      });
+      // Trigger pagination change directly via component's onPaginationChange
+      await (wrapper.vm as any).onPaginationChange({ page: 2, size: 50 });
       await flushPromises();
 
       expect(alertsService.getHistory).toHaveBeenCalledWith(
@@ -424,10 +513,10 @@ describe("AlertHistoryDrawer.vue", () => {
       );
     });
 
-    it("should update rows number from response total", async () => {
+    it("should update resultTotal from response total", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.pagination.rowsNumber).toBe(3);
+      expect(vm.resultTotal).toBe(3);
     });
   });
 
@@ -471,13 +560,11 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should reset pagination when alertId changes", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      vm.pagination.page = 5;
       vm.currentPage = 5;
 
       await wrapper.setProps({ alertId: "alert-789" });
       await flushPromises();
 
-      expect(vm.pagination.page).toBe(1);
       expect(vm.currentPage).toBe(1);
     });
 
@@ -512,37 +599,29 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.formatStatus(null)).toBe("Unknown");
     });
 
-    it("getStatusChipColor should return correct colors", async () => {
+    it("getStatusChipVariant should return correct variants", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.getStatusChipColor("firing")).toBe("red-1");
-      expect(vm.getStatusChipColor("error")).toBe("red-1");
-      expect(vm.getStatusChipColor("ok")).toBe("green-1");
-      expect(vm.getStatusChipColor("success")).toBe("green-1");
-      expect(vm.getStatusChipColor("skipped")).toBe("amber-1");
-      expect(vm.getStatusChipColor("pending")).toBe("blue-1");
-      expect(vm.getStatusChipColor("unknown")).toBe("grey-3");
-    });
-
-    it("getStatusChipTextColor should return correct text colors", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStatusChipTextColor("firing")).toBe("red-9");
-      expect(vm.getStatusChipTextColor("error")).toBe("red-9");
-      expect(vm.getStatusChipTextColor("ok")).toBe("green-9");
-      expect(vm.getStatusChipTextColor("success")).toBe("green-9");
-      expect(vm.getStatusChipTextColor("skipped")).toBe("amber-9");
-      expect(vm.getStatusChipTextColor("pending")).toBe("blue-9");
+      expect(vm.getStatusChipVariant("firing")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("error")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("anomaly")).toBe("error-soft");
+      expect(vm.getStatusChipVariant("ok")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("success")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("normal")).toBe("success-soft");
+      expect(vm.getStatusChipVariant("skipped")).toBe("warning-soft");
+      expect(vm.getStatusChipVariant("pending")).toBe("primary-soft");
+      expect(vm.getStatusChipVariant("unknown")).toBe("default-soft");
     });
 
     it("getRowClass should return error class for error/firing status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // Store theme is "dark" by default in test helper
-      expect(vm.getRowClass("firing")).toBe("row-error-dark");
-      expect(vm.getRowClass("error")).toBe("row-error-dark");
-      expect(vm.getRowClass("ok")).toBe("");
-      expect(vm.getRowClass("success")).toBe("");
+      // getRowClass takes a row object with status property
+      expect(vm.getRowClass({ status: "firing" })).toBe("row-error-dark");
+      expect(vm.getRowClass({ status: "error" })).toBe("row-error-dark");
+      expect(vm.getRowClass({ status: "ok" })).toBe("");
+      expect(vm.getRowClass({ status: "success" })).toBe("");
     });
 
     it("formatTimestamp should return N/A for falsy timestamps", async () => {
@@ -578,22 +657,17 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Per Page Options", () => {
-    it("should have correct per page options", async () => {
+    it("should have a default selectedPerPage value", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.perPageOptions).toEqual([
-        { label: "10", value: 10 },
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-      ]);
+      expect(typeof vm.selectedPerPage).toBe("number");
+      expect(vm.selectedPerPage).toBeGreaterThan(0);
     });
 
     it("should default to 50 rows per page", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       expect(vm.selectedPerPage).toBe(50);
-      expect(vm.pagination.rowsPerPage).toBe(50);
     });
   });
 
@@ -601,10 +675,9 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should have the correct columns defined", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      const columnNames = vm.historyTableColumns.map(
-        (col: any) => col.name,
-      );
-      expect(columnNames).toEqual([
+      // columns use 'id' property (OTable OTableColumnDef type), not 'name'
+      const columnIds = vm.historyTableColumns.map((col: any) => col.id);
+      expect(columnIds).toEqual([
         "#",
         "timestamp",
         "status",

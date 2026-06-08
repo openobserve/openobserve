@@ -425,8 +425,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     (ev.key.to_string(), ev.start_dt.unwrap_or_default())
                 };
-                if ev_start_dt == 0 && ev.start_dt.is_some() {
-                    ev_start_dt = ev.start_dt.unwrap();
+                if ev_start_dt == 0
+                    && let Some(start_dt) = ev.start_dt
+                {
+                    ev_start_dt = start_dt;
                 }
 
                 let item_key = ev_key.strip_prefix(key).unwrap();
@@ -650,7 +652,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         if schema_versions.is_empty() {
             continue;
         }
-        schema_versions.sort_by(|a, b| a.0.cmp(&b.0));
+        schema_versions.sort_by_key(|k| k.0);
         let latest_schema: Vec<Schema> = json::from_slice(&schema_versions.last().unwrap().1)
             .map_err(|e| {
                 anyhow::anyhow!("Error parsing schema, key: {}, error: {}", item_key, e)

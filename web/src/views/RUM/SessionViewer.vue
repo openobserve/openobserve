@@ -15,46 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row qp-2 tw:h-full tw:px-[0.625rem]">
-    <div class="col-12 row items-end tw:pb-[0.625rem]">
-      <div class="col-12 row card-container tw:px-[0.625rem] tw:py-[0.625rem]">
+  <div class="tw:flex tw:flex-col qp-2 tw:h-full">
+    <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
+      <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
-          class="flex justify-center items-center q-mr-md cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
+          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"
           title="Go Back"
           @click="router.back()"
         >
-          <q-icon name="arrow_back_ios_new" size="0.875rem" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="language" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="calendar_month" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="calendar-month" size="sm" />
           {{ sessionDetails.date }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="person" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="person" size="sm" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="location_on" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="location-on" size="sm" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="text-caption ellipsis row items-center q-mr-md">
-          <q-icon name="settings" size="0.875rem" class="q-pr-xs" />
+        <div class="tw:text-xs tw:truncate tw:flex tw:items-center tw:gap-1.5 tw:mr-3">
+          <OIcon name="settings" size="sm" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
           v-if="frustrationCount > 0"
-          class="text-caption ellipsis row items-center"
+          class="tw:text-xs tw:truncate tw:flex tw:items-center"
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
-          <q-icon
-            name="sentiment_very_dissatisfied"
-            size="0.875rem"
-            class="q-pr-xs"
+          <OIcon
+            name="sentiment-very-dissatisfied"
+            size="sm"
+            class="tw:pr-1"
             style="color: #fb923c"
             data-test="frustration-summary-icon"
           />
@@ -70,24 +70,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="col-12 row card-container tw:overflow-hidden tw:mb-[0.325rem] tw:h-[calc(100%-58px)]!"
+      class="tw:w-full tw:flex card-container tw:overflow-hidden tw:h-[calc(100%-3.125)]! tw:flex-1 tw:min-h-0"
     >
-      <div class="col-9 full-height">
-        <VideoPlayer
-          ref="videoPlayerRef"
-          :events="segmentEvents"
-          :segments="segments"
-          :is-loading="!!isLoading.length"
-        />
-      </div>
-      <div class="col-3 row">
-        <q-separator vertical class="full-height" />
-        <PlayerEventsSidebar
-          :events="segmentEvents"
-          :sessionDetails="sessionDetails"
-          @event-emitted="handleSidebarEvent"
-        />
-      </div>
+      <OSplitter
+        v-model="splitterSize"
+        :limits="[200, 1400]"
+        unit="px"
+        class="tw:w-full tw:h-full"
+        separatorClass="tw:bg-[var(--o2-border-color)] tw:w-[1px]! tw:hover:bg-[var(--o2-theme-color)]"
+      >
+        <template #before>
+          <VideoPlayer
+            ref="videoPlayerRef"
+            :events="segmentEvents"
+            :segments="segments"
+            :is-loading="!!isLoading.length"
+            class="tw:h-full"
+          />
+        </template>
+        <template #after>
+          <PlayerEventsSidebar
+            :events="segmentEvents"
+            :sessionDetails="sessionDetails"
+            :session-id="sessionId"
+            :current-time="currentTime"
+            :start-time="sessionState.data.selectedSession?.start_time || 0"
+            :end-time="sessionState.data.selectedSession?.end_time || 0"
+            @event-emitted="handleSidebarEvent"
+            class="tw:h-full"
+          />
+        </template>
+      </OSplitter>
     </div>
 
     <!-- Event Detail Drawer -->
@@ -113,8 +126,10 @@ import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
-import { date } from "quasar";
+import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
 
 const defaultEvent = {
@@ -133,6 +148,7 @@ const defaultEvent = {
 };
 
 const sessionId = ref("1");
+const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
@@ -141,6 +157,7 @@ const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
+const splitterSize = ref(600);
 const errorCount = ref(10);
 const { performanceState } = usePerformance();
 
@@ -605,7 +622,7 @@ function formatTimeDifference(start_time: number, end_time: number) {
 }
 
 const getFormattedDate = (timestamp: number) =>
-  date.formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
+  formatDate(Math.floor(timestamp), "MMM DD, YYYY HH:mm:ss Z");
 
 const handleSidebarEvent = (event: string, payload: any) => {
   if (event === "event-click") {

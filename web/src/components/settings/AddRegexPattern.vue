@@ -15,49 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: Remove store.state.theme based styling as we moved towards having at central place that is app.scss so we plan this whole to that place -->
 <template>
-  <div
-    class="q-pt-md"
-    :class="[
-      store.state.theme === 'dark'
-        ? 'bg-dark add-regex-pattern-dark'
-        : 'bg-white add-regex-pattern-light',
-    ]"
-    :style="{
-      width: isFullScreen
-        ? '100vw'
-        : store.state.isAiChatEnabled
-          ? '70vw'
-          : '40vw',
-    }"
+  <ODrawer
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    :title="isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')"
+    :width="isFullScreen ? 100 : store.state.isAiChatEnabled ? 70 : 40"
+    :primary-button-label="isSaving ? 'Saving...' : isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+    :secondary-button-label="t('regex_patterns.cancel')"
+    :primary-button-disabled="isFormEmpty || isSaving"
+    form-id="add-regex-pattern-form"
+    @click:secondary="handleClose"
+    data-test="add-regex-pattern-drawer"
   >
-    <div
-      class="add-regex-pattern-header q-px-md tw:flex tw:items-center tw:justify-between"
-    >
-      <div class="tw:flex tw:items-center tw:justify-between">
+    <template #header-right>
+      <div class="tw:flex tw:items-center tw:gap-2">
         <OButton
-          data-test="add-regex-pattern-back-btn"
-          @click="closeAddRegexPatternDialog"
-          variant="ghost"
-          size="icon"
-        >
-          <q-icon name="arrow_back" size="14px" />
-        </OButton>
-        <div
-          class="add-regex-pattern-title"
-          data-test="add-regex-pattern-title"
-        >
-          {{
-            isEdit
-              ? t("regex_patterns.edit_regex_pattern")
-              : t("regex_patterns.create_regex_pattern")
-          }}
-        </div>
-      </div>
-      <div class="tw:flex tw:items-center tw:justify-between tw:gap-2">
-        <OButton
-          v-if="
-            config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-          "
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
           size="icon-toolbar"
           @click="toggleAIChat"
@@ -67,9 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <div class="row items-center no-wrap tw:gap-2">
-            <img :src="getBtnLogo" class="header-icon ai-icon" />
-          </div>
+          <img :src="getBtnLogo" class="header-icon ai-icon" />
         </OButton>
         <OButton
           data-test="add-regex-pattern-fullscreen-btn"
@@ -77,65 +48,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="toggleFullScreen"
         >
-          <q-icon
+          <OIcon
             name="fullscreen"
-            size="14px"
-            :color="isFullScreen ? 'primary' : undefined"
+            size="xs"
+            :class="isFullScreen ? 'tw:text-[var(--o2-primary)]' : ''"
           />
         </OButton>
-        <OButton
-          variant="ghost"
-          size="icon"
-          data-test="add-regex-pattern-close-btn"
-          @click="closeAddRegexPatternDialog"
-        >
-          <q-icon name="cancel" size="14px" />
-        </OButton>
       </div>
-    </div>
-    <q-separator class="q-mb-md q-mt-sm" />
+    </template>
     <!-- form inputs starts here -->
-    <div class="tw:flex tw:w-[100%]">
+    <div class="tw:flex tw:w-[100%] tw:h-full">
       <div
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
-              ? 'tw:w-[75%] q-pl-sm'
-              : 'tw:w-[65%] q-pl-sm'
-            : 'tw:w-[100%] q-px-md'
+              ? 'tw:w-[75%] tw:pl-2'
+              : 'tw:w-[65%] tw:pl-2'
+            : 'tw:w-[100%] tw:px-3'
         "
       >
-        <q-form
+        <OForm
+          id="add-regex-pattern-form"
+          :key="formKey"
+          :default-values="{ name: regexPatternInputs.name, pattern: regexPatternInputs.pattern }"
           @submit="saveRegexPattern"
-          class="tw:flex tw:flex-col tw:gap-4"
-          style="overflow: auto; height: calc(100vh - 150px)"
+          class="tw:flex tw:flex-col tw:gap-4 tw:mt-2"
         >
-          <div class="tw:flex tw:flex-col">
-            <q-input
-              v-bind:readonly="isEdit"
-              v-bind:disable="isEdit"
+          <div class="tw:flex tw:flex-col tw:gap-y-3">
+            <OFormInput
+              name="name"
+              :readonly="isEdit"
+              :disabled="isEdit"
               v-model="regexPatternInputs.name"
               :label="t('regex_patterns.name') + ' *'"
-              class="showLabelOnTop"
               data-test="add-regex-pattern-name-input"
-              stack-label
-              dense
-              borderless
-              :lazy-rules="true"
-              :hide-bottom-space="true"
-              :rules="[(val) => val !== '' || '* Name is required']"
               placeholder="Eg. Internal Passwords"
+              :validators="[(val: string | number | undefined) => (!val || val === '') ? '* Name is required' : undefined]"
             />
-            <q-input
-              v-bind:readonly="isEdit"
-              v-bind:disable="isEdit"
+            <OInput
+              :readonly="isEdit"
+              :disabled="isEdit"
               v-model="regexPatternInputs.description"
               :label="t('regex_patterns.description')"
-              class="q-pb-md showLabelOnTop"
-              stack-label
-              borderless
-              :hide-bottom-space="true"
-              dense
+              class="tw:pb-3"
               data-test="add-regex-pattern-description-input"
               placeholder="Describe your pattern to help users understand"
             />
@@ -160,9 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     Try O2 Assistant to write expressions
                   </span>
-                  <q-icon
+                  <OIcon
                     size="sm"
-                    name="arrow_right_alt"
+                    name="arrow-right-alt"
                     class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
                   />
                 </OButton>
@@ -187,7 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Write Pattern
                   </div>
                 </div>
-                <q-input
+                <OFormTextarea
+                  name="pattern"
                   data-test="add-regex-pattern-input"
                   v-model="regexPatternInputs.pattern"
                   class="regex-pattern-input"
@@ -196,20 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'dark-mode-regex-pattern-input'
                       : 'light-mode-regex-pattern-input'
                   "
-                  stack-label
-                  borderless
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Eg. \d....\d "
-                  rows="5"
-                  :rules="[(val) => val !== '' || '* Pattern is required']"
-                  :hide-bottom-space="true"
+                  :rows="5"
+                  :validators="[(val: string | undefined) => (!val || val === '') ? '* Pattern is required' : undefined]"
                 />
               </div>
             </div>
-            <q-separator class="tw:my-2" />
+            <OSeparator class="tw:my-2" />
             <div>
               <div class="tw:flex tw:items-center tw:justify-between">
                 <span class="regex-pattern-test-string-label">
@@ -225,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </div>
             </div>
-            <div class="regex-pattern-test-string-container q-mb-sm">
+            <div class="regex-pattern-test-string-container tw:mb-2">
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
@@ -243,25 +194,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="expandState.regexTestString"
                 class="regex-pattern-input"
               >
-                <q-input
+                <OTextarea
                   data-test="add-regex-test-string-input"
                   v-model="testString"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
                       : 'light-mode-regex-test-string-input'
                   "
-                  stack-label
-                  borderless
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Eg. 1234567890"
-                  rows="5"
+                  :rows="5"
                 />
               </div>
             </div>
@@ -279,27 +224,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
-                <q-input
+                <OTextarea
                   v-if="outputString.length > 0"
-                  data-test="add-regex-test-string-input"
+                  data-test="add-regex-output-string-input"
                   v-model="outputString"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="regex-test-string-input"
                   :class="
                     store.state.theme === 'dark'
                       ? 'dark-mode-regex-test-string-input'
                       : 'light-mode-regex-test-string-input'
                   "
-                  stack-label
-                  outlined
-                  filled
-                  dense
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  type="textarea"
                   placeholder="Output String"
-                  rows="5"
+                  :rows="5"
                 />
                 <div
                   v-else
@@ -311,9 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <div v-if="!testLoading && outputString.length === 0">
-                    <q-icon
-                      :name="outlinedLightbulb"
-                      size="24px"
+                    <OIcon
+                      name="lightbulb"
+                      size="md"
                       :class="
                         store.state.theme === 'dark'
                           ? 'tw:text-[#ffffff]'
@@ -335,46 +273,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       class="tw:flex tw:items-center tw:justify-center tw:h-[111px]"
                     >
-                      <q-spinner-hourglass color="primary" size="24px" />
+                      <OSpinner size="sm" />
                     </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </q-form>
-        <div
-          class="tw:flex tw:gap-2 tw:justify-end tw:mt-2"
-          style="position: sticky; bottom: 0; right: 0"
-        >
-          <OButton
-            v-close-popup
-            variant="outline"
-            size="sm-action"
-            data-test="add-regex-pattern-cancel-btn"
-          >
-            {{ t("regex_patterns.cancel") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            @click="saveRegexPattern"
-            :disabled="isFormEmpty || isSaving"
-            data-test="add-regex-pattern-save-btn"
-          >
-            {{
-              isSaving
-                ? "Saving..."
-                : isEdit
-                  ? t("regex_patterns.update_close")
-                  : t("regex_patterns.create_close")
-            }}
-          </OButton>
-        </div>
+        </OForm>
       </div>
       <div
-        class="q-ml-sm"
+        class="tw:ml-2"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;
@@ -396,35 +305,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
 import {
   defineComponent,
-  onMounted,
   ref,
   watch,
-  nextTick,
-  onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { debounce, useQuasar } from "quasar";
-import useStreams from "@/composables/useStreams";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import regexPatternService from "@/services/regex_pattern";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
-import { outlinedLightbulb } from "@quasar/extras/material-icons-outlined";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 export default defineComponent({
   name: "AddRegexPattern",
+  emits: ["close", "update:list", "update:open"],
   props: {
     data: {
       type: Object,
@@ -434,19 +347,31 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emit: ["close", "update:list"],
+  emit: ["close", "update:list", "update:open"],
   components: {
+    OSeparator,
     FullViewContainer,
     O2AIChat,
     OButton,
+    ODrawer,
+    OSpinner,
+    OIcon,
+    OForm,
+    OFormInput,
+    OInput,
+    OFormTextarea,
+    OTextarea,
   },
   setup(props, { emit }) {
     const { t } = useI18n();
 
     const store = useStore();
 
-    const q = useQuasar();
 
     const isHovered = ref(false);
 
@@ -470,6 +395,10 @@ export default defineComponent({
 
     const inputContext = ref("");
 
+    const formRef = ref<any>(null);
+
+    const formKey = ref(0);
+
     const regexPatternInputs: any = ref({
       name: "",
       pattern: "",
@@ -482,7 +411,7 @@ export default defineComponent({
       outputString: false,
     });
 
-    onMounted(() => {
+    const seedFromProps = () => {
       if (props.isEdit) {
         regexPatternInputs.value.name = props.data.name;
         regexPatternInputs.value.pattern = props.data.pattern;
@@ -496,6 +425,7 @@ export default defineComponent({
           description: "",
         };
       }
+      formKey.value++;
       if (
         store.state.organizationData.regexPatternPrompt &&
         router.currentRoute.value.query.from == "logs"
@@ -503,7 +433,15 @@ export default defineComponent({
         inputContext.value = store.state.organizationData.regexPatternPrompt;
         testString.value = store.state.organizationData.regexPatternTestValue;
       }
-    });
+    };
+
+    watch(
+      () => props.open,
+      (v) => {
+        if (v) seedFromProps();
+      },
+      { immediate: true },
+    );
 
     // Form validation watcher
     watch(
@@ -575,26 +513,24 @@ export default defineComponent({
               payload,
             );
         if (response.status == 200) {
-          q.notify({
-            color: "positive",
+          toast({
             message: props.isEdit
               ? "Regex pattern updated successfully"
               : "Regex pattern created successfully",
-            timeout: 4000,
+            variant: "success",
           });
           emit("close");
           emit("update:list");
         }
       } catch (error) {
         if (error.response.status != 403) {
-          q.notify({
-            color: "negative",
+          toast({
             message:
               error.response?.data?.message ||
               (props.isEdit
                 ? "Failed to update regex pattern"
                 : "Failed to create regex pattern"),
-            timeout: 4000,
+            variant: "error",
           });
         }
       } finally {
@@ -619,10 +555,9 @@ export default defineComponent({
         );
         outputString.value = response.data.results[0];
       } catch (error) {
-        q.notify({
-          color: "negative",
+        toast({
           message: error.response?.data?.message || "Failed to test string",
-          timeout: 4000,
+          variant: "error",
         });
       } finally {
         testLoading.value = false;
@@ -633,10 +568,14 @@ export default defineComponent({
       emit("close");
     };
 
+    const handleClose = () => {
+      emit("update:open", false);
+      emit("close");
+    };
+
     return {
       t,
       store,
-      q,
       config,
       getBtnLogo,
       isHovered,
@@ -653,11 +592,13 @@ export default defineComponent({
       toggleFullScreen,
       outputString,
       testStringOutput,
-      outlinedLightbulb,
+      outlinedLightbulb: "lightbulb",
       testLoading,
       goToAILogo,
       inputContext,
       closeAddRegexPatternDialog,
+      handleClose,
+      formKey,
     };
   },
 });

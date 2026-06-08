@@ -24,7 +24,7 @@ import {
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
 
-interface HistogramData {
+export interface HistogramData {
   xData: any[];
   yData: any[];
   breakdownField: string | null;
@@ -39,28 +39,29 @@ interface HistogramData {
   errorDetail: string;
 }
 
-interface StreamData {
+export interface StreamData {
   streamLists: any[];
   selectedStream: string[];
   selectedStreamFields: any[];
   selectedFields: any[];
   filterField: string;
   addToFilter: string;
+  addToFilterMode: "replace" | "append";
   removeFilterField: string;
   functions: any[];
   streamType: string;
 }
 
-interface ResultGrid {
+export interface ResultGrid {
   currentPage: number;
 }
 
-interface SearchAroundData {
+export interface SearchAroundData {
   indexTimestamp: number;
   size: number;
 }
 
-interface SearchObjectData {
+export interface SearchObjectData {
   streamResults: any;
   errorMsg: string;
   errorDetail: string;
@@ -82,7 +83,7 @@ interface SearchObjectData {
   crossLinkQuery: string;
 }
 
-interface SearchObject {
+export interface SearchObject {
   organizationIdentifier: string;
   config: any;
   communicationMethod: string;

@@ -15,33 +15,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none"
-    style="height: calc(100vh - 88px); min-height: inherit"
-  >
-    <div v-if="!showImportTemplate && !showTemplateEditor">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
       <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
       >
-        <div class="q-table__title tw:font-[600]" data-test="alert-templates-list-title">
+        <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-templates-list-title">
             {{ t("alert_templates.header") }}
           </div>
-          <div class="tw:flex tw:justify-end tw:gap-2">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('template.search')"
+          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="(v: any) => { activeTab = v; }"
+              data-test="template-list-tabs"
+              class="tw:mr-2"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
+              <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                {{ t("alert_templates.filterAll") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                {{ t("alert_templates.filterPrebuilt") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+                <template #icon-left><OIcon name="settings" size="sm" /></template>
+                {{ t("alert_templates.filterCustom") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSearchInput
+              v-model="filterQuery"
+              class="tw:ml-auto"
+              :placeholder="t('template.search')"
+            />
           <OButton
             variant="outline"
             size="sm-action"
-            class="q-ml-sm"
+            class="tw:ml-2"
             @click="importTemplate"
             data-test="template-import"
             >{{ t(`dashboard.import`) }}</OButton
@@ -49,137 +59,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="template-list-add-btn"
             variant="primary"
-            size="sm-action"
-            class="q-ml-sm"
+            size="sm"
+            class="tw:ml-2"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton
           >
         </div>
       </div>
-      <q-table
+      <div class="tw:flex-1 tw:min-h-0">
+      <OTable
         data-test="alert-templates-list-table"
-        ref="qTableRef"
-        :rows="visibleRows"
+        :data="visibleRows"
         :columns="columns"
         row-key="name"
+        :loading="loading"
+        :selected-ids="selectedTemplateIds"
         selection="multiple"
-        v-model:selected="selectedTemplates"
-        style="width: 100%"
-        :rows-per-page-options="[0]"
-        :pagination="pagination"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="
-          hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px); overflow-y: auto;'
-            : 'width: 100%'
-        "
+        :is-row-selectable="isTemplateRowSelectable"
+        pagination="client"
+        :page-size="20"
+        :page-size-options="[5, 10, 20, 50, 100]"
+        :footer-title="t('alert_templates.header')"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        @update:selected-ids="handleSelectedIdsUpdate"
       >
-        <template #no-data>
+        <template #empty>
           <NoData />
         </template>
-        <template v-slot:body-selection="scope">
-          <q-checkbox
-            v-model="scope.selected"
-            size="sm"
-            class="o2-table-checkbox"
-          />
-        </template>
-        <template v-slot:header="props">
-          <q-tr :props="props">
-            <!-- Adding this block to render the select-all checkbox -->
-            <q-th v-if="columns.length > 0" auto-width>
-              <q-checkbox
-                v-model="props.selected"
-                size="sm"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-table-checkbox-dark'
-                    : 'o2-table-checkbox-light'
-                "
-                class="o2-table-checkbox"
-              />
-            </q-th>
-
-            <!-- render the table headers -->
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :class="col.classes"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <OButton
-              title="Export Template"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              @click.stop="exportTemplate(props.row)"
-              data-test="destination-export"
-            >
-              <q-icon name="download" />
-            </OButton>
-            <OButton
-              :data-test="`alert-template-list-${props.row.name}-update-template`"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_templates.edit')"
-              @click="editTemplate(props.row)"
-            >
-              <q-icon name="edit" />
-            </OButton>
-            <OButton
-              :data-test="`alert-template-list-${props.row.name}-delete-template`"
-              class="q-ml-xs"
-              variant="ghost"
-              size="icon-circle-sm"
-              :title="t('alert_templates.delete')"
-              @click="conformDeleteDestination(props.row)"
-            >
-              <q-icon :name="outlinedDelete" />
-            </OButton>
-          </q-td>
-        </template>
-        <template #bottom="scope">
-          <div
-            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
-          >
-            <div
-              class="o2-table-footer-title tw:flex tw:items-center tw:w-[150px] tw:mr-md"
-            >
-              {{ resultTotal }} {{ t("alert_templates.header") }}
-            </div>
-            <OButton
-              v-if="selectedTemplates.length > 0"
-              data-test="template-list-delete-templates-btn"
-              variant="outline"
-              size="sm"
-              class="q-mr-sm"
-              @click="openBulkDeleteDialog"
-            >
-              <q-icon name="delete" size="16px" />
-              <span class="tw:ml-2">Delete</span>
-            </OButton>
-            <QTablePagination
-              :scope="scope"
-              :position="'bottom'"
-              :resultTotal="resultTotal"
-              :perPageOptions="perPageOptions"
-              @update:changeRecordPerPage="changePagination"
-            />
+        <template #cell-name="{ row }">
+          <div class="tw:flex tw:items-center tw:gap-2">
+            <span>{{ row.name }}</span>
+            <span
+              v-if="row.isPrebuilt"
+              class="dimension-badge badge-blue"
+              :title="t('alert_templates.prebuiltBadgeHint')"
+              data-test="alert-template-prebuilt-badge"
+            >{{ t('alert_templates.prebuiltBadge') }}</span>
+            <span
+              v-else
+              class="dimension-badge"
+              data-test="alert-template-custom-badge"
+            >{{ t('alert_templates.customBadge') }}</span>
           </div>
         </template>
-      </q-table>
+        <template #cell-actions="{ row }">
+          <OButton
+            title="Export Template"
+            class="tw:ml-1"
+            variant="ghost"
+            size="icon-sm"
+            @click.stop="exportTemplate(row)"
+            data-test="destination-export"
+          >
+            <OIcon name="download" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`alert-template-list-${row.name}-update-template`"
+            class="tw:ml-1"
+            variant="ghost"
+            size="icon-sm"
+            :title="t('alert_templates.edit')"
+            @click="editTemplate(row)"
+          >
+            <OIcon name="edit" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`alert-template-list-${row.name}-clone-template`"
+            class="tw:ml-1"
+            variant="ghost"
+            size="icon-sm"
+            :title="t('alert_templates.clone')"
+            @click="cloneTemplate(row)"
+          >
+            <OIcon name="content-copy" size="sm" />
+          </OButton>
+          <OButton
+            :data-test="`alert-template-list-${row.name}-delete-template`"
+            class="tw:ml-1"
+            variant="ghost"
+            size="icon-sm"
+            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
+            :disabled="row.isPrebuilt"
+            @click="conformDeleteDestination(row)"
+          >
+            <OIcon name="delete" size="sm" />
+          </OButton>
+        </template>
+        <template
+          v-if="selectedTemplates.length > 0"
+          #bottom
+        >
+          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+            {{ selectedTemplates.length }} selected
+          </span>
+          <OButton
+            data-test="template-list-delete-templates-btn"
+            variant="outline-destructive"
+            size="sm"
+            icon-left="delete"
+            @click="openBulkDeleteDialog"
+          >
+            Delete
+          </OButton>
+        </template>
+      </OTable>
+      </div>
     </div>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
         :template="editingTemplate"
+        :is-clone="cloningTemplate"
         @cancel:hideform="toggleTemplateEditor"
         @get:templates="getTemplates"
       />
@@ -203,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts" setup>
 import {
@@ -216,18 +208,22 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
 import NoData from "../shared/grid/NoData.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ImportTemplate from "./ImportTemplate.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -236,46 +232,39 @@ const AddTemplate = defineAsyncComponent(
 const store = useStore();
 const { t } = useI18n();
 const router = useRouter();
-const q = useQuasar();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
-const columns: any = ref<QTableProps["columns"]>([
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-    style: "width: 67px",
+    id: "#",
+    header: "#",
+    accessorKey: "#",
+    size: 67,
+    meta: { align: "left" },
   },
   {
-    name: "name",
-    field: "name",
-    label: t("alert_templates.name"),
-    align: "left",
+    id: "name",
+    header: t("alert_templates.name"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: t("alert_templates.actions"),
-    align: "center",
-    sortable: false,
-    classes: "actions-column",
+    id: "actions",
+    header: t("alert_templates.actions"),
+    isAction: true,
+    pinned: "right",
+    size: 150,
+    meta: { align: "center", actionCount: 4 },
   },
-]);
+];
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);
-const perPageOptions: any = [
-  { label: "5", value: 5 },
-  { label: "10", value: 10 },
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-];
+// True when the editor was opened via the clone action — the AddTemplate
+// form should treat the prefilled data as a fresh template (not an update).
+const cloningTemplate = ref(false);
 const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(20);
-const qTableRef = ref<any>(null);
 
 const confirmDelete: Ref<{
   visible: boolean;
@@ -283,16 +272,29 @@ const confirmDelete: Ref<{
 }> = ref({ visible: false, data: null });
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
-const pagination: any = ref({
-  page: 1,
-  rowsPerPage: 20, // 0 means all rows
-});
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
 const filterQuery = ref("");
+// Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
+// system templates (name starts with `prebuilt_`), "custom" shows the rest.
+const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+
+const selectedTemplateIds = computed(() =>
+  selectedTemplates.value.map((item: any) => item.name),
+);
+
+const handleSelectedIdsUpdate = (ids: string[]) => {
+  const map = new Map(templates.value.map((r: any) => [r.name, r]));
+  // OTable's "Select All" header ignores `isRowSelectable` and emits every
+  // visible row's id; strip prebuilt rows here so they can never land in the
+  // bulk-delete payload.
+  selectedTemplates.value = ids
+    .map((id: any) => map.get(id))
+    .filter((r: any) => r && !r.isPrebuilt);
+};
+
+// Disables the individual row checkbox for prebuilt templates. The select-all
+// filtering happens in `handleSelectedIdsUpdate` above, since that's the only
+// signal we get when the header checkbox is used.
+const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
@@ -310,12 +312,15 @@ watch(
   },
 );
 
+const loading = ref(false);
 const getTemplates = () => {
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait while loading templates...",
-  });
+      timeout: 0,
+});
 
+  loading.value = true;
   templateService
     .list({
       org_identifier: store.state.selectedOrganization.identifier,
@@ -331,15 +336,15 @@ const getTemplates = () => {
     .catch((err) => {
       dismiss();
       if (err.response.status !== 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: "Error while pulling templates.",
-          timeout: 2000,
         });
       }
     })
     .finally(() => {
       dismiss();
+      loading.value = false;
     });
 };
 const updateRoute = () => {
@@ -363,6 +368,7 @@ const editTemplate = (template: any = null) => {
     });
   }
   resetEditingTemplate();
+  cloningTemplate.value = false;
   toggleTemplateEditor();
 
   const query: { [key: string]: string } = {
@@ -395,6 +401,30 @@ const editTemplate = (template: any = null) => {
 const resetEditingTemplate = () => {
   editingTemplate.value = null;
 };
+const cloneTemplate = (template: any) => {
+  track("Button Click", {
+    button: "Clone Template",
+    page: "Alert Templates",
+  });
+  // Pre-fill the editor with a copy of the source template. AddTemplate
+  // treats this as a create (since isClone=true), so the user can rename
+  // and save without overwriting the original.
+  // Underscored prefix because template names reject spaces and the other
+  // reserved characters (':', '#', '?', '&', '%', '/', quotes).
+  editingTemplate.value = {
+    ...template,
+    name: `Copy_of_${template.name}`,
+  };
+  cloningTemplate.value = true;
+  showTemplateEditor.value = true;
+  router.push({
+    name: "alertTemplates",
+    query: {
+      action: "add",
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
 const deleteTemplate = () => {
   if (confirmDelete.value?.data?.name) {
     templateService
@@ -403,20 +433,18 @@ const deleteTemplate = () => {
         template_name: confirmDelete.value.data.name,
       })
       .then(() => {
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Template ${confirmDelete.value.data.name} deleted successfully`,
-          timeout: 2000,
         });
 
         getTemplates();
       })
       .catch((err) => {
         if (err.response.data.code === 409) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: err.response.data.message,
-            timeout: 2000,
           });
         }
       });
@@ -482,11 +510,16 @@ const exportTemplate = (row: any) => {
 };
 
 const visibleRows = computed(() => {
-  if (!filterQuery.value) return templates.value || [];
-  return filterData(templates.value || [], filterQuery.value);
+  const base = templates.value || [];
+  const byTab =
+    activeTab.value === "prebuilt"
+      ? base.filter((t: any) => !!t.isPrebuilt)
+      : activeTab.value === "custom"
+        ? base.filter((t: any) => !t.isPrebuilt)
+        : base;
+  if (!filterQuery.value) return byTab;
+  return filterData(byTab, filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
 // Watch visibleRows to sync resultTotal with search filter
 watch(
   visibleRows,
@@ -513,22 +546,19 @@ const bulkDeleteTemplates = () => {
       const { successful, unsuccessful } = res.data;
 
       if (successful.length > 0 && unsuccessful.length === 0) {
-        q.notify({
-          type: "positive",
+        toast({
+          variant: "success",
           message: `Successfully deleted ${successful.length} template(s)`,
-          timeout: 2000,
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
-        q.notify({
-          type: "warning",
+        toast({
+          variant: "warning",
           message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
-          timeout: 3000,
         });
       } else if (unsuccessful.length > 0) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: `Failed to delete ${unsuccessful.length} template(s)`,
-          timeout: 2000,
         });
       }
 
@@ -542,13 +572,48 @@ const bulkDeleteTemplates = () => {
         err?.message ||
         "Error while deleting templates. Please try again.";
       if (err.response?.status != 403 || err?.status != 403) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: errorMessage,
-          timeout: 2000,
         });
       }
     });
 };
 </script>
-<style lang=""></style>
+<style lang="scss" scoped>
+// Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"
+// labels match the LLM-pricing list visually.
+.dimension-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid #d1d5db;
+  color: inherit;
+}
+
+.badge-blue {
+  border: 1px solid #1d4ed8;
+}
+
+.badge-green {
+  border: 1px solid #065f46;
+}
+
+:global(body.body--dark) .dimension-badge {
+  color: #ffffff;
+  border-color: #4b5563;
+}
+
+:global(body.body--dark) .badge-blue {
+  border-color: #93c5fd;
+}
+
+:global(body.body--dark) .badge-green {
+  border-color: #6ee7b7;
+}
+</style>

@@ -62,74 +62,6 @@ pub use file_downloader::{download_from_node, queue_download};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]
-async fn patch_sre_readonly_eval_templates() {
-    use bytes::Bytes;
-
-    const MIGRATION_ORG: &str = "_migration";
-    const FLAG_KEY: &str = "sre_readonly_eval_templates_v1";
-
-    // Already done — fast path, no cluster coordination needed
-    if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
-        .await
-        .is_ok()
-    {
-        return;
-    }
-
-    // Only the node with the lowest id runs the migration.
-    // Sorting by id is stable across restarts and requires no locking infrastructure.
-    // If the chosen node is down the next-lowest will not run it either — but the
-    // KV flag is only set on success, so the migration will retry on next startup.
-    let is_leader = infra::cluster::get_cached_online_nodes()
-        .await
-        .and_then(|mut nodes| {
-            nodes.sort_by_key(|n| n.id);
-            nodes.into_iter().next()
-        })
-        .map(|first| first.id == LOCAL_NODE.id)
-        .unwrap_or(true); // single-node / no cluster info → always run
-
-    if !is_leader {
-        log::debug!("patch_sre_readonly_eval_templates: not the lowest-id node, skipping");
-        return;
-    }
-
-    let orgs = match crate::service::db::organization::list(None).await {
-        Ok(orgs) => orgs,
-        Err(e) => {
-            log::error!("Failed to list orgs for sre-readonly eval_templates patch: {e}");
-            return;
-        }
-    };
-
-    let mut failed = false;
-    for org in orgs {
-        if let Err(e) =
-            o2_openfga::authorizer::roles::patch_sre_readonly_role_resources(&org.identifier).await
-        {
-            log::warn!(
-                "Failed to patch sre-readonly eval_templates for org '{}': {e}",
-                org.identifier
-            );
-            failed = true;
-        }
-    }
-
-    if failed {
-        log::warn!("sre-readonly eval_templates patch had failures — will retry on next startup");
-        return;
-    }
-
-    if let Err(e) =
-        crate::service::kv::set(MIGRATION_ORG, FLAG_KEY, Bytes::from_static(b"done")).await
-    {
-        log::error!("Failed to set sre_readonly_eval_templates migration flag: {e}");
-    } else {
-        log::info!("sre-readonly eval_templates patch complete");
-    }
-}
-
-#[cfg(feature = "enterprise")]
 async fn patch_sre_readonly_alerts_incidents() {
     use bytes::Bytes;
 
@@ -377,6 +309,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        if let Err(msg) =
+            config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
+        {
+            panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
+        }
         let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
@@ -422,6 +359,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("organizations cache failed");
     db::org_users::cache().await.expect("org user cache failed");
+    db::org_ingestion_tokens::cache()
+        .await
+        .expect("org ingestion tokens cache failed");
 
     db::organization::org_settings_cache()
         .await
@@ -430,6 +370,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // watch org users
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::watch());
     tokio::task::spawn(db::organization::watch());
 
     #[cfg(feature = "cloud")]
@@ -467,7 +408,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // One-time OpenFGA migrations — dist_lock ensures only one node runs each
         // migration even in multi-node deployments. KV flag prevents re-runs.
         backfill_sys_rca_agent_openfga_tuples().await;
-        patch_sre_readonly_eval_templates().await;
         patch_sre_readonly_alerts_incidents().await;
     }
 

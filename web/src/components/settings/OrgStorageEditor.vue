@@ -15,74 +15,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-none storage-settings-editor">
+  <div class="tw:p-0 storage-settings-editor">
     <!-- Header -->
-    <div class="row items-center no-wrap card-container  q-px-md tw:mb-[0.675rem]">
-      <div class="flex items-center tw:h-[60px]">
+    <div class="tw:flex tw:items-center tw:flex-nowrap card-container  tw:px-3 tw:mb-[0.675rem]">
+      <div class="tw:flex tw:items-center tw:h-[60px]">
         <div
           data-test="storage-settings-editor-back-btn"
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
+          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
           :title="t('storage_settings.goBack')"
           @click="emit('cancel')"
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+          <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <div class="text-h6" data-test="storage-settings-editor-title">
+        <div class="tw:text-xl tw:font-semibold" data-test="storage-settings-editor-title">
           {{ isEditMode ? t("storage_settings.updateStorage") : t("storage_settings.newStorageConfiguration") }}
         </div>
       </div>
     </div>
 
     <!-- Stepper -->
-    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 q-px-md tw:overflow-auto">
+    <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 tw:px-3 tw:overflow-auto">
     <div style="max-width: 720px;">
-      <q-form ref="storageForm" @submit="submitStorage">
-        <q-stepper
+      <OForm ref="storageForm" :default-values="{}" @submit="submitStorage">
+        <OStepper
           v-model="step"
           ref="stepper"
-          color="primary"
           animated
-          flat
-          class="modern-stepper"
+          :navigable="step > 1 && !isEditMode"
         >
           <!-- Step 1: Choose Provider -->
-          <q-step
+          <OStep
             :name="1"
             title="Choose Type"
             icon="cloud"
             :done="step > 1"
-            :header-nav="step > 1 && !isEditMode"
+            :navigable="step > 1 && !isEditMode"
           >
-            <div class="text-body2 text-grey q-mb-md">
+            <div class="tw:text-sm tw:text-gray-500 tw:mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
               once configured, all new data for this org will be written to your
               own storage infrastructure.
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
               :class="store.state.theme === 'dark'
                 ? 'tw:bg-amber-950/20 tw:border-amber-400/30'
                 : 'tw:bg-amber-50 tw:border-amber-300'"
             >
-              <q-icon name="warning" size="18px" color="warning" class="tw:flex-shrink-0 tw:mt-px" />
+              <OIcon name="warning" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
               <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                 This action is <strong>irreversible</strong>. Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.
               </div>
             </div>
             <div
               v-if="!isEditMode"
-              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+              class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
               :class="store.state.theme === 'dark'
                 ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                 : 'tw:bg-blue-50 tw:border-blue-200'"
             >
-              <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+              <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
               <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                 Once configured, only credential fields can be updated. All other fields will be locked.
               </div>
             </div>
-            <div class="text-subtitle2 q-mb-sm" style="font-weight: 500">
+            <div class="tw:text-sm tw:font-medium tw:mb-2" style="font-weight: 500">
               Select Storage Provider <span class="text-red">*</span>
             </div>
             <div class="destination-type-grid">
@@ -103,10 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :alt="provider.label"
                   class="card-image"
                 />
-                <q-icon
+                <OIcon
                   v-else
                   :name="provider.icon"
-                  size="28px"
+                  size="lg"
                   class="card-icon"
                 />
                 <div class="card-label">{{ provider.label }}</div>
@@ -114,192 +112,161 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="selectedProvider === provider.value"
                   class="check-icon"
                 >
-                  <q-icon name="check_circle" size="20px" color="positive" />
+                  <OIcon name="check" size="xs" />
                 </div>
               </div>
             </div>
-          </q-step>
+          </OStep>
 
           <!-- Step 2: Connection Details -->
-          <q-step
+          <OStep
             :name="2"
             title="Connection"
-            icon="settings_ethernet"
+            icon="lan"
             :done="step > 2"
-            :header-nav="step > 2"
+            :navigable="step > 2"
           >
-            <div class="q-gutter-sm">
+            <div class="tw:gap-2">
               <!-- AwsCredentials Fields -->
               <template v-if="selectedProvider === 'AwsCredentials'">
-                <q-input
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                />
-                <q-input
-                  data-test="storage-settings-region-input"
-                  v-model="formData.region"
-                  label="Region"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode || !!cloudRegion"
-                />
-                <q-input
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() || t('storage_settings.bucketNameRequired'),
-                  ]"
-                />
-                <q-input
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.access_key"
-                  label="Access Key *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() || t('storage_settings.accessKeyRequired'),
-                  ]"
-                />
-                <q-input
-                  data-test="storage-settings-secret-key-input"
-                  v-model="formData.secret_key"
-                  label="Secret Key *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  type="password"
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() || t('storage_settings.secretKeyRequired'),
-                  ]"
-                />
+                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                  />
+                  <OInput
+                    data-test="storage-settings-region-input"
+                    v-model="formData.region"
+                    label="Region"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode || !!cloudRegion"
+                  />
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.access_key"
+                    label="Access Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.access_key"
+                    :error-message="fieldErrors.access_key"
+                  />
+                  <OInput
+                    data-test="storage-settings-secret-key-input"
+                    v-model="formData.secret_key"
+                    label="Secret Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    type="password"
+                    :error="!!fieldErrors.secret_key"
+                    :error-message="fieldErrors.secret_key"
+                  />
+                </div>
               </template>
 
               <!-- AzureCredentials Fields -->
               <template v-if="selectedProvider === 'AzureCredentials'">
-                <q-input
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.storage_account"
-                  label="Storage Account Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.storageAccountRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-secret-key-input"
-                  v-model="formData.secret_key"
-                  label="Secret Key *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  type="password"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.secretKeyRequired')]"
-                />
-                <q-input
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                />
+                <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.storage_account"
+                    label="Storage Account Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                    :error="!!fieldErrors.storage_account"
+                    :error-message="fieldErrors.storage_account"
+                  />
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-secret-key-input"
+                    v-model="formData.secret_key"
+                    label="Secret Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    type="password"
+                    :error="!!fieldErrors.secret_key"
+                    :error-message="fieldErrors.secret_key"
+                  />
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                  />
+                </div>
               </template>
 
               <!-- GcpCredentials Fields -->
               <template v-if="selectedProvider === 'GcpCredentials'">
-                <q-input
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-access-key-input"
-                  v-model="formData.access_key"
-                  label="Access Key *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.accessKeyRequired')]"
-                />
-                <q-input
-                  v-if="!isCloud"
-                  data-test="storage-settings-server-url-input"
-                  v-model="formData.server_url"
-                  label="Server URL"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                />
+                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-access-key-input"
+                    v-model="formData.access_key"
+                    label="Access Key *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.access_key"
+                    :error-message="fieldErrors.access_key"
+                  />
+                  <OInput
+                    v-if="!isCloud"
+                    data-test="storage-settings-server-url-input"
+                    v-model="formData.server_url"
+                    label="Server URL"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                  />
+                </div>
               </template>
 
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] q-mb-md tw:rounded-[10px] tw:border"
+                  class="tw:flex tw:items-start tw:gap-[10px] tw:px-3 tw:py-[10px] tw:mb-3 tw:rounded-[10px] tw:border"
                   :class="store.state.theme === 'dark'
                     ? 'tw:bg-blue-950/20 tw:border-blue-400/20'
                     : 'tw:bg-blue-50 tw:border-blue-200'"
                 >
-                  <q-icon name="info" size="18px" color="primary" class="tw:flex-shrink-0 tw:mt-px" />
+                  <OIcon name="info" size="sm" class="tw:flex-shrink-0 tw:mt-px" />
                   <div class="tw:text-[0.82rem] tw:leading-[1.55] tw:text-[var(--o2-text-primary)]">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
@@ -309,64 +276,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </div>
                 </div>
-                <q-input
-                  data-test="storage-settings-bucket-name-input"
-                  v-model="formData.bucket_name"
-                  label="Bucket Name *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.bucketNameRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-region-input"
-                  v-model="formData.region"
-                  label="Region *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :disable="isEditMode || !!cloudRegion"
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.regionRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-role-arn-input"
-                  v-model="formData.role_arn"
-                  label="Role ARN *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.roleARNRequired')]"
-                />
-                <q-input
-                  data-test="storage-settings-role-external-id-input"
-                  v-model="formData.external_id"
-                  label="External Id *"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[(val: any) => !!val?.trim() || t('storage_settings.externalIdRequired')]"
-                />
+                 <div class="tw:flex tw:flex-col tw:gap-y-3">
+                  <OInput
+                    data-test="storage-settings-bucket-name-input"
+                    v-model="formData.bucket_name"
+                    label="Bucket Name *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode"
+                    :error="!!fieldErrors.bucket_name"
+                    :error-message="fieldErrors.bucket_name"
+                  />
+                  <OInput
+                    data-test="storage-settings-region-input"
+                    v-model="formData.region"
+                    label="Region *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :disabled="isEditMode || !!cloudRegion"
+                    :error="!!fieldErrors.region"
+                    :error-message="fieldErrors.region"
+                  />
+                  <OInput
+                    data-test="storage-settings-role-arn-input"
+                    v-model="formData.role_arn"
+                    label="Role ARN *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.role_arn"
+                    :error-message="fieldErrors.role_arn"
+                  />
+                  <OInput
+                    data-test="storage-settings-role-external-id-input"
+                    v-model="formData.external_id"
+                    label="External Id *"
+                    class="no-border showLabelOnTop"
+                    flat
+                    :error="!!fieldErrors.external_id"
+                    :error-message="fieldErrors.external_id"
+                  />
+                </div>
               </template>
             </div>
-          </q-step>
-        </q-stepper>
+          </OStep>
+        </OStepper>
 
         <!-- Form buttons -->
-        <div class="flex justify-start q-mb-md">
+        <div class="tw:flex tw:justify-start tw:mt-3">
           <div v-if="step === 1">
             <OButton
               data-test="step1-cancel-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] q-mr-sm"
+              class="o2-secondary-button tw:h-[36px] tw:mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -396,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               data-test="step2-back-btn"
               variant="outline"
-              class="o2-secondary-button tw:h-[36px] q-mr-sm"
+              class="o2-secondary-button tw:h-[36px] tw:mr-2"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-secondary-button-dark'
@@ -422,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-submit-btn"
               variant="primary"
-              class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
+              class="no-border tw:ml-2 o2-primary-button tw:h-[36px]"
               :class="
                 store.state.theme === 'dark'
                   ? 'o2-primary-button-dark'
@@ -434,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-      </q-form>
+      </OForm>
     </div>
     </div>
   </div>
@@ -446,11 +407,16 @@ import { ref, computed, onMounted, reactive, watch } from "vue";
 defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
   action: "add" | "edit";
@@ -463,11 +429,19 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
-const $q = useQuasar();
 
 const step = ref(1);
-const storageForm = ref(null);
 const selectedProvider = ref("");
+
+const fieldErrors = reactive<Record<string, string>>({
+  bucket_name: "",
+  access_key: "",
+  secret_key: "",
+  storage_account: "",
+  region: "",
+  role_arn: "",
+  external_id: "",
+});
 const existingConfig = ref<any>(null);
 
 const isEditMode = computed(() => props.action === "edit");
@@ -508,13 +482,11 @@ const providerDefinitions = [
   {
     label: "AWS Credentials",
     value: "AwsCredentials",
-    icon: "cloud",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
     label: "Azure Credentials",
     value: "AzureCredentials",
-    icon: "cloud",
     image: getImageURL("images/org_storage/azure.png"),
   },
   // for now we do not support gcp specifically, use the  aws route to use gcp
@@ -528,7 +500,6 @@ const providerDefinitions = [
   {
     label: "AWS Role ARN",
     value: "AwsRoleArn",
-    icon: "shield",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },
 ];
@@ -585,12 +556,37 @@ function buildDataPayload() {
   return data;
 }
 
+function validateStorageForm(): boolean {
+  Object.keys(fieldErrors).forEach((k) => (fieldErrors[k] = ""));
+  const p = selectedProvider.value;
+  if (p === "AwsCredentials") {
+    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
+    if (!formData.access_key?.trim()) fieldErrors.access_key = t("storage_settings.accessKeyRequired");
+    if (!formData.secret_key?.trim()) fieldErrors.secret_key = t("storage_settings.secretKeyRequired");
+  } else if (p === "AzureCredentials") {
+    if (!formData.storage_account?.trim()) fieldErrors.storage_account = t("storage_settings.storageAccountRequired");
+    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
+    if (!formData.secret_key?.trim()) fieldErrors.secret_key = t("storage_settings.secretKeyRequired");
+  } else if (p === "GcpCredentials") {
+    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
+    if (!formData.access_key?.trim()) fieldErrors.access_key = t("storage_settings.accessKeyRequired");
+  } else if (p === "AwsRoleArn") {
+    if (!formData.bucket_name?.trim()) fieldErrors.bucket_name = t("storage_settings.bucketNameRequired");
+    if (!formData.region?.trim()) fieldErrors.region = t("storage_settings.regionRequired");
+    if (!formData.role_arn?.trim()) fieldErrors.role_arn = t("storage_settings.roleARNRequired");
+    if (!formData.external_id?.trim()) fieldErrors.external_id = t("storage_settings.externalIdRequired");
+  }
+  return Object.values(fieldErrors).every((e) => !e);
+}
+
 async function submitStorage() {
-  const dismiss = $q.notify({
-    spinner: true,
+  if (!validateStorageForm()) return;
+
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
 
   const orgId = store.state.selectedOrganization.identifier;
   const payload = {
@@ -602,15 +598,15 @@ async function submitStorage() {
     if (isEditMode.value) {
       await orgStorageService.update(orgId, payload);
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Credentials updated successfully",
       });
     } else {
       await orgStorageService.create(orgId, payload);
       dismiss();
-      $q.notify({
-        type: "positive",
+      toast({
+        variant: "success",
         message: "Storage config created successfully",
       });
     }
@@ -618,8 +614,8 @@ async function submitStorage() {
   } catch (err: any) {
     if (err.response?.status === 403) return;
     dismiss();
-    $q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message:
         err.response?.data?.error ||
         err.response?.data?.message ||
@@ -654,8 +650,8 @@ onMounted(async () => {
         formData.storage_account = parsed.storage_account || "";
       }
     } catch {
-      $q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: "Failed to load existing storage config",
       });
     }
@@ -749,50 +745,24 @@ watch(selectedProvider, (newProvider) => {
 
   .check-icon {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 0.375rem;
+    right: 0.375rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--o2-positive);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
   }
 }
 </style>
 
 <style lang="scss">
 .storage-settings-editor {
-  .q-stepper {
-    background: transparent !important;
-  }
-
-  .modern-stepper {
-    box-shadow: none;
-
-    :deep(.q-stepper__header) {
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    :deep(.q-stepper__tab) {
-      padding: 16px 24px;
-    }
-
-    :deep(.q-stepper__tab--active) {
-      color: #1976d2;
-      font-weight: 600;
-    }
-
-    :deep(.q-stepper__tab--done) {
-      color: #4caf50;
-    }
-
-    :deep(.q-stepper__dot) {
-      width: 32px;
-      height: 32px;
-      font-size: 14px;
-      background: var(--o2-primary-btn-bg);
-    }
-
-    :deep(.q-stepper__step-inner) {
-      padding: 4px 0;
-    }
-  }
-
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0.275rem 0 0 !important;
   }

@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab List -->
       <TabList
         v-if="showTabs && selectedTabId !== null"
-        class="q-mt-sm"
+        class="tw:mt-2"
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
         @refresh="refreshDashboard"
@@ -202,21 +202,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
-                      class="panel-variables-container q-px-xs q-py-xs"
+                      class="panel-variables-container tw:px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper q-mb-sm"
+                        class="panel-time-picker-wrapper tw:mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
-                          v-model="panelTimeValues[item.id]"
+                          :modelValue="panelTimeValues[item.id]"
                           :auto-apply-dashboard="false"
                           size="sm"
                           class="panel-time-picker-widget"
-                          @update:modelValue="onPanelTimeApply(item.id)"
+                          @update:modelValue="
+                            (val) => onPanelTimeApply(item.id, val)
+                          "
                           :data-test="`panel-time-picker-${item.id}`"
                           :ref="
                             (el) => {
@@ -255,25 +257,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- view panel dialog -->
-      <q-dialog
-        v-model="showViewPanel"
-        :no-route-dismiss="true"
-        full-height
-        full-width
+      <ODialog
+        data-test="render-dashboard-charts-view-panel-dialog"
+        v-model:open="showViewPanel"
+        :width="98"
+        :show-close="false"
       >
-        <q-card style="overflow: hidden">
-          <ViewPanel
-            :folderId="folderId"
-            :dashboardId="dashboardData.dashboardId"
-            :panelId="viewPanelId"
-            :selectedDateForViewPanel="viewPanelSelectedDate"
-            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
-            :searchType="searchType"
-            @close-panel="() => (showViewPanel = false)"
-            @update:initial-variable-values="updateInitialVariableValues"
-          />
-        </q-card>
-      </q-dialog>
+        <ViewPanel
+          :folderId="folderId"
+          :dashboardId="dashboardData.dashboardId"
+          :panelId="viewPanelId"
+          :selectedDateForViewPanel="viewPanelSelectedDate"
+          :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+          :searchType="searchType"
+          @close-panel="() => (showViewPanel = false)"
+          @update:initial-variable-values="updateInitialVariableValues"
+        />
+      </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
         <NoPanel @update:Panel="addPanelData" :view-only="viewOnly" />
@@ -286,7 +286,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import {
   computed,
-  defineAsyncComponent,
   defineComponent,
   onActivated,
   onMounted,
@@ -326,11 +325,12 @@ import {
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
-import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
-
-const ViewPanel = defineAsyncComponent(() => {
-  return import("@/components/dashboards/viewPanel/ViewPanel.vue");
-});
+import {
+  panelDownloadRegistry,
+  panelCsvRegistry,
+} from "@/utils/panelDownloadRegistry";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
 
 export default defineComponent({
   name: "RenderDashboardCharts",
@@ -402,6 +402,7 @@ export default defineComponent({
     VariablesValueSelector,
     ViewPanel,
     TabList,
+    ODialog,
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();
@@ -1143,7 +1144,7 @@ export default defineComponent({
           // Mark new tab as visible - variables will load if ready
           variablesManager.setTabVisibility(newTabId, true);
 
-          // Mark old tab as hidden (optional - for cleanup)
+          // Mark old tab as tw:hidden (optional - for cleanup)
           if (oldTabId && oldTabId !== newTabId) {
             variablesManager.setTabVisibility(oldTabId, false);
           }
@@ -1245,7 +1246,14 @@ export default defineComponent({
         const currentDateTime = innerDateTimePicker.getConsumableDateTime();
 
         if (currentDateTime) {
-          panelTimeValues.value[panelId] = currentDateTime;
+          if (
+            !arePickerValuesEqual(
+              panelTimeValues.value[panelId],
+              currentDateTime,
+            )
+          ) {
+            panelTimeValues.value[panelId] = currentDateTime;
+          }
         }
       } finally {
         // Unmark after a short delay to allow events to settle
@@ -1369,6 +1377,25 @@ export default defineComponent({
       return props.selectedDateForViewPanel;
     });
 
+    // Semantic equality for picker values — used in both initializePanelTimes and onPanelTimeApply.
+    // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
+    // so we compare semantically: for relative, only compare the period string.
+    const arePickerValuesEqual = (v1: any, v2: any) => {
+      if (!v1 || !v2) return v1 === v2;
+
+      const type1 = v1.valueType || v1.type;
+      const type2 = v2.valueType || v2.type;
+      if (type1 !== type2) return false;
+
+      // For relative: only the period matters (startTime/endTime are computed & change over time)
+      if (type1 === "relative") {
+        return v1.relativeTimePeriod === v2.relativeTimePeriod;
+      }
+
+      // For absolute: compare start and end times
+      return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
+    };
+
     // Initialize panel time values for panels with panel-level time enabled
     const initializePanelTimes = () => {
       panels.value?.forEach((panel: any) => {
@@ -1378,25 +1405,6 @@ export default defineComponent({
 
           // Mark this panel as initializing to prevent change events
           panelsInitializing.value.add(panelId);
-
-          // Helper to check if two picker values represent the same time
-          // DateTimePickerDashboard normalizes values (adds startTime/endTime, may drop "type"),
-          // so we compare semantically: for relative, only compare the period string
-          const arePickerValuesEqual = (v1: any, v2: any) => {
-            if (!v1 || !v2) return v1 === v2;
-
-            const type1 = v1.valueType || v1.type;
-            const type2 = v2.valueType || v2.type;
-            if (type1 !== type2) return false;
-
-            // For relative: only the period matters (startTime/endTime are computed & change over time)
-            if (type1 === "relative") {
-              return v1.relativeTimePeriod === v2.relativeTimePeriod;
-            }
-
-            // For absolute: compare start and end times
-            return v1.startTime === v2.startTime && v1.endTime === v2.endTime;
-          };
 
           // When panel has no custom time (panel_time_range is null) and no URL panel params,
           // use local convertGlobalTimeToPickerFormat which preserves relative/absolute type
@@ -1472,7 +1480,7 @@ export default defineComponent({
     };
 
     // Handle Apply button click on panel time picker
-    const onPanelTimeApply = async (panelId: string) => {
+    const onPanelTimeApply = async (panelId: string, newValue?: any) => {
       // Guard against infinite recursion during state synchronization
       if (panelsSyncingDateTime.value.has(panelId)) {
         return;
@@ -1482,6 +1490,20 @@ export default defineComponent({
       // This prevents null-config panels from creating spurious URL params
       if (panelsInitializing.value.has(panelId)) {
         return;
+      }
+
+      // Skip when DateTime.vue emits its current value on mount (open-picker cascade).
+      // We use :modelValue (not v-model) so panelTimeValues is NOT auto-written before
+      // this handler runs — enabling a true before/after equality check here.
+      if (
+        newValue &&
+        arePickerValuesEqual(panelTimeValues.value[panelId], newValue)
+      ) {
+        return;
+      }
+
+      if (newValue) {
+        panelTimeValues.value[panelId] = newValue;
       }
 
       // Use the local helper which handles state syncing, URL update and variable freeze for this panel
@@ -1555,7 +1577,10 @@ export default defineComponent({
       // Report-server helper — returns { [panelId]: { title, csv } } as a plain
       // JS object so the report server can capture it via page.evaluate().
       // Usage:  window.oo_getAllPanelsCsv()
-      (window as any).oo_getAllPanelsCsv = (): Record<string, { title: string; csv: string }> => {
+      (window as any).oo_getAllPanelsCsv = (): Record<
+        string,
+        { title: string; csv: string }
+      > => {
         const result: Record<string, { title: string; csv: string }> = {};
         panelCsvRegistry.forEach((fn, id) => {
           try {
@@ -1736,13 +1761,33 @@ export default defineComponent({
 }
 
 @media print {
-  /* Prevent panel content from expanding beyond its allocated grid cell.
-   * Without this, tables with many rows (position:static in print mode)
-   * can grow taller than the cell, pushing the grid container's height up
-   * while other absolutely-positioned panels stay at their original pixel
-   * offsets — causing visible overlap across printed pages. */
+  /* Multi-page print at the EXACT layout the dashboard renders on screen.
+   *
+   * GridStack writes inline `position: absolute; top/left/width/height; px`
+   * onto every `.grid-stack-item` and an explicit `height` onto `.grid-stack`
+   * equal to the lowest panel bottom. Browsers paginate absolutely-positioned
+   * content correctly when the containing block has a real height and no
+   * ancestor clips with `overflow: hidden|auto|scroll` or a viewport-locked
+   * height — so all we do here is keep the grid intact and clear those clips.
+   *
+   * (Do NOT convert panels to `position: static` — that changes the visual
+   * layout to a single-column stack.) */
+  .grid-stack {
+    /* keep GridStack's inline height — it's the true content height */
+    overflow: visible !important;
+  }
+
+  .grid-stack-item {
+    /* keep absolute positioning + computed top/left/width/height */
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Drop the previous `overflow: hidden` — it was clipping each panel to
+   * its grid-cell rectangle for the on-screen layout but, paired with
+   * print pagination, prevents browsers from honouring panel heights. */
   .grid-stack-item-content {
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   /* Quasar virtual-scroll inserts padding divs above/below the rendered
@@ -1751,5 +1796,12 @@ export default defineComponent({
   :deep(.q-virtual-scroll__padding) {
     display: none !important;
   }
+}
+
+/* Print page setup — landscape A4 fits the dashboard width better than
+ * portrait, with a small margin so charts don't bleed to the edge. */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
 }
 </style>

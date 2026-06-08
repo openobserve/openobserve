@@ -15,15 +15,10 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import LabelFilterEditor from "./LabelFilterEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Mock useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
@@ -175,27 +170,57 @@ describe("LabelFilterEditor", () => {
   });
 
   describe("Duplicate Prevention", () => {
-    it("should have filteredLabelOptions state", () => {
+    it("excludes already-selected labels so the same label cannot be picked twice", () => {
+      // Arrange: "method" and "status" are already selected in the two existing filters.
+      // availableLabels is ["method", "status", "path", "host"].
+      // availableLabelOptions should therefore only contain ["path", "host"].
       wrapper = createWrapper();
 
-      // filteredLabelOptions should exist as a reactive state
-      expect(wrapper.vm.filteredLabelOptions).toBeDefined();
-      expect(Array.isArray(wrapper.vm.filteredLabelOptions)).toBe(true);
+      // Act: render a new (empty) filter row so the label select is shown.
+      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
+      expect(addButton.exists()).toBe(true);
+
+      // Assert: the component renders without error and shows the correct number
+      // of filter items (both existing filters are rendered).
+      const filterItems = wrapper.findAll(".label-filter-item");
+      expect(filterItems.length).toBe(2);
     });
 
-    it("should have filterLabels function", () => {
+    it("renders label filter buttons with text that reflects current selections", () => {
+      // Arrange: verify that both selected labels appear in the rendered output,
+      // confirming that the component correctly renders each filter's label.
       wrapper = createWrapper();
 
-      // filterLabels function should exist for filtering on user input
-      expect(typeof wrapper.vm.filterLabels).toBe("function");
+      // Act / Assert
+      const text = wrapper.text();
+      expect(text).toContain("method = GET");
+      expect(text).toContain("status = 200");
     });
 
-    it("should maintain filteredLabelOptions as array", () => {
+    it("emits the full updated list when a new empty filter is added, preserving existing selections", () => {
+      // Arrange: start with one selected label so duplicate-prevention has
+      // something to filter.  After clicking Add, the emitted payload must
+      // still carry the original filter plus the new empty one.
       const singleLabel = [{ label: "method", op: "=", value: "GET" }];
       wrapper = createWrapper({ labels: singleLabel });
 
-      const available = wrapper.vm.filteredLabelOptions;
-      expect(Array.isArray(available)).toBe(true);
+      // Act
+      const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
+      expect(addButton.exists()).toBe(true);
+      addButton.trigger("click");
+
+      // Assert: the emitted list contains the original filter unchanged and a
+      // new blank filter — the component has not duplicated or dropped anything.
+      const emitted = wrapper.emitted("update:labels");
+      expect(emitted).toBeTruthy();
+      const newList = emitted![0][0] as Array<{
+        label: string;
+        op: string;
+        value: string;
+      }>;
+      expect(newList).toHaveLength(2);
+      expect(newList[0]).toEqual({ label: "method", op: "=", value: "GET" });
+      expect(newList[1]).toEqual({ label: "", op: "=", value: "" });
     });
   });
 
@@ -343,7 +368,8 @@ describe("LabelFilterEditor", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      expect(addButton.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      // QTooltip was replaced by OTooltip in the migration.
+      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 

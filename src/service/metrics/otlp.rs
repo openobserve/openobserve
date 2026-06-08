@@ -161,8 +161,7 @@ pub async fn handle_otlp_request(
     // End get user defined schema
 
     // associated pipeline
-    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
-        HashMap::new();
+    let mut stream_executable_pipelines: HashMap<String, Vec<ExecutablePipeline>> = HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, Vec<json::Value>> = HashMap::new();
 
     // realtime alerts
@@ -214,7 +213,7 @@ pub async fn handle_otlp_request(
                 // get stream pipeline
                 if !stream_executable_pipelines.contains_key(&metric_name) {
                     let pipeline_params =
-                        crate::service::ingestion::get_stream_executable_pipeline(&stream_param)
+                        crate::service::ingestion::get_stream_executable_pipelines(&stream_param)
                             .await;
                     stream_executable_pipelines.insert(metric_name.clone(), pipeline_params);
                 }
@@ -343,7 +342,7 @@ pub async fn handle_otlp_request(
                         // get stream pipeline
                         if !stream_executable_pipelines.contains_key(&local_metric_name) {
                             let pipeline_params =
-                                crate::service::ingestion::get_stream_executable_pipeline(
+                                crate::service::ingestion::get_stream_executable_pipelines(
                                     &stream_param,
                                 )
                                 .await;
@@ -363,8 +362,7 @@ pub async fn handle_otlp_request(
                     // ready to be buffered for downstream processing
                     if stream_executable_pipelines
                         .get(&local_metric_name)
-                        .unwrap()
-                        .is_some()
+                        .is_some_and(|v| !v.is_empty())
                     {
                         stream_pipeline_inputs
                             .entry(local_metric_name.clone())
@@ -393,8 +391,11 @@ pub async fn handle_otlp_request(
     }
 
     // process records buffered for pipeline processing
-    for (stream_name, exec_pl_option) in &stream_executable_pipelines {
-        if let Some(exec_pl) = exec_pl_option {
+    for (stream_name, pipelines) in &stream_executable_pipelines {
+        if pipelines.is_empty() {
+            continue;
+        }
+        for exec_pl in pipelines {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 let err_msg = format!(
                     "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG",
@@ -528,7 +529,7 @@ pub async fn handle_otlp_request(
             let need_trigger = !stream_trigger_map.contains_key(&local_metric_name);
             if need_trigger && !stream_alerts_map.is_empty() {
                 // Start check for alert trigger
-                let key = format!("{}/{}/{}", &org_id, StreamType::Metrics, local_metric_name);
+                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, local_metric_name);
                 if let Some(alerts) = stream_alerts_map.get(&key) {
                     let mut trigger_alerts: TriggerAlertData = Vec::new();
                     let alert_end_time = now_micros();
@@ -578,14 +579,11 @@ pub async fn handle_otlp_request(
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
-        let fns_length: usize =
-            stream_executable_pipelines
-                .get(&stream_name)
-                .map_or(0, |exec_pl_option| {
-                    exec_pl_option
-                        .as_ref()
-                        .map_or(0, |exec_pl| exec_pl.num_of_func())
-                });
+        let fns_length: usize = stream_executable_pipelines
+            .get(&stream_name)
+            .map_or(0, |pipelines| {
+                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
+            });
         req_stats.response_time = start.elapsed().as_secs_f64();
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {

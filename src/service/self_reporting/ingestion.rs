@@ -128,7 +128,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
         let creds = if cfg.common.usage_reporting_creds.starts_with("Basic") {
             cfg.common.usage_reporting_creds.to_string()
         } else {
-            format!("Basic {}", &cfg.common.usage_reporting_creds)
+            format!("Basic {}", cfg.common.usage_reporting_creds)
         };
         match reqwest::Client::new()
             .post(url)
@@ -226,31 +226,35 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     if org_id == META_ORG_ID {
                         continue;
                     }
-
-                    // Check if org has usage stream enabled
-                    match crate::service::db::organization::get_org_setting_usage_stream_enabled(
-                        org_id,
-                    )
-                    .await
-                    {
-                        Ok(true) => {
-                            per_org_map
-                                .entry(org_id.to_string())
-                                .or_default()
-                                .push(usage.clone());
-                        }
-                        Ok(false) => continue,
-                        Err(e) => {
-                            log::debug!(
-                                "[SELF-REPORTING] Could not check usage_stream_enabled for {org_id}: {e}"
-                            );
-                            continue;
-                        }
-                    }
+                    per_org_map
+                        .entry(org_id.to_string())
+                        .or_default()
+                        .push(usage.clone());
                 }
             }
 
             for (org, values) in per_org_map {
+                // report to super org as well
+                #[cfg(feature = "cloud")]
+                if let Err(e) = send_to_super_org(&org, &values).await {
+                    log::error!("error in reporting usage of {org} to super org : {e}");
+                }
+                // do not skip self-reporting even if super org reporting fails
+
+                // Check if org has usage stream enabled
+                match crate::service::db::organization::get_org_setting_usage_stream_enabled(&org)
+                    .await
+                {
+                    Ok(true) => {}
+                    Ok(false) => continue, // self-report not enabled, so skip
+                    Err(e) => {
+                        log::error!(
+                            "[SELF-REPORTING] Could not check usage_stream_enabled for {org}: {e}"
+                        );
+                        continue;
+                    }
+                }
+
                 if let Err(e) = super::usage_schema::ensure_usage_stream_initialized(&org).await {
                     log::warn!(
                         "[SELF-REPORTING] Failed to ensure usage stream initialized for {org}: {e}"
@@ -362,6 +366,52 @@ pub async fn ingest_data_retention_usages(data_retention_usages: Vec<DataRetenti
     if let Err(e) = ingest_reporting_data(report_data, data_retention_stream).await {
         log::error!("[SELF-REPORTING] Error in ingesting data retention usage: {e}");
     }
+}
+
+#[cfg(feature = "cloud")]
+pub async fn send_to_super_org(org_id: &str, usage: &[json::Value]) -> Result<()> {
+    use o2_enterprise::enterprise::cloud::{
+        billing_group::list_billing_membership_of,
+        billings::{MeteringProvider, get_billing_by_org_id},
+    };
+
+    let info = get_billing_by_org_id(&org_id).await.inspect_err(|e| {
+        log::error!("error getting billing info of {org_id} for super org reporting :{e}");
+    })?;
+
+    if let Some(billing) = info
+        && billing.provider == MeteringProvider::SuperOrg
+    {
+        let membership = list_billing_membership_of(&org_id).await.inspect_err(|e| {
+            log::error!(
+                "error listing billing membership of {org_id} for super org usage reporting : {e}"
+            );
+        })?;
+        if let Some(m) = membership {
+            if let Err(e) =
+                super::usage_schema::ensure_usage_stream_initialized(&m.payer_org_id).await
+            {
+                log::warn!(
+                    "[SELF-REPORTING] Failed to ensure usage stream initialized for super org {}: {e}",
+                    m.payer_org_id
+                );
+            }
+
+            let org_usage_stream =
+                StreamParams::new(&m.payer_org_id, USAGE_STREAM, StreamType::Logs);
+            if let Err(e) = ingest_reporting_data(usage.to_vec(), org_usage_stream).await {
+                log::error!(
+                    "[SELF-REPORTING] Error ingesting usage data for super org {}: {e}",
+                    m.payer_org_id
+                );
+            }
+        } else {
+            log::error!(
+                "org {org_id} is supposed to be a super org member, but no membership record found for super org usage reporting"
+            );
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

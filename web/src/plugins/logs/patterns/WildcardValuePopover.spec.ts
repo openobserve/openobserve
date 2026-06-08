@@ -15,14 +15,8 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [quasar.Notify],
-});
 
 describe("WildcardValuePopover", () => {
   let wrapper: VueWrapper<any>;
@@ -47,6 +41,18 @@ describe("WildcardValuePopover", () => {
     return el;
   };
 
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size"],
+    emits: ["click"],
+    template: '<button :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\')"><slot /></button>',
+  };
+  const OIconStub = {
+    name: "OIcon",
+    props: ["name", "size"],
+    template: '<span data-test-stub="o-icon" />',
+  };
+
   const mountComponent = (overrides: Record<string, unknown> = {}) => {
     return mount(WildcardValuePopover, {
       props: {
@@ -58,6 +64,10 @@ describe("WildcardValuePopover", () => {
       },
       global: {
         plugins: [i18n],
+        stubs: {
+          OButton: OButtonStub,
+          OIcon: OIconStub,
+        },
       },
       attachTo: document.body,
     });
@@ -182,15 +192,17 @@ describe("WildcardValuePopover", () => {
   });
 
   describe("color scheme", () => {
-    it("should apply correct header color for <*> token", () => {
-      const headerEl = wrapper.find(".wildcard-popover-header");
+    it("should render the header for <*> token", () => {
+      const headerEl = wrapper.find(".wcp__header");
       expect(headerEl.exists()).toBe(true);
-      expect(headerEl.classes().some((c) => c.includes("wildcard-header"))).toBe(true);
+      // bar color class is applied to the fill, not the header
+      const barFill = wrapper.find(".wcp__bar-fill");
+      expect(barFill.exists()).toBe(true);
     });
 
-    it("should apply correct header color for <:IP> token", () => {
+    it("should render the header for <:IP> token", () => {
       wrapper = mountComponent({ token: "<:IP>", displayValues: [{ value: "10.0.0.1", count: 5 }] });
-      const headerEl = wrapper.find(".wildcard-popover-header");
+      const headerEl = wrapper.find(".wcp__header");
       expect(headerEl.exists()).toBe(true);
     });
   });

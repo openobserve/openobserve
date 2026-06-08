@@ -43,8 +43,9 @@ use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_fields,
-        get_stream_setting_index_updated_at, unwrap_stream_created_at, unwrap_stream_settings,
+        get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
+        get_stream_setting_index_fields, get_stream_setting_index_updated_at,
+        unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
 use itertools::Itertools;
@@ -157,6 +158,10 @@ pub async fn search(
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
     let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .filter(|v| latest_schema_map.contains_key(v))
+        .collect_vec();
+    let bloom_indexed_fields = get_stream_setting_bloom_filter_fields(&stream_settings)
         .into_iter()
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
@@ -295,6 +300,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            bloom_indexed_fields.clone(),
             storage_idx_optimize_rule,
         )
         .await
@@ -855,7 +861,9 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(RewriteHistogram::new(start_time, end_time, 60)))
+            .with_optimizer_rule(Arc::new(RewriteHistogram::new(
+                start_time, end_time, 60, None,
+            )))
             .build();
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("default", schema.clone());

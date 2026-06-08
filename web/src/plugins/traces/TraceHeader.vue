@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center header-bg bg-grey-2 trace-header-container"
-    :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-gray-100 trace-header-container"
+    :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -26,25 +26,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
+      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2 trace-header-left"
       :style="{
         width: splitterWidth + 'px',
       }"
       data-test="trace-header-operation-name"
     >
       Operation Name
-      <q-avatar
-        color="primary"
-        text-color="white"
-        size="1.25rem"
-        icon="drag_indicator"
-        class="resize-btn"
+      <div
+        class="resize-btn tw:bg-[var(--o2-primary)] tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
-      />
+      >
+        <OIcon name="drag-indicator" size="sm"  />
+      </div>
     </div>
     <div
-      class="flex justify-start items-center no-wrap row relative-position trace-header-right"
+      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative trace-header-right"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -54,25 +52,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div
-        class="col-3 text-caption q-pl-md"
+        class="tw:w-1/4 tw:text-xs tw:pl-3"
         data-test="trace-header-tic-label-0"
       >
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
       <div
-        class="col-3 text-caption q-pl-xs"
+        class="tw:w-1/4 tw:text-xs tw:pl-1"
         data-test="trace-header-tic-label-1"
       >
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
       <div
-        class="col-3 text-caption q-pl-xs"
+        class="tw:w-1/4 tw:text-xs tw:pl-1"
         data-test="trace-header-tic-label-2"
       >
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="col-3 text-caption flex justify-between items-center q-px-xs"
+        class="tw:w-1/4 tw:text-xs tw:flex tw:justify-between tw:items-center tw:px-1"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -98,9 +96,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "TraceNavbar",
+  components: { OIcon },
   props: {
     baseTracePosition: {
       type: Object,
@@ -175,6 +175,7 @@ $traceChartHeight: 250px;
 
 .trace-tic-first {
   z-index: 5;
+  display: none;
 }
 
 .header-bg {

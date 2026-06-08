@@ -15,22 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tabContent">
-    <div class="tabContent__head">
-      <div>
-        <div class="copy_action">
-          <OButton
-            data-test="rum-copy-btn"
-            variant="ghost"
-            size="icon"
-            @click="copyToClipboardFn()"
-          >
-            <q-icon name="content_copy" size="16px" />
-          </OButton>
-        </div>
-      </div>
+  <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block">
+    <div class="tw:absolute tw:top-2 tw:right-2 tw:z-10">
+      <OButton
+        data-test="rum-copy-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        @click="copyToClipboardFn()"
+      >
+        <OIcon name="content-copy" size="sm" />
+        <OTooltip content="Copy" side="top" />
+      </OButton>
     </div>
-    <pre data-test="rum-content-text">{{ computedContent }}</pre>
+    <pre data-test="rum-content-text" class="tw:text-sm tw:whitespace-pre-wrap tw:wrap-break-word tw:m-0 tw:p-3 tw:pr-10 tw:leading-5">{{ computedContent }}</pre>
   </div>
 </template>
 
@@ -39,13 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton },
+  components: { OButton,
+    OIcon,
+    OTooltip,
+},
   props: {
     content: {
       type: String,
@@ -59,7 +61,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const q = useQuasar();
     const email = ref(store.state.userInfo.email);
     const passcode = ref(store.state.organizationData.organizationPasscode);
     const basicPasscode = ref();
@@ -68,7 +69,7 @@ export default defineComponent({
       email.value = store.state.userInfo.email;
       passcode.value = store.state.organizationData.organizationPasscode;
       basicPasscode.value = b64EncodeStandard(
-        `${store.state.userInfo.email}:${store.state.organizationData.organizationPasscode}`
+        `${email.value}:${store.state.organizationData.organizationPasscode}`
       );
       if (isMask) {
         return data
@@ -85,21 +86,11 @@ export default defineComponent({
 
     const copyToClipboardFn = () => {
       const content = replaceValues(props.content, false);
-      copyToClipboard(content)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
-          });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
+      copyToClipboard(content, {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     };
 
     const displayData = ref(props.displayContent || props.content);
@@ -136,3 +127,15 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+.copy-content-block {
+  background-color: rgba(136, 136, 136, 0.103);
+}
+.dark-mode .copy-content-block {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.light-mode .copy-content-block {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+</style>

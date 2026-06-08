@@ -1,34 +1,31 @@
 ﻿<template>
   <div
+    data-test="dynamic-function-popup-root"
     :class="
       !customQuery && !fields.isDerived
         ? 'tw:flex tw:gap-2'
-        : 'tw:flex tw:flex-col tw:gap-2'
+        : 'tw:flex tw:flex-col tw:gap-y-2'
     "
   >
-    <div style="width: auto; padding-right: 12px; padding-top: 12px">
-      <div class="text-label-bold tw:pb-3">Property</div>
+    <div style="width: auto; flex-shrink: 0;">
+      <div class="text-label-bold tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="text-label-normal tw:text-sm">Label</div>
-          <input
+          <div class="text-label-normal tw:text-sm" data-test="dynamic-function-popup-label-text">Label</div>
+          <OInput
             v-model="fields.label"
-            :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
-              'edit-input',
-            ]"
+            size="sm"
+            class="tw:w-full"
             data-test="dynamic-function-popup-label-input"
           />
         </div>
         <div>
           <div class="text-label-normal tw:text-sm">Alias</div>
-          <input
+          <OInput
             v-model="fields.alias"
+            size="sm"
             disabled
-            :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
-              'edit-input',
-            ]"
+            class="tw:w-full"
             data-test="dynamic-function-popup-alias-input"
           />
         </div>
@@ -41,7 +38,7 @@
     <div
       :style="
         !customQuery && !fields.isDerived
-          ? 'width: calc(100% - 134px); display: flex; flex-direction: column;'
+          ? 'flex: 1; min-width: 0; display: flex; flex-direction: column;'
           : 'width: max-content;'
       "
     >
@@ -65,7 +62,7 @@
         />
       </OTabs>
 
-      <q-separator v-if="!customQuery && !fields.isDerived" />
+      <OSeparator v-if="!customQuery && !fields.isDerived" />
 
       <OTabPanels
         v-if="!customQuery && !fields.isDerived"
@@ -73,29 +70,25 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="tw:pt-2">
-          <div style="display: flex">
-            <div style="width: calc(100% - 134px)">
-              <div class="text-label-bold tw:pb-3">Configuration</div>
-              <SelectFunction
-                v-model="fields"
-                data-test="dynamic-function-popup-select-function"
-                :allowAggregation="allowAggregation"
-              />
-            </div>
-          </div>
+          <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
+            <div class="text-label-bold tw:pb-3">Configuration</div>
+            <SelectFunction
+              v-model="fields"
+              data-test="dynamic-function-popup-select-function"
+              :allowAggregation="allowAggregation"
+            />
           </div>
         </OTabPanel>
         <OTabPanel name="raw">
           <div class="tw:pt-2">
-          <div style="display: flex; width: 100%">
-            <div style="width: 100%; padding-right: 12px">
-              <RawQueryBuilder
-                v-model="fields"
-                data-test="dynamic-function-popup-raw-query-builder"
-              />
+            <div style="display: flex; width: 100%">
+              <div style="width: 100%; padding-right: 0.75rem">
+                <RawQueryBuilder
+                  v-model="fields"
+                  data-test="dynamic-function-popup-raw-query-builder"
+                />
+              </div>
             </div>
-          </div>
           </div>
         </OTabPanel>
       </OTabPanels>
@@ -113,8 +106,8 @@
             @click="toggleHavingFilter"
             v-if="!isHavingFilterVisible()"
             data-test="dynamic-function-popup-having-add-btn"
+            icon-left="add"
           >
-            <template #icon-left><q-icon name="add" /></template>
             Add
           </OButton>
         </div>
@@ -123,21 +116,16 @@
           class="tw:flex tw:space-x-2 tw:items-center"
           v-if="isHavingFilterVisible()"
         >
-          <q-select
-            dense
-            filled
+          <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            borderless
-            style="width: 60px"
+            class="tw:w-[60px]"
             data-test="dynamic-function-popup-having-operator"
           />
 
-          <q-input
-            dense
-            filled
+          <OInput
             v-model.number="getHavingCondition().value"
-            style="width: 50%"
+            class="tw:w-1/2"
             type="number"
             placeholder="Value"
             data-test="dynamic-function-popup-having-value"
@@ -148,25 +136,23 @@
             size="icon"
             @click="cancelHavingFilter"
             data-test="dynamic-function-popup-having-cancel-btn"
+            icon-left="close"
           >
-            <template #icon-left><q-icon name="close" /></template>
           </OButton>
         </div>
       </div>
-      <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
+      <div v-if="chartType === 'table'" class="tw:mt-2 tw:mb-2">
         <div>
-          <q-checkbox
+          <OCheckbox
             v-model="fields.treatAsNonTimestamp"
-            :label="'Mark this field as non-timestamp'"
-            dense
+            label="Mark this field as non-timestamp"
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
-        <div class="q-mt-xs">
-          <q-checkbox
+        <div class="tw:mt-1">
+          <OCheckbox
             v-model="fields.showFieldAsJson"
-            :label="'Render Data as JSON / Array'"
-            dense
+            label="Render Data as JSON / Array"
             data-test="dynamic-function-popup-show-field-as-json"
           />
         </div>
@@ -187,6 +173,10 @@ import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default {
   name: "DynamicFunctionPopUp",
   components: {
@@ -198,6 +188,10 @@ export default {
     OTabPanels,
     OTabPanel,
     OButton,
+    OSelect,
+    OInput,
+    OCheckbox,
+    OSeparator,
   },
   props: {
     modelValue: {
@@ -273,7 +267,7 @@ export default {
       }
 
       if (!fields.value.havingConditions.length) {
-        fields.value.havingConditions.push({ operator: null, value: null });
+        fields.value.havingConditions.push({ operator: "=", value: null });
       }
 
       await nextTick();
@@ -343,6 +337,12 @@ export default {
 
   &:focus {
     border-color: var(--q-primary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--o2-primary-background);
   }
 }
 </style>

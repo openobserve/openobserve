@@ -16,21 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="tw:h-full">
-    <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
+  <div class="tw:rounded-md tw:h-[calc(100vh-var(--navbar-height))] tw:overflow-hidden">
+    <!-- <div class="head tw:text-xl tw:tracking-[0.005em] tw:mx-2 tw:mb-2 tw:px-2 tw:py-2 o2-management-header">
       {{ t("settings.header") }}
     </div> -->
-      <q-splitter
+      <OSplitter
       class="logs-splitter-smooth tw:overflow-hidden"
-      v-model="splitterModel"
+      :model-value="splitterModel"
+      @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 400]"
       unit="px"
     >
-      <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs tw:overflow-hidden">
+      <template #before>
+        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] tw:pt-1 tw:overflow-hidden">
           <div class="card-container tw:mb-[0.625rem]" style="height: calc(100vh - var(--navbar-height) - 15px)">
-            <div class="flex tw:h-[calc(100vh-50px)]">
-              <div class="full-width" v-if="showManagementTabs">
+            <div class="tw:flex tw:h-[calc(100vh-50px)]">
+              <div class="tw:w-full" v-if="showManagementTabs">
                 <OTabs
                   class="management-tabs"
                   v-model="settingsTab"
@@ -39,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ORouteTab
                   name="queryManagement"
                   :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  icon="query_stats"
+                  icon="query-stats"
                   :label="t('settings.queryManagement')"
                   v-if="config.isEnterprise == 'true' && isMetaOrg"
                 />
@@ -57,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :label="t('settings.nodes')"
                 />
                 <ORouteTab
+                  data-test="general-settings-tab"
                   name="general"
                   :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
                   icon="settings"
@@ -64,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </ORouteTab>
                 <ORouteTab
+                  data-test="organization-settings-tab"
                   name="organization"
                   :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
                   icon="business"
@@ -80,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="domain"
+                  icon="dns"
                   :label="t('settings.ssoDomainRestrictions')"
                 />
                 <ORouteTab
@@ -92,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="location_on"
+                  icon="location-on"
                   :label="t('alert_destinations.header')"
                 >
                 </ORouteTab>
@@ -106,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                   icon="person_pin_circle"
+                   icon="person-pin-circle"
                    :label="t('pipeline_destinations.header')"
                 >
                 </ORouteTab>
@@ -123,6 +126,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-class="tab_content"
                   icon="cloud"
                   :label="t('storage_settings.tabLabel')"
+                >
+                </ORouteTab>
+                <ORouteTab
+                  v-if="store.state.zoConfig?.online_evals_enabled"
+                  data-test="llm-providers-tab"
+                  name="llm_providers"
+                  :to="{
+                    name: 'llmProviders',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="smart-toy"
+                  :label="t('llmProviders.tabLabel')"
                 >
                 </ORouteTab>
                 <ORouteTab
@@ -177,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="smart_toy"
+                  icon="smart-toy"
                   :label="t('settings.aiToolsets')"
                 >
                 </ORouteTab> -->
@@ -191,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         org_identifier: store.state.selectedOrganization?.identifier,
                       },
                     }"
-                    icon="card_membership"
+                    icon="card-membership"
                     :label="t('settings.license')"
                   />
                 <ORouteTab
@@ -217,16 +234,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                >
-                <div class="tw:flex tw:items-center tw:w-full">
-                  <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-                  <span class="tw:text-sm tw:font-medium tw:ml-2"
-                  :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw:text-white' : 'tw:text-black'"
-                  >{{ t('regex_patterns.title') }}</span>
-                </div>
-              </ORouteTab>
+                  :icon="`img:${regexIcon}`"
+                  :label="t('regex_patterns.title')"
+                />
                 <ORouteTab
-                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.service_streams_enabled !== false"
+                  v-if="config.isEnterprise == 'true'"
                   data-test="correlation-settings-tab"
                   name="correlation_settings"
                   :to="{
@@ -235,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       org_identifier: store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  icon="group_work"
+                  icon="group-work"
                   :label="t('settings.correlationSettings')"
                 />
                 </OTabs>
@@ -254,13 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="controlManagementTabs"
           >
             <template #icon-left>
-              <q-icon :name="showManagementTabs ? 'chevron_left' : 'chevron_right'" />
+              <OIcon :name="showManagementTabs ? 'chevron-left' : 'chevron-right'" size="sm" />
             </template>
           </OButton>
       </template>
 
-      <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
+      <template #after>
+        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pl-1 tw:pb-[0.625rem] tw:pt-1">
             <div
               class="card-container tw:h-[calc(100vh-var(--navbar-height)-15px)] tw:overflow-auto"
             >
@@ -268,9 +280,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           </div>
       </template>
-    </q-splitter>
+    </OSplitter>
 
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
@@ -290,28 +302,31 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 export default defineComponent({
   name: "AppSettings",
   components: {
     OTabs,
     ORouteTab,
     OButton,
-  },
+    OIcon,
+    OSplitter,
+},
   setup() {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const routeToSettingsTab: Record<string, string> = {
       general:               "general",
       organization:          "organization",
+      organizationSettings:  "organization",
       nodes:                 "nodes",
       queryManagement:       "queryManagement",
+      query_management:      "queryManagement",
       domainManagement:      "domain_management",
       alertDestinations:     "alert_destinations",
       pipelineDestinations:  "pipeline_destinations",
@@ -352,7 +367,7 @@ export default defineComponent({
         }
       }
       else if (router.currentRoute.value.name === "nodes") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
+        if(store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false")) {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
@@ -364,7 +379,7 @@ export default defineComponent({
 
       }
       else if (router.currentRoute.value.name === "license") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
+        if(store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false")) {
           settingsTab.value = "general";
           router.push({
             path: "/settings/general",
@@ -404,7 +419,7 @@ export default defineComponent({
       }
     }
     const regexIcon = computed(()=>{
-      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
+      return getImageURL(store.state.theme === 'dark' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
     })
 
     return {
@@ -421,7 +436,7 @@ export default defineComponent({
       // Expose methods for testing
       handleSettingsRouting,
       storePreviousStoreModel,
-      outlinedSettings,
+      "settings": "settings",
     };
   },
 });

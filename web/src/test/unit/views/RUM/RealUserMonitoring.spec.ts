@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import RealUserMonitoring from "@/views/RUM/RealUserMonitoring.vue";
 import i18n from "@/locales";
-import { Quasar } from "quasar";
 
 // Mock composables
 vi.mock("@/composables/useSessionReplay", () => ({
@@ -75,6 +74,7 @@ vi.mock("@/composables/useStreams", () => ({
     getStreams: mockGetStreams,
   })),
 }));
+
 
 describe("RealUserMonitoring.vue", () => {
   let store: any;
@@ -186,10 +186,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": {
-              template: '<div class="q-spinner-hourglass">Loading...</div>',
-            },
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -198,7 +195,7 @@ describe("RealUserMonitoring.vue", () => {
       // Wait for the component to mount and start loading
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-loading-indicator"]').exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Hold on tight, we're loading RUM data."
       );
@@ -219,11 +216,10 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -245,11 +241,10 @@ describe("RealUserMonitoring.vue", () => {
           mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-spinner-hourglass": true,
             "q-btn": {
               template: '<button @click="$attrs.onClick"><slot /></button>',
             },
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -302,8 +297,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: {
               template:
                 '<div class="app-tabs"><slot v-for="tab in tabs" :name="tab.value" /></div>',
@@ -338,9 +332,8 @@ describe("RealUserMonitoring.vue", () => {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
             },
-            "q-spinner-hourglass": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -369,9 +362,8 @@ describe("RealUserMonitoring.vue", () => {
                 '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
               components: { component: childComponentStub },
             },
-            "q-spinner-hourglass": true,
             "q-btn": true,
-            "q-icon": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -397,8 +389,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -435,8 +426,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -458,8 +448,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -480,8 +469,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -502,8 +490,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },
@@ -531,13 +518,12 @@ describe("RealUserMonitoring.vue", () => {
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view" />',
             },
-            "q-spinner-hourglass": true,
             AppTabs: true,
           },
         },
@@ -568,14 +554,13 @@ describe("RealUserMonitoring.vue", () => {
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n, Quasar],
+          plugins: [store, router, i18n],
           mocks: { $q },
           stubs: {
             "router-view": {
               template:
                 '<div><keep-alive v-if="$route.meta.keepAlive" class="keep-alive-wrapper" /></div>',
             },
-            "q-spinner-hourglass": true,
             AppTabs: true,
           },
         },
@@ -599,8 +584,7 @@ describe("RealUserMonitoring.vue", () => {
           stubs: {
             "router-view": true,
             "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            "OIcon": true,
             AppTabs: true,
           },
         },

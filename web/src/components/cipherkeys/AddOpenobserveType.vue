@@ -16,25 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div v-if="!formData.isUpdate || isUpdate || formData.key.store.local === ''">
-      <q-input
+      <OTextarea
         data-test="add-cipher-key-openobserve-secret-input"
         v-model="formData.key.store.local"
         :label="t('cipherKey.secret') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="showLabelOnTop q-w-lg q-pb-xs"
-        type="textarea"
-        stack-label
-        outlined
-        borderless
-        filled
-        dense
-        :rules="[(val: any) => !!val || 'Secret is required']"
+        class="tw:w-full tw:pb-1"
+        :error="(secretTouched || submitAttempted) && !formData.key.store.local"
+        :error-message="t('cipherKey.secretRequired')"
+        @update:model-value="secretTouched = true"
+        @blur="secretTouched = true"
       />
-      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="q-mt-sm" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
+      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="tw:mt-2" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="row q-field q-mb-md">
+      <label class="tw:flex q-field tw:mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
       <pre class="pre-text">{{ formData.key.store.local }}</pre>
@@ -47,10 +42,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTextarea from '@/lib/forms/Input/OTextarea.vue';
 
 export default defineComponent({
   name: "AddOpenobserveType",
-  components: { OButton },
+  components: { OButton, OTextarea },
   props: {
     formData: {
       type: Object,
@@ -89,13 +85,21 @@ export default defineComponent({
         },
       }),
     },
+    // Parent toggles this to true on Continue click. The Secret field's
+    // error displays when either this OR the local touched flag is true.
+    submitAttempted: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props) {
     const { t } = useI18n();
     const isUpdate = ref(false);
+    const secretTouched = ref(false);
     return {
       t,
       isUpdate,
+      secretTouched,
     };
   },
 });

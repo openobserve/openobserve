@@ -1,9 +1,8 @@
 <template>
-  <div class="tw:py-[0.25rem]">
-    <div style="display: flex; flex-direction: row" class="q-pl-md">
+    <div style="display: flex; flex-direction: row" class="tw:pl-2">
       <div class="layout-name">{{ t("panel.operations") }}</div>
       <span class="layout-separator">:</span>
-      <div class="axis-container scroll row">
+      <div class="axis-container scroll tw:flex">
         <!-- Operations with Drag and Drop -->
         <draggable
           v-if="props.operations.length"
@@ -23,27 +22,34 @@
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
-                    <q-icon name="drag_indicator" size="13px" />
+                    <OIcon name="drag-indicator" size="xs" />
                   </template>
-                  <q-tooltip>Drag to reorder</q-tooltip>
+                  <OTooltip content="Drag to reorder" side="top" />
                 </OButton>
-                <OButton
-                  variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
-                  :no-wrap="true"
-                  :data-test="`promql-operation-${index}`"
-                >
-                  {{ computedLabel(element) }}
-                  <template #icon-right
-                    ><q-icon name="arrow_drop_down"
-                  /></template>
-                  <q-menu class="q-pa-md">
+                <ODropdown>
+                  <template #trigger>
+                    <OButton
+                      variant="primary"
+                      size="chip"
+                      class="tw:!text-[12px]"
+                      :no-wrap="true"
+                      :data-test="`promql-operation-${index}`"
+                    >
+                      {{ computedLabel(element) }}
+                      <template #icon-right
+                        ><OIcon name="arrow-drop-down" size="sm"
+                      /></template>
+                    </OButton>
+                  </template>
+                  <div
+                    class="operations-list-dropdown tw:p-4"
+                    :data-test="`promql-operation-${index}-menu`"
+                  >
                     <div style="width: 350px">
                       <div class="text-weight-medium">
                         {{ getOperationDef(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-caption text-grey-7">
+                      <div class="tw:text-xs tw:text-gray-400">
                         {{ getOperationDef(element.id)?.documentation }}
                       </div>
 
@@ -55,79 +61,51 @@
                         :key="paramIndex"
                       >
                         <!-- Number Parameter -->
-                        <q-input
+                        <OInput
                           v-if="param.type === 'number'"
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
-                          class="showLabelOnTop q-mb-sm"
+                          class="showLabelOnTop tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
                         <!-- String Parameter -->
-                        <q-input
+                        <OInput
                           v-else-if="param.type === 'string'"
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
-                          class="showLabelOnTop q-mb-sm"
+                          class="showLabelOnTop tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
                         <!-- Multi-Select Parameter for labels -->
-                        <q-select
+                        <OSelect
                           v-else-if="param.type === 'select'"
                           v-model="element.params[paramIndex] as string[]"
-                          :options="filteredLabels"
+                          :options="availableLabels"
                           :label="param.name"
-                          dense
-                          borderless
-                          stack-label
-                          hide-bottom-space
                           multiple
-                          use-input
-                          input-debounce="300"
-                          @filter="filterOperationLabels"
-                          class="operation-label-selector showLabelOnTop no-case q-mb-sm"
-                          input-class="tw:normal-case!"
+                          searchable
+                          class="operation-label-selector showLabelOnTop no-case tw:mb-2"
                           :data-test="`promql-operation-param-${paramIndex}`"
-                          :hint="
-                            availableLabels.length
-                              ? 'Select one or more labels'
-                              : 'No labels available'
-                          "
                         >
-                          <template v-slot:no-option>
-                            <q-item>
-                              <q-item-section class="text-grey">
-                                {{
-                                  availableLabels.length
-                                    ? "No matching labels"
-                                    : "Select a metric first to load labels"
-                                }}
-                              </q-item-section>
-                            </q-item>
+                          <template #empty>
+                            <span>{{ availableLabels.length ? 'No matching labels' : 'Select a metric first to load labels' }}</span>
                           </template>
-                        </q-select>
+                        </OSelect>
                       </template>
                     </div>
-                  </q-menu>
-                </OButton>
+                  </div>
+                </ODropdown>
                 <OButton
                   variant="outline"
                   size="icon-chip"
                   @click="removeOperation(index)"
                   :data-test="`promql-operation-remove-${index}`"
+                  icon-left="close"
                 >
-                  <template #icon-left><q-icon name="close" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -139,84 +117,68 @@
           variant="ghost-primary"
           size="sm"
           @click="showOperationSelector = true"
-          class="add-operation-btn tw:ml-[0.25rem]"
+          class="add-operation-btn"
           data-test="promql-add-operation"
         >
-          <q-icon name="add" size="14px" />
-          <q-tooltip>Add operation</q-tooltip>
+          <OIcon name="add" size="sm" />
+          <OTooltip content="Add operation" side="top" />
         </OButton>
       </div>
     </div>
 
     <!-- Operation Selector Dialog -->
-    <q-dialog v-model="showOperationSelector">
-      <q-card style="min-width: 500px">
-        <q-card-section class="tw:pt-[0.625rem]! tw:pb-[0.625rem]!">
-          <div class="tw:text-[1.2rem]">Add Operation</div>
-        </q-card-section>
+    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" title="Add Operation"
+      primary-button-label="Close"
+      @click:primary="showOperationSelector = false"
+    >
+      <OSearchInput
+        v-model="searchQuery"
+        data-test="operations-list-search-input"
+        clearable
+      />
 
-        <q-card-section class="tw:py-[0.625rem]!">
-          <q-input
-            v-model="searchQuery"
-            dense
-            borderless
-            stack-label
-            hide-bottom-space
-            class="showLabelOnTop"
-            clearable
+      <div style="max-height: 400px; overflow-y: auto">
+        <div class="tw:border tw:border-border tw:rounded-md tw:divide-y tw:divide-border">
+          <div
+            v-for="category in categories"
+            :key="category"
+            :data-test="`operations-list-category-${category}`"
           >
-            <template v-slot:prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
-        </q-card-section>
-
-        <q-card-section
-          class="q-pt-none"
-          style="max-height: 400px; overflow-y: auto"
-        >
-          <q-list bordered separator>
-            <template v-for="category in categories" :key="category">
-              <q-expansion-item
-                :label="category"
-                default-opened
-                header-class="text-weight-medium"
-              >
-                <q-list>
-                  <q-item
-                    v-for="op in getFilteredOperationsForCategory(category)"
-                    :key="op.id"
-                    clickable
-                    v-close-popup
-                    @click="addOperation(op)"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ op.name }}</q-item-label>
-                      <q-item-label caption>{{
-                        op.documentation
-                      }}</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-expansion-item>
-            </template>
-          </q-list>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <OButton variant="outline" size="sm-action" v-close-popup>
-            Close
-          </OButton>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-  </div>
+            <OCollapsible
+              :default-open="true"
+              :label="category"
+            >
+              <div>
+                <div
+                  v-for="op in getFilteredOperationsForCategory(category)"
+                  :key="op.id"
+                  :data-test="`promql-operation-option-${op.id}`"
+                  :data-test-value="op.name"
+                  class="promql-operation-option tw:px-4 tw:py-2 tw:cursor-pointer tw:hover:bg-primary-background tw:text-sm"
+                  @click="addOperation(op); showOperationSelector = false"
+                >
+                  <div class="tw:font-medium">{{ op.name }}</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mt-0.5">{{ op.documentation }}</div>
+                </div>
+              </div>
+            </OCollapsible>
+          </div>
+        </div>
+      </div>
+    </ODialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
@@ -236,15 +198,15 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const showOperationSelector = ref(false);
-const searchQuery = ref("");
+
 
 // Access shared label options from meta
 const availableLabels = computed(
   () => props.dashboardData?.meta?.promql?.availableLabels || [],
 );
 
-// State for filtered labels in the select
-const filteredLabels = ref<string[]>([]);
+// Search query for filtering operations in the operation selector dialog
+const searchQuery = ref("");
 
 const categories = computed(() => promQueryModeller.getCategories());
 
@@ -320,30 +282,6 @@ const removeOperation = (index: number) => {
   emit("update:operations", newOperations);
 };
 
-// Filter operation labels with autocomplete
-const filterOperationLabels = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      filteredLabels.value = availableLabels.value;
-    } else {
-      // Filter labels based on input
-      const needle = val.toLowerCase();
-      filteredLabels.value = availableLabels.value.filter((label: string) =>
-        label.toLowerCase().includes(needle),
-      );
-    }
-  });
-};
-
-// Initialize filtered labels when available labels change
-watch(
-  availableLabels,
-  (newLabels) => {
-    filteredLabels.value = newLabels;
-  },
-  { immediate: true },
-);
-
 defineExpose({
   availableLabels,
 });
@@ -366,7 +304,7 @@ defineExpose({
 }
 
 .axis-container {
-  margin: 5px;
+  margin: 2px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -398,7 +336,7 @@ defineExpose({
   }
 }
 
-.q-menu {
+.operations-list-dropdown {
   box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
   transform: translateY(0.5rem);
   border-radius: 0px;

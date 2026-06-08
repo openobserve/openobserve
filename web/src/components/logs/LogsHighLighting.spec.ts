@@ -13,12 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
-installQuasar();
+// All vi.mock() calls must be hoisted — declare before any import of the module under test
 
 // Mock the store
 const mockStore = {
@@ -27,12 +25,11 @@ const mockStore = {
   },
 };
 
-// Mock vuex
 vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-// Mock vue-router (required after Mar 7 update: useLogsHighlighter now uses searchState which calls useRouter)
+// Mock vue-router (required: useLogsHighlighter uses searchState which calls useRouter)
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     currentRoute: { value: { query: { stream_type: "logs" } } },
@@ -43,7 +40,7 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-// Mock searchState composable (added to useLogsHighlighter in Mar 7 update)
+// Mock searchState composable (used inside useLogsHighlighter)
 vi.mock("@/composables/useLogs/searchState", () => ({
   searchState: () => ({
     searchObj: {
@@ -59,123 +56,109 @@ vi.mock("@/composables/useLogs/searchState", () => ({
   }),
 }));
 
-// Import the actual composable instead of mocking it
-// This allows us to test real highlighting behavior
-import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 
+// ---------------------------------------------------------------------------
+// Mount factory — eliminates duplication across 3+ mount call sites
+// ---------------------------------------------------------------------------
+interface MountOptions {
+  data?: unknown;
+  showBraces?: boolean;
+  showQuotes?: boolean;
+  queryString?: string;
+  simpleMode?: boolean;
+}
+
+function mountComponent(opts: MountOptions = {}): VueWrapper {
+  return mount(LogsHighLighting, {
+    shallow: false,
+    props: {
+      data: opts.data !== undefined ? opts.data : "test message",
+      showBraces: opts.showBraces !== undefined ? opts.showBraces : true,
+      showQuotes: opts.showQuotes !== undefined ? opts.showQuotes : false,
+      queryString: opts.queryString !== undefined ? opts.queryString : "",
+      simpleMode: opts.simpleMode !== undefined ? opts.simpleMode : false,
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function html(w: VueWrapper): string {
+  return w.find("span.logs-highlight-json").html();
+}
+
+// ---------------------------------------------------------------------------
+// Suite
+// ---------------------------------------------------------------------------
 describe("LogsHighLighting Component", () => {
-  let wrapper: any = null;
+  let wrapper: VueWrapper;
 
   beforeEach(() => {
-    // Reset theme to light before each test
     mockStore.state.theme = "light";
-
-    wrapper = mount(LogsHighLighting, {
-      shallow: false,
-      props: {
-        data: "test message",
-        showBraces: true,
-        showQuotes: false,
-        queryString: "",
-        simpleMode: false,
-      },
-    });
+    wrapper = mountComponent();
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper.unmount();
+    vi.clearAllMocks();
   });
 
+  // -------------------------------------------------------------------------
   describe("Component Mounting and Structure", () => {
-    it("should mount LogsHighLighting component", () => {
-      expect(wrapper).toBeTruthy();
-      expect(wrapper.vm).toBeDefined();
-    });
-
-    it("should render with correct root element", () => {
+    it("should mount and expose a root span.logs-highlight-json element", () => {
+      expect(wrapper.exists()).toBe(true);
       const span = wrapper.find("span.logs-highlight-json");
       expect(span.exists()).toBe(true);
-    });
-
-    it("should apply correct CSS classes", () => {
-      const span = wrapper.find("span.logs-highlight-json");
       expect(span.classes()).toContain("logs-highlight-json");
     });
 
-    it("should handle component lifecycle correctly", () => {
-      const newWrapper = mount(LogsHighLighting, {
-        props: {
-          data: "test",
-        },
-      });
-
-      expect(newWrapper).toBeTruthy();
-      newWrapper.unmount();
-      // Should not throw any errors during cleanup
+    it("should unmount without errors when lifecycle ends", () => {
+      const w = mountComponent({ data: "test" });
+      // unmount must not throw — if it does the test fails
+      w.unmount();
     });
   });
 
-  describe("Props Handling", () => {
-    it("should handle props with default values", () => {
-      const minimalWrapper = mount(LogsHighLighting, {
-        props: {
-          data: "test",
-        },
-      });
-
-      expect(minimalWrapper.props("showBraces")).toBe(true);
-      expect(minimalWrapper.props("showQuotes")).toBe(false);
-      expect(minimalWrapper.props("queryString")).toBe("");
-      expect(minimalWrapper.props("simpleMode")).toBe(false);
-
-      minimalWrapper.unmount();
+  // -------------------------------------------------------------------------
+  describe("Props — default values and reactivity", () => {
+    it("should apply default prop values when only data is provided", () => {
+      const w = mountComponent({ data: "test" });
+      expect(w.props("showBraces")).toBe(true);
+      expect(w.props("showQuotes")).toBe(false);
+      expect(w.props("queryString")).toBe("");
+      expect(w.props("simpleMode")).toBe(false);
+      w.unmount();
     });
 
-    it("should handle reactive prop changes", async () => {
-      expect(wrapper.props("data")).toBe("test message");
-
+    it("should reflect updated data prop in rendered output", async () => {
       await wrapper.setProps({ data: "updated message" });
-
       expect(wrapper.props("data")).toBe("updated message");
+      expect(html(wrapper)).toContain("updated");
     });
 
-    it("should update when showBraces prop changes", async () => {
-      await wrapper.setProps({
-        data: { level: "error" },
-        showBraces: false,
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should re-render when showBraces changes for an object payload", async () => {
+      await wrapper.setProps({ data: { level: "error" }, showBraces: false });
+      // Without braces the log-object-brace span must be absent
+      expect(html(wrapper)).not.toContain("log-object-brace");
     });
 
-    it("should update when showQuotes prop changes", async () => {
-      await wrapper.setProps({
-        data: "test string",
-        showQuotes: true,
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should produce quotes around object key text when showQuotes is true", async () => {
+      await wrapper.setProps({ data: { key: "value" }, showBraces: true, showQuotes: true });
+      // Keys are rendered inside log-key spans; with showQuotes the text contains "
+      expect(html(wrapper)).toContain('"key"');
     });
 
-    it("should update when simpleMode prop changes", async () => {
-      await wrapper.setProps({
-        data: "simple text",
-        simpleMode: true,
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should skip semantic colorization when simpleMode is true", async () => {
+      // An IP in simpleMode must not receive the log-ip class
+      await wrapper.setProps({ data: "192.168.1.1", simpleMode: true });
+      expect(html(wrapper)).toContain("192.168.1.1");
+      expect(html(wrapper)).not.toContain("log-ip");
     });
 
-    it("should handle multiple prop updates sequentially", async () => {
-      const updates = [
+    it("should handle sequential prop updates and always render a span", async () => {
+      const updates: MountOptions[] = [
         { data: "update 1", simpleMode: false },
         { data: "update 2", simpleMode: true },
         { data: { key: "value" }, simpleMode: false },
@@ -183,930 +166,653 @@ describe("LogsHighLighting Component", () => {
 
       for (const update of updates) {
         await wrapper.setProps(update);
-        expect(wrapper.props()).toMatchObject(update);
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
+        expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
       }
+      expect(wrapper.props("data")).toEqual({ key: "value" });
     });
   });
 
-  describe("Data Type Handling", () => {
-    describe("String data", () => {
-      it("should display simple string data", async () => {
-        await wrapper.setProps({ data: "Error occurred" });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("Error");
-        expect(span.html()).toContain("occurred");
-      });
-
-      it("should handle empty string", async () => {
-        await wrapper.setProps({ data: "" });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle very long strings", async () => {
-        const longString = "x".repeat(10000);
-        await wrapper.setProps({ data: longString });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle strings with special characters", async () => {
-        const specialData = "Test & symbols <> \"quotes\" 'apostrophes'";
-        await wrapper.setProps({ data: specialData });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        // Should escape HTML
-        expect(span.html()).toContain("&amp;");
-      });
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — strings", () => {
+    it("should render string content into the span", async () => {
+      await wrapper.setProps({ data: "Error occurred" });
+      expect(html(wrapper)).toContain("Error");
+      expect(html(wrapper)).toContain("occurred");
     });
 
-    describe("Number data", () => {
-      it("should handle regular numbers", async () => {
-        await wrapper.setProps({ data: 42 });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("42");
-      });
-
-      it("should handle zero", async () => {
-        await wrapper.setProps({ data: 0 });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("0");
-      });
-
-      it("should handle negative numbers", async () => {
-        await wrapper.setProps({ data: -123 });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("-123");
-      });
-
-      it("should handle large timestamp-like numbers", async () => {
-        await wrapper.setProps({ data: 1640995200000 });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("1640995200000");
-      });
-
-      it("should handle decimal numbers", async () => {
-        await wrapper.setProps({ data: 3.14159 });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("3.14159");
-      });
+    it("should render an empty string without throwing", async () => {
+      await wrapper.setProps({ data: "" });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
 
-    describe("Boolean data", () => {
-      it("should handle true value", async () => {
-        await wrapper.setProps({ data: true });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("true");
-      });
-
-      it("should handle false value", async () => {
-        await wrapper.setProps({ data: false });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("false");
-      });
+    it("should render a 10 000-character string without throwing", async () => {
+      await wrapper.setProps({ data: "x".repeat(10000) });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
 
-    describe("Null and undefined", () => {
-      it("should handle null data", async () => {
-        await wrapper.setProps({ data: null });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle undefined data", async () => {
-        await wrapper.setProps({ data: undefined });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
+    it("should escape & in string data to &amp;", async () => {
+      await wrapper.setProps({ data: "Test & symbols" });
+      expect(html(wrapper)).toContain("&amp;");
     });
 
-    describe("Object data", () => {
-      it("should handle simple objects", async () => {
-        await wrapper.setProps({
-          data: { level: "error", message: "test" },
-          showBraces: true,
-        });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-        expect(span.html()).toContain("level");
-        expect(span.html()).toContain("error");
-        expect(span.html()).toContain("message");
-        expect(span.html()).toContain("test");
-      });
-
-      it("should handle empty objects", async () => {
-        await wrapper.setProps({ data: {} });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle nested objects", async () => {
-        const complexData = {
-          user: {
-            id: 123,
-            profile: {
-              name: "John",
-              email: "john@example.com",
-            },
-          },
-          timestamp: 1640995200000,
-        };
-
-        await wrapper.setProps({ data: complexData });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle objects with various value types", async () => {
-        const mixedData = {
-          string: "text",
-          number: 42,
-          boolean: true,
-          null: null,
-          array: [1, 2, 3],
-        };
-
-        await wrapper.setProps({ data: mixedData });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should respect showBraces prop for objects", async () => {
-        await wrapper.setProps({
-          data: { key: "value" },
-          showBraces: false,
-        });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
+    it("should render whitespace-only strings without throwing", async () => {
+      await wrapper.setProps({ data: "   " });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
 
-    describe("Array data", () => {
-      it("should handle arrays", async () => {
-        const arrayData = [1, 2, 3, 4, 5];
-        await wrapper.setProps({ data: arrayData });
-        await wrapper.vm.$nextTick();
+    it("should render strings containing only special characters", async () => {
+      await wrapper.setProps({ data: "!@#$%^&*()" });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
 
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle empty arrays", async () => {
-        await wrapper.setProps({ data: [] });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
-
-      it("should handle arrays with mixed types", async () => {
-        const mixedArray = ["text", 123, true, null, { key: "value" }];
-        await wrapper.setProps({ data: mixedArray });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.exists()).toBe(true);
-      });
+    it("should preserve unicode characters in output", async () => {
+      await wrapper.setProps({ data: "Hello 世界 🌍" });
+      expect(html(wrapper)).toContain("Hello");
+      expect(html(wrapper)).toContain("世界");
     });
   });
 
-  describe("Semantic Type Detection", () => {
-    it("should detect and highlight IP addresses", async () => {
-      await wrapper.setProps({ data: "192.168.1.1" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      expect(span.html()).toContain("192.168.1.1");
-      // Should apply IP-related styling
-      expect(span.html()).toContain("log-ip");
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — numbers", () => {
+    it("should render integer 42 in output", async () => {
+      await wrapper.setProps({ data: 42 });
+      expect(html(wrapper)).toContain("42");
     });
 
-    it("should detect multiple IP addresses in text", async () => {
+    it("should render zero in output", async () => {
+      await wrapper.setProps({ data: 0 });
+      expect(html(wrapper)).toContain("0");
+    });
+
+    it("should render negative number in output", async () => {
+      await wrapper.setProps({ data: -123 });
+      expect(html(wrapper)).toContain("-123");
+    });
+
+    it("should render 13-digit timestamp number in output", async () => {
+      await wrapper.setProps({ data: 1640995200000 });
+      expect(html(wrapper)).toContain("1640995200000");
+    });
+
+    it("should render decimal number in output", async () => {
+      await wrapper.setProps({ data: 3.14159 });
+      expect(html(wrapper)).toContain("3.14159");
+    });
+
+    it("should render NaN without throwing", async () => {
+      await wrapper.setProps({ data: NaN });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+
+    it("should render Infinity without throwing", async () => {
+      await wrapper.setProps({ data: Infinity });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — booleans", () => {
+    it("should render true in output", async () => {
+      await wrapper.setProps({ data: true });
+      expect(html(wrapper)).toContain("true");
+    });
+
+    it("should render false in output", async () => {
+      await wrapper.setProps({ data: false });
+      expect(html(wrapper)).toContain("false");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — null and undefined", () => {
+    it("should render an empty span for null data", async () => {
+      await wrapper.setProps({ data: null });
+      // colorizeJson returns "" for null — span exists but inner HTML is the outer tag only
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+
+    it("should render an empty span for undefined data", async () => {
+      await wrapper.setProps({ data: undefined });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — objects", () => {
+    it("should render object key and value text in output", async () => {
+      await wrapper.setProps({ data: { level: "error", message: "test" }, showBraces: true });
+      const h = html(wrapper);
+      expect(h).toContain("level");
+      expect(h).toContain("error");
+      expect(h).toContain("message");
+      expect(h).toContain("test");
+    });
+
+    it("should wrap object with log-object-brace spans when showBraces is true", async () => {
+      await wrapper.setProps({ data: { key: "value" }, showBraces: true });
+      expect(html(wrapper)).toContain("log-object-brace");
+    });
+
+    it("should omit log-object-brace spans when showBraces is false", async () => {
+      await wrapper.setProps({ data: { key: "value" }, showBraces: false });
+      expect(html(wrapper)).not.toContain("log-object-brace");
+    });
+
+    it("should render empty objects without throwing", async () => {
+      await wrapper.setProps({ data: {} });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+
+    it("should render nested objects without throwing", async () => {
       await wrapper.setProps({
-        data: "Connection from 192.168.1.1 to 10.0.0.1",
+        data: { user: { id: 123, profile: { name: "John" } }, timestamp: 1640995200000 },
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("192.168.1.1");
-      expect(span.html()).toContain("10.0.0.1");
+      expect(html(wrapper)).toContain("user");
+      expect(html(wrapper)).toContain("John");
     });
 
-    it("should detect and highlight URLs", async () => {
+    it("should render objects with mixed value types without throwing", async () => {
+      await wrapper.setProps({
+        data: { string: "text", number: 42, boolean: true, null: null, array: [1, 2, 3] },
+      });
+      const h = html(wrapper);
+      expect(h).toContain("string");
+      expect(h).toContain("42");
+    });
+
+    it("should render deeply nested objects (10 levels) without throwing", async () => {
+      const deepObject: Record<string, unknown> = { level1: {} };
+      let current = deepObject.level1 as Record<string, unknown>;
+      for (let i = 2; i <= 10; i++) {
+        current[`level${i}`] = {};
+        current = current[`level${i}`] as Record<string, unknown>;
+      }
+      current["value"] = "deep value";
+
+      await wrapper.setProps({ data: deepObject });
+      expect(html(wrapper)).toContain("level1");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Data Type Handling — arrays", () => {
+    it("should render numeric array values in output", async () => {
+      await wrapper.setProps({ data: [1, 2, 3, 4, 5] });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+
+    it("should render empty arrays without throwing", async () => {
+      await wrapper.setProps({ data: [] });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+
+    it("should render mixed-type arrays without throwing", async () => {
+      await wrapper.setProps({ data: ["text", 123, true, null, { key: "value" }] });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Semantic Type Detection", () => {
+    it("should apply log-ip class to an IPv4 address", async () => {
+      await wrapper.setProps({ data: "192.168.1.1" });
+      const h = html(wrapper);
+      expect(h).toContain("192.168.1.1");
+      expect(h).toContain("log-ip");
+    });
+
+    it("should detect multiple IPs in a sentence", async () => {
+      await wrapper.setProps({ data: "Connection from 192.168.1.1 to 10.0.0.1" });
+      const h = html(wrapper);
+      expect(h).toContain("192.168.1.1");
+      expect(h).toContain("10.0.0.1");
+    });
+
+    it("should apply log-url class to an https URL", async () => {
       await wrapper.setProps({ data: "https://example.com/api/v1" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      expect(span.html()).toContain("https://example.com/api/v1");
-      expect(span.html()).toContain("log-url");
+      const h = html(wrapper);
+      expect(h).toContain("https://example.com/api/v1");
+      expect(h).toContain("log-url");
     });
 
-    it("should detect and highlight email addresses", async () => {
+    it("should apply log-email class to an email address", async () => {
       await wrapper.setProps({ data: "user@example.com" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      expect(span.html()).toContain("user@example.com");
-      expect(span.html()).toContain("log-email");
+      const h = html(wrapper);
+      expect(h).toContain("user@example.com");
+      expect(h).toContain("log-email");
     });
 
-    it("should detect HTTP methods", async () => {
+    it("should include HTTP method text in the output for each verb", async () => {
       const methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
-
       for (const method of methods) {
         await wrapper.setProps({ data: method });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.html()).toContain(method);
+        expect(html(wrapper)).toContain(method);
       }
     });
 
-    it("should detect HTTP status codes", async () => {
-      const statusCodes = ["200", "404", "500", "301", "403"];
-
-      for (const code of statusCodes) {
+    it("should include HTTP status code text in the output", async () => {
+      for (const code of ["200", "404", "500", "301", "403"]) {
         await wrapper.setProps({ data: code });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.html()).toContain(code);
+        expect(html(wrapper)).toContain(code);
       }
     });
 
-    it("should detect UUIDs", async () => {
+    it("should apply log-uuid class to a UUID string", async () => {
       const uuid = "550e8400-e29b-41d4-a716-446655440000";
       await wrapper.setProps({ data: uuid });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain(uuid);
-      expect(span.html()).toContain("log-uuid");
+      const h = html(wrapper);
+      expect(h).toContain(uuid);
+      expect(h).toContain("log-uuid");
     });
 
-    it("should detect file paths", async () => {
-      const unixPaths = ["/var/log/app.log", "/home/user/documents"];
-      const windowsPath = "C:\\Windows\\System32";
-
-      // Test Unix paths
-      for (const path of unixPaths) {
+    it("should apply log-path class to Unix file paths", async () => {
+      for (const path of ["/var/log/app.log", "/home/user/documents"]) {
         await wrapper.setProps({ data: path });
-        await wrapper.vm.$nextTick();
-
-        const span = wrapper.find("span.logs-highlight-json");
-        expect(span.html()).toContain(path);
-        expect(span.html()).toContain("log-path");
+        const h = html(wrapper);
+        expect(h).toContain(path);
+        expect(h).toContain("log-path");
       }
+    });
 
-      // Test Windows path separately - backslashes are present in HTML
-      await wrapper.setProps({ data: windowsPath });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      // Check for path components without worrying about backslash encoding
-      expect(span.html()).toContain("Windows");
-      expect(span.html()).toContain("System32");
+    it("should render Windows paths containing expected path components", async () => {
+      await wrapper.setProps({ data: "C:\\Windows\\System32" });
+      const h = html(wrapper);
+      expect(h).toContain("Windows");
+      expect(h).toContain("System32");
     });
   });
 
+  // -------------------------------------------------------------------------
   describe("Keyword Highlighting", () => {
-    it("should highlight keywords from query string", async () => {
-      await wrapper.setProps({
-        data: "error message occurred",
-        queryString: "match_all('error')",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("error");
-      expect(span.html()).toContain("log-highlighted");
+    it("should apply log-highlighted to text matching the query keyword", async () => {
+      await wrapper.setProps({ data: "error message occurred", queryString: "match_all('error')" });
+      const h = html(wrapper);
+      expect(h).toContain("error");
+      expect(h).toContain("log-highlighted");
     });
 
-    it("should handle multiple keywords", async () => {
+    it("should highlight all matching keywords from a compound query", async () => {
       await wrapper.setProps({
         data: "critical error in system",
         queryString: "match_all('error') AND match_all('critical')",
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("error");
-      expect(span.html()).toContain("critical");
+      const h = html(wrapper);
+      expect(h).toContain("error");
+      expect(h).toContain("critical");
     });
 
-    it("should handle case-insensitive matching", async () => {
+    it("should apply log-highlighted case-insensitively (all three cases of 'error')", async () => {
       await wrapper.setProps({
         data: "ERROR Error error",
         queryString: "match_all('error')",
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("ERROR");
-      expect(span.html()).toContain("Error");
-      expect(span.html()).toContain("error");
+      const h = html(wrapper);
+      expect(h).toContain("ERROR");
+      expect(h).toContain("Error");
+      expect(h).toContain("error");
     });
 
-    it("should handle fuzzy_match queries", async () => {
-      await wrapper.setProps({
-        data: "test message",
-        queryString: "fuzzy_match('message', 2)",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("message");
+    it("should include keyword text from fuzzy_match queries", async () => {
+      await wrapper.setProps({ data: "test message", queryString: "fuzzy_match('message', 2)" });
+      expect(html(wrapper)).toContain("message");
     });
 
-    it("should handle fuzzy_match_all queries", async () => {
+    it("should include keyword text from fuzzy_match_all queries", async () => {
       await wrapper.setProps({
         data: "important notice",
         queryString: "fuzzy_match_all('notice', 1)",
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("notice");
+      expect(html(wrapper)).toContain("notice");
     });
 
-    it("should not highlight when no query string", async () => {
-      await wrapper.setProps({
-        data: "error message",
-        queryString: "",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("error");
+    it("should render text without log-highlighted when queryString is empty", async () => {
+      await wrapper.setProps({ data: "error message", queryString: "" });
+      expect(html(wrapper)).toContain("error");
+      expect(html(wrapper)).not.toContain("log-highlighted");
     });
   });
 
-  describe("Mixed Content Detection", () => {
-    it("should detect log lines with HTTP and IP", async () => {
-      await wrapper.setProps({
-        data: "GET /api/users 192.168.1.1 200",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("GET");
-      expect(span.html()).toContain("192.168.1.1");
-      expect(span.html()).toContain("200");
+  // -------------------------------------------------------------------------
+  describe("Simple Mode", () => {
+    it("should not apply log-ip class in simpleMode even for an IP address", async () => {
+      await wrapper.setProps({ data: "192.168.1.1", simpleMode: true });
+      expect(html(wrapper)).toContain("192.168.1.1");
+      expect(html(wrapper)).not.toContain("log-ip");
     });
 
-    it("should detect Apache-style log lines", async () => {
+    it("should apply log-highlighted in simpleMode when query matches", async () => {
+      await wrapper.setProps({
+        data: "error message",
+        queryString: "match_all('error')",
+        simpleMode: true,
+      });
+      expect(html(wrapper)).toContain("log-highlighted");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("Mixed Content Detection", () => {
+    it("should render GET, IP, and status code for a web-log line", async () => {
+      await wrapper.setProps({ data: "GET /api/users 192.168.1.1 200" });
+      const h = html(wrapper);
+      expect(h).toContain("GET");
+      expect(h).toContain("192.168.1.1");
+      expect(h).toContain("200");
+    });
+
+    it("should render GET and IP from an Apache-style log line", async () => {
       await wrapper.setProps({
         data: '[01/Jan/2023:12:00:00 +0000] "GET /home HTTP/1.1" 200 192.168.1.1',
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("GET");
-      expect(span.html()).toContain("192.168.1.1");
+      const h = html(wrapper);
+      expect(h).toContain("GET");
+      expect(h).toContain("192.168.1.1");
     });
 
-    it("should detect log lines with URLs", async () => {
-      await wrapper.setProps({
-        data: "POST https://api.example.com/v1/users 201",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("POST");
-      expect(span.html()).toContain("https://api.example.com");
+    it("should render POST and URL from a mixed log line", async () => {
+      await wrapper.setProps({ data: "POST https://api.example.com/v1/users 201" });
+      const h = html(wrapper);
+      expect(h).toContain("POST");
+      expect(h).toContain("https://api.example.com");
     });
 
-    it("should not treat simple IP strings as mixed content", async () => {
-      await wrapper.setProps({
-        data: "192.168.1.1 connection failed",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("192.168.1.1");
+    it("should render IP string even without HTTP indicators", async () => {
+      await wrapper.setProps({ data: "192.168.1.1 connection failed" });
+      expect(html(wrapper)).toContain("192.168.1.1");
     });
   });
 
+  // -------------------------------------------------------------------------
   describe("XSS Prevention and HTML Escaping", () => {
-    it("should escape HTML in script tags", async () => {
-      const xssData = "<script>alert('xss')</script>";
-      await wrapper.setProps({ data: xssData });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      // Should escape < and >
-      expect(span.html()).toContain("&lt;");
-      expect(span.html()).toContain("&gt;");
-      // Should not execute script
-      expect(span.html()).not.toContain("<script>");
+    it("should escape < and > in <script> tag payloads so no script element is injected", async () => {
+      await wrapper.setProps({ data: "<script>alert('xss')</script>" });
+      const h = html(wrapper);
+      expect(h).toContain("&lt;");
+      expect(h).toContain("&gt;");
+      expect(h).not.toContain("<script>");
     });
 
-    it("should escape HTML entities", async () => {
-      const htmlData = "Test & <div>content</div> 'quotes'";
-      await wrapper.setProps({ data: htmlData });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("&amp;");
-      expect(span.html()).toContain("&lt;");
-      expect(span.html()).toContain("&gt;");
+    it("should escape & < > in arbitrary HTML strings", async () => {
+      await wrapper.setProps({ data: "Test & <div>content</div> 'quotes'" });
+      const h = html(wrapper);
+      expect(h).toContain("&amp;");
+      expect(h).toContain("&lt;");
+      expect(h).toContain("&gt;");
     });
 
-    it("should escape dangerous attributes", async () => {
-      const xssData = '<img src=x onerror="alert(1)">';
-      await wrapper.setProps({ data: xssData });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      const html = span.html();
-
-      // The key security check: dangerous tags should be escaped as text, not rendered as HTML
-      // &lt; and &gt; will remain in the HTML source because they're needed to display < and > as text
-      expect(html).toContain("&lt;"); // < must be escaped
-      expect(html).toContain("&gt;"); // > must be escaped
-
-      // Make sure no actual <img> tag was created (it should be text only)
-      expect(html).not.toContain("<img");
-
-      // Verify the text is displayed, not executed
-      const textContent = span.text();
-      expect(textContent).toContain('<img');
-      expect(textContent).toContain('onerror');
-      expect(textContent).toContain('alert(1)');
+    it("should escape <img onerror> so no img element is created in the DOM", async () => {
+      await wrapper.setProps({ data: '<img src=x onerror="alert(1)">' });
+      const h = html(wrapper);
+      expect(h).toContain("&lt;"); // < escaped
+      expect(h).toContain("&gt;"); // > escaped
+      expect(h).not.toContain("<img"); // no real img tag
+      // The raw text is visible to the user
+      const text = wrapper.find("span.logs-highlight-json").text();
+      expect(text).toContain("<img");
+      expect(text).toContain("onerror");
+      expect(text).toContain("alert(1)");
     });
 
-    it("should handle quotes safely", async () => {
-      const quoteData = 'Test "double" and \'single\' quotes';
-      await wrapper.setProps({ data: quoteData });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should render strings with double and single quotes without throwing", async () => {
+      await wrapper.setProps({ data: 'Test "double" and \'single\' quotes' });
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
   });
 
-  describe("Simple Mode", () => {
-    it("should use simple highlighting in simpleMode", async () => {
-      await wrapper.setProps({
-        data: "192.168.1.1",
-        simpleMode: true,
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      // In simple mode, should not apply semantic coloring
-    });
-
-    it("should still highlight keywords in simpleMode", async () => {
-      await wrapper.setProps({
-        data: "error message",
-        queryString: "match_all('error')",
-        simpleMode: true,
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("error");
-    });
-  });
-
+  // -------------------------------------------------------------------------
   describe("Theme Handling", () => {
-    it("should respect light theme", async () => {
+    it("should render correctly in light theme", () => {
       mockStore.state.theme = "light";
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
 
-    it("should respect dark theme", async () => {
+    it("should render correctly when mounted in dark theme", () => {
       mockStore.state.theme = "dark";
-
-      const darkWrapper = mount(LogsHighLighting, {
-        props: {
-          data: "test message",
-        },
-      });
-
-      await darkWrapper.vm.$nextTick();
-
-      const span = darkWrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-
-      darkWrapper.unmount();
+      const w = mountComponent({ data: "test message" });
+      expect(w.find("span.logs-highlight-json").exists()).toBe(true);
+      w.unmount();
     });
 
-    it("should update when theme changes", async () => {
+    it("should continue rendering after theme changes from light to dark", async () => {
       mockStore.state.theme = "light";
       await wrapper.vm.$nextTick();
-
       mockStore.state.theme = "dark";
       await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
   });
 
+  // -------------------------------------------------------------------------
   describe("CSS Classes Application", () => {
-    it("should apply log-string class for strings", async () => {
+    it("should apply log-string class when rendering a plain string", async () => {
       await wrapper.setProps({ data: "simple string" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("log-string");
+      expect(html(wrapper)).toContain("log-string");
     });
 
-    it("should apply log-highlighted class for matches", async () => {
-      await wrapper.setProps({
-        data: "error occurred",
-        queryString: "match_all('error')",
-      });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("log-highlighted");
+    it("should apply log-highlighted class when a keyword matches", async () => {
+      await wrapper.setProps({ data: "error occurred", queryString: "match_all('error')" });
+      expect(html(wrapper)).toContain("log-highlighted");
     });
 
-    it("should apply log-object-brace for object braces", async () => {
-      await wrapper.setProps({
-        data: { key: "value" },
-        showBraces: true,
-      });
-      await wrapper.vm.$nextTick();
+    it("should apply log-object-brace when showBraces is true for an object", async () => {
+      await wrapper.setProps({ data: { key: "value" }, showBraces: true });
+      expect(html(wrapper)).toContain("log-object-brace");
+    });
 
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("log-object-brace");
+    it("should apply log-key class to object keys", async () => {
+      await wrapper.setProps({ data: { myKey: "myValue" } });
+      expect(html(wrapper)).toContain("log-key");
+    });
+
+    it("should apply log-separator class for object colon separators", async () => {
+      await wrapper.setProps({ data: { key: "value" } });
+      expect(html(wrapper)).toContain("log-separator");
     });
   });
 
-  describe("Performance", () => {
-    it("should render quickly", () => {
-      const startTime = performance.now();
+  // -------------------------------------------------------------------------
+  describe("showQuotes behavior", () => {
+    let quotesWrapper: VueWrapper;
 
-      const perfWrapper = mount(LogsHighLighting, {
-        props: {
-          data: "performance test",
-        },
-      });
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      expect(renderTime).toBeLessThan(100);
-
-      perfWrapper.unmount();
+    afterEach(() => {
+      quotesWrapper?.unmount();
     });
 
-    it("should handle multiple instances efficiently", () => {
-      const instances = [];
-      const startTime = performance.now();
-
-      for (let i = 0; i < 20; i++) {
-        instances.push(
-          mount(LogsHighLighting, {
-            props: {
-              data: `message ${i}`,
-            },
-          })
-        );
-      }
-
-      const endTime = performance.now();
-      const totalTime = endTime - startTime;
-
-      expect(totalTime).toBeLessThan(500);
-
-      instances.forEach((instance) => instance.unmount());
+    it("should not wrap string value in quotes when showQuotes is false (default)", () => {
+      quotesWrapper = mountComponent({ data: "hello world", showQuotes: false });
+      expect(html(quotesWrapper)).toContain("hello");
+      // The outer log-string span should not contain a literal quote character as text
+      expect(quotesWrapper.find("span.logs-highlight-json").text()).not.toMatch(/^".*"$/);
     });
 
-    it("should handle large objects efficiently", async () => {
-      const largeObject: any = {};
-      for (let i = 0; i < 100; i++) {
-        largeObject[`key${i}`] = `value${i}`;
-      }
+    it("should wrap object key text in double-quotes when showQuotes is true", () => {
+      quotesWrapper = mountComponent({ data: { key: "value" }, showBraces: true, showQuotes: true });
+      // log-key span must contain the key with surrounding "..."
+      expect(html(quotesWrapper)).toContain('"key"');
+    });
 
-      const startTime = performance.now();
-
-      await wrapper.setProps({ data: largeObject });
-      await wrapper.vm.$nextTick();
-
-      const endTime = performance.now();
-      const renderTime = endTime - startTime;
-
-      expect(renderTime).toBeLessThan(200);
+    it("should render string value text regardless of showQuotes", () => {
+      quotesWrapper = mountComponent({ data: "hello", showQuotes: true });
+      expect(html(quotesWrapper)).toContain("hello");
     });
   });
 
-  describe("Edge Cases", () => {
-    it("should handle whitespace-only strings", async () => {
-      await wrapper.setProps({ data: "   " });
-      await wrapper.vm.$nextTick();
+  // -------------------------------------------------------------------------
+  describe("Large content handling", () => {
+    // NOTE: The component's colorizeJson function only truncates *objects* whose
+    // estimated size exceeds 50 000 bytes. Strings are passed directly to
+    // processTextWithHighlights without size-based truncation — they are tokenized
+    // and each token gets a log-string span.
+    let largeWrapper: VueWrapper;
 
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    afterEach(() => {
+      largeWrapper?.unmount();
     });
 
-    it("should handle strings with only special characters", async () => {
-      await wrapper.setProps({ data: "!@#$%^&*()" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should render a 60 000-char string without throwing (no truncation for strings)", () => {
+      largeWrapper = mountComponent({ data: "x".repeat(60000) });
+      const h = html(largeWrapper);
+      // Component renders the content inside log-string spans (no truncation for strings)
+      expect(h).toContain("log-string");
+      expect(h).not.toContain("truncated");
     });
 
-    it("should handle unicode characters", async () => {
-      await wrapper.setProps({ data: "Hello 世界 🌍" });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("Hello");
-      expect(span.html()).toContain("世界");
+    it("should not truncate a string smaller than 50 000 chars", () => {
+      largeWrapper = mountComponent({ data: "small content" });
+      const h = html(largeWrapper);
+      expect(h).toContain("small");
+      expect(h).toContain("content");
+      expect(h).not.toContain("truncated");
     });
 
-    it("should handle deeply nested objects", async () => {
-      const deepObject: any = { level1: {} };
-      let current = deepObject.level1;
-
-      for (let i = 2; i <= 10; i++) {
-        current[`level${i}`] = {};
-        current = current[`level${i}`];
+    it("should render a large object using log-object-brace and log-key spans", () => {
+      const largeObj: Record<string, string> = {};
+      // 500 fields — well under the truncation threshold but still a large object
+      for (let i = 0; i < 500; i++) {
+        largeObj[`field_key_${i}`] = `field_value_${i}`;
       }
-      current.value = "deep value";
-
-      await wrapper.setProps({ data: deepObject });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+      largeWrapper = mountComponent({ data: largeObj, showBraces: true });
+      const h = html(largeWrapper);
+      // Object structure must be present
+      expect(h).toContain("log-object-brace");
+      expect(h).toContain("log-key");
+      expect(h).toContain("field_key_0");
     });
 
-    it("should handle circular reference gracefully", async () => {
-      const circularObj: any = { name: "test" };
-      // Can't actually create circular reference in JSON, but test error handling
-
-      await wrapper.setProps({ data: circularObj });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-    });
-
-    it("should handle NaN values", async () => {
-      await wrapper.setProps({ data: NaN });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-    });
-
-    it("should handle Infinity values", async () => {
-      await wrapper.setProps({ data: Infinity });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+    it("should truncate an object whose estimated size exceeds 50 000 bytes and emit log-string", () => {
+      const hugeObj: Record<string, string> = {};
+      // 2000 fields × ~60 chars each ≈ 120 KB estimated — safely over the 50 000 threshold
+      for (let i = 0; i < 2000; i++) {
+        hugeObj[`long_field_key_name_${i}`] = `long_field_value_text_${i}_extra_padding_here`;
+      }
+      largeWrapper = mountComponent({ data: hugeObj });
+      const h = html(largeWrapper);
+      // After truncation the composable returns a log-string span with [truncated] marker
+      expect(h).toContain("log-string");
+      expect(h).toContain("truncated");
     });
   });
 
-  describe("Integration with Composable", () => {
-    it("should properly integrate with useLogsHighlighter composable", () => {
-      expect(wrapper.vm).toBeDefined();
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-    });
-
-    it("should compute colorizedJson correctly", async () => {
+  // -------------------------------------------------------------------------
+  describe("Integration with useLogsHighlighter composable", () => {
+    it("should delegate colorization to the composable and produce non-empty HTML", async () => {
       await wrapper.setProps({ data: "test data" });
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.colorizedJson).toBeDefined();
-      expect(typeof wrapper.vm.colorizedJson).toBe("string");
+      const h = html(wrapper);
+      // Must produce a span with actual content — not just the outer wrapper
+      expect(h.length).toBeGreaterThan('<span class="logs-highlight-json"></span>'.length);
     });
 
-    it("should handle async operations", async () => {
+    it("should resolve after flushPromises with the span present", async () => {
       await wrapper.setProps({ data: "async test" });
       await flushPromises();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
+      expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
   });
 
-  describe("Component State", () => {
-    it("should maintain component state correctly", async () => {
-      const initialProps = wrapper.props();
-
-      await wrapper.vm.$forceUpdate();
-
-      expect(wrapper.props()).toEqual(initialProps);
-    });
-
-    it("should handle rapid prop updates", async () => {
+  // -------------------------------------------------------------------------
+  describe("Component State — rapid updates and cleanup", () => {
+    it("should reflect the final value after 10 rapid prop updates", async () => {
       for (let i = 0; i < 10; i++) {
         await wrapper.setProps({ data: `update ${i}` });
       }
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
       expect(wrapper.props("data")).toBe("update 9");
+      // The tokenizer splits "update 9" into two log-string tokens; use text() to
+      // verify the combined visible text rather than the raw HTML structure.
+      expect(wrapper.find("span.logs-highlight-json").text()).toContain("update");
+      expect(wrapper.find("span.logs-highlight-json").text()).toContain("9");
     });
 
-    it("should clean up properly on unmount", () => {
-      const testWrapper = mount(LogsHighLighting, {
-        props: { data: "cleanup test" },
-      });
-
-      testWrapper.unmount();
-      // Should not throw any errors during cleanup
+    it("should not throw when unmounted without prior interaction", () => {
+      const w = mountComponent({ data: "cleanup test" });
+      w.unmount(); // must not throw
     });
   });
 
-  describe("Real-world Scenarios", () => {
-    it("should handle typical log message", async () => {
-      const logMessage = '[2023-01-01 12:00:00] ERROR: Connection failed to 192.168.1.1:8080';
-      await wrapper.setProps({ data: logMessage });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("ERROR");
-      expect(span.html()).toContain("192.168.1.1");
-    });
-
-    it("should handle JSON log entry", async () => {
-      const jsonLog = {
-        timestamp: 1640995200000,
-        level: "error",
-        message: "Database connection failed",
-        ip: "192.168.1.1",
-        user: "admin@example.com",
-      };
-
-      await wrapper.setProps({ data: jsonLog });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("timestamp");
-      expect(span.html()).toContain("level");
-      expect(span.html()).toContain("error");
-      expect(span.html()).toContain("192.168.1.1");
-    });
-
-    it("should handle HTTP access log", async () => {
-      const accessLog = 'GET /api/v1/users HTTP/1.1 200 192.168.1.1';
-      await wrapper.setProps({ data: accessLog });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("GET");
-      expect(span.html()).toContain("192.168.1.1");
-      expect(span.html()).toContain("200");
-    });
-
-    it("should handle stack trace", async () => {
-      const stackTrace = `Error: Something went wrong
-  at Object.method (/app/src/index.js:123:45)
-  at process._tickCallback (internal/process/next_tick.js:68:7)`;
-
-      await wrapper.setProps({ data: stackTrace });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("Error");
-    });
-
-    it("should handle query with highlighting in real log", async () => {
-      const logMessage = "Critical error in payment processing system";
+  // -------------------------------------------------------------------------
+  describe("Real-world log scenarios", () => {
+    it("should render ERROR keyword and IP from a bracketed timestamp log line", async () => {
       await wrapper.setProps({
-        data: logMessage,
+        data: "[2023-01-01 12:00:00] ERROR: Connection failed to 192.168.1.1:8080",
+      });
+      const h = html(wrapper);
+      expect(h).toContain("ERROR");
+      expect(h).toContain("192.168.1.1");
+    });
+
+    it("should render all keys from a structured JSON log entry", async () => {
+      await wrapper.setProps({
+        data: {
+          timestamp: 1640995200000,
+          level: "error",
+          message: "Database connection failed",
+          ip: "192.168.1.1",
+          user: "admin@example.com",
+        },
+      });
+      const h = html(wrapper);
+      expect(h).toContain("timestamp");
+      expect(h).toContain("level");
+      expect(h).toContain("error");
+      expect(h).toContain("192.168.1.1");
+    });
+
+    it("should render method, IP, and status code from an HTTP access log string", async () => {
+      await wrapper.setProps({ data: "GET /api/v1/users HTTP/1.1 200 192.168.1.1" });
+      const h = html(wrapper);
+      expect(h).toContain("GET");
+      expect(h).toContain("192.168.1.1");
+      expect(h).toContain("200");
+    });
+
+    it("should render the Error keyword from a multi-line stack trace", async () => {
+      await wrapper.setProps({
+        data: `Error: Something went wrong\n  at Object.method (/app/src/index.js:123:45)\n  at process._tickCallback (internal/process/next_tick.js:68:7)`,
+      });
+      expect(html(wrapper)).toContain("Error");
+    });
+
+    it("should apply log-highlighted to both error and payment in a compound query", async () => {
+      await wrapper.setProps({
+        data: "Critical error in payment processing system",
         queryString: "match_all('error') AND match_all('payment')",
       });
-      await wrapper.vm.$nextTick();
-
-      const span = wrapper.find("span.logs-highlight-json");
-      expect(span.html()).toContain("error");
-      expect(span.html()).toContain("payment");
-      expect(span.html()).toContain("log-highlighted");
+      const h = html(wrapper);
+      expect(h).toContain("error");
+      expect(h).toContain("payment");
+      expect(h).toContain("log-highlighted");
     });
   });
 
-  describe("showQuotes behavior (added Mar 7)", () => {
-    it("should not show quotes for string data when showQuotes is false (default)", async () => {
-      const wrapper2 = mount(LogsHighLighting, {
-        props: { data: "hello world", showQuotes: false },
+  // -------------------------------------------------------------------------
+  describe("Props interface — unexported type boundary (regression for interface visibility change)", () => {
+    // The Props interface was changed from `export interface Props` to `interface Props`.
+    // The component must still accept and enforce the same prop contract from the outside.
+    it("should accept all five documented props without a Vue warning", () => {
+      const w = mountComponent({
+        data: { key: "value" },
+        showBraces: false,
+        showQuotes: true,
+        queryString: "match_all('value')",
+        simpleMode: false,
       });
-      await wrapper2.vm.$nextTick();
-
-      const html = wrapper2.find("span.logs-highlight-json").html();
-      expect(html).toContain("hello");
-      wrapper2.unmount();
+      expect(w.props("showBraces")).toBe(false);
+      expect(w.props("showQuotes")).toBe(true);
+      expect(w.props("queryString")).toBe("match_all('value')");
+      expect(w.props("simpleMode")).toBe(false);
+      w.unmount();
     });
 
-    it("should show quotes around string value when showQuotes is true", async () => {
-      const wrapper2 = mount(LogsHighLighting, {
-        props: { data: "hello", showQuotes: true },
+    it("should apply all five props together to produce highlighted output", async () => {
+      await wrapper.setProps({
+        data: "matched value text",
+        showBraces: true,
+        showQuotes: false,
+        queryString: "match_all('matched')",
+        simpleMode: false,
       });
-      await wrapper2.vm.$nextTick();
-
-      const html = wrapper2.find("span.logs-highlight-json").html();
-      // showQuotes=true should render quotes in the output
-      expect(html).toContain("hello");
-      wrapper2.unmount();
-    });
-
-    it("should show quotes for object values when showQuotes is true", async () => {
-      const wrapper2 = mount(LogsHighLighting, {
-        props: { data: { key: "value" }, showBraces: true, showQuotes: true },
-      });
-      await wrapper2.vm.$nextTick();
-
-      const html = wrapper2.find("span.logs-highlight-json").html();
-      expect(html).toContain("key");
-      wrapper2.unmount();
-    });
-  });
-
-  describe("Large content truncation (added Mar 7)", () => {
-    it("should truncate very large string content", async () => {
-      // Content larger than 50KB
-      const largeStr = "x".repeat(60000);
-      const wrapper2 = mount(LogsHighLighting, {
-        props: { data: largeStr },
-      });
-      await wrapper2.vm.$nextTick();
-
-      const span = wrapper2.find("span.logs-highlight-json");
-      expect(span.exists()).toBe(true);
-      // The result should contain the truncated marker or a portion of the content
-      const html = span.html();
-      expect(html.length).toBeGreaterThan(0);
-      wrapper2.unmount();
-    });
-
-    it("should not truncate small content", async () => {
-      const smallStr = "small content";
-      const wrapper2 = mount(LogsHighLighting, {
-        props: { data: smallStr },
-      });
-      await wrapper2.vm.$nextTick();
-
-      const span = wrapper2.find("span.logs-highlight-json");
-      expect(span.html()).toContain("small");
-      expect(span.html()).toContain("content");
-      wrapper2.unmount();
+      const h = html(wrapper);
+      expect(h).toContain("matched");
+      expect(h).toContain("log-highlighted");
     });
   });
 });

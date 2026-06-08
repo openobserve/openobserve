@@ -1,14 +1,16 @@
 <template>
-  <q-page data-test="iam-page" class="q-pa-none tw:overflow-hidden">
-    <q-splitter
+  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:px-2.5 tw:pb-2.5" data-test="iam-page">
+    <OSplitter
       v-model="splitterModel"
       unit="px"
       :limits="[0, 300]"
-      class="tw:overflow-hidden logs-splitter-smooth"
+      :horizontal="false"
+      class="tw:overflow-hidden"
+      style="height: 100%;"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-        <div v-if="showSidebar" class="iam-tabs spitter-container card-container o2-container-navbarheight" style="height: calc(100vh - var(--navbar-height) - 14px);">
+        <div class="tw:w-full tw:h-full">
+        <div v-if="showSidebar" class="iam-tabs spitter-container card-container tw:h-full">
           <route-tabs
             ref="iamRouteTabsRef"
             dataTest="iam-tabs"
@@ -28,18 +30,18 @@
             :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
             @click="collapseSidebar"
           >
-            <q-icon :name="showSidebar ? 'chevron_left' : 'chevron_right'" size="12px" />
+            <OIcon :name="showSidebar ? 'chevron-left' : 'chevron-right'" size="xs" />
           </OButton>
       </template>
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="tw:overflow-hidden">
+        <div class="tw:w-full tw:h-full">
+          <div class="tw:overflow-hidden tw:h-full">
             <RouterView />
           </div>
         </div>
       </template>
-    </q-splitter>
-  </q-page>
+    </OSplitter>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -53,7 +55,8 @@ import { nextTick } from "vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { resolveTab } from "@/utils/routeTabMaps";
 import OButton from "@/lib/core/Button/OButton.vue";
-
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 
@@ -87,6 +90,7 @@ const allTabs = [
     },
     label: t("iam.basicUsers"),
     class: "tab_content",
+    icon: "person",
   },
   {
     dataTest: "iam-service-accounts-tab",
@@ -98,6 +102,19 @@ const allTabs = [
       },
     },
     label: t("iam.serviceAccounts"),
+    class: "tab_content",
+    icon: "manage-accounts",
+  },
+  {
+    dataTest: "iam-ingestion-tokens-tab",
+    name: "ingestionTokens",
+    to: {
+      name: "ingestionTokens",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.ingestionTokens"),
     class: "tab_content",
   },
   {
@@ -111,6 +128,7 @@ const allTabs = [
     },
     label: t("iam.groups"),
     class: "tab_content",
+    icon: "group",
   },
   {
     dataTest: "iam-roles-tab",
@@ -123,6 +141,7 @@ const allTabs = [
     },
     label: t("iam.roles"),
     class: "tab_content",
+    icon: "shield",
   },
   {
     dataTest: "iam-quota-tab",
@@ -135,6 +154,7 @@ const allTabs = [
     },
     label: t("iam.quota"),
     class: "tab_content",
+    icon: "speed",
   },
   {
     dataTest: "iam-organizations-tab",
@@ -147,6 +167,7 @@ const allTabs = [
     },
     label: t("iam.organizations"),
     class: "tab_content",
+    icon: "corporate-fare",
   },
   {
     dataTest: "iam-invitations-tab",
@@ -159,6 +180,7 @@ const allTabs = [
     },
     label: t("iam.invitations"),
     class: "tab_content",
+    icon: "mail",
   },
 ];
 
@@ -203,11 +225,11 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations"];
+  const cloud = ["users", "ingestionTokens", "organizations"];
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users", "serviceAccounts", "organizations"];
+  const os = ["users", "serviceAccounts", "ingestionTokens", "organizations"];
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";
@@ -272,6 +294,14 @@ const updateActiveTab = (tab: string) => {
 }
 
 .splitter-icon-collapse {
-    left: 4px !important;
+  position: absolute !important;
+  top: 0.25rem !important;
+  left: 0 !important;
+}
+
+.splitter-icon-expand {
+  position: absolute !important;
+  top: 0.25rem !important;
+  left: 0 !important;
 }
 </style>

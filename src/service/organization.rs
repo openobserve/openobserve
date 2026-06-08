@@ -37,7 +37,8 @@ use {
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
     o2_enterprise::enterprise::cloud::{
-        InvitationRecord, OrgInviteStatus, billings::get_billing_by_org_id, org_invites,
+        InvitationRecord, OrgInviteStatus, billing_group::add_as_billing_member,
+        billings::get_billing_by_org_id, org_invites,
     },
 };
 
@@ -55,7 +56,7 @@ use crate::{
     },
     service::{
         db::{self, org_users},
-        self_reporting,
+        ingestion_tokens, self_reporting,
         stream::get_streams,
         users::add_admin_to_org,
     },
@@ -197,6 +198,19 @@ pub async fn get_passcode(
     org_id: Option<&str>,
     user_id: &str,
 ) -> Result<IngestionPasscode, anyhow::Error> {
+    let lookup_org_id = org_id.unwrap_or(DEFAULT_ORG);
+
+    // Try default org ingestion token first — returns actual unmasked value
+    if let Ok(Some(token_record)) =
+        db::org_ingestion_tokens::get_by_name(lookup_org_id, "default").await
+    {
+        return Ok(IngestionPasscode {
+            user: user_id.to_string(),
+            passcode: token_record.token,
+        });
+    }
+
+    // Fall back to existing user token lookup
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
@@ -287,6 +301,17 @@ async fn update_passcode_inner(
     if is_rum_update {
         org_users::update_rum_token(local_org_id, user_id, &rum_token).await?;
     } else {
+        // If a "default" org ingestion token exists, rotate it instead of the user token
+        if db::org_ingestion_tokens::get_by_name(local_org_id, "default")
+            .await
+            .is_ok_and(|r| r.is_some())
+        {
+            let new_token = db::org_ingestion_tokens::rotate_token(local_org_id, "default").await?;
+            return Ok(IngestionTokensContainer::Passcode(IngestionPasscode {
+                user: db_user.email,
+                passcode: new_token,
+            }));
+        }
         org_users::update_token(local_org_id, user_id, &token).await?;
     }
 
@@ -333,6 +358,7 @@ pub async fn list_org_users_by_user(
 pub async fn create_org(
     org: &mut Organization,
     user_email: &str,
+    _make_billed_member_of: Option<String>,
 ) -> Result<
     (
         Organization,
@@ -359,10 +385,30 @@ pub async fn create_org(
         let o2cfg = o2_enterprise::enterprise::common::config::get_config();
         let orgs = list_orgs_by_user(user_email).await?;
         let mut free_org_count = 0;
+        let mut payer_org_checked = false;
         for org in orgs {
             let billings = get_billing_by_org_id(&org.identifier).await?;
             if billings.is_none() {
                 free_org_count += 1;
+            }
+
+            // this check here allows us to use same db call to check eligibility if possible
+            // instead of having to make another db call when we already had info of this org
+            if let Some(oid) = _make_billed_member_of.as_ref()
+                && &org.identifier == oid
+            {
+                let Some(billing) = billings else {
+                    return Err(anyhow::anyhow!(
+                        "org {oid} is not a paid org, so cannot make the new org billing member"
+                    ));
+                };
+                if !billing.provider.is_billing_group_eligible() {
+                    return Err(anyhow::anyhow!(
+                        "org {oid} uses {} as billing provider and thus cannot be made a billing group org",
+                        billing.provider
+                    ));
+                }
+                payer_org_checked = true;
             }
         }
         // if we allow creating a new org, the free org count would be max+1
@@ -372,6 +418,52 @@ pub async fn create_org(
                 "A user cannot be part of more than {} free organizations.",
                 o2cfg.cloud.max_free_orgs_allowed
             ));
+        }
+
+        // make sure that the to-be-made super org is not a member itself
+        if let Some(oid) = _make_billed_member_of.as_ref() {
+            let membership =
+                o2_enterprise::enterprise::cloud::billing_group::list_billing_membership_of(oid)
+                    .await?;
+            if membership.is_some() {
+                return Err(anyhow::anyhow!(
+                    "{oid} org itself is part of another billing group, and thus cannot make a new org its member",
+                ));
+            }
+
+            // check if the super org is in the allowlist
+            if o2cfg
+                .cloud
+                .billing_group_allowed_orgs
+                .split(",")
+                .find(|v| *v == oid)
+                .is_none()
+            {
+                return Err(anyhow::anyhow!(
+                    "Billing groups is not enabled for org {oid}",
+                ));
+            }
+        }
+
+        // if for some reason the "super" org was not part of user's org
+        // it should anyways fail the  rbac check, but in any case
+        // we do the check here
+        if let Some(oid) = _make_billed_member_of.as_ref()
+            && !payer_org_checked
+        {
+            let billings = get_billing_by_org_id(oid).await?;
+
+            let Some(billing) = billings else {
+                return Err(anyhow::anyhow!(
+                    "org {oid} is not a paid org, so cannot make the new org billing member"
+                ));
+            };
+            if !billing.provider.is_billing_group_eligible() {
+                return Err(anyhow::anyhow!(
+                    "org {oid} uses {} as billing provider and thus cannot be made a billing group org",
+                    billing.provider
+                ));
+            }
         }
     }
 
@@ -396,6 +488,16 @@ pub async fn create_org(
     match db::organization::save_org(org).await {
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
+
+            // Create the default org-level ingestion token
+            if let Err(e) =
+                ingestion_tokens::create_default_token(&org.identifier, user_email).await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
 
             // Determine which user to add to the org
             // If service_account is specified, add it instead of the caller
@@ -541,6 +643,17 @@ pub async fn create_org(
                 None
             };
 
+            #[cfg(feature = "cloud")]
+            if let Some(payer_org) = _make_billed_member_of {
+                add_as_billing_member(user_email, &payer_org, &org.identifier, None)
+                    .await
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "org created, but error in making new org billing member : {e}"
+                        )
+                    })?;
+            }
+
             Ok((org.clone(), service_account_info))
         }
         Err(e) => {
@@ -582,6 +695,14 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                 stream_name: None,
             })
             .await;
+            // Create default org-level ingestion token for auto-provisioned orgs
+            if let Err(e) = ingestion_tokens::create_default_token(&org.identifier, "system").await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
             Ok(org.clone())
         }
         Err(e) => {
@@ -610,7 +731,17 @@ pub async fn check_and_create_org_without_ofga(
         service_account: None,
     };
     match db::organization::save_org(org).await {
-        Ok(_) => Ok(org.clone()),
+        Ok(_) => {
+            // Create default org-level ingestion token for auto-provisioned orgs
+            if let Err(e) = ingestion_tokens::create_default_token(&org.identifier, "system").await
+            {
+                log::error!(
+                    "Failed to create default ingestion token for org '{}': {e}",
+                    org.identifier
+                );
+            }
+            Ok(org.clone())
+        }
         Err(e) => {
             log::error!("Error creating org: {e}");
             Err(anyhow::anyhow!("Error creating org: {}", e))

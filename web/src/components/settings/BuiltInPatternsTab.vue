@@ -17,38 +17,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="built-in-patterns-container card-container">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar q-pa-md">
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-md-6">
-          <q-input
+    <div class="filters-bar tw:p-3">
+      <div class="tw:flex tw:gap-3">
+        <div class="tw:w-full col-md-6">
+          <OSearchInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
-            borderless
-            dense
-            flat
             clearable
-            class="no-border tw:w-full"
+            class="tw:w-full"
             data-test="built-in-pattern-search"
-          >
-            <template v-slot:prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
+          />
         </div>
-        <div class="col-12 col-md-4">
-          <q-select
+        <div class="tw:w-full col-md-4">
+          <OSelect
             v-model="selectedTags"
-            :options="availableTags"
-            :label="t('regex_patterns.filter_by_tag')"
-            dense
+            :options="tagOptions"
+            :placeholder="t('regex_patterns.filter_by_tag')"
             multiple
-            use-chips
             clearable
-            borderless
             data-test="built-in-pattern-tag-filter"
           />
         </div>
-        <div class="col-12 col-md-2">
+        <div class="tw:w-full col-md-2">
           <OButton
             variant="outline"
             size="sm"
@@ -57,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-refresh-btn"
           >
             <template #icon-left
-              ><q-icon name="refresh" size="14px"
+              ><OIcon name="refresh" size="sm"
             /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
@@ -66,15 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && patterns.length === 0" class="text-center q-pa-xl">
-      <q-spinner-hourglass color="primary" size="50px" />
-      <div class="q-mt-md">{{ t("regex_patterns.loading_patterns") }}</div>
+    <div v-if="loading && patterns.length === 0" class="tw:text-center tw:p-6">
+      <OSpinner size="lg" />
+      <div class="tw:mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="text-center q-pa-xl">
-      <q-icon name="error" size="50px" color="negative" />
-      <div class="q-mt-md text-negative">{{ error }}</div>
+    <div v-else-if="error" class="tw:text-center tw:p-6">
+      <OIcon name="error" style="width: 50px; height: 50px;" />
+      <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
       <span class="tw:mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
           {{ t("regex_patterns.try_again") }}
@@ -84,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Patterns List -->
     <div v-else class="patterns-list">
-      <div class="q-pa-md">
-        <div class="text-subtitle2 q-mb-md">
+      <div class="tw:p-3">
+        <div class="tw:text-sm tw:font-medium tw:mb-3">
           {{
             t("regex_patterns.showing_patterns", {
               count: filteredPatterns.length,
@@ -94,185 +84,148 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pattern Cards -->
-        <q-list bordered separator>
-          <q-item
+        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+          <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="pattern-item"
+            class="pattern-item tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3"
             :data-test="`pattern-item-${index}`"
           >
-            <q-item-section side>
-              <q-checkbox
+            <div class="tw:flex tw:items-center tw:shrink-0">
+              <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
                 :data-test="`pattern-checkbox-${index}`"
               />
-            </q-item-section>
+            </div>
 
-            <q-item-section>
-              <q-item-label class="text-weight-bold">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:gap-1.5">
+              <span class="tw:text-sm tw:font-semibold tw:leading-snug">
                 {{ pattern.name }}
-              </q-item-label>
-              <q-item-label caption lines="2">
-                <div class="q-mb-xs">
-                  <q-chip
-                    v-for="tag in pattern.tags.slice(0, 3)"
-                    :key="tag"
-                    size="sm"
-                    color="primary"
-                    text-color="white"
-                    dense
-                  >
-                    {{ tag }}
-                  </q-chip>
-                  <q-chip v-if="pattern.tags.length > 3" size="sm" dense>
-                    +{{ pattern.tags.length - 3 }}
-                  </q-chip>
-                </div>
-                <div class="pattern-preview">
-                  {{ pattern.pattern.substring(0, 100)
-                  }}{{ pattern.pattern.length > 100 ? "..." : "" }}
-                </div>
-              </q-item-label>
-            </q-item-section>
+              </span>
+              <div class="tw:flex tw:flex-wrap tw:gap-1">
+                <OBadge
+                  v-for="tag in pattern.tags.slice(0, 3)"
+                  :key="tag"
+                  size="md"
+                  variant="primary-soft"
+                  class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
+                >
+                  {{ tag }}
+                </OBadge>
+                <OBadge v-if="pattern.tags.length > 3" size="md" variant="default-soft" class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current">
+                  +{{ pattern.tags.length - 3 }}
+                </OBadge>
+              </div>
+              <div class="pattern-preview tw:line-clamp-1">
+                {{ pattern.pattern.substring(0, 100)
+                }}{{ pattern.pattern.length > 100 ? "..." : "" }}
+              </div>
+            </div>
 
-            <q-item-section side>
+            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
               <OButton
                 variant="ghost"
                 size="icon"
                 @click="previewPattern(pattern)"
                 :data-test="`pattern-preview-${index}`"
               >
-                <q-icon name="more_vert" size="14px" />
-                <q-tooltip>{{ t("regex_patterns.preview") }}</q-tooltip>
+                <OIcon name="visibility" size="sm" />
+                <OTooltip :content="t('regex_patterns.preview')" side="top" />
               </OButton>
-            </q-item-section>
-          </q-item>
+            </div>
+          </li>
 
-          <q-item v-if="filteredPatterns.length === 0">
-            <q-item-section class="text-center text-grey-6">
-              <div class="q-pa-xl">
-                <q-icon name="search_off" size="50px" />
-                <div class="q-mt-md">
+          <li v-if="filteredPatterns.length === 0" class="tw:flex tw:items-center tw:px-3 tw:py-2">
+            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-gray-400">
+              <div class="tw:p-6">
+                <OIcon name="search-off" style="width: 50px; height: 50px;" />
+                <div class="tw:mt-3">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
               </div>
-            </q-item-section>
-          </q-item>
-        </q-list>
+            </div>
+          </li>
+        </ul>
       </div>
     </div>
 
     <!-- Preview Dialog -->
-    <q-dialog v-model="showPreview" data-test="pattern-preview-dialog">
-      <q-card style="min-width: 600px">
-        <q-card-section>
-          <div class="text-h6">{{ previewedPattern?.name }}</div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section
-          class="q-pt-none"
-          style="max-height: 60vh; overflow-y: auto"
-        >
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.description") }}
-            </div>
-            <div>
-              {{
-                previewedPattern?.description ||
-                t("regex_patterns.no_description")
-              }}
-            </div>
+    <ODialog
+      v-model:open="showPreview"
+      size="md"
+      :title="previewedPattern?.name"
+      data-test="pattern-preview-dialog"
+      :secondary-button-label="t('regex_patterns.close')"
+      :primary-button-label="t('regex_patterns.import_this_pattern')"
+      @click:secondary="showPreview = false"
+      @click:primary="importSinglePattern"
+    >
+      <div style="max-height: 60vh; overflow-y: auto">
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">
+            {{ t('regex_patterns.description') }}
           </div>
-
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.pattern") }}
-            </div>
-            <q-input
-              :model-value="previewedPattern?.pattern"
-              type="textarea"
-              readonly
-              outlined
-              dense
-              rows="3"
-            />
+          <div>
+            {{ previewedPattern?.description || t('regex_patterns.no_description') }}
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.tags") }}
-            </div>
-            <q-chip
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.pattern') }}</div>
+          <OTextarea
+            :model-value="previewedPattern?.pattern"
+            readonly
+            rows="3"
+          />
+        </div>
+
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
+          <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <OBadge
               v-for="tag in previewedPattern?.tags"
               :key="tag"
-              color="primary"
-              text-color="white"
-              dense
+              size="md"
+              variant="primary-soft"
+              class="tw:text-[11px]! tw:ring-1 tw:ring-inset tw:ring-current"
             >
               {{ tag }}
-            </q-chip>
+            </OBadge>
           </div>
+        </div>
 
-          <div class="q-mb-md">
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.rarity") }}
-            </div>
-            <div>{{ previewedPattern?.rarity }}</div>
+        <div class="tw:mb-3">
+          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.rarity') }}</div>
+          <div>{{ previewedPattern?.rarity }}</div>
+        </div>
+
+        <div
+          v-if="previewedPattern?.examples?.Valid?.length > 0"
+          class="tw:mb-3"
+        >
+          <div class="text-weight-bold tw:mb-1">
+            {{ t('regex_patterns.valid_examples') }}
           </div>
-
-          <div
-            v-if="previewedPattern?.examples?.Valid?.length > 0"
-            class="q-mb-md"
-          >
-            <div class="text-weight-bold q-mb-xs">
-              {{ t("regex_patterns.valid_examples") }}
-            </div>
-            <q-list dense bordered>
-              <q-item
-                v-for="(example, idx) in previewedPattern.examples.Valid.slice(
-                  0,
-                  3,
-                )"
-                :key="idx"
-              >
-                <q-item-section>
-                  <q-item-label
-                    caption
-                    class="text-wrap"
-                    style="word-break: break-all"
-                  >
-                    {{ example.substring(0, 200)
-                    }}{{ example.length > 200 ? "..." : "" }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </div>
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-actions align="right">
-          <div class="tw:flex tw:gap-2">
-            <OButton variant="outline" size="sm-action" v-close-popup>
-              {{ t("regex_patterns.close") }}
-            </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              @click="importSinglePattern"
-              data-test="import-single-pattern-btn"
+          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <li
+              v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
+              :key="idx"
+              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1"
             >
-              {{ t("regex_patterns.import_this_pattern") }}
-            </OButton>
-          </div>
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                <span
+                  class="tw:block tw:text-xs tw:text-muted-foreground tw:text-wrap"
+                  style="word-break: break-all"
+                >
+                  {{ example.substring(0, 200) }}{{ example.length > 200 ? '...' : '' }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </ODialog>
   </div>
 </template>
 
@@ -280,10 +233,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface PatternExample {
   Valid: string[];
@@ -303,12 +265,11 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton },
+  components: { OButton, ODialog, OSpinner, OIcon, OBadge, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
   emits: ["import-patterns"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
-    const q = useQuasar();
 
     const patterns = ref<BuiltInPattern[]>([]);
     const loading = ref(false);
@@ -326,6 +287,10 @@ export default defineComponent({
       });
       return Array.from(tags).sort();
     });
+
+    const tagOptions = computed(() =>
+      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+    );
 
     const filteredPatterns = computed(() => {
       let filtered = patterns.value;
@@ -382,13 +347,11 @@ export default defineComponent({
 
             // console.log(`[BuiltInPatternsTab] Loaded ${patterns.value.length} patterns from frontend cache`);
 
-            q.notify({
+            toast({
               message: t("regex_patterns.patterns_loaded", {
                 count: patterns.value.length,
               }),
-              color: "positive",
-              position: "bottom",
-              timeout: 2000,
+              variant: "success",
             });
             loading.value = false;
             return;
@@ -409,24 +372,20 @@ export default defineComponent({
           selected: false,
         }));
 
-        q.notify({
+        toast({
           message: t("regex_patterns.patterns_loaded", {
             count: patterns.value.length,
           }),
-          color: "positive",
-          position: "bottom",
-          timeout: 2000,
+          variant: "success",
         });
       } catch (e: any) {
         error.value =
           e.response?.data?.message ||
           e.message ||
           t("regex_patterns.failed_to_load");
-        q.notify({
+        toast({
           message: error.value,
-          color: "negative",
-          position: "bottom",
-          timeout: 4000,
+          variant: "error",
         });
       } finally {
         loading.value = false;
@@ -458,11 +417,9 @@ export default defineComponent({
       const selected = selectedPatterns.value;
 
       if (selected.length === 0) {
-        q.notify({
+        toast({
           message: t("regex_patterns.no_patterns_selected"),
-          color: "warning",
-          position: "bottom",
-          timeout: 2000,
+          variant: "warning",
         });
         return;
       }
@@ -490,6 +447,7 @@ export default defineComponent({
       searchQuery,
       selectedTags,
       availableTags,
+      tagOptions,
       filteredPatterns,
       selectedCount,
       showPreview,
@@ -514,8 +472,7 @@ export default defineComponent({
 
 .filters-bar {
   flex-shrink: 0;
-  background: var(--q-color-background);
-  border-bottom: 1px solid var(--q-color-separator);
+  border-bottom: 1px solid var(--o2-border-color);
 }
 
 .patterns-list {
@@ -525,15 +482,18 @@ export default defineComponent({
 }
 
 .pattern-item {
+  transition: background-color 0.15s ease;
+
   &:hover {
-    background-color: rgba(0, 0, 0, 0.02);
+    background-color: var(--o2-hover-accent);
   }
 }
 
 .pattern-preview {
   font-family: monospace;
-  font-size: 0.85em;
-  color: var(--q-color-text-caption);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--o2-text-secondary);
   word-break: break-all;
 }
 </style>

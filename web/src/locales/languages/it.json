@@ -124,6 +124,11 @@
     "redirectingHome": "Reindirizzamento alla home tra {countdown} secondi...",
     "resources": "Risorse",
     "updated_at": "Aggiornato a",
+    "enable": "Attivare",
+    "disable": "Disabilita",
+    "download": "Scarica",
+    "enabled": "Abilitato",
+    "disabled": "Disabili",
     "error": "Errore",
     "db": "Banca dati",
     "discardChanges": "Ignora le modifiche",
@@ -396,7 +401,21 @@
     "traces": "Tracce",
     "switchToLogs": "clicca per tornare a Logs",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "selectLogStream": "Seleziona lo stream dei log"
+    "selectLogStream": "Seleziona lo stream dei log",
+    "noData": "Nessun dato disponibile",
+    "functionEditorLabel": "Editor di funzioni",
+    "loadingStream": "Caricamento dello stream...",
+    "hideHistogram": "Nascondi istogramma",
+    "disableQuickMode": "Disattiva la modalità rapida",
+    "menuGroupSetOnce": "Imposta una volta",
+    "menuGroupSavedViews": "Visualizzazioni salvate",
+    "menuGroupTools": "Utensili",
+    "menuGroupHistory": "Storia",
+    "menuGroupDownloads": "Download",
+    "menuGroupSchedule": "Pianificazione",
+    "menuGroupInspect": "Ispezionare",
+    "validSql": "SQL valido",
+    "invalidSql": "Query non valida"
   },
   "menu": {
     "home": "Home",
@@ -429,7 +448,8 @@
     "pipeline": "Oleodotti",
     "language": "Lingua",
     "actions": "Azioni",
-    "incidents": "Incidenti"
+    "incidents": "Incidenti",
+    "evals": "Valuta"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",
@@ -482,7 +502,22 @@
     "getStartedRUM": "Inizia con Real User Monitoring",
     "loadingErrorDetails": "Tieni duro, stiamo recuperando i dettagli dell'errore.",
     "eventID": "ID evento",
-    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione."
+    "loadingApplicationErrors": "Tieni duro, stiamo recuperando errori nell'applicazione.",
+    "traces": "Tracce",
+    "noCorrelatedTraces": "Nessuna traccia correlata trovata per questa sessione.",
+    "viewTraceDetails": "Visualizza i dettagli della traccia",
+    "routeChange": "Percorso",
+    "initialView": "Iniziale",
+    "failedToFetchTraces": "Recupero dei dati di traccia non riuscito. Per favore riprova.",
+    "traceNotFound": "Dettagli della traccia non trovati.",
+    "failedToFetchTraceDetails": "Caricamento dei dettagli della traccia non riuscito. Per favore riprova.",
+    "span": "ampiezza",
+    "spans": "ricopre",
+    "errorTraces": "tracce di errore",
+    "seekToMoment": "Cerca questo momento della sessione",
+    "timeInSession": "Durata della sessione",
+    "route": "Percorso",
+    "duration": "Durata"
   },
   "about": {
     "name": "Apri Observe",
@@ -509,9 +544,9 @@
     "ingestion_limit": "Limite di ingestione",
     "today_usage": "L'uso odierno",
     "feature_comparision_ent_msg": "Stai utilizzando OpenObserve Enterprise Edition con accesso a tutte le funzionalità avanzate elencate di seguito.",
-    "feature_comparision_plan_detail": "Il tuo piano: Enterprise Edition è gratuito per un massimo di 200 GB/giorno (~6 TB/mese) di acquisizione dati.",
+    "feature_comparision_plan_detail": "Il tuo piano: Enterprise Edition è gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
     "feature_comparision_os_msg": "Al momento stai utilizzando OpenObserve Open Source Edition. Effettua l'upgrade a Enterprise Edition per sbloccare le funzionalità avanzate elencate nella tabella di confronto riportata di seguito.",
-    "feature_comparision_good_news": "Buone notizie: OpenObserve Enterprise Edition è completamente gratuito per un massimo di 200 GB/giorno (~6 TB/mese) di acquisizione dati.",
+    "feature_comparision_good_news": "Buone notizie: OpenObserve Enterprise Edition è completamente gratuito per un massimo di 50 GB/giorno (~1.5 TB/mese) di acquisizione dati.",
     "commit_lbl": "Commettere",
     "build_lbl": "Costruito",
     "no_license_installed_lbl": "Nessuna licenza installata",
@@ -566,14 +601,14 @@
     "value_support_enterprise": "Enterprise",
     "value_support_cloud": "Nuvola",
     "value_cost_free": "Gratuito",
-    "value_cost_enterprise": "Se ospitato autonomamente, è gratuito per l'acquisizione di dati fino a 200 GB/giorno. Pagato successivamente",
+    "value_cost_enterprise": "Se ospitato autonomamente, è gratuito per l'acquisizione di dati fino a 50 GB/giorno. Pagato successivamente",
     "value_cost_cloud": "14 giorni di prova gratuita. Pagato successivamente",
     "feature_comparison_lbl": "Confronto delle funzionalità",
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Funzionalità aziendali",
         "offer_text": "Ottieni tutte le funzionalità aziendali completamente gratuite ospitando OpenObserve",
-        "badge_text": "Gratuito fino a 200 GB/giorno",
+        "badge_text": "Gratuito fino a 50 GB/giorno",
         "features_title": "Funzionalità di OpenObserve Cloud",
         "features_subtitle": "Tutte le funzionalità incluse nel tuo abbonamento cloud",
         "primary_button_text": "Scarica ora"
@@ -585,7 +620,7 @@
         "features_title": "Funzionalità aziendali disponibili",
         "features_subtitle": "Ottieni una licenza gratuita per sbloccare funzionalità illimitate",
         "primary_button_text": "Ottieni la licenza gratuita",
-        "license_note": "100 GB/giorno senza licenza • 200 GB/giorno con licenza"
+        "license_note": "50 GB/giorno senza licenza • 50 GB/giorno con licenza"
       },
       "enterprise_with_license": {
         "hero_title": "La tua edizione Enterprise",
@@ -599,7 +634,7 @@
       "open_source": {
         "hero_title": "Ottieni l'edizione Enterprise",
         "offer_text": "Scarica e sblocca tutte le funzionalità aziendali in modo completamente gratuito",
-        "badge_text": "Gratuito fino a 200 GB/giorno",
+        "badge_text": "Gratuito fino a 50 GB/giorno",
         "features_title": "Sblocca tutte le funzionalità aziendali",
         "features_subtitle": "Tutto ciò di cui hai bisogno per un'osservabilità pronta per la produzione",
         "primary_button_text": "Scarica ora"
@@ -922,7 +957,8 @@
     "nameRequired": "Il nome è obbligatorio",
     "subscription_type": "Tipo di piano",
     "proceed_subscription": "Procedi alla sottoscrizione",
-    "subscription_plan": "Piano di abbonamento"
+    "subscription_plan": "Piano di abbonamento",
+    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}"
   },
   "template": {
     "header": "Modelli",
@@ -1138,7 +1174,33 @@
     "apache": "Apache",
     "iis": "IIS",
     "pubsub": "Registri Pub/Sub",
-    "aiLabel": "Integrazioni AI"
+    "aiLabel": "Integrazioni AI",
+    "manageTokensBtnLabel": "Gestisci i token",
+    "orgLevelExplanation": "Si tratta di token di ingestione a livello di organizzazione. Non sono legati ai singoli utenti e continueranno a funzionare anche se l'utente che li ha creati lascia l'organizzazione. I token possono essere utilizzati solo sugli endpoint di ingestione.",
+    "resetDefaultTokenLabel": "Token di ripristino",
+    "tokenManagementTitle": "Gestisci i token di ingestione",
+    "defaultTokenBadge": "IMPOSTAZIONE PREDEFINITA",
+    "createTokenBtn": "Crea nuovo token",
+    "createTokenTitle": "Crea token",
+    "tokenNameLabel": "Nome",
+    "tokenDescriptionLabel": "Descrizione",
+    "rotateTokenBtn": "Ruota",
+    "deleteTokenBtn": "Elimina",
+    "copyTokenBtn": "Copia",
+    "copyTokenWarning": "Copia questo token adesso. Non verrà più mostrato.",
+    "newTokenRevealed": "Nuovo token generato",
+    "deleteTokenConfirm": "Eliminare il token «{name}»? Le pipeline che utilizzano questo token smetteranno di funzionare.",
+    "rotateTokenConfirm": "Ruotare il token «{name}»? Tutte le pipeline che utilizzano questo token devono essere aggiornate con il nuovo valore.",
+    "tokenCreatedSuccess": "Token creato con successo.",
+    "tokenRotatedSuccess": "Il token è stato ruotato con successo.",
+    "tokenDeletedSuccess": "Token eliminato con successo.",
+    "resetDefaultConfirm": "Reimpostare il token di inserimento predefinito? Tutte le pipeline che utilizzano questo token devono essere aggiornate.",
+    "tokenFetchError": "Caricamento dei token non riuscito.",
+    "tokenCreateError": "Creazione del token non riuscita.",
+    "tokenRotateError": "Ruotazione del token non riuscita.",
+    "tokenDeleteError": "Eliminazione del token non riuscita.",
+    "noTokensFound": "Nessun token di ingestione trovato.",
+    "createdBy": "Creato da"
   },
   "dashboard": {
     "selectField": "Campo",
@@ -1417,7 +1479,7 @@
     "markLineYAxis": "Asse Y",
     "colorPalette": "Palette di colori",
     "colorSeriesBy": "Serie a colori di:",
-    "colorBySeries": "<b>Per serie</b>",
+    "colorBySeries": "Per serie",
     "colorDefaultPaletteBySeries": "Palette predefinita (per serie)",
     "colorDefaultPaletteBySeriesSubLabel": "Le serie con lo stesso nome useranno lo stesso colore",
     "colorPaletteClassic": "Palette-Classic",
@@ -1426,7 +1488,7 @@
     "colorSingleColorSubLabel": "Imposta un colore specifico per tutte le serie",
     "colorShadesOfSpecificColor": "Sfumature di colore specifico",
     "colorShadesOfSpecificColorSubLabel": "Diverse tonalità di colore specifico",
-    "colorByValue": "<b>Per valore</b>",
+    "colorByValue": "Per valore",
     "colorGreenYellowRed": "Verde-Giallo-Rosso (in base al valore)",
     "colorRedYellowGreen": "Rosso-Giallo-Verde (per valore)",
     "colorTemperature": "Temperatura (per valore)",
@@ -1594,7 +1656,16 @@
     "configSectionDrilldown": "Drilldown",
     "configSectionComparison": "Confronto",
     "configSectionMarkLines": "Segna linee",
-    "configSectionBackground": "Sfondo"
+    "configSectionBackground": "Sfondo",
+    "allFolders": "Tutte le cartelle",
+    "selectFile": "Seleziona file",
+    "axisLabelRotateTooltip": "Ruota il testo dell'etichetta sull'asse x di un angolo scelto (in gradi) per migliorare la leggibilità quando le etichette sono lunghe o affollate. <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali.",
+    "axisLabelTruncateTooltip": "Tronca le etichette dell'asse x alla larghezza specificata (in pixel). <br /><br /><strong>Nota:</strong> questa opzione non è supportata per i campi sull'asse x delle serie temporali.",
+    "multiSqlQueryLabel": "Etichetta di interrogazione",
+    "multiSqlQueryLabelHint": "Nome personalizzato per questa query nelle legende (ad esempio, 'Produzione')",
+    "multiQueryWarning": "Viene renderizzato solo l'interrogazione 1 per {chartType}",
+    "trellisNotSupportedWithMultiQuery": "Il layout di Trellis è disabilitato con più query. Rimuovi le query aggiuntive per utilizzare trellis.",
+    "xAliasInconsistencyWarning": "Gli alias dell'asse X non sono coerenti tra le query: alcuni utilizzano l'istogramma e altri no. Utilizza lo stesso tipo di alias in tutte le query per risultati prevedibili."
   },
   "panel": {
     "header": "Pannello",
@@ -1769,7 +1840,105 @@
     "aiModePayAsYouGo": "Paga in base al tuo uso",
     "aiModeExhausted": "Esausto",
     "aiExhaustedMessage": "Abbonati per continuare a utilizzare le funzionalità AI",
-    "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento"
+    "aiPaygMessage": "Crediti gratuiti esauriti: utilizzo fatturato all'abbonamento",
+    "organizationGroup": {
+      "tabLabel": "Gruppo organizzativo",
+      "inviteOrgButton": "Invita l'organizzazione",
+      "viewUsage": "Visualizza utilizzo",
+      "statTotal": "Total Child Orgs",
+      "statActive": "Attivo",
+      "statPending": "Inviti in sospeso",
+      "statRejected": "Respinto",
+      "statusActive": "Attivo",
+      "statusPending": "In sospeso",
+      "statusRejected": "Respinto",
+      "filterAll": "Tutti",
+      "childOrgColumn": "Organizzazione infantile",
+      "dateColumn": "Data",
+      "cancel": "Annulla",
+      "invitedBy": "Invitato da",
+      "acceptedBy": "Accettato da",
+      "addedOnCreation": "Aggiunto alla creazione",
+      "memberSince": "Membro dal",
+      "noMembers": "Nessuna organizzazione membro ancora",
+      "inviteTitle": "Invita un'organizzazione",
+      "inviteOrgIdLabel": "Identificatore dell'organizzazione",
+      "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "sendInvite": "Invia invito",
+      "inviteSent": "Invito inviato con successo",
+      "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
+      "childHeadline": "Fatturazione gestita da",
+      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione madre, non c'è nulla da gestire qui.",
+      "receivedInvitesTab": "Inviti in sospeso",
+      "noPendingInvites": "Nessun invito in sospeso",
+      "noPendingInvitesHint": "Qui vedrai gli inviti quando un'altra organizzazione ti invita a far parte del suo gruppo di fatturazione.",
+      "invitedByOn": "Invitato da {inviter}",
+      "inviteTabPrompt": "Invita un'altra organizzazione a unirsi al tuo gruppo di fatturazione. Il loro utilizzo verrà fatturato a questa organizzazione.",
+      "emptyTitle": "Avvia gruppo di fatturazione",
+      "chipConsolidatedBill": "Una fattura consolidata",
+      "chipLinkOrgs": "Collega più organizzazioni",
+      "accept": "Accetta",
+      "reject": "Rifiuta",
+      "inviteAccepted": "Invito accettato con successo",
+      "inviteRejected": "Invito rifiutato con successo",
+      "plansManagedTitle": "Fatturazione gestita dall'organizzazione madre",
+      "plansManagedDescription": "La fatturazione di questa organizzazione è gestita da {payer}. Le modifiche al piano sono gestite dall'organizzazione madre.",
+      "chipPlanManaged": "Piano gestito dal genitore",
+      "chipNoInvoices": "Nessuna fattura separata",
+      "viewOrgGroup": "Visualizza il gruppo organizzativo",
+      "usageMemberLabel": "Organizzazione membro",
+      "usageAllMembers": "Organizzazione attuale",
+      "currentOrgTitle": "Organizzazione Attuale"
+    },
+    "billingGroup": {
+      "tabLabel": "Gruppo di fatturazione",
+      "inviteOrgButton": "Invita l'organizzazione",
+      "viewUsage": "Visualizza utilizzo",
+      "statTotal": "Total Child Orgs",
+      "statActive": "Attivo",
+      "statPending": "Inviti in sospeso",
+      "statRejected": "Respinto",
+      "statusActive": "Attivo",
+      "statusPending": "In sospeso",
+      "statusRejected": "Respinto",
+      "filterAll": "Tutti",
+      "childOrgColumn": "Organizzazione infantile",
+      "orgColumn": "Organizzazione",
+      "orgIdColumn": "Identificatore dell'organizzazione",
+      "actionsColumn": "Azioni",
+      "dateColumn": "Data",
+      "cancel": "Annulla",
+      "invitedBy": "Invitato da",
+      "acceptedBy": "Accettato da",
+      "addedOnCreation": "Aggiunto alla creazione",
+      "memberSince": "Membro dal",
+      "noMembers": "Nessuna organizzazione membro ancora",
+      "inviteTitle": "Invita un'organizzazione",
+      "inviteOrgIdLabel": "Identificatore dell'organizzazione",
+      "inviteOrgIdPlaceholder": "Inserisci l'identificativo dell'organizzazione",
+      "sendInvite": "Invia invito",
+      "inviteSent": "Invito inviato con successo",
+      "inviteSameOrg": "Un'organizzazione non può invitare se stessa",
+      "childHeadline": "Fatturazione gestita da",
+      "childHeroSub": "L'utilizzo viene fatturato a questa organizzazione. Le modifiche al piano e le fatture sono gestite dall'organizzazione madre, non c'è nulla da gestire qui.",
+      "invitesPanelHint": "Queste organizzazioni ti hanno invitato a far parte del loro gruppo di fatturazione. Se accetti, l'utilizzo da parte di questa organizzazione verrà fatturato a loro.",
+      "inviteTabPrompt": "Invita un'altra organizzazione a unirsi al tuo gruppo di fatturazione. Il loro utilizzo verrà fatturato a questa organizzazione.",
+      "emptyTitle": "Avvia gruppo di fatturazione",
+      "chipConsolidatedBill": "Una fattura consolidata",
+      "chipLinkOrgs": "Collega più organizzazioni",
+      "accept": "Accetta",
+      "reject": "Rifiuta",
+      "inviteAccepted": "Invito accettato con successo",
+      "inviteRejected": "Invito rifiutato con successo",
+      "plansManagedTitle": "Fatturazione gestita dall'organizzazione madre",
+      "plansManagedDescription": "La fatturazione di questa organizzazione è gestita da {payer}. Le modifiche al piano sono gestite dall'organizzazione madre.",
+      "chipPlanManaged": "Piano gestito dal genitore",
+      "chipNoInvoices": "Nessuna fattura separata",
+      "viewOrgGroup": "Visualizza il gruppo organizzativo",
+      "usageMemberLabel": "Organizzazione membro",
+      "usageAllMembers": "Organizzazione attuale",
+      "currentOrgTitle": "Organizzazione Attuale"
+    }
   },
   "message": {
     "ServerInternalError": "Errore: qualcosa è andato storto. Errore interno del server.",
@@ -2313,7 +2482,16 @@
     "delete": "Elimina",
     "variable_guide_header": "Guida alle variabili dei modelli",
     "variable_usage_examples": "Esempi di utilizzo",
-    "body": "Corpo"
+    "body": "Corpo",
+    "clone": "Clona",
+    "cloneTitle": "Modello di clonazione",
+    "systemReadOnly": "Modello predefinito: l'eliminazione è disabilitata. Clonalo per creare una copia modificabile.",
+    "prebuiltBadge": "Precostruito",
+    "prebuiltBadgeHint": "Gestito dal sistema. È possibile modificare, ma l'eliminazione è disabilitata.",
+    "customBadge": "Personalizzato",
+    "filterAll": "Tutti",
+    "filterPrebuilt": "Precostruito",
+    "filterCustom": "Personalizzato"
   },
   "alert_destinations": {
     "header": "Destinazioni",
@@ -2350,7 +2528,13 @@
     "custom": "Personalizzato",
     "separator": "Separatore",
     "separator_placeholder": "Inserisci un separatore (ad esempio, |,\\n,\\ t, spazio)",
-    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)"
+    "separator_hint": "Stringa separatrice da utilizzare tra i record (spazi consentiti)",
+    "filterAll": "Tutti",
+    "filterPrebuilt": "Precostruito",
+    "filterCustom": "Personalizzato",
+    "templateDefaultBadge": "Predefinito",
+    "templateDefaultOption": "Default ({name})",
+    "templateHelp": "Leave as default to use the standard {type} template ({name}), or pick a custom one."
   },
   "metrics": {
     "searchMetric": "Cerca una metrica",
@@ -2606,7 +2790,8 @@
     "systemDefault": "impostazione predefinita del sistema",
     "usageStreamEnabledLabel": "Abilita flusso di utilizzo",
     "aiToolsets": "Set di strumenti AI",
-    "llmModelPricing": "Prezzi del modello LLM"
+    "llmModelPricing": "Prezzi del modello LLM",
+    "ingestionTokens": "Token di ingestione"
   },
   "iam": {
     "users": "Utenti",
@@ -2634,10 +2819,12 @@
     "serviceAccounts": "Account di servizio",
     "serviceAccountsName": "Nome degli account di servizio",
     "basicUsers": "Utenti",
+    "organizationMembers": "Membri dell'Organizzazione",
     "quota": "Quote",
     "externalUserWarningTitle": "Avviso per l'utente esterno",
     "externalUserWarningMessage": "L'aggiunta diretta di utenti esterni ai ruoli non concederà autorizzazioni. Aggiungili invece ai gruppi di utenti.",
-    "invitations": "Inviti"
+    "invitations": "Inviti",
+    "ingestionTokens": "Token di ingestione"
   },
   "pipeline": {
     "header": "Oleodotti",
@@ -3018,7 +3205,8 @@
         "cost": "Costo",
         "spans": "Spaziate"
       }
-    }
+    },
+    "openInFullView": "Apri a piena vista"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3102,7 +3290,10 @@
     "algorithm": "Algoritmo",
     "storeType": "Tipo di negozio",
     "mechanismType": "Tipo di meccanismo",
-    "actions": "Azioni"
+    "actions": "Azioni",
+    "providerTypeRequired": "Il tipo di provider è obbligatorio",
+    "algorithmRequired": "L'algoritmo è richiesto",
+    "secretRequired": "Il segreto è obbligatorio"
   },
   "quota": {
     "header": "Quote",
@@ -3422,7 +3613,8 @@
     "serviceGroupProtected": "Il gruppo di servizi non può essere rimosso. È possibile modificare solo i campi mappati.",
     "noDataFound": "Nessun dato trovato",
     "isWorkloadType": "Identificatore del servizio",
-    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database."
+    "isWorkloadTypeTooltip": "Se abilitato, questo gruppo viene utilizzato per identificare in modo univoco un servizio (ad esempio cluster, namespace, distribuzione). Disattiva per i gruppi che descrivono le operazioni tramite un servizio, ad esempio il metodo HTTP o il nome del database.",
+    "loadingCorrelation": "Caricamento dei dati di correlazione..."
   },
   "sreChat": {
     "emptyMessage": "Chiedimi qualcosa sui tuoi avvisi e incidenti",
@@ -3759,7 +3951,8 @@
     "errSave": "Salvataggio non riuscito",
     "errLoadModel": "Caricamento del modello non riuscito",
     "tierDefaultName": "Predefinito",
-    "tierConditionalName": "Livello condizionale"
+    "tierConditionalName": "Livello condizionale",
+    "shadowedWarningBanner": "Le regole seguenti sono ombreggiate da «{name}», sostituite da una regola con priorità più alta e non verranno utilizzate per il calcolo dei costi."
   },
   "overview": {
     "title": "Panoramica del sistema",
@@ -3832,5 +4025,402 @@
     "awsStsSelfHostedInfo": "Questo utilizza AWS sts per assumere ruoli ed eseguire operazioni. Assicurati di aver configurato le credenziali aws nell'ambiente di installazione che hanno accesso a questo ruolo.",
     "externalIdRequired": "È richiesto un ID esterno",
     "storageAccountRequired": "Il nome dell'account di archiviazione è obbligatorio"
+  },
+  "aiAssistant": {
+    "greeting": {
+      "morning": "Buongiorno",
+      "afternoon": "Buon pomeriggio",
+      "evening": "Buona sera",
+      "night": "Lavorare fino a tardi"
+    },
+    "welcome": {
+      "taglineLead": "Sono",
+      "taglineHighlight": "Assistente O2",
+      "taglineTail": ". Posso scrivere il tuo",
+      "taglineSql": "SQL",
+      "taglineVrl": "VRL",
+      "taglinePromql": "ProMQL",
+      "taglineAnd": "e guidarti attraverso i tuoi registri, tracce, metriche e incidenti.",
+      "signedInAs": "Ha effettuato l'accesso come",
+      "role": "Ruolo",
+      "tryOneOfThese": "Oppure prova uno di questi"
+    },
+    "capabilities": {
+      "query": {
+        "title": "Scrivere una richiesta",
+        "description": "SQL per log, trace, RUM o ProMQL per le metriche.",
+        "prompt": "Aiutami a scrivere una richiesta"
+      },
+      "incident": {
+        "title": "Indagare sugli incidenti",
+        "description": "Causa principale nei log, nelle tracce e negli avvisi, ad esempio «Perché il gateway-5xx si è attivato?»",
+        "prompt": "Aiutami a indagare sugli incidenti"
+      },
+      "dashboard": {
+        "title": "Crea una dashboard",
+        "description": "Da un argomento, ad esempio «Stato del nodo K8s: CPU, memoria, riavvii». Crea anche pannelli.",
+        "prompt": "Aiutami a creare una dashboard o un pannello"
+      },
+      "alert": {
+        "title": "Crea un avviso",
+        "description": "Avvisi di soglia o pianificati e pipeline VRL in fase di inserimento.",
+        "prompt": "Aiutami a creare un avviso o una pipeline"
+      }
+    },
+    "suggestions": {
+      "vrlParseJson": "Scrivi VRL per analizzare JSON dai miei log di nginx",
+      "regexRedact": "Genera un modello regex per oscurare le email",
+      "mapStreamSchema": "Mappa il mio schema di stream «predefinito»",
+      "promqlCpu": "Scrivi ProMQL per pod utilizzando una CPU > 80%",
+      "datadogToO2": "Converti questa query Datadog in OpenObserve SQL",
+      "lastAlertFired": "Perché è stato attivato il mio ultimo allarme?"
+    },
+    "placeholderRotation": {
+      "one": "Mostrami gli errori dell'ultima ora...",
+      "two": "Scrivi VRL per analizzare JSON dai log di nginx...",
+      "three": "Crea una dashboard per lo stato dei nodi K8s..."
+    }
+  },
+  "onlineEvals": {
+    "title": "Valutazioni",
+    "description": "Configura i provider LLM, le definizioni dei punteggi, i punteggi e i lavori di valutazione in tempo reale.",
+    "loading": "Caricamento della configurazione di eval online...",
+    "loadError": "Impossibile caricare le valutazioni online",
+    "deletePrompt": "Eliminare {name}?",
+    "deleted": "{label} eliminato",
+    "deleteError": "Eliminazione di {label} non riuscita",
+    "saved": "{label} salvato",
+    "newButton": "Nuovo {label}",
+    "search": "Cerca {label}",
+    "refresh": "Aggiorna",
+    "allStatuses": "Tutti gli stati",
+    "noRowsFound": "Nessun {label} trovato",
+    "getStartedHint": "Creane uno per iniziare la valutazione online del cablaggio.",
+    "columns": {
+      "name": "Nome",
+      "status": "Status",
+      "updated": "Aggiornato"
+    },
+    "actions": {
+      "edit": "Modifica",
+      "delete": "Elimina"
+    },
+    "tabs": {
+      "jobs": "Offerte di lavoro Eval",
+      "scorers": "Marcatori",
+      "scoreConfigs": "Configurazioni dei punteggi",
+      "providers": "Fornitori"
+    },
+    "singular": {
+      "jobs": "Valuta il lavoro",
+      "scorers": "Marcatore",
+      "scoreConfigs": "Configurazione del punteggio",
+      "providers": "Fornitore"
+    },
+    "secondaryColumn": {
+      "jobs": "Stream",
+      "scorers": "Tipo",
+      "scoreConfigs": "Tipo di dati",
+      "providers": "Fornitore"
+    },
+    "jobStatus": {
+      "draft": "Bozza",
+      "active": "Attivo",
+      "paused": "In pausa",
+      "degraded": "Degradato",
+      "archived": "Archiviato"
+    },
+    "buttons": {
+      "cancel": "Annulla",
+      "create": "Crea",
+      "save": "Salva"
+    },
+    "scorerTypeDialog": {
+      "title": "Crea un nuovo segnapunti",
+      "intro": "Scegli il tipo di marcatore. Scegli quello che si adatta al modo in cui desideri creare ed eseguilo.",
+      "llmJudgeTitle": "Giudice LLM",
+      "llmJudgeDescription": "Usa un provider configurato per valutare semanticamente.",
+      "remoteTitle": "Telecomando",
+      "remoteDescription": "Chiama il tuo endpoint HTTP per il punteggio.",
+      "codeTitle": "Codice",
+      "codeDescription": "Presto in arrivo."
+    },
+    "provider": {
+      "backTo": "Torna a Providers",
+      "createTitle": "Crea un provider LLM",
+      "editTitle": "Modifica fornitore LLM",
+      "subtitle": "Configura l'endpoint del modello utilizzato dai giudici LLM.",
+      "sectionTitle": "Fornitore",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Produzione OpenAI",
+      "typeLabel": "Tipo di fornitore",
+      "typePlaceholder": "openai",
+      "endpointLabel": "Punto finale",
+      "endpointPlaceholder": "Endpoint personalizzato opzionale",
+      "defaultModelLabel": "Modello predefinito",
+      "defaultModelPlaceholder": "gpt-4o-mini",
+      "availableModelsLabel": "Modelli disponibili",
+      "availableModelsPlaceholder": "gpt-4o-mini, gpt-4.1",
+      "useAsDefault": "Usa come provider predefinito",
+      "authConfigLabel": "Configurazione di autenticazione JSON",
+      "saveError": "Impossibile salvare il provider"
+    },
+    "scoreConfig": {
+      "createTitle": "Nuova configurazione della partitura",
+      "editTitle": "Modifica configurazione della partitura",
+      "subtitle": "Le configurazioni dei punteggi definiscono il tipo di punteggio, le soglie di salute e le categorie.",
+      "nameLabel": "Nome",
+      "dataTypeLabel": "Tipo di dati",
+      "descriptionLabel": "Descrizione",
+      "numericRangeLabel": "Intervallo numerico JSON",
+      "categoriesLabel": "Categorie JSON",
+      "healthyThresholdLabel": "Soglia sana JSON",
+      "dataTypes": {
+        "numeric": "Numerico",
+        "categorical": "Categorico",
+        "boolean": "booleano"
+      },
+      "saveError": "Impossibile salvare la configurazione della partitura"
+    },
+    "scorer": {
+      "backTo": "Torna a Scorers",
+      "badgeRemote": "Telecomando",
+      "badgeLlm": "Giudice LLM",
+      "createTitleRemote": "Crea Remote Scorer",
+      "createTitleLlm": "Crea LLM Judge Scorer",
+      "editTitleRemote": "Modifica Remote Scorer",
+      "editTitleLlm": "Modifica LLM Judge Scorer",
+      "subtitleRemote": "Chiama un endpoint HTTP ospitato. Noi eseguiamo il rendering della richiesta; tu restituisci un punteggio.",
+      "subtitleLlm": "Un modello linguistico giudica ogni traccia utilizzando il prompt fornito.",
+      "identitySection": "Identità",
+      "judgeSection": "Configurazione del giudice",
+      "endpointSection": "Punto finale",
+      "nameLabel": "Nome",
+      "namePlaceholder": "giudice_fedeltà",
+      "producesScoreConfigLabel": "Produce la configurazione del punteggio",
+      "producesScoreConfigNone": "Nessuna",
+      "scoreConfigVersionLabel": "Versione di configurazione della partitura",
+      "latestSuffix": " (più recente)",
+      "pinVersion": "Pin versione selezionata",
+      "descriptionLabel": "Descrizione",
+      "providerLabel": "Fornitore",
+      "providerPlaceholder": "Seleziona il fornitore",
+      "modelLabel": "Modello",
+      "modelPlaceholder": "gpt-4o",
+      "promptLabel": "Richiesta del giudice",
+      "outputSchemaLabel": "Schema di output JSON",
+      "remoteEndpointLabel": "Endpoint remoto",
+      "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
+      "requestBodyLabel": "Richiedi modello di corpo",
+      "saveError": "Impossibile salvare il marcatore",
+      "versionsLoadError": "Impossibile caricare le versioni di configurazione della partitura",
+      "testPanel": {
+        "title": "Metti alla prova questo marcatore",
+        "hint": "Prova il tuo segnapunti con dati di esempio prima di salvare. Le esecuzioni dei test non vengono mantenute.",
+        "emptyPrefix": "Aggiungi variabili come ",
+        "emptySuffix": " al modello di punteggio per testare con campi di esempio.",
+        "runButton": "Esegui test",
+        "scenarioSuccess": "Risposta fittizia",
+        "scenarioAuth": "Errore di autenticazione",
+        "scenarioSchema": "Mancata corrispondenza dello schema",
+        "stateIdle": "Fai un test per vedere il risultato qui.",
+        "stateRunning": "Esecuzione del test del punteggio...",
+        "successHeader": "Successo",
+        "successScore": "punteggio: 0.92",
+        "successReasoning": "ragionamento: La risposta è supportata dal contesto fornito.",
+        "authHeader": "Autenticazione fallita",
+        "authHint": "Controlla le credenziali del provider prima di salvare.",
+        "schemaHeader": "Mancata corrispondenza dello schema",
+        "schemaHint": "La risposta non corrisponde allo schema di output configurato.",
+        "valuePlaceholder": "Valore per {variable}"
+      }
+    },
+    "job": {
+      "backTo": "Torna a Eval Jobs",
+      "createTitle": "Crea un lavoro di valutazione online",
+      "editTitle": "Modifica processo di valutazione online",
+      "subtitle": "Scegli lo stream, i punteggi, la mappatura e il comportamento di campionamento per questo lavoro di valutazione.",
+      "stepper": {
+        "target": "Obiettivo",
+        "scorers": "Marcatori",
+        "mapping": "Mappatura",
+        "sampling": "Campionamento"
+      },
+      "targetSection": "Obiettivo",
+      "scorersSection": "Punteggi e mappatura",
+      "nameLabel": "Nome",
+      "namePlaceholder": "Monitoraggio della fedeltà della produzione",
+      "streamLabel": "Flusso di input",
+      "streamPlaceholder": "predefinito",
+      "streamTypeLabel": "Tipo di stream",
+      "streamTypePlaceholder": "tracce",
+      "descriptionLabel": "Descrizione",
+      "samplingModeLabel": "Modalità di campionamento",
+      "samplingValueLabel": "Valore di campionamento JSON",
+      "samplingModes": {
+        "rate": "Tariffa",
+        "all": "Tutti",
+        "count": "Conta"
+      },
+      "scorerPicker": {
+        "title": "Marcatori",
+        "hint": "Seleziona uno o più marcatori da assegnare per ogni intervallo abbinato.",
+        "meta": "{tipo} · v {versione}"
+      },
+      "filter": {
+        "title": "Condizione del filtro",
+        "hint": "Solo gli intervalli che soddisfano questa condizione inseriscono il campionamento e il punteggio."
+      },
+      "inputMapping": {
+        "title": "Mappatura degli input",
+        "hint": "Mappate i campi in ogni variabile del modello di punteggio.",
+        "selectScorers": "Seleziona i segnapunti per configurarne le mappature.",
+        "noVariables": "Questo segnapunti non ha variabili modello da mappare.",
+        "variableCount": "variabili {count}"
+      },
+      "preview": {
+        "title": "Anteprima",
+        "hint": "Utilizza i campi a sinistra per definire l'obiettivo di valutazione della produzione.",
+        "summaryTitle": "Riepilogo",
+        "summaryName": "Nome",
+        "summaryType": "Tipo",
+        "summaryStatus": "Status",
+        "statusEditing": "Redazione",
+        "statusDraft": "Bozza",
+        "emptyValue": "—"
+      },
+      "selectAtLeastOne": "Seleziona almeno un marcatore",
+      "saveError": "Impossibile salvare il lavoro di valutazione"
+    },
+    "quality": {
+      "scopeLabel": "Tutte le dimensioni di qualità in questo spazio di lavoro",
+      "timeRange": {
+        "label": "Intervallo di tempo",
+        "last1h": "Ultima 1 ora",
+        "last24h": "Ultime 24 ore",
+        "last7d": "Ultimi 7 giorni",
+        "last30d": "Ultimi 30 giorni"
+      },
+      "sourceStream": {
+        "label": "Stream di origine",
+        "all": "Tutti gli stream"
+      },
+      "refresh": "Aggiorna",
+      "kpis": {
+        "evaluated": {
+          "title": "Tracce valutate",
+          "unit": "",
+          "hint": "ID di traccia distinti in _llm_scores all'interno della finestra"
+        },
+        "qualityIssueRate": {
+          "title": "Percentuale di problemi di qualità",
+          "unit": "%",
+          "hint": "Tracce valutate con qualsiasi dimensione al di sotto della soglia"
+        },
+        "evaluationCost": {
+          "title": "Costo di valutazione",
+          "unit": "$",
+          "hint": "Somma del costo del LLM Judge scorer nella finestra"
+        },
+        "jobSuccess": {
+          "title": "Successo lavorativo",
+          "unit": "%",
+          "hint": "Percentuale di successo di Eval Job online"
+        },
+        "scorerFailures": {
+          "title": "Fallimenti del marcatore",
+          "unit": "",
+          "hint": "Richiami dello scorer non riusciti nella finestra"
+        },
+        "latencyP95": {
+          "title": "Latenza p95",
+          "unit": "s",
+          "hint": "Latenza p95 Scorer-call"
+        },
+        "vsPrev": "vs precedente",
+        "noData": "—"
+      },
+      "loading": "Caricamento dei dati di qualità...",
+      "detail": {
+        "loading": "Caricamento della suddivisione per configurazione...",
+        "noData": "Non ci sono ancora punteggi per questa configurazione in questa finestra.",
+        "drillTitle": "Trapana fino alle tracce",
+        "splitByScorer": "Diviso per marcatore",
+        "splitBySourceType": "Dividi per source_type",
+        "trendTitle": "Tendenza",
+        "trendSubtitle": "{configName}, {bucket}",
+        "distributionTitle": "Distribuzione del punteggio",
+        "compositionTitle": "Composizione nel tempo",
+        "categoryDistributionTitle": "Distribuzione delle categorie",
+        "passRateTitle": "Percentuale di superamento nel tempo",
+        "trueFalseTitle": "Vero vs falso",
+        "legendAvg": "Media",
+        "legendP95": "p95",
+        "legendThreshold": "soglia {direzione} {valore}",
+        "legendHealthy": "salutare",
+        "legendUnhealthy": "malsano",
+        "kpis": {
+          "average": "Media",
+          "p50": "P50",
+          "p95": "P95",
+          "p50p95": "P50/P95",
+          "unhealthy": "Malsano",
+          "healthy": "Salutare",
+          "coverage": "Copertura"
+        }
+      },
+      "sidebar": {
+        "allConfigs": "Tutte le configurazioni",
+        "empty": "Nessuna configurazione corrisponde a questo filtro."
+      },
+      "overview": {
+        "title": "Panoramica delle configurazioni delle partiture",
+        "countSuffix": "{n} configurazioni",
+        "searchPlaceholder": "Configurazioni dei filtri...",
+        "loading": "Caricamento degli aggregati per configurazione...",
+        "emptyNoConfigsTitle": "Nessuna configurazione dei punteggi ancora",
+        "emptyNoConfigsHint": "Definisci il tuo primo Score Config per iniziare a tracciare le dimensioni della qualità.",
+        "emptyWaitingTitle": "Aspettando che arrivino i primi punteggi",
+        "emptyWaitingHint": "Le tue configurazioni di punteggio sono dichiarate, ma nessun punteggio è stato ancora scritto in _llm_scores in questa finestra.",
+        "waitingStepJob": "Attiva un processo di valutazione online che produce punteggi per una di queste configurazioni",
+        "waitingStepRange": "Allarga l'intervallo di tempo: i punteggi di oggi o di questa settimana potrebbero non essere in questa finestra",
+        "waitingStepRefresh": "Fai clic su Aggiorna: i punteggi di un lavoro attivo vengono visualizzati entro circa 1 minuto dalla valutazione",
+        "waitingPrimaryCta": "Apri offerte di lavoro Eval",
+        "waitingRefreshCta": "Aggiorna",
+        "noThreshold": "nessuna soglia",
+        "columns": {
+          "scoreConfig": "Configurazione del punteggio",
+          "type": "Tipo",
+          "totalScores": "Punteggi totali",
+          "coverage": "Copertura",
+          "unhealthy": "Malsano",
+          "trend": "Tendenza",
+          "threshold": "Sano se",
+          "updated": "Aggiornato"
+        }
+      }
+    },
+    "deleteTitle": "Elimina {label}",
+    "deleteConfirmMessage": "Sei sicuro di voler eliminare «{name}»? Questa azione non può essere annullata."
+  },
+  "llmProviders": {
+    "tabLabel": "Fornitori di LLM",
+    "title": "Fornitori di LLM",
+    "subtitle": "Gestisci le connessioni ai provider LLM utilizzate dai valutatori LLM Judge.",
+    "newButton": "Nuovo fornitore",
+    "searchPlaceholder": "Provider di ricerca",
+    "defaultBadge": "Predefinito",
+    "loadError": "Impossibile caricare i provider LLM",
+    "columns": {
+      "name": "Nome",
+      "type": "Tipo",
+      "endpoint": "Punto finale",
+      "defaultModel": "Modello predefinito",
+      "default": "Predefinito"
+    },
+    "empty": {
+      "title": "Non ci sono ancora fornitori di LLM",
+      "description": "I provider LLM memorizzano i dettagli di connessione (endpoint + credenziali) per i modelli linguistici chiamati dai valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate sui giudizi."
+    }
   }
 }

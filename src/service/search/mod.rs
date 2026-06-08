@@ -17,7 +17,6 @@ use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
-use cache::cacher::get_ts_col_order_by;
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -30,19 +29,12 @@ use config::{
         sql::{OrderBy, resolve_stream_names},
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
-    utils::{
-        base64, json,
-        schema::filter_source_by_partition_key,
-        sql::{
-            is_complex_query, is_eligible_for_histogram, is_explain_query, is_simple_distinct_query,
-        },
-        time::now_micros,
-    },
+    utils::{base64, json, schema::filter_source_by_partition_key, time::now_micros},
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use opentelemetry::trace::TraceContextExt;
-use proto::cluster_rpc::{self, SearchQuery};
+use proto::cluster_rpc::SearchQuery;
 use sql::Sql;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -66,12 +58,13 @@ use crate::{
     service::search::{
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         partition::{
-            cpu_cores::get_cpu_cores, settings::calculate_partition_settings,
-            stream_files::collect_stream_files,
+            cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
+            sql_context::PartitionSqlContext, stream_files::collect_stream_files,
         },
     },
 };
 
+pub(crate) mod bloom_pruner;
 pub(crate) mod cache;
 #[cfg(feature = "enterprise")]
 pub(crate) mod cardinality;
@@ -597,28 +590,6 @@ pub async fn search_multi(
     Ok(multi_res)
 }
 
-/// Returns true when the query's primary ORDER BY column is not a timestamp column,
-/// meaning per-partition `hits_to_skip` is incorrect and the TopKHeap merge path
-/// must be used instead.
-///
-/// Only the first ORDER BY column is evaluated; secondary columns are not compared.
-/// Complex and histogram queries always return false — their partitioning is not
-/// affected by non-ts ORDER BY.
-fn detect_non_ts_order_by(
-    order_by: &[(String, config::meta::sql::OrderBy)],
-    ts_column: Option<&str>,
-    is_complex_query: bool,
-    is_histogram: bool,
-) -> bool {
-    if is_complex_query || is_histogram {
-        return false;
-    }
-    order_by
-        .first()
-        .map(|(field, _)| field.as_str() != TIMESTAMP_COL_NAME && ts_column != Some(field.as_str()))
-        .unwrap_or(false)
-}
-
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(name = "service:search_partition", skip(req))]
 pub async fn search_partition(
@@ -629,110 +600,49 @@ pub async fn search_partition(
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
     is_http_req: bool,
-    enable_align_histogram: bool,
     use_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
-    let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let query = cluster_rpc::SearchQuery {
-        start_time: req.start_time,
-        end_time: req.end_time,
-        sql: req.sql.to_string(),
-        histogram_interval: req.histogram_interval,
-        ..Default::default()
-    };
-    let sql = Sql::new(&query, org_id, stream_type, None).await?;
+    let ctx = PartitionSqlContext::new(req, org_id, stream_type, is_http_req).await?;
 
-    // check for vrl
-    let apply_over_hits = match req.query_fn.as_ref() {
-        None => false,
-        Some(v) => {
-            if v.is_empty() {
-                false
-            } else {
-                let v = base64::decode_url(v).unwrap_or(v.to_string());
-                RESULT_ARRAY.is_match(&v)
-            }
-        }
-    };
+    let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
 
-    // if there is no _timestamp field or EXPLAIN in the query, return single partitions
-    let is_explain_query = is_explain_query(&req.sql);
-    let is_complex_query = is_complex_query(&req.sql).unwrap_or(false);
-    let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
-    let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).map(|(v, _)| v);
-    let is_streaming_aggregate = partition::aggregate::is_streaming_aggregate(
-        &req.sql,
-        ts_column.as_deref(),
-        is_http_distinct,
-    );
-
-    let use_single_partition = is_http_distinct
-        || is_explain_query
-        || ((ts_column.is_none() || apply_over_hits)
-            && !(req.streaming_output && is_streaming_aggregate));
-
-    let stream_files = collect_stream_files(trace_id, user_id, &sql, use_single_partition).await?;
-    let files = stream_files.files;
-    let max_query_range = stream_files.max_query_range;
-    let max_query_range_in_hour = stream_files.max_query_range_in_hour;
-    let file_list_took = start.elapsed().as_millis() as usize;
-    log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, max_query_range: {max_query_range}, max_query_range_in_hour: {max_query_range_in_hour}, took: {file_list_took} ms",
-        (req.start_time, req.end_time),
-        files.len(),
-    );
-
-    // `is_multi_stream_search` will always be false for search_partition
-    let (is_histogram_eligible, _) =
-        is_eligible_for_histogram(&req.sql, false).unwrap_or((false, false));
-    let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
-        (records + f.records, original_size + f.original_size)
-    });
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
-        file_num: files.len(),
-        records: records as usize,
-        original_size: original_size as usize,
+        file_num: stream_files.files.len(),
+        records: stream_files.records as usize,
+        original_size: stream_files.original_size as usize,
         compressed_size: 0, // there is no compressed size in file list
-        max_query_range: max_query_range_in_hour,
-        histogram_interval: sql.histogram_interval,
+        max_query_range: stream_files.max_query_range_in_hour,
+        histogram_interval: ctx.sql.histogram_interval,
         partitions: vec![],
-        order_by: OrderBy::Desc,
-        limit: sql.limit,
+        order_by: ctx.sql_order_by,
+        limit: ctx.sql.limit,
         streaming_output: false,
         streaming_aggs: false,
         streaming_id: None,
-        is_histogram_eligible,
+        is_histogram_eligible: ctx.is_histogram_eligible,
         non_ts_order_by_cols: vec![],
     };
 
-    // Calculate original step with all factors considered
-    let cpu_cores = get_cpu_cores(trace_id, org_id, &sql, is_http_req).await?;
-    let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
-    if total_secs * cfg.limit.query_group_base_speed * cpu_cores < resp.original_size {
-        total_secs += 1;
-    }
+    let total_secs = estimated_secs(trace_id, &ctx, is_http_req, resp.original_size).await?;
 
-    if use_single_partition
-        || (is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
+    if ctx.use_single_partition
+        || (ctx.is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
     {
         log::info!(
-            "[trace_id {trace_id}] search_partition: return single partition because (using single partition {use_single_partition}) or (total_secs ({total_secs}) <= aggs_min_num_partition_secs ({})) is true",
+            "[trace_id {trace_id}] search_partition: return single partition because (using single partition {}) or (total_secs ({total_secs}) <= aggs_min_num_partition_secs ({})) is true",
+            ctx.use_single_partition,
             cfg.limit.aggs_min_num_partition_secs
         );
         resp.partitions = vec![[req.start_time, req.end_time]];
         return Ok(resp);
     }
 
-    if detect_non_ts_order_by(
-        &sql.order_by,
-        ts_column.as_deref(),
-        is_complex_query,
-        sql.histogram_interval.is_some() || enable_align_histogram,
-    ) {
-        resp.non_ts_order_by_cols = sql
+    if ctx.detect_non_ts_order_by() {
+        resp.non_ts_order_by_cols = ctx
+            .sql
             .order_by
             .iter()
             .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
@@ -746,68 +656,29 @@ pub async fn search_partition(
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    {
+        let (streaming_aggs, streaming_id, cache_strategy) =
+            prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
+        resp.streaming_output = streaming_aggs;
+        resp.streaming_aggs = streaming_aggs;
+        resp.streaming_id = streaming_id;
+
+        if let Some(strategy) = cache_strategy {
+            resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);
+            return Ok(resp);
+        }
+    }
+
     let partition_settings = calculate_partition_settings(
         trace_id,
         total_secs,
-        &sql,
-        is_complex_query,
-        ts_column.is_some(),
-        enable_align_histogram,
+        &ctx,
         skip_max_query_range,
-        max_query_range,
+        stream_files.max_query_range,
     );
 
-    #[cfg(feature = "enterprise")]
-    let (streaming_aggs, streaming_id, stremaing_aggs_cache_strategy) =
-        prepare_streaming_aggregate(trace_id, req, &sql, is_streaming_aggregate, use_cache).await?;
-    #[cfg(feature = "enterprise")]
-    {
-        resp.streaming_output = streaming_aggs;
-        resp.streaming_aggs = streaming_aggs;
-        resp.streaming_id = streaming_id.clone();
-    }
-
-    let sql_order_by = sql
-        .order_by
-        .first()
-        .map(|(field, order_by)| {
-            if field == &ts_column.clone().unwrap_or_default() && order_by == &OrderBy::Asc {
-                OrderBy::Asc
-            } else {
-                OrderBy::Desc
-            }
-        })
-        .unwrap_or(OrderBy::Desc);
-
-    // Add a mini partition only for histogram-aligned log searches. Actual
-    // histogram queries should keep their original interval-aligned partitions.
-    let is_histogram = sql.histogram_interval.is_some();
-    let add_mini_partition = !is_histogram && enable_align_histogram;
-    let generator = partition::PartitionGenerator::new(
-        partition_settings.min_step,
-        cfg.limit.search_mini_partition_duration_secs,
-        is_histogram || enable_align_histogram,
-    );
-    let partitions = generator.generate_partitions(
-        req.start_time,
-        req.end_time,
-        partition_settings.step,
-        sql_order_by,
-        is_complex_query,
-        add_mini_partition,
-        #[cfg(feature = "enterprise")]
-        stremaing_aggs_cache_strategy,
-    );
-
-    if sql_order_by == OrderBy::Asc {
-        resp.order_by = OrderBy::Asc;
-    }
-
-    resp.partitions = partitions;
-    if enable_align_histogram {
-        let min_step_secs = partition_settings.min_step / 1_000_000;
-        resp.histogram_interval = Some(min_step_secs);
-    }
+    resp.partitions = generate_partitions(&ctx, &partition_settings);
     Ok(resp)
 }
 
@@ -847,9 +718,8 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] search->grpc: node: {}, search err: {:?}",
-                            &node.get_grpc_addr(),
-                            err
+                            "[trace_id {trace_id}] search->grpc: node: {}, search err: {err:?}",
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));
@@ -973,16 +843,15 @@ pub async fn cancel_query(
                 });
                 let node = Arc::new(node) as _;
                 let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-                let response: cluster_rpc::CancelQueryResponse = match client
+                let response: proto::cluster_rpc::CancelQueryResponse = match client
                     .cancel_query(request)
                     .await
                 {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
-                            "[trace_id {trace_id}] grpc_cancel_query: node: {}, search err: {:?}",
-                            &node.get_grpc_addr(),
-                            err
+                            "[trace_id {trace_id}] grpc_cancel_query: node: {}, search err: {err:?}",
+                            node.get_grpc_addr(),
                         );
                         let err = ErrorCodes::from_json(err.message())?;
                         return Err(Error::ErrorCode(err));
@@ -1130,7 +999,6 @@ pub async fn search_partition_multi(
     user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
-    enable_align_histogram: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
@@ -1155,7 +1023,6 @@ pub async fn search_partition_multi(
             },
             false,
             true,
-            enable_align_histogram,
             false, // disable aggs cache
         )
         .await
@@ -1321,219 +1188,5 @@ mod tests {
     fn test_check_search_allowed_non_enterprise_always_ok() {
         assert!(check_search_allowed("myorg", None).is_ok());
         assert!(check_search_allowed("myorg", Some("logs")).is_ok());
-    }
-
-    // ── detect_non_ts_order_by unit tests ──────────────────────────────────────
-
-    use config::meta::sql::OrderBy;
-
-    fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
-        (col.to_string(), dir)
-    }
-
-    // Helper: parse SQL string → run ColumnVisitor → return order_by vec.
-    // Uses empty schemas so no schema resolution happens, which is fine for
-    // ORDER BY extraction (pre_visit_query doesn't touch schemas).
-    fn parse_order_by(sql_str: &str) -> Vec<(String, OrderBy)> {
-        use ::datafusion::common::TableReference;
-        use hashbrown::HashMap;
-        use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
-
-        use crate::service::search::sql::visitor::column::ColumnVisitor;
-
-        let mut stmt = Parser::parse_sql(&GenericDialect {}, sql_str)
-            .unwrap()
-            .pop()
-            .unwrap();
-        let schemas = HashMap::<TableReference, _>::new();
-        let mut visitor = ColumnVisitor::new(&schemas);
-        let _ = stmt.visit(&mut visitor);
-        visitor.order_by
-    }
-
-    // ── direct helper tests ────────────────────────────────────────────────────
-
-    #[test]
-    fn test_detect_no_order_by_returns_false() {
-        assert!(!detect_non_ts_order_by(&[], None, false, false));
-    }
-
-    #[test]
-    fn test_detect_timestamp_order_by_returns_false() {
-        let order_by = vec![ob("_timestamp", OrderBy::Desc)];
-        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_non_ts_desc_returns_true() {
-        let order_by = vec![ob("duration", OrderBy::Desc)];
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_non_ts_asc_returns_true() {
-        let order_by = vec![ob("duration", OrderBy::Asc)];
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_aggregate_always_false() {
-        let order_by = vec![ob("duration", OrderBy::Desc)];
-        assert!(!detect_non_ts_order_by(&order_by, None, true, false));
-    }
-
-    #[test]
-    fn test_detect_histogram_always_false() {
-        let order_by = vec![ob("duration", OrderBy::Desc)];
-        assert!(!detect_non_ts_order_by(&order_by, None, false, true));
-    }
-
-    #[test]
-    fn test_detect_custom_ts_column_returns_false() {
-        // stream uses "time" as its timestamp column
-        let order_by = vec![ob("time", OrderBy::Desc)];
-        assert!(!detect_non_ts_order_by(
-            &order_by,
-            Some("time"),
-            false,
-            false
-        ));
-    }
-
-    #[test]
-    fn test_detect_custom_ts_column_other_col_returns_true() {
-        let order_by = vec![ob("duration", OrderBy::Desc)];
-        assert!(detect_non_ts_order_by(
-            &order_by,
-            Some("time"),
-            false,
-            false
-        ));
-    }
-
-    #[test]
-    fn test_detect_multi_col_first_is_ts_returns_false() {
-        // ORDER BY _timestamp DESC, duration ASC — primary is ts → false
-        let order_by = vec![
-            ob("_timestamp", OrderBy::Desc),
-            ob("duration", OrderBy::Asc),
-        ];
-        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_multi_col_first_is_non_ts_returns_true() {
-        // ORDER BY duration DESC, _timestamp DESC — primary is non-ts → true
-        // secondary _timestamp is ignored (known limitation: ties break arbitrarily)
-        let order_by = vec![
-            ob("duration", OrderBy::Desc),
-            ob("_timestamp", OrderBy::Desc),
-        ];
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    // ── SQL-parsing integration tests (via ColumnVisitor + is_complex_query) ──
-
-    #[test]
-    fn test_detect_sql_multi_col_non_ts_primary() {
-        // ORDER BY duration DESC, _timestamp DESC — primary non-ts → true
-        // _timestamp as secondary is honored by the heap but irrelevant for detection
-        let sql = "SELECT * FROM logs ORDER BY duration DESC, _timestamp DESC";
-        let order_by = parse_order_by(sql);
-        assert_eq!(order_by[0].0, "duration");
-        assert_eq!(order_by[1].0, "_timestamp");
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_sql_multi_col_ts_primary() {
-        // ORDER BY _timestamp DESC, duration DESC — primary ts → false
-        let sql = "SELECT * FROM logs ORDER BY _timestamp DESC, duration DESC";
-        let order_by = parse_order_by(sql);
-        assert_eq!(order_by[0].0, "_timestamp");
-        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_sql_three_col_non_ts_primary() {
-        // ORDER BY total_amt DESC, status ASC, _timestamp DESC — primary non-ts → true
-        let sql = "SELECT * FROM logs ORDER BY total_amt DESC, status ASC, _timestamp DESC";
-        let order_by = parse_order_by(sql);
-        assert_eq!(order_by[0].0, "total_amt");
-        assert_eq!(order_by.len(), 3);
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_sql_aggregate_with_count_order() {
-        // is_complex_query returns true for GROUP BY → detect always false
-        let sql = "SELECT count(*), status FROM logs GROUP BY status ORDER BY count(*) DESC";
-        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
-        assert!(
-            is_complex_query,
-            "GROUP BY query must be detected as complex"
-        );
-        let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(
-            &order_by,
-            None,
-            is_complex_query,
-            false
-        ));
-    }
-
-    #[test]
-    fn test_detect_sql_join_is_complex_short_circuits() {
-        // is_complex_query returns true for JOINs → detect always false regardless of ORDER BY
-        let sql = "SELECT a.duration, b.name FROM logs a \
-                   JOIN users b ON a.user_id = b.id \
-                   ORDER BY duration DESC";
-        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
-        assert!(is_complex_query, "JOIN query must be detected as complex");
-        let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(
-            &order_by,
-            None,
-            is_complex_query,
-            false
-        ));
-    }
-
-    #[test]
-    fn test_detect_sql_subquery_is_complex_short_circuits() {
-        // is_complex_query returns true for subqueries → detect always false
-        let sql = "SELECT * FROM (SELECT * FROM logs WHERE status = 200) sub \
-                   ORDER BY duration DESC";
-        let is_complex_query = config::utils::sql::is_complex_query(sql).unwrap_or(false);
-        assert!(is_complex_query, "subquery must be detected as complex");
-        let order_by = parse_order_by(sql);
-        assert!(!detect_non_ts_order_by(
-            &order_by,
-            None,
-            is_complex_query,
-            false
-        ));
-    }
-
-    #[test]
-    fn test_detect_sql_cte_outer_ts_order_by() {
-        // CTE: pre_visit_query is top-down → outer ORDER BY _timestamp first → false
-        let sql = "WITH t AS (SELECT * FROM logs ORDER BY duration DESC) \
-                   SELECT * FROM t ORDER BY _timestamp DESC";
-        let order_by = parse_order_by(sql);
-        assert_eq!(order_by[0].0, "_timestamp");
-        assert!(!detect_non_ts_order_by(&order_by, None, false, false));
-    }
-
-    #[test]
-    fn test_detect_sql_cte_outer_non_ts_order_by() {
-        // CTE: outer ORDER BY duration first → true
-        // Note: is_complex_query may return true for CTEs with subquery body;
-        // in that case the complex-query guard fires before this helper.
-        let sql = "WITH t AS (SELECT * FROM logs ORDER BY _timestamp DESC) \
-                   SELECT * FROM t ORDER BY duration DESC";
-        let order_by = parse_order_by(sql);
-        assert_eq!(order_by[0].0, "duration");
-        assert!(detect_non_ts_order_by(&order_by, None, false, false));
     }
 }

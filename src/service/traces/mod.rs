@@ -260,15 +260,15 @@ pub async fn handle_otlp_request(
             log::warn!(
                 "[TRACES:OTLP] Failed to ensure gen_ai schema fields for {}/{}: {e}",
                 org_id,
-                &traces_stream_name
+                traces_stream_name
             );
         }
     }
 
     // Start retrieving associated pipeline and construct pipeline params
     let stream_param = StreamParams::new(org_id, &traces_stream_name, StreamType::Traces);
-    let executable_pipeline =
-        crate::service::ingestion::get_stream_executable_pipeline(&stream_param).await;
+    let executable_pipelines =
+        crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_pipeline_inputs = Vec::new();
     // End pipeline params construction
 
@@ -502,125 +502,139 @@ pub async fn handle_otlp_request(
                     json::Value::Number(timestamp.into()),
                 );
 
-                if executable_pipeline.is_some() {
+                if !executable_pipelines.is_empty() {
                     stream_pipeline_inputs.push(value);
-                } else {
-                    // JSON Flattening
-                    value = flatten::flatten(value).map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())
-                    })?;
-
-                    // get json object
-                    let mut record_val = match value.take() {
-                        json::Value::Object(v) => v,
-                        _ => {
-                            log::error!(
-                                "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
-                            );
-                            return Ok((
-                                http::StatusCode::INTERNAL_SERVER_ERROR,
-                                [(ERROR_HEADER, format!("[trace_id: {trace_id}] stream did not receive a valid json object"))],
-                                Json(MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    "stream did not receive a valid json object",
-                                )),
-                            ).into_response());
-                        }
-                    };
-                    normalize_llm_field_types(&mut record_val);
-
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&traces_stream_name) {
-                        record_val = crate::service::ingestion::refactor_map(record_val, fields);
-                    }
-
-                    let (ts_data, _) = json_data_by_stream
-                        .entry(traces_stream_name.to_string())
-                        .or_insert((Vec::new(), None));
-                    ts_data.push((timestamp, record_val));
+                } else if !finalize_and_buffer_trace_span(
+                    value,
+                    &user_defined_schema_map,
+                    &traces_stream_name,
+                    &mut partial_success,
+                    &mut json_data_by_stream,
+                ) {
+                    log::error!(
+                        "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {trace_id}"
+                    );
+                    return Ok((
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        [(
+                            ERROR_HEADER,
+                            format!(
+                                "[trace_id: {trace_id}] stream did not receive a valid json object"
+                            ),
+                        )],
+                        Json(MetaHttpResponse::error(
+                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                            "stream did not receive a valid json object",
+                        )),
+                    )
+                        .into_response());
                 }
             }
         }
     }
 
     // batch process records through pipeline
-    if let Some(exec_pl) = &executable_pipeline {
-        let records = stream_pipeline_inputs;
+    if !executable_pipelines.is_empty() {
+        let records = stream_pipeline_inputs.clone();
 
-        let records_count = records.len();
-        match exec_pl
-            .process_batch(org_id, records, in_stream_name.map(String::from))
-            .await
-        {
-            Err(e) => {
-                log::error!(
-                    "[TRACES:OTLP] pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
-                );
-                partial_success.rejected_spans += records_count as i64;
-                partial_success.error_message = format!("Pipeline batch execution error: {e}");
-            }
-            Ok(pl_results) => {
-                log::debug!(
-                    "[TRACES:OTLP] pipeline returned results map of size: {}",
-                    pl_results.len()
-                );
-                for (stream_params, stream_pl_results) in pl_results {
-                    if stream_params.stream_type != StreamType::Traces {
-                        log::warn!(
-                            "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
-                        );
-                        continue;
-                    }
-
-                    for (_idx, mut res) in stream_pl_results {
-                        // get json object
-                        let mut record_val = match res.take() {
-                            json::Value::Object(v) => v,
-                            _ => {
-                                log::error!(
-                                    "[TRACES:OTLP] stream did not receive a valid json object"
-                                );
-                                return Ok((
-                                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                                    [(ERROR_HEADER, "stream did not receive a valid json object")],
-                                    Json(MetaHttpResponse::error(
-                                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                                        "stream did not receive a valid json object",
-                                    )),
-                                )
-                                    .into_response());
-                            }
-                        };
-                        normalize_llm_field_types(&mut record_val);
-
-                        if let Some(Some(fields)) =
-                            user_defined_schema_map.get(&stream_params.stream_name.to_string())
-                        {
-                            record_val =
-                                crate::service::ingestion::refactor_map(record_val, fields);
+        for exec_pl in &executable_pipelines {
+            let records_count = records.len();
+            match exec_pl
+                .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
+                .await
+            {
+                Err(e) => {
+                    log::error!(
+                        "[TRACES:OTLP] pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
+                    );
+                    partial_success.rejected_spans += records_count as i64;
+                    partial_success.error_message = format!("Pipeline batch execution error: {e}");
+                }
+                Ok(pl_results) => {
+                    log::debug!(
+                        "[TRACES:OTLP] pipeline returned results map of size: {}",
+                        pl_results.len()
+                    );
+                    for (stream_params, stream_pl_results) in pl_results {
+                        if stream_params.stream_type != StreamType::Traces {
+                            log::warn!(
+                                "[TRACES:OTLP] stream {stream_params:?} returned by pipeline is not a Trace stream. Records dropped"
+                            );
+                            continue;
                         }
 
-                        log::debug!(
-                            "[TRACES:OTLP] pipeline result for stream: {} got {} records",
-                            stream_params.stream_name,
-                            record_val.len()
-                        );
+                        for (_idx, mut res) in stream_pl_results {
+                            // get json object
+                            let mut record_val = match res.take() {
+                                json::Value::Object(v) => v,
+                                _ => {
+                                    log::error!(
+                                        "[TRACES:OTLP] stream did not receive a valid json object"
+                                    );
+                                    return Ok((
+                                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                                        [(
+                                            ERROR_HEADER,
+                                            "stream did not receive a valid json object",
+                                        )],
+                                        Json(MetaHttpResponse::error(
+                                            http::StatusCode::INTERNAL_SERVER_ERROR,
+                                            "stream did not receive a valid json object",
+                                        )),
+                                    )
+                                        .into_response());
+                                }
+                            };
+                            normalize_llm_field_types(&mut record_val);
 
-                        let Some(timestamp) = record_val
-                            .get(TIMESTAMP_COL_NAME)
-                            .and_then(|ts| ts.as_i64())
-                        else {
-                            log::error!(
-                                "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                            if let Some(Some(fields)) =
+                                user_defined_schema_map.get(&stream_params.stream_name.to_string())
+                            {
+                                record_val =
+                                    crate::service::ingestion::refactor_map(record_val, fields);
+                            }
+
+                            log::debug!(
+                                "[TRACES:OTLP] pipeline result for stream: {} got {} records",
+                                stream_params.stream_name,
+                                record_val.len()
                             );
-                            partial_success.rejected_spans += 1;
-                            continue;
-                        };
-                        let (ts_data, _) = json_data_by_stream
-                            .entry(stream_params.stream_name.to_string())
-                            .or_insert((Vec::new(), None));
-                        ts_data.push((timestamp, record_val));
+
+                            let Some(timestamp) = record_val
+                                .get(TIMESTAMP_COL_NAME)
+                                .and_then(|ts| ts.as_i64())
+                            else {
+                                log::error!(
+                                    "[TRACES:OTLP] skipping span due to missing inserted timestamp",
+                                );
+                                partial_success.rejected_spans += 1;
+                                continue;
+                            };
+                            let (ts_data, _) = json_data_by_stream
+                                .entry(stream_params.stream_name.to_string())
+                                .or_insert((Vec::new(), None));
+                            ts_data.push((timestamp, record_val));
+                        }
                     }
                 }
+            }
+        } // for each pipeline
+
+        // When only evaluation pipelines exist for this stream (no user pipeline
+        // is responsible for writing to the source stream), preserve original
+        // records by writing them back to the source stream.
+        let has_user_pipeline = executable_pipelines
+            .iter()
+            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+        if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
+            for value in &stream_pipeline_inputs {
+                let _ = finalize_and_buffer_trace_span(
+                    value.clone(),
+                    &user_defined_schema_map,
+                    &traces_stream_name,
+                    &mut partial_success,
+                    &mut json_data_by_stream,
+                );
             }
         }
     }
@@ -683,6 +697,49 @@ pub async fn handle_otlp_request(
         .inc();
 
     format_response(partial_success, req_type)
+}
+
+/// Finalize a trace span (flatten, normalize LLM field types, apply UDS)
+/// and push it into `json_data_by_stream`.
+///
+/// Returns `true` on success, `false` when the span should be skipped.
+fn finalize_and_buffer_trace_span(
+    mut value: json::Value,
+    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
+    traces_stream_name: &str,
+    partial_success: &mut ExportTracePartialSuccess,
+    json_data_by_stream: &mut HashMap<String, O2IngestJsonData>,
+) -> bool {
+    value = match flatten::flatten(value) {
+        Ok(v) => v,
+        Err(_) => {
+            partial_success.rejected_spans += 1;
+            return false;
+        }
+    };
+    let mut record_val = match value.take() {
+        json::Value::Object(v) => v,
+        _ => {
+            partial_success.rejected_spans += 1;
+            return false;
+        }
+    };
+    normalize_llm_field_types(&mut record_val);
+    if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
+        record_val = crate::service::ingestion::refactor_map(record_val, fields);
+    }
+    let Some(timestamp) = record_val
+        .get(TIMESTAMP_COL_NAME)
+        .and_then(|ts| ts.as_i64())
+    else {
+        partial_success.rejected_spans += 1;
+        return false;
+    };
+    let (ts_data, _) = json_data_by_stream
+        .entry(traces_stream_name.to_string())
+        .or_insert((Vec::new(), None));
+    ts_data.push((timestamp, record_val));
+    true
 }
 
 /// This ingestion handler is designated to ScheduledPipeline's gPRC ingestion service.
@@ -757,7 +814,7 @@ pub async fn ingest_json(
         if timestamp < min_ts {
             log::error!(
                 "[TRACES:JSON] skipping span with timestamp older than allowed retention period, trace_id: {}",
-                &trace_id
+                trace_id
             );
             partial_success.rejected_spans += 1;
             continue;
@@ -765,7 +822,7 @@ pub async fn ingest_json(
         if timestamp > max_ts {
             log::error!(
                 "[TRACES:JSON] skipping span with timestamp newer than allowed retention period, trace_id: {}",
-                &trace_id
+                trace_id
             );
             partial_success.rejected_spans += 1;
             continue;
@@ -781,7 +838,7 @@ pub async fn ingest_json(
             _ => {
                 log::error!(
                     "[TRACES:JSON] stream did not receive a valid json object, trace_id: {}",
-                    &trace_id
+                    trace_id
                 );
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,

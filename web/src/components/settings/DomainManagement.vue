@@ -15,47 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md domain_management">
+  <div class="domain_management tw:flex tw:flex-col tw:h-full">
+  <div class="tw:px-3 tw:py-3 tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
-    <div class="q-mb-xl">
-      <div class="text-h6 text-bold q-mb-xs">
+    <div class="tw:mb-6">
+      <div
+        data-test="domain-management-claim-parser-title"
+        class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+      >
         {{ t("settings.claimParserFunction") }}
       </div>
-      <div class="text-body2 text-grey-7 q-mb-md">
+      <div class="tw:text-sm tw:text-gray-400 tw:mb-3">
         {{ t("settings.claimParserFunctionDescription") }}
       </div>
 
-      <div class="row q-gutter-md items-end">
+      <div class="tw:flex tw:gap-3 tw:items-end">
         <div class="col-auto claim-parser-select">
-          <q-select
+          <OSelect
             v-model="claimParserFunction"
             :options="functionOptions"
             :label="t('settings.claimParserFunctionLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            dense
-            :loading="loadingFunctions"
-            @filter="filterFunctions"
-            use-input
-            fill-input
-            hide-selected
-            input-debounce="300"
+            searchable
             clearable
+            :loading="loadingFunctions"
+            @update:model-value="userTouched = true"
           >
-            <template v-slot:hint>
-              {{ t("settings.claimParserFunctionHint") }}
+            <template #empty>
+              <span>{{ t('settings.noVrlFunctionsFound') }}</span>
             </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.noVrlFunctionsFound") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          </OSelect>
         </div>
         <div class="col-auto">
           <OButton
@@ -71,225 +59,191 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-muted"
             size="icon-xs-sq"
             @click="showVrlInfo = true"
+            icon-left="help-outline"
           >
-            <template #icon-left><q-icon name="help_outline" /></template>
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
+            <OTooltip :content="t('settings.claimParserFunctionInfoTitle')" side="top" />
           </OButton>
         </div>
       </div>
 
       <!-- Right Drawer for VRL Information -->
-      <q-drawer
-        v-model="showVrlInfo"
+      <ODrawer
+        v-model:open="showVrlInfo"
+        :title="t('settings.claimParserFunctionInfoTitle')"
         side="right"
-        bordered
-        :width="450"
-        overlay
-        elevated
+        :width="40"
       >
-        <div class="q-pa-md">
-          <div class="row items-center q-mb-md">
-            <div class="col text-h6 text-bold">
-              {{ t("settings.claimParserFunctionInfoTitle") }}
-            </div>
-            <div class="col-auto">
-              <OButton
-                variant="ghost"
-                size="icon"
-                @click="showVrlInfo = false"
-              >
-                <template #icon-left><X class="tw:size-4 tw:shrink-0" /></template>
-              </OButton>
+        <div class="tw:p-4 tw:text-sm">
+          <div class="tw:mb-4 tw:p-4 info-box">
+            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+            <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+          </div>
+
+          <div class="tw:mb-4 tw:p-4 info-box">
+            <div class="tw:font-medium tw:mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+            <div class="tw:mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+            <div class="tw:ml-4">
+              <div class="tw:mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+              <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
             </div>
           </div>
 
-          <div class="text-body2">
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
-              <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
-            </div>
-
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="q-ml-md">
-                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
-                <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
-              </div>
-            </div>
-
-            <!-- Recent Errors Section -->
-            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
-              <div class="row items-center q-mb-sm">
-                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
-                <div class="col-auto">
-                  <OButton
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
-                    @click="loadRecentErrors"
-                    :loading="loadingErrors"
-                  >
-                    <template #icon-left><RefreshCw class="tw:size-3.5 tw:shrink-0" /></template>
-                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-                  </OButton>
-                </div>
-              </div>
-
-              <div v-if="loadingErrors" class="text-center q-py-md">
-                <q-spinner color="primary" size="sm" />
-              </div>
-
-              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
-                {{ t("settings.noRecentErrors") }}
-              </div>
-
-              <div v-else class="error-list">
-                <div
-                  v-for="(error, index) in recentErrors.slice(0, 3)"
-                  :key="index"
-                  class="error-item q-pa-sm q-mb-xs"
+          <!-- Recent Errors Section -->
+          <div v-if="claimParserFunction" class="tw:p-4 info-box error-section">
+            <div class="tw:flex tw:items-center tw:mb-2">
+              <div class="tw:flex-1 tw:font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+              <div>
+                <OButton
+                  icon-left="refresh"
+                  variant="ghost-muted"
+                  size="icon-xs-sq"
+                  @click="loadRecentErrors"
+                  :loading="loadingErrors"
                 >
-                  <div class="row items-start q-mb-xs">
-                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
-                    <div class="col">
-                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
-                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
-                    </div>
-                  </div>
-                  <div class="text-caption error-message">{{ error.error }}</div>
-                </div>
+                  <OTooltip :content="t('common.refresh')" side="top" />
+                </OButton>
+              </div>
+            </div>
 
-                <!-- Show More Button -->
-                <div class="q-mt-sm text-center">
-                  <OButton
-                    variant="ghost-primary"
-                    size="sm"
-                    @click="viewAllErrors"
-                  >
-                    {{ t('common.showMore') }}
-                    <template #icon-right><ExternalLink class="tw:size-3.5 tw:shrink-0" /></template>
-                  </OButton>
+            <div v-if="loadingErrors" class="tw:text-center tw:py-4">
+              <OSpinner size="xs" />
+            </div>
+
+            <div v-else-if="recentErrors.length === 0" class="tw:text-center tw:py-2" style="color: var(--o2-text-muted)">
+              {{ t("settings.noRecentErrors") }}
+            </div>
+
+            <div v-else class="error-list">
+              <div
+                v-for="(error, index) in recentErrors.slice(0, 3)"
+                :key="index"
+                class="error-item tw:p-2 tw:mb-1"
+              >
+                <div class="tw:flex tw:items-start tw:mb-1">
+                  <OIcon name="error" size="xs" class="tw:mr-1 tw:mt-1" />
+                  <div class="tw:flex-1">
+                    <div class="tw:text-xs tw:font-medium">{{ error.error_type }}</div>
+                    <div class="tw:text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                  </div>
                 </div>
+                <div class="tw:text-xs error-message">{{ error.error }}</div>
+              </div>
+
+              <!-- Show More Button -->
+              <div class="tw:mt-2 tw:text-center">
+                <OButton
+                  icon-right="open-in-new"
+                  variant="ghost-primary"
+                  size="sm"
+                  @click="viewAllErrors"
+                >
+                  {{ t('common.showMore') }}
+                </OButton>
               </div>
             </div>
           </div>
         </div>
-      </q-drawer>
+      </ODrawer>
     </div>
 
     <!-- Divider -->
-    <q-separator class="q-mb-xl" />
+    <OSeparator class="tw:mb-8" />
 
-    <div class="text-h6 text-bold q-mb-xs">
+    <div
+      data-test="domain-management-domain-restrictions-title"
+      class="tw:text-xl tw:font-semibold tw:font-bold tw:mb-1"
+    >
       {{ t("settings.domainRestrictionsSubsection") }}
     </div>
-    <div class="text-body2 text-grey-7 q-mb-lg">
+    <div class="tw:text-sm tw:text-gray-400 tw:mb-4">
       {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
     <!-- Domain Input Section -->
-    <div class="q-mb-xs">
-      <div class="text-body1 text-bold q-mb-md">
+    <div class="tw:mb-1">
+      <div class="tw:text-base tw:font-bold tw:mb-3">
         {{ t("settings.domainAndAllowedUsers") }}
       </div>
       
-      <div class="row q-gutter-md items-center q-mb-md">
-        <div class="col-auto">
-          <q-input
+      <div class="tw:flex tw:gap-x-2 tw:items-center">
+          <OInput
             v-model="newDomain"
-            :hint="t('settings.domainHint', { 'at_sign': '@' })"
             class="domain-input"
-            borderless
-            hide-bottom-space
-            dense
             @keydown.enter="addDomain"
             :placeholder="t('settings.domainPlaceholder')"
-            :rules="[
-              (val) => isValidDomain(val) || t('settings.invalidDomain')
-            ]"
+            :error="!!domainError"
+            :error-message="domainError"
+            @update:model-value="domainError = ''"
           />
-        </div>
-        <div class="col-auto q-my-none">
           <OButton
             variant="primary"
             size="sm-action"
             @click="addDomain"
             :disabled="!newDomain || !isValidDomain(newDomain)"
-          >{{ t('settings.addDomain') }}</OButton>
-        </div>
+          >{{ t('settings.addDomain') }}
+          </OButton>
+      </div>
+      <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
+        {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
 
-      <div class="text-caption text-grey-6 q-mb-md" v-if="domains.length > 0">
+      <div class="tw:text-xs tw:text-gray-400 tw:mt-1 tw:mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
 
     <!-- Domain List -->
-    <div v-if="domains.length > 0" class="q-mb-lg">
+    <div v-if="domains.length > 0" class="tw:mb-4">
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div 
           v-if="domain && domain.name"
-          class="domain-card q-mb-xs"
+          class="domain-card tw:mb-1"
         >
-          <div class="domain-header row items-center justify-between q-px-md q-py-sm">
-          <div class="text-body1 text-bold">{{ domain.name }}</div>
+          <div class="domain-header tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+          <div class="tw:text-base tw:font-bold">{{ domain.name }}</div>
           <OButton
+            icon-left="close"
             variant="ghost-destructive"
             size="icon-xs-sq"
             @click="removeDomain(index)"
             :title="t('common.delete')"
-          >
-            <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-          </OButton>
+          />
         </div>
 
-        <div class="q-pa-md">
+        <div class="tw:p-3">
           <!-- Radio Button Options -->
-          <div class="q-mb-xs">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
+          <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
+            <div class="tw:mb-1">
+              <ORadio
+                :val="true"
+                :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
+              />
+            </div>
+            <div class="tw:mb-3">
+              <ORadio
+                :val="false"
+                :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
+              />
+            </div>
+          </ORadioGroup>
 
           <!-- Info message for all users -->
           <div 
             v-if="domain.allowAllUsers"
-            class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
+            class="tw:p-2 tw:bg-blue-50 tw:text-blue-700 tw:rounded tw:mb-3"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
           <!-- Specific users section -->
           <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="row q-gutter-md items-center q-mb-md">
-              <div class="col">
-                <q-input
+              <div class="tw:flex tw:gap-x-2 tw:items-end">
+                <OInput
                   v-model="domain.newEmail"
                   :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  color="input-border"
-                  bg-color="input-bg"
                   class="email-input"
-                  outlined
-                  dense
                   @keydown.enter="addEmail(domain)"
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
                 />
-              </div>
-              <div class="col-auto q-my-none">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -297,24 +251,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
                 >{{ t('settings.addEmail') }}</OButton>
               </div>
-            </div>
 
             <!-- Email List -->
             <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
               <div 
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="email-item row items-center justify-between q-pa-sm q-mb-xs"
+                class="email-item tw:flex tw:items-center tw:justify-between tw:p-2 tw:mb-1"
               >
-                <div class="text-body2">{{ email }}</div>
+                <div class="tw:text-sm">{{ email }}</div>
                 <OButton
+                  icon-left="close"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   @click="removeEmail(domain, emailIndex)"
                   :title="t('common.delete')"
-                >
-                  <template #icon-left><X class="tw:size-3.5 tw:shrink-0" /></template>
-                </OButton>
+                />
               </div>
             </div>
           </div>
@@ -322,12 +274,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       </template>
     </div>
-    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card">
+    <div
+      v-else
+      data-test="domain-management-no-domain-message"
+      class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3 tw:mb-4 tw:w-full tw:text-center tw:p-4 domain-card"
+    >
       {{ t("settings.noDomainMessage") }}
     </div>
 
+  </div>
     <!-- Action Buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-2 q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
+    <div class="tw:flex tw:justify-end tw:gap-2 tw:px-6 tw:py-4 tw:border-t tw:border-(--o2-border-color) tw:shrink-0 tw:bg-(--o2-bg-default)">
       <OButton
         variant="outline"
         size="sm-action"
@@ -341,21 +298,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t('settings.saveChanges') }}</OButton>
     </div>
   </div>
+
+  <!-- Confirm remove domain dialog -->
+  <ODialog
+    v-model:open="confirmRemoveDomainOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveDomainOpen = false"
+    @click:primary="doRemoveDomain"
+  >
+    <p v-if="pendingRemoveDomainIndex !== null">{{ t('settings.confirmRemoveDomain', { domain: domains[pendingRemoveDomainIndex]?.name }) }}</p>
+  </ODialog>
+
+  <!-- Confirm remove email dialog -->
+  <ODialog
+    v-model:open="confirmRemoveEmailOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveEmailOpen = false"
+    @click:primary="doRemoveEmail"
+  >
+    <p v-if="pendingRemoveEmail !== null">{{ t('settings.confirmRemoveEmail', { email: pendingRemoveEmail.email }) }}</p>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { X, RefreshCw, ExternalLink } from "lucide-vue-next";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { add, formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 interface Domain {
   name: string;
@@ -365,17 +358,24 @@ interface Domain {
 }
 
 const { t } = useI18n();
-const q = useQuasar();
+
+// Dialog state for domain/email removal confirmations
+const confirmRemoveDomainOpen = ref(false);
+const pendingRemoveDomainIndex = ref<number | null>(null);
+const confirmRemoveEmailOpen = ref(false);
+const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string } | null>(null);
 const store = useStore();
 const router = useRouter();
 
 const newDomain = ref("");
+const domainError = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 
 // Claim parser function state
 const claimParserFunction = ref("");
 const originalClaimParserFunction = ref(""); // Track original value to detect changes
+const userTouched = ref(false); // Only true after user explicitly interacts with the select
 const functionOptions = ref<string[]>([]);
 const allFunctions = ref<string[]>([]);
 const loadingFunctions = ref(false);
@@ -386,9 +386,12 @@ const loadingErrors = ref(false);
 
 const emit = defineEmits(["cancel", "saved"]);
 
-// Computed property to check if claim parser function value has changed
+// Computed property to check if claim parser function value has changed.
+// Requires explicit user interaction (userTouched) so the pre-loaded stored value
+// does not enable the Save button on first render — matching main branch q-select hide-selected behaviour.
 const hasClaimParserChanged = computed(() => {
-  return claimParserFunction.value !== originalClaimParserFunction.value;
+  if (!userTouched.value) return false;
+  return (claimParserFunction.value || "") !== originalClaimParserFunction.value;
 });
 
 onMounted(() => {
@@ -434,10 +437,13 @@ const loadDomainSettings = async () => {
       domains.splice(0, domains.length, ...loadedDomains);
     }
 
-    // Load claim parser function from organization settings
+    // Track the saved value for change detection without pre-populating the OSelect model.
+    // This matches main branch's q-select hide-selected visual behaviour: the field appears
+    // empty on first load; the user must explicitly select a value before saving.
     const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
+    claimParserFunction.value = ""; // Always start visually empty
+    userTouched.value = false;      // Reset so save button is disabled until user acts
+    originalClaimParserFunction.value = storedFunction;
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
@@ -522,14 +528,20 @@ const isValidEmail = (email: any, domain: any): boolean => {
 };
 
 const addDomain = () => {
-  if (!newDomain.value || !isValidDomain(newDomain.value)) return;
+  if (!newDomain.value) {
+    domainError.value = t("settings.domainRequired") || "Domain is required";
+    return;
+  }
+  if (!isValidDomain(newDomain.value)) {
+    domainError.value = t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)";
+    return;
+  }
   
   // Check if domain already exists
   if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.domainAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
@@ -543,26 +555,27 @@ const addDomain = () => {
 
   newDomain.value = "";
 
-  // q.notify({
-  //   type: "positive",
+  // toast({
+  //   variant: "success",
   //   message: t("settings.domainAdded"),
   //   timeout: 3000,
   // });
 };
 
 const removeDomain = (index: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveDomain", { domain: domains[index].name }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domains.splice(index, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.domainRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveDomainIndex.value = index;
+  confirmRemoveDomainOpen.value = true;
+};
+
+const doRemoveDomain = () => {
+  const index = pendingRemoveDomainIndex.value;
+  if (index === null) return;
+  domains.splice(index, 1);
+  pendingRemoveDomainIndex.value = null;
+  confirmRemoveDomainOpen.value = false;
+  toast({
+    variant: "success",
+    message: t("settings.domainRemoved"),
   });
 };
 
@@ -571,10 +584,9 @@ const addEmail = (domain: Domain) => {
 
   // Check if email already exists
   if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: t("settings.emailAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
@@ -582,26 +594,26 @@ const addEmail = (domain: Domain) => {
   domain.allowedEmails.push(domain.newEmail.toLowerCase());
   domain.newEmail = "";
 
-  q.notify({
-    type: "positive",
+  toast({
+    variant: "success",
     message: t("settings.emailAdded"),
-    timeout: 3000,
   });
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveEmail.value = { domain, emailIndex, email: domain.allowedEmails[emailIndex] };
+  confirmRemoveEmailOpen.value = true;
+};
+
+const doRemoveEmail = () => {
+  const pending = pendingRemoveEmail.value;
+  if (!pending) return;
+  pending.domain.allowedEmails.splice(pending.emailIndex, 1);
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
+  toast({
+    variant: "success",
+    message: t("settings.emailRemoved"),
   });
 };
 
@@ -611,13 +623,13 @@ const loadFunctions = async () => {
     loadingFunctions.value = true;
     const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
 
+    // Populate options. The model value (claimParserFunction) is intentionally NOT set here
+    // so the trigger remains visually empty until the user makes an explicit selection.
+    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    originalClaimParserFunction.value = storedFunction;
+
     allFunctions.value = response.data.list.map((fn: any) => fn.name);
     functionOptions.value = allFunctions.value;
-
-    // Set the current value from store if it exists
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
   } catch (e: any) {
     console.error("Error loading functions:", e);
   } finally {
@@ -660,19 +672,18 @@ const saveClaimParserFunction = async () => {
     };
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    // Update original value after successful save
+    // Update original value after successful save and reset interaction flag
     originalClaimParserFunction.value = claimParserFunction.value || "";
+    userTouched.value = false;
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.claimParserFunctionSaved"),
-      timeout: 3000,
     });
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingClaimParserFunction"),
-      timeout: 3000,
     });
   } finally {
     savingClaimParser.value = false;
@@ -784,10 +795,9 @@ const saveChanges = async () => {
     // Validate all domains have proper configuration
     for (const domain of domains) {
       if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
-          timeout: 3000,
         });
         saving.value = false;
         return;
@@ -806,18 +816,16 @@ const saveChanges = async () => {
     // Save to backend API
     await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.domainSettingsSaved"),
-      timeout: 3000,
     });
 
     emit("saved", domains);
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingDomainSettings"),
-      timeout: 3000,
     });
   } finally {
     saving.value = false;

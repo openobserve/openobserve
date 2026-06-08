@@ -1,9 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ShortUrl > should match snapshot 1`] = `
-"<div data-v-fb8cde2d="" data-test="loading-container" class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"><svg data-v-fb8cde2d="" class="q-spinner text-primary q-spinner-mat" width="3em" height="3em" viewBox="25 25 50 50" data-test="spinner">
-    <circle class="path" cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="2" stroke-miterlimit="10"></circle>
-  </svg>
+"<div data-v-fb8cde2d="" data-test="loading-container" class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center">
+  <!-- Ring variant --><span data-v-fb8cde2d="" class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:size-12" role="status" aria-label="Loading" aria-live="polite" data-test="spinner"><svg class="tw:animate-spin tw:size-full tw:text-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><!-- Track --><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="tw:opacity-20"></circle><!-- Spinning arc --><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="tw:text-spinner"></path></svg></span>
   <div data-v-fb8cde2d="" data-test="message" class="message">Redirecting...</div>
 </div>"
 `;

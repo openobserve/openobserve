@@ -6,7 +6,7 @@ on:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
   merge_group:
 
 concurrency:
@@ -74,7 +74,7 @@ jobs:
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
       - uses: taiki-e/install-action@v2
         with:

@@ -20,20 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
           class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px]"
         >
-          <div class="q-table__title tw:font-[600]">
+          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
             {{ t('storage_settings.title') }}
           </div>
         </div>
    
     <!-- Loading state -->
-    <div v-if="loading" class="flex justify-center items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
-      <q-spinner color="primary" size="2em" />
+    <div v-if="loading" class="tw:flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
+      <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
     </div>
 
     <!-- Cloud: storage not enabled -->
     <div
       v-else-if="isCloud && !orgStorageEnabled"
-      class="text-body2 text-grey q-py-md"
+      class="tw:text-sm tw:text-gray-500 tw:py-3"
     >
       {{ t('storage_settings.notEnabled') }}
     </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="hero-page__inline-logo-wrap"
               >
                 <img :src="p.image" :alt="p.label" class="hero-page__inline-logo" />
-                <q-tooltip>{{ p.label }}</q-tooltip>
+                <OTooltip :content="p.label" />
               </div>
             </div>
           </div>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="store.state.theme === 'dark' ? 'feature-card--dark' : ''"
           >
             <div class="feature-card__icon-box" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark' : ''">
-              <q-icon :name="feature.icon" size="20px" class="feature-card__icon" />
+              <OIcon :name="feature.icon" size="md" class="feature-card__icon" />
             </div>
             <div class="feature-card__content">
               <div class="feature-card__title">{{ feature.title }}</div>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- double-ring icon -->
       <div class="ent-empty__icon-outer">
         <div class="ent-empty__icon-inner" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark' : ''">
-          <q-icon name="cloud_upload" size="28px" class="ent-empty__icon" />
+          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon" />
         </div>
       </div>
 
@@ -126,15 +126,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- key fact chips -->
       <div class="ent-empty__chips">
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="corporate_fare" size="13px" />
+          <OIcon name="corporate-fare" size="xs" />
           {{ t("storage_settings.perOrgIsolation") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="bolt" size="13px" />
+          <OIcon name="bolt" size="xs" />
           {{ t("storage_settings.appliesImmediately") }}
         </span>
         <span class="ent-empty__chip" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark' : ''">
-          <q-icon name="lock" size="13px" />
+          <OIcon name="lock" size="xs" />
           {{ t("storage_settings.usesOrgCredentials") }}
         </span>
       </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ent-empty__logo-wrap"
           >
             <img :src="p.image" :alt="p.label" class="ent-empty__logo" />
-            <q-tooltip>{{ p.label }}</q-tooltip>
+            <OTooltip :content="p.label" />
           </div>
         </div>
       </div>
@@ -167,50 +167,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ========== CONFIGURED ========== -->
     <div v-else>
 
-      <div class="q-pa-md">
-      <q-card
-        flat
-        bordered
+      <div class="tw:p-3">
+      <OCard
         class="storage-card"
         :class="store.state.theme === 'dark' ? 'storage-card--dark' : ''"
         style="max-width: 680px;"
       >
         <!-- Card header: logo + name + badge | update button -->
-        <q-card-section class="row items-center justify-between q-py-md q-px-lg no-wrap">
-          <div class="row items-center no-wrap" style="gap: 14px;">
+        <OCardSection role="header">
+          <div class="tw:flex tw:items-center tw:flex-nowrap tw:flex-1" style="gap: 14px;">
             <img
               :src="configuredProviderImage"
               :alt="configuredProviderLabel"
               style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;"
             />
             <div>
-              <div class="text-subtitle1" style="font-weight: 700; line-height: 1.3;">
+              <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
                 {{ configuredProviderLabel }}
               </div>
-              <q-badge
-                color="positive"
-                style="font-size: 11px; border-radius: 20px; padding: 2px 8px; margin-top: 4px;"
+              <OBadge
+                variant="success"
+                style="font-size: 11px; padding: 2px 8px; margin-top: 4px;"
               >
-                <q-icon name="check_circle" size="11px" style="margin-right: 3px;" />
+                <OIcon name="check-circle" size="xs" style="margin-right: 3px;" />
                 {{ t("storage_settings.active") }}
-              </q-badge>
+              </OBadge>
             </div>
           </div>
           <OButton
             data-test="storage-settings-update-btn"
             variant="primary"
-            class="no-border o2-primary-button tw:h-[36px]"
+            size="sm"
+            class="no-border o2-primary-button"
             :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
             @click="navigateToEdit"
           >
             {{ t("storage_settings.updateStorage") }}
           </OButton>
-        </q-card-section>
+        </OCardSection>
 
-        <q-separator />
+        <OSeparator />
 
         <!-- Field grid -->
-        <q-card-section class="q-px-lg q-pt-md q-pb-md">
+        <OCardSection role="body">
           <div class="storage-detail-grid">
             <div v-if="storageData.bucket_name" class="storage-field">
               <div class="storage-field__label">{{ t("storage_settings.bucketName") }}</div>
@@ -237,24 +236,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="storage-field__value" style="word-break: break-all;">{{ storageData.role_arn }}</div>
             </div>
           </div>
-        </q-card-section>
+        </OCardSection>
 
-        <q-separator v-if="configTimestamps" />
+        <OSeparator v-if="configTimestamps" />
 
         <!-- Timestamps -->
-        <q-card-section v-if="configTimestamps" class="q-px-lg q-py-sm">
-          <div class="row" style="gap: 40px;">
-            <div v-if="configTimestamps.created_at" class="row items-center" style="gap: 6px;">
+        <OCardSection v-if="configTimestamps">
+          <div class="tw:flex" style="gap: 40px;">
+            <div v-if="configTimestamps.created_at" class="tw:flex tw:items-center" style="gap: 6px;">
               <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
-              <span class="text-body2">{{ configTimestamps.created_at }}</span>
+              <span class="tw:text-sm">{{ configTimestamps.created_at }}</span>
             </div>
-            <div v-if="configTimestamps.updated_at" class="row items-center" style="gap: 6px;">
+            <div v-if="configTimestamps.updated_at" class="tw:flex tw:items-center" style="gap: 6px;">
               <span class="storage-field__label" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
-              <span class="text-body2">{{ configTimestamps.updated_at }}</span>
+              <span class="tw:text-sm">{{ configTimestamps.updated_at }}</span>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
+        </OCardSection>
+      </OCard>
       </div>
     </div>
     </template>
@@ -269,12 +268,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();
@@ -491,7 +497,7 @@ onMounted(() => {
     margin-bottom: 28px;
   }
 
-  // provider logos inline beneath the CTA
+  // provider logos tw:inline beneath the CTA
   &__inline-providers {
     display: flex;
     align-items: center;
@@ -700,7 +706,7 @@ onMounted(() => {
     }
   }
 
-  // fact chips row
+  // fact chips "row"
   &__chips {
     display: flex;
     align-items: center;

@@ -15,39 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
+  <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="tw:pb-[0.625rem]">
       <div class="card-container">
         <div
-          class="text-right tw:p-[0.375rem] flex align-center justify-between"
+          class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
         >
           <syntax-guide />
-          <div class="flex align-center justify-end metrics-date-time">
-            <date-time
-              auto-apply
-              :default-type="errorTrackingState.data.datetime?.valueType"
-              :default-absolute-time="{
-                startTime: errorTrackingState.data.datetime.startTime,
-                endTime: errorTrackingState.data.datetime.endTime,
-              }"
-              :default-relative-time="
-                errorTrackingState.data.datetime.relativeTimePeriod
-              "
-              data-test="logs-search-bar-date-time-dropdown"
-              class="q-mr-sm"
-              @on:date-change="updateDateChange"
-            />
-            <OButton
-              data-test="metrics-explorer-run-query-button"
-              data-cy="metrics-explorer-run-query-button"
-              variant="primary"
-              size="sm-toolbar"
-              :title="t('metrics.runQuery')"
-              @click="runQuery"
-            >
-              {{ t("metrics.runQuery") }}
-            </OButton>
-          </div>
+          <date-time
+            auto-apply
+            menu-align="end"
+            :default-type="errorTrackingState.data.datetime?.valueType"
+            :default-absolute-time="{
+              startTime: errorTrackingState.data.datetime.startTime,
+              endTime: errorTrackingState.data.datetime.endTime,
+            }"
+            :default-relative-time="
+              errorTrackingState.data.datetime.relativeTimePeriod
+            "
+            data-test="logs-search-bar-date-time-dropdown"
+            @on:date-change="updateDateChange"
+          />
+          <OButton
+            data-test="metrics-explorer-run-query-button"
+            data-cy="metrics-explorer-run-query-button"
+            variant="primary"
+            size="sm-toolbar"
+            :title="t('metrics.runQuery')"
+            @click="runQuery"
+          >
+            {{ t("metrics.runQuery") }}
+          </OButton>
         </div>
         <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
           <query-editor
@@ -59,63 +57,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <q-splitter
-      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-8.125rem)]!"
+    <OSplitter
+      class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
       v-model="splitterModel"
       unit="px"
-      vertical
+      :horizontal="false"
     >
       <template #before>
         <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
-          <FieldList
+          <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
               startTime: dateTime.startTime,
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
+            :query="errorTrackingState.data.editorValue"
             @event-emitted="handleSidebarEvent"
           />
         </div>
       </template>
       <template #after>
-        <div class="tw:pr-[0.625rem] tw:h-full">
-          <div class="card-container tw:h-full">
-            <template v-if="isLoading.length">
-              <div
-                class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
-              >
-                <div>
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="2.5rem"
-                    class="tw:mx-auto tw:block"
-                  />
-                  <div class="text-center full-width">
-                    {{ t("rum.loadingApplicationErrors") }}
-                  </div>
-                </div>
-              </div>
+        <div class="card-container tw:h-full tw:overflow-hidden">
+          <OTable
+            :data="tableErrors"
+            :columns="tableColumns"
+            :loading="isLoading.length"
+            row-key="_rowKey"
+            pagination="none"
+            virtual-scroll
+            :dense="false"
+            :row-height="86"
+            :show-global-filter="false"
+            horizontal-scroll
+            class="tw:h-full"
+            data-test="rum-app-errors-table"
+            row-class="tw:cursor-pointer"
+            @row-click="handleRowClick"
+          >
+            <template #empty>
+              <NoData />
             </template>
-            <AppTable
-              :columns="columns"
-              :rows="errorTrackingState.data.errors"
-              class="app-table-container tw:h-full"
-              @event-emitted="handleTableEvent"
-            >
-              <template v-slot:error_details="slotProps">
-                <ErrorDetail :column="slotProps.column.row" />
-              </template>
-            </AppTable>
-          </div>
+            <template #cell-error="{ row }">
+              <ErrorDetail :column="row" />
+            </template>
+          </OTable>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
 <script setup lang="ts">
 import {
+  computed,
   nextTick,
   onBeforeMount,
   onMounted,
@@ -123,7 +118,8 @@ import {
   type Ref,
   defineAsyncComponent,
 } from "vue";
-import AppTable from "@/components/rum/AppTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import ErrorDetail from "@/components/rum/ErrorDetail.vue";
@@ -134,15 +130,17 @@ import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
 import {
   applyFilterTerm,
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import NoData from "@/components/shared/grid/NoData.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -164,34 +162,41 @@ const isMounted = ref(false);
 const { getStream } = useStreams();
 const totalErrorsCount = ref(0);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const columns = ref([
+
+const tableErrors = computed(() => {
+  const errors = errorTrackingState.data.errors;
+  if (!Array.isArray(errors)) return [];
+  return errors.map((e: any, i: number) => ({
+    _rowKey: e.latest_error_id || e.zo_sql_timestamp || `err_${i}`,
+    ...e,
+  }));
+});
+const tableColumns = [
   {
-    name: "error",
-    field: (row: any) => row["error"],
-    prop: (row: any) => row["error"],
-    label: t("rum.error"),
-    align: "left",
+    id: "error",
+    header: t("rum.error"),
+    accessorKey: "error",
     sortable: true,
-    slot: true,
-    slotName: "error_details",
+    size: 300,
+    meta: { align: "left" }
   },
   {
-    name: "events",
-    field: (row: any) => row["events"],
-    prop: (row: any) => row["events"],
-    label: t("rum.events"),
-    align: "left",
+    id: "events",
+    header: t("rum.events"),
+    accessorKey: "events",
     sortable: true,
+    size: 100,
+    meta: { align: "left" },
   },
   {
-    name: "initial_view_name",
-    field: (row: any) => row["view_url"],
-    prop: (row: any) => row["view_url"],
-    label: t("rum.viewURL"),
-    align: "left",
+    id: "initial_view_name",
+    header: t("rum.viewURL"),
+    accessorKey: "view_url",
     sortable: true,
+    size: 500,
+    meta: { align: "left" },
   },
-]);
+];
 
 const userDataSet = new Set([
   "user_agent_device_brand",
@@ -243,7 +248,6 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -391,12 +395,10 @@ const getErrorLogs = () => {
       );
     })
     .catch((err) => {
-      q.notify({
+      toast({
         message:
           err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
-        timeout: 4000,
+        variant: "error",
       });
     })
     .finally(() => isLoading.value.pop());
@@ -434,14 +436,8 @@ const handleErrorTypeClick = async (payload: any) => {
   });
 };
 
-const handleTableEvent = (event: string, payload: any) => {
-  const eventsToHandle = ["cell-click"];
-  if (eventsToHandle.indexOf(event) === -1) return;
-
-  const eventMapping: { [key: string]: (payload: any) => Promise<void> } = {
-    "cell-click": handleErrorTypeClick,
-  };
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  handleErrorTypeClick({ row });
 };
 
 function restoreUrlQueryParams() {
@@ -498,10 +494,6 @@ function updateUrlQueryParams() {
     overflow: hidden;
   }
 
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
   .index-table :hover::-webkit-scrollbar,
   #tracesSearchGridComponent:hover::-webkit-scrollbar {
     height: 0.8125rem;
@@ -543,12 +535,7 @@ function updateUrlQueryParams() {
     .q-btn__content {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .q-icon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
+}
   }
 }
 </style>

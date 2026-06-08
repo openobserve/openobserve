@@ -15,6 +15,7 @@
 
 #![feature(btree_cursors)]
 
+pub mod bloom;
 pub mod cache;
 pub mod client;
 pub mod cluster;
@@ -25,6 +26,7 @@ pub mod errors;
 pub mod file_list;
 pub mod local_lock;
 pub mod pipeline;
+pub mod provider;
 pub mod queue;
 pub mod runtime;
 pub mod scheduler;

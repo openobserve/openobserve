@@ -184,10 +184,15 @@ impl From<meta_dest::Template> for Template {
             meta_dest::TemplateType::Sns => (String::new(), DestinationType::Sns),
         };
 
+        // Shared rule lives in `config::prebuilt_loader` so the HTTP DTO and
+        // the service-layer guards can't drift apart.
+        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name);
+
         Self {
             name: value.name,
             body: value.body,
             is_default: value.is_default.then_some(true),
+            is_prebuilt,
             template_type,
             title,
         }
@@ -341,6 +346,12 @@ pub struct Template {
     #[serde(rename = "isDefault")]
     #[serde(default)]
     pub is_default: Option<bool>,
+    /// True for system-managed prebuilt templates (those whose name starts
+    /// with `prebuilt_`). The public API refuses updates and deletes for
+    /// these, so the UI should render them as read-only.
+    #[serde(rename = "isPrebuilt")]
+    #[serde(default)]
+    pub is_prebuilt: bool,
     /// Indicates whether the body is
     /// http or email body
     #[serde(rename = "type")]
@@ -456,6 +467,7 @@ mod tests {
             name: "tmpl".to_string(),
             body: "body".to_string(),
             is_default: None,
+            is_prebuilt: false,
             template_type: DestinationType::Http,
             title: String::new(),
         };
@@ -472,6 +484,7 @@ mod tests {
             name: "email_tmpl".to_string(),
             body: "hi".to_string(),
             is_default: Some(true),
+            is_prebuilt: false,
             template_type: DestinationType::Email,
             title: "My Alert".to_string(),
         };
@@ -489,6 +502,7 @@ mod tests {
             name: "s".to_string(),
             body: "b".to_string(),
             is_default: None,
+            is_prebuilt: false,
             template_type: DestinationType::Sns,
             title: String::new(),
         };

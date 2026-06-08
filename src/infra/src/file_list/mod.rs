@@ -69,6 +69,22 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
+    /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
+    /// post-merge bloom builder (see `service::compact::bloom_build`).
+    /// Empty `ids` is a no-op.
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
+    /// Is `bloom_ver` still referenced by at least one live file_list row in
+    /// this `(stream, date)` bucket? Used by the post-merge orphan cleanup to
+    /// decide whether a `.bf` can be retired. `stream` is the combined
+    /// `{org}/{stream_type}/{stream}` key; `date` is the `YYYY/MM/DD/HH` value.
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -95,7 +111,18 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<Vec<FileRecord>>;
     async fn query_for_dump_by_updated_at(&self, time_range: (i64, i64))
     -> Result<Vec<FileRecord>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -176,7 +203,12 @@ pub trait FileList: Sync + Send + 'static {
         stream: &str,
         offset: i64,
     ) -> Result<i64>;
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
     -> Result<u64>;
@@ -281,6 +313,28 @@ pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
 }
 
 #[inline]
+pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+pub async fn bloom_ver_referenced(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+    bloom_ver: i64,
+) -> Result<bool> {
+    CLIENT
+        .bloom_ver_referenced(org_id, stream_type, stream_name, date, bloom_ver)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:update_compressed_size")]
 pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
     CLIENT.update_compressed_size(file, size).await
 }
@@ -347,12 +401,25 @@ pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<
 }
 
 #[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_bloom")]
+pub async fn query_for_bloom(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+) -> Result<Vec<FileKey>> {
+    CLIENT
+        .query_for_bloom(org_id, stream_type, stream_name, date)
+        .await
+}
+
+#[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+pub async fn query_by_ids(ids: &[i64], time_range: Option<(i64, i64)>) -> Result<Vec<FileKey>> {
     if ids.is_empty() {
         return Ok(Vec::default());
     }
-    CLIENT.query_by_ids(ids).await
+    CLIENT.query_by_ids(ids, time_range).await
 }
 
 #[inline]
@@ -515,8 +582,12 @@ pub async fn add_job(
 }
 
 #[inline]
-pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
-    CLIENT.get_pending_jobs(node, limit).await
+pub async fn get_pending_jobs(
+    node: &str,
+    limit: i64,
+    fast_mode: bool,
+) -> Result<Vec<MergeJobRecord>> {
+    CLIENT.get_pending_jobs(node, limit, fast_mode).await
 }
 
 #[inline]
@@ -660,13 +731,20 @@ pub struct FileRecord {
     pub file: String,
     #[sqlx(default)]
     pub deleted: bool,
+    #[sqlx(default)]
     pub min_ts: i64,
+    #[sqlx(default)]
     pub max_ts: i64,
+    #[sqlx(default)]
     pub records: i64,
+    #[sqlx(default)]
     pub original_size: i64,
+    #[sqlx(default)]
     pub compressed_size: i64,
     #[sqlx(default)]
     pub index_size: i64,
+    #[sqlx(default)]
+    pub bloom_ver: i64,
     #[sqlx(default)]
     pub flattened: bool,
     #[sqlx(default)]
@@ -696,6 +774,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
     }
@@ -883,6 +962,7 @@ mod tests {
             original_size: 102400,
             compressed_size: 51200,
             index_size: 1024,
+            bloom_ver: 0,
             flattened: true,
             updated_at: 9999,
         };
@@ -915,6 +995,7 @@ mod tests {
             original_size: 4096,
             compressed_size: 2048,
             index_size: 0,
+            bloom_ver: 0,
             flattened: false,
             updated_at: 0,
         };
@@ -930,6 +1011,59 @@ mod tests {
         assert!(key.segment_ids.is_none());
         assert_eq!(key.meta.min_ts, 100);
         assert_eq!(key.meta.max_ts, 200);
+    }
+
+    // ── bloom_ver coverage on FileRecord ─────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record_carries_bloom_ver() {
+        let record = FileRecord {
+            id: 1,
+            account: "a".to_string(),
+            org: "o".to_string(),
+            stream: "s/logs/x".to_string(),
+            date: "2026/05/08/00".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            bloom_ver: 1_715_000_000_000_000,
+            flattened: false,
+            updated_at: 0,
+        };
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, record.bloom_ver);
+    }
+
+    #[test]
+    fn test_file_record_bloom_ver_default_is_zero() {
+        // sqlx::FromRow with #[sqlx(default)] should fall back to 0 for missing column.
+        let record = FileRecord {
+            id: 0,
+            account: String::new(),
+            org: String::new(),
+            stream: String::new(),
+            date: String::new(),
+            file: String::new(),
+            deleted: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            bloom_ver: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+        // Conversion yields meta.bloom_ver == 0 too, which is the "no .bf" sentinel
+        // that downstream search code uses to fall back to the original tantivy path.
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, 0);
     }
 
     // ── From<&StatsRecord> for StreamStats ───────────────────────────────────

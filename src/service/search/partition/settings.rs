@@ -18,9 +18,9 @@ use std::cmp::max;
 use chrono::Duration;
 use config::get_config;
 
-use crate::service::search::sql::{
-    Sql,
-    visitor::histogram_interval::{
+use crate::service::search::{
+    partition::sql_context::PartitionSqlContext,
+    sql::visitor::histogram_interval::{
         convert_histogram_interval_to_seconds, generate_histogram_interval,
     },
 };
@@ -30,23 +30,21 @@ pub struct PartitionSettings {
     pub step: i64,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn calculate_partition_settings(
     trace_id: &str,
     total_secs: usize,
-    sql: &Sql,
-    is_complex_query: bool,
-    has_ts_column: bool,
-    enable_align_histogram: bool,
+    ctx: &PartitionSqlContext,
     skip_max_query_range: bool,
     max_query_range: i64,
 ) -> PartitionSettings {
     let cfg = get_config();
     let query_partition_by_secs = cfg.limit.query_partition_by_secs;
     let query_partition_max_num = cfg.limit.query_partition_max_num;
-    let start_time = sql.time_range.0;
-    let end_time = sql.time_range.1;
-    let histogram_interval = sql.histogram_interval;
+    let start_time = ctx.sql.time_range.0;
+    let end_time = ctx.sql.time_range.1;
+    let histogram_interval = ctx.sql.histogram_interval;
+    let is_complex_query = ctx.is_complex_query;
+    let has_ts_column = ctx.ts_column.is_some();
 
     let mut part_num = max(1, total_secs / query_partition_by_secs);
     if part_num * query_partition_by_secs < total_secs {
@@ -63,7 +61,7 @@ pub fn calculate_partition_settings(
         .unwrap()
         .num_microseconds()
         .unwrap();
-    if (is_complex_query && has_ts_column) || enable_align_histogram {
+    if is_complex_query && has_ts_column {
         let hist_int = if let Some(hist_int) = histogram_interval {
             hist_int
         } else {

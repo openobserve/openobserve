@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::destinations::{Template, TemplateType};
+// The "is this a system-managed template?" check lives next to
+// `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
+// service-layer guards below, and any future caller all derive the same
+// answer from one place. Re-exported here as a thin wrapper so existing
+// callers in this module keep working without a long path.
+pub use config::prebuilt_loader::is_prebuilt_template_name;
 
 use crate::{
     common::{
@@ -46,6 +52,18 @@ pub async fn save(
         && title.is_empty()
     {
         return Err(TemplateError::EmptyTitle);
+    }
+
+    // Canonical `prebuilt_<type>` names are reserved for system-managed
+    // templates: users may not create new templates with one of those names.
+    // Editing existing prebuilt templates IS allowed (lets users tweak the
+    // global default payload); deletion is blocked separately in `delete()`
+    // since destinations may still reference them.
+    // System initializers (`ensure_prebuilt_template`,
+    // `ensure_system_templates`) write through the db layer directly and so
+    // bypass this guard intentionally.
+    if create && is_prebuilt_template_name(&template.name) {
+        return Err(TemplateError::ReservedName(template.name.clone()));
     }
 
     match db::alerts::templates::get(&template.org_id, &template.name).await {
@@ -97,6 +115,11 @@ pub async fn list(
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), TemplateError> {
+    // System prebuilt templates are read-only from the public API; deleting
+    // one would break every destination still referencing it.
+    if is_prebuilt_template_name(name) {
+        return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
+    }
     db::alerts::templates::delete(org_id, name).await?;
     remove_ownership(org_id, "templates", Authz::new(name)).await;
     Ok(())

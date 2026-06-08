@@ -91,9 +91,15 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.crossLinkPage.clickCrossLinkingTab();
         await pm.crossLinkPage.deleteAllCrossLinks();
         await pm.crossLinkPage.addCrossLink(crossLink);
+
+        // Wait for the PUT settings API to confirm the save succeeded
+        const settingsResponse = page.waitForResponse(
+            (resp) => resp.url().includes('/streams/') && resp.url().includes('/settings') && resp.request().method() === 'PUT',
+            { timeout: 15000 }
+        );
         await pm.crossLinkPage.clickUpdateSettings();
-        await page.waitForTimeout(2000);
-        testLogger.info(`Cross-link "${crossLink.name}" set up on ${streamName}`);
+        const resp = await settingsResponse;
+        testLogger.info(`Cross-link "${crossLink.name}" saved on ${streamName}`, { status: resp.status() });
         return true;
     }
 
@@ -129,6 +135,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('Both stream cross-links configured', { crossLinkNameA, crossLinkNameB });
 
         // Step 3: Navigate to logs and select both streams
+        await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectIndexAndStreamJoinUnion(STREAM_A, STREAM_B);
         await page.waitForTimeout(2000);
 
@@ -136,34 +143,54 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.ensureQuickModeState(false);
         await page.waitForTimeout(1000);
 
-        // Run query
-        await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(3000);
+        // Arm the result_schema waiter BEFORE pressing Run so we don't miss a
+        // fast response. The cross-linking data is loaded by the parallel
+        // result_schema (cross_linking=true) calls fired alongside the search.
+        const crossLinkCapture = pm.crossLinkPage.captureCrossLinkResponses();
+
+        // Run query + retry if responses come back empty. The backend's
+        // result_schema cross-link merge is eventually-consistent — a query
+        // fired immediately after the schema-settings PUT can race the
+        // cross-link materialisation and return `stream_links: []` for both
+        // streams. Re-firing the query forces fresh result_schema calls, which
+        // pick up the now-persisted links. We cap at 3 attempts so a genuinely
+        // broken backend still fails fast.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            crossLinkCapture.reset();
+            await pm.logsPage.runQueryAndWaitForResults();
+            await page.waitForTimeout(3000);
+
+            const captured = await crossLinkCapture.waitForAtLeast(2, { timeout: 8000 });
+            await page.waitForTimeout(500);
+
+            const nonEmpty = crossLinkCapture.getNonEmptyCount();
+            testLogger.info('result_schema cross_linking responses captured', {
+                attempt,
+                count: captured,
+                nonEmpty,
+            });
+
+            if (nonEmpty >= 1) break;
+
+            if (attempt < 3) {
+                testLogger.warn(
+                    `Attempt ${attempt}: both result_schema responses empty — re-firing query`,
+                );
+                await page.waitForTimeout(1500);
+            }
+        }
 
         // Step 4: Expand a log row to reveal JSON preview
-        const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
-        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expandBtn.click();
-        await page.waitForTimeout(2000);
+        await pm.crossLinkPage.expandFirstLogRow();
 
-        // Step 5: Open kubernetes_container_name field action dropdown
-        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-        await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await fieldActionBtn.click();
-        await page.waitForTimeout(1500);
-
-        // Step 6: Verify BOTH cross-links appear in the dropdown
-        const crossLinkItemA = page.locator(`[data-test="log-details-cross-link-${crossLinkNameA}"]`);
-        const crossLinkItemB = page.locator(`[data-test="log-details-cross-link-${crossLinkNameB}"]`);
-
-        const hasA = await crossLinkItemA.isVisible().catch(() => false);
-        const hasB = await crossLinkItemB.isVisible().catch(() => false);
-
-        testLogger.info('Cross-link visibility in dropdown', { streamA: hasA, streamB: hasB });
-
-        expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible`).toBe(true);
-        expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible`).toBe(true);
+        // Step 5 & 6: Open kubernetes_container_name field action dropdown and
+        // verify BOTH cross-links appear. expectCrossLinksFromBothStreams polls
+        // and re-opens the dropdown until a late-arriving result_schema lands.
+        await pm.crossLinkPage.expectCrossLinksFromBothStreams(
+            'kubernetes_container_name',
+            crossLinkNameA,
+            crossLinkNameB,
+        );
 
         testLogger.info('PASSED: Both streams cross-links visible in non-SQL multi-stream mode');
     });
@@ -199,50 +226,52 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('Both stream cross-links configured for UNION test', { crossLinkNameA, crossLinkNameB });
 
         // Step 2: Navigate to logs, select both streams, enable SQL mode
+        await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectIndexAndStreamJoinUnion(STREAM_A, STREAM_B);
-        await page.waitForTimeout(2000);
+        // selectIndexAndStreamJoinUnion already waits for stream options and selection
 
         await pm.logsPage.enableSqlModeIfNeeded();
-        await page.waitForTimeout(1000);
 
         // Step 3: Enter UNION ALL query
         const unionQuery = `SELECT * FROM "${STREAM_A}" UNION ALL BY NAME SELECT * FROM "${STREAM_B}" LIMIT 100`;
         await pm.logsPage.clearAndFillQueryEditor(unionQuery);
-        await page.waitForTimeout(500);
         testLogger.info('UNION ALL query entered', { query: unionQuery });
 
         // Disable quick mode for full field visibility
         await pm.logsPage.ensureQuickModeState(false);
-        await page.waitForTimeout(1000);
+        // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query
+        // Run query and wait for BOTH result_schema cross-linking responses
+        // (UNION ALL fires one per stream — we need both before checking cross-links)
+        let schemaCount = 0;
+        const bothSchemasPromise = new Promise((resolve) => {
+            const handler = (resp) => {
+                if (resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200) {
+                    schemaCount++;
+                    if (schemaCount >= 2) {
+                        page.off('response', handler);
+                        resolve();
+                    }
+                }
+            };
+            page.on('response', handler);
+            setTimeout(() => { page.off('response', handler); resolve(); }, 20000);
+        });
         await pm.logsPage.selectRunQuery();
-        await page.waitForTimeout(3000);
+        await bothSchemasPromise;
 
         // Step 4: Expand a log row
-        const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
-        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expandBtn.click();
-        await page.waitForTimeout(2000);
+        await pm.crossLinkPage.expandFirstLogRow();
 
-        // Step 5: Open kubernetes_container_name field action dropdown
-        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-        await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await fieldActionBtn.click();
-        await page.waitForTimeout(1500);
+        // Step 5 & 6: Poll until BOTH cross-links appear (backend merges from both streams).
+        // The result_schema response is eventually-consistent, so use the polling helper
+        // that re-opens the dropdown until late-arriving responses land.
+        // Check each cross-link separately to isolate failures.
+        const hasA = await pm.crossLinkPage.expectLogCrossLinkVisible('kubernetes_container_name', crossLinkNameA);
+        expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible`).toBe(true);
 
-        // Step 6: Verify BOTH cross-links appear (backend merges from both streams)
-        const crossLinkItemA = page.locator(`[data-test="log-details-cross-link-${crossLinkNameA}"]`);
-        const crossLinkItemB = page.locator(`[data-test="log-details-cross-link-${crossLinkNameB}"]`);
-
-        const hasA = await crossLinkItemA.isVisible().catch(() => false);
-        const hasB = await crossLinkItemB.isVisible().catch(() => false);
-
-        testLogger.info('UNION ALL cross-link visibility', { streamA: hasA, streamB: hasB });
-
-        expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible in UNION query`).toBe(true);
-        expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible in UNION query`).toBe(true);
+        const hasB = await pm.crossLinkPage.expectLogCrossLinkVisible('kubernetes_container_name', crossLinkNameB);
+        expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible`).toBe(true);
 
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
@@ -254,17 +283,12 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('Testing network calls for multi-stream cross-links');
 
         // Step 1: Navigate to logs and select both streams
+        await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectIndexAndStreamJoinUnion(STREAM_A, STREAM_B);
         await page.waitForTimeout(2000);
 
         // Step 2: Set up network interception for result_schema calls
-        const resultSchemaRequests = [];
-        page.on('request', (request) => {
-            const url = request.url();
-            if (url.includes('result_schema') && url.includes('cross_linking=true')) {
-                resultSchemaRequests.push(url);
-            }
-        });
+        const requestCapture = pm.crossLinkPage.captureCrossLinkRequests();
 
         // Step 3: Run query (triggers result_schema calls for cross-links)
         await pm.logsPage.runQueryAndWaitForResults();
@@ -272,11 +296,11 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
 
         // Step 4: Verify multiple result_schema calls were fired
         testLogger.info('result_schema calls captured', {
-            count: resultSchemaRequests.length,
-            urls: resultSchemaRequests
+            count: requestCapture.getCount(),
+            urls: requestCapture.getUrls(),
         });
 
-        expect(resultSchemaRequests.length,
+        expect(requestCapture.getCount(),
             'Should fire at least 2 result_schema calls for 2 streams'
         ).toBeGreaterThanOrEqual(2);
 
@@ -334,28 +358,16 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         try {
             // Step 4: Click a data cell in the table panel to trigger drilldown menu
             await page.waitForTimeout(2000);
-            await page.evaluate(() => {
-                const table = document.querySelector('[data-test="dashboard-panel-table"]');
-                if (!table) return;
-                const cells = table.querySelectorAll('td');
-                for (const cell of cells) {
-                    if (cell.offsetParent !== null && cell.textContent.trim()) {
-                        cell.click();
-                        return;
-                    }
-                }
-            });
+            await pm.crossLinkPage.clickFirstDashboardTableCell();
             await page.waitForTimeout(1500);
 
-            // Step 5: Verify the crosslink-drilldown-menu appears with the cross-link
-            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
+            // Step 5: Verify the drilldown menu appears with the cross-link
+            const menuVisible = await pm.crossLinkPage.isDrilldownMenuVisible();
 
             expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
             testLogger.info('Drilldown menu is visible');
 
-            const crossLinkMenuItem = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkName });
-            const crossLinkMenuVisible = await crossLinkMenuItem.isVisible().catch(() => false);
+            const crossLinkMenuVisible = await pm.crossLinkPage.isDrilldownMenuItemVisible(crossLinkName);
 
             expect(crossLinkMenuVisible, `Cross-link "${crossLinkName}" should be visible in drilldown menu`).toBe(true);
             testLogger.info('Cross-link menu item found in dashboard drilldown');
@@ -392,28 +404,23 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const crossLinkNameA = `CL-DashA-${Date.now()}`;
         const crossLinkNameB = `CL-DashB-${Date.now()}`;
 
-        // Step 1: Set up cross-links on both streams
-        const featureEnabledA = await setupStreamCrossLink(page, pm, STREAM_A, {
-            name: crossLinkNameA,
-            url: 'https://dash-union-a.example.com/${field.__value}',
-            fields: ['kubernetes_container_name']
-        });
-        if (!featureEnabledA) {
+        // Step 1: Feature-gate check — navigate to STREAM_A only to verify cross-linking
+        // is enabled, without fully configuring it yet. The actual cross-link setup is
+        // deferred until right before the result_schema call (see Step 3) to minimise
+        // the window in which crossLinking.spec.js — which runs in parallel on CI and
+        // repeatedly calls deleteAllCrossLinks() on e2e_automate — can wipe the link.
+        const featureCheckResult = await (async () => {
+            await pm.crossLinkPage.navigateToStreams();
+            await pm.crossLinkPage.searchStream(STREAM_A);
+            await pm.crossLinkPage.openStreamDetail();
+            return pm.crossLinkPage.isCrossLinkingTabVisible();
+        })();
+        if (!featureCheckResult) {
             test.skip(true, 'Cross-linking feature not enabled');
         }
 
-        const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
-            name: crossLinkNameB,
-            url: 'https://dash-union-b.example.com/${field.__value}',
-            fields: ['kubernetes_container_name']
-        });
-        if (!featureEnabledB) {
-            test.skip(true, 'Cross-linking feature not enabled on second stream');
-        }
-
-        testLogger.info('Both stream cross-links configured for dashboard UNION test', { crossLinkNameA, crossLinkNameB });
-
-        // Step 2: Create a dashboard with a table panel using custom UNION ALL SQL
+        // Step 2: Create a dashboard with a table panel using custom UNION ALL SQL.
+        // Cross-links are intentionally NOT set up yet.
         const dashboardName = `CL-Union-Dash-${Date.now()}`;
         const orgId = process.env["ORGNAME"] || 'default';
         await page.goto(`${process.env["ZO_BASE_URL"] || 'http://localhost:5080'}/web/dashboards?org_identifier=${orgId}`);
@@ -431,37 +438,112 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await page.waitForTimeout(500);
         testLogger.info('Allow Dynamic Columns enabled');
 
-        // Switch to Custom SQL mode and enter UNION ALL query
-        await page.locator('[data-test="dashboard-sql-query-type"]').click();
-        await page.locator('[data-test="dashboard-custom-query-type"]').click();
-        await page.waitForTimeout(500);
-
+        // Switch to Custom SQL mode and enter UNION ALL query — `setCustomSQL`
+        // clicks the SQL + Custom Query type buttons and then enters the SQL
+        // (mirrors `chartTypeSelector.setCustomSQL` in dashboard-chart.js).
         const unionQuery = `SELECT * FROM "${STREAM_A}" UNION ALL BY NAME SELECT * FROM "${STREAM_B}" LIMIT 100`;
-        await pm.chartTypeSelector.enterCustomSQL(unionQuery);
+        await pm.chartTypeSelector.setCustomSQL(unionQuery);
         await page.waitForTimeout(500);
         testLogger.info('UNION ALL dashboard query entered', { query: unionQuery });
 
-        // Apply query to execute and render the table
+        // Apply and save the panel — cross-links are set up AFTER this.
         await pm.dashboardPanelActions.applyDashboardBtn();
-        await page.waitForTimeout(5000);
-
-        // Save the panel
+        await page.waitForTimeout(3000);
         await pm.dashboardPanelActions.savePanel();
         await page.waitForTimeout(3000);
 
-        testLogger.info('Dashboard with UNION ALL table panel created');
+        testLogger.info('Dashboard with UNION ALL table panel saved');
 
-        // Step 3: Wait for the table panel to render with data in dashboard view
-        const tablePanel = page.locator('[data-test="dashboard-panel-table"]');
-        await tablePanel.waitFor({ state: 'visible', timeout: 15000 });
+        // Confirm the table panel rendered with data rows so we know the query
+        // works. `waitForTablePanelWithData` is the approved PO wrapper around
+        // the scoped `waitForFunction` that scans `[data-test="dashboard-panel-table"]`
+        // for any populated cell.
+        await pm.dashboardPanelActions.waitForTablePanelWithData();
+        testLogger.info('Table panel confirmed with data rows');
 
-        await page.waitForFunction(() => {
-            const table = document.querySelector('[data-test="dashboard-panel-table"]');
-            if (!table) return false;
-            const cells = table.querySelectorAll('td');
-            return Array.from(cells).some(cell => cell.offsetParent !== null && cell.textContent.trim());
-        }, { timeout: 15000 });
-        testLogger.info('Table panel has data rows');
+        // Capture the dashboard view URL so we can reload it after cross-link setup.
+        const dashboardViewUrl = page.url();
+
+        // Step 3: Set up cross-links as late as possible — immediately before
+        // navigating back to the dashboard so result_schema fires with both links
+        // still present. Set up STREAM_B first (safe: no concurrent test touches it)
+        // then STREAM_A last (minimises the gap between A's save and result_schema call).
+        const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
+            name: crossLinkNameB,
+            url: 'https://dash-union-b.example.com/${field.__value}',
+            fields: ['kubernetes_container_name']
+        });
+        if (!featureEnabledB) {
+            test.skip(true, 'Cross-linking feature not enabled on second stream');
+        }
+
+        // Step 3b: Retry loop — set up A's cross-link, immediately reload the
+        // dashboard, and verify the result_schema response body contains both links.
+        // If crossLinking.spec.js deletes A's link in the small window between setup
+        // and the API response, we re-setup and retry (up to 3 attempts total).
+        let crossLinkResponseData = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            // (Re-)set up A's cross-link immediately before navigating back.
+            const featureEnabledA = await setupStreamCrossLink(page, pm, STREAM_A, {
+                name: crossLinkNameA,
+                url: 'https://dash-union-a.example.com/${field.__value}',
+                fields: ['kubernetes_container_name']
+            });
+            if (!featureEnabledA) {
+                test.skip(true, 'Cross-linking feature not enabled');
+            }
+
+            testLogger.info(`Attempt ${attempt}: cross-links set up, navigating to dashboard`, {
+                crossLinkNameA, crossLinkNameB
+            });
+
+            // Arm the waiter BEFORE the navigation so we don't miss a fast response.
+            const crossLinkResponsePromise = page
+                .waitForResponse(
+                    (resp) =>
+                        resp.url().includes('result_schema') &&
+                        resp.url().includes('cross_linking=true') &&
+                        resp.request().method() === 'POST',
+                    { timeout: 20000 }
+                )
+                .catch(() => null);
+
+            // Navigate back to the saved dashboard — this remounts the panel and
+            // fires the result_schema cross-link call.
+            await page.goto(dashboardViewUrl);
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+            const crossLinkResponse = await crossLinkResponsePromise;
+            if (!crossLinkResponse) {
+                testLogger.warn(`Attempt ${attempt}: result_schema response timed out`);
+                continue;
+            }
+
+            // Inspect the response body to decide whether to retry.
+            crossLinkResponseData = await crossLinkResponse.json().catch(() => null);
+            const streamLinks = crossLinkResponseData?.cross_links?.stream_links ?? [];
+            const hasAInResponse = streamLinks.some((l) => l.name === crossLinkNameA);
+            const hasBInResponse = streamLinks.some((l) => l.name === crossLinkNameB);
+
+            testLogger.info(`Attempt ${attempt}: result_schema cross-link check`, {
+                hasA: hasAInResponse, hasB: hasBInResponse,
+                streamLinkNames: streamLinks.map((l) => l.name)
+            });
+
+            if (hasAInResponse && hasBInResponse) {
+                testLogger.info('Both cross-links confirmed in result_schema response');
+                break;
+            }
+
+            if (attempt < 3) {
+                testLogger.warn(`Attempt ${attempt}: cross-link(s) missing — retrying`, {
+                    missingA: !hasAInResponse, missingB: !hasBInResponse
+                });
+            }
+        }
+
+        // Allow Vue's reactive update + nextTick to settle after the response.
+        await page.waitForTimeout(1500);
 
         // Step 4: Intercept window.open
         await page.evaluate(() => {
@@ -474,39 +556,41 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         });
 
         try {
-            // Step 5: Click a data cell in the table panel
-            await page.waitForTimeout(2000);
-            await page.evaluate(() => {
-                const table = document.querySelector('[data-test="dashboard-panel-table"]');
-                if (!table) return;
-                const cells = table.querySelectorAll('td');
-                for (const cell of cells) {
-                    if (cell.offsetParent !== null && cell.textContent.trim()) {
-                        cell.click();
-                        return;
+            // Step 5 & 6: Click a table cell and verify BOTH cross-link items appear in the
+            // drilldown menu. expect.poll provides automatic retry if the menu opens before
+            // Vue has finished wiring the freshly-loaded crossLinksData into drilldownArray.
+            await expect
+                .poll(
+                    async () => {
+                        if (await pm.crossLinkPage.isDrilldownMenuVisible()) {
+                            await page.mouse.move(0, 0);
+                            await page.waitForTimeout(300);
+                        }
+
+                        await pm.crossLinkPage.clickFirstDashboardTableCell();
+
+                        await page.waitForTimeout(800);
+
+                        const menuVisible = await pm.crossLinkPage.isDrilldownMenuVisible();
+                        const hasA = menuVisible
+                            ? await pm.crossLinkPage.isDrilldownMenuItemVisible(crossLinkNameA)
+                            : false;
+                        const hasB = menuVisible
+                            ? await pm.crossLinkPage.isDrilldownMenuItemVisible(crossLinkNameB)
+                            : false;
+
+                        return { menuVisible, hasA, hasB };
+                    },
+                    {
+                        timeout: 15000,
+                        intervals: [800, 1200, 1500],
+                        message:
+                            'Drilldown menu should show cross-links from both streams in UNION ALL panel',
                     }
-                }
-            });
-            await page.waitForTimeout(1500);
+                )
+                .toEqual({ menuVisible: true, hasA: true, hasB: true });
 
-            // Step 6: Verify the crosslink-drilldown-menu appears with BOTH cross-links
-            const drilldownMenu = page.locator('.crosslink-drilldown-menu');
-            const menuVisible = await drilldownMenu.isVisible().catch(() => false);
-
-            expect(menuVisible, 'Drilldown menu should appear after clicking table cell').toBe(true);
-            testLogger.info('Drilldown menu is visible');
-
-            const crossLinkMenuItemA = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameA });
-            const crossLinkMenuItemB = drilldownMenu.locator('.crosslink-drilldown-menu-item').filter({ hasText: crossLinkNameB });
-
-            const hasA = await crossLinkMenuItemA.isVisible().catch(() => false);
-            const hasB = await crossLinkMenuItemB.isVisible().catch(() => false);
-
-            testLogger.info('Dashboard UNION ALL cross-link visibility in drilldown', { streamA: hasA, streamB: hasB });
-
-            expect(hasA, `Cross-link "${crossLinkNameA}" from ${STREAM_A} should be visible in dashboard drilldown`).toBe(true);
-            expect(hasB, `Cross-link "${crossLinkNameB}" from ${STREAM_B} should be visible in dashboard drilldown`).toBe(true);
-
+            testLogger.info('Drilldown menu is visible with both cross-links');
             testLogger.info('PASSED: Both streams cross-links visible in dashboard UNION ALL table panel drilldown');
         } finally {
             await page.evaluate(() => {
@@ -551,32 +635,32 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Step 2: Navigate to logs, select only Stream A
         await pm.logsPage.navigateToLogs();
         await pm.logsPage.selectStream(STREAM_A);
-        await page.waitForTimeout(2000);
+        // selectStream already waits for the stream option and selection
 
         // Disable quick mode
         await pm.logsPage.ensureQuickModeState(false);
-        await page.waitForTimeout(1000);
+        // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query
+        // Run query and wait for search API + result_schema cross-linking response
+        const resultSchemaPromise = page.waitForResponse(
+            (resp) => resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200,
+            { timeout: 20000 }
+        ).catch(() => {});
         await pm.logsPage.runQueryAndWaitForResults();
-        await page.waitForTimeout(3000);
+        await resultSchemaPromise;
 
         // Step 3: Expand a log row
-        const expandBtn = page.locator('[data-test="table-row-expand-menu"]').first();
-        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expandBtn.click();
-        await page.waitForTimeout(2000);
+        await pm.crossLinkPage.expandFirstLogRow();
 
-        // Step 4: Open kubernetes_container_name field action dropdown
-        const fieldRow = page.locator('.log_json_content').filter({ hasText: 'kubernetes_container_name' }).first();
-        await fieldRow.waitFor({ state: 'visible', timeout: 10000 });
-        const fieldActionBtn = fieldRow.locator('[data-test="log-details-include-exclude-field-btn"]');
-        await fieldActionBtn.click();
-        await page.waitForTimeout(1500);
-
-        // Step 5: Verify cross-link appears
-        const crossLinkItem = page.locator(`[data-test="log-details-cross-link-${crossLinkName}"]`);
-        const hasCrossLink = await crossLinkItem.isVisible().catch(() => false);
+        // Step 4 & 5: Open kubernetes_container_name field action dropdown and
+        // poll until the cross-link appears. The `result_schema?cross_linking=true`
+        // response is eventually-consistent — a one-shot `isVisible()` raced the
+        // schema-merge on CI, so use the polling helper that re-opens the dropdown
+        // until the late-arriving response lands (mirrors `expectCrossLinksFromBothStreams`).
+        const hasCrossLink = await pm.crossLinkPage.expectLogCrossLinkVisible(
+            'kubernetes_container_name',
+            crossLinkName,
+        );
 
         testLogger.info('Single-stream cross-link visibility', { visible: hasCrossLink });
 

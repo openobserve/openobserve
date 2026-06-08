@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import TraceTimelineIcon from '@/components/icons/TraceTimelineIcon.vue';
-import { Quasar } from 'quasar';
+
 
 describe('TraceTimelineIcon.vue', () => {
   let wrapper: VueWrapper;
@@ -10,7 +10,7 @@ describe('TraceTimelineIcon.vue', () => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = () => mount(TraceTimelineIcon, { global: { plugins: [Quasar] } });
+  const createWrapper = () => mount(TraceTimelineIcon, { global: { plugins: [] } });
 
   describe('Component Rendering', () => {
     it('renders the component correctly', () => {

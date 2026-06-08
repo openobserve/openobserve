@@ -17,199 +17,129 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
   >
     <!-- Header bar -->
-    <div class="card-container tw:mb-[0.625rem]">
-      <div
-        class="flex justify-between full-width tw:py-3 tw:px-4 tw:h-[68px] items-center"
-      >
+    <div class="tw:shrink-0">
+      <div class="card-container tw:mb-[0.625rem]">
         <div
-          class="q-table__title tw:font-[600]"
-          data-test="eval-template-list-title"
+          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
         >
-          {{ t("evalTemplate.header") }}
-        </div>
-
-        <div class="flex q-ml-auto tw:ps-2 items-center">
-          <!-- Search input -->
-          <q-input
-            data-test="eval-template-list-search-input"
-            v-model="filterQuery"
-            borderless
-            dense
-            class="no-border o2-search-input"
-            :placeholder="t('evalTemplate.search')"
+          <div
+            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+            data-test="eval-template-list-title"
           >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
+            {{ t("evalTemplate.header") }}
+          </div>
 
-          <!-- Refresh button -->
-          <OButton
-            data-test="eval-template-list-refresh-btn"
-            variant="outline"
-            size="sm-action"
-            class="q-ml-sm"
-            @click="loadTemplates"
-          >
-            {{ t('common.refresh') }}
-          </OButton>
+          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
+            <!-- Search input -->
+            <OSearchInput
+              data-test="eval-template-list-search-input"
+              v-model="filterQuery"
+              class="tw:ml-2 tw:w-[200px]"
+              :placeholder="t('evalTemplate.search')"
+            />
 
-          <!-- Add button -->
-          <OButton
-            data-test="eval-template-list-add-btn"
-            variant="primary"
-            size="sm-action"
-            class="q-ml-sm"
-            @click="goToCreate"
-          >
-            {{ t('evalTemplate.newTemplate') }}
-          </OButton>
+            <!-- Refresh button -->
+            <OButton
+              data-test="eval-template-list-refresh-btn"
+              variant="outline"
+              size="sm"
+              class="tw:ml-2"
+              @click="loadTemplates"
+            >
+              {{ t('common.refresh') }}
+            </OButton>
+
+            <!-- Add button -->
+            <OButton
+              data-test="eval-template-list-add-btn"
+              variant="primary"
+              size="sm"
+              class="tw:ml-2"
+              @click="goToCreate"
+            >
+              {{ t('evalTemplate.newTemplate') }}
+            </OButton>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Table area -->
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">
-        <q-table
+    <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:h-full">
+        <OTable
           data-test="eval-template-list-table"
-          ref="qTableRef"
-          :rows="isLoading ? [] : visibleRows"
+          :data="rows"
           :columns="columns"
           row-key="id"
           :loading="isLoading"
-          :pagination="pagination"
+          :global-filter="filterQuery"
+          :show-global-filter="false"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
-          v-model:selected="selectedItems"
-          style="width: 100%"
-          :style="
-            !isLoading && hasVisibleRows
-              ? 'width: 100%; height: calc(100vh - var(--navbar-height) - 87px)'
-              : 'width: 100%'
-          "
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+          v-model:selected-ids="selectedIds"
+          width="100%"
+          class="tw:w-full tw:h-full"
         >
-          <!-- Custom header with select-all checkbox -->
-          <template v-slot:header="props">
-            <q-tr :props="props">
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-table-checkbox-dark'
-                      : 'o2-table-checkbox-light'
-                  "
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
-          </template>
-
-          <!-- Row selection checkbox -->
-          <template v-slot:body-selection="scope">
-            <q-checkbox
-              v-model="scope.selected"
-              size="sm"
-              class="o2-table-checkbox"
-            />
-          </template>
-
           <!-- Version column -->
-          <template v-slot:body-cell-version="props">
-            <q-td :props="props" class="tw:text-center">
-              <span class="eval-version-badge">v{{ props.row.version }}</span>
-            </q-td>
+          <template #cell-version="{ row }">
+            <span class="eval-version-badge">v{{ row.version }}</span>
           </template>
 
           <!-- Actions column -->
-          <template v-slot:body-cell-actions="props">
-            <q-td :props="props">
-              <div class="tw:flex tw:items-center tw:justify-center actions-container">
-                <OButton
-                  :data-test="`eval-template-list-${props.row.name}-edit-btn`"
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="t('common.edit')"
-                  @click="goToEdit(props.row)"
-                >
-                  <Pencil class="tw:size-4" />
-                </OButton>
-                <OButton
-                  :data-test="`eval-template-list-${props.row.name}-delete-btn`"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  :title="t('common.delete')"
-                  @click="confirmDelete(props.row)"
-                >
-                  <Trash2 class="tw:size-4" />
-                </OButton>
-              </div>
-            </q-td>
-          </template>
-
-          <!-- Loading state -->
-          <template #loading>
-            <div class="tw:flex tw:items-center tw:justify-center tw:py-20">
-              <q-spinner-hourglass color="primary" size="3rem" />
+          <template #cell-actions="{ row }">
+            <div class="tw:flex tw:items-center tw:justify-center actions-container">
+              <OButton
+                :data-test="`eval-template-list-${row.name}-edit-btn`"
+                icon-left="edit"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('common.edit')"
+                @click="goToEdit(row)"
+              />
+              <OButton
+                :data-test="`eval-template-list-${row.name}-delete-btn`"
+                icon-left="delete"
+                variant="ghost-destructive"
+                size="icon-sm"
+                :title="t('common.delete')"
+                @click="confirmDelete(row)"
+              />
             </div>
           </template>
 
           <!-- Empty state -->
-          <template #no-data>
-            <div
-              v-if="!isLoading"
-              class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full"
-            >
-              <NoData />
-            </div>
+          <template #empty>
+            <NoData />
           </template>
 
           <!-- Pagination footer -->
-          <template #bottom="scope">
+          <template #bottom="bottomProps">
             <div
               class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
             >
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:whitespace-nowrap"
-                >
-                  {{ resultTotal }} {{ t("evalTemplate.header") }}
-                </div>
-                <OButton
-                  v-if="selectedItems.length > 0"
-                  data-test="eval-template-list-bulk-delete-btn"
-                  variant="outline"
-                  size="sm-action"
-                  @click="openBulkDeleteDialog"
-                >
-                  <Trash2 class="tw:size-4 tw:mr-1" />
-                  {{ t("common.delete") }}
-                </OButton>
+              <div
+                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4"
+              >
+                {{ bottomProps.totalRows }} {{ t("evalTemplate.header") }}
               </div>
-              <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
+              <OButton
+                v-if="selectedIds.length > 0"
+                data-test="eval-template-list-bulk-delete-btn"
+                icon-left="delete"
+                variant="outline-destructive"
+                size="sm"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </div>
           </template>
-        </q-table>
+        </OTable>
       </div>
     </div>
 
@@ -234,18 +164,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, onBeforeMount, computed, watch } from "vue";
+import { ref, onBeforeMount, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Template {
   id: string;
@@ -261,84 +191,66 @@ interface Template {
 }
 
 const { t } = useI18n();
-const q = useQuasar();
 const store = useStore();
 const router = useRouter();
-const qTableRef: any = ref({});
-
 // ── State ──────────────────────────────────────────────────────────────────────
 const rows = ref<Template[]>([]);
 const filterQuery = ref("");
-const selectedItems = ref<any[]>([]);
-const isLoading = ref(false);
-
-// ── Pagination ─────────────────────────────────────────────────────────────────
-const perPageOptions: any = [
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-  { label: "500", value: 500 },
-];
-const resultTotal = ref<number>(0);
-const selectedPerPage = ref<number>(20);
-const pagination: any = ref({ rowsPerPage: 20 });
-
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  qTableRef.value?.setPagination(pagination.value);
-};
-
+const isLoading = ref(true);
+const selectedIds = ref<string[]>([]);
+const selectedItems = computed(() =>
+  rows.value.filter((r: Template) => selectedIds.value.includes(r.id))
+);
 // ── Columns ────────────────────────────────────────────────────────────────────
-const columns: any = ref([
-  { name: "#", label: "#", field: "#", align: "left", style: "width: 67px" },
+const columns = ref<OTableColumnDef<Template>[]>([
+  { id: "#", header: "#", accessorKey: "#", sortable: false, size: 67, meta: { align: "left" } },
   {
-    name: "name",
-    label: t("common.name"),
-    field: "name",
-    align: "left",
+    id: "name",
+    header: t("common.name"),
+    accessorKey: "name",
     sortable: true,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "response_type",
-    label: t("evalTemplate.responseType"),
-    field: "response_type",
-    align: "left",
+    id: "response_type",
+    header: t("evalTemplate.responseType"),
+    accessorKey: "response_type",
     sortable: true,
+    meta: { align: "left" },
   },
   {
-    name: "version",
-    label: t("common.version"),
-    field: "version",
-    align: "center",
+    id: "version",
+    header: t("common.version"),
+    accessorKey: "version",
     sortable: true,
+    meta: { align: "center" },
   },
   {
-    name: "updated_at",
-    label: t("common.updated_at"),
-    field: "updated_at",
-    align: "left",
+    id: "updated_at",
+    header: t("common.updated_at"),
+    accessorKey: "updated_at",
     sortable: true,
-    format: (val: number) =>
-      val
-        ? new Date(val).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
-        : t("evalTemplate.never"),
+    meta: {
+      align: "left",
+      format: (val: number) =>
+        val
+          ? new Date(val).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : t("evalTemplate.never"),
+    },
   },
   {
-    name: "actions",
-    label: t("common.actions"),
-    field: "actions",
-    align: "center",
+    id: "actions",
+    header: t("common.actions"),
     sortable: false,
-    classes: "actions-column",
-    style: "width: 80px; min-width: 80px;",
+    isAction: true,
+    size: 80,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
 
@@ -355,28 +267,6 @@ const bulkDeleteDialog = ref({
   title: "",
   message: "",
 });
-
-// ── Computed: filtered rows ────────────────────────────────────────────────────
-const filterData = (items: Template[], term: string) => {
-  const lc = term.toLowerCase();
-  return items.filter((r) => r.name?.toLowerCase().includes(lc));
-};
-
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return rows.value;
-  return filterData(rows.value, filterQuery.value);
-});
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-watch(
-  visibleRows,
-  (newRows) => {
-    resultTotal.value = newRows.length;
-  },
-  { immediate: true },
-);
-
 // ── Data loading ───────────────────────────────────────────────────────────────
 const loadTemplates = async () => {
   isLoading.value = true;
@@ -389,10 +279,9 @@ const loadTemplates = async () => {
     }));
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.loadFailed"),
-        timeout: 3000,
       });
     }
   } finally {
@@ -423,26 +312,24 @@ const deleteTemplate = async () => {
   const template = deleteDialog.value.data;
   if (!template) return;
 
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
     await evalTemplateService.deleteTemplate(orgId, template.id);
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("evalTemplate.deleteSuccess"),
-      timeout: 2000,
     });
     await loadTemplates();
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message:
           err?.response?.data?.message ||
           err?.message ||
           t("evalTemplate.deleteFailed"),
-        timeout: 3000,
       });
     }
   } finally {
@@ -461,7 +348,7 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeleteTemplates = async () => {
-  const dismiss = q.notify({ spinner: true, message: t("common.loading"), timeout: 0 });
+  const dismiss = toast({ variant: "loading", message: t("common.loading"), timeout: 0 });
 
   try {
     const orgId = store.state.selectedOrganization.identifier;
@@ -470,15 +357,14 @@ const bulkDeleteTemplates = async () => {
         evalTemplateService.deleteTemplate(orgId, item.id),
       ),
     );
-    q.notify({ type: "positive", message: t("evalTemplate.deleteSuccess"), timeout: 2000 });
+    toast({ variant: "success", message: t("evalTemplate.deleteSuccess") });
     selectedItems.value = [];
     await loadTemplates();
   } catch (err: any) {
     if (err?.response?.status !== 403) {
-      q.notify({
-        type: "negative",
+      toast({
+        variant: "error",
         message: err?.response?.data?.message || t("evalTemplate.deleteFailed"),
-        timeout: 3000,
       });
     }
   } finally {

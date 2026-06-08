@@ -168,16 +168,82 @@ export class AlertBulkOperations {
             await this.page.waitForTimeout(1000);
         }
         await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
-        try {
-            await moveBtn.click({ timeout: 5000 });
-        } catch (e) {
-            testLogger.warn('Move button click failed, retrying with force', { error: e.message });
-            await this.page.waitForTimeout(1000);
-            await moveBtn.click({ force: true, timeout: 5000 });
+
+        // Dismiss any visible toasts before clicking the move button.
+        // Toasts (e.g. "Please select stream type" error from clone validation, or "Folder
+        // added successfully" from ensureFolderExists) render in the Notifications region and
+        // intercept pointer events at the button's position. Error toasts linger 30s by default
+        // (and their timers are paused in headless mode). Loop until all are gone.
+        const toastDismissBtn = this.page.locator('button[aria-label="Dismiss notification"]');
+        let toastCount = await toastDismissBtn.count().catch(() => 0);
+        if (toastCount > 0) {
+            testLogger.warn('Dismissing visible toast(s) before move operation', { count: toastCount });
+            while (toastCount > 0) {
+                await toastDismissBtn.first().click({ force: true }).catch(() => {});
+                await this.page.waitForTimeout(150);
+                toastCount = await toastDismissBtn.count().catch(() => 0);
+            }
+            await this.page.waitForTimeout(500);
         }
 
-        // Handle folder selection with scrolling
-        await this.page.locator(this.locators.folderDropdown).click();
+        const moveDrawer = this.page.locator('[data-test="dashboard-move-to-another-folder-dialog"]');
+        const scopedFolderDropdown = moveDrawer.locator(this.locators.folderDropdown);
+
+        // Retry opening the drawer and wait for an interactive child control.
+        // Uses force:true on all attempts to bypass any residual toast overlay.
+        // Re-selects alerts before each attempt because Vue may clear selectedAlerts
+        // during the previous attempt's timeout period (v-if hides the button when empty).
+        let drawerReady = false;
+        let lastOpenError;
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                // Ensure move button is still visible — selectedAlerts may have been cleared.
+                const isMoveVisible = await moveBtn.isVisible({ timeout: 2000 }).catch(() => false);
+                if (!isMoveVisible) {
+                    testLogger.warn('Move button disappeared before click attempt — re-selecting alerts', { attempt });
+                    const hdrChk = this.page.locator(this.locators.headerCheckbox).first();
+                    await hdrChk.waitFor({ state: 'visible', timeout: 5000 });
+                    if (!(await hdrChk.isChecked().catch(() => false))) {
+                        await hdrChk.click({ force: true });
+                    }
+                    await moveBtn.waitFor({ state: 'visible', timeout: 10000 });
+                }
+
+                await moveBtn.click({ force: true, timeout: 5000 });
+
+                await moveDrawer.waitFor({ state: 'visible', timeout: 7000 });
+                await scopedFolderDropdown.waitFor({ state: 'visible', timeout: 7000 });
+                drawerReady = true;
+                break;
+            } catch (e) {
+                lastOpenError = e;
+                testLogger.warn('Move drawer did not become ready, retrying move action', {
+                    attempt,
+                    error: e.message,
+                });
+                // Only press Escape if the drawer actually opened — pressing it when
+                // the drawer is not visible would disrupt other UI state.
+                const isDrawerOpen = await moveDrawer.isVisible({ timeout: 300 }).catch(() => false);
+                if (isDrawerOpen) {
+                    await this.page.keyboard.press('Escape').catch(() => {});
+                }
+                // Dismiss any toasts that may have appeared during this attempt.
+                let dc = await toastDismissBtn.count().catch(() => 0);
+                while (dc > 0) {
+                    await toastDismissBtn.first().click({ force: true }).catch(() => {});
+                    await this.page.waitForTimeout(150);
+                    dc = await toastDismissBtn.count().catch(() => 0);
+                }
+                await this.page.waitForTimeout(800);
+            }
+        }
+
+        if (!drawerReady) {
+            throw new Error(`Move drawer failed to open after retries: ${lastOpenError?.message || 'unknown error'}`);
+        }
+
+        await scopedFolderDropdown.click();
         await this.page.waitForTimeout(2000);
 
         await this.commonActions.scrollAndFindOption(targetFolderName, 'folder');
@@ -187,7 +253,7 @@ export class AlertBulkOperations {
         // between the click and the toast check — it would burn the toast's lifetime.
         await this.page.locator(this.locators.moveButton).click();
 
-        await expect(this.page.getByText(this.locators.alertsMovedMessage)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertsMovedMessage })).toBeVisible({ timeout: 15000 });
         testLogger.info('Move operation confirmed via success message');
 
         // Wait for UI to update
@@ -324,7 +390,7 @@ export class AlertBulkOperations {
 
         await this.page.getByText('Delete', { exact: true }).click();
         await this.page.locator(this.locators.confirmButton).click();
-        await expect(this.page.getByText(this.locators.alertDeletedMessage)).toBeVisible();
+        await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertDeletedMessage })).toBeVisible();
         await this.page.waitForTimeout(1000);
     }
 }

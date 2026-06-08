@@ -16,18 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    data-test="dashboard-custom-markdown-editor-container"
     class="markdown-editor card-container"
     style="width: 100%; height: 100%; overflow: hidden"
   >
-    <div style="width: 100%; height: 100%">
-      <q-splitter
+    <div
+      data-test="dashboard-custom-markdown-editor-inner"
+      style="width: 100%; height: 100%"
+    >
+      <OSplitter
         v-model="splitterModel"
         style="width: 100%; height: 100% !important"
         @update:modelValue="layoutSplitterUpdated"
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
+          <div
+            data-test="dashboard-custom-markdown-editor-flex-col"
+            class="tw:flex tw:flex-col"
+            style="height: 100%; display: flex; flex-direction: column;"
+          >
             <CodeQueryEditor
               language="markdown"
               v-model:query="markdownContent"
@@ -39,15 +47,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <div class="splitter-vertical splitter-enabled"></div>
-          <q-avatar
-            color="primary"
-            text-color="white"
-            size="20px"
-            icon="drag_indicator"
-            style="top: 10px; left: 3.5px"
+          <div
+            data-test="dashboard-custom-markdown-editor-splitter-separator"
+            class="splitter-vertical splitter-enabled"
+          ></div>
+          <div
+            class="tw:absolute! tw:bg-button-primary tw:text-button-primary-foreground tw:flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
+            style="top: 10px; left: 50%; transform: translateX(-50%); z-index: 100"
             data-test="dashboard-markdown-editor-drag-indicator"
-          />
+          >
+            <OIcon name="drag-indicator" size="xs" />
+          </div>
         </template>
         <template #after>
           <markdown-renderer
@@ -57,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panelId="panelId"
           />
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </div>
 </template>
@@ -65,6 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineAsyncComponent, defineComponent, ref } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
@@ -72,6 +84,8 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     MarkdownRenderer,
+    OIcon,
+    OSplitter,
   },
   name: "CustomMarkdownEditor",
   props: {
@@ -130,13 +144,13 @@ export default defineComponent({
   height: 100%;
 }
 .splitter-enabled {
-  background-color: #ffffff00;
+  background-color: var(--o2-border, #e5e7eb);
   transition: 0.3s;
   transition-delay: 0.2s;
 }
 
 .splitter-enabled:hover {
-  background-color: orange;
+  background-color: var(--o2-primary, orange);
 }
 
 :deep(.query-editor-splitter .q-splitter__separator) {

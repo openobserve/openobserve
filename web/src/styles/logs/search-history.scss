@@ -46,6 +46,45 @@
 :deep(.date-time-button) {
   height: 36px !important;
 }
+
+.wrap-content-btn {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  width: 1.45rem !important;
+  padding: 0 !important;
+  border: 0.0626rem solid var(--o2-border-color) !important;
+  border-radius: 0.25rem !important;
+  transition: all 0.2s ease;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(10px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+  }
+
+  &--active {
+    background: var(--q-primary) !important;
+    color: white;
+
+    &:hover {
+      background: var(--q-primary) !important;
+      opacity: 0.85;
+    }
+  }
+
+  :deep(.q-icon) {
+    font-size: 0.75rem !important;
+  }
+
+  :deep(.q-btn__content) {
+    min-height: 1.45rem !important;
+    padding: 0 !important;
+  }
+}
 .expanded-sql {
   border-left: #7a54a2 3px solid;
 }

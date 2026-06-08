@@ -418,9 +418,9 @@
     "today_usage": "Today's Usage",
     "feature_comparison_lbl": "Feature Comparison",
     "feature_comparision_ent_msg": "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
-    "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 200 GB/day (~6 TB/month) of data ingestion.",
+    "feature_comparision_plan_detail": "Your plan: Enterprise Edition is free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
     "feature_comparision_os_msg": "You're currently using OpenObserve Open Source Edition. Upgrade to Enterprise Edition to unlock advanced features listed in the comparison table below.",
-    "feature_comparision_good_news": "Good news: OpenObserve Enterprise Edition is completely free for up to 200 GB/day (~6 TB/month) of data ingestion.",
+    "feature_comparision_good_news": "Good news: OpenObserve Enterprise Edition is completely free for up to 50 GB/day (~1.5 TB/month) of data ingestion.",
     "feature_comparision_subtitle": "Compare features across Open Source, Enterprise, and Cloud offerings",
     "feature_column_name": "Feature",
     "edition_opensource": "Open Source (Self hosted)",
@@ -464,7 +464,7 @@
     "value_support_enterprise": "Enterprise",
     "value_support_cloud": "Cloud",
     "value_cost_free": "Free",
-    "value_cost_enterprise": "If self hosted, free for up to 200 GB/Day data ingested. Paid thereafter",
+    "value_cost_enterprise": "If self hosted, free for up to 50 GB/Day data ingested. Paid thereafter",
     "value_cost_cloud": "14 day free trial. Paid thereafter",
     "commit_lbl": "Commit",
     "build_lbl": "Built",
@@ -522,7 +522,7 @@
       "cloud": {
         "hero_title": "Enterprise Features",
         "offer_text": "Get all enterprise features completely free when you self-host OpenObserve",
-        "badge_text": "Free up to 200GB / day",
+        "badge_text": "Free up to 50GB / day",
         "features_title": "OpenObserve Cloud Features",
         "features_subtitle": "All features included in your cloud subscription",
         "primary_button_text": "Download Now"
@@ -534,7 +534,7 @@
         "features_title": "Available Enterprise Features",
         "features_subtitle": "Get a free license to unlock unlimited capabilities",
         "primary_button_text": "Get Free License",
-        "license_note": "100GB/day without license • 200GB/day with license"
+        "license_note": "50GB/day without license • 50GB/day with license"
       },
       "enterprise_with_license": {
         "hero_title": "Your Enterprise Edition",
@@ -548,7 +548,7 @@
       "open_source": {
         "hero_title": "Get Enterprise Edition",
         "offer_text": "Download and unlock all enterprise features completely free",
-        "badge_text": "Free up to 200GB / day",
+        "badge_text": "Free up to 50GB / day",
         "features_title": "Unlock All Enterprise Features",
         "features_subtitle": "Everything you need for production-ready observability",
         "primary_button_text": "Download Now"
@@ -1343,7 +1343,7 @@
     "markLineYAxis": "Y-Axis",
     "colorPalette": "Color palette",
     "colorSeriesBy": "Color series by:",
-    "colorBySeries": "<b>By Series</b>",
+    "colorBySeries": "By Series",
     "colorDefaultPaletteBySeries": "Default Palette (By Series)",
     "colorDefaultPaletteBySeriesSubLabel": "Series with the same name will use the same color",
     "colorPaletteClassic": "Palette-Classic",
@@ -1352,7 +1352,7 @@
     "colorSingleColorSubLabel": "Set a specific color to all series",
     "colorShadesOfSpecificColor": "Shades Of Specific Color",
     "colorShadesOfSpecificColorSubLabel": "Different shades of specific color",
-    "colorByValue": "<b>By Value</b>",
+    "colorByValue": "By Value",
     "colorGreenYellowRed": "Green-Yellow-Red (By Value)",
     "colorRedYellowGreen": "Red-Yellow-Green (By Value)",
     "colorTemperature": "Temperature (By Value)",
@@ -2229,6 +2229,7 @@
     "serviceAccounts": "Service Accounts",
     "serviceAccountsName": "Service Accounts Name",
     "basicUsers": "Users",
+    "organizationMembers": "संगठन के सदस्य",
     "invitations": "Invitations",
     "quota": "Quotas",
     "externalUserWarningTitle": "External user warning",

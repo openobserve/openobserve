@@ -143,13 +143,19 @@ export const useStreamFields = () => {
   const extractFields = async () => {
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
+    searchObj.loadingStream = true;
+    await nextTick();
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
       searchObj.data.errorDetail = "";
       searchObj.data.countErrorMsg = "";
-      searchObj.data.stream.selectedStreamFields = [];
+      // Do NOT clear selectedStreamFields here — clearing it before the async
+      // work completes causes the field list to briefly render empty, which
+      // resets the scroll container's scrollTop to 0 and loses the user's
+      // scroll position. Instead we compute the new list locally and assign it
+      // atomically at the end (see assignments below).
       searchObj.data.stream.interestingFieldList = [];
       const schemaFields: any = [];
       const commonSchemaFields: any = [];
@@ -903,6 +909,7 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
+      searchObj.loadingStream = false;
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while extracting fields.", e);
@@ -913,21 +920,16 @@ export const useStreamFields = () => {
   const loadStreamFields = async (streamName: string) => {
     try {
       if (streamName != "") {
-        searchObj.loadingStream = true;
         return await getStream(
           streamName,
           searchObj.data.stream.streamType || "logs",
           true,
-        ).then((res) => {
-          searchObj.loadingStream = false;
-          return res;
-        });
+        );
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
       }
       return;
     } catch (e: any) {
-      searchObj.loadingStream = false;
       console.log("Error while loading stream fields");
     }
   };

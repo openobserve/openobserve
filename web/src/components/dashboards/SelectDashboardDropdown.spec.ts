@@ -16,11 +16,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SelectDashboardDropdown from "./SelectDashboardDropdown.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-installQuasar();
 
 // Mock the utils functions
 vi.mock("@/utils/commons", () => ({
@@ -33,6 +31,85 @@ vi.mock("@/utils/commons", () => ({
     dashboardId: "dash1",
   }),
 }));
+
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
+// can assert on the props the component forwards + emit the click events
+// the component listens to.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+    "formId",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-secondary"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+    </div>
+  `,
+};
+
+// Stub AddDashboard so we can spy on the imperatively-called submit() method
+// from setup, without actually rendering its internals.
+const AddDashboardStub = {
+  name: "AddDashboard",
+  props: ["activeFolderId", "showFolderSelection"],
+  emits: ["updated"],
+  template: `<div data-test="add-dashboard-stub"></div>`,
+  methods: {
+    submit: vi.fn(),
+  },
+};
+
+const mountComponent = (props: any = {}, store: any) =>
+  mount(SelectDashboardDropdown, {
+    props: {
+      folderId: "folder1",
+      ...props,
+    },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        ODialog: ODialogStub,
+        AddDashboard: AddDashboardStub,
+      },
+    },
+  });
 
 describe("SelectDashboardDropdown", () => {
   let store: any;
@@ -62,90 +139,52 @@ describe("SelectDashboardDropdown", () => {
   });
 
   it("should render the component", () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
+    const wrapper = mountComponent({}, store);
     expect(wrapper.exists()).toBe(true);
   });
 
   it("should render dashboard dropdown", () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const dropdown = wrapper.find('[data-test="dashboard-dropdown-dashboard-selection"]');
+    const wrapper = mountComponent({}, store);
+    const dropdown = wrapper.find(
+      '[data-test="dashboard-dropdown-dashboard-selection"]',
+    );
     expect(dropdown.exists()).toBe(true);
   });
 
   it("should render add button", () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const addButton = wrapper.find('[data-test="dashboard-dashboard-new-add"]');
+    const wrapper = mountComponent({}, store);
+    const addButton = wrapper.find(
+      '[data-test="dashboard-dashboard-new-add"]',
+    );
     expect(addButton.exists()).toBe(true);
   });
 
   it("should open add dashboard dialog when add button is clicked", async () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
+    const wrapper = mountComponent({}, store);
 
-    const addButton = wrapper.find('[data-test="dashboard-dashboard-new-add"]');
+    const addButton = wrapper.find(
+      '[data-test="dashboard-dashboard-new-add"]',
+    );
     await addButton.trigger("click");
 
     expect(wrapper.vm.showAddDashboardDialog).toBe(true);
   });
 
   it("should emit dashboard-selected when selectedDashboard changes", async () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
+    const wrapper = mountComponent({}, store);
     await flushPromises();
 
-    wrapper.vm.selectedDashboard = { label: "Test Dashboard", value: "test123" };
+    wrapper.vm.selectedDashboard = {
+      label: "Test Dashboard",
+      value: "test123",
+    };
     await wrapper.vm.$nextTick();
 
     expect(wrapper.emitted("dashboard-selected")).toBeTruthy();
   });
 
   it("should load dashboards on mount", async () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
+    const wrapper = mountComponent({}, store);
     await flushPromises();
 
     expect(wrapper.vm.dashboardList).toHaveLength(2);
@@ -153,20 +192,180 @@ describe("SelectDashboardDropdown", () => {
   });
 
   it("should select first dashboard automatically", async () => {
-    const wrapper = mount(SelectDashboardDropdown, {
-      props: {
-        folderId: "folder1",
-      },
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
+    const wrapper = mountComponent({}, store);
     await flushPromises();
 
-    expect(wrapper.vm.selectedDashboard).toEqual({
-      label: "Dashboard 1",
-      value: "dash1",
+    // selectedDashboard stores the value (id), not the option object.
+    expect(wrapper.vm.selectedDashboard).toBe("dash1");
+  });
+
+  describe("ODrawer migration", () => {
+    it("should render ODrawer in place of q-dialog", () => {
+      const wrapper = mountComponent({}, store);
+      expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
+    });
+
+    it("should keep ODrawer closed by default", () => {
+      const wrapper = mountComponent({}, store);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("should forward open=true to ODrawer once add button is clicked", async () => {
+      const wrapper = mountComponent({}, store);
+
+      const addButton = wrapper.find(
+        '[data-test="dashboard-dashboard-new-add"]',
+      );
+      await addButton.trigger("click");
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("open")).toBe(true);
+    });
+
+    it("should use size sm on ODialog", () => {
+      const wrapper = mountComponent({}, store);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("size")).toBe("sm");
+    });
+
+    it("should pass 'New dashboard' title to ODrawer", () => {
+      const wrapper = mountComponent({}, store);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("title")).toBe("New dashboard");
+    });
+
+    it("should render i18n label on secondary (cancel) button", () => {
+      const wrapper = mountComponent({}, store);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    });
+
+    it("should render i18n label on primary (save) button", () => {
+      const wrapper = mountComponent({}, store);
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("primaryButtonLabel")).toBe("Save");
+    });
+
+    it("should keep data-test hook on the drawer", () => {
+      const wrapper = mountComponent({}, store);
+      // data-test is passed through as an attribute on ODrawer
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.attributes("data-test")).toBe(
+        "dashboard-dashboard-add-dialog",
+      );
+    });
+  });
+
+  describe("ODrawer event handling", () => {
+    it("should close drawer when ODrawer emits click:secondary", async () => {
+      const wrapper = mountComponent({}, store);
+      wrapper.vm.showAddDashboardDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent(ODialogStub);
+      await drawer.vm.$emit("click:secondary");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
+    });
+
+    it("should forward update:open into showAddDashboardDialog", async () => {
+      const wrapper = mountComponent({}, store);
+      wrapper.vm.showAddDashboardDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent(ODialogStub);
+      await drawer.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
+    });
+
+    it("should pass form-id to ODialog for native form submission", async () => {
+      const wrapper = mountComponent({}, store);
+      wrapper.vm.showAddDashboardDialog = true;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(drawer.props("formId")).toBe("add-dashboard-form");
+    });
+
+    it("should not throw when click:primary is emitted with no addDashboardRef", async () => {
+      const wrapper = mountComponent({}, store);
+      wrapper.vm.showAddDashboardDialog = true;
+      wrapper.vm.addDashboardRef = null;
+      await wrapper.vm.$nextTick();
+
+      const drawer = wrapper.findComponent(ODialogStub);
+      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
+    });
+  });
+
+  describe("updateDashboardList", () => {
+    it("should close drawer and select the just-created dashboard", async () => {
+      const wrapper = mountComponent({}, store);
+      await flushPromises();
+
+      wrapper.vm.showAddDashboardDialog = true;
+      await wrapper.vm.$nextTick();
+
+      await wrapper.vm.updateDashboardList("dash1", "folder1");
+      await flushPromises();
+
+      expect(wrapper.vm.showAddDashboardDialog).toBe(false);
+      // selectedDashboard stores the value (id), not the option object.
+      expect(wrapper.vm.selectedDashboard).toBe("dash1");
+    });
+
+    it("should emit dashboard-list-updated after refresh", async () => {
+      const wrapper = mountComponent({}, store);
+      await flushPromises();
+
+      await wrapper.vm.updateDashboardList("dash1", "folder1");
+      await flushPromises();
+
+      expect(wrapper.emitted("dashboard-list-updated")).toBeTruthy();
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should set selectedDashboard to null when folder has no dashboards", async () => {
+      const commons = await import("@/utils/commons");
+      (commons.getAllDashboardsByFolderId as any).mockResolvedValueOnce([]);
+
+      const wrapper = mountComponent({}, store);
+      await flushPromises();
+
+      expect(wrapper.vm.dashboardList).toEqual([]);
+      expect(wrapper.vm.selectedDashboard).toBeNull();
+    });
+
+    it("should not load dashboards when folderId is null", async () => {
+      const commons = await import("@/utils/commons");
+      (commons.getAllDashboardsByFolderId as any).mockClear();
+
+      const wrapper = mountComponent({ folderId: null }, store);
+      await flushPromises();
+
+      expect(commons.getAllDashboardsByFolderId).not.toHaveBeenCalled();
+      expect(wrapper.vm.dashboardList).toEqual([]);
+    });
+
+    it("should reload dashboards when folderId prop changes", async () => {
+      const commons = await import("@/utils/commons");
+      const wrapper = mountComponent({}, store);
+      await flushPromises();
+
+      (commons.getAllDashboardsByFolderId as any).mockClear();
+      await wrapper.setProps({ folderId: "default" });
+      await flushPromises();
+
+      expect(commons.getAllDashboardsByFolderId).toHaveBeenCalledWith(
+        expect.anything(),
+        "default",
+      );
     });
   });
 });

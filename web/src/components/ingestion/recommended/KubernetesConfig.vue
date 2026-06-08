@@ -1,37 +1,35 @@
 ﻿<!-- eslint-disable no-useless-escape -->
 <template>
-  <div class="q-pa-md kubernetes-config-section tw:pb-lg">
+  <div class="tw:p-3 kubernetes-config-section tw:pb-lg">
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">
-        <q-icon name="rocket_launch" size="md" color="primary" />
+        <OIcon name="rocket-launch" size="xl" class="tw:text-[var(--q-primary)]" />
         <div class="tw:flex-1">
-          <h6 class="tw:text-base tw:font-bold tw:m-0 tw:mb-2">Quick Install (Recommended)</h6>
-          <p class="tw:text-sm tw:m-0 tw:mb-3" :class="descriptionClass">
+          <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">Quick Install (Recommended)</h6>
+          <p class="tw:text-sm tw:mt-0 tw:mb-6!" :class="descriptionClass">
             Install OpenObserve collector with a single command. Just set your cluster name and run.
           </p>
 
           <div class="tw:mb-3">
-            <q-input
+              <OInput
               v-model="clusterName"
               label="Cluster Name"
               placeholder="e.g., production, staging, dev"
-              filled
-              dense
               class="tw:max-w-md"
               data-test="kubernetes-cluster-name-input"
             >
-              <template #prepend>
-                <q-icon name="dns" />
+              <template #icon-left>
+                <OIcon name="dns" size="sm" />
               </template>
-            </q-input>
+            </OInput>
           </div>
 
           <div v-if="config.isCloud != 'true'" class="tw:mb-3">
             <OTabs v-model="installType" dense>
               <OTab name="external" label="External Endpoint" />
               <OTab name="internal" label="Internal Endpoint">
-                <q-tooltip>Use this if OpenObserve is in the same cluster</q-tooltip>
+                <OTooltip content="Use this if OpenObserve is in the same cluster" side="top" />
               </OTab>
             </OTabs>
           </div>
@@ -39,62 +37,61 @@
           <ContentCopy class="tw:mt-3" :content="quickInstallCmd" :key="`${clusterName}-${installType}`" />
 
           <div class="tw:mt-2 tw:text-xs" :class="hintClass">
-            <q-icon name="info" size="xs" class="tw:mr-1" />
+            <OIcon name="info" size="sm" class="tw:mr-1" />
             This installs cert-manager, OpenTelemetry operator, and OpenObserve collector automatically
           </div>
         </div>
       </div>
     </div>
 
-    <q-separator class="tw:mb-6" />
+    <OSeparator class="tw:mb-6" />
 
     <!-- Advanced/Manual Install Section -->
-    <q-expansion-item
+    <OCollapsible
       v-model="showAdvancedInstall"
       label="Advanced Installation (Manual Steps)"
       caption="For custom configurations or step-by-step installation"
-      header-class="text-primary"
       data-test="kubernetes-advanced-install-toggle"
     >
       <div class="tw:mt-4">
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Install cert-manager</div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.0/cert-manager.yaml"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Wait for 2 minutes after installing cert-manger for the webhook to be
           ready.
         </div>
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
-        <ContentCopy class="q-mt-sm" :content="helmUpdateCmd" />
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Update helm repo</div>
+        <ContentCopy class="tw:mt-2" :content="helmUpdateCmd" />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Install Prometheus operator CRDs(Required by Opentelemetry operator)
         </div>
-        <ContentCopy class="q-mt-sm" :content="crdCommand" />
+        <ContentCopy class="tw:mt-2" :content="crdCommand" />
 
-        <div class="text-subtitle1 q-pl-xs q:mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 q:mt-md">
           Install OpenTelemetry operator
         </div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl apply -f https://raw.githubusercontent.com/openobserve/openobserve-helm-chart/refs/heads/main/opentelemetry-operator.yaml"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">Create namespace</div>
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">Create namespace</div>
         <ContentCopy
-          class="q-mt-sm"
+          class="tw:mt-2"
           content="kubectl create ns openobserve-collector"
         />
 
-        <div class="text-subtitle1 q-pl-xs q-mt-md">
+        <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
           Install OpenObserve collector
         </div>
         <div v-if="config.isCloud == 'true'">
-          <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+          <ContentCopy class="tw:mt-2" :content="collectorCmd" />
         </div>
         <div v-else>
           <OTabs v-model="tab" horizontalalign="left">
@@ -108,12 +105,10 @@
               name="internal"
               :label="t('ingestion.internal')"
             >
-              <q-tooltip>
-                {{ t("ingestion.internalLabel") }}
-              </q-tooltip>
+              <OTooltip :content="t('ingestion.internalLabel')" side="top" />
             </OTab>
           </OTabs>
-          <q-separator />
+          <OSeparator />
           <OTabPanels
             v-model="tab"
             animated
@@ -123,7 +118,7 @@
             transition-next="jump-up"
           >
             <OTabPanel name="internal" data-test="kubernetes-tab-panels-this">
-              <ContentCopy class="q-mt-sm" :content="collectorCmdThisCluster" />
+              <ContentCopy class="tw:mt-2" :content="collectorCmdThisCluster" />
               <pre>
 Format of the URL is: http://&lt;helm-release-name&gt;-openobserve-router.&lt;namespace&gt;.svc.cluster.local
 Make changes accordingly to the above URL.
@@ -131,16 +126,16 @@ Make changes accordingly to the above URL.
             </OTabPanel>
 
             <OTabPanel name="external" data-test="kubernetes-tab-panels-default">
-              <ContentCopy class="q-mt-sm" :content="collectorCmd" />
+              <ContentCopy class="tw:mt-2" :content="collectorCmd" />
             </OTabPanel>
           </OTabPanels>
         </div>
       </div>
-    </q-expansion-item>
+    </OCollapsible>
 
     <br />
     <hr />
-    <div class="text-subtitle1 q-pl-xs q-mt-md q-mb-lg">
+    <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3 tw:mb-4">
       Once you have installed the OpenObserve collector, it will:
       <ul class="tw:list-disc tw:ml-5">
         <li>Collect metrics from your Kubernetes cluster</li>
@@ -206,6 +201,8 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OInput from '@/lib/forms/Input/OInput.vue'
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
@@ -213,6 +210,9 @@ import { useStore } from "vuex";
 import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
 import { useI18n } from "vue-i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 
 const store = useStore();
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
+  <div class="tw:p-2">
     <div class="title" data-test="vector-title-text">
       <b>OTLP HTTP</b>
     
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="title q-pt-md" data-test="vector-title-text" v-if="config.isCloud == 'false'">
+    <div class="title tw:pt-3" data-test="vector-title-text" v-if="config.isCloud == 'false'">
       <b>OTLP gRPC</b>
       <CopyContent :content="copyGRPCTracesContent" />
     </div>

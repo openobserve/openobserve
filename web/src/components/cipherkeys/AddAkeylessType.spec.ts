@@ -15,9 +15,7 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
-import { Dialog, QBtn, QFieldset, QInput, QSelect } from "quasar";
 import {
   mockAkeylessFormData,
   createCipherKeyMountConfig,
@@ -25,10 +23,6 @@ import {
   cloneMockData
 } from "@/test/unit/fixtures/cipherKeyTestFixtures";
 
-installQuasar({
-  plugins: [Dialog],
-  components: [QInput, QSelect, QBtn, QFieldset],
-});
 
 describe("AddAkeylessType", () => {
   let wrapper: any = null;

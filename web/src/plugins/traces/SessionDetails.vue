@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Back nav -->
     <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem]">
       <OButton variant="ghost-muted" size="icon" @click="goBack">
-        <q-icon name="arrow_back" size="20px" />
-        <q-tooltip>{{ t('traces.sessionDetail.backToSessions') }}</q-tooltip>
+        <OIcon name="arrow-back" size="sm" />
+        <OTooltip :content="t('traces.sessionDetail.backToSessions')" />
       </OButton>
       <span class="tw:text-[1rem] tw:font-semibold">{{ t('traces.sessionDetail.pageTitle') }}</span>
     </div>
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="loading"
       class="tw:flex tw:items-center tw:justify-center tw:flex-1"
     >
-      <q-spinner-hourglass color="primary" size="2rem" />
+      <OSpinner size="md" />
     </div>
 
     <!-- Error -->
@@ -43,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="error"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
     >
-      <q-icon
-        name="error_outline"
-        size="3rem"
+      <OIcon
+        name="error-outline"
+        size="xl"
         class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
@@ -64,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!detail"
       class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
     >
-      <q-icon
-        name="search_off"
-        size="3rem"
+      <OIcon
+        name="search-off"
+        size="xl"
         class="tw:mb-3 tw:text-[var(--o2-text-muted)]"
       />
       <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
@@ -83,35 +83,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-wrap"
       >
-        <q-input
+        <OSearchInput
           v-model="searchText"
           :placeholder="t('traces.sessionDetail.searchPlaceholder')"
-          borderless
-          dense
           clearable
-          debounce="200"
+          :debounce="200"
+          size="xs"
           class="no-border tw:w-[18rem]! tw:h-[36px]"
-        >
-          <template #prepend>
-            <q-icon class="o2-search-input-icon" size="1rem" name="search" />
-          </template>
-        </q-input>
-        <q-select
+        />
+        <OSelect
           v-model="statusFilter"
           :options="statusOptions"
-          dense
-          borderless
-          emit-value
-          map-options
+          size="sm"
           class="tw:w-[10rem]"
         />
-        <q-select
+        <OSelect
           v-model="modelFilter"
           :options="modelOptions"
-          dense
-          borderless
-          emit-value
-          map-options
+          size="sm"
           class="tw:w-[14rem]"
         />
         <span
@@ -148,19 +137,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:text-[0.75rem] tw:font-mono tw:text-[var(--o2-text-muted)] tw:flex tw:items-center tw:gap-[0.375rem]"
             >
               {{ t('traces.sessionDetail.sessionPrefix') }} {{ detail.sessionId }}
-              <q-icon
-                name="content_copy"
-                size="12px"
-                class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
-                @click="copySessionId"
-              >
-                <q-tooltip>{{ t('traces.sessionDetail.copySessionId') }}</q-tooltip>
-              </q-icon>
+              <OTooltip :content="t('traces.sessionDetail.copySessionId')">
+                <OIcon
+                  name="content-copy"
+                  size="xs"
+                  class="tw:cursor-pointer tw:hover:text-[var(--o2-text-primary)]"
+                  @click="copySessionId"
+                />
+              </OTooltip>
             </span>
           </div>
         </div>
         <OButton variant="outline" size="sm" @click="openInTraceExplorer">
-          <q-icon name="open_in_new" size="14px" class="tw:mr-[0.25rem]" />
+          <OIcon name="open-in-new" size="xs" class="tw:mr-[0.25rem]" />
           {{ t('traces.sessionDetail.openInTraceExplorer') }}
         </OButton>
       </div>
@@ -220,9 +209,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`session-turn-row-${trace.traceId}`"
             @click="toggleTurn(trace.traceId)"
           >
-            <q-icon
-              :name="isExpanded(trace.traceId) ? 'expand_more' : 'chevron_right'"
-              size="18px"
+            <OIcon
+              :name="isExpanded(trace.traceId) ? 'expand-more' : 'chevron-right'"
+              size="sm"
               class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0"
             />
             <span
@@ -245,9 +234,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:rounded tw:px-[0.375rem] tw:py-[0.05rem] tw:text-[0.65rem] tw:font-semibold tw:capitalize tw:inline-flex tw:items-center tw:gap-[0.25rem]"
               :class="statusBadgeClass(trace.status)"
             >
-              <q-icon
+              <OIcon
                 :name="trace.status === 'error' ? 'close' : 'check'"
-                size="10px"
+                size="xs"
               />
               {{ trace.status }}
             </span>
@@ -269,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('traces.sessionDetail.openTrace')"
                 @click.stop="openTrace(trace.traceId)"
               >
-                <q-icon name="open_in_new" size="14px" />
+                <OIcon name="open-in-new" size="xs" />
               </OButton>
               <OButton
                 v-if="isExpanded(trace.traceId) && !turnDetailLoading[trace.traceId]"
@@ -278,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('traces.sessionDetail.fullscreen.expandTurn')"
                 @click.stop="openFullscreen(trace.traceId)"
               >
-                <q-icon name="fullscreen" size="13px" />
+                <OIcon name="fullscreen" size="xs" />
               </OButton>
             </span>
           </div>
@@ -289,26 +278,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="turnDetailLoading[trace.traceId]" class="turn-grid">
               <!-- Messages skeleton -->
               <div class="turn-messages">
-                <!-- User block skeleton -->
+                <!-- User tw:block skeleton -->
                 <div class="msg-block msg-block--user">
                   <div class="msg-block__header">
-                    <q-skeleton type="rect" width="2.5rem" height="0.7rem" class="tw:rounded" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 2.5rem; height: 0.7rem" />
                   </div>
                   <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
-                    <q-skeleton type="rect" width="70%" height="0.65rem" class="tw:rounded" />
-                    <q-skeleton type="rect" width="45%" height="0.65rem" class="tw:rounded" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 70%; height: 0.65rem" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 45%; height: 0.65rem" />
                   </div>
                 </div>
-                <!-- Assistant block skeleton -->
+                <!-- Assistant tw:block skeleton -->
                 <div class="msg-block msg-block--assistant">
                   <div class="msg-block__header">
-                    <q-skeleton type="rect" width="7rem" height="0.7rem" class="tw:rounded" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 7rem; height: 0.7rem" />
                   </div>
                   <div class="msg-block__body tw:flex tw:flex-col tw:gap-[0.4rem]">
-                    <q-skeleton type="rect" width="95%" height="0.65rem" class="tw:rounded" />
-                    <q-skeleton type="rect" width="88%" height="0.65rem" class="tw:rounded" />
-                    <q-skeleton type="rect" width="80%" height="0.65rem" class="tw:rounded" />
-                    <q-skeleton type="rect" width="60%" height="0.65rem" class="tw:rounded" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 95%; height: 0.65rem" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 88%; height: 0.65rem" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 80%; height: 0.65rem" />
+                    <OSkeleton type="rect" class="tw:rounded" style="width: 60%; height: 0.65rem" />
                   </div>
                 </div>
               </div>
@@ -316,31 +305,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="turn-stats">
                 <!-- Status -->
                 <div class="stat-section">
-                  <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
-                  <q-skeleton type="rect" width="100%" height="1.5rem" class="tw:rounded" />
+                  <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3rem; height: 0.6rem" />
+                  <OSkeleton type="rect" class="tw:rounded" style="width: 100%; height: 1.5rem" />
                 </div>
                 <!-- Tokens -->
                 <div class="stat-section">
-                  <q-skeleton type="rect" width="3.5rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3.5rem; height: 0.6rem" />
                   <div class="stat-rows">
                     <div v-for="n in 3" :key="n" class="stat-row">
-                      <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded" />
-                      <q-skeleton type="rect" width="3.5rem" height="0.6rem" class="tw:rounded" />
+                      <OSkeleton type="rect" class="tw:rounded" style="width: 3rem; height: 0.6rem" />
+                      <OSkeleton type="rect" class="tw:rounded" style="width: 3.5rem; height: 0.6rem" />
                     </div>
                   </div>
                 </div>
                 <!-- Cost -->
                 <div class="stat-section">
-                  <q-skeleton type="rect" width="2.5rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
-                  <q-skeleton type="rect" width="4rem" height="0.75rem" class="tw:rounded" />
+                  <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 2.5rem; height: 0.6rem" />
+                  <OSkeleton type="rect" class="tw:rounded" style="width: 4rem; height: 0.75rem" />
                 </div>
                 <!-- Spans -->
                 <div class="stat-section">
-                  <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded tw:mb-[0.375rem]" />
+                  <OSkeleton type="rect" class="tw:rounded tw:mb-[0.375rem]" style="width: 3rem; height: 0.6rem" />
                   <div class="stat-rows">
                     <div class="stat-row">
-                      <q-skeleton type="rect" width="3rem" height="0.6rem" class="tw:rounded" />
-                      <q-skeleton type="rect" width="2rem" height="0.6rem" class="tw:rounded" />
+                      <OSkeleton type="rect" class="tw:rounded" style="width: 3rem; height: 0.6rem" />
+                      <OSkeleton type="rect" class="tw:rounded" style="width: 2rem; height: 0.6rem" />
                     </div>
                   </div>
                 </div>
@@ -350,14 +339,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="turn-grid">
               <!-- Messages column -->
               <div class="turn-messages">
-                <!-- USER block -->
+                <!-- USER tw:block -->
                 <div class="msg-block msg-block--user">
                   <div class="msg-block__header">
                     <span class="msg-block__role">{{ t('traces.sessionDetail.roles.user') }}</span>
-                    <q-icon
+                    <OIcon
                       v-if="turnDetail(trace.traceId)?.userMessage"
-                      name="content_copy"
-                      size="13px"
+                      name="content-copy"
+                      size="xs"
                       class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
                       @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
                     />
@@ -370,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- ASSISTANT block -->
+                <!-- ASSISTANT tw:block -->
                 <div class="msg-block msg-block--assistant">
                   <div class="msg-block__header">
                     <span class="msg-block__role">
@@ -382,10 +371,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         · {{ turnDetail(trace.traceId)?.model }}
                       </span>
                     </span>
-                    <q-icon
+                    <OIcon
                       v-if="turnDetail(trace.traceId)?.assistantMessage"
-                      name="content_copy"
-                      size="13px"
+                      name="content-copy"
+                      size="xs"
                       class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
                       @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
                     />
@@ -455,12 +444,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div v-if="turnDetail(trace.traceId)?.otherCalls" class="stat-row">
                       <span class="tw:flex tw:items-center tw:gap-[0.25rem]">
                         {{ t('traces.sessionDetail.stats.otherCalls') }}
-                        <q-icon name="info" size="11px" class="tw:text-[var(--o2-text-muted)] tw:cursor-default">
-                          <q-tooltip max-width="220px">
+                        <OTooltip max-width="220px">
+                          <OIcon name="info" size="xs" class="tw:text-[var(--o2-text-muted)] tw:cursor-default" />
+                          <template #content>
                             {{ t('traces.sessionDetail.stats.otherCallsTooltip') }}<br />
                             <span class="tw:font-mono tw:text-[0.7rem]">{{ turnDetail(trace.traceId)!.otherOps.join(', ') }}</span>
-                          </q-tooltip>
-                        </q-icon>
+                          </template>
+                        </OTooltip>
                       </span>
                       <span class="tw:tabular-nums">{{ turnDetail(trace.traceId)!.otherCalls }}</span>
                     </div>
@@ -483,9 +473,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- Fullscreen turn dialog -->
-  <q-dialog v-model="fullscreenOpen" maximized>
+  <ODialog v-model:open="fullscreenOpen" size="full" :show-close="false">
     <div class="fullscreen-turn-dialog" v-if="fullscreenTraceId && fullscreenTrace">
-      <!-- Header — mirrors the inline turn-header row -->
+      <!-- Header — mirrors the tw:inline turn-header row -->
       <div
         class="fullscreen-turn-dialog__header"
         :class="{
@@ -509,9 +499,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:rounded tw:px-[0.375rem] tw:py-[0.05rem] tw:text-[0.65rem] tw:font-semibold tw:capitalize tw:inline-flex tw:items-center tw:gap-[0.25rem]"
           :class="statusBadgeClass(fullscreenTrace.status)"
         >
-          <q-icon
+          <OIcon
             :name="fullscreenTrace.status === 'error' ? 'close' : 'check'"
-            size="10px"
+            size="xs"
           />
           {{ fullscreenTrace.status }}
         </span>
@@ -531,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.sessionDetail.openTrace')"
             @click="openTrace(fullscreenTraceId)"
           >
-            <q-icon name="open_in_new" size="14px" />
+            <OIcon name="open-in-new" size="xs" />
           </OButton>
           <OButton
             variant="outline"
@@ -539,7 +529,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.sessionDetail.fullscreen.close')"
             @click="fullscreenOpen = false"
           >
-            <q-icon name="fullscreen_exit" size="16px" />
+            <OIcon name="fullscreen-exit" size="sm" />
           </OButton>
         </span>
       </div>
@@ -550,10 +540,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="fullscreen-panel fullscreen-panel--user">
           <div class="fullscreen-panel__header">
             <span class="fullscreen-panel__role">{{ t('traces.sessionDetail.roles.user') }}</span>
-            <q-icon
+            <OIcon
               v-if="turnDetail(fullscreenTraceId)?.userMessage"
-              name="content_copy"
-              size="14px"
+              name="content-copy"
+              size="xs"
               class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
               @click="copyText(turnDetail(fullscreenTraceId)?.userMessage?.content)"
             />
@@ -575,10 +565,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 · {{ turnDetail(fullscreenTraceId)?.model }}
               </span>
             </span>
-            <q-icon
+            <OIcon
               v-if="turnDetail(fullscreenTraceId)?.assistantMessage"
-              name="content_copy"
-              size="14px"
+              name="content-copy"
+              size="xs"
               class="tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100"
               @click="copyText(turnDetail(fullscreenTraceId)?.assistantMessage?.content)"
             />
@@ -589,7 +579,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-  </q-dialog>
+  </ODialog>
   </div>
 </template>
 
@@ -597,7 +587,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, computed, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { date, copyToClipboard, useQuasar } from "quasar";
+import { formatDate } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import {
   useSessions,
@@ -606,8 +597,16 @@ import {
   type TurnDetail,
 } from "./composables/useSessions";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
+
 import {
   splitNumberWithUnit,
   splitDuration,
@@ -617,10 +616,9 @@ const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
-const $q = useQuasar();
+
 const { fetchSession, fetchTurnDetail } = useSessions();
 const { searchObj } = useTraces();
-
 const detail = ref<SessionDetail | null>(null);
 const traces = ref<SessionTraceRow[]>([]);
 const loading = ref(false);
@@ -738,7 +736,7 @@ async function toggleTurn(traceId: string) {
     turnDetails[traceId] = td;
   } catch (e: any) {
     console.error("Turn detail fetch error:", e?.raw ?? e);
-    // Surface as an empty turn so the user sees the block instead of a
+    // Surface as an empty turn so the user sees the tw:block instead of a
     // forever-spinning loader — they can still inspect the trace.
     turnDetails[traceId] = {
       traceId,
@@ -845,14 +843,12 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text).then(() => {
-    $q.notify({ message: "Copied", position: "top", timeout: 1000 });
-  });
+  copyToClipboard(text, { successMessage: "Copied", timeout: 1000 });
 }
 
 function formatTimestamp(micros: number): string {
   if (!micros) return "—";
-  return date.formatDate(Math.floor(micros / 1000), "YYYY-MM-DD HH:mm:ss");
+  return formatDate(Math.floor(micros / 1000), "YYYY-MM-DD HH:mm:ss");
 }
 
 function shortId(id: string): string {

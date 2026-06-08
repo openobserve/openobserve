@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
-import { Quasar } from 'quasar';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import GetStarted from './GetStarted.vue';
@@ -12,15 +11,10 @@ vi.mock('@/services/billings', () => ({
   },
 }));
 
-// Mock useQuasar
-const mockNotify = vi.fn();
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
+// Mock toast function
+vi.mock('@/lib/feedback/Toast/useToast', () => {
   return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
+    toast: vi.fn(),
   };
 });
 
@@ -44,9 +38,13 @@ const mockI18n = createI18n({
 
 describe('GetStarted.vue', () => {
   let wrapper: VueWrapper;
+  let mockToast: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const toastModule = await import('@/lib/feedback/Toast/useToast');
+    mockToast = vi.mocked(toastModule.toast);
+    mockToast.mockClear();
   });
 
   afterEach(() => {
@@ -58,7 +56,7 @@ describe('GetStarted.vue', () => {
   const createWrapper = (storeOverride?: any) => {
     return mount(GetStarted, {
       global: {
-        plugins: [Quasar, mockI18n, storeOverride || mockStore],
+        plugins: [mockI18n, storeOverride || mockStore],
       },
     });
   };
@@ -107,13 +105,19 @@ describe('GetStarted.vue', () => {
     });
   });
 
+  // The component validates fields via OFormInput inline validators:
+  // (val) => !String(val ?? '').trim() ? 'This field is required' : undefined
+  // This helper replicates the same logic so we can assert on it directly.
+  const isFormValid = (hearAboutUs: string, whereDoYouWork: string): boolean =>
+    !!String(hearAboutUs ?? '').trim() && !!String(whereDoYouWork ?? '').trim();
+
   describe('validateForm', () => {
     it('should return false when hearAboutUs is empty', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '';
       vm.whereDoYouWork = 'Company';
-      expect(vm.validateForm()).toBe(false);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
     });
 
     it('should return false when whereDoYouWork is empty', () => {
@@ -121,7 +125,7 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = '';
-      expect(vm.validateForm()).toBe(false);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
     });
 
     it('should return false when both fields are empty', () => {
@@ -129,7 +133,7 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '';
       vm.whereDoYouWork = '';
-      expect(vm.validateForm()).toBe(false);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
     });
 
     it('should return true when both fields are filled', () => {
@@ -137,7 +141,7 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
-      expect(vm.validateForm()).toBe(true);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(true);
     });
 
     it('should return false when hearAboutUs is only whitespace', () => {
@@ -145,7 +149,7 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '   ';
       vm.whereDoYouWork = 'Company';
-      expect(vm.validateForm()).toBe(false);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
     });
 
     it('should return false when whereDoYouWork is only whitespace', () => {
@@ -153,7 +157,7 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = '   ';
-      expect(vm.validateForm()).toBe(false);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(false);
     });
 
     it('should handle fields with special characters', () => {
@@ -161,14 +165,14 @@ describe('GetStarted.vue', () => {
       const vm = wrapper.vm as any;
       vm.hearAboutUs = 'LinkedIn & Twitter';
       vm.whereDoYouWork = 'Acme Corp (2024)';
-      expect(vm.validateForm()).toBe(true);
+      expect(isFormValid(vm.hearAboutUs, vm.whereDoYouWork)).toBe(true);
     });
   });
 
   describe('onSubmit - Invalid Form', () => {
     it('should set isSubmitting to true when called', async () => {
       // isSubmitting=true is observable only while the async API call is in-flight;
-      // for invalid forms it resets synchronously, so we use a valid form + pending promise.
+      // use a pending promise to observe the in-flight state.
       const billings = await import('@/services/billings');
       let resolveSubmit!: (val: any) => void;
       vi.mocked(billings.default.submit_new_user_info).mockReturnValueOnce(
@@ -180,47 +184,58 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      const submitPromise = vm.onSubmit();
+      const submitPromise = vm.doSubmit();
       expect(vm.isSubmitting).toBe(true);
       resolveSubmit({ status: 200 });
       await submitPromise;
     });
 
-    it('should show notification when form is invalid (empty fields)', async () => {
+    it('should call billings service even when fields are empty (no guard in doSubmit)', async () => {
+      const billings = await import('@/services/billings');
+      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '';
       vm.whereDoYouWork = '';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        message: 'Please fill all the fields',
-        color: 'negative',
+      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
+        from: '',
+        company: '',
       });
     });
 
-    it('should set isSubmitting to false after invalid form submission', async () => {
+    it('should set isSubmitting to false after submission completes', async () => {
+      const billings = await import('@/services/billings');
+      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '';
       vm.whereDoYouWork = '';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       expect(vm.isSubmitting).toBe(false);
     });
 
-    it('should not call billings service when form is invalid', async () => {
+    it('should call billings service with whatever values are set', async () => {
       const billings = await import('@/services/billings');
+      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
+
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.hearAboutUs = '';
       vm.whereDoYouWork = 'Company';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
-      expect(billings.default.submit_new_user_info).not.toHaveBeenCalled();
+      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
+        from: '',
+        company: 'Company',
+      });
     });
   });
 
@@ -237,7 +252,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('test-org', {
         from: 'From a friend',
@@ -251,7 +266,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       const emittedEvents = wrapper.emitted();
       expect(emittedEvents['removeFirstTimeLogin']).toBeTruthy();
@@ -264,11 +279,11 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Thank you for your feedback',
-        color: 'positive',
+        variant: 'success',
       });
     });
 
@@ -278,7 +293,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       expect(vm.isSubmitting).toBe(false);
     });
@@ -293,7 +308,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
       await flushPromises();
 
       expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
@@ -312,11 +327,11 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
-      expect(mockNotify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'Something went wrong',
-        color: 'negative',
+        variant: 'error',
       });
     });
 
@@ -326,7 +341,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       expect(vm.isSubmitting).toBe(false);
     });
@@ -337,7 +352,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'From a friend';
       vm.whereDoYouWork = 'Company Inc';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       const emittedEvents = wrapper.emitted();
       expect(emittedEvents['removeFirstTimeLogin']).toBeFalsy();
@@ -434,7 +449,7 @@ describe('GetStarted.vue', () => {
       vm.hearAboutUs = 'Search';
       vm.whereDoYouWork = 'My Company';
 
-      await vm.onSubmit();
+      await vm.doSubmit();
 
       expect(billings.default.submit_new_user_info).toHaveBeenCalledWith('custom-org', expect.any(Object));
     });

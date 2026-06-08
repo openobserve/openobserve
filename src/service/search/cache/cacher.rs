@@ -963,7 +963,7 @@ fn calculate_deltas_multi(
 
     // sort the results by response end time descending
     let mut results = results.to_vec();
-    results.sort_by(|a, b| b.response_end_time.cmp(&a.response_end_time));
+    results.sort_by_key(|k| std::cmp::Reverse(k.response_end_time));
     for meta in results {
         cache_duration += meta.response_end_time - meta.response_start_time;
         current_start_time = meta.response_start_time;
@@ -1207,6 +1207,7 @@ mod tests {
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
+            timezone: None,
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1349,6 +1350,7 @@ mod tests {
                 streaming_output: false,
                 streaming_id: None,
                 histogram_interval: 0,
+                timezone: None,
                 sampling_ratio: None,
                 sampling_config: None,
             },

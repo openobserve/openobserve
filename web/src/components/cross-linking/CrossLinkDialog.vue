@@ -1,27 +1,25 @@
 <template>
-  <q-dialog v-model="dialogVisible" persistent>
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="tw:flex tw:items-center tw:justify-between">
-          <div class="text-h6">
-            {{ isEditing ? t("crossLinks.editCrossLink") : t("crossLinks.addCrossLink") }}
-          </div>
-          <CrossLinkUserGuide />
-        </div>
-      </q-card-section>
-
-      <q-card-section>
-        <q-form @submit.prevent="onSubmit">
+  <ODialog data-test="cross-link-dialog" v-model:open="dialogVisible" persistent size="md" :show-close="false"
+    :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="isEditing ? t('crossLinks.update') : t('crossLinks.add')"
+    :primary-button-disabled="!form.name || !form.url"
+    @click:secondary="onCancel"
+    @click:primary="onSubmit"
+  >
+    <template #header-right>
+      <CrossLinkUserGuide />
+    </template>
+        <div>
           <!-- Name -->
           <div class="tw:mb-3">
             <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.name") }} *</label>
-            <q-input
+            <OInput
               v-model="form.name"
-              dense
               :placeholder="t('crossLinks.namePlaceholder')"
-              :rules="[(val: string) => !!val || t('crossLinks.nameRequired')]"
-              borderless
-              hide-bottom-space
+              :error="!!nameError"
+              :error-message="nameError"
+              @update:model-value="nameError = ''"
               data-test="cross-link-name-input"
             />
           </div>
@@ -29,13 +27,12 @@
           <!-- URL Template -->
           <div class="tw:mb-3">
             <label class="tw:block tw:text-sm tw:font-semibold tw:mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.urlTemplate") }} *</label>
-            <q-input
+            <OInput
               v-model="form.url"
-              dense
               :placeholder="t('crossLinks.urlPlaceholder')"
-              :rules="[(val: string) => !!val || t('crossLinks.urlRequired')]"
-              borderless
-              hide-bottom-space
+              :error="!!urlError"
+              :error-message="urlError"
+              @update:model-value="urlError = ''"
               data-test="cross-link-url-input"
             />
             <div class="tw:text-xs tw:mt-1" style="color: var(--o2-text-muted)">
@@ -50,93 +47,68 @@
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="form.fields.length > 0" class="tw:flex tw:flex-wrap tw:gap-1 tw:mb-2">
-              <q-chip
+              <OBadge
                 v-for="(field, idx) in form.fields"
                 :key="idx"
-                removable
-                dense
+                variant="default"
+                size="sm"
                 class="tw:max-w-[250px]"
-                @remove="form.fields.splice(idx, 1)"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="tw:truncate tw:text-xs" :title="field.name">{{ field.name }}</span>
-              </q-chip>
-            </div>
-            <div class="tw:flex tw:gap-2 tw:items-center">
-              <q-select
-                ref="fieldSelectRef"
-                v-if="availableFields.length > 0"
-                v-model="newFieldName"
-                :options="filteredFieldOptions"
-                use-input
-                fill-input
-                hide-selected
-                input-debounce="0"
-                @filter="filterFieldOptions"
-                @input-value="onFieldInputValue"
-                @update:model-value="onFieldSelected"
-                @keyup.enter="addField"
-                dense
-                borderless
-                class="tw:flex-1"
-                :placeholder="t('crossLinks.fieldSearchPlaceholder')"
-                hide-bottom-space
-                data-test="cross-link-field-input"
-              >
-                <template v-slot:no-option>
-                  <q-item>
-                    <q-item-section class="tw:text-xs" style="color: var(--o2-text-muted)">
-                      {{ t("crossLinks.noMatchingFields") }}
-                    </q-item-section>
-                  </q-item>
+                <template #trailing>
+                  <button
+                    type="button"
+                    :aria-label="`Remove ${field.name}`"
+                    :data-test="`cross-link-field-chip-remove-${idx}`"
+                    class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                    @click="form.fields.splice(idx, 1)"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </button>
                 </template>
-              </q-select>
-              <q-input
+              </OBadge>
+            </div>
+            <div
+              class="tw:flex tw:gap-2 tw:items-center"
+              @keydown="onFieldKeydown"
+            >
+              <!--
+                OCombobox provides suggestions from `availableFields` while
+                still allowing custom (free-text) field names. Enter on the
+                input adds the current value (whether it came from a listbox
+                pick or was typed manually), so cross-links remain valid even
+                when the stream schema doesn't list a given field yet.
+              -->
+              <OCombobox
+                v-if="availableFields.length > 0"
+                ref="fieldComboboxRef"
+                v-model="newFieldName"
+                class="tw:flex-1"
+                :items="availableFieldOptions"
+                :placeholder="t('crossLinks.fieldInputPlaceholder')"
+                @select="onFieldSelect"
+                data-test="cross-link-field-input"
+              />
+              <OInput
                 v-else
                 v-model="newFieldName"
-                dense
-                borderless
                 class="tw:flex-1"
                 :placeholder="t('crossLinks.fieldInputPlaceholder')"
-                @keyup.enter="addField"
-                hide-bottom-space
                 data-test="cross-link-field-input"
               />
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                icon-left="add"
                 @click="addField"
-                :disabled="!newFieldName && !fieldInputValue"
+                :disabled="!newFieldName"
                 data-test="cross-link-add-field-btn"
-              >
-                <Plus class="tw:size-4" />
-              </OButton>
+              />
             </div>
           </div>
-        </q-form>
-      </q-card-section>
-
-      <q-card-actions align="right" class="q-pa-md tw:gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="onCancel"
-          data-test="cross-link-cancel-btn"
-        >
-          {{ t('common.cancel') }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!form.name || !form.url"
-          @click="onSubmit"
-          data-test="cross-link-save-btn"
-        >
-          {{ isEditing ? t('crossLinks.update') : t('crossLinks.add') }}
-        </OButton>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -145,7 +117,11 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
-import { Plus } from 'lucide-vue-next';
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 
 export interface CrossLink {
   name: string;
@@ -155,7 +131,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OButton, Plus },
+  components: { CrossLinkUserGuide, OBadge, OButton, OCombobox, ODialog, OIcon, OInput },
   props: {
     modelValue: {
       type: Boolean,
@@ -179,19 +155,15 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
+    const nameError = ref("");
+    const urlError = ref("");
     const isEditing = computed(() => !!props.link?.name);
     const newFieldName = ref("");
-    const fieldSelectRef = ref<any>(null);
-    const filteredFieldOptions = ref<string[]>([]);
-
-    function filterFieldOptions(val: string, update: Function) {
-      update(() => {
-        const needle = val.toLowerCase();
-        filteredFieldOptions.value = props.availableFields.filter(
-          (f) => f.toLowerCase().includes(needle),
-        );
-      });
-    }
+    // Template ref to OCombobox so we can call its imperative `clear()` after
+    // every commit (Add / Enter / select). The v-model path alone is
+    // unreliable because reka-ui's internal search-term state survives
+    // synchronous v-model round-trips when the parent clears in the same tick.
+    const fieldComboboxRef = ref<{ clear: () => Promise<void> } | null>(null);
 
     const form = ref({
       name: "",
@@ -199,40 +171,52 @@ export default defineComponent({
       fields: [] as Array<{ name: string }>,
     });
 
-    // Track the raw input value from q-select (since v-model only updates on selection)
-    const fieldInputValue = ref("");
-
-    function onFieldInputValue(val: string) {
-      fieldInputValue.value = val;
-    }
-
     function clearFieldInput() {
+      // Reset the v-model AND call OCombobox's imperative `clear()`. The
+      // v-model write alone is insufficient because Vue's pre-flush watcher
+      // dedupes synchronous "" → value → "" round-trips (they look like a
+      // no-op), and reka-ui keeps an internal search-term state that survives
+      // the v-model reset. The exposed clear() resets both layers together.
       newFieldName.value = "";
-      fieldInputValue.value = "";
-      // Clear q-select's internal input text (use-input + fill-input caches it)
-      if (fieldSelectRef.value?.updateInputValue) {
-        fieldSelectRef.value.updateInputValue("", true);
-      }
-    }
-
-    function onFieldSelected(val: string) {
-      // When user selects from dropdown, auto-add immediately
-      if (val) {
-        const name = val.trim();
-        if (name && !form.value.fields.some((f) => f.name === name)) {
-          form.value.fields.push({ name });
-        }
-        clearFieldInput();
-      }
+      fieldComboboxRef.value?.clear();
     }
 
     function addField() {
-      // Use fieldInputValue (raw typed text) if available, otherwise fall back to model
-      const name = (fieldInputValue.value || newFieldName.value || "").trim();
+      const name = (newFieldName.value || "").trim();
       if (name && !form.value.fields.some((f) => f.name === name)) {
         form.value.fields.push({ name });
       }
       clearFieldInput();
+    }
+
+    // Suggestion options shown by the OCombobox. We filter out fields that
+    // have already been added so the dropdown only suggests remaining
+    // schema columns; custom (free-text) values are still accepted via the
+    // OCombobox input + Enter / Add button.
+    const availableFieldOptions = computed(() => {
+      const added = new Set(form.value.fields.map((f) => f.name));
+      return (props.availableFields || [])
+        .filter((name) => !added.has(name))
+        .map((name) => ({ label: name, value: name }));
+    });
+
+    function onFieldSelect(value: string) {
+      // Selecting from the suggestions list should commit the field
+      // immediately; the typed value is already synced via v-model.
+      newFieldName.value = value;
+      addField();
+    }
+
+    // Enter on the wrapper bubbles up from OCombobox's internal input.
+    // reka-ui's Combobox handles Enter to commit the highlighted item to
+    // v-model first; by the time this fires `newFieldName.value` is the
+    // selected / typed text, so addField() picks up the correct value.
+    function onFieldKeydown(event: KeyboardEvent) {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      // Defer to the next microtask so reka-ui's update:model-value has
+      // a chance to land before we read newFieldName.value.
+      queueMicrotask(() => addField());
     }
 
     // Reset form when dialog opens
@@ -257,7 +241,9 @@ export default defineComponent({
     );
 
     function onSubmit() {
-      if (!form.value.name || !form.value.url) return;
+      nameError.value = !form.value.name ? t('crossLinks.nameRequired') : '';
+      urlError.value = !form.value.url ? t('crossLinks.urlRequired') : '';
+      if (nameError.value || urlError.value) return;
       // Auto-add pending field if user typed something but didn't press +
       addField();
       emit("save", { ...form.value });
@@ -273,15 +259,15 @@ export default defineComponent({
       store,
       dialogVisible,
       isEditing,
+      nameError,
+      urlError,
       form,
       newFieldName,
-      fieldInputValue,
-      fieldSelectRef,
-      filteredFieldOptions,
-      filterFieldOptions,
-      onFieldInputValue,
-      onFieldSelected,
+      fieldComboboxRef,
+      availableFieldOptions,
       addField,
+      onFieldSelect,
+      onFieldKeydown,
       onSubmit,
       onCancel,
     };

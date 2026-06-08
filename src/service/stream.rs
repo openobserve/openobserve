@@ -20,30 +20,32 @@ use axum::{
     response::{IntoResponse, Response as HttpResponse},
 };
 use chrono::{TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use config::{
-    SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
+    ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
+    is_local_disk_storage,
     meta::{
         promql,
         stream::{
-            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamPartition,
-            StreamSettings, StreamStats, StreamType, TimeRange, UpdateStreamSettings,
+            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamSettings,
+            StreamStats, StreamType, TimeRange, UpdateStreamSettings,
         },
     },
     utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
 };
+#[cfg(feature = "enterprise")]
+use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::stats,
     schema::{
         STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        get_partition_time_level, get_stream_setting_fts_fields, unwrap_stream_created_at,
-        unwrap_stream_is_derived, unwrap_stream_settings,
+        get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
+        unwrap_stream_settings,
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
+use itertools::chain;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
@@ -347,8 +349,6 @@ pub async fn create_stream(
                 .collect::<Vec<_>>(),
         );
     }
-    stream.settings.defined_schema_fields.sort();
-    stream.settings.defined_schema_fields.dedup();
 
     // create the stream settings
     let resp = save_stream_settings(org_id, stream_name, stream_type, stream.settings).await?;
@@ -390,45 +390,35 @@ pub async fn save_stream_settings(
         )));
     }
 
-    // _all field can't setting for inverted index & index field
-    for key in settings.full_text_search_keys.iter() {
-        if key == &cfg.common.column_all {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{key}] can't be used for full text search"
-            )));
-        }
+    // check stroage type is compliance
+    if settings.data_retention > 0
+        && settings.data_retention < 30
+        && settings.storage_type.is_compliance()
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "data_retention must be at least 30 days when storage_type is compliance",
+        ));
     }
-    for key in settings.index_fields.iter() {
-        if key == &cfg.common.column_all {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{key}] can't be used for secondary index"
-            )));
-        }
-    }
-
-    for key in settings.partition_keys.iter() {
-        if SQL_FULL_TEXT_SEARCH_FIELDS.contains(&key.field) || key.field == cfg.common.column_all {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{}] can't be used for partition key",
-                key.field
-            )));
-        }
+    #[cfg(feature = "enterprise")]
+    if org_id == META_ORG_ID && stream_name == USAGE_STREAM && settings.data_retention < 32 {
+        // _meta org, usage stream can't be set to less than 32 days
+        settings.data_retention = 0;
     }
 
-    // get schema
-    let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
-        Ok(schema) => schema,
-        Err(e) => {
-            return Ok((
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("error in getting schema : {e}"))],
-                Json(MetaHttpResponse::error(
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("error in getting schema : {e}"),
-                )),
-            )
-                .into_response());
-        }
+    // if index_original_data is true, store_original_data must be true
+    if settings.index_original_data {
+        settings.store_original_data = true;
+    }
+
+    // index_original_data & index_all_values only can open one at a time
+    if settings.index_original_data && settings.index_all_values {
+        return Ok(MetaHttpResponse::bad_request(
+            "index_original_data & index_all_values cannot be true at the same time",
+        ));
+    }
+
+    let Ok(schema) = infra::schema::get(org_id, stream_name, stream_type).await else {
+        return Ok(MetaHttpResponse::not_found("stream not found"));
     };
     let schema_fields = schema
         .fields()
@@ -436,16 +426,113 @@ pub async fn save_stream_settings(
         .map(|f| (f.name(), f))
         .collect::<HashMap<_, _>>();
 
-    // check the full text search keys must be text field
-    for key in settings.full_text_search_keys.iter() {
-        let Some(field) = schema_fields.get(key) else {
+    // Dedup + fold bloom into index. Single place where the stored shape gets
+    // normalized; both direct-save callers and the update path (via this
+    // function at the end) flow through here.
+    normalize_stream_settings(&mut settings);
+
+    // check for user defined schema
+    if !settings.defined_schema_fields.is_empty() {
+        // check fields with stream type
+        let fields = super::schema::check_schema_for_defined_schema_fields(
+            stream_type,
+            &schema,
+            settings.defined_schema_fields.to_vec(),
+        );
+        // remove the fields that are not in the new schema
+        let mut fields: Vec<_> = fields.into_iter().collect();
+        fields.sort();
+        fields.dedup();
+        fields.retain(|field| schema_fields.contains_key(field));
+        settings.defined_schema_fields = fields;
+    }
+    if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "user defined schema fields count exceeds the limit: {}",
+            cfg.limit.user_defined_schema_max_fields
+        )));
+    }
+
+    // Check the fields are not reserved
+    let fts_set: HashSet<_> = settings.full_text_search_keys.iter().cloned().collect();
+    let index_set: HashSet<_> = settings.index_fields.iter().cloned().collect();
+    let bloom_set: HashSet<_> = settings.bloom_filter_fields.iter().cloned().collect();
+    let pk_set: HashSet<_> = settings
+        .partition_keys
+        .iter()
+        .map(|p| p.field.clone())
+        .collect();
+
+    // ---- 1. Reserved columns (raw lists) ----
+    let strict_reserved: [&str; 2] = [TIMESTAMP_COL_NAME, cfg.common.column_all.as_str()];
+    let no_search_reserved: [&str; 2] = [ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME];
+    for &r in chain(strict_reserved.iter(), no_search_reserved.iter()) {
+        if index_set.contains(r) {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{key}] not found in schema"
+                "field [{r}] is reserved and cannot be used for secondary index"
             )));
-        };
-        if field.data_type() != &DataType::Utf8 && field.data_type() != &DataType::LargeUtf8 {
+        }
+        if bloom_set.contains(r) {
             return Ok(MetaHttpResponse::bad_request(format!(
-                "full text search field [{key}] must be text field"
+                "field [{r}] is reserved and cannot be used for bloom filter"
+            )));
+        }
+        if pk_set.contains(r) {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{r}] is reserved and cannot be used as partition key"
+            )));
+        }
+    }
+    for &r in &strict_reserved {
+        // FTS is explicitly allowed for these — they hold human-readable content.
+        if fts_set.contains(r) {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{r}] is reserved and cannot be used for full text search"
+            )));
+        }
+    }
+
+    // ---- 2. FTS ∩ Index = ∅ (resolved) ----
+    if let Some(name) = fts_set.intersection(&index_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "field [{name}] cannot be both full text search and secondary index — choose one"
+        )));
+    }
+    // ---- 3. FTS ∩ Bloom = ∅ (resolved) ----
+    if let Some(name) = fts_set.intersection(&bloom_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "field [{name}] cannot be both full text search and bloom filter"
+        )));
+    }
+    // ---- 4. Bloom ⊆ Index (raw) ----
+    if let Some(name) = bloom_set.difference(&index_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "bloom filter field [{name}] must also be a secondary index field"
+        )));
+    }
+    // ---- 5. Partition keys disjoint from FTS / Index / Bloom (resolved) ----
+    if let Some(name) = pk_set.intersection(&fts_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "partition key [{name}] cannot also be a full text search field"
+        )));
+    }
+    if let Some(name) = pk_set.intersection(&index_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "partition key [{name}] cannot also be a secondary index field"
+        )));
+    }
+    if let Some(name) = pk_set.intersection(&bloom_set).next() {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "partition key [{name}] cannot also be a bloom filter field"
+        )));
+    }
+
+    // check if the partition key is a full text search field
+    for key in settings.partition_keys.iter() {
+        if fts_set.contains(&key.field) {
+            return Ok(MetaHttpResponse::bad_request(format!(
+                "field [{}] can't be used for partition key",
+                key.field
             )));
         }
     }
@@ -551,19 +638,10 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let Ok(mut schema) = infra::schema::get(org_id, stream_name, stream_type).await else {
-        return Ok(MetaHttpResponse::not_found("stream not found"));
-    };
     let Some(mut settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await
     else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
-
-    // Validate index field uniqueness BEFORE any DB writes
-    // This prevents inconsistent state if validation fails
-    if let Err(err) = validate_index_field_conflicts(&settings, &new_settings) {
-        return Ok(MetaHttpResponse::bad_request(err));
-    }
 
     // process new fields first
     let new_fields = std::mem::take(&mut new_settings.fields);
@@ -578,234 +656,129 @@ pub async fn update_stream_settings(
             fields.push(arrow_schema::Field::new(name, data_type, true));
         }
         let new_schema = Schema::new(fields);
-        schema =
-            match infra::schema::merge(org_id, stream_name, stream_type, &new_schema, None).await {
-                Ok(Some((s, _))) => s,
-                Ok(None) => {
-                    return Err(Error::other(
-                        "error in update stream settings: update schema is empty".to_string(),
-                    ));
-                }
-                Err(e) => {
-                    return Err(Error::other(format!(
-                        "error in update stream settings: {e}"
-                    )));
-                }
-            };
-    }
-
-    let cfg = config::get_config();
-    if let Some(max_query_range) = new_settings.max_query_range {
-        settings.max_query_range = max_query_range;
-    }
-    if let Some(store_original_data) = new_settings.store_original_data {
-        settings.store_original_data = store_original_data;
-    }
-    if let Some(approx_partition) = new_settings.approx_partition {
-        settings.approx_partition = approx_partition;
-    }
-
-    if let Some(flatten_level) = new_settings.flatten_level {
-        settings.flatten_level = Some(flatten_level);
-    }
-
-    if let Some(data_retention) = new_settings.data_retention {
-        let effective_storage_type = new_settings.storage_type.unwrap_or(settings.storage_type);
-        if effective_storage_type.is_compliance() && data_retention < 30 {
-            return Ok(MetaHttpResponse::bad_request(
-                "data_retention must be at least 30 days when storage_type is compliance",
-            ));
-        }
-        #[cfg(feature = "enterprise")]
-        if org_id == META_ORG_ID && stream_name == USAGE_STREAM {
-            if data_retention >= 32 {
-                settings.data_retention = data_retention;
+        match infra::schema::merge(org_id, stream_name, stream_type, &new_schema, None).await {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                return Err(Error::other(
+                    "error in update stream settings: update schema is empty".to_string(),
+                ));
             }
-        } else {
-            settings.data_retention = data_retention;
-        }
-        #[cfg(not(feature = "enterprise"))]
-        {
-            settings.data_retention = data_retention;
-        }
+            Err(e) => {
+                return Err(Error::other(format!(
+                    "error in update stream settings: {e}"
+                )));
+            }
+        };
     }
 
-    if let Some(index_original_data) = new_settings.index_original_data {
-        settings.index_original_data = index_original_data;
+    if let Some(v) = new_settings.storage_type {
+        settings.storage_type = v;
+    }
+    if let Some(v) = new_settings.data_retention {
+        settings.data_retention = v;
+    }
+    if let Some(v) = new_settings.flatten_level {
+        settings.flatten_level = Some(v);
+    }
+    if let Some(v) = new_settings.max_query_range {
+        settings.max_query_range = v;
+    }
+    if let Some(v) = new_settings.store_original_data {
+        settings.store_original_data = v;
+    }
+    if let Some(v) = new_settings.approx_partition {
+        settings.approx_partition = v;
+    }
+    if let Some(v) = new_settings.index_original_data {
+        settings.index_original_data = v;
+    }
+    if let Some(v) = new_settings.index_all_values {
+        settings.index_all_values = v;
+    }
+    if let Some(v) = new_settings.enable_log_patterns_extraction {
+        settings.enable_log_patterns_extraction = v;
+    }
+    if let Some(v) = new_settings.is_llm_stream {
+        settings.is_llm_stream = v;
     }
 
-    if let Some(index_all_values) = new_settings.index_all_values {
-        settings.index_all_values = index_all_values;
+    // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
+    if !new_settings.partition_keys.remove.is_empty() {
+        settings.partition_keys.retain(|p| {
+            !new_settings
+                .partition_keys
+                .remove
+                .iter()
+                .any(|r| r.field == p.field)
+        });
+    }
+    if !new_settings.partition_keys.add.is_empty() {
+        settings
+            .partition_keys
+            .extend(new_settings.partition_keys.add);
     }
 
-    // if index_original_data is true, store_original_data must be true
-    if settings.index_original_data {
-        settings.store_original_data = true;
+    // full_text_search_keys: remove first, then add
+    if !new_settings.full_text_search_keys.remove.is_empty() {
+        settings
+            .full_text_search_keys
+            .retain(|f| !new_settings.full_text_search_keys.remove.contains(f));
+    }
+    if !new_settings.full_text_search_keys.add.is_empty() {
+        settings
+            .full_text_search_keys
+            .extend(new_settings.full_text_search_keys.add);
+        settings.index_updated_at = now_micros();
     }
 
-    // index_original_data & index_all_values only can open one at a time
-    if settings.index_original_data && settings.index_all_values {
-        return Ok(MetaHttpResponse::bad_request(
-            "index_original_data & index_all_values cannot be true at the same time",
-        ));
+    // index_fields: remove first, then add
+    if !new_settings.index_fields.remove.is_empty() {
+        settings
+            .index_fields
+            .retain(|f| !new_settings.index_fields.remove.contains(f));
+    }
+    if !new_settings.index_fields.add.is_empty() {
+        settings.index_fields.extend(new_settings.index_fields.add);
+        settings.index_updated_at = now_micros();
+    }
+
+    // bloom_filter_fields: remove first, then add
+    if !new_settings.bloom_filter_fields.remove.is_empty() {
+        settings
+            .bloom_filter_fields
+            .retain(|f| !new_settings.bloom_filter_fields.remove.contains(f));
+    }
+    if !new_settings.bloom_filter_fields.add.is_empty() {
+        settings
+            .bloom_filter_fields
+            .extend(new_settings.bloom_filter_fields.add);
     }
 
     // check for user defined schema
-    if !new_settings.defined_schema_fields.add.is_empty() {
-        if !cfg.common.allow_user_defined_schemas {
-            return Ok(MetaHttpResponse::bad_request(
-                "user defined schema is not allowed, you need to set ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
-            ));
-        }
-        let new_defined: Vec<_> = new_settings
-            .defined_schema_fields
-            .add
-            .into_iter()
-            .filter(|f| !settings.defined_schema_fields.contains(f))
-            .collect();
-        settings.defined_schema_fields.extend(new_defined);
-    }
     if !new_settings.defined_schema_fields.remove.is_empty() {
         settings
             .defined_schema_fields
             .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
-        // _timestamp cannot be deselected from the UI, so when the user removes every
-        // UDS field they can see, _timestamp may be the only one left. Treat that as a
-        // request to disable UDS entirely.
-        if settings.defined_schema_fields.len() == 1
-            && settings.defined_schema_fields[0] == TIMESTAMP_COL_NAME
-        {
-            settings.defined_schema_fields.clear();
-        }
     }
-    if !settings.defined_schema_fields.is_empty() {
-        // check fields with stream type
-        let fields = super::schema::check_schema_for_defined_schema_fields(
-            stream_type,
-            &schema,
-            settings.defined_schema_fields.to_vec(),
-        );
-
-        // remove the fields that are not in the new schema
-        let schema_fields = schema
-            .fields()
-            .iter()
-            .map(|f| f.name())
-            .collect::<HashSet<_>>();
-        let mut fields: Vec<_> = fields.into_iter().collect();
-        fields.sort();
-        fields.dedup();
-        fields.retain(|field| schema_fields.contains(field));
-        settings.defined_schema_fields = fields;
-    }
-    if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "user defined schema fields count exceeds the limit: {}",
-            cfg.limit.user_defined_schema_max_fields
-        )));
-    }
-
-    // check for bloom filter fields
-    if !new_settings.bloom_filter_fields.add.is_empty() {
-        let mut add = new_settings.bloom_filter_fields.add;
-        add.sort();
-        add.dedup();
-        let new_bloom: Vec<_> = add
-            .into_iter()
-            .filter(|f| !settings.bloom_filter_fields.contains(f))
-            .collect();
-        settings.bloom_filter_fields.extend(new_bloom);
-    }
-    if !new_settings.bloom_filter_fields.remove.is_empty() {
+    if !new_settings.defined_schema_fields.add.is_empty() {
         settings
-            .bloom_filter_fields
-            .retain(|field| !new_settings.bloom_filter_fields.remove.contains(field));
+            .defined_schema_fields
+            .extend(new_settings.defined_schema_fields.add);
     }
 
-    // check for index fields
-    if !new_settings.index_fields.add.is_empty() {
-        let mut add = new_settings.index_fields.add;
-        add.sort();
-        add.dedup();
-        let new_index: Vec<_> = add
-            .into_iter()
-            .filter(|f| !settings.index_fields.contains(f))
-            .collect();
-        settings.index_fields.extend(new_index);
-        settings.index_updated_at = now_micros();
-    }
-    if !new_settings.index_fields.remove.is_empty() {
-        settings
-            .index_fields
-            .retain(|field| !new_settings.index_fields.remove.contains(field));
-    }
-
-    if !new_settings.extended_retention_days.add.is_empty() {
-        let mut seen = std::collections::HashSet::new();
-        let new_retention: Vec<_> = new_settings
-            .extended_retention_days
-            .add
-            .into_iter()
-            .filter(|r| {
-                if seen.contains(r) || settings.extended_retention_days.contains(r) {
-                    false
-                } else {
-                    seen.insert(r.clone());
-                    true
-                }
-            })
-            .collect();
-        settings.extended_retention_days.extend(new_retention);
-    }
-
+    // extended_retention_days: remove first, then add
     if !new_settings.extended_retention_days.remove.is_empty() {
         settings
             .extended_retention_days
             .retain(|range| !new_settings.extended_retention_days.remove.contains(range));
     }
-
-    let _fts = get_stream_setting_fts_fields(&Some(settings.clone()));
-
-    if !new_settings.distinct_value_fields.add.is_empty() {
-        for f in &new_settings.distinct_value_fields.add {
-            if f == "count" || f == TIMESTAMP_COL_NAME {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"
-                )));
-            }
-            // we ignore full text search fields
-            if _fts.contains(f) || new_settings.full_text_search_keys.add.contains(f) {
-                continue;
-            }
-            let record = DistinctFieldRecord::new(
-                OriginType::Stream,
-                stream_name,
-                org_id,
-                stream_name,
-                stream_type.to_string(),
-                f,
-            );
-            if let Err(e) = distinct_values::add(record).await {
-                return Ok((
-                    http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, format!("error in updating settings : {e}"))],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("error in updating settings : {e}"),
-                    )),
-                )
-                    .into_response());
-            }
-            // we cannot allow duplicate entries here
-            let temp = DistinctField {
-                name: f.to_owned(),
-                added_ts: now_micros(),
-            };
-            if !settings.distinct_value_fields.contains(&temp) {
-                settings.distinct_value_fields.push(temp);
-            }
-        }
+    if !new_settings.extended_retention_days.add.is_empty() {
+        settings
+            .extended_retention_days
+            .extend(new_settings.extended_retention_days.add);
     }
+
+    // distinct_value_fields: remove first, then add
 
     if !new_settings.distinct_value_fields.remove.is_empty() {
         for f in &new_settings.distinct_value_fields.remove {
@@ -847,6 +820,46 @@ pub async fn update_stream_settings(
                 .contains(&field.name)
         });
     }
+    if !new_settings.distinct_value_fields.add.is_empty() {
+        for f in &new_settings.distinct_value_fields.add {
+            if f == "count" || f == TIMESTAMP_COL_NAME {
+                return Ok(MetaHttpResponse::bad_request(format!(
+                    "count and {TIMESTAMP_COL_NAME} are reserved fields and cannot be added"
+                )));
+            }
+            // we ignore full text search fields
+            if settings.full_text_search_keys.contains(f) {
+                continue;
+            }
+            let record = DistinctFieldRecord::new(
+                OriginType::Stream,
+                stream_name,
+                org_id,
+                stream_name,
+                stream_type.to_string(),
+                f,
+            );
+            if let Err(e) = distinct_values::add(record).await {
+                return Ok((
+                    http::StatusCode::INTERNAL_SERVER_ERROR,
+                    [(ERROR_HEADER, format!("error in updating settings : {e}"))],
+                    Json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("error in updating settings : {e}"),
+                    )),
+                )
+                    .into_response());
+            }
+            // we cannot allow duplicate entries here
+            let temp = DistinctField {
+                name: f.to_owned(),
+                added_ts: now_micros(),
+            };
+            if !settings.distinct_value_fields.contains(&temp) {
+                settings.distinct_value_fields.push(temp);
+            }
+        }
+    }
 
     if let Some(enable_distinct_fields) = new_settings.enable_distinct_fields {
         // Only reset timestamps when transitioning from disabled to enabled
@@ -865,69 +878,6 @@ pub async fn update_stream_settings(
                 settings.distinct_value_fields
             );
         }
-    }
-
-    if let Some(enable_log_patterns_extraction) = new_settings.enable_log_patterns_extraction {
-        settings.enable_log_patterns_extraction = enable_log_patterns_extraction;
-    }
-
-    if let Some(storage_type) = new_settings.storage_type {
-        if storage_type.is_compliance() {
-            let effective_retention = new_settings
-                .data_retention
-                .unwrap_or(settings.data_retention);
-            if effective_retention < 30 {
-                return Ok(MetaHttpResponse::bad_request(
-                    "data_retention must be at least 30 days when storage_type is compliance",
-                ));
-            }
-        }
-        settings.storage_type = storage_type;
-    }
-
-    if let Some(is_llm_stream) = new_settings.is_llm_stream {
-        settings.is_llm_stream = is_llm_stream;
-    }
-
-    if !new_settings.full_text_search_keys.add.is_empty() {
-        let mut add = new_settings.full_text_search_keys.add;
-        add.sort();
-        add.dedup();
-        let new_fts: Vec<_> = add
-            .into_iter()
-            .filter(|f| !settings.full_text_search_keys.contains(f))
-            .collect();
-        settings.full_text_search_keys.extend(new_fts);
-        settings.index_updated_at = now_micros();
-    }
-
-    if !new_settings.full_text_search_keys.remove.is_empty() {
-        settings
-            .full_text_search_keys
-            .retain(|field| !new_settings.full_text_search_keys.remove.contains(field));
-    }
-
-    if !new_settings.partition_keys.add.is_empty() {
-        let mut seen: Vec<StreamPartition> = Vec::new();
-        for k in new_settings.partition_keys.add {
-            if seen.iter().any(|s| s.field == k.field)
-                || settings.partition_keys.iter().any(|s| s.field == k.field)
-            {
-                continue;
-            }
-            seen.push(k.clone());
-            settings.partition_keys.push(k);
-        }
-    }
-
-    if !new_settings.partition_keys.remove.is_empty() {
-        settings.partition_keys.retain(|field| {
-            !new_settings
-                .partition_keys
-                .remove
-                .iter()
-                .any(|r| r.field == field.field)
-        });
     }
 
     // Handle cross_links updates
@@ -1034,22 +984,23 @@ pub async fn delete_stream(
 
     // delete associated feature resources, i.e. pipelines, alerts
     if del_related_feature_resources {
-        if let Some(pipeline) =
+        for pipeline in
             db::pipeline::get_by_stream(&StreamParams::new(org_id, stream_name, stream_type)).await
-            && let Err(e) = db::pipeline::delete(&pipeline.id).await
         {
-            return Ok((
-                http::StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
-                Json(MetaHttpResponse::error(
+            if let Err(e) = db::pipeline::delete(&pipeline.id).await {
+                return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    format!(
-                        "Error: failed to delete the associated pipeline \"{}\": {e}",
-                        pipeline.name
-                    ),
-                )),
-            )
-                .into_response());
+                    [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                    Json(MetaHttpResponse::error(
+                        http::StatusCode::INTERNAL_SERVER_ERROR,
+                        format!(
+                            "Error: failed to delete the associated pipeline \"{}\": {e}",
+                            pipeline.name
+                        ),
+                    )),
+                )
+                    .into_response());
+            }
         }
 
         if let Ok(alerts) =
@@ -1347,70 +1298,58 @@ pub async fn update_fields_type(
     Ok(())
 }
 
-/// Validates that a field cannot have both Full Text Search and Secondary Index
+/// Make `settings` internally consistent before validation / persistence.
+/// Two normalizations, both in-place:
 ///
-/// IMPORTANT: This validation must account for DEFAULT index fields:
-/// - `_DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS` Default FTS fields: log, message, msg, content, data,
-///   body, json, error, errors
-/// - `_DEFAULT_SQL_SECONDARY_INDEX_SEARCH_FIELDS` Default Index fields: trace_id, service_name,
-///   operation_name
-/// - Plus any configured via ZO_FEATURE_FULLTEXT_EXTRA_FIELDS or
-///   ZO_FEATURE_SECONDARY_INDEX_EXTRA_FIELDS
+/// 1. **Dedup** each of `full_text_search_keys`, `index_fields`, `bloom_filter_fields`, and
+///    `partition_keys`, preserving first-occurrence order. Matches the silent dedup the update path
+///    has always done on `.add` lists, so a user re-adding the same field is a no-op rather than an
+///    error.
+/// 2. **Enforce `bloom ⊆ index`** by folding any bloom-only field into `index_fields` (and bumping
+///    `index_updated_at` if anything was added). Bloom is built by walking the tantivy term dict,
+///    so a bloom field that isn't in `index_fields` would silently produce no `.bf`; auto-folding
+///    here keeps the stored shape consistent with the runtime invariant.
 ///
-/// These defaults are not stored in StreamSettings but are applied at runtime,
-/// so we must use get_stream_setting_fts_fields() and get_stream_setting_index_fields()
-/// to get the complete list including defaults.
-///
-/// Note: Bloom Filter is independent and can coexist with either FTS or Secondary Index
-fn validate_index_field_conflicts(
-    current_settings: &config::meta::stream::StreamSettings,
-    new_settings: &config::meta::stream::UpdateStreamSettings,
-) -> Result<(), String> {
-    // Get the actual FTS and Index fields including defaults
-    let current_fts_with_defaults =
-        infra::schema::get_stream_setting_fts_fields(&Some(current_settings.clone()));
-    let current_index_with_defaults =
-        infra::schema::get_stream_setting_index_fields(&Some(current_settings.clone()));
+/// Called by [`save_stream_settings`] just before [`validate_stream_settings`],
+/// and by [`validate_update_pre_flight`] on its simulated state so both paths
+/// validate the same normalized shape.
+fn normalize_stream_settings(settings: &mut StreamSettings) {
+    // 1. dedup
+    dedup_preserve_order(&mut settings.full_text_search_keys);
+    dedup_preserve_order(&mut settings.index_fields);
+    dedup_preserve_order(&mut settings.bloom_filter_fields);
+    dedup_preserve_order(&mut settings.defined_schema_fields);
+    let mut seen: HashSet<String> = HashSet::new();
+    settings
+        .partition_keys
+        .retain(|p| seen.insert(p.field.clone()));
+    seen.clear();
+    settings
+        .distinct_value_fields
+        .retain(|d| seen.insert(d.name.clone()));
+    seen.clear();
+    settings
+        .extended_retention_days
+        .retain(|r| seen.insert(r.to_string()));
+    seen.clear();
+    settings.cross_links.retain(|c| seen.insert(c.to_string()));
 
-    // Simulate the final state after applying the update
-    let mut final_fts_fields: HashSet<String> = current_fts_with_defaults.iter().cloned().collect();
-    let mut final_index_fields: HashSet<String> =
-        current_index_with_defaults.iter().cloned().collect();
-
-    // Apply removes
-    for field in &new_settings.full_text_search_keys.remove {
-        final_fts_fields.remove(field);
-    }
-    for field in &new_settings.index_fields.remove {
-        final_index_fields.remove(field);
-    }
-
-    // Apply adds
-    for field in &new_settings.full_text_search_keys.add {
-        final_fts_fields.insert(field.clone());
-    }
-    for field in &new_settings.index_fields.add {
-        final_index_fields.insert(field.clone());
-    }
-
-    // Find fields that would exist in both FTS and Secondary Index
-    let conflicting_fields: Vec<String> = final_fts_fields
-        .intersection(&final_index_fields)
+    // 2. bloom ⊆ index
+    let missing_index: Vec<String> = settings
+        .bloom_filter_fields
+        .iter()
+        .filter(|f| !settings.index_fields.contains(f))
         .cloned()
         .collect();
-
-    if !conflicting_fields.is_empty() {
-        let field_names: Vec<String> = conflicting_fields
-            .iter()
-            .map(|s| format!("'{s}'"))
-            .collect();
-        return Err(format!(
-            "Field(s) {} cannot have both Full Text Search and Secondary Index. Please choose only one index type per field.",
-            field_names.join(", ")
-        ));
+    if !missing_index.is_empty() {
+        settings.index_fields.extend(missing_index);
+        settings.index_updated_at = now_micros();
     }
+}
 
-    Ok(())
+fn dedup_preserve_order(v: &mut Vec<String>) {
+    let mut seen: HashSet<String> = HashSet::new();
+    v.retain(|s| seen.insert(s.clone()));
 }
 
 pub async fn get_stream_retention(

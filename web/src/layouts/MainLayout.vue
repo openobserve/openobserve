@@ -15,13 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-layout
-    view="hHh Lpr lff"
-    :class="[store.state.printMode === true ? 'printMode' : '']"
+  <div
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
   >
-    <q-header>
+    <header class="o2-app-header tw:shrink-0">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <WebinarBanner v-if="config.isCloud === 'true'" variant="header" />
+      <div
+        v-if="config.isCloud === 'true'"
+        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+      >
+        <WebinarBanner variant="header" />
+      </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
       <Header
@@ -35,13 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-language="selectedLanguage"
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
-        :filtered-organizations="filteredOrganizations"
-        :search-query="searchQuery"
-        :rows-per-page="rowsPerPage"
+        :organizations="orgOptions"
         :is-hovered="isHovered"
         :get-btn-logo="getBtnLogo"
         @update:selected-org="selectedOrg = $event"
-        @update:search-query="searchQuery = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
@@ -54,92 +55,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open-predefined-themes="openPredefinedThemes"
         @signout="signout"
       />
-    </q-header>
+    </header>
 
-    <q-drawer
-      v-model="drawer"
-      show-if-above
-      :width="84"
-      :breakpoint="500"
-      role="navigation"
-      aria-label="Main navigation"
-      class="card-container q-mt-xs tw:mb-[0.675rem]"
-    >
-      <q-list class="leftNavList">
-        <menu-link
-          v-for="(nav, index) in linksList"
-          :key="nav.title"
-          :link-name="nav.name"
-          :animation-index="index"
-          v-bind="{ ...nav, mini: miniMode }"
-          @mouseenter="handleMenuHover(nav.link)"
-        />
-      </q-list>
-    </q-drawer>
-    <div class="row full-height no-wrap">
-      <!-- Left Panel -->
-      <div
-        class="col"
-        v-show="isLoading"
-        :style="{ width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%' }"
-        :key="store.state.selectedOrganization?.identifier"
-      >
-        <q-page-container v-if="isLoading">
-          <router-view v-slot="{ Component }">
-            <component :is="Component" @sendToAiChat="sendToAiChat" />
-          </router-view>
-        </q-page-container>
-      </div>
+    <div class="tw:flex-1 tw:flex tw:min-h-0">
+      <ONavbar
+        v-if="store.state.printMode !== true"
+        :links-list="linksList"
+        :mini-mode="miniMode"
+        :visible="leftDrawerOpen"
+        @menu-hover="handleMenuHover"
+      />
 
-      <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
-      <div
-        v-show="store.state.isAiChatEnabled && isLoading"
-        class="col-auto"
-        :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-        :style="store.state.isAiChatExpanded
-          ? 'position: fixed; top: 0; right: 0; width: 50%; max-width: 100%; min-width: 300px; height: 100vh; z-index: 200; background: var(--o2-card-bg-solid); box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15); padding-top: calc(var(--navbar-height) + 8px);'
-          : 'width: 25%; max-width: 100%; min-width: 75px; z-index: 10; padding-top: calc(var(--navbar-height) + 8px); padding-right: 0.625rem;'"
-      >
-        <O2AIChat
-          :header-height="42.5"
-          :is-open="store.state.isAiChatEnabled"
-          @close="closeChat"
-          :aiChatInputContext="aiChatInputContext"
-          :appendMode="aiChatAppendMode"
-          :aiChatPayload="aiChatPayload"
-        />
-      </div>
+      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
+        <!-- Main Panel -->
+        <main
+          data-test="main-content"
+          class="tw:flex tw:flex-col tw:min-h-0"
+          :style="{
+            width:
+              store.state.isAiChatEnabled && !store.state.isAiChatExpanded
+                ? '75%'
+                : '100%',
+          }"
+        >
+          <div
+            v-if="isLoading"
+            :key="store.state.selectedOrganization?.identifier"
+            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
+          >
+            <router-view v-slot="{ Component }">
+              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+            </router-view>
+          </div>
+        </main>
+
+        <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+        <aside
+          v-show="store.state.isAiChatEnabled && isLoading"
+          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
+          :class="[
+            store.state.theme == 'dark'
+              ? 'dark-mode-chat-container'
+              : 'light-mode-chat-container',
+            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
+          ]"
+          :style="[
+            {
+              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+            },
+            store.state.isAiChatExpanded
+              ? {
+                  position: 'fixed',
+                  top: 0,
+                  right: 0,
+                  width: '50%',
+                  maxWidth: '100%',
+                  minWidth: '18.75rem',
+                  height: '100vh',
+                  zIndex: 200,
+                }
+              : {
+                  width: '25%',
+                  maxWidth: '100%',
+                  minWidth: '4.688rem',
+                },
+          ]"
+        >
+          <O2AIChat
+            :header-height="42.5"
+            :is-open="store.state.isAiChatEnabled"
+            @close="closeChat"
+            :aiChatInputContext="aiChatInputContext"
+            :appendMode="aiChatAppendMode"
+            :aiChatPayload="aiChatPayload"
+          />
+        </aside>
+    </div>
     </div>
 
-    <q-dialog v-model="showGetStarted"
-maximized full-height>
+    <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
-    </q-dialog>
+    </ODialog>
     <PredefinedThemes />
-  </q-layout>
+  </div>
 </template>
 
 <script lang="ts">
-import {
-  QPage,
-  QPageContainer,
-  QLayout,
-  QDrawer,
-  QList,
-  QItem,
-  QItemLabel,
-  QItemSection,
-  QBtn,
-  QBtnDropdown,
-  QToolbarTitle,
-  QHeader,
-  QToolbar,
-  QAvatar,
-  QIcon,
-  QSelect,
-  useQuasar,
-} from "quasar";
-import MenuLink from "../components/MenuLink.vue";
+import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import Header from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -174,30 +176,11 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
-import streamService from "@/services/stream";
-import billings from "@/services/billings";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
-import {
-  outlinedHome,
-  outlinedSearch,
-  outlinedBarChart,
-  outlinedAccountTree,
-  outlinedDashboard,
-  outlinedWindow,
-  outlinedReportProblem,
-  outlinedFilterAlt,
-  outlinedPerson,
-  outlinedFormatListBulleted,
-  outlinedSettings,
-  outlinedManageAccounts,
-  outlinedDescription,
-  outlinedCode,
-  outlinedDevices,
-  outlinedNotificationsActive,
-} from "@quasar/extras/material-icons-outlined";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
@@ -207,6 +190,8 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
+import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -219,33 +204,18 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
-    "menu-link": MenuLink,
     Header,
     WebinarBanner,
     "keep-alive": KeepAlive,
-    "q-page": QPage,
-    "q-page-container": QPageContainer,
-    "q-layout": QLayout,
-    "q-drawer": QDrawer,
-    "q-list": QList,
-    "q-item": QItem,
-    "q-item-label": QItemLabel,
-    "q-item-section": QItemSection,
-    "q-btn": QBtn,
-    "q-btn-dropdown": QBtnDropdown,
-    "q-toolbar-title": QToolbarTitle,
-    "q-header": QHeader,
-    "q-toolbar": QToolbar,
+    ONavbar,
     "router-view": RouterView,
-    "q-avatar": QAvatar,
-    "q-icon": QIcon,
-    "q-select": QSelect,
     SlackIcon,
     ManagementIcon,
     ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
     GetStarted,
+    ODialog,
   },
   methods: {
     navigateToDocs() {
@@ -263,6 +233,9 @@ export default defineComponent({
     },
     signout() {
       this.closeSocket();
+
+      // Clear any open notifications so they don't carry over past logout.
+      dismissAll();
 
       // Stop session replay recording on logout
       if (this.store.state.zoConfig?.rum?.enabled) {
@@ -297,7 +270,7 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string; icon: string }) {
+    changeLanguage(item: { code: string; label: string }) {
       setLanguage(item.code);
       window.location.reload();
     },
@@ -306,7 +279,6 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const $q = useQuasar();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
@@ -324,26 +296,11 @@ export default defineComponent({
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
-    const aiChatAutoSend = ref(false);
-    const aiChatPayload = ref<{ text: string; autoSend: boolean; id: number } | null>(null);
-    const rowsPerPage = ref(10);
-    const searchQuery = ref("");
-
-    const filteredOrganizations = computed(() => {
-      //we will return all organizations if searchQuery is empty
-      //else we will search based upon label or identifier that we get from the search query
-      //if anyone of the orgs matches either label or identifier then we will return that orgs
-      if (!searchQuery.value) return orgOptions.value;
-      const toBeSearched = searchQuery.value.toLowerCase().trim();
-      return orgOptions.value.filter((org: any) => {
-        const labelMatch = org.label?.toLowerCase().includes(toBeSearched);
-        const identifierMatch = org.identifier
-          ?.toLowerCase()
-          .includes(toBeSearched);
-        return labelMatch || identifierMatch;
-      });
-    });
-
+    const aiChatPayload = ref<{
+      text: string;
+      autoSend: boolean;
+      id: number;
+    } | null>(null);
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
     )
@@ -351,17 +308,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const excludeParentRedirect = [
-      "pipeline",
-      "functionList",
-      "streamFunctions",
-      "enrichmentTables",
-      "alertList",
-      "alertDestinations",
-      "alertTemplates",
-      "/ingestion/",
-    ];
-
     const isActionsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -374,6 +320,14 @@ export default defineComponent({
         (config.isEnterprise == "true" || config.isCloud == "true") &&
         store.state.zoConfig.incidents_enabled
       );
+    });
+
+    // Backend `/config` flag `online_evals_enabled` — controlled by
+    // `ZO_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // of whether the config response arrived before or after this component
+    // mounted.
+    const isOnlineEvalsEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.online_evals_enabled);
     });
 
     const orgOptions = ref([{ label: Number, value: String }]);
@@ -390,62 +344,62 @@ export default defineComponent({
     var linksList = ref([
       {
         title: t("menu.home"),
-        icon: outlinedHome,
+        icon: "home",
         link: "/",
         exact: true,
         name: "home",
       },
       {
         title: t("menu.search"),
-        icon: outlinedSearch,
+        icon: "search",
         link: "/logs",
         name: "logs",
       },
       {
         title: t("menu.metrics"),
-        icon: outlinedBarChart,
+        icon: "bar-chart",
         link: "/metrics",
         name: "metrics",
       },
       {
         title: t("menu.traces"),
-        icon: outlinedAccountTree,
+        icon: "account-tree",
         link: "/traces",
         name: "traces",
       },
       {
         title: t("menu.rum"),
-        icon: outlinedDevices,
+        icon: "devices",
         link: "/rum",
         name: "rum",
       },
       {
         title: t("menu.dashboard"),
-        icon: outlinedDashboard,
+        icon: "dashboard",
         link: "/dashboards",
         name: "dashboards",
       },
       {
         title: t("menu.index"),
-        icon: outlinedWindow,
+        icon: "window",
         link: "/streams",
         name: "streams",
       },
       {
         title: t("menu.alerts"),
-        icon: outlinedReportProblem,
+        icon: "shield-alert-outline",
         link: "/alerts",
         name: "alertList",
       },
       {
         title: t("menu.ingestion"),
-        icon: outlinedFilterAlt,
+        icon: "data-plus-line",
         link: "/ingestion",
         name: "ingestion",
       },
       {
         title: t("menu.iam"),
-        icon: outlinedManageAccounts,
+        icon: "manage-accounts",
         link: "/iam",
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
@@ -456,57 +410,50 @@ export default defineComponent({
       {
         label: "English",
         code: "en-gb",
-        icon: "img:" + getImageURL("images/language_flags/en-gb.svg"),
       },
       {
         label: "Türkçe",
         code: "tr-turk",
-        icon: "img:" + getImageURL("images/language_flags/tr-turk.svg"),
       },
       {
         label: "简体中文",
         code: "zh-cn",
-        icon: "img:" + getImageURL("images/language_flags/zh-cn.svg"),
+      },
+      {
+        label: "繁體中文",
+        code: "zh-tw",
       },
       {
         label: "Français",
         code: "fr",
-        icon: "img:" + getImageURL("images/language_flags/fr.svg"),
       },
       {
         label: "Español",
         code: "es",
-        icon: "img:" + getImageURL("images/language_flags/es.svg"),
       },
       {
         label: "Deutsch",
         code: "de",
-        icon: "img:" + getImageURL("images/language_flags/de.svg"),
       },
       {
         label: "Italiano",
         code: "it",
-        icon: "img:" + getImageURL("images/language_flags/it.svg"),
       },
       {
         label: "日本語",
         code: "ja",
-        icon: "img:" + getImageURL("images/language_flags/ja.svg"),
       },
       {
         label: "한국어",
         code: "ko",
-        icon: "img:" + getImageURL("images/language_flags/ko.svg"),
       },
       {
         label: "Nederlands",
         code: "nl",
-        icon: "img:" + getImageURL("images/language_flags/nl.svg"),
       },
       {
         label: "Português",
         code: "pt",
-        icon: "img:" + getImageURL("images/language_flags/pt.svg"),
       },
     ];
 
@@ -535,10 +482,11 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible
-          ? "calc(36px + 27px)"
-          : "36px";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
+        document.documentElement.style.setProperty(
+          "--navbar-height",
+          navbarHeight,
+        );
       },
       { immediate: true },
     );
@@ -580,7 +528,7 @@ export default defineComponent({
         if (alertIndex !== -1 && !incidentExists) {
           linksList.value.splice(alertIndex + 1, 0, {
             title: t("menu.incidents"),
-            icon: outlinedNotificationsActive,
+            icon: "notifications-active",
             link: "/incidents",
             name: "incidentList",
           });
@@ -601,7 +549,7 @@ export default defineComponent({
         if (incidentIndex !== -1 && !actionExists) {
           linksList.value.splice(incidentIndex + 1, 0, {
             title: t("menu.actions"),
-            icon: outlinedCode,
+            icon: "code",
             link: "/actions",
             name: "actionScripts",
           });
@@ -612,9 +560,39 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
+    // Insert / remove the Evaluations menu entry based on the live config
+    // flag. Position: directly after Traces. Idempotent — safe to call from
+    // multiple lifecycle hooks.
+    const updateOnlineEvalsMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (link: any) => link.name === "onlineEvals",
+      );
+
+      if (isOnlineEvalsEnabled.value) {
+        if (existingIndex !== -1) return;
+        const tracesIndex = linksList.value.findIndex(
+          (link: any) => link.name === "traces",
+        );
+        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        linksList.value.splice(insertAt, 0, {
+          title: t("menu.evals"),
+          icon: "check-circle-outline",
+          link: "/online-evals",
+          name: "onlineEvals",
+        });
+      } else if (existingIndex !== -1) {
+        linksList.value.splice(existingIndex, 1);
+      }
+    };
+
+    // If `/config` resolves after this component mounted (or if the flag
+    // ever flips at runtime), keep the menu in sync.
+    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateOnlineEvalsMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
@@ -640,7 +618,7 @@ export default defineComponent({
     } else {
       linksList.value.splice(7, 0, {
         title: t("menu.report"),
-        icon: outlinedDescription,
+        icon: "description",
         link: "/reports",
         name: "reports",
       });
@@ -655,34 +633,6 @@ export default defineComponent({
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
-      }
-    }
-
-    const triggerRefreshToken = () => {
-      const expirationTimeUnix = store.state.userInfo.exp;
-
-      // Convert the expiration time to milliseconds
-      const expirationTimeMilliseconds = expirationTimeUnix * 1000;
-
-      // Get the current time in milliseconds
-      const currentTimeMilliseconds = Date.now();
-
-      // Calculate the time difference
-      const timeUntilNextAPICall =
-        expirationTimeMilliseconds - currentTimeMilliseconds - 100;
-
-      // Convert the time difference from milliseconds to seconds
-      const timeUntilNextAPICallInSeconds = timeUntilNextAPICall / 1000;
-
-      // setTimeout(() => {
-      //   mainLayoutMixin.setup().getRefreshToken();
-      // }, timeUntilNextAPICallInSeconds);
-    };
-
-    //get refresh token for cloud environment
-    if (store.state.hasOwnProperty("userInfo") && store.state.userInfo.email) {
-      if (config.isCloud == "true") {
-        triggerRefreshToken();
       }
     }
 
@@ -748,8 +698,8 @@ export default defineComponent({
           if (currentPath.indexOf("/iam") !== -1) {
             return;
           }
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message:
               "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
             timeout: 5000,
@@ -1085,11 +1035,23 @@ export default defineComponent({
     const toggleAIChat = () => {
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
+        window.dispatchEvent(
+          new CustomEvent("o2:home-switch-tab", { detail: "ai" }),
+        );
         return;
       }
-      const isEnabled = !store.state.isAiChatEnabled;
-      store.dispatch("setIsAiChatEnabled", isEnabled);
+      if (!store.state.isAiChatEnabled) {
+        // Closed → Open tw:inline sidebar
+        store.dispatch("setIsAiChatEnabled", true);
+        store.dispatch("setIsAiChatExpanded", false);
+      } else if (!store.state.isAiChatExpanded) {
+        // Inline sidebar → Close
+        store.dispatch("setIsAiChatEnabled", false);
+        store.dispatch("setIsAiChatExpanded", false);
+      } else {
+        // Expanded overlay → Back to tw:inline sidebar
+        store.dispatch("setIsAiChatExpanded", false);
+      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -1100,13 +1062,15 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
+      if (store.state.theme === "dark") {
+        return getImageURL("images/common/ai_icon_dark.svg");
+      }
+
       if (isHovered.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
-      return store.state.theme === "dark"
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
+      return getImageURL("images/common/ai_icon_gradient.svg");
     });
     //this will be the function used to cancel the get started dialog and remove the isFirstTimeLogin from local storage
     //this will be called from the get started component whenever users clicks on the submit button
@@ -1115,7 +1079,11 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
+    const sendToAiChat = (
+      value: any,
+      append: boolean = true,
+      autoSend: boolean = false,
+    ) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
@@ -1138,7 +1106,9 @@ export default defineComponent({
       aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = text;
-        nextTick(() => { aiChatInputContext.value = ""; });
+        nextTick(() => {
+          aiChatInputContext.value = "";
+        });
       });
     };
 
@@ -1154,14 +1124,11 @@ export default defineComponent({
       prefetchRoute(routePath);
     };
 
-    //this is the used to set the selected org to the user clicked org because all the operations are happening on the selected org
-    //to make sync with the user clicked org
-    //we dont need search query after selectedOrg has been changed so resetting it
+    // Sync the user-clicked org with the selected org
     watch(
       selectedOrg,
       (newVal) => {
         userClickedOrg.value = newVal;
-        searchQuery.value = "";
       },
       { immediate: true },
     );
@@ -1176,7 +1143,7 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: false,
+      leftDrawerOpen: true,
       miniMode,
       user,
       zoBackendUrl,
@@ -1186,12 +1153,11 @@ export default defineComponent({
       setSelectedOrganization,
       getOrganizationSettings,
       resetStreams,
-      triggerRefreshToken,
       prefetch,
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
-      outlinedSettings,
+      "settings": "settings",
       closeSocket,
       splitterModel,
       toggleAIChat,
@@ -1203,10 +1169,8 @@ export default defineComponent({
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,
+      aiChatPayload,
       userClickedOrg,
-      searchQuery,
-      filteredOrganizations,
-      rowsPerPage,
       verifyStreamExist,
       filterMenus,
       updateActionsMenu,
@@ -1245,6 +1209,8 @@ export default defineComponent({
     async changeOrganizationIdentifier() {
       this.isLoading = false;
       this.resetStreams();
+      // Clear notifications from the previous org — they no longer apply.
+      dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");
       this.store.dispatch("resetOrganizationData", {});
 
@@ -1265,565 +1231,23 @@ export default defineComponent({
         this.selectedOrg = matchingOrg;
       }
     },
-    changeUserInfo(newVal) {
-      if (JSON.stringify(newVal) != "{}") {
-        this.triggerRefreshToken();
-      }
-    },
   },
 });
 </script>
 
 <style lang="scss">
 @import "../styles/app.scss";
-@import "../styles/menu-variables";
-@import "../styles/menu-animations";
+</style>
 
-// Logo container
-.logo-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  min-width: 150px;
-}
-
-// OpenObserve logo styling
-.openobserve-logo {
-  height: 32px;
-  width: auto;
-  max-width: 150px;
-  display: block;
-  transition: opacity 0.2s ease;
-
-  &:hover {
-    opacity: 0.8;
-  }
-}
-
+<style lang="scss" scoped>
+// Print mode — hide header + sidebar, show body overflow
 .printMode {
-  body {
+  :global(body) {
     overflow: auto !important;
   }
-  .q-header {
+
+  .o2-app-header {
     display: none;
   }
-
-  .q-drawer {
-    display: none;
-  }
-
-  .q-page-container {
-    padding-left: 0px !important;
-  }
-}
-
-@media print {
-  .tw:h-full,
-  .tw:h-\[calc\(100vh-105px\)\],
-  .tw:overflow-y-auto {
-    overflow: visible !important;
-  }
-}
-
-.q-drawer {
-  border-radius: 0.625rem;
-}
-
-.warning-msg {
-  background-color: var(--q-warning);
-  padding: 5px;
-  border-radius: 5px;
-}
-
-.alert-msg {
-  background-color: var(--q-alert);
-  padding: 5px;
-  border-radius: 5px;
-}
-
-.q-header .q-btn-dropdown__arrow {
-  margin-left: -4px;
-}
-
-.q-header {
-  color: unset;
-
-  .beta-text {
-    font-size: 11px;
-    right: 1px;
-    bottom: -9px;
-  }
-
-  .appLogo {
-    width: 120px;
-    max-width: 150px;
-    max-height: 31px;
-    cursor: pointer;
-
-    &__mini {
-      margin-right: 0.25rem;
-      // margin-left: 0.25rem;
-      height: 30px;
-      width: 30px;
-    }
-  }
-}
-
-.q-toolbar {
-  min-height: 40px;
-}
-
-.headerMenu {
-  margin-right: 1rem;
-
-  .block {
-    font-weight: 700;
-    color: #404040;
-  }
-}
-
-.q-item {
-  min-height: 30px;
-  padding: 3px 8px;
-}
-
-.o2-bg-color {
-  // background-color: rgba(89, 96, 178, 0.08);
-  background: transparent;
-}
-
-.q-list {
-  &.leftNavList {
-    padding: 4px 0px 0px 0px;
-
-    .q-item {
-      margin: 0px 5px;
-      display: list-item;
-      text-align: center;
-      list-style: none;
-      padding: 2px 2px;
-      border-radius: 5px;
-
-      .q-icon {
-        height: 1.3rem;
-        width: 1.3rem;
-      }
-
-      .q-item__label {
-        padding-bottom: 4px;
-      }
-
-      &.q-router-link--active {
-        .q-icon img {
-          filter: brightness(100);
-        }
-
-        .q-item__label {
-          color: var(--o2-menu-color);
-
-          // Light mode: make text blue for readability
-          body.body--light & {
-            color: #19191e !important;
-          }
-          // Dark mode: make text blue for readability
-          body.body--dark & {
-            color: #ffffff !important;
-          }
-        }
-        color: var(--o2-menu-color);
-
-        // Light mode: make item text blue
-        body.body--light & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #19191e !important;
-          }
-        }
-
-        // Dark mode: make item text blue
-        body.body--dark & {
-          color: var(--o2-menu-color) !important;
-
-          .q-icon {
-            color: #ffffff !important;
-          }
-        }
-      }
-
-      &__label {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--o2-text-secondary);
-      }
-    }
-  }
-
-  .flagIcon img {
-    border-radius: 3px;
-    object-fit: cover;
-    display: block;
-    height: 16px;
-    width: 24px;
-  }
-
-  .q-item {
-    &__section {
-      &--avatar {
-        padding-right: 0px !important;
-        min-width: 1.5rem;
-        display: list-item;
-        text-align: center;
-        list-style: none;
-      }
-    }
-
-    &__label {
-      font-weight: 400;
-    }
-
-    &.activeLang {
-      &__label {
-        font-weight: 600;
-        color: $primary;
-      }
-    }
-  }
-}
-
-.userInfo {
-  align-items: flex-start;
-  flex-direction: column;
-  margin-left: 0.875rem;
-  margin-right: 1rem;
-  display: flex;
-
-  .userName {
-    line-height: 1.25rem;
-    font-weight: 700;
-  }
-
-  .userRole {
-    font-size: 0.75rem;
-    line-height: 1rem;
-    color: #565656;
-    font-weight: 600;
-  }
-}
-
-.headerMenu {
-  margin-right: 1rem;
-
-  .block {
-    font-weight: 700;
-    color: #404040;
-  }
-}
-.q-list {
-  // &.leftNavList {
-  //   .q-item {
-  //     .q-icon {
-  //       height: 1rem;
-  //       width: 1rem;
-  //     }
-
-  //     &.q-router-link--active {
-  //       .q-icon img {
-  //         filter: brightness(100);
-  //       }
-  //     }
-  //   }
-  // }
-
-  .flagIcon img {
-    border-radius: 3px;
-    object-fit: cover;
-    display: block;
-    height: 16px;
-    width: 24px;
-  }
-
-  .q-item {
-    &__section {
-      &--avatar {
-        padding-right: 0.875rem;
-        min-width: 1.5rem;
-      }
-    }
-
-    &__label {
-      font-weight: 400;
-    }
-
-    &.activeLang {
-      &__label {
-        font-weight: 600;
-        color: $primary;
-      }
-    }
-  }
-}
-
-.userInfo {
-  align-items: flex-start;
-  flex-direction: column;
-  margin-left: 0.875rem;
-  margin-right: 1rem;
-  display: flex;
-
-  .userName {
-    line-height: 1.25rem;
-    font-weight: 700;
-  }
-
-  .userRole {
-    font-size: 0.75rem;
-    line-height: 1rem;
-    color: #565656;
-    font-weight: 600;
-  }
-}
-
-.dark-mode {
-  background-color: $dark-page;
-}
-
-.languagelist {
-  .q-item {
-    padding: 4px 8px;
-  }
-}
-
-.text-powered-by {
-  float: left;
-  display: inline-block;
-  position: absolute;
-  margin-top: 16px;
-  margin-left: 0px;
-}
-
-.custom-text-logo {
-  display: inline-block;
-  float: left;
-  position: absolute;
-  margin-left: 72px !important;
-  margin-top: 16px !important;
-  width: 80px !important;
-}
-
-.header-menu {
-  display: flex;
-  align-items: center;
-
-  .q-btn,
-  [data-o2-btn] {
-    transition: transform 0.2s ease;
-
-    &:hover {
-      transform: translateY(-2px);
-    }
-
-    // Skip bounce effect for AI button and org selector
-    &.ai-hover-btn {
-      &:hover {
-        transform: none;
-      }
-    }
-  }
-
-  // Skip bounce for org selector (inside div)
-  [data-test="navbar-organizations-select"] .q-btn,
-  [data-test="navbar-organizations-select"] [data-o2-btn] {
-    &:hover {
-      transform: none;
-    }
-  }
-}
-
-.header-icon {
-  opacity: 0.7;
-}
-
-body.ai-chat-open {
-  .q-layout {
-    width: 75%;
-    transition: width 0.3s ease;
-  }
-}
-
-.q-layout {
-  width: 100%;
-  transition: width 0.3s ease;
-}
-
-.o2-button {
-  border-radius: 4px;
-  padding: 0px 8px;
-  color: white;
-}
-.dark-mode-chat-container {
-}
-.light-mode-chat-container {
-}
-
-
-.ai-btn-active {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-
-  .header-icon {
-    opacity: 1 !important;
-  }
-}
-.ai-btn-active:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-}
-.ai-hover-btn {
-  background: linear-gradient(
-    135deg,
-    rgba(139, 92, 246, 0.15) 0%,
-    rgba(236, 72, 153, 0.15) 100%
-  ) !important;
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.ai-hover-btn:hover {
-  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
-  box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
-}
-
-.ai-icon {
-  transition: transform 0.6s ease;
-}
-
-.ai-hover-btn:hover .ai-icon {
-  transform: rotate(180deg);
-}
-
-.theme-btn-active {
-  background: color-mix(
-    in srgb,
-    var(--o2-theme-color) 15%,
-    transparent 85%
-  ) !important;
-
-  .header-icon {
-    opacity: 1 !important;
-    color: var(--o2-theme-color) !important;
-  }
-}
-
-.organization-menu-o2 {
-  // Disable hover for organization menu dropdown
-  // Disable table row hover
-  .q-tr:hover,
-  tr:hover,
-  tbody tr:hover,
-  tbody .q-tr:hover {
-    background-color: transparent !important;
-    background: transparent !important;
-  }
-
-  td:hover,
-  .q-td:hover {
-    background-color: transparent !important;
-    background: transparent !important;
-  }
-
-  // Disable default q-item hover
-  .q-item:hover {
-    background-color: transparent !important;
-    background: transparent !important;
-    color: inherit !important;
-  }
-
-  .org-table {
-    // Disable global table row hover
-    tbody .q-tr:hover {
-      background: transparent !important;
-    }
-
-    td {
-      padding: 0 !important;
-      height: 32px !important;
-      min-height: 32px !important;
-    }
-
-    .q-table__top {
-      padding: 10px !important;
-
-      .q-field__control {
-        height: 40px;
-      }
-
-      input {
-        font-size: 14px;
-      }
-    }
-
-    .q-table__bottom {
-      padding: 8px 12px !important;
-      min-height: 40px;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-
-      .q-table__control {
-        display: flex !important;
-        align-items: center !important;
-      }
-
-      // Ensure pagination arrows are visible
-      .q-btn {
-        display: inline-flex !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-      }
-    }
-
-    // Table cell with no padding
-    .org-list-item-cell {
-      padding: 0 !important;
-      cursor: pointer;
-    }
-
-    // Individual org menu item
-    .org-menu-item {
-      padding: 6px 12px;
-      width: 100%;
-      display: block;
-      transition: background-color 0.2s ease;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 13px;
-
-      // Enable hover only for individual org menu items
-      &:hover {
-        background-color: var(--o2-hover-accent) !important;
-        border-radius: 4px;
-      }
-
-      // Active/selected state
-      &--active {
-        color: var(--q-primary) !important;
-        font-weight: 500;
-        background: rgba(89, 96, 178, 0.08);
-
-        &:hover {
-          background: rgba(89, 96, 178, 0.12) !important;
-        }
-      }
-    }
-  }
-}
-.q-drawer {
-  margin-bottom: 0.675rem;
 }
 </style>

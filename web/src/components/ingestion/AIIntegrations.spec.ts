@@ -2,11 +2,9 @@
 
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-installQuasar();
 
 const mockReplace = vi.fn();
 const mockCurrentRoute = { value: { name: "ai-integrations" } };
@@ -36,7 +34,7 @@ describe("AIIntegrations", () => {
         plugins: [store, i18n],
         stubs: {
           "q-input": true,
-          "q-icon": true,
+          "OIcon": true,
           "router-view": true,
           "q-tabs": {
             template: '<div class="q-tabs-stub"><slot /></div>',

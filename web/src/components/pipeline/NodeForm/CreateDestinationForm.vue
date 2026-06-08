@@ -16,29 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="create-destination-form">
-    <q-form
-      ref="destinationForm"
+    <OForm
+      :default-values="formDefaultValues"
       @submit="createDestination"
-      class="col-12 pipeline-add-remote-destination-form"
+      class="tw:w-full pipeline-add-remote-destination-form"
     >
       <!-- Stepper for Create New Destination -->
-      <q-stepper
+      <OStepper
         v-model="step"
         ref="stepper"
-        color="primary"
         animated
-        flat
-        class="modern-stepper"
       >
         <!-- Step 1: Choose Destination Type -->
-        <q-step
+        <OStep
           :name="1"
           title="Choose Type"
-          icon="category"
+          icon="edit"
           :done="step > 1"
-          :header-nav="step > 1"
+          :navigable="step > 1"
         >
-          <div class="text-subtitle2 q-mb-md" style="font-weight: 500">
+          <div class="tw:text-sm tw:font-medium tw:mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
           <div class="destination-type-grid">
@@ -59,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :alt="destType.label"
                 class="card-image"
               />
-              <q-icon
+              <OIcon
                 v-else
                 :name="destType.icon"
-                size="28px"
+                size="lg"
                 class="card-icon"
               />
               <div class="card-label">{{ destType.label }}</div>
@@ -71,426 +68,286 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="check-icon"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                <q-icon name="check_circle" size="20px" color="positive" />
+                <OIcon name="check" size="xs" />
               </div>
             </div>
           </div>
-        </q-step>
+        </OStep>
 
         <!-- Step 2: Connection Details -->
-        <q-step
+        <OStep
           :name="2"
           title="Connection"
-          icon="settings_ethernet"
+          icon="compare-arrows"
           :done="step > 2"
-          :header-nav="step > 2"
+          :navigable="step > 2"
         >
-          <div class="text-subtitle2 q-mb-lg" style="font-weight: 500">
+          <div class="tw:text-sm tw:font-medium tw:mb-4" style="font-weight: 500">
             Connection Details
           </div>
 
-          <div class="q-gutter-sm">
-            <q-input
+          <div class="tw:flex tw:flex-col tw:gap-4">
+            <OFormInput
               data-test="add-destination-name-input"
               v-model="formData.name"
+              name="name"
               :label="t('alerts.name') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val
-                    ? isValidResourceName(val) ||
-                      `Characters like :, ?, /, #, and spaces are not allowed.`
-                    : t('common.nameRequired'),
+              :validators="[
+                (val: string | number | undefined) => !val ? t('common.nameRequired') : !isValidResourceName(String(val)) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : undefined,
               ]"
               tabindex="0"
-            ></q-input>
+            />
 
-            <q-input
+            <OFormInput
               data-test="add-destination-url-input"
               v-model="formData.url"
+              name="url"
               :label="t('alert_destinations.url') + ' *'"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) => !!val.trim() || 'Field is required!',
-                (val: any) =>
-                  !val.trim().endsWith('/') ||
-                  'URL should not end with a trailing slash',
+              :validators="[
+                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined,
+                (val: string | number | undefined) => String(val ?? '').trim().endsWith('/') ? 'URL should not end with a trailing slash' : undefined,
               ]"
+              help-text="Base URL without trailing slash (e.g., https://your-domain.com)"
               tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption"
-                  >Base URL without trailing slash (e.g.,
-                  https://your-domain.com)</span
-                >
-              </template>
-            </q-input>
+            />
 
             <!-- OpenObserve Organization and Stream fields -->
             <div
               v-if="formData.destination_type === 'openobserve'"
-              class="row q-col-gutter-xs q-mt-xs q-ml-xs"
+              class="tw:flex tw:gap-4"
             >
-              <div class="col-6">
-                <q-input
+              <div class="tw:w-1/2">
+                <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   v-model="openobserveOrg"
+                  name="org"
                   :label="'Organization *'"
                   :placeholder="'e.g., default'"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() ||
-                      'Organization is required for OpenObserve',
+                  :validators="[
+                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Organization is required for OpenObserve' : undefined,
                   ]"
+                  help-text="OpenObserve organization identifier"
                   tabindex="0"
-                >
-                  <template #hint>
-                    <span class="text-caption">
-                      OpenObserve organization identifier
-                    </span>
-                  </template>
-                </q-input>
+                />
               </div>
-              <div class="col-6">
-                <q-input
+              <div class="tw:w-1/2">
+                <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   v-model="openobserveStream"
+                  name="stream"
                   :label="'Stream Name *'"
                   :placeholder="'e.g., default'"
-                  class="no-border showLabelOnTop"
-                  borderless
-                  dense
-                  flat
-                  stack-label
-                  :rules="[
-                    (val: any) =>
-                      !!val?.trim() ||
-                      'Stream name is required for OpenObserve',
+                  :validators="[
+                    (val: string | number | undefined) => !String(val ?? '').trim() ? 'Stream name is required for OpenObserve' : undefined,
                   ]"
+                  help-text="OpenObserve stream name"
                   tabindex="0"
-                >
-                  <template #hint>
-                    <span class="text-caption"> OpenObserve stream name </span>
-                  </template>
-                </q-input>
+                />
               </div>
             </div>
 
-            <!-- Endpoint Path field - shown for all destination types -->
-            <q-input
+            <OFormInput
               data-test="add-destination-url-endpoint-input"
               v-model="formData.url_endpoint"
+              name="url_endpoint"
               :label="
                 formData.destination_type === 'custom'
                   ? 'Endpoint Path'
                   : 'Endpoint Path *'
               "
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              bottom-slots
-              :disable="formData.destination_type !== 'custom'"
-              :rules="[
-                ...(formData.destination_type === 'custom'
-                  ? []
-                  : [(val: any) => !!val.trim() || 'Field is required!']),
-                (val: any) =>
-                  !val.trim() ||
-                  val.trim().startsWith('/') ||
-                  'Endpoint path must start with /',
+              :disabled="formData.destination_type !== 'custom'"
+              :validators="[
+                ...(formData.destination_type !== 'custom'
+                  ? [(val: string | number | undefined) => !String(val ?? '').trim() ? 'Field is required!' : undefined]
+                  : []),
+                (val: string | number | undefined) =>
+                  String(val ?? '').trim() && !String(val ?? '').trim().startsWith('/')
+                    ? 'Endpoint path must start with /'
+                    : undefined,
               ]"
+              help-text="Path will be appended to base URL (must start with /)"
               tabindex="0"
-            >
-              <template #hint>
-                <span class="text-caption">
-                  Path will be appended to base URL (must start with /)
-                </span>
-              </template>
-            </q-input>
+            />
             <!-- Method field - only shown for Custom destination type -->
-            <q-select
+            <OFormSelect
               v-if="formData.destination_type === 'custom'"
               data-test="add-destination-method-select"
               v-model="formData.method"
+              name="method"
               :label="t('alert_destinations.method') + ' *'"
               :options="apiMethods"
-              class="no-border showLabelOnTop"
-              borderless
-              dense
-              flat
-              stack-label
-              :popup-content-style="{ textTransform: 'uppercase' }"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
               tabindex="0"
             />
 
             <!-- Output Format field - disabled for all except Custom -->
-            <q-select
+            <OFormSelect
               data-test="add-destination-output-format-select"
               v-model="formData.output_format"
+              name="output_format"
               :label="t('alert_destinations.output_format') + ' *'"
               :options="outputFormats"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              emit-value
-              map-options
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              :disable="formData.destination_type !== 'custom'"
+              labelKey="label"
+              valueKey="value"
+              :validators="[(val: any) => !val ? 'Field is required!' : undefined]"
+              :disabled="formData.destination_type !== 'custom'"
               tabindex="0"
             />
 
             <!-- ESBulk Index Name field - only shown when output format is esbulk -->
-            <q-input
+            <OFormInput
               v-if="formData.output_format === 'esbulk'"
               data-test="add-destination-esbulk-index-input"
               v-model="formData.esbulk_index"
+              name="esbulk_index"
               :label="'ESBulk Index Name *'"
               :placeholder="'Enter index name (e.g., logs, events)'"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  !!val?.trim() || 'Index name is required for ESBulk format',
+              :validators="[
+                (val: string | number | undefined) => !String(val ?? '').trim() ? 'Index name is required for ESBulk format' : undefined,
               ]"
+              help-text="Index name where data will be written in Elasticsearch"
               tabindex="0"
-            >
-              <template v-slot:hint>
-                Index name where data will be written in Elasticsearch
-              </template>
-            </q-input>
+            />
 
             <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
-            <q-input
+            <OFormInput
               v-if="formData.output_format === 'stringseparated'"
               data-test="add-destination-separator-input"
               v-model="formData.separator"
+              name="separator"
               :label="t('alert_destinations.separator') + ' *'"
               :placeholder="t('alert_destinations.separator_placeholder')"
-              class="no-border showLabelOnTop q-mt-sm"
-              borderless
-              dense
-              flat
-              stack-label
-              :rules="[
-                (val: any) =>
-                  (val !== null && val !== undefined && val !== '') ||
-                  'Separator is required for StringSeparated format',
+              :validators="[
+                (val: string | number | undefined) =>
+                  (val === null || val === undefined || val === '')
+                    ? 'Separator is required for StringSeparated format'
+                    : undefined,
               ]"
+              :help-text="t('alert_destinations.separator_hint')"
               tabindex="0"
-            >
-              <template v-slot:hint>
-                {{ t('alert_destinations.separator_hint') }}
-              </template>
-            </q-input>
+            />
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="q-gutter-sm q-mt-md">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
+          <div v-if="showMetadataFields" class="tw:flex tw:flex-col tw:gap-4 tw:mt-4">
+            <div class="tw:w-full tw:text-[14px] tw:font-bold header-label">
               Metadata Configuration
             </div>
 
             <!-- Splunk Metadata Fields -->
             <template v-if="formData.destination_type === 'splunk'">
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-source-input"
                 v-model="formData.metadata!.source"
                 :label="'Source'"
                 :placeholder="'Enter source (e.g., http:my_source)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
+                help-text="Splunk source field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk source field for event metadata
-                </template>
-              </q-input>
+              />
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-sourcetype-input"
                 v-model="formData.metadata!.sourcetype"
                 :label="'Source Type'"
                 :placeholder="'Enter source type (e.g., _json)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
+                help-text="Splunk sourcetype field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk sourcetype field for event metadata
-                </template>
-              </q-input>
+              />
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
+                help-text="Splunk host field for event metadata"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Splunk host field for event metadata
-                </template>
-              </q-input>
+              />
             </template>
 
             <!-- Datadog Metadata Fields -->
             <template v-if="formData.destination_type === 'datadog'">
-              <q-input
+              <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
                 v-model="formData.metadata!.ddsource"
+                name="ddsource"
                 :label="'DD Source *'"
                 :placeholder="'Enter source (e.g., nginx, java)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Source is required for Datadog',
+                :validators="[
+                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Source is required for Datadog' : undefined,
                 ]"
+                help-text="Source attribute for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Source attribute for Datadog logs
-                </template>
-              </q-input>
+              />
 
-              <q-input
+              <OFormInput
                 data-test="add-destination-metadata-ddtags-input"
                 v-model="formData.metadata!.ddtags"
+                name="ddtags"
                 :label="'DD Tags *'"
                 :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
-                :rules="[
-                  (val: any) =>
-                    !!val?.trim() || 'DD Tags are required for Datadog',
+                :validators="[
+                  (val: string | number | undefined) => !String(val ?? '').trim() ? 'DD Tags are required for Datadog' : undefined,
                 ]"
+                help-text="Comma-separated tags for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint>
-                  Comma-separated tags for Datadog logs
-                </template>
-              </q-input>
+              />
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-service-input"
                 v-model="formData.metadata!.service"
                 :label="'Service'"
                 :placeholder="'Enter service name (e.g., api-gateway)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
+                help-text="Service name for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint> Service name for Datadog logs </template>
-              </q-input>
+              />
 
-              <q-input
+              <OInput
                 data-test="add-destination-metadata-hostname-input"
                 v-model="formData.metadata!.hostname"
                 :label="'Hostname'"
                 :placeholder="'Enter hostname (e.g., server01)'"
-                class="no-border showLabelOnTop"
-                borderless
-                dense
-                flat
-                stack-label
+                help-text="Hostname for Datadog logs"
                 tabindex="0"
-              >
-                <template v-slot:hint> Hostname for Datadog logs </template>
-              </q-input>
+              />
             </template>
 
           </div>
 
-          <div class="q-gutter-sm">
-            <div class="col-12 tw:text-[14px] tw:font-bold header-label">
+          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-4">
+            <div class="o-input-label tw:leading-tight tw:flex tw:items-center">
               Headers
             </div>
+            <div class="tw:flex tw:flex-col tw:gap-2">
             <div
               v-for="(header, index) in apiHeaders"
               :key="header.uuid"
-              class="row q-col-gutter-xs q-ml-xs"
+              class="tw:flex tw:gap-1"
             >
-              <div class="col-5">
-                <q-input
+              <div class="tw:w-5/12">
+                <OInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   v-model="header.key"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
                   :placeholder="t('alert_destinations.api_header')"
-                  dense
                   tabindex="0"
                 />
               </div>
-              <div class="col-5">
-                <q-input
+              <div class="tw:w-5/12">
+                <OInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   v-model="header.value"
                   :placeholder="t('alert_destinations.api_header_value')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  outlined
-                  filled
-                  dense
                   tabindex="0"
                 />
               </div>
-              <div class="col-2 headers-btns">
+              <div class="tw:w-1/6 headers-btns">
                 <OButton
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="deleteApiHeader(header)"
-                >
-                  <template #icon-left>
-                    <Trash2 class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="delete"
+                />
                 <OButton
                   data-test="add-destination-add-header-btn"
                   v-if="index === apiHeaders.length - 1"
@@ -498,77 +355,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-xs-sq"
                   :title="t('alert_templates.edit')"
                   @click="addApiHeader()"
-                >
-                  <template #icon-left>
-                    <Plus class="tw:size-3.5 tw:shrink-0" />
-                  </template>
-                </OButton>
+                  icon-left="add"
+                />
               </div>
+            </div>
             </div>
           </div>
 
-          <div class="col-12 q-mt-md tw:inline-flex">
-            <q-toggle
+          <div class="tw:w-full tw:mt-3 tw:inline-flex">
+            <OSwitch
               data-test="add-destination-skip-tls-verify-toggle"
-              class="o2-toggle-button-xs q-mt-sm tw:inline-flex"
-              size="xs"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-toggle-button-xs-dark'
-                  : 'o2-toggle-button-xs-light'
-              "
               v-model="formData.skip_tls_verify"
               :label="t('alert_destinations.skip_tls_verify')"
             />
           </div>
 
           <!-- Connection Notes Card -->
-          <q-card
-            flat
-            bordered
-            class="connection-notes-card q-mb-lg q-mt-md"
-            :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-blue-1'"
+          <OCard
+            class="connection-notes-card tw:mb-6 tw:mt-4 tw:!bg-[var(--color-banner-info-bg)]"
           >
-            <q-card-section>
-              <div class="row items-center q-mb-sm">
-                <q-icon
+            <OCardSection role="body">
+              <div class="tw:flex tw:items-center tw:mb-2">
+                <OIcon
                   name="info"
-                  color="primary"
-                  size="20px"
-                  class="q-mr-sm"
+                  size="md"
+                  class="tw:mr-2"
                 />
-                <div class="text-subtitle2 text-weight-medium">
+                <div class="tw:text-sm tw:font-medium text-weight-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
-              <div class="text-body2">
-                <ol class="connection-steps q-pl-md q-mb-none">
+              <div class="tw:text-sm">
+                <ol class="connection-steps tw:pl-3 tw:mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="q-mb-xs"
+                    class="tw:mb-1"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="q-mt-sm q-pa-sm example-url"
+                  class="tw:mt-2 tw:p-2 example-url"
                   :class="
-                    store.state.theme === 'dark' ? 'bg-grey-8' : 'bg-white'
+                    store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'
                   "
                 >
                   <strong>Example:</strong>
-                  <code class="q-ml-xs">{{ connectionNotes.example }}</code>
+                  <code class="tw:ml-1">{{ connectionNotes.example }}</code>
                 </div>
               </div>
-            </q-card-section>
-          </q-card>
-        </q-step>
-      </q-stepper>
+            </OCardSection>
+          </OCard>
+        </OStep>
+      </OStepper>
 
       <!-- Form buttons -->
-      <div class="flex justify-start q-mb-md">
+      <div class="tw:flex tw:justify-start tw:mb-3">
         <div v-if="step === 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step1-cancel-btn"
@@ -615,21 +459,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
-    </q-form>
+    </OForm>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch } from "vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { Trash2, Plus } from "lucide-vue-next";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
+import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Props
 const props = defineProps<{
@@ -637,13 +490,16 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const q = useQuasar();
 const store = useStore();
 const { t } = useI18n();
 
 const isEditMode = computed(() => !!props.destination);
 
-const apiMethods = ["get", "post", "put"];
+const apiMethods = [
+  { label: "GET", value: "get" },
+  { label: "POST", value: "post" },
+  { label: "PUT", value: "put" },
+];
 const outputFormats = [
   { label: "JSON", value: "json" },
   { label: "NDJSON", value: "ndjson" },
@@ -685,7 +541,7 @@ const destinationTypes = [
   {
     label: "Newrelic",
     value: "newrelic",
-    icon: "monitor_heart",
+    icon: "monitor-heart",
     image: getImageURL("images/pipeline/newrelic.png"),
   },
   {
@@ -696,7 +552,6 @@ const destinationTypes = [
   },
 ];
 
-const destinationForm = ref(null);
 const step = ref(1);
 
 const formData: Ref<DestinationData> = ref({
@@ -982,6 +837,23 @@ watch(
   { immediate: true },
 );
 
+// Snapshot of all field values for OForm defaultValues.
+// Defined AFTER the immediate watch above so that edit-mode values
+// (set synchronously by populateFormForEdit) are captured correctly.
+const formDefaultValues = {
+  name: formData.value.name,
+  url: formData.value.url,
+  url_endpoint: formData.value.url_endpoint,
+  method: formData.value.method,
+  output_format: formData.value.output_format ?? "json",
+  esbulk_index: formData.value.esbulk_index ?? "",
+  separator: formData.value.separator ?? "",
+  org: openobserveOrg.value,
+  stream: openobserveStream.value,
+  ddsource: formData.value.metadata?.ddsource ?? "",
+  ddtags: formData.value.metadata?.ddtags ?? "",
+};
+
 // Watch destination_type changes to ensure method is set to "post" for non-custom types
 watch(
   () => formData.value.destination_type,
@@ -1220,18 +1092,18 @@ const connectionNotes = computed(() => {
 
 const createDestination = () => {
   if (!isValidDestination.value) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: "Please fill required fields",
       timeout: 1500,
     });
     return;
   }
-  const dismiss = q.notify({
-    spinner: true,
+  const dismiss = toast({
+    variant: "loading",
     message: "Please wait...",
-    timeout: 2000,
-  });
+      timeout: 0,
+});
   const headers: Headers = {};
   apiHeaders.value.forEach((header) => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
@@ -1300,8 +1172,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1323,8 +1195,8 @@ const createDestination = () => {
           return;
         }
         dismiss();
-        q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: err.response?.data?.error || err.response?.data?.message,
         });
       });
@@ -1484,41 +1356,18 @@ defineExpose({
 
   .check-icon {
     position: absolute;
-    top: 8px;
-    right: 8px;
-  }
-}
-
-// Stepper Styles
-.modern-stepper {
-  box-shadow: none;
-
-  :deep(.q-stepper__header) {
-    border-bottom: 1px solid #e0e0e0;
-  }
-
-  :deep(.q-stepper__tab) {
-    padding: 16px 24px;
-  }
-
-  :deep(.q-stepper__tab--active) {
-    color: #1976d2;
-    font-weight: 600;
-  }
-
-  :deep(.q-stepper__tab--done) {
-    color: #4caf50;
-  }
-
-  :deep(.q-stepper__dot) {
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-    background: var(--o2-primary-btn-bg);
-  }
-
-  :deep(.q-stepper__step-inner) {
-    padding: 10px 0;
+    top: 0.375rem;
+    right: 0.375rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--o2-positive);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
   }
 }
 
@@ -1570,16 +1419,7 @@ defineExpose({
 </style>
 
 <style lang="scss">
-.pipeline-add-remote-destination-form .modern-stepper .q-stepper__tab {
-  padding: 5px 5px 15px 5px !important;
-  min-height: 35px !important;
-}
-
 .create-destination-form {
-  .q-stepper {
-    background: transparent !important;
-  }
-
   .q-field--labeled.showLabelOnTop .q-field__bottom {
     padding: 0.275rem 0 0 !important;
   }

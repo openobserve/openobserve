@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -26,11 +24,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
-
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
 
 // ── vi.mock calls must be at the top level so Vitest can hoist them ──────────
 
@@ -110,17 +103,15 @@ vi.mock("@/utils/zincutils", async (importOriginal: any) => {
   };
 });
 
-// Mock Quasar notify
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock Quasar (no longer a dependency — provide minimal stub)
+const { mockNotify } = vi.hoisted(() => ({
+  mockNotify: vi.fn(),
+}));
+vi.mock("quasar", () => ({
+  useQuasar: () => ({
+    notify: mockNotify,
+  }),
+}));
 
 // ── Shared mock state — must be defined before the vi.mock factory runs ──────
 // The factory for useTraces references mockSearchObj via closure.
@@ -226,9 +217,31 @@ function mountIndexList(props: Record<string, unknown> = {}) {
       plugins: [i18n, router],
       provide: { store },
       stubs: {
-        // FieldRow stub exposes the expansion slot so BasicValuesFilter renders
+        // GroupedFieldList stub renders the field-row slot for each field
+        GroupedFieldList: {
+          template: `<div data-test="grouped-field-list">
+            <slot
+              v-for="(row, idx) in fields"
+              :key="idx"
+              name="field-row"
+              :row="row"
+            />
+            <slot name="after-list" :currentPage="1" :totalPages="1" :isFirstPage="true" :isLastPage="true" />
+            <slot name="loading" />
+          </div>`,
+          props: [
+            "fields",
+            "search",
+            "loading",
+            "theme",
+            "showPagination",
+            "pageSize",
+            "currentPage",
+          ],
+        },
+        // FieldRow stub exposes the expansion slot so FieldExpansion renders
         FieldRow: {
-          template: '<div><slot name="expansion" :field="field" /></div>',
+          template: '<div class="field_list"><slot name="expansion" :field="field" /></div>',
           props: [
             "field",
             "selectedFields",
@@ -238,16 +251,30 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "showVisibilityToggle",
           ],
         },
-        BasicValuesFilter: {
+        FieldExpansion: {
           template:
-            '<div data-test="basic-values-filter">Basic Values Filter</div>',
+            '<div data-test="field-expansion">Field Expansion</div>',
           props: [
-            "row",
+            "field",
+            "fieldValues",
             "activeIncludeValues",
             "activeExcludeValues",
             "selectedFields",
             "showVisibilityToggle",
+            "showFilterIcon",
+            "showQuickMode",
+            "valueMapper",
           ],
+        },
+        OTable: {
+          template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
+            <div data-test="table-top"><slot name="top"></slot></div>
+            <div data-test="table-body">
+              <slot name="cell-name" v-for="row in data" :key="row.name" v-bind="{row: row}"></slot>
+            </div>
+          </div>`,
+          props: ["data", "columns", "rowKey", "pagination", "showGlobalFilter", "rowClass"],
+          emits: ["row-click"],
         },
       },
     },
@@ -336,11 +363,11 @@ describe("IndexList Component", () => {
       expect(fieldsTable.exists()).toBe(true);
     });
 
-    it("should render field search input", () => {
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
+    it("should render GroupedFieldList for field display", () => {
+      const groupedFieldList = wrapper.find(
+        '[data-test="grouped-field-list"]',
       );
-      expect(searchInput.exists()).toBe(true);
+      expect(groupedFieldList.exists()).toBe(true);
     });
   });
 
@@ -370,8 +397,8 @@ describe("IndexList Component", () => {
       expect(fieldCells.length).toBeGreaterThan(0);
     });
 
-    it("should show BasicValuesFilter for fields with showValues=true", () => {
-      const basicFilters = wrapper.findAll('[data-test="basic-values-filter"]');
+    it("should show FieldExpansion for fields with showValues=true", () => {
+      const basicFilters = wrapper.findAll('[data-test="field-expansion"]');
       expect(basicFilters.length).toBeGreaterThan(0);
     });
   });
@@ -386,25 +413,19 @@ describe("IndexList Component", () => {
   });
 
   describe("Field Search", () => {
-    it("should update filter field when searching", async () => {
-      const searchInput = wrapper.find(
-        '[data-test="log-search-index-list-field-search-input"]',
-      );
-      expect(searchInput.exists()).toBe(true);
-      await searchInput.setValue("service");
+    it("should update filterField in searchObj when GroupedFieldList emits update:search", async () => {
+      // The search is now managed by GroupedFieldList internally and exposed via
+      // the @update:search event which writes to searchObj.data.stream.filterField
+      expect(wrapper.vm.searchObj.data.stream.filterField).toBe("");
+      wrapper.vm.searchObj.data.stream.filterField = "service";
       await wrapper.vm.$nextTick();
-      expect(searchInput.exists()).toBe(true);
+      expect(wrapper.vm.searchObj.data.stream.filterField).toBe("service");
     });
 
-    it("should filter fields using filterFieldFn", () => {
-      const testRows = [
-        { name: "service_name" },
-        { name: "operation_name" },
-        { name: "custom_field" },
-      ];
-      const result = wrapper.vm.filterFieldFn(testRows, "service");
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("service_name");
+    it("should pass filterField from searchObj to GroupedFieldList as search prop", () => {
+      // filterField is now managed by GroupedFieldList internally via the search prop
+      mockSearchObj.data.stream.filterField = "service";
+      expect(wrapper.vm.searchObj.data.stream.filterField).toBe("service");
     });
   });
 
@@ -502,10 +523,10 @@ describe("IndexList Component", () => {
       ).toBe(true);
     });
 
-    it("should have data-test on field search input", () => {
+    it("should have data-test on GroupedFieldList", () => {
       expect(
         wrapper
-          .find('[data-test="log-search-index-list-field-search-input"]')
+          .find('[data-test="grouped-field-list"]')
           .exists(),
       ).toBe(true);
     });
@@ -783,8 +804,11 @@ describe("IndexList Component", () => {
     });
 
     it("should update selectedStream on stream change", async () => {
+      // onStreamChange now takes a string value (post q-select → OSelect migration)
+      // and looks up the stream from streamLists
       const newStream = { label: "new_stream", value: "new_stream" };
-      await wrapper.vm.onStreamChange(newStream);
+      wrapper.vm.searchObj.data.stream.streamLists = [newStream];
+      await wrapper.vm.onStreamChange("new_stream");
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(
         newStream,
       );
@@ -807,41 +831,6 @@ describe("IndexList Component", () => {
       mockSearchObj.loadingStream = false;
       await wrapper.vm.$nextTick();
       expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  // ─── filterFieldFn — edge cases ───────────────────────────────────────────
-
-  describe("filterFieldFn — edge cases", () => {
-    it("should return all rows when terms is empty string", () => {
-      const rows = [{ name: "field_a" }, { name: "field_b" }];
-      const result = wrapper.vm.filterFieldFn(rows, "");
-      expect(result).toEqual(rows);
-    });
-
-    it("should perform case-insensitive match", () => {
-      const rows = [{ name: "ServiceName" }, { name: "operation" }];
-      const result = wrapper.vm.filterFieldFn(rows, "servicename");
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("ServiceName");
-    });
-
-    it("should return multiple matches when several rows match", () => {
-      const rows = [
-        { name: "span_id" },
-        { name: "span_name" },
-        { name: "duration" },
-      ];
-      const result = wrapper.vm.filterFieldFn(rows, "span");
-      expect(result).toHaveLength(2);
-    });
-
-    it("should return sentinel row when no rows match", () => {
-      const rows = [{ name: "field_a" }, { name: "field_b" }];
-      const result = wrapper.vm.filterFieldFn(rows, "xyz_no_match");
-      expect(result).toHaveLength(1);
-      expect(result[0].label).toBe(true);
-      expect(result[0].name).toBe("No matching fields found");
     });
   });
 

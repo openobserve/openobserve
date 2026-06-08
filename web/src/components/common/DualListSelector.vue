@@ -19,23 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Priority Order (Left) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ leftTitle }}</div>
-      <q-input v-model="searchLeft" dense outlined placeholder="Search..." class="tw:mb-3">
-        <template #prepend><q-icon name="search" /></template>
-      </q-input>
+      <OSearchInput v-model="searchLeft" placeholder="Search..." class="tw:mb-3" />
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <q-list dense>
-          <q-item
+        <ul class="tw:flex tw:flex-col">
+          <li
             v-for="(item, index) in filteredSelected"
             :key="item.value"
-            clickable
+            data-test="dual-list-selector-left-item"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            :class="{ 'tw:bg-muted/30': leftSelected.includes(item.value) }"
             @click="toggleLeftSelection(item.value)"
-            :active="leftSelected.includes(item.value)"
           >
-            <q-item-section avatar>
+            <div class="tw:flex tw:items-center tw:shrink-0">
               <span class="tw:text-xs tw:font-bold">{{ index + 1 }}</span>
-            </q-item-section>
-            <q-item-section>{{ item.label }}</q-item-section>
-            <q-item-section side>
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
+            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
               <div class="tw:flex tw:gap-1">
                 <OButton
                   variant="ghost"
@@ -43,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="index === 0"
                   @click.stop="moveUp(index)"
                 >
-                  <q-icon name="arrow_upward" size="14px" />
+                  <OIcon name="arrow-upward" size="xs" />
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -51,24 +50,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="index === modelValue.length - 1"
                   @click.stop="moveDown(index)"
                 >
-                  <q-icon name="arrow_downward" size="14px" />
+                  <OIcon name="arrow-downward" size="xs" />
                 </OButton>
                 <OButton
                   variant="ghost-destructive"
                   size="icon-xs"
                   @click.stop="removeItem(item.value)"
                 >
-                  <q-icon name="delete" size="14px" />
+                  <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
-            </q-item-section>
-          </q-item>
-          <q-item v-if="filteredSelected.length === 0">
-            <q-item-section class="text-grey-6 text-center tw:text-sm">
-              No items selected
-            </q-item-section>
-          </q-item>
-        </q-list>
+            </div>
+          </li>
+          <li
+            v-if="filteredSelected.length === 0"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-gray-400 tw:text-center tw:text-sm tw:justify-center"
+          >
+            No items selected
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="rightSelected.length === 0"
         @click="addSelected"
       >
-        <q-icon name="arrow_back" size="16px" />
-        <q-tooltip>Add selected</q-tooltip>
+        <OIcon name="arrow-back" size="sm" />
+        <OTooltip content="Add selected" />
       </OButton>
       <OButton
         variant="outline"
@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="availableItems.length === 0"
         @click="addAll"
       >
-        <q-icon name="keyboard_double_arrow_left" size="16px" />
-        <q-tooltip>Add all</q-tooltip>
+        <OIcon name="keyboard-double-arrow-left" size="sm" />
+        <OTooltip content="Add all" />
       </OButton>
       <OButton
         variant="outline"
@@ -98,8 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="leftSelected.length === 0"
         @click="removeSelected"
       >
-        <q-icon name="arrow_forward" size="16px" />
-        <q-tooltip>Remove selected</q-tooltip>
+        <OIcon name="arrow-forward" size="sm" />
+        <OTooltip content="Remove selected" />
       </OButton>
       <OButton
         variant="outline"
@@ -107,41 +107,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="modelValue.length === 0"
         @click="removeAll"
       >
-        <q-icon name="keyboard_double_arrow_right" size="16px" />
-        <q-tooltip>Remove all</q-tooltip>
+        <OIcon name="keyboard-double-arrow-right" size="sm" />
+        <OTooltip content="Remove all" />
       </OButton>
     </div>
 
     <!-- Available Items (Right) -->
     <div class="tw:flex-1 tw:border tw:rounded tw:p-4">
       <div class="tw:text-sm tw:font-semibold tw:mb-3">{{ rightTitle }}</div>
-      <q-input v-model="searchRight" dense outlined placeholder="Search..." class="tw:mb-3">
-        <template #prepend><q-icon name="search" /></template>
-      </q-input>
+      <OSearchInput v-model="searchRight" placeholder="Search..." class="tw:mb-3" />
       <div class="tw:border tw:rounded tw:min-h-80 tw:max-h-96 tw:overflow-auto">
-        <q-list dense>
-          <q-item
+        <ul class="tw:flex tw:flex-col">
+          <li
             v-for="item in filteredAvailable"
             :key="item.value"
-            clickable
+            data-test="dual-list-selector-right-item"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer hover:tw:bg-muted/50"
+            :class="{ 'tw:bg-muted/30': rightSelected.includes(item.value) }"
             @click="toggleRightSelection(item.value)"
-            :active="rightSelected.includes(item.value)"
           >
-            <q-item-section>
-              <q-checkbox
+            <div class="tw:flex tw:items-center tw:shrink-0">
+              <OCheckbox
                 :model-value="rightSelected.includes(item.value)"
                 @click.stop="toggleRightSelection(item.value)"
-                dense
               />
-            </q-item-section>
-            <q-item-section>{{ item.label }}</q-item-section>
-          </q-item>
-          <q-item v-if="filteredAvailable.length === 0">
-            <q-item-section class="text-grey-6 text-center tw:text-sm">
-              No items available
-            </q-item-section>
-          </q-item>
-        </q-list>
+            </div>
+            <div class="tw:flex tw:flex-1 tw:min-w-0 tw:text-sm">{{ item.label }}</div>
+          </li>
+          <li
+            v-if="filteredAvailable.length === 0"
+            class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:text-gray-400 tw:text-center tw:text-sm tw:justify-center"
+          >
+            No items available
+          </li>
+        </ul>
       </div>
     </div>
   </div>
@@ -150,6 +149,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import OButton from '@/lib/core/Button/OButton.vue';
+import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface Item {
   label: string;

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { ref, computed, watch } from 'vue';
-import { useQuasar } from 'quasar';
 import { useI18n } from 'vue-i18n';
 
 // Services
@@ -53,6 +52,7 @@ import type {
 
 // Store
 import { useStore } from 'vuex';
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 /**
  * Parses a comma/space-separated string of email recipients into an array.
@@ -70,7 +70,6 @@ function parseEmailRecipients(recipients: string | string[]): string[] {
  * Provides functionality for template management, validation, testing, and creation
  */
 export function usePrebuiltDestinations() {
-  const $q = useQuasar();
   const { t } = useI18n();
   const store = useStore();
 
@@ -435,13 +434,18 @@ export function usePrebuiltDestinations() {
 
   /**
    * Create a prebuilt destination with auto-linked template
+   *
+   * `templateOverride` lets callers attach a user-chosen custom template
+   * instead of the standard `prebuilt_<type>` one — required to let multiple
+   * destinations of the same prebuilt type use different message bodies.
    */
   async function createDestination(
     type: PrebuiltTypeId,
     name: string,
     credentials: Record<string, any>,
     headers: Record<string, string> = {},
-    skipTlsVerify: boolean = false
+    skipTlsVerify: boolean = false,
+    templateOverride?: string
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -463,6 +467,7 @@ export function usePrebuiltDestinations() {
       // Generate destination data
       const destinationUrl = generateDestinationUrl(type, credentials);
       const destinationHeaders = generateDestinationHeaders(type, credentials);
+      const templateName = templateOverride?.trim() || config.templateName;
 
       // Create destination payload
       // Email destinations use different payload structure than HTTP destinations
@@ -473,7 +478,7 @@ export function usePrebuiltDestinations() {
         destinationData = {
           name,
           type: 'email',
-          template: config.templateName, // Include template for email
+          template: templateName,
           skip_tls_verify: skipTlsVerify,
           output_format: 'json',
           destination_type_name: type,
@@ -497,7 +502,7 @@ export function usePrebuiltDestinations() {
           type: 'http',
           url: destinationUrl,
           method: config.method,
-          template: config.templateName, // Include template for all destinations
+          template: templateName,
           skip_tls_verify: skipTlsVerify,
           headers: { ...destinationHeaders, ...headers },
           output_format: 'json',
@@ -516,7 +521,7 @@ export function usePrebuiltDestinations() {
         };
 
         // Special handling for ServiceNow - encode Basic Auth in Authorization header
-        if (type === 'servicenow') {
+        if (type === 'servicenow' && credentials.username && credentials.password) {
           const authString = btoa(`${credentials.username}:${credentials.password}`);
           destinationData.headers = {
             ...destinationData.headers,
@@ -532,16 +537,15 @@ export function usePrebuiltDestinations() {
         data: destinationData
       });
 
-      $q.notify({
-        type: 'positive',
-        message: t('alerts.destinations.saved'),
-        timeout: 2000
+      toast({
+        variant: "success",
+        message: t('alert_destinations.saved'),
       });
 
     } catch (error: any) {
       console.error('Failed to create prebuilt destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
@@ -552,6 +556,11 @@ export function usePrebuiltDestinations() {
 
   /**
    * Update an existing prebuilt destination
+   *
+   * `templateOverride` mirrors the create path: when non-empty it replaces
+   * the standard `prebuilt_<type>` template so a user can swap a prebuilt
+   * destination over to a custom message body without dropping the prebuilt
+   * destination type.
    */
   async function updateDestination(
     type: PrebuiltTypeId,
@@ -559,7 +568,8 @@ export function usePrebuiltDestinations() {
     name: string,
     credentials: Record<string, any>,
     headers: Record<string, string> = {},
-    skipTlsVerify: boolean = false
+    skipTlsVerify: boolean = false,
+    templateOverride?: string
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -578,6 +588,7 @@ export function usePrebuiltDestinations() {
       // Generate destination data
       const destinationUrl = generateDestinationUrl(type, credentials);
       const destinationHeaders = generateDestinationHeaders(type, credentials);
+      const templateName = templateOverride?.trim() || config.templateName;
 
       // Build update payload (same structure as create)
       let destinationData: any;
@@ -586,7 +597,7 @@ export function usePrebuiltDestinations() {
         destinationData = {
           name,
           type: 'email',
-          template: config.templateName,
+          template: templateName,
           skip_tls_verify: skipTlsVerify,
           output_format: 'json',
           destination_type_name: type,
@@ -608,7 +619,7 @@ export function usePrebuiltDestinations() {
           type: 'http',
           url: destinationUrl,
           method: config.method,
-          template: config.templateName,
+          template: templateName,
           skip_tls_verify: skipTlsVerify,
           headers: { ...destinationHeaders, ...headers },
           output_format: 'json',
@@ -626,11 +637,22 @@ export function usePrebuiltDestinations() {
         };
 
         if (type === 'servicenow') {
-          const authString = btoa(`${credentials.username}:${credentials.password}`);
-          destinationData.headers = {
-            ...destinationData.headers,
-            'Authorization': `Basic ${authString}`
-          };
+          // Only overwrite Authorization when both username and password are provided.
+          // If either is missing, preserve the existing stored header.
+          if (credentials.username && credentials.password) {
+            const authString = btoa(`${credentials.username}:${credentials.password}`);
+            destinationData.headers = {
+              ...destinationData.headers,
+              'Authorization': `Basic ${authString}`
+            };
+          }
+        }
+        // For Opsgenie, drop the Authorization header when apiKey is blank so the
+        // existing stored value is preserved. generateDestinationHeaders always
+        // produces an Authorization header, but it will contain "GenieKey " when
+        // the credential is empty.
+        if (type === 'opsgenie' && !credentials.apiKey) {
+          delete destinationData.headers['Authorization'];
         }
       }
 
@@ -641,16 +663,15 @@ export function usePrebuiltDestinations() {
         data: destinationData
       });
 
-      $q.notify({
-        type: 'positive',
-        message: t('alerts.destinations.saved'),
-        timeout: 2000
+      toast({
+        variant: "success",
+        message: t('alert_destinations.saved'),
       });
 
     } catch (error: any) {
       console.error('Failed to update prebuilt destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;
@@ -737,16 +758,15 @@ export function usePrebuiltDestinations() {
         data: updatedData
       });
 
-      $q.notify({
-        type: 'positive',
+      toast({
+        variant: "success",
         message: t('alerts.prebuilt.conversionSuccess'),
-        timeout: 2000
       });
 
     } catch (error: any) {
       console.error('Failed to convert destination:', error);
-      $q.notify({
-        type: 'negative',
+      toast({
+        variant: "error",
         message: error.response?.data?.error || error.response?.data?.message || error.message,
       });
       throw error;

@@ -180,7 +180,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
+                trigger.module, trigger.org, trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
@@ -308,7 +308,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         if trigger.module == TriggerModule::Alert && trigger.is_realtime {
             let key = format!(
                 "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
+                trigger.module, trigger.org, trigger.module_key
             );
             let cluster_coordinator = db::get_coordinator().await;
             cluster_coordinator
@@ -385,7 +385,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     if trigger.module == TriggerModule::Alert && trigger.is_realtime {
                         let key = format!(
                             "{TRIGGERS_KEY}{}/{}/{}",
-                            trigger.module, &trigger.org, &trigger.module_key
+                            trigger.module, trigger.org, trigger.module_key
                         );
                         let cluster_coordinator = db::get_coordinator().await;
                         if let Err(e) = cluster_coordinator
@@ -393,9 +393,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                             .await
                         {
                             log::error!(
-                                "Error updating cluster coordinator for trigger {}: {}",
-                                key,
-                                e
+                                "Error updating cluster coordinator for trigger {key}: {e}",
                             );
                         }
                     }
@@ -403,10 +401,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 Ok(())
             }
             Err(e) => {
-                log::warn!(
-                    "Bulk update failed, falling back to individual updates: {}",
-                    e
-                );
+                log::warn!("Bulk update failed, falling back to individual updates: {e}");
                 // Fallback to individual updates
                 for trigger in triggers {
                     self.update_trigger(trigger, false).await?;
@@ -483,8 +478,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
             if let Err(e) = query.execute(&pool).await {
                 log::warn!(
-                    "Bulk status update with data failed, falling back to individual updates: {}",
-                    e
+                    "Bulk status update with data failed, falling back to individual updates: {e}"
                 );
                 for (org, module, module_key, status, retries, data) in updates_with_data {
                     self.update_status(&org, module, &module_key, status, retries, data.as_deref())

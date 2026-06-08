@@ -15,14 +15,27 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-installQuasar({ plugins: [Dialog, Notify] });
 
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+
+// Minimal stub for the in-house ODrawer. Mirrors the public surface
+// the component depends on (v-model:open) so tests can deterministically
+// observe and drive open/close state without rendering teleported content.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
 
 const makeGroup = (overrides: Record<string, any> = {}) => ({
   id: `group-${Math.random().toString(36).slice(2)}`,
@@ -49,15 +62,17 @@ async function mountComp(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
+        ODrawer: ODrawerStub,
         SemanticGroupItem: {
           template: '<div data-test="semantic-group-item-stub"></div>',
           props: ["group"],
           emits: ["update", "delete"],
         },
         ImportSemanticGroupsDrawer: {
+          name: "ImportSemanticGroupsDrawer",
           template: '<div data-test="import-drawer-stub"></div>',
-          props: ["currentGroups", "orgId"],
-          emits: ["apply", "close"],
+          props: ["currentGroups", "orgId", "open"],
+          emits: ["apply", "update:open"],
         },
       },
     },
@@ -88,6 +103,11 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
   it("renders the category select", async () => {
     const w = await mountComp();
     expect(w.find('[data-test="semantic-group-category-select"]').exists()).toBe(true);
+  });
+
+  it("renders the ImportSemanticGroupsDrawer for import flow", async () => {
+    const w = await mountComp();
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
   });
 });
 
@@ -245,6 +265,52 @@ describe("SemanticFieldGroupsConfig - import drawer", () => {
     const w = await mountComp();
     (w.vm as any).navigateToImport();
     expect((w.vm as any).showImportDrawer).toBe(true);
+  });
+
+  it("ImportSemanticGroupsDrawer receives open=true after navigateToImport", async () => {
+    const w = await mountComp();
+    (w.vm as any).navigateToImport();
+    await flushPromises();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(true);
+  });
+
+  it("ImportSemanticGroupsDrawer is closed by default", async () => {
+    const w = await mountComp();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(false);
+  });
+
+  it("closes drawer when ImportSemanticGroupsDrawer emits update:open=false", async () => {
+    const w = await mountComp();
+    (w.vm as any).showImportDrawer = true;
+    await flushPromises();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    await importDrawer.vm.$emit("update:open", false);
+    expect((w.vm as any).showImportDrawer).toBe(false);
+  });
+
+  it("renders ImportSemanticGroupsDrawer for import flow", async () => {
+    const w = await mountComp();
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
+  });
+
+  it("closes drawer when child ImportSemanticGroupsDrawer emits update:open=false", async () => {
+    const w = await mountComp();
+    (w.vm as any).showImportDrawer = true;
+    await flushPromises();
+    const importChild = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    await importChild.vm.$emit("update:open", false);
+    expect((w.vm as any).showImportDrawer).toBe(false);
+  });
+
+  it("merges imported groups when ImportSemanticGroupsDrawer emits apply", async () => {
+    const w = await mountComp();
+    const importChild = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    const imported = [makeGroup({ id: "imported-1", display: "Imported", group: "NewCat" })];
+    await importChild.vm.$emit("apply", imported);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "imported-1")).toBe(true);
+    expect(w.emitted("update:semanticFieldGroups")).toBeTruthy();
   });
 });
 
