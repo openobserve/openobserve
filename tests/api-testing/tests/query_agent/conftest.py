@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import sys
+import time
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
@@ -254,6 +255,36 @@ def ingest_query_agent_data():
     expected1 = len(records1)
     expected2 = len(records2)
     _max_ts = max(r["_timestamp"] for r in records1 + records2)
+
+    # Vortex servers do not expose WAL/memtable data — searches return
+    # NewEmptyExec until data is flushed to vortex files.  Detect this by
+    # attempting 3 quick polls; if no data appears, flush once and continue.
+    def _quick_count(stream: str) -> int:
+        now = datetime.now(UTC)
+        end_us = max(int(now.timestamp() * 1_000_000), _max_ts) + 3_600_000_000
+        start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
+        r = client.post("_search?type=logs", json={
+            "query": {"sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                      "start_time": start_us, "end_time": end_us,
+                      "from": 0, "size": 1}
+        })
+        if r.status_code != 200:
+            return 0
+        hits = r.json().get("hits", [])
+        return int(hits[0].get("c", 0)) if hits else 0
+
+    _memtable_visible = False
+    for _ in range(3):
+        if _quick_count(STREAM) > 0:
+            _memtable_visible = True
+            break
+        time.sleep(1.0)
+
+    if not _memtable_visible:
+        # No memtable data after 3s — flush so vortex files are created.
+        flush_r = client.put("node/flush", prefix="")
+        logging.info("Auto-flush after 3s (vortex or slow memtable): %s", flush_r.status_code)
+        time.sleep(2.0)
 
     def _data_is_searchable():
         now = datetime.now(UTC)

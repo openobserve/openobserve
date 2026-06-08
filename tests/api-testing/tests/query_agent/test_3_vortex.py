@@ -37,7 +37,9 @@ def post_flush_vortex(ingest_query_agent_data):  # noqa: ARG001
 
     def _data_searchable():
         now = datetime.now(UTC)
-        end_us = int(now.timestamp() * 1_000_000)
+        # Extend end_us 12 hours ahead to cover future-dated records
+        # (BASE_TS = now - 2h; records span up to now + ~7h).
+        end_us = int((now + timedelta(hours=12)).timestamp() * 1_000_000)
         start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
         payload = {
             "query": {
