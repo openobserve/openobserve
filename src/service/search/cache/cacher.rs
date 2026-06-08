@@ -1146,6 +1146,7 @@ mod tests {
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
             histogram_interval: None,
+            timezone: None,
             sorted_by_time: true,
             sampling_config: None,
         };
@@ -1286,6 +1287,7 @@ mod tests {
                 streaming_output: false,
                 streaming_id: None,
                 histogram_interval: 0,
+                timezone: None,
                 sampling_ratio: None,
                 sampling_config: None,
             },

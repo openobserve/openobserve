@@ -145,6 +145,10 @@ pub struct Query {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub histogram_interval: i64,
+    /// Default fixed-offset timezone (e.g. "+08:00") applied to histogram() buckets
+    /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 fn default_size() -> i64 {
@@ -171,6 +175,7 @@ impl Default for Query {
             streaming_output: false,
             streaming_id: None,
             histogram_interval: 0,
+            timezone: None,
         }
     }
 }
@@ -687,6 +692,7 @@ impl SearchHistoryRequest {
                 streaming_output: false,
                 streaming_id: None,
                 histogram_interval: 0,
+                timezone: None,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -902,6 +908,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
             histogram_interval: query.histogram_interval,
+            timezone: query.timezone,
             sampling_ratio: query.sampling_ratio,
         }
     }
@@ -1299,6 +1306,7 @@ impl MultiStreamRequest {
                     streaming_output: false,
                     streaming_id: None,
                     histogram_interval: 0,
+                    timezone: None,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
