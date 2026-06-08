@@ -92,6 +92,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -121,6 +122,17 @@ export default defineComponent({
       removeXYFilters,
       updateXYFieldsForCustomQueryMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { applyDefaultPanelFields } = useDefaultPanelFields(
+      dashboardPanelDataPageKey,
+    );
+    // Pages that re-seed default builder fields on the in-page Custom -> Builder
+    // toggle (and SQL <-> PromQL while in builder), discarding the previous
+    // custom query in favour of defaults — matching the Add Panel behavior.
+    //
+    // NOTE: the initial parse-from-query that happens when ENTERING a builder
+    // surface (Logs Visualize / Build tab) runs on mount via that page's own
+    // init, NOT through this toggle handler, so it is unaffected.
+    const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
       "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
@@ -271,9 +283,6 @@ export default defineComponent({
         popupSelectedButtonType.value === "promql" ||
         popupSelectedButtonType.value === "sql";
 
-      const isSwitchingToBuilder =
-        !isQueryTypeChange && popupSelectedButtonType.value === "builder";
-
       if (isQueryTypeChange) {
         selectedButtonQueryType.value = popupSelectedButtonType.value;
       } else {
@@ -308,22 +317,19 @@ export default defineComponent({
         dashboardPanelData.layout.hiddenQueries = [];
       }
 
-      // For metrics page: when switching from custom to builder in PromQL, set sample query
-      if (
-        dashboardPanelDataPageKey === "metrics" &&
-        isSwitchingToBuilder &&
-        dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.stream
-      ) {
-        const streamName =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = `${streamName}{}`;
+      // Re-seed default builder fields when the resulting mode is a builder
+      // (Custom -> Builder, or switching SQL <-> PromQL while in builder).
+      // removeXYFilters() above has just wiped the builder fields, so this
+      // restores sensible defaults for both SQL and PromQL — matching the Add
+      // Panel behavior on every gated page.
+      const seedQueryIdx = dashboardPanelData.layout.currentQueryIndex;
+      const seedQuery = dashboardPanelData.data.queries[seedQueryIdx];
+      const resultingBuilderMode = !seedQuery?.customQuery;
+      const shouldSeedDefaults =
+        resultingBuilderMode &&
+        SEED_ON_TOGGLE_PAGES.includes(dashboardPanelDataPageKey);
+      if (shouldSeedDefaults) {
+        await applyDefaultPanelFields();
       }
 
       // empty the errors

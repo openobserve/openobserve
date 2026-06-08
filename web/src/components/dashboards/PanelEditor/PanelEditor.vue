@@ -1110,6 +1110,12 @@ watch(
   () => [
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       ?.fields?.stream,
+    // Rebuild the auto query once the stream schema finishes loading. The
+    // builder fields can be seeded (default fields, or restored) before the
+    // stream's fields arrive; makeAutoSQLQuery bails out while groupedFields is
+    // empty, so without this dependency the query would stay empty until the
+    // user manually edits a field.
+    dashboardPanelData.meta?.streamFields?.groupedFields?.length,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       ?.fields?.x,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
