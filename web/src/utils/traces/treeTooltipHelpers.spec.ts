@@ -22,6 +22,7 @@ import {
   generateEdgeTooltipContent,
   findIncomingEdgeForNode,
   calculateRootNodeMetrics,
+  generateTracePatternTooltipContent,
 } from './treeTooltipHelpers';
 
 describe('treeTooltipHelpers', () => {
@@ -266,6 +267,117 @@ describe('treeTooltipHelpers', () => {
       const metrics = calculateRootNodeMetrics('node', edges);
 
       expect(metrics.errorRate).toBe(0);
+    });
+  });
+
+  describe('generateTracePatternTooltipContent', () => {
+    it('should generate tooltip HTML with all duration metrics', () => {
+      const mockMetadata = {
+        pathSignature: 'frontend → recommendation',
+        count: 3,
+        avg: 45.5,
+        min: 20.1,
+        max: 89.3,
+        p75: 67.2,
+        p95: 85.6,
+        p99: 88.4,
+        errorRate: 12.5,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      expect(result).toContain('frontend → recommendation');
+      expect(result).toContain('Calls: 3');
+      expect(result).toContain('Average: 45.5ms');
+      expect(result).toContain('Minimum: 20.1ms');
+      expect(result).toContain('Maximum: 89.3ms');
+      expect(result).toContain('P75: 67.2ms');
+      expect(result).toContain('P95: 85.6ms');
+      expect(result).toContain('P99: 88.4ms');
+      expect(result).toContain('Error Rate: 12.5%');
+    });
+
+    it('should handle missing or invalid metadata gracefully', () => {
+      const result = generateTracePatternTooltipContent({});
+
+      expect(result).toContain('Unknown Pattern');
+      expect(result).toContain('Calls: 1');
+      expect(result).toContain('Average: 0.0ms');
+      expect(result).toContain('Error Rate: 0.0%');
+    });
+
+    it('should handle null or undefined metadata', () => {
+      const resultNull = generateTracePatternTooltipContent(null);
+      const resultUndefined = generateTracePatternTooltipContent(undefined);
+
+      expect(resultNull).toContain('Unknown Pattern');
+      expect(resultUndefined).toContain('Unknown Pattern');
+    });
+
+    it('should format percentile values with single decimal place', () => {
+      const mockMetadata = {
+        pathSignature: 'service-a → service-b',
+        count: 100,
+        avg: 123.456,
+        min: 10.123,
+        max: 999.999,
+        p75: 456.789,
+        p95: 789.123,
+        p99: 999.876,
+        errorRate: 5.555,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      expect(result).toContain('Average: 123.5ms');
+      expect(result).toContain('Minimum: 10.1ms');
+      expect(result).toContain('Maximum: 1000.0ms');
+      expect(result).toContain('P75: 456.8ms');
+      expect(result).toContain('P95: 789.1ms');
+      expect(result).toContain('P99: 999.9ms');
+      expect(result).toContain('Error Rate: 5.6%');
+    });
+
+    it('should handle zero values for all metrics', () => {
+      const mockMetadata = {
+        pathSignature: 'zero-pattern',
+        count: 0,
+        avg: 0,
+        min: 0,
+        max: 0,
+        p75: 0,
+        p95: 0,
+        p99: 0,
+        errorRate: 0,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      expect(result).toContain('Calls: 0');
+      expect(result).toContain('Average: 0.0ms');
+      expect(result).toContain('Minimum: 0.0ms');
+      expect(result).toContain('Maximum: 0.0ms');
+      expect(result).toContain('Error Rate: 0.0%');
+    });
+
+    it('should include tree-tooltip HTML structure', () => {
+      const mockMetadata = {
+        pathSignature: 'test',
+        count: 1,
+        avg: 10,
+        min: 5,
+        max: 15,
+        p75: 12,
+        p95: 14,
+        p99: 14.5,
+        errorRate: 0,
+      };
+
+      const result = generateTracePatternTooltipContent(mockMetadata);
+
+      expect(result).toContain('tree-tooltip');
+      expect(result).toContain('tooltip-header');
+      expect(result).toContain('tooltip-metrics');
     });
   });
 

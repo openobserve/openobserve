@@ -149,3 +149,135 @@ export const calculateRootNodeMetrics = (
 
   return { requests: total, errors: failed, errorRate };
 };
+
+/**
+ * Generate service node tooltip content (for ServiceGraph)
+ */
+export const generateServiceNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return '';
+
+  const requests = metadata.requests || 0;
+  const errors = metadata.errors || 0;
+  const errorRate = metadata.errorRate || 0;
+
+  return `
+    <div class="tree-tooltip">
+      <div class="tooltip-header">${metadata.serviceName || 'Unknown Service'}</div>
+      <div class="tooltip-metrics">
+        <div>Requests: ${formatNumber(requests)}</div>
+        <div>Errors: ${formatNumber(errors)}</div>
+        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+      </div>
+    </div>
+  `;
+};
+
+/**
+ * Generate pattern node tooltip content (for TraceDetails patterns)
+ */
+export const generatePatternNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return '';
+  // console.log('[TOOLTIP CONTENT DEBUG] metadata:', metadata);
+  const {
+    pathSignature = 'Unknown Pattern',
+    count = 1,
+    avg = 0,
+    traceTimePercent = 0
+  } = metadata;
+
+  return `
+    <div class="tw:flex tw:flex-col tw:gap-0.5">
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Spans:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${count}</span>
+      </div>
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Average:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</span>
+      </div>
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Errors:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${metadata.errorCount || 0}</span>
+      </div>
+    </div>
+  `;
+};
+
+/**
+ * Generate tooltip HTML content for trace pattern metrics
+ * Shows comprehensive duration metrics in single column format
+ */
+export const generateTracePatternTooltipContent = (metadata: any): string => {
+  if (!metadata) {
+    return `
+      <div style="
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 280px;
+        color: rgba(255, 255, 255, 0.88);
+      ">
+        <div style="
+          font-weight: 600;
+          font-size: 13px;
+          margin-bottom: 8px;
+          color: rgba(255, 255, 255, 0.95);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding-bottom: 4px;
+        ">Unknown Pattern</div>
+        <div>
+          <div style="margin-bottom: 2px;">Calls: <span style="font-family: monospace;">1</span></div>
+          <div style="margin-bottom: 2px;">Average: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Minimum: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Maximum: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P75: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P95: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P99: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Error Rate: <span style="font-family: monospace; color: #10b981;">0.0%</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  const {
+    pathSignature = 'Unknown Pattern',
+    count = 1,
+    avg = 0,
+    min = 0,
+    max = 0,
+    p75 = 0,
+    p95 = 0,
+    p99 = 0,
+    errorRate = 0,
+  } = metadata;
+
+  return `
+    <div style="
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 280px;
+      color: rgba(255, 255, 255, 0.88);
+    ">
+      <div style="
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: rgba(255, 255, 255, 0.95);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+      ">${pathSignature}</div>
+
+      <div>
+        <div style="margin-bottom: 2px;">Calls: <span style="font-family: monospace;">${count}</span></div>
+        <div style="margin-bottom: 2px;">Average: <span style="font-family: monospace;">${avg.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">Minimum: <span style="font-family: monospace;">${min.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">Maximum: <span style="font-family: monospace;">${max.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P75: <span style="font-family: monospace;">${p75.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P95: <span style="font-family: monospace;">${p95.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P99: <span style="font-family: monospace;">${p99.toFixed(1)}ms</span></div>
+        <div>Error Rate: <span style="font-family: monospace; color: ${errorRate > 0 ? '#ef4444' : '#10b981'};">${errorRate.toFixed(1)}%</span></div>
+      </div>
+    </div>
+  `;
+};

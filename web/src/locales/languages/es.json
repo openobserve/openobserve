@@ -3193,7 +3193,10 @@
         "spans": "Vanos"
       }
     },
-    "openInFullView": "Abrir a la vista"
+    "openInFullView": "Abrir a la vista",
+    "serviceMap": "Mapa de servicios",
+    "patternView": "Vista de patrón",
+    "spanView": "Vista de España"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
