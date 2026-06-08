@@ -161,8 +161,16 @@ const alerts = {
     }
     return http().patch(url);
   },
-  bulkToggleState: (org_identifier: string, enable: boolean, data: any) => {
-    const url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
+  bulkToggleState: (
+    org_identifier: string,
+    enable: boolean,
+    data: any,
+    folder_id?: string,
+  ) => {
+    let url = `/api/v2/${org_identifier}/alerts/bulk/enable?value=${enable}`;
+    if (folder_id) {
+      url += `&folder=${folder_id}`;
+    }
     return http().post(url, data);
   },
   bulkDelete: (org_identifier: string, data: any, folder_id?: string) => {

@@ -867,6 +867,14 @@ body {
   transition: box-shadow 0.3s ease, opacity 0.2s ease;
   background: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
 
+  // Keep the icon + label on a single row. Quasar's .q-btn__content defaults to
+  // flex-wrap: wrap, so a label wider than the padded min-width (e.g. "Resume")
+  // would stack the icon above the text. Force no-wrap and let the button grow.
+  .q-btn__content {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+  }
+
   &:hover {
     opacity: 0.8;
     box-shadow: 0 0 7px color-mix(in srgb, var(--o2-primary-btn-bg), transparent 10%);

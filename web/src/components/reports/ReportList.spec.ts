@@ -595,9 +595,13 @@ describe("ReportList", () => {
       } as any);
       await wrapper.vm.bulkDeleteReports();
       await flushPromises();
-      expect(vi.mocked(reports.bulkDeleteById)).toHaveBeenCalledWith("test-org", {
-        ids: [REPORT_SCHEDULED.report_id],
-      });
+      expect(vi.mocked(reports.bulkDeleteById)).toHaveBeenCalledWith(
+        "test-org",
+        {
+          ids: [REPORT_SCHEDULED.report_id],
+        },
+        "default",
+      );
     });
 
     it("should remove successfully deleted reports from staticReportsList", async () => {

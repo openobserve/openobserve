@@ -304,6 +304,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </q-btn>
                       <q-btn
                         v-if="selectedReports.length > 0"
+                        data-test="report-list-pause-reports-btn"
+                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-secondary-button-dark'
+                            : 'o2-secondary-button-light'
+                        "
+                        no-caps
+                        dense
+                        @click="bulkToggleReports('pause')"
+                      >
+                        <q-icon name="pause" size="16px" />
+                        <span class="tw:ml-2">Pause</span>
+                      </q-btn>
+                      <q-btn
+                        v-if="selectedReports.length > 0"
+                        data-test="report-list-resume-reports-btn"
+                        class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                        :class="
+                          store.state.theme === 'dark'
+                            ? 'o2-secondary-button-dark'
+                            : 'o2-secondary-button-light'
+                        "
+                        no-caps
+                        dense
+                        @click="bulkToggleReports('resume')"
+                      >
+                        <q-icon name="play_arrow" size="16px" />
+                        <span class="tw:ml-2">Resume</span>
+                      </q-btn>
+                      <q-btn
+                        v-if="selectedReports.length > 0"
                         data-test="report-list-delete-reports-btn"
                         class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
                         :class="
@@ -797,6 +829,7 @@ const bulkDeleteReports = async () => {
     const response = await reports.bulkDeleteById(
       store.state.selectedOrganization.identifier,
       payload,
+      activeFolderId.value,
     );
     dismiss();
 
@@ -824,6 +857,60 @@ const bulkDeleteReports = async () => {
     }
   }
   confirmBulkDelete.value = false;
+};
+
+// Bulk pause/resume — uses report_ids (v2)
+const bulkToggleReports = async (action: "pause" | "resume") => {
+  const isResuming = action === "resume";
+  const dismiss = q.notify({
+    spinner: true,
+    message: `${isResuming ? "Resuming" : "Pausing"} reports...`,
+    timeout: 0,
+  });
+  try {
+    // Only toggle reports whose state actually changes.
+    const reportsToToggle = selectedReports.value.filter((r: any) =>
+      isResuming ? !r.enabled : r.enabled,
+    );
+
+    if (!reportsToToggle.length) {
+      q.notify({ type: "negative", message: `No reports to ${action}`, timeout: 2000 });
+      dismiss();
+      return;
+    }
+
+    const payload = { ids: reportsToToggle.map((r: any) => r.report_id) };
+    const response = await reports.bulkToggleState(
+      store.state.selectedOrganization.identifier,
+      isResuming,
+      payload,
+      activeFolderId.value,
+    );
+    dismiss();
+
+    const { successful = [], unsuccessful = [] } = response.data ?? {};
+    if (unsuccessful.length && successful.length) {
+      q.notify({ type: "warning", message: `${successful.length} ${action}d, ${unsuccessful.length} failed`, timeout: 5000 });
+    } else if (unsuccessful.length) {
+      q.notify({ type: "negative", message: `Failed to ${action} ${unsuccessful.length} report(s)`, timeout: 3000 });
+    } else {
+      q.notify({ type: "positive", message: `${successful.length} report(s) ${action}d successfully`, timeout: 2000 });
+    }
+
+    const successfulIds = new Set(successful);
+    staticReportsList.value = staticReportsList.value.map((r: any) =>
+      successfulIds.has(r.report_id) ? { ...r, enabled: isResuming } : r,
+    );
+    invalidateFolderCache(activeFolderId.value);
+    filterReports();
+    selectedReports.value = [];
+  } catch (error: any) {
+    dismiss();
+    const msg = error.response?.data?.message || error?.message || `Error ${action}ing reports.`;
+    if (error.response?.status !== 403) {
+      q.notify({ type: "negative", message: msg, timeout: 3000 });
+    }
+  }
 };
 
 // Move to folder — single row

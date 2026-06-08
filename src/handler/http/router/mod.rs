@@ -698,6 +698,7 @@ pub fn service_routes() -> Router {
         // Reports (v2) — /bulk and /move must precede /{report_id} to avoid route conflicts
         .route("/v2/{org_id}/reports", get(dashboards::reports::list_reports_v2).post(dashboards::reports::create_report_v2))
         .route("/v2/{org_id}/reports/bulk", delete(dashboards::reports::delete_report_bulk_v2))
+        .route("/v2/{org_id}/reports/bulk/enable", patch(dashboards::reports::enable_report_bulk_v2))
         .route("/v2/{org_id}/reports/move", patch(dashboards::reports::move_reports))
         .route("/v2/{org_id}/reports/{report_id}", get(dashboards::reports::get_report_v2).put(dashboards::reports::update_report_v2).delete(dashboards::reports::delete_report_v2))
         .route("/v2/{org_id}/reports/{report_id}/enable", patch(dashboards::reports::enable_report_v2))

@@ -679,10 +679,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <q-btn
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
-                      class="tw:flex items-center no-border o2-secondary-button tw:h-[36px] q-mr-sm tw:w-[200px]"
+                      class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'o2-secondary-button-dark'
+                          : 'o2-secondary-button-light'
+                      "
                       no-caps
                       dense
-                      style="width: 170px"
                       @click="bulkToggleAlerts('resume')"
                     >
                       <q-icon name="play_arrow" size="16px" />
@@ -2788,6 +2792,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           isResuming,
           payload,
+          activeFolderId.value,
         );
 
         if (response) {

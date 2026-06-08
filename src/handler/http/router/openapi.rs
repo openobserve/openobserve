@@ -199,6 +199,7 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::reports::delete_report_v2,
         request::dashboards::reports::delete_report_bulk_v2,
         request::dashboards::reports::enable_report_v2,
+        request::dashboards::reports::enable_report_bulk_v2,
         request::dashboards::reports::trigger_report_v2,
         request::dashboards::reports::move_reports,
         request::actions::action::upload_zipped_action,
