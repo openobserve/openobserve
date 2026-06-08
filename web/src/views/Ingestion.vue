@@ -104,9 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <!-- Tab bar: no bordered card — just a bottom separator like the header. -->
-    <div class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:-mt-2">
-      <div class="tw:-mb-0.75">
+    <!-- Tab bar: no bordered card — just a bottom separator like the header.
+         Flush-left (no left padding) so the first tab lines up with the vertical
+         sub-nav (Kubernetes/Windows/…) in the section below, whose tablist sits
+         at the content's left edge. The bottom divider still spans full width. -->
+    <div class="tw:w-full tw:shrink-0 tw:pr-4 tw:border-b tw:border-border-default tw:-mt-2">
+      <div class="tw:-mb-0.75 tw:pl-0.5">
           <OTabs v-model="ingestTabType" horizontal align="left">
             <ORouteTab
               name="recommended"

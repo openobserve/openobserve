@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="running-queries-page tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
     <div class="tw:flex-none">
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container">
         <div
           class="tw:flex tw:flex-col tw:px-4 tw:py-3 tw:border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
