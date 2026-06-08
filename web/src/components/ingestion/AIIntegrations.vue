@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:h-full tw:gap-0">
     <div class="tw:w-[200px] tw:flex tw:flex-col tw:border-r tw:border-border-default">
       <div class="tw:flex-1 tw:min-h-0 tw:bg-surface-panel el-border-radius">
-        <div class="tw:overflow-y-auto tw:h-full">
+        <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
           <OTabs
             v-model="selectedCategory"
             orientation="vertical"
