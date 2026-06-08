@@ -30,13 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
         data-test="dashboard-query-data"
       >
-        <span
-          v-if="!(promqlMode || dashboardPanelData.data.type == 'geomap')"
-          class="tw:text-sm tw:font-medium text-weight-bold tw:ml-2"
-          >{{ t("panel.sql") }}</span
-        >
         <div
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           style="max-width: 600px; overflow: hidden"
         >
           <OTabs
@@ -53,27 +47,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
-              <span>{{ "Query " + (index + 1) }}</span>
-              <OIcon
-                v-if="promqlMode"
-                :name="
-                  dashboardPanelData.layout.hiddenQueries.includes(index)
-                    ? 'visibility-off'
-                    : 'visibility'
-                "
-                class="tw:ml-1 dashboard-query-visibility-icon"
-                @click.stop="toggleQueryVisibility(index)"
-                style="cursor: pointer"
-                size="sm"
-                :data-test="`dashboard-panel-query-tab-visibility-${index}`"
-               />
+              <!-- Inline editable query name (multi-SQL).
+                   Wrapped in a <div @click.stop> because OInput has
+                   inheritAttrs: false and doesn't re-emit `click`, so a
+                   listener on <OInput> wouldn't catch the tab-click. -->
+              <div
+                v-if="editingQueryIndex === index"
+                @click.stop
+                class="tw:inline-block query-tab-name-input-wrap"
+              >
+                <OInput
+                  ref="renameInputRef"
+                  v-model="editingQueryName"
+                  size="sm"
+                  autofocus
+                  :id="`dashboard-query-rename-input-${index}`"
+                  class="query-tab-name-input"
+                  :data-test="`dashboard-panel-query-tab-name-input-${index}`"
+                  @keydown.enter.stop="saveQueryName(index)"
+                  @keydown.escape.stop="cancelQueryNameEdit"
+                  @blur="saveQueryName(index)"
+                />
+              </div>
+              <span
+                v-else
+                @dblclick.stop.prevent="startEditQueryName(index, tab)"
+                class="query-tab-name-text"
+                style="font-size: 12px"
+                :title="'Double-click to rename'"
+                :data-test="`dashboard-panel-query-tab-name-${index}`"
+              >{{ tab.tabName || ('Query ' + (index + 1)) }}</span>
+              <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
+                   trigger is scoped to JUST the icon, not the entire OTab. -->
+              <span
+                v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
+                class="tw:inline-flex tw:items-center tw:relative"
+              >
+                <OIcon
+                  :name="
+                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
+                      ? 'visibility-off'
+                      : 'visibility'
+                  "
+                  class="tw:ml-1 dashboard-query-visibility-icon"
+                  @click.stop="toggleQueryVisibility(index)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
+                  style="cursor: pointer"
+                  size="sm"
+                  :data-test="`dashboard-panel-query-tab-visibility-${index}`"
+                  :data-test-hidden="
+                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
+                      ? 'true'
+                      : 'false'
+                  "
+                />
                 <OTooltip
                   :content="
-                    dashboardPanelData.layout.hiddenQueries.includes(index)
+                    (dashboardPanelData.layout.hiddenQueries || []).includes(index)
                       ? t('dashboard.showQueryResults')
                       : t('dashboard.hideQueryResults')
                   "
                 />
+              </span>
               <OIcon
                 v-if="
                   index > 0 ||
@@ -82,7 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="close"
                 size="sm"
                 class="dashboard-query-remove-icon"
-                @click.stop="removeTab(index)"
+                @click.stop.prevent="removeTab(index)"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
                 style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
@@ -90,7 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabs>
         </div>
         <OButton
-          v-if="promqlMode || dashboardPanelData.data.type == 'geomap'"
           variant="ghost"
           size="icon"
           @click.stop="addTab"
@@ -98,6 +135,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
         </OButton>
+        <!-- D5: Warning for restricted chart types with multiple queries.
+             Outlined soft-background chip (warning-soft variant + ring),
+             height-aligned (h-8) with the toolbar's size="sm" buttons. -->
+        <OBadge
+          v-if="multiQueryWarning"
+          variant="warning-soft"
+          size="sm"
+          icon="info-outline"
+          class="dashboard-multi-query-warning tw:h-8 tw:mr-2 tw:ring-1 tw:ring-inset tw:ring-current"
+        >
+          {{ multiQueryWarning }}
+        </OBadge>
       </div>
       <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
         <OSwitch
@@ -277,12 +326,15 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
+import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 
 export default defineComponent({
   name: "DashboardQueryEditor",
@@ -298,6 +350,8 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OSplitter,
+    OInput,
+    OBadge,
   },
   emits: ["searchdata", "run-query"],
   methods: {
@@ -442,6 +496,29 @@ export default defineComponent({
     const functionEditorPlaceholderFlag = ref(true);
     const vrlFnEditorRef = ref(null);
 
+
+    // A table panel with a breakdown field is a pivot table, which only
+    // supports a single query (so the add-query button is hidden and a warning
+    // is shown if multiple queries already exist).
+    const isPivotTable = computed(
+      () =>
+        dashboardPanelData.data.type === "table" &&
+        (dashboardPanelData.data.queries?.[0]?.fields?.breakdown?.length ?? 0) >
+          0,
+    );
+
+    // D5: Warning banner for restricted chart types with multiple queries
+    const multiQueryWarning = computed(() => {
+      if (dashboardPanelData.data.queries.length <= 1) return null;
+      if (promqlMode.value) return null;
+
+      if (isPivotTable.value) {
+        return t("dashboard.multiQueryWarning", { chartType: "Pivot Table" });
+      }
+
+      return null;
+    });
+
     const addTab = () => {
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
@@ -503,8 +580,27 @@ export default defineComponent({
       }
     };
 
+    // The fx toggle is PER QUERY and derived from VRL presence: on tab change
+    // (and mount) it's ON iff the active query has a VRL function, OFF otherwise.
     watch(
-      () => [promqlMode.value, dashboardPanelData.layout.vrlFunctionToggle],
+      () => dashboardPanelData.layout.currentQueryIndex,
+      (idx) => {
+        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
+          dashboardPanelData.data.queries[idx],
+        );
+      },
+      { immediate: true },
+    );
+
+    // Keep the splitter in sync with the VRL toggle and query mode: 70/30 when
+    // the VRL editor is shown (SQL + toggle on), 100/0 otherwise. Runs on mount
+    // and on tab switch so the active query's state is reflected.
+    watch(
+      () => [
+        promqlMode.value,
+        dashboardPanelData.layout.vrlFunctionToggle,
+        dashboardPanelData.layout.currentQueryIndex,
+      ],
       () => {
         if (promqlMode.value || !dashboardPanelData.layout.vrlFunctionToggle) {
           splitterModel.value = 100;
@@ -512,6 +608,7 @@ export default defineComponent({
           splitterModel.value = 70;
         }
       },
+      { immediate: true },
     );
 
     // SQL field + function keyword autocomplete.
@@ -588,6 +685,10 @@ export default defineComponent({
     };
 
     const toggleQueryVisibility = (index) => {
+      // Lazy-init for layouts loaded from saved dashboards that predate the multi-SQL feature.
+      if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
+        dashboardPanelData.layout.hiddenQueries = [];
+      }
       const hiddenQueries = dashboardPanelData.layout.hiddenQueries;
       const queryIndex = hiddenQueries.indexOf(index);
 
@@ -665,17 +766,26 @@ export default defineComponent({
     };
 
     const onFunctionToggle = (value, event) => {
-      event.stopPropagation();
+      // OSwitch's @update:model-value calls this with only the value (no event),
+      // so guard it.
+      event?.stopPropagation();
 
-      // if value is false
-      if (!value) {
-        // hide function editor
+      const idx = dashboardPanelData.layout.currentQueryIndex;
+
+      if (value) {
+        // On: show the function editor pane (70/30 split).
+        if (!promqlMode.value) splitterModel.value = 70;
+      } else {
+        // Off: hide the editor and remove this query's VRL function and its
+        // derived field list, so VRL is no longer applied for this query.
         splitterModel.value = 100;
-
-        // reset function query
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].vrlFunctionQuery = "";
+        if (dashboardPanelData.data.queries[idx]) {
+          dashboardPanelData.data.queries[idx].vrlFunctionQuery = "";
+        }
+        if (dashboardPanelData.meta.queryFields[idx]) {
+          dashboardPanelData.meta.queryFields[idx].vrlFunctionFieldList = [];
+        }
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
 
       // open query editor
@@ -758,6 +868,42 @@ export default defineComponent({
       // VRL function code is already updated via @update:query handler
     };
 
+    // Inline query tab renaming
+    const editingQueryIndex = ref(-1);
+    const editingQueryName = ref("");
+    // Vue ref to the OInput wrapper for the rename field.
+    // OInput doesn't call defineExpose, so we reach into $el and grab the
+    // underlying <input> via querySelector. Cleaner than a global DOM lookup.
+    const renameInputRef = ref<any>(null);
+
+    const startEditQueryName = (index: number, tab: any) => {
+      editingQueryIndex.value = index;
+      editingQueryName.value = tab.tabName || "Query " + (index + 1);
+      // OInput renders on the next tick; focus + select the inner <input>
+      // by its deterministic id (forwarded by OInput onto the input element).
+      nextTick(() => {
+        const el = document.getElementById(
+          `dashboard-query-rename-input-${index}`,
+        ) as HTMLInputElement | null;
+        el?.focus();
+        el?.select();
+      });
+    };
+
+    const saveQueryName = (index: number) => {
+      if (editingQueryIndex.value !== index) return;
+      const trimmed = editingQueryName.value.trim();
+      dashboardPanelData.data.queries[index].tabName =
+        trimmed || undefined;
+      editingQueryIndex.value = -1;
+      editingQueryName.value = "";
+    };
+
+    const cancelQueryNameEdit = () => {
+      editingQueryIndex.value = -1;
+      editingQueryName.value = "";
+    };
+
     return {
       t,
       router,
@@ -786,6 +932,8 @@ export default defineComponent({
       onFunctionSelect,
       selectedStreamFieldsBasedOnUserDefinedSchema,
       store,
+      multiQueryWarning,
+      isPivotTable,
       handleQueryUpdate,
       handleLanguageChange,
       handleAskAI,
@@ -794,6 +942,12 @@ export default defineComponent({
       handleVrlGenerationStart,
       handleVrlGenerationEnd,
       handleVrlGenerationSuccess,
+      editingQueryIndex,
+      editingQueryName,
+      renameInputRef,
+      startEditQueryName,
+      saveQueryName,
+      cancelQueryNameEdit,
       currentEditorKeywords,
       currentEditorSuggestions,
     };
@@ -807,14 +961,38 @@ export default defineComponent({
   height: 40px;
 }
 
-.dashboard-query-remove-icon:hover {
-  background-color: #eaeaeaa5;
-  border-radius: 50%;
+.dashboard-query-remove-icon {
+  opacity: 0.6;
+  transition: opacity 0.15s, background-color 0.15s;
+
+  &:hover {
+    opacity: 1;
+    background-color: var(--o2-hover-gray);
+    border-radius: 50%;
+  }
 }
 
-.dashboard-query-visibility-icon:hover {
-  background-color: #eaeaeaa5;
-  border-radius: 50%;
+.dashboard-query-visibility-icon {
+  opacity: 0.7;
+  transition: opacity 0.15s, background-color 0.15s;
+
+  &:hover {
+    opacity: 1;
+    background-color: var(--o2-hover-gray);
+    border-radius: 50%;
+  }
+}
+
+.query-tab-name-text {
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.query-tab-name-input-wrap {
+  width: 90px;
+  min-width: 50px;
+  max-width: 160px;
 }
 
 

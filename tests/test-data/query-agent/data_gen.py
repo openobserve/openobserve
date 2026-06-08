@@ -10,6 +10,10 @@ from pathlib import Path
 
 random.seed(42)
 
+# Number of queries this generator produces data for.
+# build_dataset() default must match this value.
+NUM_QUERIES = 520
+
 # Check for a BASE_TS override saved by compute_counts.py so that the
 # compute oracle and the test harness share the same BASE_TS. Without
 # this, a minute boundary crossing between compute and test shifts
@@ -19,9 +23,12 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    # Shift enough so all per-query windows (60s each) are in the past.
-    # 400 queries × 60s = 6.67h; 8h shift gives ~1.3h of headroom.
-    BASE_TS = int((_now - timedelta(hours=8)).timestamp() * 1_000_000)
+    # Each query gets a 60s window. Shift far enough into the past so
+    # ALL records are behind _now at ingestion time (necessary for the
+    # fixture's wait_until poll to find them).  NUM_QUERIES * 60 // 3600
+    # is the span in hours; +2h adds margin for CI runner delays.
+    _span_hours = NUM_QUERIES * 60 // 3600 + 2
+    BASE_TS = int((_now - timedelta(hours=_span_hours)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
     # --- Original 17 fields (warehouse/sorter themed) ---
@@ -587,14 +594,28 @@ _NULLABLE_FIELDS = {
 }
 
 
-def make_record(ts, idx, qid):
+def make_record(ts, idx, qid, stream_offset=0):
     """Build a single deterministic data record.
 
     Each field uses a different rotation offset so field-value
     combinations vary independently — no two fields pick from the same
     pool position for the same (idx, qi) pair.
+
+    stream_offset shifts the per-field rotation so the same (qi, idx)
+    produces different values for a secondary stream while keeping
+    partial overlap on join keys (pallet_id, org_name, etc.).
+
+    IMPORTANT: stream_offset only affects field VALUES, NOT timestamps.
+    Both streams generate records at the same _timestamp values (same
+    BASE_TS, same per-query time windows).  This means cross-stream
+    JOIN queries can use a single time_offset — both streams' records
+    for a given query fall within the same 74-second window.
+
+    The log field always uses the original qid (unshifted) so that log
+    entries are tagged with the query that owns them, regardless of
+    stream_offset.  Only qi (used for per-field rotation) is shifted.
     """
-    qi = int(qid[1:])
+    qi = int(qid[1:]) + stream_offset
     # Vary the log field: some records get an ACK batch suffix for
     # str_match_ignore_case testing on ack_detail-like patterns.
     if idx % 3 == 0:
@@ -627,11 +648,14 @@ def make_record(ts, idx, qid):
     return r
 
 
-def build_dataset(num_queries=400):
+def build_dataset(num_queries=NUM_QUERIES, stream_offset=0):
     """Generate deterministic records for queries Q001-Q{num_queries}.
 
     Each query gets 5 records spaced 18 seconds apart within its own
     non-overlapping 60-second time window.
+
+    stream_offset shifts field rotation for secondary streams while
+    preserving shared time windows and partial join-key overlap.
     """
     records = []
     for qi in range(1, num_queries + 1):
@@ -639,5 +663,5 @@ def build_dataset(num_queries=400):
         base = BASE_TS + (qi - 1) * 60_000_000
         for i in range(5):
             ts = base + i * 18_000_000
-            records.append(make_record(ts, i, qid))
+            records.append(make_record(ts, i, qid, stream_offset))
     return records

@@ -663,21 +663,15 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "386.25",
-            "88.1"
-          ],
-          [
             "ZONE-1",
             "4",
             "653.75",
             "94.6"
           ],
           [
-            "ZONE-4",
-            "3",
-            "210.0",
+            "ZONE-2",
+            "4",
+            "386.25",
             "88.1"
           ],
           [
@@ -685,6 +679,12 @@
             "3",
             "571.6666666666666",
             "72.8"
+          ],
+          [
+            "ZONE-4",
+            "3",
+            "210.0",
+            "88.1"
           ]
         ],
         "results_mode": "rowsort"
@@ -2939,6 +2939,286 @@
             "performanceMetric"
           ]
         ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q461",
+      "sql": "SELECT _timestamp, log, action_category FROM \"{stream}\" WHERE match_all('warehouse') AND action_category = 'performanceMetric' ORDER BY _timestamp DESC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27599000000,
+        "end_offset": 27673000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_category"
+        ],
+        "results": [
+          [
+            "Q461 warehouse event record 2",
+            "performanceMetric"
+          ],
+          [
+            "Q461 warehouse event record 1",
+            "performanceMetric"
+          ],
+          [
+            "Q460 warehouse event record 4",
+            "performanceMetric"
+          ],
+          [
+            "Q461 warehouse event record 0 ACK batch batchIdList:Q461-0",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q462",
+      "sql": "SELECT _timestamp, exception_message, component_name FROM \"{stream}\" WHERE str_match_ignore_case(exception_message, 'exception') AND component_name IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27659000000,
+        "end_offset": 27733000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "component_name"
+        ],
+        "results": [
+          [
+            "ValidationException: item_count exceeds defect_limit bounds",
+            "temp-regulator"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "charge-checker"
+          ],
+          [
+            "StateTransitionException: operation_mode hybrid invalid state",
+            "charge-checker"
+          ],
+          [
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "sorter-engine"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "conveyor-driver"
+          ],
+          [
+            "NullPointerException at ConveyorController.handle()",
+            "conveyor-driver"
+          ],
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "zone-controller"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q463",
+      "sql": "SELECT _timestamp, log, request_payload FROM \"{stream}\" WHERE match_all('warehouse') AND log LIKE '%event%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27719000000,
+        "end_offset": 27793000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "request_payload"
+        ],
+        "results": [
+          [
+            "Q463 warehouse event record 0 ACK batch batchIdList:Q463-0",
+            "{\"message\":{\"endpoint\":\"archiveLog\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q462 warehouse event record 4",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}"
+          ],
+          [
+            "Q463 warehouse event record 1",
+            "{\"message\":{\"endpoint\":\"retryScan\",\"status\":\"retrying\"}}"
+          ],
+          [
+            "Q463 warehouse event record 2",
+            "{\"message\":{\"endpoint\":\"syncZone\",\"status\":\"syncing\"}}"
+          ],
+          [
+            "Q463 warehouse event record 3 ACK batch batchIdList:Q463-3",
+            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q464 warehouse event record 0 ACK batch batchIdList:Q464-0",
+            "{\"message\":{\"endpoint\":\"searchItems\",\"status\":\"ok\"}}"
+          ],
+          [
+            "Q463 warehouse event record 4",
+            "{\"message\":{\"endpoint\":\"updateBatch\",\"status\":\"pending\"}}"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q464",
+      "sql": "SELECT _timestamp, event_detail, action_category FROM \"{stream}\" WHERE str_match_ignore_case(event_detail, 'batch') AND action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27779000000,
+        "end_offset": 27853000000
+      },
+      "expected": {
+        "columns": [
+          "event_detail",
+          "action_category"
+        ],
+        "results": [
+          [
+            "batch XYZ789 timed out at checkpoint 3",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q465",
+      "sql": "SELECT _timestamp, db_info, action_category FROM \"{stream}\" WHERE match_all('cid') AND db_info IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27839000000,
+        "end_offset": 27913000000
+      },
+      "expected": {
+        "columns": [
+          "db_info",
+          "action_category"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q466",
+      "sql": "SELECT _timestamp, ack_detail, facility_zone FROM \"{stream}\" WHERE str_match_ignore_case(ack_detail, 'received') AND facility_zone IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27899000000,
+        "end_offset": 27973000000
+      },
+      "expected": {
+        "columns": [
+          "ack_detail",
+          "facility_zone"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q467",
+      "sql": "SELECT _timestamp, exception_message, error_code FROM \"{stream}\" WHERE match_all('Exception') AND error_code IS NOT NULL AND error_code LIKE 'E00%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 27959000000,
+        "end_offset": 28033000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q468",
+      "sql": "SELECT _timestamp, log, action_subcategory FROM \"{stream}\" WHERE match_all('warehouse') AND action_subcategory IS NOT NULL ORDER BY _timestamp ASC LIMIT 15",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28019000000,
+        "end_offset": 28093000000
+      },
+      "expected": {
+        "columns": [
+          "log",
+          "action_subcategory"
+        ],
+        "results": [
+          [
+            "Q468 warehouse event record 0 ACK batch batchIdList:Q468-0",
+            "pageView"
+          ],
+          [
+            "Q467 warehouse event record 4",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 1",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 2",
+            "vitalsInp"
+          ],
+          [
+            "Q468 warehouse event record 3 ACK batch batchIdList:Q468-3",
+            "vitalsLcp"
+          ],
+          [
+            "Q469 warehouse event record 0 ACK batch batchIdList:Q469-0",
+            "vitalsLcp"
+          ],
+          [
+            "Q468 warehouse event record 4",
+            "vitalsInp"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q469",
+      "sql": "SELECT _timestamp, exception_message, error_code, component_name FROM \"{stream}\" WHERE (match_all('Exception') OR match_all('Timeout')) AND action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28079000000,
+        "end_offset": 28153000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "error_code",
+          "component_name"
+        ],
+        "results": [],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q470",
+      "sql": "SELECT _timestamp, log_message, uri_path FROM \"{stream}\" WHERE str_match_ignore_case(log_message, 'INFO') AND uri_path LIKE '/api/%' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 28139000000,
+        "end_offset": 28213000000
+      },
+      "expected": {
+        "columns": [
+          "log_message",
+          "uri_path"
+        ],
+        "results": [],
         "results_mode": "rowsort"
       }
     }
