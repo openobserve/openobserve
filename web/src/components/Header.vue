@@ -224,7 +224,7 @@ size="xs" class="warning" />{{
           @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave"
         >
-          <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
+          <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
         </OButton>
       </template>
 
@@ -238,7 +238,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="tw:opacity-60 tw:size-4 tw:shrink-0" />
+        <component :is="slackIcon" class="tw:opacity-60 tw:size-5 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
@@ -246,7 +246,7 @@ size="xs" class="warning" />{{
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
-            <OIcon name="help-outline" size="sm" class="tw:opacity-60" />
+            <OIcon name="help-outline" size="sm" class="tw:opacity-60 tw:size-5!" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
@@ -303,7 +303,7 @@ size="xs" class="warning" />{{
             <OIcon
               :name="user.picture ? user.picture : 'person'"
               size="sm"
-              class="tw:opacity-60"
+              class="tw:opacity-60 tw:size-5!"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>

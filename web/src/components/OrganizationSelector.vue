@@ -202,11 +202,11 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     <ODropdown v-model:open="open" side="bottom" align="end">
       <template #trigger>
         <OButton
-          variant="outline"
-          size="sm-toolbar"
+          variant="outline-primary"
+          size="xs"
           data-test="navbar-organizations-select-trigger"
           class="tw:w-56"
-          :class="open ? 'tw:bg-button-outline-hover-bg' : ''"
+          :class="open ? 'tw:ring-1 tw:ring-inset tw:ring-primary-300' : ''"
         >
           <template #icon-left>
             <OIcon
@@ -320,7 +320,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 :class="
                   copiedId === row.org.identifier
                     ? 'tw:opacity-100 tw:text-primary-600'
-                    : 'tw:text-text-secondary tw:opacity-0 tw:group-hover:opacity-100 tw:focus-visible:opacity-100'
+                    : row.index === highlightedIndex
+                      ? 'tw:text-text-secondary tw:opacity-100'
+                      : 'tw:text-text-secondary tw:opacity-0 tw:focus-visible:opacity-100'
                 "
                 @click.stop="copyId(row.org)"
               >

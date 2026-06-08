@@ -91,8 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      isActive ? 'tw:text-primary-600' : 'tw:text-tabs-inactive-text',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      isActive
+        ? 'tw:text-primary-700 tw:bg-surface-base tw:shadow-sm'
+        : 'tw:text-tabs-inactive-text tw:hover:bg-primary-200',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"
@@ -103,8 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1 tw:transition-colors tw:duration-250"
         :class="isActive
-          ? 'tw:bg-primary-200 tw:text-primary-700!'
-          : 'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'"
+          ? 'tw:text-primary-700!'
+          : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >
         <OIcon
           :name="icon"
@@ -130,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1 tw:transition-colors tw:duration-250"
         :class="[
-          isActive ? 'tw:bg-primary-200 tw:text-primary-700!' : 'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'
+          isActive ? 'tw:text-primary-700!' : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'
         ]"
       >
         <component
