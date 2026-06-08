@@ -24,6 +24,7 @@ const SKIP_SEED_TYPES = [
   "custom_chart",
   "html",
   "markdown",
+  "heatmap",
 ];
 
 /**

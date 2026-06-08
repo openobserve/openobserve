@@ -224,6 +224,17 @@ describe("useDefaultPanelFields", () => {
       expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
     });
 
+    it("is a no-op for heatmap (measure lives on Z; Y disallows aggregation)", async () => {
+      setPanel({ type: "heatmap", customQuery: true });
+      const { applyDefaultPanelFields } = useDefaultPanelFields("dashboard");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().customQuery).toBe(true); // returned before any mutation
+      expect(currentQuery().fields.x).toEqual([]);
+      expect(currentQuery().fields.y).toEqual([]);
+      expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    });
+
     it("returns early (no throw) when the current query is missing", async () => {
       setPanel();
       state.panel.data.queries = [];
