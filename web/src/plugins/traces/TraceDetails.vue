@@ -1054,7 +1054,9 @@ export default defineComponent({
             treeData: patternTreeData.value,
             getNodeLabel: getPatternNodeLabel,
             getNodeTooltip: getPatternNodeTooltip,
-            getNodeErrorRate: getPatternNodeErrorRate
+            getNodeErrorRate: getPatternNodeErrorRate,
+            getNodeServiceColor: (node: any) =>
+              searchObj.meta.serviceColors[node.name]
           },
           {
             layoutType: 'horizontal',

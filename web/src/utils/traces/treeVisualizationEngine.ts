@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from 'vuex'
+import { getServiceColorHex } from '@/utils/traces/traceColors'
 
 /**
  * Tree node interface for tree visualization with coordinate support
@@ -48,6 +49,7 @@ export interface TreeVisualizationData {
   getNodeLabel: (node: TreeNode) => string
   getNodeTooltip: (node: TreeNode) => string
   getNodeErrorRate: (node: TreeNode) => number
+  getNodeServiceColor?: (node: TreeNode) => string
 }
 
 /**
@@ -67,15 +69,36 @@ export function createTreeVisualizationEngine() {
     const { treeData, getNodeLabel, getNodeErrorRate } = data
     const { layoutType, isDarkMode, nodeSize, symbolSize = 30 } = config
 
+    /**
+     * Create a simple circle SVG data URL with a colored border.
+     * The border is baked into the SVG so it's always visible — ECharts tree
+     * series doesn't reliably render itemStyle.borderColor on default symbols.
+     * Pattern matches ServiceGraph's getServiceIconSvg in convertTraceData.ts.
+     */
+    const getCircleSvg = (fillColor: string, strokeColor: string, strokeWidth: number): string => {
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">` +
+        `<circle cx="28" cy="28" r="22" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>` +
+        `</svg>`
+      return `image://data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`
+    }
+
     // Convert TreeNode format to ECharts tree format
     const convertToEChartsFormat = (nodes: TreeNode[]): any[] => {
       return nodes.map(node => {
-        const borderColor = getHealthColor(getNodeErrorRate(node), isDarkMode)
+        const errorRate = getNodeErrorRate(node)
+        const serviceColor = data.getNodeServiceColor?.(node)
+          || getServiceColorHex(node.name, isDarkMode ? 'dark' : 'light')
+        const borderColor = errorRate > 0
+          ? (isDarkMode ? '#ef4444' : '#dc2626') // Red for error spans
+          : serviceColor
         const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3"
+        const fillColor = isDarkMode ? "#1a1f2e" : "#ffffff"
 
         return {
           name: node.name,
           value: node.value,
+          symbol: getCircleSvg(fillColor, borderColor, 4),
           symbolSize: nodeSize === 'dynamic' ?
             Math.max(20, Math.min(50, Math.log10((node.value || 0) + 1) * 8)) :
             symbolSize,
@@ -86,7 +109,7 @@ export function createTreeVisualizationEngine() {
           itemStyle: {
             color: isDarkMode ? "#1a1f2e" : "#ffffff",
             borderColor: borderColor,
-            borderWidth: 3, // Slightly thinner for default state
+            borderWidth: 4, // Service-color border always visible
             borderType: "solid",
             shadowBlur: 10,
             shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
@@ -98,8 +121,8 @@ export function createTreeVisualizationEngine() {
             scale: true,
             scaleSize: 1.15,
             itemStyle: {
-              borderColor: borderColor, // Maintain health color on hover
-              borderWidth: 4, // Slightly thicker on hover
+              borderColor: borderColor, // Maintain service/error color on hover
+              borderWidth: 5, // Slightly thicker on hover
               shadowBlur: 20,
               shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.3)",
             },
@@ -111,8 +134,8 @@ export function createTreeVisualizationEngine() {
           },
           select: {
             itemStyle: {
-              borderColor: borderColor, // Keep health color
-              borderWidth: 5, // Thicker border when selected
+              borderColor: borderColor, // Keep service/error color
+              borderWidth: 6, // Thicker border when selected
               borderType: "solid",
               shadowBlur: 45,
               shadowColor: "rgba(59, 130, 246, 0.9)", // Prominent blue glow for selection
