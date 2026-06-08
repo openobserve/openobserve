@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="full-height"
         v-model="splitterModel"
         :horizontal="true"
+        unit="px"
+        :limits="[85, 400]"
         :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         @update:model-value="onSplitterUpdate"
       >
@@ -699,7 +701,7 @@ export default defineComponent({
     const isLogsMounted = ref(false);
 
     const expandedLogs = ref([]);
-    const splitterModel = ref(10);
+    const splitterModel = ref(90);
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -2314,8 +2316,8 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand splitter to 15 when either editor has >2 lines; collapse to 10 otherwise.
-    // Never overrides a user-set value above 15.
+    // Auto-expand splitter to 165px when either editor has >2 lines; collapse to 130px otherwise.
+    // Never overrides a user-set value above 165px.
     watch(
       [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent],
       ([queryValue, fnValue]) => {
@@ -2323,10 +2325,10 @@ export default defineComponent({
         const fnLines = (fnValue || '').split('\n').length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
 
-        if (hasMoreThanTwoLines && splitterModel.value < 15) {
-          splitterModel.value = 15;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= 15) {
-          splitterModel.value = 10;
+        if (hasMoreThanTwoLines && splitterModel.value < 130) {
+          splitterModel.value = 130;
+        } else if (!hasMoreThanTwoLines && splitterModel.value <= 130) {
+          splitterModel.value = 83;
         }
       },
       { immediate: true },

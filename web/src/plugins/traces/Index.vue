@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
         :horizontal="true"
+        unit="px"
+        :limits="[85, 400]"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.125rem]!'
@@ -423,7 +425,7 @@ const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const llmInsightsRef = ref<any>(null);
 const sessionsListRef = ref<any>(null);
-const splitterModel = ref(10);
+const splitterModel = ref(90);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
