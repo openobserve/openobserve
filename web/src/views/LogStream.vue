@@ -155,7 +155,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div v-if="!loadingState">
-              <OEmptyState size="hero" preset="no-streams" hide-action />
+              <OEmptyState
+                size="hero"
+                preset="no-streams"
+                :filtered="!!filterQuery"
+                :hide-action="!filterQuery"
+                @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              />
             </div>
           </template>
           <template #bottom="scope">

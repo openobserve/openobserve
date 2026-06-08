@@ -407,6 +407,12 @@ export default defineComponent({
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
       },
+      {
+        title: t("menu.settings"),
+        icon: "settings",
+        link: "/settings",
+        name: "settings",
+      },
     ]);
 
     const langList = [
