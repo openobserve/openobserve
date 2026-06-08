@@ -1058,7 +1058,7 @@ pub struct Common {
     pub feature_enrichment_broadcast_join_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = false,
+        default = true,
         help = "Enable pushdown filter"
     )]
     pub feature_pushdown_filter_enabled: bool,
