@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template v-slot:before>
       <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel el-border-radius">
+        <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
           <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
             <OTabs
               v-model="selectedCategory"
