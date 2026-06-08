@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col logs-index-menu tw:pr-[0.375rem]! tw:h-[calc(100%-0.7rem)] tw:bg-surface-panel!"
+    class="tw:flex tw:flex-col logs-index-menu tw:pr-[0.375rem]! tw:h-full tw:bg-surface-panel!"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
