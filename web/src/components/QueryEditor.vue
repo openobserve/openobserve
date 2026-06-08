@@ -540,6 +540,18 @@ defineExpose({
     }
   },
 
+  // Error diagnostics
+  addErrorDiagnostics: (ranges: any[]) => {
+    if (editorRef.value?.addErrorDiagnostics) {
+      editorRef.value.addErrorDiagnostics(ranges);
+    }
+  },
+  clearErrorDiagnostics: () => {
+    if (editorRef.value?.addErrorDiagnostics) {
+      editorRef.value.addErrorDiagnostics([]);
+    }
+  },
+
   // State (for parent components that need to read generation status)
   isGenerating: computed(() => isGenerating.value),
 
