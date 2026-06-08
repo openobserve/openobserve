@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </q-tooltip>
                 </q-route-tab>
                 <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
+                  v-if="false"
                   data-test="eval-templates-tab"
                   name="evalTemplates"
                   :to="{

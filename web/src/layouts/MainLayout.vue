@@ -376,10 +376,7 @@ export default defineComponent({
     });
 
     const isIncidentsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.incidents_enabled
-      );
+      return false;
     });
 
     const orgOptions = ref([{ label: Number, value: String }]);
