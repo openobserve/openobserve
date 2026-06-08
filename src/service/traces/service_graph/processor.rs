@@ -65,7 +65,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         next_updated_at = now;
     }
 
-    log::debug!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
+    log::info!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
 
     // Query usage stream to find which streams have recent ingestion activity
     let sql = r#"SELECT org_id, stream_name
@@ -123,6 +123,8 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     }
 
     // update last updated at
+    let next_updated_at = last_updated_at
+        + get_o2_config().service_graph.processing_interval_secs as i64 * 60 * 1_000_000;
     crate::service::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone()))
         .await?;
 
