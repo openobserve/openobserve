@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :target="target"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:first:mt-1 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0.5 tw:py-1 tw:min-h-0 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       'tw:text-tabs-inactive-text',
       { 'menu-link-function': title === 'Functions' }
     ]"
@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="ariaLabel"
     @click.prevent="openWebPage(link)"
   >
-    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-1 tw:w-full">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="'tw:text-tabs-inactive-text tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600'"
       >
         <OIcon
@@ -50,11 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:[hyphens:auto] tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-1 tw:w-full">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:[hyphens:auto] tw:leading-tight"
         :class="'tw:text-tabs-inactive-text tw:group-hover:text-tabs-active-text'"
       >{{ title }}</div>
     </div>
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     :class="[
       'nav-menu-item',
-      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:p-1 tw:min-h-6 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
+      'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0.5 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       isActive
         ? 'tw:text-primary-700 tw:bg-surface-base tw:shadow-sm'
         : 'tw:text-tabs-inactive-text tw:hover:bg-primary-200',
@@ -101,9 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-current="isActive ? 'page' : undefined"
     :aria-label="ariaLabel"
   >
-    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-1 tw:w-full">
+    <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="isActive
           ? 'tw:text-primary-700!'
           : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
@@ -122,15 +122,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:[hyphens:auto] tw:leading-tight"
         :class="isActive
           ? 'tw:font-semibold tw:text-primary-600!'
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
-    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-1 tw:w-full">
+    <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-xl tw:p-1 tw:transition-colors tw:duration-250"
+        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="[
           isActive ? 'tw:text-primary-700!' : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'
         ]"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:leading-tight"
+        class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:wrap-break-word tw:[hyphens:auto] tw:leading-tight"
         :class="isActive
           ? 'tw:font-semibold tw:text-primary-600!'
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"

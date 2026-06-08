@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem]"
+    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:py-1"
     @keydown="handleKeydown"
   >
     <!-- Single shared accent bar — slides to whichever item is active so the
@@ -167,3 +167,28 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 </script>
+
+<style scoped>
+/* Slim, unobtrusive scrollbar that floats in the reserved gutter
+   (scrollbar-gutter: stable) so it never steals width from the labels. */
+.o2-navbar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.o2-navbar-scroll:hover {
+  scrollbar-color: var(--color-border-soft, rgba(148, 163, 184, 0.5)) transparent;
+}
+.o2-navbar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.o2-navbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.o2-navbar-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+}
+.o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
+}
+</style>
