@@ -995,11 +995,6 @@ export default defineComponent({
   max-width: 160px;
 }
 
-.empty-function .monaco-editor-background {
-  background-image: url("../../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
 
 // .query-tabs-container {
 //   width: 100%;

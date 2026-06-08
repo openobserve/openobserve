@@ -25,6 +25,9 @@ export const patternsState = ref({
   lastQuery: null as SearchRequestPayload | null,
 });
 
+// Module-level abort controller — one in-flight request at a time
+let patternAbortController: AbortController | null = null;
+
 /**
  * Composable for pattern extraction - completely separate from logs flow
  */
@@ -43,6 +46,8 @@ export default function usePatterns() {
       return;
     }
 
+    patternAbortController = new AbortController();
+
     try {
       patternsState.value.loading = true;
       patternsState.value.error = null;
@@ -54,6 +59,7 @@ export default function usePatterns() {
         org_identifier,
         stream_name,
         query: queryReq,
+        signal: patternAbortController.signal,
       });
 
       // console.log("[Patterns] API Response:", response.data);
@@ -94,6 +100,10 @@ export default function usePatterns() {
       //   "patterns found",
       // );
     } catch (error: any) {
+      // Axios wraps AbortSignal cancellations as CanceledError
+      if (error?.name === "CanceledError" || error?.name === "AbortError") {
+        return;
+      }
       console.error("[Patterns] Error extracting patterns:", error);
       patternsState.value.error =
         error?.response?.data?.message ||
@@ -101,7 +111,19 @@ export default function usePatterns() {
       throw error;
     } finally {
       patternsState.value.loading = false;
+      patternAbortController = null;
     }
+  };
+
+  /**
+   * Cancel an in-flight pattern extraction request
+   */
+  const cancelPatterns = () => {
+    if (patternAbortController) {
+      patternAbortController.abort();
+      patternAbortController = null;
+    }
+    patternsState.value.loading = false;
   };
 
   /**
@@ -126,5 +148,6 @@ export default function usePatterns() {
     extractPatterns,
     clearPatterns,
     hasPatterns,
+    cancelPatterns,
   };
 }

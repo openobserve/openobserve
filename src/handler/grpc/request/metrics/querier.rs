@@ -121,10 +121,27 @@ impl Metrics for MetricsQuerier {
             req.query.as_ref().unwrap().label_selector,
         );
 
+        #[cfg(feature = "enterprise")]
+        let trace_id = req.job.as_ref().unwrap().trace_id.clone();
+
+        // Register trace_id in SEARCH_SERVER so selector_load_data_inner can
+        // insert_sender — without this the engine returns SearchCancelQuery
+        // immediately (same registration the `query` handler performs).
+        #[cfg(feature = "enterprise")]
+        if !SEARCH_SERVER.contain_key(&trace_id).await {
+            SEARCH_SERVER
+                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
+                .await;
+        }
+
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
             if let Err(e) = crate::service::promql::search::grpc::data(&req, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
+            }
+            #[cfg(feature = "enterprise")]
+            if !SEARCH_SERVER.is_leader(&trace_id).await {
+                SEARCH_SERVER.remove(&trace_id, false).await;
             }
         });
 

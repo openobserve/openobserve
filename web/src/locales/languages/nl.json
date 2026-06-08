@@ -404,7 +404,18 @@
     "selectLogStream": "Stream van logboeken selecteren",
     "noData": "Geen gegevens beschikbaar",
     "functionEditorLabel": "Functie-editor",
-    "loadingStream": "Stream wordt geladen..."
+    "loadingStream": "Stream wordt geladen...",
+    "hideHistogram": "Histogram verbergen",
+    "disableQuickMode": "Schakel de snelle modus uit",
+    "menuGroupSetOnce": "Eenmaal instellen",
+    "menuGroupSavedViews": "Opgeslagen weergaven",
+    "menuGroupTools": "Hulpmiddelen",
+    "menuGroupHistory": "Historie",
+    "menuGroupDownloads": "Downloads",
+    "menuGroupSchedule": "Schema",
+    "menuGroupInspect": "Inspecteer",
+    "validSql": "Geldige SQL",
+    "invalidSql": "Ongeldige vraag"
   },
   "menu": {
     "home": "Home",

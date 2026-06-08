@@ -15,8 +15,9 @@
 
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, entity::prelude::*,
+    QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
 };
+use serde::{Deserialize, Serialize};
 
 use super::{
     entity::org_ingestion_tokens::{ActiveModel, Column, Entity, Model},
@@ -29,7 +30,7 @@ use crate::{
 
 pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrgIngestionTokenRecord {
     pub id: String,
     pub org_id: String,
@@ -107,6 +108,47 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
         },
     }
+}
+
+/// Insert or update an org ingestion token row by primary key (`id`).
+///
+/// Used by super-cluster sync to replicate a token record exactly as it exists
+/// on the originating cluster, preserving timestamps. On conflict on `id` the
+/// mutable columns are overwritten.
+pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let model = ActiveModel {
+        id: Set(record.id.clone()),
+        org_id: Set(record.org_id.clone()),
+        name: Set(record.name.clone()),
+        token: Set(record.token.clone()),
+        description: Set(record.description.clone()),
+        is_default: Set(record.is_default),
+        enabled: Set(record.enabled),
+        created_by: Set(record.created_by.clone()),
+        created_at: Set(record.created_at),
+        updated_at: Set(record.updated_at),
+    };
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::insert(model)
+        .on_conflict(
+            OnConflict::column(Column::Id)
+                .update_columns([
+                    Column::OrgId,
+                    Column::Name,
+                    Column::Token,
+                    Column::Description,
+                    Column::IsDefault,
+                    Column::Enabled,
+                    Column::UpdatedAt,
+                ])
+                .to_owned(),
+        )
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(())
 }
 
 /// Find a token by org_id and token value. Only returns enabled tokens.
@@ -190,6 +232,24 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(())
+}
+
+/// Delete a single token row by org_id and token value.
+///
+/// Used by super-cluster sync to remove a token (e.g. the old value after a
+/// rotation) on a receiving cluster.
+pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Token.eq(token))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;

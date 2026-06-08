@@ -84,7 +84,7 @@ test.describe("Streaming for logs", () => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
         await pm.streamsPage.kubernetesContainerNameJoinLike();
-        await pm.streamsPage.enableSQLMode();
+        // SQL mode is now auto-detected from query content — no manual toggle needed
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.validateResult();
     });
@@ -95,7 +95,7 @@ test.describe("Streaming for logs", () => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
         await pm.streamsPage.kubernetesContainerNameLeftJoin();
-        await pm.streamsPage.enableSQLMode();
+        // SQL mode is now auto-detected from query content — no manual toggle needed
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.validateResult();
     });
@@ -106,7 +106,7 @@ test.describe("Streaming for logs", () => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
         await pm.streamsPage.kubernetesContainerNameRightJoin();
-        await pm.streamsPage.enableSQLMode();
+        // SQL mode is now auto-detected from query content — no manual toggle needed
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.validateResult();
     });
@@ -127,8 +127,8 @@ test.describe("Streaming for logs", () => {
     }, async ({ page }) => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        await pm.streamsPage.enableSQLMode();
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();
@@ -140,8 +140,8 @@ test.describe("Streaming for logs", () => {
     }, async ({ page }) => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        await pm.streamsPage.enableSQLMode();
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();
@@ -154,8 +154,8 @@ test.describe("Streaming for logs", () => {
         testLogger.info('Testing add/remove interesting fields');
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexAndStreamJoin();
-        await pm.streamsPage.enableSQLMode();
-        await pm.streamsPage.clickQuickModeToggle();
+        // Ensure quick mode is ON (not a blind toggle — avoids turning it OFF if already ON)
+        await pm.streamsPage.enableQuickModeIfDisabled();
         await pm.streamsPage.clickAllFieldsButton();
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.clickInterestingFields();
@@ -181,7 +181,7 @@ test.describe("Streaming for logs", () => {
     }, async ({ page }) => {
         await pm.streamsPage.navigateToLogs();
         await pm.streamsPage.selectIndexStreamDefault();
-        await pm.streamsPage.enableSQLMode();
+        // SQL mode toggle removed — typing a SELECT query auto-enables SQL mode
         await pm.streamsPage.clearAndFillQueryEditor('SELECT count(_timestamp)  FROM "default" where code = 201');
         await pm.streamsPage.selectRunQuery();
         await pm.streamsPage.expectNoDataFoundForHistogram();
