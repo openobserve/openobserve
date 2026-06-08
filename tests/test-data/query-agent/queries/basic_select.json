@@ -677,7 +677,7 @@
     },
     {
       "id": "Q025",
-      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan FROM \"{stream}\" WHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0 ORDER BY utilization_index DESC LIMIT 12",
+      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan FROM \"{stream}\" WHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0 ORDER BY utilization_index DESC, pallet_id ASC, conveyor_lane ASC LIMIT 12",
       "category": "basic_select",
       "expected": {
         "columns": [
