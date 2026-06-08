@@ -44,6 +44,7 @@ import EmptyTrace from "./EmptyTrace.vue";
 import EmptyPipeline from "./EmptyPipeline.vue";
 import EmptyFunction from "./EmptyFunction.vue";
 import EmptyHistory from "./EmptyHistory.vue";
+import EmptySchedule from "./EmptySchedule.vue";
 import EmptyUsers from "./EmptyUsers.vue";
 import EmptyReport from "./EmptyReport.vue";
 import EmptyQuery from "./EmptyQuery.vue";
@@ -63,6 +64,7 @@ export const illustrations = {
   pipeline: EmptyPipeline,
   function: EmptyFunction,
   history: EmptyHistory,
+  schedule: EmptySchedule,
   users: EmptyUsers,
   report: EmptyReport,
   query: EmptyQuery,

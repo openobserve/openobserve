@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
                 class="tw:flex-1"
+                data-test="organizations-search-input"
               />
             </div>
           </template>

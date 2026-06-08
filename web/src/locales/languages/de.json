@@ -1666,7 +1666,12 @@
     "axisLabelTooltipNotePrefix": "Hinweis:",
     "axisLabelTooltipNoteText": " Diese Option wird für X-Achsenfelder mit Zeitreihen nicht unterstützt.",
     "allFolders": "Alle Ordner",
-    "selectFile": "Wählen Sie Datei"
+    "selectFile": "Wählen Sie Datei",
+    "multiSqlQueryLabel": "Bezeichnung abfragen",
+    "multiSqlQueryLabelHint": "Benutzerdefinierter Name für diese Abfrage in Legenden (z. B. 'Production')",
+    "multiQueryWarning": "Nur Abfrage 1 wird für {chartType} gerendert",
+    "trellisNotSupportedWithMultiQuery": "Das Trellis-Layout ist bei mehreren Abfragen deaktiviert. Entfernen Sie zusätzliche Abfragen, um Trellis zu verwenden.",
+    "xAliasInconsistencyWarning": "X-Achsen-Aliase sind bei allen Abfragen inkonsistent: Einige verwenden ein Histogramm, andere nicht. Verwenden Sie für alle Abfragen denselben Aliastyp, um vorhersehbare Ergebnisse zu erzielen."
   },
   "panel": {
     "header": "Panel",
@@ -4291,6 +4296,10 @@
     "noBackfillJobs": {
       "title": "Keine Backfill-Jobs",
       "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
+    },
+    "noSearchJobs": {
+      "title": "Keine geplanten Suchaufträge",
+      "description": "Langfristige Suchanfragen, die Sie planen, werden hier angezeigt. Dort können Sie ihren Status verfolgen und die Ergebnisse einsehen, sobald sie abgeschlossen sind."
     }
   },
   "onlineEvals": {

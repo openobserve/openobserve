@@ -852,6 +852,13 @@ export const usePanelFields = ({
     ) {
       dashboardPanelData.meta.stream.customQueryFields = [];
       dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+      // Also clear per-query field cache in meta
+      const currentIdx = dashboardPanelData.layout.currentQueryIndex;
+      if (dashboardPanelData.meta.queryFields[currentIdx]) {
+        dashboardPanelData.meta.queryFields[currentIdx].customQueryFields = [];
+        dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList =
+          [];
+      }
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x.splice(
@@ -920,7 +927,7 @@ export const usePanelFields = ({
   };
 
   const resetFields = () => {
-    // Preserve stream name and type across field resets ΓÇö these identify
+    // Preserve stream name and type across field resets — these identify
     // which stream the query targets and should not change when chart type
     // or field layout changes.
     const currentFields =

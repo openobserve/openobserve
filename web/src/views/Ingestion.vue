@@ -87,6 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <template #tabs>
+        <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
+             up with the vertical sub-nav (Kubernetes/…) in the section below. -->
+        <div class="tw:-ml-3 tw:w-full">
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"
@@ -144,6 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('ingestion.otherLabel')"
           />
         </OTabs>
+        </div>
       </template>
     </AppPageHeader>
     <ConfirmDialog

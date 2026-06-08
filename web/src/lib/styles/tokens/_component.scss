@@ -157,7 +157,7 @@
   --color-tabs-active-bg: var(--color-primary-100);
   --color-tabs-inactive-text: var(--color-text-heading);
   --color-tabs-hover-text: var(--color-text-primary);
-  --color-tabs-hover-bg: var(--color-primary-50);
+  --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
   --color-tabs-focus-ring: var(--color-primary-400);
