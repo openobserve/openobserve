@@ -1666,7 +1666,12 @@
     "axisLabelTooltipNotePrefix": "Nota:",
     "axisLabelTooltipNoteText": " Essa opção não é suportada para campos do eixo x de séries temporais.",
     "allFolders": "Todas as pastas",
-    "selectFile": "Selecionar arquivo"
+    "selectFile": "Selecionar arquivo",
+    "multiSqlQueryLabel": "Rótulo de consulta",
+    "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
+    "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
+    "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
   },
   "panel": {
     "header": "Painel",

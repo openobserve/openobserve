@@ -27,13 +27,17 @@ import { getDataValue } from "./aliasUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
+  // Validate that at least one query has all required fields
+  const hasValidQuery = panelSchema.queries?.some(
+    (query: any) =>
+      query.fields?.source && query.fields?.target && query.fields?.value,
+  );
+
   if (
     !Array.isArray(searchQueryData) ||
     searchQueryData.length === 0 ||
     !searchQueryData[0] ||
-    !panelSchema.queries[0].fields.source ||
-    !panelSchema.queries[0].fields.target ||
-    !panelSchema.queries[0].fields.value
+    !hasValidQuery
   ) {
     return { options: null };
   }
@@ -42,6 +46,7 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   const links: any[] = [];
 
   const filteredData = panelSchema.queries.map((query: any, index: any) => {
+    if (!searchQueryData[index] || !query.fields?.source) return [];
     return searchQueryData[index].filter((item: any) => {
       return (
         getDataValue(item, query.fields.source.alias) != null &&
@@ -51,17 +56,20 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
     });
   });
 
-  filteredData.forEach((queryData: any) => {
+  filteredData.forEach((queryData: any, queryIndex: number) => {
+    const query = panelSchema.queries[queryIndex];
+    if (!query?.fields?.source) return;
+
     queryData.forEach((item: any) => {
       const source = getDataValue(
         item,
-        panelSchema.queries[0].fields.source.alias,
+        query.fields.source.alias,
       );
       const target = getDataValue(
         item,
-        panelSchema.queries[0].fields.target.alias,
+        query.fields.target.alias,
       );
-      let value = getDataValue(item, panelSchema.queries[0].fields.value.alias);
+      let value = getDataValue(item, query.fields.value.alias);
 
       if (source && target && value) {
         nodes.add(source);
