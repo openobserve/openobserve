@@ -73,13 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
-          <div class="tw:h-full tw:border-t tw:border-border-default tw:overflow-hidden">
+          <div class="tw:h-full tw:overflow-hidden">
           <!-- Service Graph Tab Content -->
           <div
             v-if="
               activeTab === 'service-graph' && config.isEnterprise == 'true'
             "
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <service-graph
               ref="serviceGraphRef"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Services Catalog Tab Content -->
           <div
             v-if="activeTab === 'services-catalog'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <services-catalog
               ref="servicesCatalogRef"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- LLM Insights Tab Content -->
           <div
             v-if="activeTab === 'llm-insights'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <LLMInsightsDashboard
               :key="'llm-' + store.state.selectedOrganization.identifier"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Sessions Tab Content -->
           <div
             v-if="activeTab === 'sessions'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <SessionsList
               :key="'sessions-' + store.state.selectedOrganization.identifier"
