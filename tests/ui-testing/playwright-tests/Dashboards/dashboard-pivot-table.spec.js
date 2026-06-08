@@ -977,6 +977,9 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
 
+      // Remove the default seeded Y field (count) so this truly tests the no-Y case
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
+
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
