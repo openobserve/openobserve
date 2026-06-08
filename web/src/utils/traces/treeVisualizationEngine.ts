@@ -243,9 +243,12 @@ export function createTreeVisualizationEngine() {
    */
   const findNodeAtPoint = (chart: any, point: [number, number], treeData: TreeNode[]): TreeNode | null => {
     try {
+
       // Use ECharts' built-in hit detection for accurate node detection
       const zr = chart.getZr()
-      if (!zr || !zr.handler) return null
+      if (!zr || !zr.handler) {
+        return null;
+      }
 
       // Get the element at the mouse position
       const hoveredElements = zr.handler.findHover(point[0], point[1])
@@ -259,7 +262,8 @@ export function createTreeVisualizationEngine() {
       if (dataIndex === undefined || dataIndex === null) return null
 
       // Find the corresponding tree node using the data index
-      return findNodeByIndex(treeData, dataIndex)
+      const foundNode = findNodeByIndex(treeData, dataIndex);
+      return foundNode;
     } catch (error) {
       console.warn('Error in findNodeAtPoint:', error)
       return null
@@ -267,7 +271,29 @@ export function createTreeVisualizationEngine() {
   }
 
   /**
-   * Helper to find tree node by ECharts data index
+   * Helper to find tree node by name (more reliable than index)
+   * Traverses the tree data to find the node with matching name
+   */
+  const findNodeByName = (nodes: TreeNode[], targetName: string): TreeNode | null => {
+    const traverse = (nodeList: TreeNode[]): TreeNode | null => {
+      for (const node of nodeList) {
+        if (node.name === targetName || node.id === targetName) {
+          return node
+        }
+
+        if (node.children && node.children.length > 0) {
+          const found = traverse(node.children)
+          if (found) return found
+        }
+      }
+      return null
+    }
+
+    return traverse(nodes)
+  }
+
+  /**
+   * Helper to find tree node by ECharts data index (fallback method)
    * Traverses the tree data to find the node at the given index
    */
   const findNodeByIndex = (nodes: TreeNode[], targetIndex: number): TreeNode | null => {
@@ -296,12 +322,14 @@ export function createTreeVisualizationEngine() {
    * Follows exact Service Graph tooltip patterns for consistency
    */
   const setupTraceNodeTooltips = (chart: any, data: TreeVisualizationData): (() => void) => {
+
     const chartDom = chart.getDom()
+
     const store = useStore()
 
     // Create tooltip element with Service Graph styling
     const tooltipEl = document.createElement("div")
-    const isDarkMode = store.state.theme === 'dark'
+    const isDarkMode = store?.state?.theme === 'dark'
 
     // Exact styling from Service Graph implementation
     tooltipEl.style.cssText = `
@@ -360,7 +388,9 @@ export function createTreeVisualizationEngine() {
     }
 
     const showNodeTooltip = (mouseX: number, mouseY: number, node: TreeNode) => {
+
       const tooltipContent = data.getNodeTooltip(node)
+
       tooltipEl.innerHTML = tooltipContent
       positionTooltip(mouseX, mouseY)
     }
@@ -370,20 +400,35 @@ export function createTreeVisualizationEngine() {
       activeNodeId = null
     }
 
-    // Mouse event handling with Service Graph timing and proper timer management
-    const onMouseMove = (e: any) => {
-      const hoveredNode = findNodeAtPoint(chart, [e.offsetX, e.offsetY], data.treeData)
+    // ECharts event handling - use built-in hover events directly on chart elements
+    const onNodeMouseOver = (params: any) => {
+      if (!params || !params.data) return;
+
+      // Use node name to find matching TreeNode instead of unreliable dataIndex
+      const hoveredNode = findNodeByName(data.treeData, params.data.name);
 
       if (hoveredNode && hoveredNode.id !== activeNodeId) {
+
         // Clear any existing timer to prevent race conditions
         if (hideTimer) {
           clearTimeout(hideTimer)
           hideTimer = null
         }
+
         activeNodeId = hoveredNode.id
-        showNodeTooltip(e.offsetX, e.offsetY, hoveredNode)
-      } else if (!hoveredNode && activeNodeId) {
-        // Always clear existing timer before setting new one
+
+        // Use event pixel coordinates if available, otherwise use chart center
+        const mouseX = params.event?.offsetX || chartDom.clientWidth / 2;
+        const mouseY = params.event?.offsetY || chartDom.clientHeight / 2;
+
+        showNodeTooltip(mouseX, mouseY, hoveredNode)
+      }
+    }
+
+    const onNodeMouseOut = (params: any) => {
+
+      if (activeNodeId) {
+        // Clear existing timer before setting new one
         if (hideTimer) {
           clearTimeout(hideTimer)
         }
@@ -394,7 +439,7 @@ export function createTreeVisualizationEngine() {
       }
     }
 
-    const onMouseLeave = () => {
+    const onChartMouseLeave = () => {
       if (hideTimer) {
         clearTimeout(hideTimer)
         hideTimer = null
@@ -402,16 +447,17 @@ export function createTreeVisualizationEngine() {
       hideTooltip()
     }
 
-    // Register mouse events
-    const zr = chart.getZr()
-    zr.on("mousemove", onMouseMove)
-    zr.on("globalout", onMouseLeave)
+    // Register ECharts events directly on chart elements
+    chart.on('mouseover', onNodeMouseOver)
+    chart.on('mouseout', onNodeMouseOut)
+    chart.on('globalout', onChartMouseLeave)
 
     // Cleanup function
     return () => {
       if (hideTimer) clearTimeout(hideTimer)
-      zr.off("mousemove", onMouseMove)
-      zr.off("globalout", onMouseLeave)
+      chart.off('mouseover', onNodeMouseOver)
+      chart.off('mouseout', onNodeMouseOut)
+      chart.off('globalout', onChartMouseLeave)
       tooltipEl.remove()
     }
   }
@@ -420,6 +466,7 @@ export function createTreeVisualizationEngine() {
     generateEChartsOptions,
     setupTraceNodeTooltips,
     findNodeAtPoint, // Export for testing
+    findNodeByName, // Export helper for testing
     findNodeByIndex, // Export helper for testing
     getHealthColor
   }

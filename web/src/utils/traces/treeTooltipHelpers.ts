@@ -177,7 +177,7 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
  */
 export const generatePatternNodeTooltipContent = (metadata: any): string => {
   if (!metadata) return '';
-
+  // console.log('[TOOLTIP CONTENT DEBUG] metadata:', metadata);
   const {
     pathSignature = 'Unknown Pattern',
     count = 1,
@@ -213,17 +213,30 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
 export const generateTracePatternTooltipContent = (metadata: any): string => {
   if (!metadata) {
     return `
-      <div class="tree-tooltip">
-        <div class="tooltip-header">Unknown Pattern</div>
-        <div class="tooltip-metrics">
-          <div>Calls: 1</div>
-          <div>Average: 0.0ms</div>
-          <div>Minimum: 0.0ms</div>
-          <div>Maximum: 0.0ms</div>
-          <div>P75: 0.0ms</div>
-          <div>P95: 0.0ms</div>
-          <div>P99: 0.0ms</div>
-          <div>Error Rate: 0.0%</div>
+      <div style="
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 280px;
+        color: rgba(255, 255, 255, 0.88);
+      ">
+        <div style="
+          font-weight: 600;
+          font-size: 13px;
+          margin-bottom: 8px;
+          color: rgba(255, 255, 255, 0.95);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding-bottom: 4px;
+        ">Unknown Pattern</div>
+        <div>
+          <div style="margin-bottom: 2px;">Calls: <span style="font-family: monospace;">1</span></div>
+          <div style="margin-bottom: 2px;">Average: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Minimum: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Maximum: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P75: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P95: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">P99: <span style="font-family: monospace;">0.0ms</span></div>
+          <div style="margin-bottom: 2px;">Error Rate: <span style="font-family: monospace; color: #10b981;">0.0%</span></div>
         </div>
       </div>
     `;
@@ -242,17 +255,31 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
   } = metadata;
 
   return `
-    <div class="tree-tooltip">
-      <div class="tooltip-header">${pathSignature}</div>
-      <div class="tooltip-metrics">
-        <div>Calls: ${count}</div>
-        <div>Average: ${avg.toFixed(1)}ms</div>
-        <div>Minimum: ${min.toFixed(1)}ms</div>
-        <div>Maximum: ${max.toFixed(1)}ms</div>
-        <div>P75: ${p75.toFixed(1)}ms</div>
-        <div>P95: ${p95.toFixed(1)}ms</div>
-        <div>P99: ${p99.toFixed(1)}ms</div>
-        <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+    <div style="
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      max-width: 280px;
+      color: rgba(255, 255, 255, 0.88);
+    ">
+      <div style="
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 8px;
+        color: rgba(255, 255, 255, 0.95);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+      ">${pathSignature}</div>
+
+      <div>
+        <div style="margin-bottom: 2px;">Calls: <span style="font-family: monospace;">${count}</span></div>
+        <div style="margin-bottom: 2px;">Average: <span style="font-family: monospace;">${avg.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">Minimum: <span style="font-family: monospace;">${min.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">Maximum: <span style="font-family: monospace;">${max.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P75: <span style="font-family: monospace;">${p75.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P95: <span style="font-family: monospace;">${p95.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 2px;">P99: <span style="font-family: monospace;">${p99.toFixed(1)}ms</span></div>
+        <div>Error Rate: <span style="font-family: monospace; color: ${errorRate > 0 ? '#ef4444' : '#10b981'};">${errorRate.toFixed(1)}%</span></div>
       </div>
     </div>
   `;
