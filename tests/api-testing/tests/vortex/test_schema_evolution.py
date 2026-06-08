@@ -239,3 +239,125 @@ class TestSchemaEvolutionEdgeCases:
 
         total = count_records(client, s)
         assert total == 5
+
+
+# ─── Section 2.6: Incompatible type changes ────────────────────────────────────
+
+class TestIncompatibleTypeChanges:
+    """Scenarios A–F: a field's type changes to an incompatible type across batches.
+
+    Each test ingests Batch 1 (type T1), flushes to disk, then ingests Batch 2
+    (type T2) and flushes again — ensuring the two batches end up in separate
+    files with different schemas. Assertions verify:
+      1. No crash — total record count is intact after the type change.
+      2. A type-specific filter returns only the matching batch's records;
+         the other batch's records are excluded without error.
+    """
+
+    def test_scenario_a_bool_to_string(self, client):
+        """Scenario A: flag bool→string. WHERE flag='yes' matches only Batch 2."""
+        s = _stream("bool_to_str")
+        b1 = [{"_timestamp": _ts(i), "flag": True, "batch": 1} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "flag": "yes", "batch": 2} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="flag = 'yes'")
+        assert matched == 5, f"WHERE flag='yes' should match only Batch 2 (5 records); got {matched}"
+
+    def test_scenario_b_float_to_string(self, client):
+        """Scenario B: score float→string. WHERE score='high' matches only Batch 2."""
+        s = _stream("float_to_str")
+        b1 = [{"_timestamp": _ts(i), "score": 3.14, "batch": 1} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "score": "high", "batch": 2} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="score = 'high'")
+        assert matched == 5, f"WHERE score='high' should match only Batch 2 (5 records); got {matched}"
+
+    def test_scenario_c_int_to_string(self, client):
+        """Scenario C: code int→string. WHERE code='foo' matches only Batch 2."""
+        s = _stream("int_to_str")
+        b1 = [{"_timestamp": _ts(i), "code": 100, "batch": 1} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "code": "foo", "batch": 2} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="code = 'foo'")
+        assert matched == 5, f"WHERE code='foo' should match only Batch 2 (5 records); got {matched}"
+
+    def test_scenario_d_bool_to_int(self, client):
+        """Scenario D: active bool→int. WHERE active=1 matches only Batch 2."""
+        s = _stream("bool_to_int")
+        b1 = [{"_timestamp": _ts(i), "active": True, "batch": 1} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "active": 1, "batch": 2} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="active = 1")
+        assert matched == 5, f"WHERE active=1 should match only Batch 2 (5 records); got {matched}"
+
+    def test_scenario_e_bool_to_float(self, client):
+        """Scenario E: ratio bool→float. WHERE ratio>0.7 matches only the high-value Batch 2 records."""
+        s = _stream("bool_to_float")
+        # Batch 1: all True — should NOT match a float > 0.7 filter
+        b1 = [{"_timestamp": _ts(i), "ratio": True, "batch": 1} for i in range(5)]
+        # Batch 2: 3 records at 1.0 (>0.7), 2 records at 0.5 (<0.7)
+        b2 = [
+            {"_timestamp": _ts(100 + i), "ratio": 1.0 if i % 2 == 0 else 0.5, "batch": 2}
+            for i in range(5)
+        ]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="ratio > 0.7")
+        assert matched == 3, f"WHERE ratio>0.7 should match 3 Batch 2 records (ratio=1.0); got {matched}"
+
+    def test_scenario_f_int_to_float(self, client):
+        """Scenario F: value int→float. WHERE value>1.2 matches only Batch 2."""
+        s = _stream("int_to_float")
+        # Batch 1: value=1 — 1 < 1.2 so should NOT match even after coercion
+        b1 = [{"_timestamp": _ts(i), "value": 1, "batch": 1} for i in range(5)]
+        b2 = [{"_timestamp": _ts(100 + i), "value": 1.5, "batch": 2} for i in range(5)]
+
+        ingest(client, s, b1)
+        flush_and_wait(client, s, expected=5)
+        ingest(client, s, b2)
+        flush_and_wait(client, s, expected=10)
+
+        total = count_records(client, s)
+        assert total == 10, f"expected 10 total records; got {total}"
+
+        matched = count_records(client, s, where="value > 1.2")
+        assert matched == 5, f"WHERE value>1.2 should match only Batch 2 (5 records); got {matched}"
