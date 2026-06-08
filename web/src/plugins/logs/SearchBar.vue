@@ -1608,6 +1608,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
+import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
@@ -2139,21 +2140,8 @@ export default defineComponent({
     // Responsive breakpoint: share button moves into overflow menu at narrow widths
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
 
-    // Track window width for responsive toolbar layout (share button breakpoint)
-    // Measure the ACTUAL available width for the left section:
-    //   availableLeftWidth = bar container width − right section width − bar padding (14px)
-    // Both sides are observed via ResizeObserver so any layout shift (window resize,
-    // panel open/close, sidebar toggle) is handled automatically.
-    const toolbarLeftRef  = ref<HTMLElement | null>(null);
-    const toolbarRightRef = ref<HTMLElement | null>(null);
-    const toolbarBarWidth   = ref(window.innerWidth);
-    const toolbarRightWidth = ref(0);
-    let toolbarResizeObserver: ResizeObserver | null = null;
-    let toolbarRightObserver:  ResizeObserver | null = null;
-
-    const availableLeftWidth = computed(() =>
-      Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14),
-    );
+    // Responsive toolbar — width tracking via shared composable
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
 
     // Approximate rendered widths of left-section content at each collapse state:
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
@@ -2818,23 +2806,6 @@ export default defineComponent({
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
 
-      // Observe the bar container (parent of left section) for total width.
-      const barEl = toolbarLeftRef.value?.parentElement;
-      if (barEl) {
-        toolbarBarWidth.value = barEl.getBoundingClientRect().width;
-        toolbarResizeObserver = new ResizeObserver((entries) => {
-          toolbarBarWidth.value = entries[0]?.contentRect.width ?? 0;
-        });
-        toolbarResizeObserver.observe(barEl);
-      }
-      // Observe the right section so its actual rendered width is always known.
-      if (toolbarRightRef.value) {
-        toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
-        toolbarRightObserver = new ResizeObserver((entries) => {
-          toolbarRightWidth.value = entries[0]?.contentRect.width ?? 0;
-        });
-        toolbarRightObserver.observe(toolbarRightRef.value);
-      }
     });
 
     onUnmounted(() => {
@@ -2843,8 +2814,6 @@ export default defineComponent({
       });
       window.removeEventListener("keydown", handleEscKey);
       window.removeEventListener("resize", onWindowResize);
-      toolbarResizeObserver?.disconnect();
-      toolbarRightObserver?.disconnect();
     });
 
     onActivated(() => {

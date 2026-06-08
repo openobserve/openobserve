@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="search-bar-component tw:h-full" id="searchBarComponent">
     <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
-      <div class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
+      <div ref="toolbarLeftRef" class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem] tw:flex-1 tw:min-w-0 tw:overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -27,42 +27,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-mode-spans-btn"
             value="spans"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Spans' : undefined"
           >
             <template #icon-left
               ><OIcon name="layers" size="sm" class="tw:shrink-0"
             /></template>
-            Spans
+            <span v-if="!shouldHideToggleText">Spans</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-traces-btn"
             value="traces"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Traces' : undefined"
           >
             <template #icon-left
               ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
             /></template>
-            Traces
+            <span v-if="!shouldHideToggleText">Traces</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             v-if="config.isEnterprise == 'true'"
             data-test="traces-service-graph-toggle"
             value="service-graph"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Service Graph' : undefined"
           >
             <template #icon-left
               ><OIcon name="share" size="sm" class="tw:shrink-0"
             /></template>
-            Service Graph
+            <span v-if="!shouldHideToggleText">Service Graph</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-services-catalog-btn"
             value="services-catalog"
             size="sm"
+            :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
           >
             <template #icon-left
               ><OIcon name="menu-book" size="sm" class="tw:shrink-0"
             /></template>
-            {{ t("traces.servicesCatalog.tabLabel") }}
+            <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
 
@@ -75,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'sessions'
           "
         >
-          <!-- Reset: matches logs page style (icon + text) -->
+          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
           <OButton
             data-test="traces-search-bar-reset-filters-btn"
             variant="outline"
@@ -85,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("common.reset") }}
+            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
           </OButton>
 
           <div
@@ -167,12 +171,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </ODropdown>
       </div>
+      <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
+      <div ref="toolbarRightRef" class="tw:flex-shrink-0 tw:flex tw:items-center">
       <div
         v-if="
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]"
+        class="tw:flex tw:items-center tw:gap-[0.375rem]"
       >
         <date-time
           ref="dateTimeRef"
@@ -402,6 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      </div><!-- /toolbarRightRef wrapper -->
 
     </div>
     <div
@@ -486,6 +493,7 @@ import SyntaxGuide from "./SyntaxGuide.vue";
 import { debounce } from "lodash-es";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import {
@@ -994,6 +1002,15 @@ export default defineComponent({
       _traceNoStream,
     );
 
+    // Responsive toolbar — shared composable tracks available left-section width
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+
+    // Traces-specific breakpoints (actual content widths + 60px buffer to fire before clipping):
+    //   Toggle items with text: ~682px total → hide at 750 (682+68 buffer)
+    //   After toggle icon-only (~459px) + reset text: hide reset text at 540
+    const shouldHideToggleText = computed(() => availableLeftWidth.value < 750);
+    const shouldHideResetText  = computed(() => availableLeftWidth.value < 540);
+
     return {
       t,
       router,
@@ -1025,6 +1042,10 @@ export default defineComponent({
       onServiceGraphLayoutChange,
       toggleLiveMode,
       traceEditorPlaceholder,
+      toolbarLeftRef,
+      toolbarRightRef,
+      shouldHideToggleText,
+      shouldHideResetText,
     };
   },
   computed: {
