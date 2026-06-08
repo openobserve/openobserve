@@ -4200,6 +4200,106 @@
       "queries": "domande",
       "serviceAccounts": "account di servizio",
       "invitations": "inviti"
+    },
+    "noDashboardsInFolder": {
+      "title": "Nessuna dashboard in questa cartella",
+      "description": "Questa cartella è vuota. Aggiungi qui una dashboard o spostane una da un'altra cartella.",
+      "action": "Nuova dashboard",
+      "actionDesc": "Crea una dashboard in questa cartella",
+      "import": "Dashboard di importazione",
+      "importDesc": "Carica un file JSON della dashboard",
+      "templates": "Sfoglia i modelli",
+      "templatesDesc": "Inizia da una dashboard della community"
+    },
+    "noGroups": {
+      "title": "Non ci sono ancora gruppi",
+      "description": "I gruppi consentono di gestire le autorizzazioni per più utenti contemporaneamente. Creane uno per iniziare.",
+      "action": "Nuovo gruppo",
+      "actionDesc": "Creare un gruppo di utenti"
+    },
+    "noRoles": {
+      "title": "Ancora nessun ruolo",
+      "description": "I ruoli definiscono le azioni che gli utenti possono eseguire. Crea un ruolo personalizzato per controllare l'accesso.",
+      "action": "Nuovo ruolo",
+      "actionDesc": "Definire un ruolo di accesso personalizzato"
+    },
+    "noAnomalyConfigs": {
+      "title": "Nessun rilevamento di anomalie configurato",
+      "description": "Imposta il rilevamento delle anomalie per identificare automaticamente modelli insoliti nei tuoi dati.",
+      "action": "Nuova configurazione",
+      "actionDesc": "Configurazione del rilevamento delle anomalie"
+    },
+    "noApiLimits": {
+      "title": "Nessun limite API configurato",
+      "description": "I limiti delle API controllano la quantità di dati che ogni organizzazione può acquisire e interrogare per finestra temporale."
+    },
+    "noRoleLimits": {
+      "title": "Nessun limite di ruolo configurato",
+      "description": "I limiti dei ruoli definiscono le quote di inserimento e interrogazione applicate ai singoli ruoli all'interno di un'organizzazione."
+    },
+    "noIngestionTokens": {
+      "title": "Ancora nessun token di ingestione",
+      "description": "I token di ingestione autenticano le fonti di dati durante l'invio di log, metriche e tracce.",
+      "action": "Nuovo token",
+      "actionDesc": "Genera un token di ingestione"
+    },
+    "noOrganizations": {
+      "title": "Ancora nessuna organizzazione",
+      "description": "Le organizzazioni raggruppano utenti e dati. Creane uno per iniziare."
+    },
+    "noAlertDestinations": {
+      "title": "Ancora nessuna destinazione",
+      "description": "Le destinazioni definiscono dove vengono inviate le notifiche di avviso: Slack, email, webhook e altro ancora.",
+      "action": "Nuova destinazione",
+      "actionDesc": "Connetti un canale di notifica"
+    },
+    "noAlertTemplates": {
+      "title": "Non ci sono ancora modelli",
+      "description": "I modelli definiscono il formato dei messaggi di notifica degli avvisi.",
+      "action": "Nuovo modello",
+      "actionDesc": "Creare un modello di notifica"
+    },
+    "noEnrichmentTables": {
+      "title": "Ancora nessuna tabella di arricchimento",
+      "description": "Le tabelle di arricchimento consentono di allegare un contesto aggiuntivo ai dati di registro al momento dell'interrogazione.",
+      "action": "Nuovo tavolo",
+      "actionDesc": "Crea una tabella di arricchimento"
+    },
+    "noCipherKeys": {
+      "title": "Ancora nessuna chiave di cifratura",
+      "description": "Le chiavi di cifratura vengono utilizzate per crittografare i campi sensibili nei flussi di dati.",
+      "action": "Nuova chiave",
+      "actionDesc": "Genera una chiave di cifratura"
+    },
+    "noAiToolsets": {
+      "title": "Non ci sono ancora set di strumenti di intelligenza artificiale",
+      "description": "I set di strumenti di intelligenza artificiale collegano la tua organizzazione a funzionalità di intelligenza artificiale esterne.",
+      "action": "Nuovo set di strumenti",
+      "actionDesc": "Aggiungi un set di strumenti AI"
+    },
+    "noLlmProviders": {
+      "title": "Nessun provider LLM configurato",
+      "description": "Connetti un fornitore di modelli linguistici per abilitare le funzionalità basate sull'intelligenza artificiale.",
+      "action": "Aggiungi fornitore",
+      "actionDesc": "Configurare un provider LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Nessun servizio scoperto",
+      "description": "I servizi appariranno qui automaticamente non appena inizieranno ad arrivare le tracce."
+    },
+    "noNodes": {
+      "title": "Nessun nodo disponibile",
+      "description": "I nodi del cluster verranno visualizzati qui una volta registrati."
+    },
+    "noSourceMaps": {
+      "title": "Nessuna mappa sorgente caricata",
+      "description": "Carica le mappe dei sorgenti per abilitare tracce di stack leggibili nei report di errore RUM.",
+      "action": "Carica",
+      "actionDesc": "Carica un file di mappa sorgente"
+    },
+    "noBackfillJobs": {
+      "title": "Nessun lavoro di backfill",
+      "description": "I lavori di backfill rielaborano i dati storici tramite una pipeline. Eseguine uno per iniziare."
     }
   },
   "onlineEvals": {

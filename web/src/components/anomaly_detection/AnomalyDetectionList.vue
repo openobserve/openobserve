@@ -144,9 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty state -->
       <template #empty>
-        <div class="tw:w-full tw:text-center tw:py-12 tw:text-gray-400">
-          {{ t("alerts.noDestinations") }}
-        </div>
+        <OEmptyState size="hero" preset="no-anomaly-configs" hide-action />
       </template>
     </OTable>
 
@@ -243,13 +241,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
+  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {

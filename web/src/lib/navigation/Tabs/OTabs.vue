@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OTabsProps, OTabsEmits, OTabsSlots } from './OTabs.types'
-import { computed, provide, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { computed, provide, reactive, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsRoot, TabsList } from 'reka-ui'
@@ -53,6 +53,30 @@ const context = computed<TabsContext>(() => ({
 
 provide(TABS_CONTEXT_KEY, context)
 
+// ── Sliding active indicator (horizontal only) ────────────────────────────
+// A single underline positioned over the active tab. On selection it animates
+// (translateX + width) from the previous tab to the new one. It lives inside
+// the scrolling tablist, so its offset-based coordinates stay correct while the
+// tabs scroll.
+const indicator = reactive({ left: 0, width: 0, visible: false })
+// Suppress the transition on first paint so the bar doesn't slide in from the
+// left edge on initial mount — only later selections animate.
+const indicatorReady = ref(false)
+
+function updateIndicator(): void {
+  if (isVertical.value) return
+  const list = tablistRef.value
+  if (!list) return
+  const active = list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+  if (!active) {
+    indicator.visible = false
+    return
+  }
+  indicator.left = active.offsetLeft
+  indicator.width = active.offsetWidth
+  indicator.visible = true
+}
+
 // ── Scroll arrows (horizontal only) ───────────────────────────────────────
 const hasOverflow = ref(false)
 const canScrollLeft = ref(false)
@@ -69,6 +93,8 @@ function updateScrollState(): void {
   hasOverflow.value = el.scrollWidth > el.clientWidth + 1
   canScrollLeft.value = el.scrollLeft > 1
   canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+  // Tab geometry can shift on resize (wrap/overflow) — keep the bar aligned.
+  updateIndicator()
 }
 
 function scrollTabs(direction: 1 | -1): void {
@@ -87,7 +113,11 @@ onMounted(() => {
   ro = new ResizeObserver(updateScrollState)
   ro.observe(el)
   if (tablistRef.value) ro.observe(tablistRef.value)
-  nextTick(updateScrollState)
+  nextTick(() => {
+    updateScrollState()
+    // Enable the slide animation only after the bar is placed once.
+    requestAnimationFrame(() => { indicatorReady.value = true })
+  })
 })
 
 onUnmounted(() => {
@@ -99,6 +129,8 @@ onUnmounted(() => {
 watch(() => props.modelValue, async () => {
   if (isVertical.value) return
   await nextTick()
+  // Slide the shared underline to the newly active tab.
+  updateIndicator()
   const el = scrollRef.value
   if (!el) return
   const activeTab = el.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
@@ -175,6 +207,19 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
             :class="['o-tabs tw:flex tw:flex-row tw:relative tw:px-[3px]', alignClasses[align]]"
             @focusin="handleFocusin"
           >
+            <!-- Single shared underline — slides (translateX + width) to the
+                 active tab instead of each tab drawing its own border. -->
+            <span
+              v-show="indicator.visible"
+              aria-hidden="true"
+              data-test="otabs-active-indicator"
+              class="tw:absolute tw:bottom-0 tw:left-0 tw:h-0.5 tw:rounded-full tw:bg-tabs-indicator tw:pointer-events-none tw:z-10"
+              :class="indicatorReady ? 'tw:transition-[transform,width] tw:duration-300 tw:ease-out' : ''"
+              :style="{
+                transform: `translateX(${indicator.left}px)`,
+                width: `${indicator.width}px`,
+              }"
+            />
             <slot />
           </div>
         </TabsList>

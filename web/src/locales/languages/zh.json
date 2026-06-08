@@ -4195,6 +4195,106 @@
       "queries": "查询",
       "serviceAccounts": "服务账号",
       "invitations": "邀请函"
+    },
+    "noDashboardsInFolder": {
+      "title": "此文件夹中没有仪表板",
+      "description": "这个文件夹是空的。在此处添加仪表板或将仪表板从另一个文件夹中移动。",
+      "action": "新仪表板",
+      "actionDesc": "在此文件夹中创建仪表板",
+      "import": "导入控制面板",
+      "importDesc": "上传仪表板 JSON 文件",
+      "templates": "浏览模板",
+      "templatesDesc": "从社区仪表板开始"
+    },
+    "noGroups": {
+      "title": "还没有群组",
+      "description": "群组允许您同时管理多个用户的权限。创建一个即可开始使用。",
+      "action": "新群组",
+      "actionDesc": "创建用户组"
+    },
+    "noRoles": {
+      "title": "还没有角色",
+      "description": "角色定义用户可以执行的操作。创建自定义角色来控制访问权限。",
+      "action": "新角色",
+      "actionDesc": "定义自定义访问角色"
+    },
+    "noAnomalyConfigs": {
+      "title": "未配置异常检测",
+      "description": "设置异常检测以自动识别数据中的异常模式。",
+      "action": "新配置",
+      "actionDesc": "配置异常检测"
+    },
+    "noApiLimits": {
+      "title": "未配置 API 限制",
+      "description": "API 限制控制每个组织在每个时间窗口可以摄取和查询多少数据。"
+    },
+    "noRoleLimits": {
+      "title": "未配置角色限制",
+      "description": "角色限制定义了适用于组织内单个角色的采集和查询配额。"
+    },
+    "noIngestionTokens": {
+      "title": "还没有摄取令牌",
+      "description": "在发送日志、指标和跟踪时，摄取令牌对数据源进行身份验证。",
+      "action": "新代币",
+      "actionDesc": "生成摄取令牌"
+    },
+    "noOrganizations": {
+      "title": "尚无组织",
+      "description": "组织将您的用户和数据分组在一起。创建一个即可开始使用。"
+    },
+    "noAlertDestinations": {
+      "title": "还没有目的地",
+      "description": "目的地定义警报通知的发送地点——Slack、电子邮件、网络挂钩等。",
+      "action": "新目的地",
+      "actionDesc": "连接通知频道"
+    },
+    "noAlertTemplates": {
+      "title": "还没有模板",
+      "description": "模板定义警报通知消息的格式。",
+      "action": "新模板",
+      "actionDesc": "创建通知模板"
+    },
+    "noEnrichmentTables": {
+      "title": "还没有浓缩表",
+      "description": "丰富表允许您在查询时为日志数据附加额外的上下文。",
+      "action": "新桌子",
+      "actionDesc": "创建浓缩表"
+    },
+    "noCipherKeys": {
+      "title": "还没有密钥",
+      "description": "密码密钥用于加密数据流中的敏感字段。",
+      "action": "新密钥",
+      "actionDesc": "生成密钥"
+    },
+    "noAiToolsets": {
+      "title": "还没有 AI 工具集",
+      "description": "AI 工具集将您的组织与外部 AI 功能连接起来。",
+      "action": "新工具集",
+      "actionDesc": "添加 AI 工具集"
+    },
+    "noLlmProviders": {
+      "title": "未配置 LLM 提供商",
+      "description": "连接语言模型提供商以启用 AI 驱动的功能。",
+      "action": "添加提供商",
+      "actionDesc": "配置 LLM 提供商"
+    },
+    "noDiscoveredServices": {
+      "title": "未发现任何服务",
+      "description": "一旦跟踪开始到达，服务将自动出现在此处。"
+    },
+    "noNodes": {
+      "title": "没有可用的节点",
+      "description": "群集节点注册后将显示在此处。"
+    },
+    "noSourceMaps": {
+      "title": "未上传任何源地图",
+      "description": "上传源映射以在 RUM 错误报告中启用可读的堆栈跟踪。",
+      "action": "上传",
+      "actionDesc": "上传源地图文件"
+    },
+    "noBackfillJobs": {
+      "title": "没有回填作业",
+      "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
     }
   },
   "onlineEvals": {

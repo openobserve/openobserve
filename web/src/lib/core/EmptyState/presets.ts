@@ -279,6 +279,222 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noInvitations.title",
     descriptionKey: "emptyState.noInvitations.description",
   },
+  "no-dashboards-in-folder": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noDashboardsInFolder.title",
+    descriptionKey: "emptyState.noDashboardsInFolder.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDashboardsInFolder.action",
+        descriptionKey: "emptyState.noDashboardsInFolder.actionDesc",
+      },
+      {
+        id: "import",
+        icon: "upload-file",
+        titleKey: "emptyState.noDashboardsInFolder.import",
+        descriptionKey: "emptyState.noDashboardsInFolder.importDesc",
+      },
+      {
+        id: "templates",
+        icon: "dashboard-customize",
+        titleKey: "emptyState.noDashboardsInFolder.templates",
+        descriptionKey: "emptyState.noDashboardsInFolder.templatesDesc",
+      },
+    ],
+  },
+  "no-groups": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noGroups.title",
+    descriptionKey: "emptyState.noGroups.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noGroups.action",
+        descriptionKey: "emptyState.noGroups.actionDesc",
+      },
+    ],
+  },
+  "no-roles": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noRoles.title",
+    descriptionKey: "emptyState.noRoles.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noRoles.action",
+        descriptionKey: "emptyState.noRoles.actionDesc",
+      },
+    ],
+  },
+  "no-anomaly-configs": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAnomalyConfigs.title",
+    descriptionKey: "emptyState.noAnomalyConfigs.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAnomalyConfigs.action",
+        descriptionKey: "emptyState.noAnomalyConfigs.actionDesc",
+      },
+    ],
+  },
+  "no-api-limits": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noApiLimits.title",
+    descriptionKey: "emptyState.noApiLimits.description",
+  },
+  "no-role-limits": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noRoleLimits.title",
+    descriptionKey: "emptyState.noRoleLimits.description",
+  },
+  "no-ingestion-tokens": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noIngestionTokens.title",
+    descriptionKey: "emptyState.noIngestionTokens.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noIngestionTokens.action",
+        descriptionKey: "emptyState.noIngestionTokens.actionDesc",
+      },
+    ],
+  },
+  "no-organizations": {
+    illustration: "users",
+    variant: "neutral",
+    titleKey: "emptyState.noOrganizations.title",
+    descriptionKey: "emptyState.noOrganizations.description",
+  },
+  "no-alert-destinations": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAlertDestinations.title",
+    descriptionKey: "emptyState.noAlertDestinations.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAlertDestinations.action",
+        descriptionKey: "emptyState.noAlertDestinations.actionDesc",
+      },
+    ],
+  },
+  "no-alert-templates": {
+    illustration: "alert",
+    variant: "create",
+    titleKey: "emptyState.noAlertTemplates.title",
+    descriptionKey: "emptyState.noAlertTemplates.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAlertTemplates.action",
+        descriptionKey: "emptyState.noAlertTemplates.actionDesc",
+      },
+    ],
+  },
+  "no-enrichment-tables": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noEnrichmentTables.title",
+    descriptionKey: "emptyState.noEnrichmentTables.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEnrichmentTables.action",
+        descriptionKey: "emptyState.noEnrichmentTables.actionDesc",
+      },
+    ],
+  },
+  "no-cipher-keys": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noCipherKeys.title",
+    descriptionKey: "emptyState.noCipherKeys.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noCipherKeys.action",
+        descriptionKey: "emptyState.noCipherKeys.actionDesc",
+      },
+    ],
+  },
+  "no-ai-toolsets": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noAiToolsets.title",
+    descriptionKey: "emptyState.noAiToolsets.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noAiToolsets.action",
+        descriptionKey: "emptyState.noAiToolsets.actionDesc",
+      },
+    ],
+  },
+  "no-llm-providers": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noLlmProviders.title",
+    descriptionKey: "emptyState.noLlmProviders.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noLlmProviders.action",
+        descriptionKey: "emptyState.noLlmProviders.actionDesc",
+      },
+    ],
+  },
+  "no-discovered-services": {
+    illustration: "trace",
+    variant: "neutral",
+    titleKey: "emptyState.noDiscoveredServices.title",
+    descriptionKey: "emptyState.noDiscoveredServices.description",
+  },
+  "no-nodes": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noNodes.title",
+    descriptionKey: "emptyState.noNodes.description",
+  },
+  "no-source-maps": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noSourceMaps.title",
+    descriptionKey: "emptyState.noSourceMaps.description",
+    actions: [
+      {
+        id: "upload",
+        icon: "upload-file",
+        titleKey: "emptyState.noSourceMaps.action",
+        descriptionKey: "emptyState.noSourceMaps.actionDesc",
+      },
+    ],
+  },
+  "no-backfill-jobs": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noBackfillJobs.title",
+    descriptionKey: "emptyState.noBackfillJobs.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -300,4 +516,20 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-queries": "emptyState.nouns.queries",
   "no-service-accounts": "emptyState.nouns.serviceAccounts",
   "no-invitations": "emptyState.nouns.invitations",
+  "no-dashboards-in-folder": "emptyState.nouns.dashboards",
+  "no-groups": "emptyState.nouns.groups",
+  "no-roles": "emptyState.nouns.roles",
+  "no-anomaly-configs": "emptyState.nouns.anomalyConfigs",
+  "no-api-limits": "emptyState.nouns.apiLimits",
+  "no-role-limits": "emptyState.nouns.roleLimits",
+  "no-ingestion-tokens": "emptyState.nouns.ingestionTokens",
+  "no-organizations": "emptyState.nouns.organizations",
+  "no-alert-destinations": "emptyState.nouns.alertDestinations",
+  "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
+  "no-cipher-keys": "emptyState.nouns.cipherKeys",
+  "no-ai-toolsets": "emptyState.nouns.aiToolsets",
+  "no-llm-providers": "emptyState.nouns.llmProviders",
+  "no-source-maps": "emptyState.nouns.sourceMaps",
+  "no-backfill-jobs": "emptyState.nouns.backfillJobs",
 };

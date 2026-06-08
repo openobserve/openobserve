@@ -4191,6 +4191,106 @@
       "queries": "consultas",
       "serviceAccounts": "contas de serviço",
       "invitations": "convites"
+    },
+    "noDashboardsInFolder": {
+      "title": "Não há painéis nesta pasta",
+      "description": "Essa pasta está vazia. Adicione um painel aqui ou mova um de outra pasta.",
+      "action": "Novo painel",
+      "actionDesc": "Crie um painel nesta pasta",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noGroups": {
+      "title": "Ainda não há grupos",
+      "description": "Os grupos permitem gerenciar permissões para vários usuários ao mesmo tempo. Crie um para começar.",
+      "action": "Novo grupo",
+      "actionDesc": "Criar um grupo de usuários"
+    },
+    "noRoles": {
+      "title": "Ainda não há funções",
+      "description": "As funções definem quais ações os usuários podem realizar. Crie uma função personalizada para controlar o acesso.",
+      "action": "Novo papel",
+      "actionDesc": "Definir uma função de acesso personalizada"
+    },
+    "noAnomalyConfigs": {
+      "title": "Nenhuma detecção de anomalia configurada",
+      "description": "Configure a detecção de anomalias para identificar automaticamente padrões incomuns em seus dados.",
+      "action": "Nova configuração",
+      "actionDesc": "Configurar a detecção de anomalias"
+    },
+    "noApiLimits": {
+      "title": "Nenhum limite de API configurado",
+      "description": "Os limites da API controlam a quantidade de dados que cada organização pode ingerir e consultar por janela de tempo."
+    },
+    "noRoleLimits": {
+      "title": "Nenhum limite de função configurado",
+      "description": "Os limites de função definem as cotas de ingestão e consulta aplicadas a funções individuais em uma organização."
+    },
+    "noIngestionTokens": {
+      "title": "Ainda não há tokens de ingestão",
+      "description": "Os tokens de ingestão autenticam as fontes de dados ao enviar registros, métricas e rastreamentos.",
+      "action": "Novo token",
+      "actionDesc": "Gere um token de ingestão"
+    },
+    "noOrganizations": {
+      "title": "Ainda não há organizações",
+      "description": "As organizações agrupam seus usuários e dados. Crie um para começar."
+    },
+    "noAlertDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Os destinos definem para onde as notificações de alerta são enviadas: Slack, e-mail, webhooks e muito mais.",
+      "action": "Novo destino",
+      "actionDesc": "Conectar um canal de notificação"
+    },
+    "noAlertTemplates": {
+      "title": "Ainda não há modelos",
+      "description": "Os modelos definem o formato das mensagens de notificação de alerta.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de notificação"
+    },
+    "noEnrichmentTables": {
+      "title": "Ainda não há tabelas de enriquecimento",
+      "description": "As tabelas de enriquecimento permitem que você anexe contexto adicional aos seus dados de registro no momento da consulta.",
+      "action": "Mesa nova",
+      "actionDesc": "Crie uma tabela de enriquecimento"
+    },
+    "noCipherKeys": {
+      "title": "Ainda não há chaves cifradas",
+      "description": "As chaves cifradas são usadas para criptografar campos confidenciais em seus fluxos de dados.",
+      "action": "Nova chave",
+      "actionDesc": "Gere uma chave cifrada"
+    },
+    "noAiToolsets": {
+      "title": "Ainda não há conjuntos de ferramentas de IA",
+      "description": "Os conjuntos de ferramentas de IA conectam sua organização a recursos externos de IA.",
+      "action": "Novo conjunto de ferramentas",
+      "actionDesc": "Adicionar um conjunto de ferramentas de IA"
+    },
+    "noLlmProviders": {
+      "title": "Nenhum provedor de LLM configurado",
+      "description": "Conecte um provedor de modelos de idiomas para habilitar recursos baseados em IA.",
+      "action": "Adicionar provedor",
+      "actionDesc": "Configurar um provedor LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Nenhum serviço descoberto",
+      "description": "Os serviços aparecerão aqui automaticamente quando os rastreamentos começarem a chegar."
+    },
+    "noNodes": {
+      "title": "Não há nós disponíveis",
+      "description": "Os nós do cluster aparecerão aqui assim que forem registrados."
+    },
+    "noSourceMaps": {
+      "title": "Nenhum mapa de origem carregado",
+      "description": "Faça upload de mapas de origem para permitir rastreamentos de pilha legíveis em seus relatórios de erros de RUM.",
+      "action": "Carregar",
+      "actionDesc": "Carregar um arquivo de mapa de origem"
+    },
+    "noBackfillJobs": {
+      "title": "Sem trabalhos de preenchimento",
+      "description": "Os trabalhos de preenchimento reprocessam dados históricos por meio de um pipeline. Execute um para começar."
     }
   },
   "onlineEvals": {

@@ -90,7 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #empty>
-        <NoData />
+        <NoData
+          :filtered="!!scheduledFilterQuery"
+          @action="scheduledFilterQuery = ''"
+        />
       </template>
     </OTable>
     </div>
