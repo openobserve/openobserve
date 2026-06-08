@@ -222,66 +222,60 @@ describe("HomeView.vue", () => {
       await nextTick();
 
       if (wrapper.vm.tabOrder.length > 1) {
-        expect(wrapper.find(".home-tab-bar").exists()).toBe(true);
+        expect(wrapper.find('[data-test="home-tab-bar"]').exists()).toBe(true);
       }
     });
 
     it("should hide tab bar when only one tab exists", () => {
       wrapper = createWrapper();
       if (wrapper.vm.tabOrder.length <= 1) {
-        expect(wrapper.find(".home-tab-bar").exists()).toBe(false);
+        expect(wrapper.find('[data-test="home-tab-bar"]').exists()).toBe(false);
       }
     });
   });
 
-  // ── Drag and Drop ────────────────────────────────────────────────────────
+  // ── Reorder ──────────────────────────────────────────────────────────────
+  // Drag mechanics now live in the shared OTabs component, which reports moves
+  // via its `reorder` event. HomeView only applies the move + persists it.
 
-  describe("Tab Drag and Drop", () => {
-    it("should set draggingTab on drag start", () => {
+  describe("Tab Reorder", () => {
+    const seed = () => [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+      { id: "c", label: "C" },
+    ];
+
+    it("moves a tab after the target when before=false, and persists", () => {
       wrapper = createWrapper();
-      const tabId = wrapper.vm.tabOrder[0].id;
-      const mockEvent = {
-        dataTransfer: {
-          effectAllowed: "",
-          setData: vi.fn(),
-        },
-      };
-      wrapper.vm.onTabDragStart(mockEvent, tabId);
-      expect(wrapper.vm.draggingTab).toBe(tabId);
-      expect(mockEvent.dataTransfer.effectAllowed).toBe("move");
+      wrapper.vm.tabOrder = seed();
+      wrapper.vm.onTabReorder({ from: "a", to: "b", before: false });
+      const newOrder = wrapper.vm.tabOrder.map((t: any) => t.id);
+      expect(newOrder).toEqual(["b", "a", "c"]);
+      expect(localStorage.getItem("o2_home_tab_order")).toBe(
+        JSON.stringify(["b", "a", "c"]),
+      );
     });
 
-    it("should clear dragging state on drag end", () => {
+    it("inserts a tab before the target when before=true", () => {
       wrapper = createWrapper();
-      wrapper.vm.draggingTab = "usage";
-      wrapper.vm.dragOverTab = "overview";
-      wrapper.vm.onTabDragEnd();
-      expect(wrapper.vm.draggingTab).toBeNull();
-      expect(wrapper.vm.dragOverTab).toBeNull();
+      wrapper.vm.tabOrder = seed();
+      wrapper.vm.onTabReorder({ from: "c", to: "a", before: true });
+      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual([
+        "c",
+        "a",
+        "b",
+      ]);
     });
 
-    it("should reorder tabs and persist to localStorage on drop", () => {
+    it("ignores a reorder onto the same tab", () => {
       wrapper = createWrapper();
-      const tabs = wrapper.vm.tabOrder;
-      if (tabs.length >= 2) {
-        const fromId = tabs[0].id;
-        const toId = tabs[1].id;
-        wrapper.vm.dragOverTab = toId;
-        wrapper.vm.draggingTab = fromId;
-
-        const mockEvent = {
-          preventDefault: vi.fn(),
-          dataTransfer: {
-            getData: vi.fn().mockReturnValue(fromId),
-          },
-        };
-        wrapper.vm.onTabDrop(mockEvent);
-        const newOrder = wrapper.vm.tabOrder.map((t: any) => t.id);
-        expect(newOrder[0]).toBe(toId);
-        expect(localStorage.getItem("o2_home_tab_order")).toBe(
-          JSON.stringify(newOrder),
-        );
-      }
+      wrapper.vm.tabOrder = seed();
+      wrapper.vm.onTabReorder({ from: "a", to: "a", before: true });
+      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual([
+        "a",
+        "b",
+        "c",
+      ]);
     });
   });
 
