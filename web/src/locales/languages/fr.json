@@ -4138,6 +4138,10 @@
     "noBackfillJobs": {
       "title": "Aucun travail de remblayage",
       "description": "Les tâches de remblayage retraitent les données historiques via un pipeline. Exécutez-en un pour commencer."
+    },
+    "noSearchJobs": {
+      "title": "Aucune tâche de recherche planifiée",
+      "description": "Les recherches de longue durée que vous planifiez apparaîtront ici, où vous pourrez suivre leur statut et explorer les résultats une fois qu'elles sont terminées."
     }
   }
 }

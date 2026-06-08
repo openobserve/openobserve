@@ -4149,6 +4149,10 @@
     "noBackfillJobs": {
       "title": "Dolgu işi yok",
       "description": "Doldurma işleri, geçmiş verileri bir boru hattı aracılığıyla yeniden işler. Başlamak için birini çalıştırın."
+    },
+    "noSearchJobs": {
+      "title": "Planlanmış arama işi yok",
+      "description": "Planladığınız uzun süren aramalar burada görünecektir, burada durumlarını takip edebilir ve tamamlandıktan sonra sonuçları keşfedebilirsiniz."
     }
   }
 }

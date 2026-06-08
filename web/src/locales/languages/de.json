@@ -4138,6 +4138,10 @@
     "noBackfillJobs": {
       "title": "Keine Backfill-Jobs",
       "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
+    },
+    "noSearchJobs": {
+      "title": "Keine geplanten Suchaufträge",
+      "description": "Langfristige Suchanfragen, die Sie planen, werden hier angezeigt. Dort können Sie ihren Status verfolgen und die Ergebnisse einsehen, sobald sie abgeschlossen sind."
     }
   }
 }

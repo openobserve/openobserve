@@ -4136,6 +4136,10 @@
     "noBackfillJobs": {
       "title": "Sin trabajos de relleno",
       "description": "Los trabajos de relleno reprocesan los datos históricos a través de una canalización. Ejecute uno para empezar."
+    },
+    "noSearchJobs": {
+      "title": "No hay trabajos de búsqueda programados",
+      "description": "Las búsquedas de larga duración que programes aparecerán aquí, donde podrás realizar un seguimiento de su estado y explorar los resultados una vez finalizadas."
     }
   }
 }
