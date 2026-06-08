@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
     </OSelect>
     <div
-      class="index-table tw:h-[calc(100%-2.125rem)]!"
+      class="index-table tw:h-[calc(100%-2rem)]!"
       data-test="log-search-index-list-fields-table"
     >
       <GroupedFieldList

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.searchApplied
         "
         data-test="traces-section-header"
-        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
