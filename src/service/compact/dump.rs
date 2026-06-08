@@ -371,28 +371,21 @@ pub async fn delete_all(
         stream_type,
         stream_name,
         (BASE_TIME.timestamp_micros(), Utc::now().timestamp_micros()),
-        true,
     )
     .await
 }
 
-// check this delete is daily or hourly
-// -> daily
-//   1. we need to get all the files in the range
-//   2. simple mark these files as deleted
-//   3. insert the deleted items into file_list_deleted table
-// -> hourly
+// check this delete is all or other cases
 //   1. we need to get all the files in the range
 //   2. pickup the items that need to be deleted
-//   3. insert the deleted items into file_list_deleted table
-//   4. generate a new dump file excluding the items that need to be deleted
-//   5. make the old files deleted and add the new file to file_list table
+//   3. if not all the files need to be deleted, we need to generate new dump files
+//   4. insert the deleted items into file_list_deleted table
+//   5. make the old files deleted and add the new files to file_list table
 pub async fn delete_by_time_range(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     range: (i64, i64),
-    is_hourly: bool,
 ) -> Result<(), errors::Error> {
     let cfg = get_config();
     if !cfg.compact.file_list_dump_enabled {
@@ -405,104 +398,7 @@ pub async fn delete_by_time_range(
     if list.is_empty() {
         return Ok(());
     }
-    if is_hourly {
-        if let Err(e) = delete_hourly_inner(org_id, stream_type, stream_name, list, range).await {
-            log::error!("[FILE_LIST_DUMP] delete_hourly_inner failed: {e}");
-            return Err(e);
-        }
-    } else if let Err(e) = delete_daily_inner(org_id, list, range).await {
-        log::error!("[FILE_LIST_DUMP] delete_daily_inner failed: {e}");
-        return Err(e);
-    }
-    Ok(())
-}
 
-async fn delete_daily_inner(
-    org_id: &str,
-    list: Vec<FileRecord>,
-    _range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let cfg = get_config();
-    let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
-    let query = "SELECT * FROM file_list";
-    let trace_id = config::ider::generate_trace_id();
-    let ret = exec(&trace_id, cfg.limit.cpu_num, dump_files.clone(), query).await?;
-    let files = ret
-        .into_iter()
-        .flat_map(record_batch_to_file_record)
-        .collect::<Vec<_>>();
-
-    // create deleted items for file_list_deleted table
-    let mut del_items: Vec<_> = files
-        .iter()
-        .map(|f| FileListDeleted {
-            id: 0,
-            account: f.account.to_string(),
-            file: format!("files/{}/{}/{}", f.stream, f.date, f.file),
-            index_file: false,
-            flattened: false,
-        })
-        .collect();
-
-    // we also need to delete the dump files
-    del_items.extend(dump_files.iter().map(|f| FileListDeleted {
-        id: 0,
-        account: f.account.to_string(),
-        file: f.key.clone(),
-        index_file: false,
-        flattened: false,
-    }));
-
-    let items: Vec<_> = dump_files
-        .into_iter()
-        .map(|mut f| {
-            f.deleted = true;
-            f.segment_ids = None;
-            f
-        })
-        .collect();
-
-    let mut mark_deleted_done = false;
-    for _ in 0..5 {
-        if !mark_deleted_done && let Err(e) = infra::file_list::batch_process(&items).await {
-            log::error!("[FILE_LIST_DUMP] batch_delete to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        mark_deleted_done = true;
-
-        if let Err(e) =
-            infra::file_list::batch_add_deleted(org_id, Utc::now().timestamp_micros(), &del_items)
-                .await
-        {
-            log::error!("[FILE_LIST_DUMP] batch_add_deleted to db failed, retrying: {e}");
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-            continue;
-        }
-        break;
-    }
-
-    // Delete dump_stats for deleted dump files
-    for item in &items {
-        if let Err(e) = infra_file_list::delete_dump_stats(&item.key).await {
-            log::error!(
-                "[FILE_LIST_DUMP] delete_dump_stats for {} failed: {e}",
-                item.key
-            );
-        }
-    }
-
-    Ok(())
-}
-
-async fn delete_hourly_inner(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    list: Vec<FileRecord>,
-    range: (i64, i64),
-) -> Result<(), errors::Error> {
-    let cfg = get_config();
     let dump_files = list.iter().map(|f| f.into()).collect::<Vec<_>>();
     let query = "SELECT * FROM file_list;";
     let trace_id = config::ider::generate_trace_id();
@@ -523,19 +419,26 @@ async fn delete_hourly_inner(
         return Ok(()); // nothing need to do
     }
 
-    let new_dump_file = if !files_to_keep.is_empty() {
-        match generate_dump(org_id, stream_type, stream_name, range, files_to_keep).await {
-            Ok(v) => v,
+    // Check if there are some files need to be kept, then we need to generate new dump files
+    let mut new_dump_files = Vec::new();
+    let groupd_files_to_keep = files_to_keep
+        .into_iter()
+        .chunk_by(|f| f.date.clone())
+        .into_iter()
+        .map(|(date, files)| (date, files.collect::<Vec<_>>()))
+        .collect::<Vec<_>>();
+    for (date, files) in groupd_files_to_keep {
+        match generate_dump(org_id, stream_type, stream_name, range, files).await {
+            Ok(Some(v)) => new_dump_files.push(v),
+            Ok(None) => continue,
             Err(e) => {
                 log::error!(
-                    "[FILE_LIST_DUMP] failed to generate dump file for delete hourly data, time range: {range:?}, error: {e}"
+                    "[FILE_LIST_DUMP] failed to generate dump file for delete data, date: {date}, error: {e}"
                 );
                 return Err(e);
             }
         }
-    } else {
-        None
-    };
+    }
 
     // Create deleted items for file_list_deleted table
     let mut del_items: Vec<_> = files_to_delete
@@ -569,8 +472,8 @@ async fn delete_hourly_inner(
         .collect();
 
     // insert the new dump file into file_list table
-    if let Some(ref new_dump_file) = new_dump_file {
-        items.push(new_dump_file.clone());
+    if !new_dump_files.is_empty() {
+        items.extend(new_dump_files.clone());
     }
 
     // Insert deleted items into file_list_deleted table with retry logic
@@ -608,7 +511,7 @@ async fn delete_hourly_inner(
     }
 
     // If a new dump file was created, calculate and insert its stats
-    if let Some(ref new_dump_file) = new_dump_file {
+    for new_dump_file in new_dump_files {
         match calculate_dump_file_stats(&new_dump_file.account, &new_dump_file.key).await {
             Ok(stats) => {
                 // Insert dump_stats for the new dump file

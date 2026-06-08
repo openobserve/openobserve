@@ -210,6 +210,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .worker_threads(cfg.limit.job_runtime_worker_num)
             .enable_all()
             .thread_name("job_runtime")
+            .thread_stack_size(16 * 1024 * 1024)
             .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
             .build()
         else {
