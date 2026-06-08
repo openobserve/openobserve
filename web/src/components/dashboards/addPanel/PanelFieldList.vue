@@ -15,7 +15,7 @@
       :page-size-options="[250]"
       :show-pagination="true"
       :current-page="currentPage"
-      row-key="name"
+      row-key="_uid"
       :draggable="!hideAllFieldsSelection && !promqlMode"
       :drag-enabled-fn="isRowDragEnabled"
       :sort-fn="sortFieldsFn"
@@ -865,6 +865,18 @@ const flattenGroupedFields = computed(() => {
         });
       });
     }
+  });
+
+  // Field names can legitimately repeat across stream groups (joins,
+  // multi-stream, or custom/function fields overlapping schema fields), so
+  // keying the list by `name` produces DUPLICATE Vue keys. Duplicate keys
+  // corrupt list patching on update — most visibly, the search filter appears
+  // to stop working after the field set grows (e.g. after switching query
+  // tabs). Give every row a guaranteed-unique key (index-prefixed) instead.
+  flattenedFields.forEach((row: any, i: number) => {
+    row._uid = `${i}:${
+      row.isGroup ? "g:" + row.groupName : (row.stream ?? "") + ":" + row.name
+    }`;
   });
 
   return flattenedFields;

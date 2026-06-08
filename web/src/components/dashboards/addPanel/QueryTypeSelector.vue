@@ -200,6 +200,14 @@ export default defineComponent({
       },
     );
 
+    // re-sync the toggle when switching between query tabs
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      () => {
+        initializeSelectedButtonType();
+      },
+    );
+
     const isSQLMode = computed(() => selectedButtonQueryType.value === "sql");
 
     const isPromQLMode = computed(
@@ -293,29 +301,17 @@ export default defineComponent({
       removeXYFilters();
       updateXYFieldsForCustomQueryMode();
 
-      const queryIdx = dashboardPanelData.layout.currentQueryIndex;
-
-      // Clear query when switching query types (SQL <-> PromQL)
+      // Clear queries for all tabs when switching query types (SQL <-> PromQL)
+      // since the syntax is incompatible between modes
       if (
         isQueryTypeChange &&
         dashboardPanelData.data.type !== "custom_chart"
       ) {
-        dashboardPanelData.data.queries[queryIdx].query = "";
+        dashboardPanelData.data.queries.forEach((q: any) => {
+          q.query = "";
+        });
       }
 
-
-      // When switching to SQL mode, multi-query is not supported.
-      // Keep only the current query, remove others, and reset index to 0.
-      if (
-        isQueryTypeChange &&
-        popupSelectedButtonType.value === "sql" &&
-        dashboardPanelData.data.queries.length > 1
-      ) {
-        const currentQuery = dashboardPanelData.data.queries[queryIdx];
-        dashboardPanelData.data.queries = [currentQuery];
-        dashboardPanelData.layout.currentQueryIndex = 0;
-        dashboardPanelData.layout.hiddenQueries = [];
-      }
 
       // Re-seed default builder fields when the resulting mode is a builder
       // (Custom -> Builder, or switching SQL <-> PromQL while in builder).

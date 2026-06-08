@@ -229,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : null
                       "
                       :viewOnly="false"
+                      :xAliasInconsistencyWarning="hasInconsistentXAlias"
                     />
                   </div>
 
@@ -837,6 +838,35 @@ const showCustomChartTypeSelector = ref(false);
 // ============================================================================
 // Computed Properties
 // ============================================================================
+
+// X-axis alias consistency warning for multi-SQL panels
+// Only applicable for chart types that render an x-axis
+const xAxisChartTypes = new Set([
+  "line", "area", "area-stacked", "stacked", "h-stacked",
+  "bar", "h-bar", "scatter",
+]);
+const hasInconsistentXAlias = computed(() => {
+  if (!xAxisChartTypes.has(dashboardPanelData.data.type)) return false;
+
+  // Only check builder-mode queries — custom SQL queries don't have
+  // functionName metadata, so including them causes false positives
+  // when the user writes SQL with the same timestamp field.
+  const activeQueries = dashboardPanelData.data.queries.filter(
+    (_: any, idx: number) =>
+      !(dashboardPanelData.layout.hiddenQueries || []).includes(idx),
+  );
+  const builderQueries = activeQueries.filter(
+    (q: any) => !q.customQuery && q.fields.x && q.fields.x.length > 0,
+  );
+  if (builderQueries.length < 2) return false;
+  const hasHistogram = builderQueries.some((q: any) =>
+    q.fields.x.some((f: any) => f.functionName === "histogram"),
+  );
+  const hasNonHistogram = builderQueries.some((q: any) =>
+    q.fields.x.some((f: any) => f.functionName !== "histogram"),
+  );
+  return hasHistogram && hasNonHistogram;
+});
 
 // Content height based on page type
 const contentHeight = computed(() => {
