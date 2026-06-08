@@ -4191,6 +4191,106 @@
       "queries": "Anfragen",
       "serviceAccounts": "Dienstkonten",
       "invitations": "Einladungen"
+    },
+    "noDashboardsInFolder": {
+      "title": "Keine Dashboards in diesem Ordner",
+      "description": "Dieser Ordner ist leer. Fügen Sie hier ein Dashboard hinzu oder verschieben Sie eines aus einem anderen Ordner.",
+      "action": "Neues Dashboard",
+      "actionDesc": "Erstellen Sie ein Dashboard in diesem Ordner",
+      "import": "Dashboard importieren",
+      "importDesc": "Laden Sie eine Dashboard-JSON-Datei hoch",
+      "templates": "Vorlagen durchsuchen",
+      "templatesDesc": "Starte von einem Community-Dashboard"
+    },
+    "noGroups": {
+      "title": "Noch keine Gruppen",
+      "description": "Mit Gruppen können Sie Berechtigungen für mehrere Benutzer gleichzeitig verwalten. Erstellen Sie eine, um loszulegen.",
+      "action": "Neue Gruppe",
+      "actionDesc": "Erstellen Sie eine Benutzergruppe"
+    },
+    "noRoles": {
+      "title": "Noch keine Rollen",
+      "description": "Rollen definieren, welche Aktionen Benutzer ausführen können. Erstellen Sie eine benutzerdefinierte Rolle, um den Zugriff zu kontrollieren.",
+      "action": "Neue Rolle",
+      "actionDesc": "Definieren Sie eine benutzerdefinierte Zugriffsrolle"
+    },
+    "noAnomalyConfigs": {
+      "title": "Keine Anomalieerkennung konfiguriert",
+      "description": "Richten Sie die Anomalieerkennung ein, um ungewöhnliche Muster in Ihren Daten automatisch zu erkennen.",
+      "action": "Neue Konfiguration",
+      "actionDesc": "Anomalieerkennung konfigurieren"
+    },
+    "noApiLimits": {
+      "title": "Keine API-Limits konfiguriert",
+      "description": "API-Limits steuern, wie viele Daten jede Organisation pro Zeitfenster aufnehmen und abfragen kann."
+    },
+    "noRoleLimits": {
+      "title": "Keine Rollenbeschränkungen konfiguriert",
+      "description": "Rollenlimits definieren die Aufnahme- und Abfragequoten, die auf einzelne Rollen innerhalb einer Organisation angewendet werden."
+    },
+    "noIngestionTokens": {
+      "title": "Noch keine Ingestion-Token",
+      "description": "Ingestion-Token authentifizieren Datenquellen beim Senden von Protokollen, Metriken und Traces.",
+      "action": "Neues Token",
+      "actionDesc": "Generieren Sie ein Aufnahme-Token"
+    },
+    "noOrganizations": {
+      "title": "Noch keine Organisationen",
+      "description": "Organisationen gruppieren Ihre Benutzer und Daten. Erstellen Sie eine, um loszulegen."
+    },
+    "noAlertDestinations": {
+      "title": "Noch keine Ziele",
+      "description": "Ziele definieren, wohin Warnmeldungen gesendet werden — Slack, E-Mail, Webhooks und mehr.",
+      "action": "Neues Reiseziel",
+      "actionDesc": "Einen Benachrichtigungskanal verbinden"
+    },
+    "noAlertTemplates": {
+      "title": "Noch keine Vorlagen",
+      "description": "Vorlagen definieren das Format von Warnmeldungen.",
+      "action": "Neue Vorlage",
+      "actionDesc": "Erstellen Sie eine Benachrichtigungsvorlage"
+    },
+    "noEnrichmentTables": {
+      "title": "Noch keine Anreicherungstabellen",
+      "description": "Mithilfe von Anreicherungstabellen können Sie Ihren Protokolldaten bei der Abfrage zusätzlichen Kontext hinzufügen.",
+      "action": "Neuer Tisch",
+      "actionDesc": "Erstellen Sie eine Anreicherungstabelle"
+    },
+    "noCipherKeys": {
+      "title": "Noch keine Chiffrierschlüssel",
+      "description": "Chiffrenschlüssel werden verwendet, um sensible Felder in Ihren Datenströmen zu verschlüsseln.",
+      "action": "Neuer Schlüssel",
+      "actionDesc": "Generieren Sie einen Chiffrenschlüssel"
+    },
+    "noAiToolsets": {
+      "title": "Noch keine KI-Toolsets",
+      "description": "KI-Toolsets verbinden Ihr Unternehmen mit externen KI-Funktionen.",
+      "action": "Neues Toolset",
+      "actionDesc": "Fügen Sie ein KI-Toolset hinzu"
+    },
+    "noLlmProviders": {
+      "title": "Keine LLM-Anbieter konfiguriert",
+      "description": "Stellen Sie eine Verbindung zu einem Sprachmodellanbieter her, um KI-gestützte Funktionen zu aktivieren.",
+      "action": "Anbieter hinzufügen",
+      "actionDesc": "Konfigurieren Sie einen LLM-Anbieter"
+    },
+    "noDiscoveredServices": {
+      "title": "Keine Dienste gefunden",
+      "description": "Dienste werden hier automatisch angezeigt, sobald Spuren eintreffen."
+    },
+    "noNodes": {
+      "title": "Keine Knoten verfügbar",
+      "description": "Clusterknoten werden hier angezeigt, sobald sie registriert sind."
+    },
+    "noSourceMaps": {
+      "title": "Keine Quellkarten hochgeladen",
+      "description": "Laden Sie Quellzuordnungen hoch, um lesbare Stack-Traces in Ihren RUM-Fehlerberichten zu aktivieren.",
+      "action": "Upload",
+      "actionDesc": "Laden Sie eine Quellkartendatei hoch"
+    },
+    "noBackfillJobs": {
+      "title": "Keine Backfill-Jobs",
+      "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
     }
   },
   "onlineEvals": {

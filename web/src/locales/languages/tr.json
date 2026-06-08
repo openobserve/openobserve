@@ -4202,6 +4202,106 @@
       "queries": "sorgular",
       "serviceAccounts": "hizmet hesapları",
       "invitations": "davetiyeleri"
+    },
+    "noDashboardsInFolder": {
+      "title": "Bu klasörde gösterge paneli yok",
+      "description": "Bu klasör boş. Buraya bir gösterge tablosu ekleyin veya başka bir klasörden taşıyın.",
+      "action": "Yeni gösterge tablosu",
+      "actionDesc": "Bu klasörde bir gösterge tablosu oluşturun",
+      "import": "Kontrol panosunu içe aktarma",
+      "importDesc": "Bir gösterge paneli JSON dosyası yükleyin",
+      "templates": "Şablonlara göz atın",
+      "templatesDesc": "Bir topluluk panosundan başlayın"
+    },
+    "noGroups": {
+      "title": "Henüz grup yok",
+      "description": "Gruplar, aynı anda birden fazla kullanıcının izinlerini yönetmenize olanak tanır. Başlamak için bir tane oluşturun.",
+      "action": "Yeni grup",
+      "actionDesc": "Bir kullanıcı grubu oluşturma"
+    },
+    "noRoles": {
+      "title": "Henüz rol yok",
+      "description": "Roller, kullanıcıların hangi eylemleri gerçekleştirebileceğini tanımlar. Erişimi kontrol etmek için özel bir rol oluşturun.",
+      "action": "Yeni rol",
+      "actionDesc": "Özel erişim rolü tanımlama"
+    },
+    "noAnomalyConfigs": {
+      "title": "Anomali algılama yapılandırılmadı",
+      "description": "Verilerinizdeki olağandışı kalıpları otomatik olarak tanımlamak için anormallik algılamayı ayarlayın.",
+      "action": "Yeni yapılandırma",
+      "actionDesc": "Anomali algılamayı yapılandırma"
+    },
+    "noApiLimits": {
+      "title": "Yapılandırılmış API sınırı yok",
+      "description": "API sınırları, her kuruluşun zaman aralığı başına ne kadar veri alabileceğini ve sorgulayabileceğini kontrol eder."
+    },
+    "noRoleLimits": {
+      "title": "Yapılandırılmış rol sınırı yok",
+      "description": "Rol sınırları, bir kuruluş içindeki bireysel rollere uygulanan alım ve sorgu kotalarını tanımlar."
+    },
+    "noIngestionTokens": {
+      "title": "Henüz alım belirteci yok",
+      "description": "Yutma belirteçleri, günlükleri, metrikleri ve izleri gönderirken veri kaynaklarını doğrular.",
+      "action": "Yeni belirteç",
+      "actionDesc": "Bir yutma belirteci oluşturun"
+    },
+    "noOrganizations": {
+      "title": "Henüz kuruluş yok",
+      "description": "Kuruluşlar kullanıcılarınızı ve verilerinizi bir arada gruplandırır. Başlamak için bir tane oluşturun."
+    },
+    "noAlertDestinations": {
+      "title": "Henüz destinasyon yok",
+      "description": "Hedefler, uyarı bildirimlerinin nereye gönderileceğini tanımlar - Slack, e-posta, web kancaları ve daha fazlası.",
+      "action": "Yeni hedef",
+      "actionDesc": "Bir bildirim kanalı bağlayın"
+    },
+    "noAlertTemplates": {
+      "title": "Henüz şablon yok",
+      "description": "Şablonlar, uyarı bildirim mesajlarının biçimini tanımlar.",
+      "action": "Yeni şablon",
+      "actionDesc": "Bildirim şablonu oluşturma"
+    },
+    "noEnrichmentTables": {
+      "title": "Henüz zenginleştirme tablosu yok",
+      "description": "Zenginleştirme tabloları, sorgu sırasında günlük verilerinize ek bağlam eklemenizi sağlar.",
+      "action": "Yeni tablo",
+      "actionDesc": "Zenginleştirme tablosu oluşturma"
+    },
+    "noCipherKeys": {
+      "title": "Henüz şifreleme anahtarı yok",
+      "description": "Şifre anahtarları, veri akışlarınızdaki hassas alanları şifrelemek için kullanılır.",
+      "action": "Yeni anahtar",
+      "actionDesc": "Şifre anahtarı oluştur"
+    },
+    "noAiToolsets": {
+      "title": "Henüz AI araç seti yok",
+      "description": "Yapay zeka araç setleri, kuruluşunuzu harici yapay zeka yeteneklerine bağlar.",
+      "action": "Yeni araç seti",
+      "actionDesc": "Yapay zeka araç seti ekleyin"
+    },
+    "noLlmProviders": {
+      "title": "LLM sağlayıcısı yapılandırılmamış",
+      "description": "Yapay zeka destekli özellikleri etkinleştirmek için bir dil modeli sağlayıcısı bağlayın.",
+      "action": "Sağlayıcı ekle",
+      "actionDesc": "LLM sağlayıcısını yapılandırma"
+    },
+    "noDiscoveredServices": {
+      "title": "Hiçbir hizmet keşfedilmedi",
+      "description": "İzler gelmeye başladığında hizmetler burada otomatik olarak görünecektir."
+    },
+    "noNodes": {
+      "title": "Mevcut düğüm yok",
+      "description": "Küme düğümleri kaydedildikten sonra burada görünecektir."
+    },
+    "noSourceMaps": {
+      "title": "Kaynak harita yüklenmedi",
+      "description": "RUM hata raporlarınızda okunabilir yığın izlerini etkinleştirmek için kaynak haritaları yükleyin.",
+      "action": "Yükleme",
+      "actionDesc": "Kaynak harita dosyası yükle"
+    },
+    "noBackfillJobs": {
+      "title": "Dolgu işi yok",
+      "description": "Doldurma işleri, geçmiş verileri bir boru hattı aracılığıyla yeniden işler. Başlamak için birini çalıştırın."
     }
   },
   "onlineEvals": {

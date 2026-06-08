@@ -4191,6 +4191,106 @@
       "queries": "クエリ",
       "serviceAccounts": "サービスアカウント",
       "invitations": "招待状"
+    },
+    "noDashboardsInFolder": {
+      "title": "このフォルダにはダッシュボードがありません",
+      "description": "このフォルダは空です。ここにダッシュボードを追加するか、別のフォルダからダッシュボードを移動してください。",
+      "action": "新しいダッシュボード",
+      "actionDesc": "このフォルダにダッシュボードを作成",
+      "import": "ダッシュボードをインポート",
+      "importDesc": "ダッシュボード JSON ファイルのアップロード",
+      "templates": "テンプレートを閲覧する",
+      "templatesDesc": "コミュニティダッシュボードから始める"
+    },
+    "noGroups": {
+      "title": "まだグループはありません",
+      "description": "グループを使用すると、複数のユーザーの権限を一度に管理できます。1 つ作成して始めましょう。",
+      "action": "新しいグループ",
+      "actionDesc": "ユーザーグループの作成"
+    },
+    "noRoles": {
+      "title": "ロールはまだありません",
+      "description": "ロールは、ユーザーが実行できるアクションを定義します。アクセスを制御するカスタムロールを作成します。",
+      "action": "新しい役割",
+      "actionDesc": "カスタムアクセスロールの定義"
+    },
+    "noAnomalyConfigs": {
+      "title": "異常検出は設定されていません",
+      "description": "異常検出を設定して、データ内の異常なパターンを自動的に識別します。",
+      "action": "新しい構成",
+      "actionDesc": "異常検出の設定"
+    },
+    "noApiLimits": {
+      "title": "API 制限は設定されていません",
+      "description": "API 制限は、各組織が時間枠ごとに取り込んでクエリできるデータ量を制御します。"
+    },
+    "noRoleLimits": {
+      "title": "ロール制限は設定されていません",
+      "description": "ロール制限は、組織内の個々のロールに適用されるインジェストクォータとクエリクォータを定義します。"
+    },
+    "noIngestionTokens": {
+      "title": "インジェストトークンはまだありません",
+      "description": "取り込みトークンは、ログ、メトリクス、トレースを送信する際にデータソースを認証します。",
+      "action": "新しいトークン",
+      "actionDesc": "取り込みトークンを生成する"
+    },
+    "noOrganizations": {
+      "title": "まだ組織はありません",
+      "description": "組織はユーザーとデータをグループ化します。作成して始めましょう。"
+    },
+    "noAlertDestinations": {
+      "title": "目的地はまだありません",
+      "description": "送信先は、アラート通知の送信先 (Slack、メール、Webhook など) を定義します。",
+      "action": "新しい目的地",
+      "actionDesc": "通知チャネルを接続する"
+    },
+    "noAlertTemplates": {
+      "title": "テンプレートはまだありません",
+      "description": "テンプレートはアラート通知メッセージの形式を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "通知テンプレートを作成する"
+    },
+    "noEnrichmentTables": {
+      "title": "エンリッチメントテーブルはまだありません",
+      "description": "エンリッチメントテーブルを使用すると、クエリ時にログデータに追加のコンテキストを添付できます。",
+      "action": "新しいテーブル",
+      "actionDesc": "エンリッチメントテーブルを作成する"
+    },
+    "noCipherKeys": {
+      "title": "暗号鍵はまだありません",
+      "description": "暗号鍵は、データストリームの機密フィールドを暗号化するために使用されます。",
+      "action": "新しいキー",
+      "actionDesc": "暗号鍵を生成"
+    },
+    "noAiToolsets": {
+      "title": "AI ツールセットはまだありません",
+      "description": "AI ツールセットは、組織を外部 AI 機能に接続します。",
+      "action": "新しいツールセット",
+      "actionDesc": "AI ツールセットの追加"
+    },
+    "noLlmProviders": {
+      "title": "LLM プロバイダーは設定されていません",
+      "description": "言語モデルプロバイダーに接続して AI を活用した機能を有効にします。",
+      "action": "プロバイダーを追加",
+      "actionDesc": "LLM プロバイダーの設定"
+    },
+    "noDiscoveredServices": {
+      "title": "サービスが見つかりませんでした",
+      "description": "トレースが到着し始めると、サービスが自動的にここに表示されます。"
+    },
+    "noNodes": {
+      "title": "使用可能なノードはありません",
+      "description": "クラスターノードは、登録するとここに表示されます。"
+    },
+    "noSourceMaps": {
+      "title": "ソースマップがアップロードされていません",
+      "description": "ソースマップをアップロードして、RUM エラーレポートで読みやすいスタックトレースを有効にします。",
+      "action": "アップロード",
+      "actionDesc": "ソースマップファイルのアップロード"
+    },
+    "noBackfillJobs": {
+      "title": "バックフィルジョブなし",
+      "description": "バックフィルジョブは、パイプラインを通じて履歴データを再処理します。1 つ実行して始めましょう。"
     }
   },
   "onlineEvals": {
