@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="dataset"
         :subtitle="'Lookup tables that enrich ingested data'"
         tabs-below
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="tw:shrink-0 tw:px-4"
       >
         <template #tabs>
           <PipelineSectionTabs />

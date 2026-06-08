@@ -249,7 +249,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     <TabsList as-child :loop="true">
       <div
         ref="tablistRef"
-        :class="['o-tabs tw:flex tw:flex-col tw:gap-0.5 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
+        :class="['o-tabs tw:flex tw:flex-col tw:gap-0.5 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-border-default': bordered }]"
         @dragstart="onTabDragStart"
         @dragover="onTabDragOver"
         @drop="onTabDrop"
@@ -269,7 +269,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     as-child
     @update:model-value="(v) => onTabClick(v as string | number)"
   >
-    <div :class="['tw:flex tw:flex-row tw:items-stretch', { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]">
+    <div :class="['tw:flex tw:flex-row tw:items-stretch', { 'tw:border-b tw:border-solid tw:border-border-default': bordered }]">
       <!-- Left arrow -->
       <button
         v-show="hasOverflow"
@@ -286,7 +286,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
       <!-- Overflow-hidden scroll container -->
       <div
         ref="scrollRef"
-        class="tw:flex-1 tw:overflow-x-hidden tw:relative tw:py-[3px]"
+        class="tw:flex-1 tw:overflow-x-hidden tw:relative tw:pt-0.75"
       >
         <TabsList as-child :loop="true">
           <div

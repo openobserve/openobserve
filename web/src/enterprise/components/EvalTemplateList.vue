@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="fact-check"
       :subtitle="'Reusable scoring templates for LLM evaluations'"
       tabs-below
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="tw:shrink-0 tw:px-4"
     >
       <template #title>
         <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>

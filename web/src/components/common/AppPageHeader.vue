@@ -52,11 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
     class="app-page-header tw:shrink-0"
-    :class="
+    :class="[
       tabsBelow
         ? 'tw:flex tw:flex-col'
-        : 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4'
-    "
+        : 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4',
+      // The header owns its bottom divider whenever it carries tabs, so the tab
+      // underline always lands on it — consumers never hand-draw a border-b.
+      { 'tw:border-b tw:border-border-default': hasTabs && tabsBelow },
+    ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
@@ -142,11 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Row 2: full-width section-tab strip (prototype's two-row header). The
-         active tab's underline sits just above the header's bottom divider. -->
-    <div
-      v-if="hasTabs && tabsBelow"
-      class="tw:flex tw:items-stretch tw:h-10"
-    >
+         header draws its own bottom divider (see the border-b on <header> above)
+         whenever it has tabs, and OTabs draws its active underline flush at its
+         bottom edge — so the underline lands exactly on that divider with no
+         margin hacks and no consumer-drawn border. The -mt-2 pulls the tab row up
+         into the title row's slack so the overall header height stays compact. -->
+    <div v-if="hasTabs && tabsBelow" class="tw:-mt-2">
       <slot name="tabs" />
     </div>
   </header>

@@ -26,24 +26,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
       <!-- Tab bar (drag to reorder) — shown when multiple tabs exist.
-           Standard OTabs for consistency; `reorderable` keeps the drag-to-
-           reorder behavior the home tabs have always had. -->
-      <OTabs
+           Standard page-tab recipe: OTabs inside a border-b divider; the active
+           underline lands on the line automatically (OTabs draws it flush at the
+           bottom). `reorderable` keeps the drag-to-reorder behavior. -->
+      <div
         v-if="tabOrder.length > 1"
-        v-model="activeHomeTab"
-        reorderable
-        bordered
-        data-test="home-tab-bar"
-        @reorder="onTabReorder"
+        class="tw:shrink-0 tw:border-b tw:border-border-default"
       >
-        <OTab
-          v-for="tab in tabOrder"
-          :key="tab.id"
-          :name="tab.id"
-          :label="tab.label"
-          :data-test="`home-tab-${tab.id}`"
-        />
-      </OTabs>
+        <OTabs
+          v-model="activeHomeTab"
+          align="left"
+          reorderable
+          data-test="home-tab-bar"
+          @reorder="onTabReorder"
+        >
+          <OTab
+            v-for="tab in tabOrder"
+            :key="tab.id"
+            :name="tab.id"
+            :label="tab.label"
+            :data-test="`home-tab-${tab.id}`"
+          />
+        </OTabs>
+      </div>
 
       <!-- O2 AI Assistant tab -->
       <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">

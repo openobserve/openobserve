@@ -34,16 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
       <div v-if="showTabs" class="tw:w-full tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
-        <div class="tw:-mb-0.75">
-          <OTabs v-model="activeTab" align="left" dense @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-            />
-          </OTabs>
-        </div>
+        <OTabs v-model="activeTab" align="left" @change="changeTab">
+          <OTab
+            v-for="tab in tabs"
+            :key="tab.value"
+            :name="tab.value"
+            :label="tab.label"
+          />
+        </OTabs>
       </div>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">

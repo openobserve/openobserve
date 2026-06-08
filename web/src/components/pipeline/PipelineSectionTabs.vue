@@ -22,15 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   This mirrors the breadcrumb section dropdown as faster inline navigation.
 -->
 <template>
-  <!-- Prototype-style section tabs: underline text tabs with an optional count
-       pill. Lives in an AppPageHeader #tabs slot (use :tabs-below for a full
-       second row). The active tab is derived from the route; clicking navigates. -->
+  <!-- Section tabs — standard non-dense OTabs. The active underline sits on the
+       header's bottom divider automatically (OTabs draws its indicator flush at
+       the bottom). The active tab is derived from the route; clicking navigates. -->
   <OTabs
     :model-value="activeSectionKey"
     align="left"
-    dense
     data-test="pipeline-section-tabs"
-    class="tw:h-full"
     @change="navigateToSection"
   >
     <OTab
