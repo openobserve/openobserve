@@ -64,7 +64,17 @@ test.describe("Logs Quickmode testcases", () => {
     } catch (error) {
       testLogger.warn('All fields button click failed', { error: error.message });
     }
-    
+
+    // Reset SQL mode to OFF so that clickSQLModeToggle reliably turns it ON.
+    // If a previous test (or localStorage restore) left the editor in SQL mode,
+    // clickSQLModeToggle would clear the editor instead of building a SELECT query.
+    try {
+      await pm.logsPage.disableSqlModeIfNeeded();
+      testLogger.info('SQL mode reset to OFF');
+    } catch (error) {
+      testLogger.warn('SQL mode reset failed, continuing', { error: error.message });
+    }
+
     testLogger.info('Test setup completed');
   });
 
@@ -82,11 +92,13 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Testing interesting fields and query editor');
     
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    // Use ensureFieldIsInteresting so that if the field is already starred (e.g. from
+    // localStorage from a previous run) we don't accidentally remove it via toggle.
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.expectInterestingFieldInEditor("_timestamp,kubernetes_pod_id");
-    
+
     testLogger.info('Interesting fields and query editor test completed');
   });
   test("should display quick mode toggle button", {
@@ -108,7 +120,7 @@ test.describe("Logs Quickmode testcases", () => {
 
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
     testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field via sidebar button');
     await pm.logsPage.clickSearchBarRefreshButton();
     testLogger.info('Validated: search refresh triggered with interesting field selection active');
@@ -152,7 +164,7 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Testing interesting fields SQL mode default behavior');
     
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.expectQueryEditorVisible();
@@ -166,9 +178,9 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Testing interesting fields add/remove functionality');
     
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_container_name");
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_container_name");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_container_name");
     await pm.logsPage.fillIndexFieldSearchInput("level");
-    await pm.logsPage.clickInterestingFieldButton("level");
+    await pm.logsPage.ensureFieldIsInteresting("level");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.waitForQueryEditorTextbox();
     await pm.logsPage.runQueryAfterModeChange();
@@ -189,11 +201,11 @@ test.describe("Logs Quickmode testcases", () => {
     testLogger.info('Testing SQL mode order by persistence after page reload');
     
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickSearchBarRefreshButton();
     await pm.logsPage.page.reload();
-    await pm.logsPage.page.waitForLoadState('domcontentloaded');
+    await pm.logsPage.page.waitForLoadState('networkidle');
     await pm.logsPage.expectQueryEditorContainsText('SELECT _timestamp,kubernetes_pod_id FROM "e2e_automate"');
     
     testLogger.info('SQL mode order by persistence test completed');
@@ -206,7 +218,7 @@ test.describe("Logs Quickmode testcases", () => {
 
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
     testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field');
     await pm.logsPage.clickSQLModeToggle();
     testLogger.info('Validated: switched to SQL mode');
@@ -236,7 +248,7 @@ test.describe("Logs Quickmode testcases", () => {
     // Search and click kubernetes_pod_id field
     await pm.logsPage.fillIndexFieldSearchInput("kubernetes_pod_id");
     testLogger.info('Validated: field search input filtered to "kubernetes_pod_id"');
-    await pm.logsPage.clickInterestingFieldButton("kubernetes_pod_id");
+    await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     testLogger.info('Validated: "kubernetes_pod_id" marked as an interesting field');
 
     // Click on infoschema button

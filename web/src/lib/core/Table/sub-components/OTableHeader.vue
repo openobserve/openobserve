@@ -381,8 +381,9 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           v-if="header.column.getCanResize()"
           :class="[
             'resizer',
-            'tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-1 tw:cursor-col-resize tw:hover:bg-[var(--color-table-resize-handle)] tw:hover:opacity-100 tw:opacity-0 tw:transition-opacity',
-            header.column.getIsResizing() ? 'isResizing tw:bg-[var(--color-table-resize-handle)]!' : '',
+            'tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-0.5 tw:cursor-col-resize tw:transition-colors tw:bg-[var(--color-border-default)]',
+            'group-hover:tw:bg-[var(--color-table-resize-handle)]',
+            header.column.getIsResizing() ? 'tw:bg-[var(--color-table-resize-handle)]!' : '',
           ]"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="header.getResizeHandler()?.($event)"
@@ -498,14 +499,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           v-if="header.column.getCanResize()"
           :class="[
             'resizer',
-            'tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-1 tw:cursor-col-resize tw:hover:bg-[var(--color-table-resize-handle)] tw:hover:opacity-100 tw:opacity-0 tw:transition-opacity',
-            header.column.getIsResizing() ? 'isResizing tw:bg-[var(--color-table-resize-handle)]!' : '',
+            'tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-0.5 tw:cursor-col-resize tw:transition-colors tw:bg-[var(--color-border-default)]',
+            'group-hover:tw:bg-[var(--color-table-resize-handle)]',
+            header.column.getIsResizing() ? 'tw:bg-[var(--color-table-resize-handle)]!' : '',
           ]"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="header.getResizeHandler()?.($event)"
           @touchstart.prevent.stop="header.getResizeHandler()?.($event)"
         />
       </th>
+
     </tr>
   </thead>
 </template>

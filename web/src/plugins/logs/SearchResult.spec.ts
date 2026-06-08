@@ -240,7 +240,7 @@ describe("SearchResult Component", () => {
     it("should compute updateTitle", () => {
       const title = "Test Title";
       wrapper.vm.searchObj.data.histogram.chartParams.title = title;
-      expect(wrapper.vm.updateTitle).toBe(title);
+      expect(wrapper.vm.noOfRecordsTitle).toBe(title);
     });
 
     it("should compute resetPlotChart", () => {

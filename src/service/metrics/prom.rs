@@ -97,8 +97,7 @@ pub async fn remote_write(
     // End get user defined schema
 
     // associated pipeline
-    let mut stream_executable_pipelines: HashMap<String, Option<ExecutablePipeline>> =
-        HashMap::new();
+    let mut stream_executable_pipelines: HashMap<String, Vec<ExecutablePipeline>> = HashMap::new();
     let mut stream_pipeline_inputs: HashMap<String, Vec<(json::Value, i64)>> = HashMap::new();
 
     // realtime alerts
@@ -210,7 +209,7 @@ pub async fn remote_write(
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !stream_executable_pipelines.contains_key(stream_name_str) {
                 let pipeline_params =
-                    crate::service::ingestion::get_stream_executable_pipeline(stream).await;
+                    crate::service::ingestion::get_stream_executable_pipelines(stream).await;
                 stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
             }
         }
@@ -384,8 +383,7 @@ pub async fn remote_write(
             // ready to be buffered for downstream processing
             if stream_executable_pipelines
                 .get(&metric_name)
-                .unwrap()
-                .is_some()
+                .is_some_and(|v| !v.is_empty())
             {
                 // buffer to pipeline for batch processing
                 stream_pipeline_inputs
@@ -435,8 +433,11 @@ pub async fn remote_write(
     }
 
     // process records buffered for pipeline processing
-    for (stream_name, exec_pl_option) in &stream_executable_pipelines {
-        if let Some(exec_pl) = exec_pl_option {
+    for (stream_name, pipelines) in &stream_executable_pipelines {
+        if pipelines.is_empty() {
+            continue;
+        }
+        for exec_pl in pipelines {
             let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
                 log::error!(
                     "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
@@ -658,14 +659,11 @@ pub async fn remote_write(
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
         write_file_time += t.elapsed().as_micros();
 
-        let fns_length: usize =
-            stream_executable_pipelines
-                .get(&stream_name)
-                .map_or(0, |exec_pl_option| {
-                    exec_pl_option
-                        .as_ref()
-                        .map_or(0, |exec_pl| exec_pl.num_of_func())
-                });
+        let fns_length: usize = stream_executable_pipelines
+            .get(&stream_name)
+            .map_or(0, |pipelines| {
+                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
+            });
         req_stats.response_time = start.elapsed().as_secs_f64();
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {

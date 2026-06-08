@@ -17,7 +17,10 @@ use std::sync::{Arc, LazyLock as Lazy};
 
 use config::{
     cluster::LOCAL_NODE,
-    meta::{pipeline::Pipeline, stream::StreamParams},
+    meta::{
+        pipeline::{Pipeline, PipelineKind},
+        stream::StreamParams,
+    },
 };
 use infra::{
     coordinator::pipelines::PIPELINES_WATCH_PREFIX,
@@ -90,23 +93,26 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, 
     Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
 }
 
-/// Retrieve cached ExecutablePipeline struct that's ready for batch processing records by
-/// StreamParams
+/// Retrieve cached ExecutablePipelines for a stream. User pipelines come first,
+/// followed by evaluation pipelines.
 ///
 /// Used for pipeline execution.
-pub async fn get_executable_pipeline(stream_params: &StreamParams) -> Option<ExecutablePipeline> {
-    STREAM_EXECUTABLE_PIPELINES
+pub async fn get_executable_pipelines(stream_params: &StreamParams) -> Vec<ExecutablePipeline> {
+    let mut pipelines: Vec<ExecutablePipeline> = STREAM_EXECUTABLE_PIPELINES
         .read()
         .await
         .get(stream_params)
         .cloned()
+        .unwrap_or_default();
+    pipelines.sort_by_key(|p| p.kind != PipelineKind::User);
+    pipelines
 }
 
-/// Returns the pipeline by id.
-///
-/// Used to get the pipeline associated with the ID when scheduled job is ran.
-pub async fn get_by_stream(stream_params: &StreamParams) -> Option<Pipeline> {
-    infra_pipeline::get_by_stream(stream_params).await.ok()
+/// Returns all realtime pipelines for the given stream. User pipelines first.
+pub async fn get_by_stream(stream_params: &StreamParams) -> Vec<Pipeline> {
+    infra_pipeline::get_by_stream(stream_params)
+        .await
+        .unwrap_or_default()
 }
 
 /// Returns the pipeline by id.
@@ -195,10 +201,12 @@ pub async fn clear_scheduled_pipelines_cache() {
     log::info!("[Pipeline] Scheduled pipelines cache cleared");
 }
 
-/// Finds the pipeline with the same source
+/// Finds the pipelines with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
-pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline, PipelineError> {
+pub async fn get_with_same_source_stream(
+    pipeline: &Pipeline,
+) -> Result<Vec<Pipeline>, PipelineError> {
     Ok(infra_pipeline::get_with_same_source_stream(pipeline).await?)
 }
 
@@ -267,7 +275,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                         Ok(exec_pl) => {
                             pipeline_stream_mapping_cache
                                 .insert(pipeline.id.clone(), stream_params.clone());
-                            stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                            stream_exec_pl
+                                .entry(stream_params.clone())
+                                .or_default()
+                                .push(exec_pl);
                         }
                     };
                 }
@@ -433,21 +444,33 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                                 Ok(exec_pl) => {
                                     pipeline_stream_mapping_cache
                                         .insert(pipeline_id.to_string(), stream_params.clone());
-                                    stream_exec_pl.insert(stream_params.clone(), exec_pl);
+                                    stream_exec_pl
+                                        .entry(stream_params.clone())
+                                        .or_default()
+                                        .push(exec_pl);
                                     log::info!(
                                         "[Pipeline::watch]: realtime pipeline {} added to cache.",
                                         pipeline.id
                                     );
                                 }
                             };
-                        } else if let Some(removed) =
+                        } else if let Some(removed_stream) =
                             pipeline_stream_mapping_cache.remove(pipeline_id)
-                            && stream_exec_pl.remove(&removed).is_some()
                         {
-                            // remove pipeline from cache if the update is to disable
-                            log::info!(
-                                "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
-                            );
+                            // Remove this specific pipeline from the Vec
+                            let mut removed = false;
+                            if let Some(vec) = stream_exec_pl.get_mut(&removed_stream) {
+                                vec.retain(|pl| pl.id != pipeline_id);
+                                if vec.is_empty() {
+                                    stream_exec_pl.remove(&removed_stream);
+                                }
+                                removed = true;
+                            }
+                            if removed {
+                                log::info!(
+                                    "[Pipeline]: realtime pipeline {pipeline_id} disabled and removed from cache."
+                                );
+                            }
                         }
                     }
                     config::meta::pipeline::components::PipelineSource::Scheduled(_) => {
@@ -471,13 +494,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
-                if let Some(removed) = PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
-                    && STREAM_EXECUTABLE_PIPELINES
-                        .write()
-                        .await
-                        .remove(&removed)
-                        .is_some()
+                if let Some(removed_stream) =
+                    PIPELINE_STREAM_MAPPING.write().await.remove(pipeline_id)
                 {
+                    let mut stream_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
+                    if let Some(vec) = stream_exec.get_mut(&removed_stream) {
+                        vec.retain(|pl| pl.id != pipeline_id);
+                        if vec.is_empty() {
+                            stream_exec.remove(&removed_stream);
+                        }
+                    }
                     log::info!(
                         "[Pipeline]: realtime pipeline {pipeline_id} deleted and removed from cache."
                     );
@@ -532,6 +558,7 @@ mod tests {
             source: PipelineSource::Scheduled(DerivedStream::default()),
             nodes: vec![],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         // Cache the pipeline
@@ -570,6 +597,7 @@ mod tests {
             )),
             nodes: vec![],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         // Try to cache the realtime pipeline (should be ignored)
@@ -590,6 +618,7 @@ mod tests {
             source: PipelineSource::Scheduled(DerivedStream::default()),
             nodes: vec![],
             edges: vec![],
+            kind: config::meta::pipeline::PipelineKind::User,
         };
 
         // Cache the scheduled pipeline

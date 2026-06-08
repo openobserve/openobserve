@@ -171,6 +171,7 @@ jobs:
                 "org.spec.js",
                 "theme-management.spec.js",
                 "ingestion-config.spec.js",
+                "ingestionTokens.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
               ]
@@ -244,6 +245,7 @@ jobs:
                 "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
@@ -474,21 +476,27 @@ jobs:
             CURRENT_ATTEMPT=${{ github.run_attempt }}
 
             # Get all jobs from the run
+            # Fallback to empty jobs array on network/rate-limit errors so the step
+            # never fails due to a transient GitHub API issue.
             ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100" \
+              || echo '{"jobs":[]}')
 
             # Count jobs that are NOT completed (actually running in this attempt)
-            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length")
+            # Fall back to "0" if jq fails (e.g. API returned an error body instead of JSON).
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length" 2>/dev/null || echo "0")
 
             # Count total unique matrix job names (from attempt 1)
-            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
+            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length" 2>/dev/null || echo "0")
 
             echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
             echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
 
-            # Store rerun type for potential use
-            if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
+            # Store rerun type for potential use.
+            # Guard against non-numeric jq output (e.g. "null") to prevent bash
+            # "integer expression expected" errors under set -eo pipefail.
+            if [ "${CURRENT_ATTEMPT_JOBS:-0}" -eq "${TOTAL_MATRIX_JOBS:-0}" ] 2>/dev/null; then
               echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs running)"
               echo "rerun_type=all" >> $GITHUB_OUTPUT
             else
@@ -1042,7 +1050,6 @@ jobs:
         check_changes,
         build_binary,
         ui_integration_tests,
-        merge_and_upload_reports,
       ]
     if: always()
     steps:
@@ -1057,7 +1064,6 @@ jobs:
 
           BUILD_OK=false
           UI_OK=false
-          MERGE_OK=false
 
           if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
             BUILD_OK=true
@@ -1067,17 +1073,12 @@ jobs:
             UI_OK=true
           fi
 
-          if [ "${{ needs.merge_and_upload_reports.result }}" == "success" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "skipped" ] || [ "${{ needs.merge_and_upload_reports.result }}" == "failure" ]; then
-            MERGE_OK=true
-          fi
-
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
             echo "Playwright tests failed:"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
-            echo "  merge_and_upload_reports: ${{ needs.merge_and_upload_reports.result }}"
             exit 1
           fi

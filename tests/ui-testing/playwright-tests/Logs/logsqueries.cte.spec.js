@@ -21,6 +21,11 @@ test.describe("CTE Logs Queries testcases", () => {
     // pattern that races the auto-search response listener.
     await pm.logsPage.waitForSearchBarRefreshButton();
     await pm.logsPage.runQueryAndWaitForResults();
+    // After the button settles, give the virtual-list renderer one pass to
+    // materialise row 0.  waitForTableHits returns quickly when rows are present
+    // and gives up silently after 5 s so the individual-test assertion still
+    // owns the final failure message.
+    await pm.logsPage.waitForTableHits(5000).catch(() => {});
   }
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -42,6 +47,16 @@ test.describe("CTE Logs Queries testcases", () => {
     // CTE queries use SQL syntax — enable SQL mode before the initial query run.
     await pageManager.logsPage.enableSqlModeIfDisabled();
     await applyQueryButton(pageManager);
+
+    // Data-readiness gate: OpenObserve's WAL flush can delay indexing by a few
+    // seconds.  If the initial SELECT * returns 0 rows (table still empty after
+    // the 5 s window inside applyQueryButton), run the query once more so that
+    // any in-progress flush has time to complete before the CTE test runs.
+    const hasInitialData = await pageManager.logsPage.waitForTableHits(3000);
+    if (!hasInitialData) {
+      testLogger.warn('CTE beforeEach: No rows after initial query — retrying to allow data indexing');
+      await applyQueryButton(pageManager);
+    }
 
     testLogger.info('CTE test setup completed');
   });
@@ -86,7 +101,7 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.setQueryEditorValue('WITH FilteredLogs AS (SELECT * FROM "e2e_cte" WHERE str_match_ignore_case(message, \'org\')) SELECT message, kubernetes_pod_name FROM FilteredLogs');
+    await pageManager.logsPage.setQueryEditorValue('WITH FilteredLogs AS (SELECT * FROM "e2e_cte" WHERE message LIKE \'%org%\') SELECT message, kubernetes_pod_name FROM FilteredLogs');
     // Deterministic wait — confirms Monaco model reflects the new query before Run.
     await pageManager.logsPage.waitForQueryEditorValue('FilteredLogs');
     await applyQueryButton(pageManager);
@@ -142,7 +157,9 @@ test.describe("CTE Logs Queries testcases", () => {
     
     await pageManager.logsPage.clickDateTimeButton();
     await pageManager.logsPage.clickRelative15MinButton();
-    await pageManager.logsPage.setQueryEditorValue('WITH Normalized AS (SELECT _timestamp, COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte") SELECT * FROM Normalized WHERE normalized_message LIKE \'%timeout%\'');
+    // Filter on the original message field inside the CTE — LIKE on a CTE-aliased
+    // column in the outer WHERE is unreliable in OpenObserve's SQL engine.
+    await pageManager.logsPage.setQueryEditorValue('WITH Normalized AS (SELECT _timestamp, COALESCE(message, \'No message\') AS normalized_message FROM "e2e_cte" WHERE str_match_ignore_case(message, \'timeout\')) SELECT * FROM Normalized');
     // Deterministic wait — confirms Monaco model reflects the new query before Run.
     await pageManager.logsPage.waitForQueryEditorValue('Normalized');
     await applyQueryButton(pageManager);

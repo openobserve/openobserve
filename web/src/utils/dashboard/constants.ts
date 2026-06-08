@@ -20,3 +20,7 @@ export const PIVOT_TABLE_TOTAL_COLUMN_WIDTH = 150;
 
 // UI constants
 export const FIELD_FUNCTION_MENU_WIDTH = "771px";
+
+// Chart types whose queries are always hand-written (custom) rather than
+// builder-generated. Add future custom-query chart types here.
+export const CUSTOM_QUERY_CHART_TYPES = ["custom_chart"];

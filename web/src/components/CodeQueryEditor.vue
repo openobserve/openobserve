@@ -359,7 +359,7 @@ export default defineComponent({
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -617,6 +617,17 @@ export default defineComponent({
         },
       });
 
+      monaco.editor.defineTheme("myCustomDarkTheme", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "string", foreground: "CE9178" },
+          { token: "string.sql", foreground: "CE9178" },
+          { token: "string.vrl", foreground: "CE9178" },
+        ],
+        colors: {},
+      });
+
       // Dispose the provider if it already exists before registering a new one
       provider.value?.dispose();
       registerAutoCompleteProvider();
@@ -667,7 +678,7 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        theme: store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+        theme: store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
         wordWrap: "on",
@@ -874,7 +885,7 @@ export default defineComponent({
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
+          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );

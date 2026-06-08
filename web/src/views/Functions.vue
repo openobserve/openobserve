@@ -100,27 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('function.enrichmentTables')"
                   />
                 </ORouteTab>
-                <ORouteTab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="eval-templates-tab"
-                  name="evalTemplates"
-                  :to="{
-                    name: 'evalTemplates',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="isCompactSidebar ? undefined : t('pipeline.evalTemplates')"
-                  :icon="isCompactSidebar ? 'rule' : undefined"
-                >
-                  <OTooltip
-                    v-if="isCompactSidebar"
-                    side="right"
-                    align="center"
-                    :sideOffset="8"
-                    :content="t('pipeline.evalTemplates')"
-                  />
-                </ORouteTab>
               </OTabs>
             </div>
           </div>

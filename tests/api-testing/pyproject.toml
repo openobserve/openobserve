@@ -26,6 +26,8 @@ dependencies = [
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    # query-agent oracle: regenerates queries/*.json via DuckDB before CI runs
+    "duckdb>=1.0",
     # Phase 5: schemathesis runs OpenAPI-spec-driven fuzz tests in its own
     # CI job (api_fuzz_tests). Looks for 5xx panics across the 150 endpoints
     # OO exposes at /api-doc/openapi.json.

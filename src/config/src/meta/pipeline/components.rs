@@ -260,6 +260,61 @@ impl MemorySize for FunctionParams {
     }
 }
 
+/// Reference to a scorer: either a scorer entity id (latest version) or entity id + pinned version.
+///
+/// Supports two JSON forms:
+/// - Latest: `"scorer_entity_id"` (plain string -> version = None)
+/// - Pinned: `{"id": "scorer_entity_id", "version": 2}`
+#[derive(Clone, Debug, PartialEq, ToSchema)]
+pub struct ScorerRef {
+    pub id: String,
+    pub version: Option<i32>,
+}
+
+impl Serialize for ScorerRef {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        if self.version.is_some() {
+            let mut s = serializer.serialize_struct("ScorerRef", 2)?;
+            s.serialize_field("id", &self.id)?;
+            s.serialize_field("version", &self.version)?;
+            s.end()
+        } else {
+            serializer.serialize_str(&self.id)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ScorerRef {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let v = serde_json::Value::deserialize(deserializer)?;
+        match v {
+            serde_json::Value::String(id) => Ok(ScorerRef { id, version: None }),
+            serde_json::Value::Object(map) => {
+                let id = map
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .map(String::from)
+                    .ok_or_else(|| serde::de::Error::missing_field("id"))?;
+                let version = map
+                    .get("version")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32);
+                Ok(ScorerRef { id, version })
+            }
+            _ => Err(serde::de::Error::custom(
+                "expected string or object for ScorerRef",
+            )),
+        }
+    }
+}
+
+impl crate::stats::MemorySize for ScorerRef {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<ScorerRef>() + self.id.mem_size() + self.version.mem_size()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(default)]
 pub struct LlmEvaluationParams {
@@ -268,29 +323,18 @@ pub struct LlmEvaluationParams {
     /// Uses hash-based sampling on trace_id for deterministic, consistent sampling.
     #[serde(default = "default_sampling_rate", with = "sampling_rate_str")]
     pub sampling_rate: f64,
-    /// Backward-compat: ignored, LLM judge is always enabled.
-    #[serde(default = "default_enable_llm_judge")]
-    pub enable_llm_judge: bool,
-    /// Field name used to identify LLM spans within a trace (e.g., "llm_input").
-    /// Only spans containing this field (with a non-empty value) are considered LLM spans.
-    #[serde(default = "default_llm_span_identifier")]
-    pub llm_span_identifier: String,
-    /// Optional template to use for evaluation (response_type name).
-    /// If specified, overrides auto-resolution by response_type.
+    /// Scorers to execute for this eval node.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scorers: Vec<ScorerRef>,
+    /// Optional job ID for online eval jobs. When set, the evaluation pipeline
+    /// runs in span-bounded mode (single-span evaluation via Provider API)
+    /// rather than the trace-buffered mode (multi-span aggregation via sre-agent).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eval_template: Option<String>,
+    pub job_id: Option<String>,
 }
 
 fn default_sampling_rate() -> f64 {
     0.01
-}
-
-fn default_enable_llm_judge() -> bool {
-    true
-}
-
-fn default_llm_span_identifier() -> String {
-    "llm_input".to_string()
 }
 
 mod sampling_rate_str {
@@ -334,9 +378,8 @@ impl Default for LlmEvaluationParams {
         Self {
             name: String::new(),
             sampling_rate: default_sampling_rate(),
-            enable_llm_judge: default_enable_llm_judge(),
-            llm_span_identifier: default_llm_span_identifier(),
-            eval_template: None,
+            scorers: Vec::new(),
+            job_id: None,
         }
     }
 }
@@ -345,8 +388,7 @@ impl MemorySize for LlmEvaluationParams {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<LlmEvaluationParams>()
             + self.name.mem_size()
-            + self.llm_span_identifier.mem_size()
-            + self.eval_template.mem_size()
+            + self.scorers.iter().map(|s| s.mem_size()).sum::<usize>()
     }
 }
 
@@ -824,10 +866,8 @@ mod tests {
     fn test_llm_evaluation_params_default() {
         let p = LlmEvaluationParams::default();
         assert_eq!(p.sampling_rate, 0.01);
-        assert!(p.enable_llm_judge);
-        assert_eq!(p.llm_span_identifier, "llm_input");
         assert!(p.name.is_empty());
-        assert!(p.eval_template.is_none());
+        assert!(p.scorers.is_empty());
     }
 
     #[test]
@@ -1004,34 +1044,59 @@ mod tests {
     }
 
     #[test]
-    fn test_llm_evaluation_params_eval_template_absent_when_none() {
+    fn test_llm_evaluation_params_scorers_absent_when_empty() {
         let params = LlmEvaluationParams::default();
         let json = serde_json::to_value(&params).unwrap();
-        assert!(!json.as_object().unwrap().contains_key("eval_template"));
+        assert!(!json.as_object().unwrap().contains_key("scorers"));
     }
 
     #[test]
-    fn test_llm_evaluation_params_eval_template_present_when_some() {
+    fn test_llm_evaluation_params_scorers_present_when_some() {
         let params = LlmEvaluationParams {
-            eval_template: Some("my_template".to_string()),
+            scorers: vec![ScorerRef {
+                id: "scorer-entity-1".to_string(),
+                version: None,
+            }],
             ..LlmEvaluationParams::default()
         };
         let json = serde_json::to_value(&params).unwrap();
-        assert!(json.as_object().unwrap().contains_key("eval_template"));
+        assert!(json.as_object().unwrap().contains_key("scorers"));
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_scorers_deserialize_from_array() {
+        let json = serde_json::json!({
+            "name": "llm_eval",
+            "sampling_rate": 0.01,
+            "scorers": ["scorer-entity-1", "scorer-entity-2"]
+        });
+        let params: LlmEvaluationParams = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            params.scorers,
+            vec![
+                ScorerRef {
+                    id: "scorer-entity-1".to_string(),
+                    version: None,
+                },
+                ScorerRef {
+                    id: "scorer-entity-2".to_string(),
+                    version: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_scorer_ref_deserialize_pinned_entity_id() {
+        let json = serde_json::json!({"id": "scorer-entity-1", "version": 2});
+        let scorer_ref: ScorerRef = serde_json::from_value(json).unwrap();
+
+        assert_eq!(scorer_ref.id, "scorer-entity-1");
+        assert_eq!(scorer_ref.version, Some(2));
     }
 
     #[test]
     fn test_default_sampling_rate() {
         assert!((default_sampling_rate() - 0.01).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_default_enable_llm_judge() {
-        assert!(default_enable_llm_judge());
-    }
-
-    #[test]
-    fn test_default_llm_span_identifier() {
-        assert_eq!(default_llm_span_identifier(), "llm_input");
     }
 }

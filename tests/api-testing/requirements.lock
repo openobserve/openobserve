@@ -7,7 +7,6 @@
 #   all-features: false
 #   with-sources: false
 #   generate-hashes: false
-#   universal: false
 
 -e file:.
 absl-py==2.1.0
@@ -26,6 +25,8 @@ charset-normalizer==3.3.2
     # via requests
 click==8.4.1
     # via schemathesis
+duckdb==1.5.3
+    # via pytest-openobserve
 execnet==2.1.2
     # via pytest-xdist
 graphql-core==3.2.8

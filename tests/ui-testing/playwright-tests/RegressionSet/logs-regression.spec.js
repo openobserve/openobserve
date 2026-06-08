@@ -688,14 +688,10 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(2000);
 
-    // Ensure we're in non-SQL (quick) mode first.
-    // getSQLModeState returns data-state attr ("checked" = SQL on, "unchecked" = SQL off)
-    const sqlState = await pm.logsPage.getSQLModeState();
-    if (sqlState === 'checked') {
-      await pm.logsPage.clickSQLModeSwitch();
-      await page.waitForTimeout(1000);
-      testLogger.info('Switched to quick mode for test setup');
-    }
+    // Ensure we're in non-SQL mode first — SQL mode is now auto-detected from query
+    // content (SELECT...FROM = SQL on), so clear the editor to guarantee FTS mode.
+    await pm.logsPage.setQueryEditorContent('');
+    await page.waitForTimeout(500);
 
     // Enter a query with pipe syntax in non-SQL mode
     const queryWithPipe = 'kubernetes_pod_name | stats count()';
@@ -706,39 +702,37 @@ test.describe("Logs Regression Bugs", () => {
 
     await page.waitForTimeout(1000);
 
-    // Toggle to SQL mode
+    // Switch to SQL mode — clickSQLModeSwitch() writes a SELECT query into the
+    // editor which triggers auto-detection. The pipe query is replaced (not
+    // converted inline) as the SQL toggle button was removed in PR #12483.
     await pm.logsPage.clickSQLModeSwitch();
     await page.waitForTimeout(1500);
     testLogger.info('Toggled to SQL mode');
 
-    // Get the converted SQL query (via Monaco API — no line numbers)
+    // Get the resulting SQL query (via Monaco API — no line numbers)
     const convertedQuery = await pm.logsPage.getQueryFromEditor();
-    testLogger.info(`Converted SQL query: ${convertedQuery}`);
+    testLogger.info(`SQL query after switch: ${convertedQuery}`);
 
-    // ASSERTION 1: Query should be wrapped in SQL syntax (non-empty, contains SELECT/FROM)
+    // ASSERTION 1: Editor must now contain a valid SELECT statement
     expect(convertedQuery.length).toBeGreaterThan(0);
     expect(convertedQuery).toMatch(/select/i);
     expect(convertedQuery).toMatch(/from/i);
-    testLogger.info('✓ Query was wrapped in SQL syntax');
+    testLogger.info('✓ Editor contains valid SQL syntax after mode switch');
 
-    // ASSERTION 2: The original filter text is preserved in the WHERE clause
-    expect(convertedQuery).toContain('kubernetes_pod_name');
-    testLogger.info('✓ Original filter text preserved in converted query');
-
-    // Run the query and check for errors only — results depend on backend pipe support
+    // Run the query and check for errors only
     await pm.logsPage.clickRefreshButton();
     await page.waitForTimeout(3000);
 
-    // ASSERTION 3: Conversion should not cause syntax errors
+    // ASSERTION 2: Switching mode must not produce a syntax error
     const hasError = await pm.logsPage.hasErrorNotification();
     if (hasError) {
       const errorText = await pm.logsPage.getNotificationText();
-      testLogger.error(`Error after SQL conversion: ${errorText}`);
+      testLogger.error(`Error after SQL mode switch: ${errorText}`);
     }
     expect(hasError).toBeFalsy();
-    testLogger.info('✓ No syntax errors after SQL mode conversion');
+    testLogger.info('✓ No syntax errors after SQL mode switch');
 
-    testLogger.info('✓ SQL mode conversion completed successfully');
+    testLogger.info('✓ SQL mode switch with pipe query completed successfully');
   });
 
   // ============================================================================

@@ -11,6 +11,7 @@ import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scope
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplete";
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
+import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
@@ -49,6 +50,7 @@ import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { DataPage } from "./generalPages/dataPage.js";
 import { IamPage } from "./iamPages/iamPage.js";
+import { IngestionTokensPage } from "./iamPages/ingestionTokensPage.js";
 import { ManagementPage } from "./generalPages/managementPage.js";
 import { AboutPage } from "./generalPages/aboutPage.js";
 import { CreateOrgPage } from "./generalPages/createOrgPage.js";
@@ -100,6 +102,7 @@ class PageManager {
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardSqlAutocomplete = new DashboardSqlAutocomplete(page);
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
+    this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
@@ -141,6 +144,7 @@ class PageManager {
     this.reportFoldersPage = new ReportFoldersPage(page);
     this.dataPage = new DataPage(page);
     this.iamPage = new IamPage(page);
+    this.ingestionTokensPage = new IngestionTokensPage(page);
     this.managementPage = new ManagementPage(page);
     this.aboutPage = new AboutPage(page);
     this.createOrgPage = new CreateOrgPage(page);

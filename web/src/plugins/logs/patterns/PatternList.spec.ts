@@ -151,14 +151,14 @@ describe("PatternList", () => {
       });
     });
 
-    it("should display loading spinner when loading is true", () => {
-      const spinner = wrapper.find('[data-test="pattern-list-loading-indicator"]');
-      expect(spinner.exists()).toBe(true);
+    it("should display loading skeleton when loading is true", () => {
+      const skeleton = wrapper.find('[data-test="pattern-list-loading-skeleton"]');
+      expect(skeleton.exists()).toBe(true);
     });
 
     it("should display loading text", () => {
-      const loadingText = wrapper.text();
-      expect(loadingText).toContain("Extracting patterns from logs");
+      const skeleton = wrapper.find('[data-test="pattern-list-loading-skeleton"]');
+      expect(skeleton.attributes("aria-label")).toContain("Extracting patterns from logs");
     });
 
     it("should not display virtual scroll when loading", () => {

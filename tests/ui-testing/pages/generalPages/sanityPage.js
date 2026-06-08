@@ -89,7 +89,7 @@ export class SanityPage {
         this.folderAddNameField = page.locator('[data-test="dashboard-folder-add-name-field"]');
         // AddFolder.vue now uses ODrawer's primary footer button — there is
         // no standalone "dashboard-folder-add-save" element after migration.
-        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.folderAddSave = page.locator('[data-test="dashboard-folder-dialog"] [data-test="o-dialog-primary-btn"]');
         this.deleteFolderIcon = page.locator('[data-test="dashboard-delete-folder-icon"]');
 
         // ============================================================
@@ -102,7 +102,7 @@ export class SanityPage {
         this.streamTypeLogsOption = page.locator('[data-test="add-stream-type-input-option"][data-test-value="logs"]');
         // AddStream.vue uses ODrawer (isInPipeline=false on the Streams page).
         // The save action is the ODrawer built-in primary footer button.
-        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-drawer-primary-btn"]');
+        this.saveStreamButton = page.locator('[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]');
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
@@ -235,8 +235,16 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram toggle is inside the utilities ODropdown in SearchBar.vue.
-        // Must open the menu first before the OSwitch element exists in the DOM.
+        // Histogram has an inline toolbar button at normal viewport widths
+        // (data-test="logs-search-bar-histogram-btn"). It moves into the
+        // utilities ("More") menu only at narrow viewports (shouldMoveButtonsToMenu).
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isInline) {
+            await inlineBtn.click();
+            return;
+        }
+        // Narrow-viewport fallback: open utilities menu and click the menu item.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -250,9 +258,18 @@ export class SanityPage {
 
     // Returns true when the histogram OSwitch is currently ON.
     // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"` — opens the utilities menu to read the state,
-    // then closes it without triggering a toggle.
+    // `aria-checked="true|false"`. At normal viewport widths the histogram button
+    // is inline; at narrow widths it lives inside the utilities menu.
     async isHistogramOn() {
+        // Check the inline histogram button first (normal viewport).
+        const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
+        const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isInline) {
+            const switchControl = inlineBtn.locator('[role="switch"]');
+            const aria = await switchControl.getAttribute('aria-checked');
+            return aria === 'true';
+        }
+        // Narrow-viewport fallback: read state from the menu item OSwitch.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -295,20 +312,17 @@ export class SanityPage {
     // ================================================================
 
     /**
-     * Open the utilities ("More") dropdown, click the SQL mode ODropdownItem to toggle it,
-     * then close the dropdown.
-     * Uses [data-test="logs-search-bar-menu-sql-mode-btn"] — NOT the legacy syntax-guide element.
+     * Enable SQL mode. The SQL mode toggle was removed from the UI; the app now
+     * auto-detects SQL mode when the query editor contains both "select" and "from".
+     * This helper types a minimal SELECT query to trigger that auto-detection.
+     * Callers that subsequently call MonacoEditorHelper.setContent() will overwrite
+     * this query — SQL mode stays active because the replacement also contains SELECT.
      */
     async _clickSqlModeToggle() {
-        const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
-        const isVisible = await sqlModeMenuItem.isVisible({ timeout: 500 }).catch(() => false);
-        if (!isVisible) {
-            await this.utilitiesMenuButton.click();
-            await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 5000 });
-        }
-        await sqlModeMenuItem.click();
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(100);
+        await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
+        const monacoHelper = new MonacoEditorHelper(this.page);
+        await monacoHelper.setContent(this.queryEditor, 'SELECT * FROM "e2e_automate"');
+        await this.page.waitForTimeout(200);
     }
 
     // ================================================================

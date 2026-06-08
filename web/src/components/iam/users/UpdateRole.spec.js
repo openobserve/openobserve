@@ -46,20 +46,13 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import * as useToastModule from "@/lib/feedback/Toast/useToast";
 
 
-// ODrawer stub: exposes the migrated props (open/title/size/persistent) and
-// emits the standard update:open / click:* events. Slot content (q-form,
-// q-input, q-select, OButtons) is rendered inline so existing form-driven
-// tests continue to work.
-const ODrawerStub = {
-  name: "ODrawer",
-  // Use typed prop declarations so Vue applies Boolean coercion for flags
-  // like `persistent` / `showClose` that are passed as bare attributes.
+const ODialogStub = {
+  name: "ODialog",
   props: {
     open: { type: Boolean, default: false },
-    width: { type: [Number, String], default: undefined },
+    size: { type: String, default: "sm" },
     showClose: { type: Boolean, default: true },
     persistent: { type: Boolean, default: false },
-    size: { type: String, default: "md" },
     title: { type: String, default: "" },
     subTitle: { type: String, default: "" },
     primaryButtonLabel: { type: String, default: "" },
@@ -78,22 +71,22 @@ const ODrawerStub = {
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
-      data-test-stub="o-drawer"
+      data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
       :data-size="size"
       :data-persistent="persistent"
     >
-      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
-      <div data-test-stub="o-drawer-body"><slot /></div>
-      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+      <div data-test-stub="o-dialog-header"><slot name="header" /></div>
+      <div data-test-stub="o-dialog-body"><slot /></div>
+      <div data-test-stub="o-dialog-footer"><slot name="footer" /></div>
     </div>
   `,
   inheritAttrs: false,
 };
 
 const findDrawer = (w) =>
-  w.findComponent({ name: "ODrawer" });
+  w.findComponent({ name: "ODialog" });
 
 describe("UpdateRole Component", () => {
   let wrapper;
@@ -116,7 +109,7 @@ describe("UpdateRole Component", () => {
           store: mockStore,
         },
         stubs: {
-          ODrawer: ODrawerStub,
+          ODialog: ODialogStub,
           QForm: false,
           QInput: false,
           QSelect: false,
@@ -163,7 +156,7 @@ describe("UpdateRole Component", () => {
       const drawer = findDrawer(wrapper);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("width")).toBe(30);
+      expect(drawer.props("size")).toBe("sm");
       expect(drawer.props("title")).toBe("user.editUser");
       expect(drawer.props("persistent")).toBe(true);
     });

@@ -680,11 +680,6 @@ export default defineComponent({
         return data.value;
       }
 
-      // Only filter for PromQL queries
-      if (panelSchema.value.queryType !== "promql") {
-        return data.value;
-      }
-
       // If no hidden queries or empty array, return as is
       if (
         !hiddenQueries.value ||
@@ -694,13 +689,31 @@ export default defineComponent({
         return data.value;
       }
 
-      // Filter out hidden queries
+      // Filter out hidden queries by index (works for both SQL and PromQL)
       const filtered = data.value.filter(
         (_: any, index: number) => !hiddenQueries.value.includes(index),
       );
 
-      // Return filtered data
       return filtered;
+    });
+
+    // E2: Also filter panelSchema.queries in sync with filteredData
+    // to keep data[i] aligned with queries[i] in convertMultiSQLData
+    const filteredPanelSchema = computed(() => {
+      if (
+        panelSchema.value.queryType === "promql" ||
+        !hiddenQueries.value?.length ||
+        !Array.isArray(panelSchema.value.queries)
+      ) {
+        return panelSchema.value;
+      }
+
+      return {
+        ...panelSchema.value,
+        queries: panelSchema.value.queries.filter(
+          (_: any, i: number) => !hiddenQueries.value.includes(i),
+        ),
+      };
     });
 
     // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
@@ -873,13 +886,28 @@ export default defineComponent({
       tableRendererRef.value = null;
     });
     const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Preserve the previously rendered chart during a reload. While loading,
+      // if the new data buffer has no rows yet but a chart is already rendered,
+      // skip conversion so non-streaming callers (the panelSchema deep watcher,
+      // resize observer, etc.) can't replace it with an empty 0-series result
+      // before the first streaming chunk arrives. The streaming overlay path
+      // (applyOverlay=true) and loading=false final renders are unaffected.
+      const hasRows =
+        data.value?.length > 0 &&
+        (data.value[0]?.result?.length > 0 ||
+          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasOldChart = panelData.value?.options?.series?.length > 0;
+      if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
+        return;
+      }
+
       if (
         !errorDetail?.value?.message &&
         validatePanelData?.value?.length === 0
       ) {
         try {
           const result = await convertPanelData(
-            panelSchema.value,
+            filteredPanelSchema.value,
             filteredData.value,
             store,
             chartPanelRef,
@@ -1089,28 +1117,58 @@ export default defineComponent({
         annotations,
       ],
       async () => {
-        // emit vrl function field list
-        if (data.value?.length && data.value[0] && data.value[0].length) {
-          // Find the index of the record with max attributes
-          const maxAttributesIndex = data.value[0].reduce(
-            (
-              maxIndex: string | number | any,
-              obj: {},
-              currentIndex: any,
-              array: Array<Record<string, unknown>>,
-            ) => {
-              const numAttributes = Object.keys(obj).length;
-              const maxNumAttributes = Object.keys(array[maxIndex]).length;
-              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
-            },
-            0,
+        // emit vrl function field list per query index
+        if (data.value?.length) {
+          // data.value is in compacted/executor order (empty queries are
+          // skipped, time-shift queries expand into multiple entries), which
+          // does NOT line up with the panel query (tab) index. Re-key the
+          // detected fields by panelQueryIndex so downstream per-query field
+          // storage maps to the correct query tab. Build a DENSE array (one
+          // slot per panel query, default []) so the consumer's
+          // Array.isArray(fieldList[0]) format check and forEach both see every
+          // index even when a query returned no rows.
+          // Size the array to cover BOTH the panel's queries and the actual
+          // data results (data.value can have more entries than panel queries,
+          // e.g. time-shift expansion), so no query's fields are dropped.
+          const totalQueries = Math.max(
+            panelSchema.value?.queries?.length ?? 0,
+            data.value.length,
           );
-
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
-
-          const responseFields = Object.keys(recordwithMaxAttribute);
-
-          emit("updated:vrlFunctionFieldList", responseFields);
+          const perQueryFields: string[][] = Array.from(
+            { length: totalQueries },
+            () => [],
+          );
+          for (let qi = 0; qi < data.value.length; qi++) {
+            const panelIdx =
+              metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
+            const queryData = data.value[qi];
+            if (
+              queryData &&
+              queryData.length &&
+              panelIdx >= 0 &&
+              panelIdx < perQueryFields.length
+            ) {
+              const maxAttributesIndex = queryData.reduce(
+                (
+                  maxIndex: string | number | any,
+                  obj: {},
+                  currentIndex: any,
+                  array: Array<Record<string, unknown>>,
+                ) => {
+                  const numAttributes = Object.keys(obj).length;
+                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
+                  return numAttributes > maxNumAttributes
+                    ? currentIndex
+                    : maxIndex;
+                },
+                0,
+              );
+              perQueryFields[panelIdx] = Object.keys(
+                queryData[maxAttributesIndex],
+              );
+            }
+          }
+          emit("updated:vrlFunctionFieldList", perQueryFields);
         }
         if (panelData.value.chartType == "custom_chart")
           errorDetail.value = {
@@ -1326,6 +1384,9 @@ export default defineComponent({
     // Compute the value of the 'noData' variable.
     // Instead of re-scanning raw rows, this checks the conversion output
     // (panelData) which the pipeline already computed — O(1) property access.
+    // Multi-SQL note: panelData is built from filteredData (visible queries only)
+    // by convertSQLData and friends, so the type-specific checks below
+    // already reflect the multi-query aggregate.
     const noData = computed(() => {
       const type = panelSchema.value.type;
 
@@ -1334,8 +1395,15 @@ export default defineComponent({
       }
 
       if (panelSchema.value?.queryType === "promql") {
-        return filteredData.value?.length &&
-          filteredData.value.some((item: any) => item?.result?.length)
+        const hasResults =
+          filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length);
+        if (hasResults) return "";
+        // During a reload the executor clears state.data before the new results
+        // stream in. Keep showing the previously rendered chart while loading
+        // (matching the SQL branch below); only show "No Data" once the load
+        // completes with no results.
+        return loading.value && panelData.value?.options?.series?.length > 0
           ? ""
           : "No Data";
       }
@@ -1455,9 +1523,19 @@ export default defineComponent({
       showPositiveNotification,
     });
 
+    // Trellis only applies when EVERY query has a breakdown field (each
+    // breakdown value becomes a subplot). Mirrors the converter's isTrellis.
+    const allQueriesHaveBreakdown = computed(
+      () =>
+        (panelSchema.value?.queries?.length ?? 0) > 0 &&
+        panelSchema.value.queries.every(
+          (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
+        ),
+    );
+
     const chartPanelHeight = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -1469,7 +1547,7 @@ export default defineComponent({
 
     const chartPanelClass = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {

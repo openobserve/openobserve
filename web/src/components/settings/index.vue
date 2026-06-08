@@ -129,6 +129,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 </ORouteTab>
                 <ORouteTab
+                  v-if="store.state.zoConfig?.online_evals_enabled"
+                  data-test="llm-providers-tab"
+                  name="llm_providers"
+                  :to="{
+                    name: 'llmProviders',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="smart-toy"
+                  :label="t('llmProviders.tabLabel')"
+                >
+                </ORouteTab>
+                <ORouteTab
                   data-test="alert-templates-tab"
                   name="templates"
                   :to="{

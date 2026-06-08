@@ -143,6 +143,8 @@ export const useStreamFields = () => {
   const extractFields = async () => {
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
+    searchObj.loadingStream = true;
+    await nextTick();
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
@@ -907,6 +909,7 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
+      searchObj.loadingStream = false;
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while extracting fields.", e);
@@ -917,21 +920,16 @@ export const useStreamFields = () => {
   const loadStreamFields = async (streamName: string) => {
     try {
       if (streamName != "") {
-        searchObj.loadingStream = true;
         return await getStream(
           streamName,
           searchObj.data.stream.streamType || "logs",
           true,
-        ).then((res) => {
-          searchObj.loadingStream = false;
-          return res;
-        });
+        );
       } else {
         searchObj.data.errorMsg = "No stream found in selected organization!";
       }
       return;
     } catch (e: any) {
-      searchObj.loadingStream = false;
       console.log("Error while loading stream fields");
     }
   };

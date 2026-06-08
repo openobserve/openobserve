@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODialog
     v-if="!isInPipeline"
     data-test="add-stream-dialog"
     :open="open"
-    size="lg"
+    size="md"
     :title="t('logStream.add')"
     :secondary-button-label="t('logStream.cancel')"
     :primary-button-label="t('common.save')"
+    form-id="add-stream-form"
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
-    @click:primary="submitForm"
   >
-    <div class="tw:p-4 tw:w-full">
-      <OForm :default-values="streamInputsDefault" @submit="submitForm">
+    <div class="tw:w-full">
+      <OForm id="add-stream-form" :default-values="streamInputsDefault" @submit="submitForm">
         <div class="tw:mt-2">
           <OInput
             data-test="add-stream-name-input"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OForm>
     </div>
-  </ODrawer>
+  </ODialog>
 
   <!-- Inline form for pipeline usage (no drawer wrapper) -->
     <div v-else class="tw:p-4 tw:w-full">
@@ -160,7 +160,7 @@ import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

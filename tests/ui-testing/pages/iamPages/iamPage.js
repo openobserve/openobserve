@@ -31,8 +31,11 @@ export class IamPage {
         this.emailInput = page.locator('[data-test="iam-add-service-account-email-input-field"]');
         this.emailInputError = page.locator('[data-test="iam-add-service-account-email-input-error"]');
         this.descriptionInput = page.locator('[data-test="iam-add-service-account-description-input-field"]');
-        this.saveButton = page.locator('[data-test="iam-add-service-account-save-btn"]');
-        this.cancelButton = page.locator('[data-test="cancel-button"]');
+        // Add/Edit service account dialog footer uses ODialog's built-in
+        // primary/secondary buttons; scope to the dialog to avoid colliding
+        // with other dialogs' generic o-dialog-*-btn slugs.
+        this.saveButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.cancelButton = page.locator('[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]');
 
         // Token dialog (post-creation popup with Copy / Download / Close)
         this.tokenDialog = page.locator('[data-test="service-accounts-list-token-dialog"]');

@@ -6,28 +6,29 @@
 <template>
   <div class="query-editor tw:w-full tw:relative" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
+    <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
-      class="ai-input-bar tw:p-2 tw:flex-shrink-0 tw:z-10"
+      :class="['ai-input-bar tw:h-[2.25rem] tw:flex tw:items-center tw:gap-2 tw:px-2 tw:flex-shrink-0 tw:z-10', props.hasExpandButton && 'tw:pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
-      <div v-if="isGenerating" :class="aiBarStreamingClass">
-        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px]" />
+      <template v-if="isGenerating">
+        <img :src="nlpIcon" alt="AI" class="tw:w-[20px] tw:h-[20px] tw:shrink-0" />
         <OSpinner variant="dots" size="xs" />
-        <span class="tw:text-sm tw:flex-1">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
+        <span class="tw:text-sm tw:flex-1 tw:truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
           variant="ghost-destructive"
           size="icon-circle-sm"
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="ai-stop-button"
+          class="ai-stop-button tw:shrink-0"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
-      </div>
+      </template>
       <!-- Normal input when not generating -->
-      <div v-else class="tw:flex tw:items-center tw:gap-2">
+      <template v-else>
         <OInput
           v-model="aiInputText"
           :placeholder="props.aiPlaceholder || t('search.askAIPlaceholder')"
@@ -63,7 +64,7 @@
         >
           <OTooltip :content="t('common.close')" />
         </OButton>
-      </div>
+      </template>
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
@@ -81,14 +82,25 @@
         :debounce-time="debounceTime"
         @update:query="handleQueryUpdate"
         @run-query="emit('run-query')"
-        @focus="emit('focus')"
-        @blur="emit('blur')"
+        @focus="handleEditorFocus"
+        @blur="handleEditorBlur"
         @nlpModeDetected="handleNlpModeDetected"
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
         @generation-success="handleGenerationSuccess"
         class="monaco-editor tw:w-full tw:h-full"
       />
+
+      <!-- Floating placeholder shown when editor is empty and unfocused -->
+      <!-- VRL (function editor): static text, always visible -->
+      <!-- Query editor: fades between phrases -->
+      <span
+        v-if="showPlaceholder"
+        class="query-editor__placeholder"
+        :class="{ 'query-editor__placeholder--visible': isVrlMode || placeholderFadeVisible }"
+        :data-test="`${dataTestPrefix}-placeholder`"
+        aria-hidden="true"
+      >{{ placeholderText }}</span>
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
@@ -108,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
@@ -148,6 +160,7 @@ interface Props {
   disableAiReason?: string;     // Tooltip reason when AI is disabled
   aiPlaceholder?: string;       // Custom placeholder for AI input (default: 'search.askAIPlaceholder')
   aiTooltip?: string;           // Custom tooltip for AI send button (default: 'search.enterPrompt')
+  hasExpandButton?: boolean;    // Reserve right padding so AI bar close btn doesn't overlap the expand btn
 
   // Testing
   dataTestPrefix?: string;
@@ -166,6 +179,7 @@ const props = withDefaults(defineProps<Props>(), {
   hideNlToggle: false,
   disableAi: false,
   disableAiReason: '',
+  hasExpandButton: false,
   dataTestPrefix: 'query-editor',
 });
 
@@ -231,8 +245,8 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => {
   return store.state.theme === 'dark'
-    ? 'ai-input-field ai-input-field--dark tw:flex-1'
-    : 'ai-input-field tw:flex-1';
+    ? 'ai-input-field ai-input-field--dark tw:flex-1 tw:my-px'
+    : 'ai-input-field tw:flex-1 tw:my-px';
 });
 
 // Computed: AI streaming bar class based on theme
@@ -260,13 +274,22 @@ const rootStyle = computed(() => {
   if (props.editorHeight === '100%') {
     return { height: '100%' };
   }
-  // For fixed/calc heights, apply to the root so it sizes correctly in any parent
   return { height: props.editorHeight };
 });
 
 // Handle query update from editor
 const handleQueryUpdate = (newQuery: string) => {
   emit('update:query', newQuery);
+};
+
+const handleEditorFocus = () => {
+  editorFocused.value = true;
+  emit('focus');
+};
+
+const handleEditorBlur = () => {
+  editorFocused.value = false;
+  emit('blur');
 };
 
 // Handle auto-detection from editor
@@ -438,6 +461,89 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   emit('generation-success', { type, message });
 };
 
+// ───── Floating placeholder ─────
+const editorFocused = ref(false);
+const placeholderText = ref('');
+const placeholderFadeVisible = ref(false);
+
+const placeholderPhrases = computed<string[]>(() => {
+  if (currentLanguage.value === 'vrl') {
+    return ["Write a VRL function (e.g. .status = to_int!(.status))"];
+  }
+  if (currentLanguage.value === 'promql') {
+    return ["Write a PromQL query (e.g. rate(http_requests_total[5m]))"];
+  }
+  return [
+    "Add filter conditions (e.g. level='error' AND status=500 AND method='GET')",
+    "Write a SQL query (e.g. SELECT * FROM 'logs' WHERE level='error' LIMIT 100)",
+  ];
+});
+
+const showPlaceholder = computed(
+  () => !editorFocused.value && (!props.query || !props.query.trim()),
+);
+
+// VRL (function editor) shows static text — no animation needed
+const isVrlMode = computed(() => currentLanguage.value === 'vrl');
+
+const FADE_MS = 400;
+const DISPLAY_MS = 3500;
+
+let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+let phraseIdx = 0;
+
+const stopFader = () => {
+  if (fadeTimer) clearTimeout(fadeTimer);
+  fadeTimer = null;
+};
+
+const startFader = () => {
+  const phrases = placeholderPhrases.value;
+  placeholderText.value = phrases[phraseIdx % phrases.length];
+  placeholderFadeVisible.value = true;
+
+  if (phrases.length <= 1) return; // single phrase — show statically, no cycling
+
+  const cycle = () => {
+    // fade out
+    placeholderFadeVisible.value = false;
+    fadeTimer = setTimeout(() => {
+      phraseIdx = (phraseIdx + 1) % phrases.length;
+      placeholderText.value = phrases[phraseIdx];
+      // fade in
+      placeholderFadeVisible.value = true;
+      fadeTimer = setTimeout(cycle, DISPLAY_MS);
+    }, FADE_MS);
+  };
+
+  fadeTimer = setTimeout(cycle, DISPLAY_MS);
+};
+
+const restartFader = () => {
+  stopFader();
+  phraseIdx = 0;
+  placeholderFadeVisible.value = false;
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  // Brief delay so the fade-out completes before showing new text
+  fadeTimer = setTimeout(startFader, FADE_MS);
+};
+
+watch(currentLanguage, () => {
+  stopFader();
+  phraseIdx = 0;
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  placeholderFadeVisible.value = false;
+  if (!isVrlMode.value) {
+    fadeTimer = setTimeout(startFader, FADE_MS);
+  }
+});
+
+onMounted(() => {
+  placeholderText.value = placeholderPhrases.value[0] ?? '';
+  if (!isVrlMode.value) startFader();
+});
+onBeforeUnmount(stopFader);
+
 // Watch for language prop changes
 watch(() => props.defaultLanguage, (newLang) => {
   if (newLang && newLang !== currentLanguage.value) {
@@ -535,6 +641,7 @@ defineExpose({
 
   // Streaming response (for AI status display)
   streamingResponse: computed(() => editorRef.value?.streamingResponse),
+
 });
 </script>
 
@@ -551,11 +658,34 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating AI Button (top-right corner) - matches MainLayout ai-hover-btn */
+/* Floating placeholder shown when the editor is empty and unfocused.
+   Font + left position match Monaco's actual render settings:
+   glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
+.query-editor__placeholder {
+  position: absolute;
+  top: 0;
+  left: 0.8rem;
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
+  font-size: 0.7875rem;
+  line-height: 1.375rem;
+  color: var(--o2-text-placeholder, var(--o2-text-muted));
+  white-space: nowrap;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.query-editor__placeholder--visible {
+  opacity: 1;
+}
+
+/* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
 .ai-floating-button {
   position: absolute;
   top: 0.1875rem;
-  right: 1.375rem;
+  right: 2.375rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;
@@ -631,11 +761,20 @@ defineExpose({
   border-bottom: 1px solid var(--o2-border-color);
 }
 
+.ai-input-field {
+  height: 1.75rem !important; /* tw:h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
+.ai-input-field :deep(.tw\:h-8) {
+  height: 1.75rem !important; /* h-7 = 28px, overrides OInput's default h-8 (32px) */
+}
+
 .ai-input-field :deep(.q-field__control) {
   background: white;
   border-radius: 6px;
-  padding: 2px 8px;
-  min-height: 32px;
+  padding: 0 8px;
+  min-height: 18px;
+  height: 18px;
 }
 
 /* Remove focus border */
