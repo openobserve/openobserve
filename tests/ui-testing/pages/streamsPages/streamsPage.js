@@ -19,7 +19,7 @@ export class StreamsPage {
 
         
         // Locators following alerts pattern - only the ones that were changed
-        this.managementMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+        this.managementMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         this.streamingToggle = page.locator('[data-test="general-settings-enable-streaming"]');
     }
 

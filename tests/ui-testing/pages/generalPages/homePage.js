@@ -35,7 +35,7 @@ export class HomePage {
         this.slackButton = page.locator('[data-test="menu-link-slack-item"]');
         this.helpButton = page.locator('[data-test="menu-link-help-item"]');
         this.aboutLink = page.locator('[data-test="menu-link-about-item"]');
-        this.settingsButton = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsButton = page.locator('[data-test="menu-link-/settings-item"]');
         this.profileIcon = page.locator('[data-test="header-my-account-profile-icon"]');
         this.languageDropdown = page.locator('[data-test="language-dropdown-item"]');
         this.themeManager = page.locator('[data-test="menu-link-predefined-themes-item"]');

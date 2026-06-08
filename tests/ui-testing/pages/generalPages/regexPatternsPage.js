@@ -7,7 +7,7 @@ export class RegexPatternsPage {
     this.page = page;
 
     // Navigation
-    this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+    this.settingsMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
     this.regexPatternsTab = page.locator('[data-test="regex-patterns-tab"]');
 
     // List View

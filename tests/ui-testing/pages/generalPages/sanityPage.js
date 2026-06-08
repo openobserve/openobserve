@@ -122,7 +122,7 @@ export class SanityPage {
         // ============================================================
         // Settings locators
         // ============================================================
-        this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         // general-settings-tab data-test added in settings/index.vue this pass.
         this.generalSettingsTab = page.locator('button[data-test="general-settings-tab"]');
         // OInput auto-generates `-field` for the native input.

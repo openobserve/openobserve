@@ -18,56 +18,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
-      <div class="tw:flex-shrink-0">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v; }"
-              data-test="destination-list-tabs"
-              class="tw:mr-2"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alert_destinations.filterAll") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-                {{ t("alert_destinations.filterPrebuilt") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-                <template #icon-left><OIcon name="settings" size="sm" /></template>
-                {{ t("alert_destinations.filterCustom") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="tw:h-[36px] tw:w-[200px]"
-              :placeholder="t('alert_destinations.search')"
-            />
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="importDestination"
-              data-test="destination-import"
-            >{{ t(`dashboard.import`) }}</OButton>
-            <OButton
-              data-test="alert-destination-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              :disabled="!templates.length"
-              @click="editDestination(null)"
-            >{{ t(`alert_destinations.add`) }}</OButton>
-          </div>
-        </div>
-      </div>
+      <AppPageHeader
+        :title="t('alert_destinations.header')"
+        icon="location-on"
+        subtitle="Where triggered alerts are delivered"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #title>
+          <span data-test="alert-destinations-list-title">{{
+            t("alert_destinations.header")
+          }}</span>
+        </template>
+        <template #actions>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v) => { activeTab = v; }"
+            data-test="destination-list-tabs"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("alert_destinations.filterAll") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+              {{ t("alert_destinations.filterPrebuilt") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+              <template #icon-left><OIcon name="settings" size="sm" /></template>
+              {{ t("alert_destinations.filterCustom") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OButton
+            variant="outline"
+            size="sm"
+            @click="importDestination"
+            data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton>
+          <OButton
+            data-test="alert-destination-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            :disabled="!templates.length"
+            @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton>
+        </template>
+      </AppPageHeader>
       <div class="tw:flex-1 tw:min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -86,6 +81,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              data-test="destination-list-search-input"
+              class="tw:flex-1"
+              :placeholder="t('alert_destinations.search')"
+            />
+          </template>
+
           <template #bottom="{ totalRows }">
             <span class="o2-table-footer-title tw:text-primary">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
@@ -267,6 +271,7 @@ import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -289,6 +294,7 @@ export default defineComponent({
     OTable,
     OToggleGroup,
     OToggleGroupItem,
+    AppPageHeader,
   },
   setup() {
     const store = useStore();

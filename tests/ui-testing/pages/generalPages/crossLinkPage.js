@@ -37,7 +37,7 @@ export class CrossLinkPage {
         this.schemaUpdateSettingsBtn = '[data-test="schema-update-settings-button"]';
 
         // Organization Settings page selectors
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.orgSettingsSaveBtn = '[data-test="add-alert-submit-btn"]';
 
         // Logs result-table expand toggle — kept as a Locator class member so

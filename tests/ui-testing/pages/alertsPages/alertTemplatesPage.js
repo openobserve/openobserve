@@ -10,7 +10,7 @@ export class AlertTemplatesPage {
         this.alertDestinationsPage = new AlertDestinationsPage(page);
         
         // Navigation locators
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.templatesTab = '[data-test="alert-templates-tab"]';
         
         // Template creation locators

@@ -8,7 +8,7 @@ export class CipherKeys {
 
         this.page = page;
 
-        this.settingsMenu = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsMenu = page.locator('[data-test="menu-link-/settings-item"]');
         this.cipherKeyTab = page.locator('[data-test="management-cipher-key-tab"]');
         this.addCipherKeyButton = page.locator('[data-test="cipher-keys-add-btn"]');
         // OInput wrapper: [data-test="add-cipher-key-name-input"]
@@ -34,7 +34,7 @@ export class CipherKeys {
     }
 
     async navigateToSettingsMenu() {
-        await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
+        await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
         await this.settingsMenu.click();
       }
 
