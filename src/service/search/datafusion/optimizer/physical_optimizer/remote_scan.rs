@@ -22,10 +22,12 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
     },
     config::ConfigOptions,
-    physical_expr::LexOrdering,
+    physical_expr::{LexOrdering, PhysicalExpr, expressions::Column as PhysicalColumn},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
         ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
+        coalesce_partitions::CoalescePartitionsExec,
         repartition::RepartitionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
@@ -116,11 +118,10 @@ impl RemoteScanRule {
             sampling_config,
         );
         let remote_scan_nodes = Arc::new(remote_scan_nodes);
+        let cfg = config::get_config();
         Self {
             remote_scan_nodes,
-            single_node_optimizer_enable: config::get_config()
-                .common
-                .feature_single_node_optimize_enabled,
+            single_node_optimizer_enable: cfg.common.feature_single_node_optimize_enabled,
         }
     }
 
@@ -202,13 +203,16 @@ impl PhysicalOptimizerRule for RemoteScanRule {
 pub struct RemoteScanRewriter {
     pub remote_scan_nodes: Arc<RemoteScanNodes>,
     pub is_changed: bool,
+    pub partial_reduce_enabled: bool,
 }
 
 impl RemoteScanRewriter {
     pub fn new(remote_scan_nodes: Arc<RemoteScanNodes>) -> Self {
+        let cfg = config::get_config();
         Self {
             remote_scan_nodes,
             is_changed: false,
+            partial_reduce_enabled: cfg.common.feature_partial_reduce_enabled,
         }
     }
 }
@@ -223,14 +227,19 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                let remote_scan = Arc::new(RemoteScanExec::new(
-                    input.clone(),
-                    self.remote_scan_nodes.get_remote_node(&table_name),
-                )?);
+                let remote_scan_input =
+                    wrap_partial_reduce(self.partial_reduce_enabled, input.clone())?;
+                let remote_scan_or_partial_reduce: Arc<dyn ExecutionPlan> =
+                    Arc::new(RemoteScanExec::new(
+                        remote_scan_input,
+                        self.remote_scan_nodes.get_remote_node(&table_name),
+                    )?);
                 let output_partitioning =
                     Partitioning::RoundRobinBatch(input.output_partitioning().partition_count());
-                let repartition =
-                    Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
+                let repartition = Arc::new(RepartitionExec::try_new(
+                    remote_scan_or_partial_reduce,
+                    output_partitioning,
+                )?);
                 let new_node = node.with_new_children(vec![repartition])?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
@@ -318,6 +327,55 @@ impl TreeNodeRewriter for RemoteScanRewriter {
         }
         Ok(Transformed::no(node))
     }
+}
+
+// If partial reduce is enabled and the input is a Partial AggregateExec,
+// wrap it with a PartialReduce AggregateExec.
+fn wrap_partial_reduce(
+    partial_reduce_enabled: bool,
+    input: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if !partial_reduce_enabled {
+        return Ok(input);
+    }
+    let Some(agg) = input.as_any().downcast_ref::<AggregateExec>() else {
+        return Ok(input);
+    };
+    if *agg.mode() != AggregateMode::Partial {
+        return Ok(input);
+    }
+    // PartialReduce receives Partial's output, so group expressions must be
+    // simple Column refs into that schema rather than the original scan-level exprs.
+    let partial_schema = input.schema();
+    let group_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg
+        .group_expr()
+        .expr()
+        .iter()
+        .map(|(_, name)| {
+            let idx = partial_schema.index_of(name)?;
+            Ok((
+                Arc::new(PhysicalColumn::new(name, idx)) as Arc<dyn PhysicalExpr>,
+                name.clone(),
+            ))
+        })
+        .collect::<Result<_>>()?;
+    // null_expr entries are schema-independent NULL literals used by GROUPING SETS
+    let null_exprs: Vec<(Arc<dyn PhysicalExpr>, String)> = agg.group_expr().null_expr().to_vec();
+    let new_group_by = PhysicalGroupBy::new(
+        group_exprs,
+        null_exprs,
+        agg.group_expr().groups().to_vec(),
+        !agg.group_expr().is_single(),
+    );
+    let coalesce_partition_exec = Arc::new(CoalescePartitionsExec::new(input.clone()));
+    Ok(Arc::new(AggregateExec::try_new(
+        AggregateMode::PartialReduce,
+        new_group_by,
+        agg.aggr_expr().to_vec(),
+        vec![None; agg.aggr_expr().len()],
+        coalesce_partition_exec,
+        agg.input_schema(),
+    )?) as Arc<dyn ExecutionPlan>)
 }
 
 fn is_single_node_optimize(plan: &Arc<dyn ExecutionPlan>) -> bool {
@@ -408,5 +466,246 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecCountVisitor {
             self.count += 1;
         }
         Ok(TreeNodeRecursion::Continue)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        physical_optimizer::PhysicalOptimizerRule,
+        physical_plan::{empty::EmptyExec, expressions::col},
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_remote_scan_rule_name() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert_eq!(rule.name(), "RemoteScanRule");
+    }
+
+    #[test]
+    fn test_remote_scan_rule_schema_check() {
+        let rule = RemoteScanRule::new_test(HashMap::new(), false);
+        assert!(rule.schema_check());
+    }
+
+    #[test]
+    fn test_table_name_visitor_new_initial_state() {
+        let v = TableNameVisitor::new();
+        assert!(v.table_name.is_none());
+        assert!(!v.has_remote_scan);
+    }
+
+    #[test]
+    fn test_new_empty_exec_count_visitor_new_starts_at_zero() {
+        let v = NewEmptyExecCountVisitor::new();
+        assert_eq!(v.get_count(), 0);
+    }
+
+    #[test]
+    fn test_new_empty_exec_count_visitor_default_starts_at_zero() {
+        let v = NewEmptyExecCountVisitor::default();
+        assert_eq!(v.get_count(), 0);
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_disabled_returns_input_unchanged() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::clone(&schema)));
+        let result = wrap_partial_reduce(false, input).unwrap();
+        assert_eq!(result.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_non_agg_input_returns_input_unchanged() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let input: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(Arc::clone(&schema)));
+        let result = wrap_partial_reduce(true, input).unwrap();
+        assert_eq!(result.name(), "EmptyExec");
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_single_mode_returns_input_unchanged()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Single,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::Single);
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_partial_no_group_by_produces_partial_reduce()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(vec![], vec![], vec![vec![]], false);
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert!(result_agg.group_expr().expr().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_wrap_partial_reduce_partial_with_group_by_produces_partial_reduce_with_column_refs()
+    -> datafusion::common::Result<()> {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, false)]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("a", &schema)?, "a".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        assert_eq!(result_agg.group_expr().expr().len(), 1);
+        let (expr, name) = &result_agg.group_expr().expr()[0];
+        assert_eq!(name, "a");
+        let col_expr = expr
+            .as_any()
+            .downcast_ref::<PhysicalColumn>()
+            .expect("group expr should be a Column reference into partial output schema");
+        assert_eq!(col_expr.name(), "a");
+        assert_eq!(col_expr.index(), 0);
+        Ok(())
+    }
+
+    // Regression test: PartialReduce must carry the SCAN schema as input_schema, not the
+    // partial-aggregate output schema.  DataFusion uses input_schema during plan
+    // serialisation/deserialisation to reconstruct aggregate-expression argument types.
+    // If we used the partial output schema instead, a `max(_timestamp:Int64)` expression
+    // (column index 0 in the scan) would be resolved against index 0 of the partial output
+    // (which is the group-by key `client_ip:Utf8`), causing MinMaxBytesAccumulator(Utf8) to
+    // be created and then panic when fed Int64 state data.
+    #[test]
+    fn test_wrap_partial_reduce_input_schema_is_scan_schema() -> datafusion::common::Result<()> {
+        // Scan schema: [_timestamp:Int64 @ 0, client_ip:Utf8 @ 1]
+        // Group by client_ip (index 1), so partial output is [client_ip:Utf8, ...].
+        // After wrapping, result_agg.input_schema() must still be the SCAN schema.
+        let scan_schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("client_ip", DataType::Utf8, false),
+        ]));
+        let group_by = PhysicalGroupBy::new(
+            vec![(col("client_ip", &scan_schema)?, "client_ip".to_string())],
+            vec![],
+            vec![vec![false]],
+            false,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&scan_schema))),
+            Arc::clone(&scan_schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+        // The critical invariant: input_schema must be the original scan schema so that
+        // aggregate expression argument types (e.g. _timestamp:Int64) are reconstructed
+        // correctly during plan serde on querier nodes.
+        assert_eq!(
+            result_agg.input_schema().as_ref(),
+            scan_schema.as_ref(),
+            "PartialReduce input_schema must be the scan schema, not the partial output schema"
+        );
+        Ok(())
+    }
+
+    // Regression test: null_exprs (GROUPING SETS placeholders) must be carried over
+    // unchanged.  The original code remapped them to Column refs, which would replace
+    // the NULL sentinel with the actual column value during ROLLUP/CUBE aggregation.
+    #[test]
+    fn test_wrap_partial_reduce_null_exprs_preserved_for_grouping_sets()
+    -> datafusion::common::Result<()> {
+        use datafusion::{
+            arrow::datatypes::DataType, common::ScalarValue, physical_expr::expressions::Literal,
+        };
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int64, false),
+            Field::new("b", DataType::Utf8, false),
+        ]));
+        // Simulate ROLLUP(a, b): null_expr entries are NULL literals (schema-independent).
+        let null_a: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Int64(None)));
+        let null_b: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Utf8(None)));
+        let group_by = PhysicalGroupBy::new(
+            vec![
+                (col("a", &schema)?, "a".to_string()),
+                (col("b", &schema)?, "b".to_string()),
+            ],
+            vec![
+                (Arc::clone(&null_a), "a".to_string()),
+                (Arc::clone(&null_b), "b".to_string()),
+            ],
+            vec![
+                vec![false, false], // (a, b)
+                vec![false, true],  // (a)
+                vec![true, false],  // (b)
+            ],
+            true,
+        );
+        let agg = AggregateExec::try_new(
+            AggregateMode::Partial,
+            group_by,
+            vec![],
+            vec![],
+            Arc::new(EmptyExec::new(Arc::clone(&schema))),
+            Arc::clone(&schema),
+        )?;
+        let input: Arc<dyn ExecutionPlan> = Arc::new(agg);
+        let result = wrap_partial_reduce(true, input)?;
+        let result_agg = result.as_any().downcast_ref::<AggregateExec>().unwrap();
+        assert_eq!(*result_agg.mode(), AggregateMode::PartialReduce);
+
+        let null_exprs = result_agg.group_expr().null_expr();
+        assert_eq!(null_exprs.len(), 2);
+        // Both must still be Literal(NULL), NOT remapped to Column refs.
+        for (expr, _) in null_exprs {
+            assert!(
+                expr.as_any().is::<Literal>(),
+                "null_expr must remain a Literal, not be replaced with a Column ref"
+            );
+        }
+        Ok(())
     }
 }

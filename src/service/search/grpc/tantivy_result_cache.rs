@@ -22,20 +22,22 @@ use config::{meta::bitvec::BitVec, metrics};
 use dashmap::DashMap;
 use roaring::RoaringBitmap;
 
-use crate::service::search::grpc::tantivy_result::TantivyResult;
+use crate::service::search::grpc::tantivy::TantivyResult;
 
 pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));
 
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
+    /// (row_id_bitvec, matched_row_count)
     RowIdsBitVec(usize, BitVec),
-    // true number in bitmap, bitmap, parquet row numbers
+    /// (sparse_row_ids, matched_row_count, parquet_row_count)
     RowIdsRoaring(usize, RoaringBitmap, usize),
-    Count(usize),              // simple count optimization
-    Histogram(Vec<u64>),       // simple histogram optimization
-    TopN(Vec<(String, u64)>),  // simple top n optimization
-    Distinct(HashSet<String>), // simple distinct optimization
+    Count(usize),                            // simple count optimization
+    Histogram(Vec<u64>),                     // simple histogram optimization
+    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
+    TopN(Vec<(String, u64)>),                // simple top n optimization
+    Distinct(HashSet<String>),               // simple distinct optimization
 }
 
 impl From<CacheEntry> for TantivyResult {
@@ -53,6 +55,9 @@ impl From<CacheEntry> for TantivyResult {
             }
             CacheEntry::Count(count) => TantivyResult::Count(count),
             CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
+            CacheEntry::MultiHistogram(multi_histogram) => {
+                TantivyResult::MultiHistogram(multi_histogram)
+            }
             CacheEntry::TopN(top_n) => TantivyResult::TopN(top_n),
             CacheEntry::Distinct(distinct) => TantivyResult::Distinct(distinct),
         }
@@ -73,6 +78,15 @@ impl CacheEntry {
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
+            }
+            CacheEntry::MultiHistogram(multi_histogram) => {
+                multi_histogram
+                    .iter()
+                    .map(|(_, s, _)| {
+                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
+                    })
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(i64, String, u64)>>()
             }
             CacheEntry::TopN(top_n) => {
                 top_n

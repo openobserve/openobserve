@@ -15,14 +15,11 @@
 
 use std::{collections::HashSet, ops::ControlFlow};
 
-use config::{meta::sql::MAX_LIMIT, utils::sql::AGGREGATE_UDF_LIST};
+use config::utils::sql::AGGREGATE_UDF_LIST;
 use datafusion::sql::TableReference;
-use sqlparser::ast::{
-    Expr, FunctionArguments, GroupByExpr, Ident, OrderByKind, Query, Select, SelectItem, Statement,
-    Value, ValueWithSpan, VisitMut, VisitorMut,
-};
+use sqlparser::ast::{Expr, GroupByExpr, Ident, Query, Statement, VisitMut, VisitorMut};
 
-use crate::service::search::utils::{get_field_name, trim_quotes};
+use crate::service::search::utils::trim_quotes;
 
 pub struct FieldNameVisitor {
     pub field_names: HashSet<String>,
@@ -131,301 +128,6 @@ impl VisitorMut for ComplexQueryVisitor {
     }
 }
 
-// check if the query is only count(*) query
-pub fn is_simple_count_query(select: &Select) -> bool {
-    select.projection.len() == 1 && is_sql_func(&select.projection[0], "count", true)
-}
-
-// check if the query is only histogram & count query
-pub fn is_simple_histogram_query(select: &Select) -> bool {
-    select.projection.len() == 2
-        && is_sql_func(&select.projection[0], "histogram", false)
-        && is_sql_func(&select.projection[1], "count", true)
-}
-
-// check if the query is only topn query
-// the topn query: `select id, count(*) as cnt from stream group by id order by cnt desc limit 10`
-pub fn is_simple_topn_query(query: &Query) -> Option<(String, usize, bool)> {
-    let select = match query.body.as_ref() {
-        sqlparser::ast::SetExpr::Select(select) => select,
-        _ => return None,
-    };
-
-    // Must have exactly 2 projections: a field and count(*)
-    if select.projection.len() != 2 {
-        return None;
-    }
-
-    // First projection should be a simple field (not a function)
-    let field_name = match &select.projection[0] {
-        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
-            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
-        {
-            get_field_name(expr)
-        }
-        _ => return None,
-    };
-
-    // Second projection should be count(*)
-    if !is_sql_func(&select.projection[1], "count", true) {
-        return None;
-    }
-
-    // Must have GROUP BY with exactly one expression
-    match &select.group_by {
-        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => {}
-        _ => return None,
-    };
-
-    // Check if ORDER BY references the count(*) function (with alias support)
-    let count_alias = match &select.projection[1] {
-        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
-        _ => None,
-    };
-
-    let mut order_by_references_count = false;
-    if let Some(order_by) = &query.order_by
-        && let OrderByKind::Expressions(exprs) = &order_by.kind
-        && exprs.len() == 1
-    {
-        match &exprs[0].expr {
-            Expr::Identifier(ident) => {
-                // Check if it's the count alias
-                if let Some(alias) = &count_alias
-                    && ident.value == *alias
-                    && exprs[0].options.asc == Some(false)
-                {
-                    order_by_references_count = true;
-                }
-            }
-            Expr::Function(func) => {
-                // Check if it's count(*) function directly
-                let name = trim_quotes(&func.name.to_string().to_lowercase());
-                if name == "count"
-                    && let FunctionArguments::List(list) = &func.args
-                    && list.args.len() == 1
-                    && trim_quotes(&list.args[0].to_string()) == "*"
-                    && exprs[0].options.asc == Some(false)
-                {
-                    order_by_references_count = true;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // check if limit is present
-    let limit = match &query.limit_clause {
-        Some(sqlparser::ast::LimitClause::LimitOffset {
-            limit:
-                Some(Expr::Value(ValueWithSpan {
-                    value: Value::Number(v, _b),
-                    ..
-                })),
-            offset,
-            ..
-        }) => {
-            let limit_val: i64 = v.parse().unwrap_or(0);
-            let offset_val: i64 = match offset {
-                Some(offset) => {
-                    if let Expr::Value(ValueWithSpan {
-                        value: Value::Number(offset_v, _),
-                        ..
-                    }) = &offset.value
-                    {
-                        offset_v.parse().unwrap_or(0)
-                    } else {
-                        return None;
-                    }
-                }
-                _ => 0,
-            };
-            let effective_limit = limit_val + offset_val;
-            std::cmp::min(effective_limit, MAX_LIMIT) as usize
-        }
-        _ => return None,
-    };
-
-    if order_by_references_count {
-        Some((field_name, limit, order_by_references_count))
-    } else {
-        None
-    }
-}
-
-// check if the query is only distinct query
-// the distinct query: `select id from stream group by id order by id asc limit 10`
-pub fn is_simple_distinct_query(query: &Query) -> Option<(String, usize, bool)> {
-    let select = match query.body.as_ref() {
-        sqlparser::ast::SetExpr::Select(select) => select,
-        _ => return None,
-    };
-
-    // Must have exactly 1 projection: a simple field (not a function)
-    if select.projection.len() != 1 {
-        return None;
-    }
-
-    // First projection should be a simple field (not a function)
-    let field_name = match &select.projection[0] {
-        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. }
-            if matches!(expr, Expr::Identifier(_) | Expr::CompoundIdentifier(_)) =>
-        {
-            get_field_name(expr)
-        }
-        _ => return None,
-    };
-
-    // Check if ORDER BY references the field (with alias support)
-    let field_alias = match &select.projection[0] {
-        SelectItem::ExprWithAlias { alias, .. } => Some(alias.value.clone()),
-        _ => None,
-    };
-
-    // Must have GROUP BY with exactly one expression that references the same field
-    let group_by_field = match &select.group_by {
-        GroupByExpr::Expressions(exprs, _) if exprs.len() == 1 => match &exprs[0] {
-            Expr::Identifier(ident) => Some(ident.value.clone()),
-            Expr::CompoundIdentifier(idents) => {
-                if !idents.is_empty() {
-                    Some(idents.last().unwrap().value.clone())
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        },
-        _ => return None,
-    };
-
-    // GROUP BY field must match SELECT field (with alias support)
-    if let Some(group_by_field_name) = group_by_field.as_ref() {
-        if !field_matches_with_alias(&field_name, field_alias.as_deref(), group_by_field_name) {
-            return None;
-        }
-    } else {
-        return None;
-    }
-
-    // Check if ORDER BY references the same field
-    let mut order_by_references_field = false;
-    let mut is_asc = false;
-    if let Some(order_by) = &query.order_by
-        && let OrderByKind::Expressions(exprs) = &order_by.kind
-        && exprs.len() == 1
-    {
-        match &exprs[0].expr {
-            Expr::Identifier(ident) => {
-                if field_matches_with_alias(&field_name, field_alias.as_deref(), &ident.value) {
-                    order_by_references_field = true;
-                    is_asc = exprs[0].options.asc.unwrap_or(true);
-                }
-            }
-            Expr::CompoundIdentifier(idents) => {
-                if !idents.is_empty()
-                    && field_matches_with_alias(
-                        &field_name,
-                        field_alias.as_deref(),
-                        &idents.last().unwrap().value,
-                    )
-                {
-                    order_by_references_field = true;
-                    is_asc = exprs[0].options.asc.unwrap_or(true);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    // ORDER BY field must match SELECT field
-    if !order_by_references_field {
-        return None;
-    }
-
-    // check if limit is present
-    let limit = match &query.limit_clause {
-        Some(sqlparser::ast::LimitClause::LimitOffset {
-            limit:
-                Some(Expr::Value(ValueWithSpan {
-                    value: Value::Number(v, _b),
-                    ..
-                })),
-            offset,
-            ..
-        }) => {
-            let limit_val: i64 = v.parse().unwrap_or(0);
-            let offset_val: i64 = match offset {
-                Some(offset) => {
-                    if let Expr::Value(ValueWithSpan {
-                        value: Value::Number(offset_v, _),
-                        ..
-                    }) = &offset.value
-                    {
-                        offset_v.parse().unwrap_or(0)
-                    } else {
-                        return None;
-                    }
-                }
-                _ => 0,
-            };
-            let effective_limit = limit_val + offset_val;
-            std::cmp::min(effective_limit, MAX_LIMIT) as usize
-        }
-        _ => return None,
-    };
-
-    Some((field_name, limit, is_asc))
-}
-
-// Check if the query is a simple `select sql_func(*)` without modifiers
-fn is_sql_func(select: &SelectItem, fn_name: &str, with_star: bool) -> bool {
-    match select {
-        SelectItem::UnnamedExpr(expr) | SelectItem::ExprWithAlias { expr, .. } => {
-            if let Expr::Function(func) = expr {
-                let name = trim_quotes(&func.name.to_string().to_lowercase());
-                // Check function name matches and has no special modifiers
-                let has_no_modifiers =
-                    func.filter.is_none() && func.over.is_none() && func.within_group.is_empty();
-
-                // If with_start is true, check for single "*" argument
-                let has_valid_args = if with_star {
-                    matches!(
-                        &func.args,
-                        FunctionArguments::List(list)
-                            if list.args.len() == 1
-                            && trim_quotes(&list.args[0].to_string()) == "*"
-                    )
-                } else {
-                    true
-                };
-
-                name == fn_name && has_no_modifiers && has_valid_args
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-/// Helper function to resolve field names considering aliases
-/// Returns true if the given field_name matches either the actual field name or its alias
-fn field_matches_with_alias(field_name: &str, alias: Option<&str>, target_field: &str) -> bool {
-    // Direct match with field name
-    if field_name == target_field {
-        return true;
-    }
-
-    // Match with alias if present
-    if let Some(alias_name) = alias
-        && alias_name == target_field
-    {
-        return true;
-    }
-
-    false
-}
-
 pub fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
     if idents.len() == 2 {
         let table_name = idents[0].value.as_str();
@@ -441,9 +143,20 @@ pub fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
 
 #[cfg(test)]
 mod tests {
-    use sqlparser::{ast::VisitMut, dialect::GenericDialect};
+    use sqlparser::{
+        ast::{Statement, VisitMut},
+        dialect::GenericDialect,
+        parser::Parser,
+    };
 
     use super::*;
+
+    fn parse_stmt(sql: &str) -> Statement {
+        Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap()
+    }
 
     #[test]
     fn test_field_name_visitor() {
@@ -462,28 +175,6 @@ mod tests {
     }
 
     #[test]
-    fn test_field_matches_with_alias() {
-        // Test direct field name match
-        assert!(field_matches_with_alias("field1", None, "field1"));
-
-        // Test alias match
-        assert!(field_matches_with_alias("field1", Some("alias1"), "alias1"));
-
-        // Test no match
-        assert!(!field_matches_with_alias("field1", None, "field2"));
-        assert!(!field_matches_with_alias(
-            "field1",
-            Some("alias1"),
-            "field2"
-        ));
-        assert!(!field_matches_with_alias(
-            "field1",
-            Some("alias1"),
-            "alias2"
-        ));
-    }
-
-    #[test]
     fn test_complex_query_visitor() {
         let sql = "SELECT * FROM users WHERE name IN (SELECT name FROM admins)";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
@@ -496,5 +187,47 @@ mod tests {
 
         // Should detect complex query due to subquery
         assert!(complex_visitor.is_complex);
+    }
+
+    #[test]
+    fn test_is_complex_query_simple_select_is_not_complex() {
+        let mut stmt = parse_stmt("SELECT a, b FROM t WHERE a = 1");
+        assert!(!is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_group_by_is_complex() {
+        let mut stmt = parse_stmt("SELECT a, count(a) FROM t GROUP BY a");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_distinct_is_complex() {
+        let mut stmt = parse_stmt("SELECT DISTINCT a FROM t");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_union_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1 UNION SELECT a FROM t2");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_subquery_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t WHERE a IN (SELECT a FROM t2)");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_join_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1 JOIN t2 ON t1.id = t2.id");
+        assert!(is_complex_query(&mut stmt));
+    }
+
+    #[test]
+    fn test_is_complex_query_multi_from_is_complex() {
+        let mut stmt = parse_stmt("SELECT a FROM t1, t2 WHERE t1.id = t2.id");
+        assert!(is_complex_query(&mut stmt));
     }
 }

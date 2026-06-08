@@ -752,8 +752,8 @@ pub struct Grpc {
     pub internal_grpc_token: String,
     #[env_config(
         name = "ZO_GRPC_MAX_MESSAGE_SIZE",
-        default = 16,
-        help = "Max grpc message size in MB, default is 16 MB"
+        default = 32,
+        help = "Max grpc message size in MB, default is 32 MB"
     )]
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
@@ -1008,6 +1008,12 @@ pub struct Common {
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1363,12 +1369,6 @@ pub struct Common {
     #[env_config(name = "ZO_INGEST_DEFAULT_HEC_STREAM", default = "")]
     pub default_hec_stream: String,
     #[env_config(
-        name = "ZO_ALIGN_PARTITIONS_FOR_INDEX",
-        default = false,
-        help = "Enable to use large partition for index. This will apply for all streams"
-    )]
-    pub align_partitions_for_index: bool,
-    #[env_config(
         name = "ZO_CONFIG_WATCHER_INTERVAL",
         default = 30,
         help = "Config file watcher interval in seconds. Set to 0 to disable"
@@ -1480,8 +1480,6 @@ pub struct Limit {
     pub usage_reporting_thread_num: usize,
     #[env_config(name = "ZO_QUERY_THREAD_NUM", default = 0)]
     pub query_thread_num: usize,
-    #[env_config(name = "ZO_QUERY_INDEX_THREAD_NUM", default = 0)]
-    pub query_index_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
@@ -1728,6 +1726,12 @@ pub struct Limit {
         help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -2517,13 +2521,6 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.limit.query_thread_num = cpu_num * 4;
         }
     }
-    if cfg.limit.query_index_thread_num == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.query_index_thread_num = cpu_num;
-        } else {
-            cfg.limit.query_index_thread_num = cpu_num * 4;
-        }
-    }
 
     if cfg.limit.file_download_thread_num == 0 {
         cfg.limit.file_download_thread_num = std::cmp::max(1, cpu_num / 2);
@@ -3008,6 +3005,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
+    }
+
+    if cfg.limit.footer_cache_max_size == 0 {
+        cfg.limit.footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }
