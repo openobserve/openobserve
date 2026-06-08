@@ -3112,7 +3112,10 @@
         "cost": "成本",
         "spans": "跨度"
       }
-    }
+    },
+    "serviceMap": "服务地图",
+    "patternView": "图案视图",
+    "spanView": "跨度视图"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

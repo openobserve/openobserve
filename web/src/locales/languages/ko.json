@@ -3119,7 +3119,10 @@
         "cost": "비용",
         "spans": "스팬"
       }
-    }
+    },
+    "serviceMap": "서비스 맵",
+    "patternView": "패턴 뷰",
+    "spanView": "스팬 뷰"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",
