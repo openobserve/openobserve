@@ -23,11 +23,12 @@ if _OVERRIDE_FILE.exists():
     BASE_TS = json.loads(_OVERRIDE_FILE.read_text())["BASE_TS"]
 else:
     _now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
-    # Each query gets a 60s window. Shift far enough into the past so
-    # ALL records are behind _now at ingestion time (necessary for the
-    # fixture's wait_until poll to find them).  NUM_QUERIES * 60 // 3600
-    # is the span in hours; +2h adds margin for CI runner delays.
-    _span_hours = NUM_QUERIES * 60 // 3600 + 2
+    # Anchor BASE_TS 2 hours in the past.  Records span forward from there
+    # (BASE_TS to BASE_TS + NUM_QUERIES*60s), so most land in the future.
+    # 2h keeps BASE_TS within any server's ZO_INGEST_ALLOWED_UPTO limit
+    # (default 5h) while the fixture's wait_until uses end_us=max(now,
+    # max_ts)+1h to cover future-dated records on vortex and parquet.
+    _span_hours = 2
     BASE_TS = int((_now - timedelta(hours=_span_hours)).timestamp() * 1_000_000)
 
 FIELD_POOL = {
