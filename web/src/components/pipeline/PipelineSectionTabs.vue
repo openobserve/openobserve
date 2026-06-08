@@ -25,26 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Prototype-style section tabs: underline text tabs with an optional count
        pill. Lives in an AppPageHeader #tabs slot (use :tabs-below for a full
        second row). The active tab is derived from the route; clicking navigates. -->
-  <nav
-    class="tw:flex tw:items-stretch tw:gap-1 tw:h-full tw:overflow-x-auto"
+  <OTabs
+    :model-value="activeSectionKey"
+    align="left"
+    dense
     data-test="pipeline-section-tabs"
+    class="tw:h-full"
+    @change="navigateToSection"
   >
-    <button
+    <OTab
       v-for="s in visibleSections"
       :key="s.key"
-      type="button"
+      :name="s.key"
       :data-test="`pipeline-section-tab-${s.key}`"
-      :aria-current="s.key === activeSectionKey ? 'page' : undefined"
-      class="tw:inline-flex tw:items-center tw:gap-1.5 tw:h-full tw:px-3 tw:text-sm tw:font-semibold tw:whitespace-nowrap tw:border-b-2 tw:transition-colors tw:outline-none tw:cursor-pointer tw:bg-transparent"
-      :class="
-        s.key === activeSectionKey
-          ? 'tw:text-primary-600 tw:border-primary-600'
-          : 'tw:text-tabs-inactive-text tw:border-transparent tw:hover:text-primary-600'
-      "
-      @click="navigateToSection(s.key)"
     >
-      <OIcon :name="s.icon" size="sm" />
-      {{ s.label }}
+      <OIcon :name="s.icon" size="sm" class="tw:shrink-0" />
+      <span>{{ s.label }}</span>
       <span
         v-if="s.count != null"
         class="tw:text-[11px] tw:font-bold tw:leading-none tw:px-1.5 tw:py-1 tw:rounded-full"
@@ -54,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : 'tw:bg-surface-subtle tw:text-text-secondary'
         "
       >{{ s.count }}</span>
-    </button>
-  </nav>
+    </OTab>
+  </OTabs>
 </template>
 
 <script setup lang="ts">
@@ -65,6 +61,8 @@ import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 const { t } = useI18n();
 const store = useStore();
@@ -145,7 +143,7 @@ const visibleSections = computed(() =>
   sections.value.filter((s) => s.visible),
 );
 
-const navigateToSection = (key: string) => {
+const navigateToSection = (key: string | number) => {
   if (key === activeSectionKey.value) return;
   const section = sections.value.find((s) => s.key === key);
   if (section) router.push(section.to);
