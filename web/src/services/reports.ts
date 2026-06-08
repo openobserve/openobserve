@@ -114,6 +114,16 @@ const reports = {
   bulkDeleteById: (org_identifier: string, data: { ids: string[] }) => {
     return http().delete(`/api/v2/${org_identifier}/reports/bulk`, { data });
   },
+  bulkToggleState: (
+    org_identifier: string,
+    enable: boolean,
+    data: { ids: string[] },
+  ) => {
+    return http().patch(
+      `/api/v2/${org_identifier}/reports/bulk/enable?value=${enable}`,
+      data,
+    );
+  },
   triggerReportById: (org_identifier: string, report_id: string) => {
     return http().put(
       `/api/v2/${org_identifier}/reports/${report_id}/trigger`,

@@ -837,6 +837,75 @@ pub async fn enable_report_v2(
     }
 }
 
+/// EnableReportBulkV2
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/reports/bulk/enable",
+    context_path = "/api",
+    tag = "Reports",
+    operation_id = "EnableReportBulkV2",
+    summary = "Enable or disable reports in bulk (v2)",
+    description = "Toggles the active status of multiple reports to enable or disable scheduled delivery in bulk. \
+                   When disabled, scheduled report deliveries are paused but the configuration is preserved. \
+                   When re-enabled, report deliveries resume according to the configured schedule.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("value" = bool, Query, description = "true to enable, false to disable"),
+    ),
+    request_body(content = BulkDeleteRequest, description = "Report IDs (KSUIDs)"),
+    responses(
+        (status = 200, description = "Success", body = BulkDeleteResponse),
+        (status = 404, description = "Not found", body = ()),
+        (status = 500, description = "Failure", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Reports", "operation": "update"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn enable_report_bulk_v2(
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    Headers(user_email): Headers<UserEmail>,
+    axum::Json(req): axum::Json<BulkDeleteRequest>,
+) -> Response {
+    let _user_id = user_email.user_id;
+
+    #[cfg(feature = "enterprise")]
+    for id in &req.ids {
+        if !check_permissions(id, &org_id, &_user_id, "reports", "PUT", None).await {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    let enable = query
+        .get("value")
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or(false);
+
+    let mut successful = Vec::with_capacity(req.ids.len());
+    let mut unsuccessful = Vec::with_capacity(req.ids.len());
+    let mut err = None;
+
+    for report_id in req.ids {
+        match reports::enable_by_id(&org_id, &report_id, enable).await {
+            Ok(_) => successful.push(report_id),
+            Err(ReportError::ReportNotFound) => successful.push(report_id), // idempotent
+            Err(e) => {
+                log::error!("error enabling report {org_id}/{report_id}: {e}");
+                unsuccessful.push(report_id);
+                err = Some(e.to_string());
+            }
+        }
+    }
+    MetaHttpResponse::json(BulkDeleteResponse {
+        successful,
+        unsuccessful,
+        err,
+    })
+}
+
 /// TriggerReportV2
 #[utoipa::path(
     put,
