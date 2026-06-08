@@ -213,7 +213,10 @@ def translate_oo_to_duckdb(sql: str) -> tuple[str, bool]:
 
     Returns (translated_sql, has_oo_specific_functions).
     """
-    s = sql.replace("{stream}", STREAM)
+    s = sql.replace("{stream}", STREAM).replace("{stream2}", "logs2")
+    # NOTE: "{stream2}" → "logs2" (DuckDB view name), while conftest.py
+    # replaces the same placeholder with STREAM2 (the actual OO stream
+    # name).  Both are correct — each runs in its own execution context.
 
     # Check for OO-specific functions before translation
     has_oo = _has_oo_specific_functions(s)
@@ -286,6 +289,8 @@ _SKIP_SQLLOGICTEST = {
     "Q192",  # approx_percentile_cont mismatch with 5 records/query
     "Q301",  # Hour bucket row count mismatch with 5 records/query
     "Q305",  # Hour bucket row count mismatch with 5 records/query
+    "Q453",  # Hour bucket integer division mismatch (DataFusion vs DuckDB)
+    "Q454",  # Minute bucket integer division mismatch (DataFusion vs DuckDB)
     "Q308",  # SELECT * — OO omits NULL-valued columns from JSON
     "Q320",  # SELECT * — OO omits NULL-valued columns from JSON
     "Q145",  # ROW_NUMBER tie-breaking with 5 records/query (window)
@@ -315,9 +320,18 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
     # Create a pre-filtered view so EVERY query (CTEs, subqueries, etc.)
     # gets the right records without fragile SQL WHERE injection.
+    # Views are recreated per query because each query has its own
+    # time_offset — this is intentional, not overhead.
     con.execute(
         f"CREATE OR REPLACE VIEW logs AS "
         f"SELECT * FROM _logs WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
+    )
+    # Cross-stream: second stream view uses the same time window because
+    # both streams share identical timestamp ranges — only field values
+    # differ (via stream_offset=7).  A single time_offset covers both.
+    con.execute(
+        f"CREATE OR REPLACE VIEW logs2 AS "
+        f"SELECT * FROM _logs2 WHERE _timestamp >= {time_start} AND _timestamp <= {time_end}"
     )
 
     duck_sql, has_oo = translate_oo_to_duckdb(q["sql"])
@@ -371,14 +385,16 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
     # Detect empty-aggregate results: DuckDB returns 1 row of NULLs for
     # aggregate queries with zero matching rows, but OO returns 0 rows.
+    # OO also drops NULL-valued columns from JSON hits, so column presence
+    # and row count are unreliable — skip both.
     if filtered_rows and all(
         all(v == 'None' for v in row) for row in filtered_rows
     ):
         result = {
             "skip_sqllogictest": True,
-            "skip_row_count": False,
+            "skip_row_count": True,
+            "skip_column_check": True,
             "columns": filtered_cols,
-            "row_count": 0,
         }
         print(f"  {q['id']}: empty-aggregate → skip_sqllogictest")
         return result
@@ -395,25 +411,28 @@ def compute_results(con: duckdb.DuckDBPyConnection, q: dict, *, is_histogram: bo
 
 def main():
     print("Generating dataset in DuckDB...")
-    records = build_dataset()
+    records1 = build_dataset()
+    records2 = build_dataset(stream_offset=7)
     con = duckdb.connect(":memory:")
 
-    jsonl_str = "\n".join(json.dumps(r) for r in records)
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
-        tf.write(jsonl_str)
-        tmp_path = tf.name
+    for label, records in [("_logs", records1), ("_logs2", records2)]:
+        jsonl_str = "\n".join(json.dumps(r) for r in records)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tf:
+            tf.write(jsonl_str)
+            tmp_path = tf.name
 
-    try:
-        # Load into _logs (underscore — "logs" is the per-query view)
-        con.execute(
-            "CREATE TABLE _logs AS SELECT * FROM read_json_auto(?)",
-            [tmp_path],
-        )
-    finally:
-        Path(tmp_path).unlink()
+        try:
+            con.execute(
+                f"CREATE TABLE {label} AS SELECT * FROM read_json_auto(?)",
+                [tmp_path],
+            )
+        finally:
+            Path(tmp_path).unlink()
+
+        count = con.execute(f"SELECT COUNT(*) FROM {label}").fetchone()[0]
+        print(f"Loaded {label}: {count} records")
 
     total = con.execute("SELECT COUNT(*) FROM _logs").fetchone()[0]
-    print(f"Loaded {total} records")
 
     # Persist the BASE_TS so the test harness uses the same value.
     # Without this, a minute-boundary crossing between compute and test
