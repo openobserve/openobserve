@@ -39,6 +39,30 @@ const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name)
 const isDense = computed<boolean>(() => context?.value.dense ?? false)
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false)
+const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false)
+/** This tab is the one being dragged → dim it. */
+const isDragging = computed<boolean>(
+  () => isReorderable.value && context?.value.draggingName === props.name,
+)
+/** Pointer is hovering this tab as a drop target → show an insertion line. */
+const isDropTarget = computed<boolean>(
+  () =>
+    isReorderable.value &&
+    context?.value.dropTargetName != null &&
+    context.value.dropTargetName === props.name,
+)
+/** Position class for the insertion line (which edge, and orientation). */
+const dropIndicatorClass = computed<string>(() => {
+  const before = context?.value.dropBefore ?? true
+  if (isVertical.value) {
+    return before
+      ? 'tw:top-0 tw:left-1 tw:right-1 tw:h-0.5'
+      : 'tw:bottom-0 tw:left-1 tw:right-1 tw:h-0.5'
+  }
+  return before
+    ? 'tw:left-0 tw:top-1 tw:bottom-1 tw:w-0.5'
+    : 'tw:right-0 tw:top-1 tw:bottom-1 tw:w-0.5'
+})
 
 /** True when the icon prop uses Quasar's `img:` prefix (renders as <img>) */
 const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')))
@@ -122,9 +146,34 @@ const heightClasses = computed<string>(() => {
       :aria-disabled="disable || undefined"
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
-      :class="[baseClasses, stateClasses, heightClasses]"
+      :class="[
+        baseClasses,
+        stateClasses,
+        heightClasses,
+        isReorderable ? 'tw:cursor-grab tw:active:cursor-grabbing' : '',
+        isDragging ? 'tw:opacity-40' : '',
+      ]"
+      :draggable="isReorderable || undefined"
+      :data-otab-name="name"
       v-bind="$attrs"
     >
+      <!-- Insertion line — shows where the dragged tab will land (before/after
+           this drop-target tab) so the drop position is visible during drag. -->
+      <span
+        v-if="isDropTarget"
+        aria-hidden="true"
+        class="tw:absolute tw:rounded-full tw:bg-primary-600 tw:pointer-events-none tw:z-20"
+        :class="dropIndicatorClass"
+      />
+      <!-- Drag handle — shown only in reorderable mode to signal the tab can be
+           dragged to reorder. Purely an affordance; the whole tab is draggable. -->
+      <OIcon
+        v-if="isReorderable"
+        name="drag-indicator"
+        size="sm"
+        class="o-tab__drag-handle tw:shrink-0 tw:opacity-40 tw:-ml-0.5"
+        aria-hidden="true"
+      />
       <!--
         If label or icon props are provided, render them (prop-driven mode).
         If neither is set, fall back to the default slot (custom content mode:

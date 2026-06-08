@@ -29,6 +29,7 @@ const props = withDefaults(defineProps<OTabsProps>(), {
   align: 'left',
   dense: false,
   bordered: false,
+  reorderable: false,
 })
 
 const emit = defineEmits<OTabsEmits>()
@@ -43,12 +44,80 @@ function onTabClick(name: string | number): void {
   emit('change', name)
 }
 
+// ── Drag-to-reorder (opt-in via `reorderable`) ─────────────────────────────
+// Handlers are delegated on the tablist: drag events bubble up from the
+// draggable tab buttons. State is reactive (not imperative DOM styling) so the
+// dragged tab dims and the drop target shows an insertion line via OTab. OTabs
+// doesn't own the tab list, so on drop it only reports the intended move (by
+// tab name + side) via `reorder`; the parent applies it to its data.
+const draggingName = ref<string | null>(null)
+const dropTargetName = ref<string | null>(null)
+const dropBefore = ref(true)
+
+function clearDrag(): void {
+  draggingName.value = null
+  dropTargetName.value = null
+}
+
+function tabElFromEvent(e: DragEvent): HTMLElement | null {
+  return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-otab-name]') ?? null
+}
+
+function onTabDragStart(e: DragEvent): void {
+  if (!props.reorderable) return
+  const el = tabElFromEvent(e)
+  const name = el?.dataset.otabName ?? null
+  if (name == null) return
+  draggingName.value = name
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', name)
+  }
+}
+
+function onTabDragOver(e: DragEvent): void {
+  if (!props.reorderable || draggingName.value == null) return
+  e.preventDefault() // required to allow a drop
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  const el = tabElFromEvent(e)
+  const name = el?.dataset.otabName ?? null
+  if (el == null || name == null || name === draggingName.value) {
+    dropTargetName.value = null
+    return
+  }
+  // Pointer past the tab's midpoint → drop after it, else before it.
+  const rect = el.getBoundingClientRect()
+  dropBefore.value = isVertical.value
+    ? e.clientY < rect.top + rect.height / 2
+    : e.clientX < rect.left + rect.width / 2
+  dropTargetName.value = name
+}
+
+function onTabDrop(e: DragEvent): void {
+  if (!props.reorderable) return
+  e.preventDefault()
+  const from = draggingName.value ?? e.dataTransfer?.getData('text/plain') ?? null
+  const to = dropTargetName.value
+  if (from != null && to != null && from !== to) {
+    emit('reorder', { from, to, before: dropBefore.value })
+  }
+  clearDrag()
+}
+
+function onTabDragEnd(): void {
+  clearDrag()
+}
+
 /** Provide context to OTab / ORouteTab descendants */
 const context = computed<TabsContext>(() => ({
   modelValue: props.modelValue,
   onTabClick,
   isVertical: isVertical.value,
   dense: props.dense,
+  reorderable: props.reorderable,
+  draggingName: draggingName.value,
+  dropTargetName: dropTargetName.value,
+  dropBefore: dropBefore.value,
 }))
 
 provide(TABS_CONTEXT_KEY, context)
@@ -104,6 +173,7 @@ function scrollTabs(direction: 1 | -1): void {
 }
 
 let ro: ResizeObserver | null = null
+let mo: MutationObserver | null = null
 
 onMounted(() => {
   if (isVertical.value) return
@@ -113,6 +183,18 @@ onMounted(() => {
   ro = new ResizeObserver(updateScrollState)
   ro.observe(el)
   if (tablistRef.value) ro.observe(tablistRef.value)
+  // Reordering tabs changes their order without changing modelValue or the
+  // tablist size, so the ResizeObserver won't fire. Watch the child list (and
+  // the active-state attribute) so the underline re-measures after a reorder.
+  if (tablistRef.value) {
+    mo = new MutationObserver(() => updateIndicator())
+    mo.observe(tablistRef.value, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-selected'],
+    })
+  }
   nextTick(() => {
     updateScrollState()
     // Enable the slide animation only after the bar is placed once.
@@ -123,6 +205,7 @@ onMounted(() => {
 onUnmounted(() => {
   scrollRef.value?.removeEventListener('scroll', updateScrollState)
   ro?.disconnect()
+  mo?.disconnect()
 })
 
 // Auto-scroll to reveal the active tab when modelValue changes
@@ -167,6 +250,10 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
       <div
         ref="tablistRef"
         :class="['o-tabs tw:flex tw:flex-col tw:gap-0.5 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
+        @dragstart="onTabDragStart"
+        @dragover="onTabDragOver"
+        @drop="onTabDrop"
+        @dragend="onTabDragEnd"
       >
         <slot />
       </div>
@@ -206,6 +293,10 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
             ref="tablistRef"
             :class="['o-tabs tw:flex tw:flex-row tw:relative tw:px-[3px]', alignClasses[align]]"
             @focusin="handleFocusin"
+            @dragstart="onTabDragStart"
+            @dragover="onTabDragOver"
+            @drop="onTabDrop"
+            @dragend="onTabDragEnd"
           >
             <!-- Single shared underline — slides (translateX + width) to the
                  active tab instead of each tab drawing its own border. -->
