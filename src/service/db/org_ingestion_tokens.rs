@@ -40,7 +40,7 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), anyhow::Error> 
     let key = event_key(&record.org_id, &record.token);
     let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
     #[cfg(feature = "enterprise")]
-    super_cluster::org_ingestion_token_put(&key).await?;
+    super_cluster::org_ingestion_token_put(&key, record).await?;
     Ok(())
 }
 
@@ -63,7 +63,11 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, anyhow::Er
     #[cfg(feature = "enterprise")]
     {
         super_cluster::org_ingestion_token_delete(&old_key).await?;
-        super_cluster::org_ingestion_token_put(&new_key).await?;
+        let new_record = OrgIngestionTokenRecord {
+            token: new_token.clone(),
+            ..existing
+        };
+        super_cluster::org_ingestion_token_put(&new_key, &new_record).await?;
     }
     Ok(new_token)
 }
@@ -79,12 +83,18 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
     let key = event_key(org_id, &existing.token);
     if enabled {
         let _ = put_into_db_coordinator(&key, Bytes::new(), true, None).await;
-        #[cfg(feature = "enterprise")]
-        super_cluster::org_ingestion_token_put(&key).await?;
     } else {
         let _ = delete_from_db_coordinator(&key, false, true, None).await;
-        #[cfg(feature = "enterprise")]
-        super_cluster::org_ingestion_token_delete(&key).await?;
+    }
+    // Always replicate the token with its new `enabled` state; the receiving
+    // cluster fires the matching coordinator event based on the flag.
+    #[cfg(feature = "enterprise")]
+    {
+        let record = OrgIngestionTokenRecord {
+            enabled,
+            ..existing
+        };
+        super_cluster::org_ingestion_token_put(&key, &record).await?;
     }
     Ok(())
 }
@@ -173,16 +183,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use infra::errors::Error;
+    use config::utils::json;
+    use infra::{errors::Error, table::org_ingestion_tokens::OrgIngestionTokenRecord};
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-    pub async fn org_ingestion_token_put(key: &str) -> Result<(), Error> {
-        if o2_enterprise::enterprise::common::config::get_config()
-            .super_cluster
-            .enabled
-        {
-            o2_enterprise::enterprise::super_cluster::queue::put(
+    /// Replicate a token (with its current `enabled` state) to other clusters on
+    /// the `org_users` topic. The receiving cluster upserts the row and fires the
+    /// appropriate coordinator event based on the record's `enabled` flag.
+    pub async fn org_ingestion_token_put(
+        key: &str,
+        record: &OrgIngestionTokenRecord,
+    ) -> Result<(), Error> {
+        if get_o2_config().super_cluster.enabled {
+            let value = json::to_vec(record)?.into();
+            o2_enterprise::enterprise::super_cluster::queue::org_ingestion_token_put(
                 key,
-                bytes::Bytes::new(),
+                value,
                 infra::db::NEED_WATCH,
                 None,
             )
@@ -192,14 +208,12 @@ mod super_cluster {
         Ok(())
     }
 
+    /// Replicate a token removal (e.g. the old value after a rotation) to other
+    /// clusters on the `org_users` topic.
     pub async fn org_ingestion_token_delete(key: &str) -> Result<(), Error> {
-        if o2_enterprise::enterprise::common::config::get_config()
-            .super_cluster
-            .enabled
-        {
-            o2_enterprise::enterprise::super_cluster::queue::delete(
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::org_ingestion_token_delete(
                 key,
-                false,
                 infra::db::NEED_WATCH,
                 None,
             )

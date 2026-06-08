@@ -1,5 +1,11 @@
 import { ref, watch, type Ref } from "vue";
+import onlineEvalsService, {
+  type ScorerTestPayload,
+  type ScorerTestResult,
+} from "@/services/online-evals.service";
 import { defaultTestValue, extractTemplateVariables } from "../utils/evalFormat";
+
+export type ScorerTestState = "idle" | "running" | "success" | "error";
 
 export function useScorerTest(template: Ref<string>) {
   const scorerTestInputs = ref<Record<string, string>>({
@@ -7,10 +13,10 @@ export function useScorerTest(template: Ref<string>) {
     output: "Paris is the capital of France.",
     metadata: "{}",
   });
-  const scorerTestScenario = ref<"success" | "auth" | "schema">("success");
-  const scorerTestState = ref<"idle" | "running" | "success" | "error">("idle");
-
+  const scorerTestState = ref<ScorerTestState>("idle");
   const scorerTestVariables = ref<string[]>([]);
+  const scorerTestResult = ref<ScorerTestResult | null>(null);
+  const scorerTestError = ref<string | null>(null);
 
   watch(
     template,
@@ -24,23 +30,41 @@ export function useScorerTest(template: Ref<string>) {
       });
       scorerTestInputs.value = next;
       scorerTestState.value = "idle";
+      scorerTestResult.value = null;
+      scorerTestError.value = null;
     },
     { immediate: true },
   );
 
-  function runScorerTest() {
+  async function runScorerTest(orgId: string, payload: ScorerTestPayload) {
     scorerTestState.value = "running";
-    window.setTimeout(() => {
-      scorerTestState.value =
-        scorerTestScenario.value === "success" ? "success" : "error";
-    }, 450);
+    scorerTestResult.value = null;
+    scorerTestError.value = null;
+    try {
+      const data = await onlineEvalsService.scorers.test(orgId, payload);
+      scorerTestResult.value = data;
+      // Backend returns `success: false` with an `error` field for runtime
+      // failures (LLM call rejected, parse failure, etc.) but still HTTP 200.
+      scorerTestState.value = data?.success ? "success" : "error";
+      if (!data?.success) {
+        scorerTestError.value = data?.error ?? "Scorer test failed";
+      }
+    } catch (err: any) {
+      // HTTP-level failure (400 / 5xx / network). Surface the server message
+      // when available so the user can act on it.
+      const body = err?.response?.data ?? {};
+      scorerTestError.value =
+        body.message || body.error || err?.message || "Failed to run scorer test";
+      scorerTestState.value = "error";
+    }
   }
 
   return {
     scorerTestInputs,
-    scorerTestScenario,
     scorerTestState,
     scorerTestVariables,
+    scorerTestResult,
+    scorerTestError,
     runScorerTest,
   };
 }

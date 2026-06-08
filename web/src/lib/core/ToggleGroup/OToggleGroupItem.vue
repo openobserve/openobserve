@@ -25,7 +25,7 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
 // Icon size mirrors the toggle size — md = sm icon (16px), sm/xs = xs icon (12px)
 const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
   {
-    md: "sm",
+    md: "md",
     sm: "sm",
     xs: "xs",
   };

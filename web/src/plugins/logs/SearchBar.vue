@@ -20,44 +20,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:justify-between tw:w-full">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden">
       <div
-        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap"
+        ref="toolbarLeftRef"
+        class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
       >
-        <!-- View Mode Toggle Group -->
+        <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
+        <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              data-test="logs-view-mode-dropdown-btn"
+              size="xs"
+              variant="outline"
+              icon-right="chevron-down"
+            >
+              <OIcon :name="currentToggleOption.icon" size="sm" class="tw:shrink-0" />
+              {{ currentToggleOption.label }}
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-for="opt in toggleViewOptions"
+            :key="opt.value"
+            :data-test="`logs-view-mode-${opt.value}-item`"
+            :disabled="opt.disabled"
+            @select="onLogsVisualizeToggleUpdate(opt.value)"
+          >
+            <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
+            {{ opt.label }}
+          </ODropdownItem>
+        </ODropdown>
+
         <OToggleGroup
+          v-else
           :model-value="searchObj.meta.logsVisualizeToggle"
           @update:model-value="onLogsVisualizeToggleUpdate($event)"
         >
-          <OToggleGroupItem data-test="logs-logs-toggle" value="logs" size="sm">
+          <OToggleGroupItem
+            data-test="logs-logs-toggle"
+            value="logs"
+            size="sm"
+            :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
+          >
             <template #icon-left>
               <OIcon name="search" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("common.search") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("common.search") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
             data-test="logs-visualize-toggle"
             :disabled="isVisualizeDisabled"
-            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : undefined"
+            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
             value="visualize"
             size="sm"
           >
             <template #icon-left>
               <OIcon name="timeline" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.visualize") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.visualize") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
             data-test="logs-build-toggle"
             value="build"
             size="sm"
+            :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
           >
             <template #icon-left>
               <OIcon name="build" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.buildQuery") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
           </OToggleGroupItem>
 
           <OToggleGroupItem
@@ -65,24 +97,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-patterns-toggle"
             value="patterns"
             size="sm"
+            :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
           >
             <template #icon-left>
               <OIcon name="layers" size="sm" class="tw:shrink-0" />
             </template>
-            {{ t("search.showPatternsLabel") }}
+            <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
-        <!-- reset filters button - directly on toolbar (hidden when moved to menu) -->
+        <!-- reset filters button — moves into More menu at very narrow widths -->
         <OButton
+          v-if="!toolbarMoveResetToMenu"
           data-test="logs-search-bar-reset-filters-btn"
-          class="tw:ms-1"
-          size="icon-toolbar"
+          size="xs"
           variant="outline"
           @click="resetFilters"
         >
           <OIcon name="restart-alt" size="sm" />
+          <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
           <OTooltip :content="t('search.resetFilters')" />
         </OButton>
+
+        <!-- Histogram toggle — moves into More menu below 328px available width -->
+        <OButton
+          v-if="!shouldMoveButtonsToMenu"
+          data-test="logs-search-bar-histogram-btn"
+          size="xs"
+          variant="outline"
+          class="tw:gap-1.5"
+          @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+        >
+          <OSwitch
+            v-model="searchObj.meta.showHistogram"
+            size="md"
+            @click.stop
+          />
+          <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
+          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" />
+        </OButton>
+
         <!-- this is the button group responsible for showing all the utilities -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
@@ -97,109 +150,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
-          <!-- Histogram Toggle -->
-          <ODropdownItem
-            data-test="logs-search-bar-menu-histogram-btn"
-            @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-          >
-            <template #icon-left>
-              <OSwitch
-                v-model="searchObj.meta.showHistogram"
-                size="md"
-                data-test="logs-search-bar-show-histogram-toggle-btn"
-                @click.stop
-              />
-            </template>
-            {{ t("search.showHistogramLabel") }}
-          </ODropdownItem>
+          <!-- SET ONCE — view controls that persist across sessions -->
+          <ODropdownGroup :label="t('search.menuGroupSetOnce')">
+            <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
+            <ODropdownItem
+              v-if="toolbarMoveResetToMenu"
+              data-test="logs-search-bar-menu-reset-btn"
+              @select="resetFilters"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="restart-alt" size="sm" />
+                </span>
+              </template>
+              {{ t("search.resetFilters") }}
+            </ODropdownItem>
 
-          <!-- SQL Mode Toggle -->
-          <ODropdownItem
-            data-test="logs-search-bar-menu-sql-mode-btn"
-            @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
-          >
-            <template #icon-left>
-              <OSwitch
-                v-model="searchObj.meta.sqlMode"
-                :disabled="isSqlModeDisabled"
-                size="md"
-                data-test="logs-search-bar-sql-mode-toggle"
-                @click.stop
-              />
-            </template>
-            {{ t("search.sqlModeLabel") }}
-          </ODropdownItem>
+            <!-- Histogram (shown here only when toolbar is too narrow for inline button) -->
+            <ODropdownItem
+              v-if="shouldMoveButtonsToMenu"
+              data-test="logs-search-bar-menu-histogram-btn"
+              @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="bar-chart" size="sm" />
+                </span>
+              </template>
+              {{ t("search.showHistogramLabel") }}
+              <template #icon-right>
+                <OSwitch
+                  v-model="searchObj.meta.showHistogram"
+                  size="md"
+                  data-test="logs-search-bar-show-histogram-toggle-btn"
+                  class="tw:ml-auto"
+                  @click.stop
+                />
+              </template>
+            </ODropdownItem>
 
-          <!-- Quick Mode Toggle -->
-          <ODropdownItem
-            data-test="logs-search-bar-quick-mode-toggle-btn"
-            @select.prevent="handleQuickMode"
-          >
-            <template #icon-left>
-              <OSwitch
-                :model-value="searchObj.meta.quickMode"
-                size="md"
-                data-test="logs-search-bar-quick-mode-switch"
-                @click.stop="handleQuickMode"
-              />
-            </template>
-            {{ t("search.quickModeLabel") }}
-          </ODropdownItem>
+            <!-- Quick Mode — always in the More menu -->
+            <ODropdownItem
+              data-test="logs-search-bar-menu-quick-mode-toggle-btn"
+              @select.prevent="handleQuickMode"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="bolt" size="sm" />
+                </span>
+              </template>
+              {{ t("search.quickModeLabel") }}
+              <template #icon-right>
+                <OSwitch
+                  :model-value="searchObj.meta.quickMode"
+                  size="md"
+                  data-test="logs-search-bar-quick-mode-switch"
+                  class="tw:ml-auto"
+                  @click.stop="handleQuickMode"
+                />
+              </template>
+            </ODropdownItem>
 
-          <!-- Function/Transform Editor Toggle -->
-          <ODropdownItem
-            data-test="logs-search-bar-menu-transform-editor-toggle-btn"
-            @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
-          >
-            <template #icon-left>
-              <OSwitch
-                data-test="logs-search-bar-show-query-toggle-btn"
-                v-model="searchObj.meta.showTransformEditor"
-                size="md"
-                @click.stop
-              />
-            </template>
-            {{ t('search.functionEditorLabel') }}
-          </ODropdownItem>
-
-          <ODropdownSeparator />
-
-          <!-- === SAVED VIEWS GROUP === -->
-          <ODropdownItem
-            data-test="logs-search-bar-menu-list-saved-views-btn"
-            @select="openSavedViewsList"
-          >
-            <template #icon-left>
-              <OIcon name="saved-search" size="sm" />
-            </template>
-            {{ t("search.listSavedViews") }}
-          </ODropdownItem>
-
-          <ODropdownItem
-            data-test="logs-search-bar-menu-create-saved-view-btn"
-            @select="fnSavedView"
-          >
-            <template #icon-left>
-              <OIcon name="add-circle-outline" size="sm" />
-            </template>
-            {{ t("search.createSavedView") }}
-          </ODropdownItem>
+            <!-- Function Editor -->
+            <ODropdownItem
+              data-test="logs-search-bar-menu-transform-editor-toggle-btn"
+              @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge more-menu-icon-badge--mono">fx</span>
+              </template>
+              {{ t('search.functionEditorLabel') }}
+              <template #icon-right>
+                <OSwitch
+                  data-test="logs-search-bar-show-query-toggle-btn"
+                  v-model="searchObj.meta.showTransformEditor"
+                  size="md"
+                  class="tw:ml-auto"
+                  @click.stop
+                />
+              </template>
+            </ODropdownItem>
+          </ODropdownGroup>
 
           <ODropdownSeparator />
 
-          <!-- Syntax Guide -->
-          <ODropdownItem @select.prevent>
-            <syntax-guide
-              data-test="logs-search-bar-sql-mode-toggle-btn"
-              :sqlmode="searchObj.meta.sqlMode"
-              no-border
-              :label="t('search.syntaxGuideLabel')"
-            />
-          </ODropdownItem>
+          <!-- SAVED VIEWS -->
+          <ODropdownGroup :label="t('search.menuGroupSavedViews')">
+            <ODropdownItem
+              data-test="logs-search-bar-menu-list-saved-views-btn"
+              @select="openSavedViewsList"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="format-list-bulleted" size="sm" />
+                </span>
+              </template>
+              {{ t("search.listSavedViews") }}
+            </ODropdownItem>
+
+            <ODropdownItem
+              data-test="logs-search-bar-menu-create-saved-view-btn"
+              @select="fnSavedView"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="add" size="sm" />
+                </span>
+              </template>
+              {{ t("search.createSavedView") }}
+            </ODropdownItem>
+          </ODropdownGroup>
         </ODropdown>
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-1 tw:ml-auto">
+      <div ref="toolbarRightRef" class="tw:flex tw:items-center tw:gap-1 tw:flex-shrink-0">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <transform-selector
             v-if="isActionsEnabled"
@@ -246,139 +310,151 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator v-if="shouldMoveShareToMenu" />
 
-          <ODropdownItem
-            data-test="search-history-item-btn"
-            @select="showSearchHistoryfn"
-          >
-            <template #icon-left>
-              <OIcon name="history" size="sm" />
-            </template>
-            {{ t("search.searchHistory") }}
-          </ODropdownItem>
-
-          <ODropdownSeparator />
-
-          <!-- Download results — nested sub-dropdown (hover to open) -->
-          <div
-            data-test="search-download-submenu-trigger"
-            class="search-download-item"
-            :class="{ 'search-download-item--disabled': isDownloadDisabled }"
-            :aria-disabled="isDownloadDisabled || undefined"
-            @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
-            @mouseleave="showDownloadSubmenu = false"
-          >
-            <OIcon size="sm" name="download" class="search-download-item-icon" />
-            <span class="search-download-item-label">{{ t("search.downloadTable") }}</span>
-            <OIcon size="sm" name="chevron-right" />
-
-            <!-- Submenu — absolutely positioned to the left of parent dropdown -->
-            <div
-              v-if="showDownloadSubmenu && !isDownloadDisabled"
-              class="search-download-submenu"
-              data-test="search-download-submenu"
+          <!-- HISTORY -->
+          <ODropdownGroup :label="t('search.menuGroupHistory')">
+            <ODropdownItem
+              data-test="search-history-item-btn"
+              @select="showSearchHistoryfn"
             >
-              <button
-                type="button"
-                data-test="search-download-csv-btn"
-                class="search-download-submenu-item"
-                @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
-              >
-                <OIcon name="grid-on" size="sm" />
-                <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
-              </button>
-              <button
-                type="button"
-                data-test="search-download-json-btn"
-                class="search-download-submenu-item"
-                @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
-              >
-                <OIcon name="data-object" size="sm" />
-                <span class="tw:flex-1">{{ t("search.downloadJSON") }}</span>
-              </button>
-            </div>
-          </div>
-
-          <ODropdownItem
-            data-test="logs-search-bar-download-custom-range-btn"
-            :disabled="isDownloadDisabled"
-            @select="toggleCustomDownloadDialog"
-          >
-            <template #icon-left>
-              <img
-                :src="customRangeIcon"
-                alt="Custom Range"
-                class="tw:w-4 tw:h-4"
-              />
-            </template>
-            {{ t("search.customRange") }}
-          </ODropdownItem>
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="history" size="sm" />
+                </span>
+              </template>
+              {{ t("search.searchHistory") }}
+            </ODropdownItem>
+          </ODropdownGroup>
 
           <ODropdownSeparator />
 
-          <ODropdownItem
-            v-if="searchObj.meta.sqlMode"
-            data-test="logs-search-bar-explain-query-menu-btn"
-            :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
-            @select="openExplainDialog"
-          >
-            <template #icon-left>
-              <OIcon name="lightbulb" size="sm" />
-            </template>
-            {{ t("search.explainQuery") }}
-          </ODropdownItem>
+          <!-- DOWNLOADS -->
+          <ODropdownGroup :label="t('search.menuGroupDownloads')">
+            <!-- Download results — nested sub-dropdown (hover to open) -->
+            <div
+              data-test="search-download-submenu-trigger"
+              class="search-download-item"
+              :class="{ 'search-download-item--disabled': isDownloadDisabled }"
+              :aria-disabled="isDownloadDisabled || undefined"
+              @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
+              @mouseleave="showDownloadSubmenu = false"
+            >
+              <span class="more-menu-icon-badge search-download-item-icon">
+                <OIcon size="sm" name="download" />
+              </span>
+              <span class="search-download-item-label">{{ t("search.downloadTable") }}</span>
+              <OIcon size="sm" name="chevron-right" />
 
-          <ODropdownSeparator v-if="searchObj.meta.sqlMode" />
+              <div
+                v-if="showDownloadSubmenu && !isDownloadDisabled"
+                class="search-download-submenu"
+                data-test="search-download-submenu"
+              >
+                <button
+                  type="button"
+                  data-test="search-download-csv-btn"
+                  class="search-download-submenu-item"
+                  @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
+                >
+                  <OIcon name="grid-on" size="sm" />
+                  <span class="tw:flex-1">{{ t("search.downloadCSV") }}</span>
+                </button>
+                <button
+                  type="button"
+                  data-test="search-download-json-btn"
+                  class="search-download-submenu-item"
+                  @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
+                >
+                  <OIcon name="data-object" size="sm" />
+                  <span class="tw:flex-1">{{ t("search.downloadJSON") }}</span>
+                </button>
+              </div>
+            </div>
 
-          <ODropdownItem
+            <ODropdownItem
+              data-test="logs-search-bar-download-custom-range-btn"
+              :disabled="isDownloadDisabled"
+              @select="toggleCustomDownloadDialog"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <img
+                    :src="customRangeIcon"
+                    alt="Custom Range"
+                    class="tw:w-4 tw:h-4"
+                  />
+                </span>
+              </template>
+              {{ t("search.customRange") }}
+            </ODropdownItem>
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
+
+          <ODropdownGroup
             v-if="config.isEnterprise == 'true'"
-            data-test="search-scheduler-create-new-btn"
-            @select="createScheduleJob"
+            :label="t('search.menuGroupSchedule')"
           >
-            <template #icon-left>
-              <img
-                :src="createScheduledSearchIcon"
-                alt="Create Scheduled Search"
-                class="tw:w-4 tw:h-4"
-              />
-            </template>
-            <span data-test="search-scheduler-create-new-label">
-              {{ t("search.createScheduledSearch") }}
-            </span>
-          </ODropdownItem>
+            <ODropdownItem
+              v-if="config.isEnterprise == 'true'"
+              data-test="search-scheduler-create-new-btn"
+              @select="createScheduleJob"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <img
+                    :src="createScheduledSearchIcon"
+                    alt="Create Scheduled Search"
+                    class="tw:w-4 tw:h-4"
+                  />
+                </span>
+              </template>
+              <span data-test="search-scheduler-create-new-label">
+                {{ t("search.createScheduledSearch") }}
+              </span>
+            </ODropdownItem>
 
-          <ODropdownItem
-            v-if="config.isEnterprise == 'true'"
-            data-test="search-scheduler-list-btn"
-            @select="routeToSearchSchedule"
-          >
-            <template #icon-left>
-              <img
-                :src="listScheduledSearchIcon"
-                alt="List Scheduled Search"
-                class="tw:w-4 tw:h-4"
-              />
-            </template>
-            <span data-test="search-scheduler-list-label">
-              {{ t("search.listScheduledSearch") }}
-            </span>
-          </ODropdownItem>
+            <ODropdownItem
+              v-if="config.isEnterprise == 'true'"
+              data-test="search-scheduler-list-btn"
+              @select="routeToSearchSchedule"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <img
+                    :src="listScheduledSearchIcon"
+                    alt="List Scheduled Search"
+                    class="tw:w-4 tw:h-4"
+                  />
+                </span>
+              </template>
+              <span data-test="search-scheduler-list-label">
+                {{ t("search.listScheduledSearch") }}
+              </span>
+            </ODropdownItem>
+          </ODropdownGroup>
 
           <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
 
-          <ODropdownItem
+          <ODropdownGroup
             v-if="
               config.isEnterprise == 'true' &&
               config.isCloud == 'false' &&
               store.state.zoConfig.search_inspector_enabled
             "
-            data-test="search-inspect-btn"
-            @select="openSearchInspectDialog"
+            :label="t('search.menuGroupInspect')"
           >
-            <template #icon-left>
-              <OIcon name="troubleshoot" size="sm" />
-            </template>
-            <span data-test="search-inspect-label">Search Inspect</span>
-          </ODropdownItem>
+            <ODropdownItem
+              data-test="search-inspect-btn"
+              @select="openSearchInspectDialog"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="troubleshoot" size="sm" />
+                </span>
+              </template>
+              <span data-test="search-inspect-label">Search Inspect</span>
+            </ODropdownItem>
+          </ODropdownGroup>
         </ODropdown>
         <share-button
           v-if="!shouldMoveShareToMenu"
@@ -671,8 +747,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div v-else class="tw:flex tw:items-center">
+              <!-- Cancel button for patterns tab -->
               <OButton
                 v-if="
+                  searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                  patternsState.loading
+                "
+                data-test="logs-search-bar-patterns-cancel-btn"
+                variant="ghost"
+                :title="t('search.cancel')"
+                class="tw:p-0 tw:h-[1.875rem]! o2-run-query-button o2-color-cancel element-box-shadow search-button-normal-border-radius"
+                @click="cancelPatterns"
+                >{{ t("search.cancel") }}</OButton
+              >
+              <!-- Cancel button for logs tab (enterprise only, trace-based) -->
+              <OButton
+                v-else-if="
                   config.isEnterprise == 'true' &&
                   (!!searchObj.data.searchRequestTraceIds.length ||
                     !!searchObj.data.searchWebSocketTraceIds.length) &&
@@ -721,6 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="
                   searchObj.loading == true ||
                   searchObj.loadingHistogram == true ||
+                  patternsState.loading ||
                   isGeneratingSQL ||
                   (isNaturalLanguageDetected &&
                     !searchObj.meta.nlpMode &&
@@ -767,12 +858,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-xs"
                     :class="[
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                      config.isEnterprise == 'true' &&
-                      (!!searchObj.data.searchRequestTraceIds.length ||
-                        !!searchObj.data.searchWebSocketTraceIds.length) &&
-                      (searchObj.loading == true ||
-                        searchObj.loadingHistogram == true)
+                      (searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                        patternsState.loading) ||
+                      (!(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                        config.isEnterprise == 'true' &&
+                        (!!searchObj.data.searchRequestTraceIds.length ||
+                          !!searchObj.data.searchWebSocketTraceIds.length) &&
+                        (searchObj.loading == true ||
+                          searchObj.loadingHistogram == true))
                         ? 'o2-color-cancel'
                         : !(
                               isNaturalLanguageDetected &&
@@ -869,27 +962,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden">
+    <div
+      ref="editorContainerRef"
+      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
+      :class="{ 'editor-fullscreen': isFocused }"
+      :style="editorFullscreenStyle"
+    >
+      <!-- Expand / collapse button — always top-right of the full editor area -->
+      <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        data-test="logs-query-editor-full_screen-btn"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleEditorFullscreen"
+        class="tw:absolute! tw:z-[51] tw:top-[0.1875rem] tw:right-[0.25rem] editor-expand-btn"
+      >
+        <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
+      </OButton>
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
-        :class="{ 'expand-on-focus': isFocused }"
-        :style="backgroundColorStyle"
       >
         <OSplitter
           class="logs-search-splitter tw:h-full!"
           v-model="searchObj.config.fnSplitterModel"
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
+          separator-class="tw:w-px! tw:bg-[var(--o2-border-color)]"
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
-              :class="
-                searchObj.data.transformType &&
-                searchObj.meta.showTransformEditor
-                  ? 'tw:ml-[0.375rem]'
-                  : 'tw:ml-[0.375rem]'
-              "
+              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              :class="{
+                'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
+                'fn-editor-open': showFunctionEditor
+              }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <unified-query-editor
@@ -900,6 +1006,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
+                :has-expand-button="!showFunctionEditor"
                 :show-ai-icon="
                   config.isEnterprise == 'true' &&
                   store.state.zoConfig.ai_enabled
@@ -917,12 +1024,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
-                :class="
-                  searchObj.data.editorValue == '' &&
-                  searchObj.meta.queryEditorPlaceholderFlag
-                    ? 'empty-query'
-                    : ''
-                "
                 language="sql"
                 :readOnly="
                   searchObj.meta.logsVisualizeToggle === 'build' &&
@@ -946,7 +1047,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mr-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:h-full"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:rounded-l-none tw:border-l-0 tw:relative tw:h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -958,6 +1059,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="searchObj.data.tempFunctionContent"
                       :nlp-mode="vrlEditorNlpMode"
                       :hide-nl-toggle="false"
+                      :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
                       :disable-ai-reason="
                         isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
@@ -967,12 +1069,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
                       class="monaco-editor"
-                      :class="
-                        searchObj.data.tempFunctionContent == '' &&
-                        searchObj.meta.functionEditorPlaceholderFlag
-                          ? 'empty-function'
-                          : ''
-                      "
                       @update:query="
                         searchObj.data.tempFunctionContent = $event
                       "
@@ -1016,31 +1112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
       </div>
-      <OButton
-        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
-        data-test="logs-query-editor-full_screen-btn"
-        :title="isFocused ? t('search.collapse') : t('search.expand')"
-        variant="ghost"
-        size="icon"
-        @click="isFocused = !isFocused"
-        class="tw:p-1 tw:absolute! tw:z-50 fullscreen-hover-btn"
-        :style="{
-          top:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '6.5rem'
-              : '3.5rem',
-          right:
-            (searchObj.meta.nlpMode && !searchObj.meta.showTransformEditor) ||
-            (vrlEditorNlpMode &&
-              searchObj.meta.showTransformEditor &&
-              searchObj.data.transformType === 'function')
-              ? '1.6rem'
-              : '4rem',
-        }"
-      />
     </div>
 
     <ODialog
@@ -1575,6 +1646,7 @@ import {
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
+import usePatterns, { patternsState } from "@/composables/useLogs/usePatterns";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1584,6 +1656,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -1666,6 +1739,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
+    ODropdownGroup,
     DateTime,
     ShareButton,
     OButton,
@@ -1861,6 +1935,7 @@ export default defineComponent({
       cancelQuery,
     } = useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
+    const { cancelPatterns } = usePatterns();
 
     const {
       refreshData,
@@ -1897,6 +1972,35 @@ export default defineComponent({
     const functionUpdateConfirm = ref(false);
 
     const isFocused = ref(false);
+    const editorContainerRef = ref<HTMLElement | null>(null);
+    const fullscreenRect = ref<{ left: number; width: number; top: number } | null>(null);
+
+    const editorFullscreenStyle = computed(() => {
+      if (!isFocused.value || !fullscreenRect.value) return {};
+      const { left, width, top } = fullscreenRect.value;
+      return {
+        position: 'fixed' as const,
+        left: `${left}px`,
+        width: `${width}px`,
+        top: `${top}px`,
+        height: `${Math.round(window.innerHeight * 0.6)}px`,
+        zIndex: 50,
+      };
+    });
+
+    const toggleEditorFullscreen = () => {
+      if (!isFocused.value) {
+        const el = editorContainerRef.value;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top };
+        }
+        isFocused.value = true;
+      } else {
+        isFocused.value = false;
+        fullscreenRect.value = null;
+      }
+    };
 
     const confirmDialogVisible: boolean = ref(false);
     const confirmSavedViewDialogVisible: boolean = ref(false);
@@ -2008,6 +2112,46 @@ export default defineComponent({
 
     // Responsive breakpoint: share button moves into overflow menu at narrow widths
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
+
+    // Track window width for responsive toolbar layout (share button breakpoint)
+    // Measure the ACTUAL available width for the left section:
+    //   availableLeftWidth = bar container width − right section width − bar padding (14px)
+    // Both sides are observed via ResizeObserver so any layout shift (window resize,
+    // panel open/close, sidebar toggle) is handled automatically.
+    const toolbarLeftRef  = ref<HTMLElement | null>(null);
+    const toolbarRightRef = ref<HTMLElement | null>(null);
+    const toolbarBarWidth   = ref(window.innerWidth);
+    const toolbarRightWidth = ref(0);
+    let toolbarResizeObserver: ResizeObserver | null = null;
+    let toolbarRightObserver:  ResizeObserver | null = null;
+
+    const availableLeftWidth = computed(() =>
+      Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14),
+    );
+
+    // Approximate rendered widths of left-section content at each collapse state:
+    // Each threshold has a small buffer (+16px) so collapse fires before clipping.
+    const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
+    const toolbarToggleIconOnly       = computed(() => availableLeftWidth.value < 568);
+    const shouldMoveButtonsToMenu     = computed(() => availableLeftWidth.value < 328);
+    const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
+    const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
+
+    // Computed label/icon for the toggle-group-as-dropdown trigger
+    const toggleViewOptions = computed(() => [
+      { value: 'logs',      icon: 'search',   label: t('common.search'),          disabled: false },
+      { value: 'visualize', icon: 'timeline', label: t('search.visualize'),
+        disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 },
+      { value: 'build',     icon: 'build',    label: t('search.buildQuery'),      disabled: false },
+      ...(config.isEnterprise === 'true'
+        ? [{ value: 'patterns', icon: 'layers', label: t('search.showPatternsLabel'), disabled: false }]
+        : []),
+    ]);
+    const currentToggleOption = computed(() =>
+      toggleViewOptions.value.find((o) => o.value === searchObj.meta.logsVisualizeToggle)
+        ?? toggleViewOptions.value[0],
+    );
+
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
 
     const confirmUpdate = ref(false);
@@ -2230,16 +2374,8 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
-      // Auto-switch off SQL mode only when the user has typed something
-      // non-empty that clearly isn't a SQL statement (e.g. a filter expression
-      // after removing the SELECT … FROM prefix). An empty editor is ambiguous
-      // — keep the current mode so a blank SQL query still runs as SQL.
-      if (
-        value.trim() !== "" &&
-        !isSqlQuery(value) &&
-        searchObj.meta.sqlMode === true
-      ) {
-        searchObj.meta.sqlModeEditTransition = true;
+      // Turn off SQL mode when query is completely cleared
+      if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
       }
 
@@ -2322,7 +2458,8 @@ export default defineComponent({
       if (
         searchObj.meta.sqlMode === false &&
         searchObj.meta.logsVisualizeToggle !== "build" &&
-        isSqlQuery(value)
+        value.toLowerCase().includes("select") &&
+        value.toLowerCase().includes("from")
       ) {
         searchObj.meta.sqlMode = true;
         searchObj.meta.sqlModeManualTrigger = true;
@@ -2423,6 +2560,10 @@ export default defineComponent({
     // typing start/end time before firing the query.
     const debouncedAutoRunAbsolute = debounce(() => {
       emit("searchdata");
+    }, 2500);
+
+    const debouncedAutoRunPatterns = debounce(() => {
+      emit("extractPatterns");
     }, 2500);
 
     let ignoreAutoTrigger = false;
@@ -2548,6 +2689,20 @@ export default defineComponent({
           emit("searchdata");
         }
       }
+
+      // Patterns tab: re-run when auto-run is enabled (live or non-live)
+      if (
+        store.state.zoConfig.auto_query_enabled &&
+        searchObj.meta.logsVisualizeToggle === "patterns" &&
+        searchObj.loading == false &&
+        ignoreAutoTrigger == false
+      ) {
+        if (searchObj.meta.liveMode && value.valueType === "absolute") {
+          debouncedAutoRunPatterns();
+        } else {
+          emit("extractPatterns");
+        }
+      }
     };
 
     const updateTimezone = () => {
@@ -2636,6 +2791,24 @@ export default defineComponent({
 
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
+
+      // Observe the bar container (parent of left section) for total width.
+      const barEl = toolbarLeftRef.value?.parentElement;
+      if (barEl) {
+        toolbarBarWidth.value = barEl.getBoundingClientRect().width;
+        toolbarResizeObserver = new ResizeObserver((entries) => {
+          toolbarBarWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        toolbarResizeObserver.observe(barEl);
+      }
+      // Observe the right section so its actual rendered width is always known.
+      if (toolbarRightRef.value) {
+        toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
+        toolbarRightObserver = new ResizeObserver((entries) => {
+          toolbarRightWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        toolbarRightObserver.observe(toolbarRightRef.value);
+      }
     });
 
     onUnmounted(() => {
@@ -2644,6 +2817,8 @@ export default defineComponent({
       });
       window.removeEventListener("keydown", handleEscKey);
       window.removeEventListener("resize", onWindowResize);
+      toolbarResizeObserver?.disconnect();
+      toolbarRightObserver?.disconnect();
     });
 
     onActivated(() => {
@@ -4242,24 +4417,6 @@ export default defineComponent({
 
       return searchIds;
     });
-    const backgroundColorStyle = computed(() => {
-      return {
-        backgroundColor:
-          searchObj.data.transformType === "function" && isFocused.value
-            ? "var(--o2-card-bg)"
-            : "",
-        borderBottom:
-          searchObj.data.transformType === "function" && isFocused.value
-            ? "0.375rem solid var(--o2-card-bg)"
-            : "none",
-        // Conditional width when focused (expand-on-focus active)
-        width: isFocused.value
-          ? store.state.isAiChatEnabled
-            ? "calc(75% - 104px)" // AI chat enabled: 75% minus nav width
-            : "calc(100% - 104px)" // AI chat disabled: full width minus nav
-          : undefined,
-      };
-    });
     const editorWidthToggleFunction = computed(() => {
       if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
@@ -4602,7 +4759,10 @@ export default defineComponent({
       disable,
       cancelVisualizeQueries,
       isFocused,
-      backgroundColorStyle,
+      editorContainerRef,
+      editorFullscreenStyle,
+      toggleEditorFullscreen,
+
       editorWidthToggleFunction,
       fnParsedSQL,
       fnUnparsedSQL,
@@ -4669,7 +4829,18 @@ export default defineComponent({
       isGeneratingSQL,
       vrlEditorNlpMode,
       shouldMoveShareToMenu,
+      toolbarLeftRef,
+      toolbarRightRef,
+      shouldHideToolbarButtonText,
+      toolbarToggleIconOnly,
+      shouldMoveButtonsToMenu,
+      toolbarMoveResetToMenu,
+      toolbarToggleAsDropdown,
+      toggleViewOptions,
+      currentToggleOption,
       toggleLiveMode,
+      patternsState,
+      cancelPatterns,
     };
   },
   computed: {
@@ -4967,13 +5138,34 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* Icon badge — small rounded square used as icon container in dropdown menus */
+.more-menu-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--o2-section-header-bg);
+  color: var(--o2-text-secondary);
+  flex-shrink: 0;
+
+  &--mono {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--text-sm);
+    font-style: italic;
+    font-weight: var(--font-bold);
+    color: var(--o2-primary-color);
+  }
+}
+
 /* "Download results" item with hover-triggered CSV/JSON sub-popover.
    Matches the language sub-menu pattern in Header.vue. */
 .search-download-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 0.375rem 0.75rem;
   font-size: var(--text-base);
   line-height: 1.2;
@@ -5063,14 +5255,6 @@ export default defineComponent({
       background-color: var(--o2-hover-accent);
     }
   }
-}
-
-.expand-on-focus {
-  position: fixed !important;
-  height: calc(100vh - 12.5rem) !important;
-  z-index: 20 !important;
-  max-width: 100vw;
-  /* Width is now handled dynamically via backgroundColorStyle computed property */
 }
 
 .file-type label {
@@ -5184,8 +5368,8 @@ html.dark .file-type label,
   font-size: var(--text-xs);
   font-weight: var(--font-medium) !important;
   line-height: 1rem !important;
-  padding: 0 !important;
-  width: 5.875rem !important;
+  padding: 0 0.5rem !important;
+  min-width: 5.875rem;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -5220,6 +5404,29 @@ html.dark .file-type label,
   :deep(.q-splitter__separator) {
     height: 100%;
   }
+}
+
+/* When function editor is open, move AI button flush to the right of the query panel */
+.fn-editor-open :deep(.ai-floating-button) {
+  right: 0.25rem;
+}
+
+/* Expand button border */
+.editor-expand-btn {
+  border: 1px solid var(--o2-border-color) !important;
+  border-radius: 0.375rem;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+}
+
+.editor-fullscreen {
+  overflow: hidden !important;
+  background: var(--o2-body-primary-bg) !important;
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
 }
 
 .query-mode-toggle {

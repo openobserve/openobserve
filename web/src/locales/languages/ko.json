@@ -404,7 +404,18 @@
     "selectLogStream": "로그 스트림 선택",
     "noData": "사용 가능한 데이터 없음",
     "functionEditorLabel": "함수 에디터",
-    "loadingStream": "스트림 로드 중..."
+    "loadingStream": "스트림 로드 중...",
+    "hideHistogram": "히스토그램 숨기기",
+    "disableQuickMode": "퀵 모드 비활성화",
+    "menuGroupSetOnce": "한 번 설정",
+    "menuGroupSavedViews": "저장된 뷰",
+    "menuGroupTools": "도구",
+    "menuGroupHistory": "역사",
+    "menuGroupDownloads": "다운로드",
+    "menuGroupSchedule": "스케줄",
+    "menuGroupInspect": "검사",
+    "validSql": "유효한 SQL",
+    "invalidSql": "잘못된 쿼리"
   },
   "menu": {
     "home": "홈",
