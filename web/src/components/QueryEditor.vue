@@ -91,17 +91,6 @@
         class="monaco-editor tw:w-full tw:h-full"
       />
 
-      <!-- Floating placeholder shown when editor is empty and unfocused -->
-      <!-- VRL (function editor): static text, always visible -->
-      <!-- Query editor: fades between phrases -->
-      <span
-        v-if="showPlaceholder"
-        class="query-editor__placeholder"
-        :class="{ 'query-editor__placeholder--visible': isVrlMode || placeholderFadeVisible }"
-        :data-test="`${dataTestPrefix}-placeholder`"
-        aria-hidden="true"
-      >{{ placeholderText }}</span>
-
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled && !hideNlToggle && !isAIMode"
@@ -120,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
@@ -283,12 +272,10 @@ const handleQueryUpdate = (newQuery: string) => {
 };
 
 const handleEditorFocus = () => {
-  editorFocused.value = true;
   emit('focus');
 };
 
 const handleEditorBlur = () => {
-  editorFocused.value = false;
   emit('blur');
 };
 
@@ -461,89 +448,6 @@ const handleGenerationSuccess = ({ type, message }: any) => {
   emit('generation-success', { type, message });
 };
 
-// ───── Floating placeholder ─────
-const editorFocused = ref(false);
-const placeholderText = ref('');
-const placeholderFadeVisible = ref(false);
-
-const placeholderPhrases = computed<string[]>(() => {
-  if (currentLanguage.value === 'vrl') {
-    return ["Write a VRL function (e.g. .status = to_int!(.status))"];
-  }
-  if (currentLanguage.value === 'promql') {
-    return ["Write a PromQL query (e.g. rate(http_requests_total[5m]))"];
-  }
-  return [
-    "Add filter conditions (e.g. level='error' AND status=500 AND method='GET')",
-    "Write a SQL query (e.g. SELECT * FROM 'logs' WHERE level='error' LIMIT 100)",
-  ];
-});
-
-const showPlaceholder = computed(
-  () => !editorFocused.value && (!props.query || !props.query.trim()),
-);
-
-// VRL (function editor) shows static text — no animation needed
-const isVrlMode = computed(() => currentLanguage.value === 'vrl');
-
-const FADE_MS = 400;
-const DISPLAY_MS = 3500;
-
-let fadeTimer: ReturnType<typeof setTimeout> | null = null;
-let phraseIdx = 0;
-
-const stopFader = () => {
-  if (fadeTimer) clearTimeout(fadeTimer);
-  fadeTimer = null;
-};
-
-const startFader = () => {
-  const phrases = placeholderPhrases.value;
-  placeholderText.value = phrases[phraseIdx % phrases.length];
-  placeholderFadeVisible.value = true;
-
-  if (phrases.length <= 1) return; // single phrase — show statically, no cycling
-
-  const cycle = () => {
-    // fade out
-    placeholderFadeVisible.value = false;
-    fadeTimer = setTimeout(() => {
-      phraseIdx = (phraseIdx + 1) % phrases.length;
-      placeholderText.value = phrases[phraseIdx];
-      // fade in
-      placeholderFadeVisible.value = true;
-      fadeTimer = setTimeout(cycle, DISPLAY_MS);
-    }, FADE_MS);
-  };
-
-  fadeTimer = setTimeout(cycle, DISPLAY_MS);
-};
-
-const restartFader = () => {
-  stopFader();
-  phraseIdx = 0;
-  placeholderFadeVisible.value = false;
-  placeholderText.value = placeholderPhrases.value[0] ?? '';
-  // Brief delay so the fade-out completes before showing new text
-  fadeTimer = setTimeout(startFader, FADE_MS);
-};
-
-watch(currentLanguage, () => {
-  stopFader();
-  phraseIdx = 0;
-  placeholderText.value = placeholderPhrases.value[0] ?? '';
-  placeholderFadeVisible.value = false;
-  if (!isVrlMode.value) {
-    fadeTimer = setTimeout(startFader, FADE_MS);
-  }
-});
-
-onMounted(() => {
-  placeholderText.value = placeholderPhrases.value[0] ?? '';
-  if (!isVrlMode.value) startFader();
-});
-onBeforeUnmount(stopFader);
-
 // Watch for language prop changes
 watch(() => props.defaultLanguage, (newLang) => {
   if (newLang && newLang !== currentLanguage.value) {
@@ -656,29 +560,6 @@ defineExpose({
 /* Editor container - clips Monaco but keeps floating button visible */
 .editor-container {
   overflow: hidden;
-}
-
-/* Floating placeholder shown when the editor is empty and unfocused.
-   Font + left position match Monaco's actual render settings:
-   glyphMargin:false, lineDecorationsWidth:3, lineNumbersMinChars:0 → ~30px gutter. */
-.query-editor__placeholder {
-  position: absolute;
-  top: 0;
-  left: 0.8rem;
-  pointer-events: none;
-  user-select: none;
-  font-family: var(--font-mono, 'Menlo', 'Monaco', 'Courier New', monospace);
-  font-size: 0.7875rem;
-  line-height: 1.375rem;
-  color: var(--o2-text-placeholder, var(--o2-text-muted));
-  white-space: nowrap;
-  z-index: 10;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.query-editor__placeholder--visible {
-  opacity: 1;
 }
 
 /* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
