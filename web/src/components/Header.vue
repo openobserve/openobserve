@@ -288,17 +288,6 @@ size="xs" class="warning" />{{
         </div>
       </ODropdown>
 
-      <!-- SETTINGS BUTTON -->
-      <OButton
-        variant="ghost"
-        size="icon-toolbar"
-        data-test="menu-link-settings-item"
-        @click="router.push({ name: 'settings' })"
-      >
-        <OIcon name="settings" size="sm" class="tw:opacity-60" />
-        <OTooltip side="top" align="center" :content="t('menu.settings')" />
-      </OButton>
-
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
       <ODropdown
         side="bottom"
