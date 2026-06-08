@@ -60,13 +60,16 @@ const alignClass = computed(() => {
   return "tw:text-left";
 });
 
+const isAction = computed(() => meta.value?.isAction ?? false);
+
 const slotAlignClass = computed(() => {
+  // Action cells shrink to their content (inline-flex, no w-full) so the
+  // column can be measured and sized to the buttons with no dead space.
+  if (isAction.value) return "tw:inline-flex tw:items-center";
   if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full";
   if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full";
   return "tw:flex tw:items-center tw:w-full";
 });
-
-const isAction = computed(() => meta.value?.isAction ?? false);
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
@@ -99,10 +102,20 @@ const horizontalScroll = inject<{ value: boolean } | null>(
 
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
-  if (!isAutoWidth.value) {
+  if (isAutoWidth.value) {
+    // Elastic column: no width (absorbs the table's leftover space), but honour
+    // minSize so it can't collapse — it pushes the table to scroll instead.
+    const min = props.cell.column.columnDef.minSize;
+    if (min) base.minWidth = `${min}px`;
+  } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
-    if (!horizontalScroll?.value) {
+    // Rigid columns (index, actions) pin min+max to the size var so their width
+    // never depends on — or is squeezed by — the sibling data columns.
+    if (meta.value?.fixedWidth) {
+      base.minWidth = sizeVar;
+      base.maxWidth = sizeVar;
+    } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
     }
   }

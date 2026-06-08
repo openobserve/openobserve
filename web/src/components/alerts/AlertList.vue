@@ -70,10 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0 tw:px-2.5 tw:pb-2.5 tw:pt-2.5 tw:gap-2.5"
+      class="tw:flex-1 tw:flex tw:min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: splitterModel + 'px' }">
+      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
         <div class="tw:h-full">
           <FolderList
             type="alerts"
@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-list-table"
                 :data="filteredResults || []"
                 :columns="columns"
+                show-index
                 row-key="alert_id"
                 :loading="loading"
                 pagination="client"
@@ -177,16 +178,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                       </OInput>
                     </div>
-                    <OButton
-                      variant="outline"
-                      size="icon-sm"
-                      icon-left="refresh"
-                      :loading="loading"
-                      title="Reload alerts"
-                      data-test="alert-list-refresh-btn"
-                      @click="refreshAlerts"
-                    />
                   </div>
+                </template>
+                <template #toolbar-trailing>
+                  <OButton
+                    variant="outline"
+                    size="icon-sm"
+                    icon-left="refresh"
+                    :loading="loading"
+                    title="Reload alerts"
+                    data-test="alert-list-refresh-btn"
+                    @click="refreshAlerts"
+                  />
                 </template>
 
 
@@ -426,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div style="width: 600px" class="tw:mt-6">
                       <template v-if="!templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-template-text"
                         >
                           It looks like you haven't created any Templates yet.
@@ -443,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-if="!destinations.length && templates.length">
                         <div
-                          class="tw:text-base tw:font-medium"
+                          class="tw:text-sm"
                           data-test="alert-list-create-destination-text"
                         >
                           It looks like you haven't created any Destinations
@@ -461,7 +464,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <template v-else>
-                    <NoData />
+                    <OEmptyState
+                      size="hero"
+                      preset="no-alerts"
+                      :filtered="!!(filterQuery || searchQuery)"
+                      @action="
+                        (id) =>
+                          id === 'clear-filters'
+                            ? ((filterQuery = ''), (searchQuery = ''))
+                            : showAddUpdateFn({})
+                      "
+                    />
                   </template>
                 </template>
 
@@ -680,7 +693,7 @@ import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -723,6 +736,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -734,7 +748,7 @@ export default defineComponent({
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     ImportAlert,
     DedupSummaryCards,
@@ -992,22 +1006,17 @@ export default defineComponent({
     const columns = computed<OTableColumnDef[]>(() => {
       const baseColumns: OTableColumnDef[] = [
         {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          size: 67,
-          meta: { align: "left" },
-        },
-        {
           id: "name",
           accessorKey: "name",
           header: t("alerts.name"),
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 250,
+          size: COL.name,
           minSize: 200,
-          meta: { align: "left" },
+          // Elastic column: absorbs the table's leftover width so the fixed
+          // columns (#, dates, actions) keep their exact widths.
+          meta: { align: "left", autoWidth: true },
         },
         {
           id: "owner",
@@ -1017,7 +1026,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.owner,
           meta: { align: "left" },
         },
         // "period" (Look back window) — all tabs except realTime
@@ -1031,7 +1040,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.frequency,
                 meta: { align: "center" },
               } as OTableColumnDef,
             ]
@@ -1047,7 +1056,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.frequency,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1060,7 +1069,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.date,
           meta: { align: "left" },
         },
         {
@@ -1071,7 +1080,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.date,
           meta: { align: "left" },
         },
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
@@ -1085,7 +1094,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 150,
+                size: COL.date,
                 meta: { align: "left" },
               } as OTableColumnDef,
               {
@@ -1096,7 +1105,7 @@ export default defineComponent({
                 sortable: true,
                 resizable: true,
                 hideable: true,
-                size: 120,
+                size: COL.status,
                 meta: { align: "left" },
               } as OTableColumnDef,
             ]
@@ -1111,9 +1120,9 @@ export default defineComponent({
         },
       ];
 
-      // insert folder_name column if applicable
+      // insert folder_name column after the name column if applicable
       if (searchAcrossFolders.value && searchQuery.value !== "") {
-        baseColumns.splice(2, 0, {
+        baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
           header: "Folder",
@@ -1121,7 +1130,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: 150,
+          size: COL.folder,
           meta: { align: "center" },
         } as OTableColumnDef);
       }
@@ -1166,7 +1175,6 @@ export default defineComponent({
       anomaly: any,
       counter: number,
     ): any => ({
-      "#": counter <= 9 ? `0${counter}` : `${counter}`,
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1310,7 +1318,6 @@ export default defineComponent({
           }
 
           return {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
             alert_id: data.alert_id,
             name: data.name,
             alert_type: data.is_real_time ? "Real Time" : "Scheduled",

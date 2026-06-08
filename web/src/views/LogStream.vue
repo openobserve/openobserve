@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="log-stream-table"
         :data="logStream"
         :columns="columns"
+        show-index
         row-key="_rowKey"
         :frame="false"
         selection="multiple"
@@ -66,6 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         :default-columns="false"
         :loading="loadingState"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="streams-log-stream-list"
         style="width: 100%; height: 100%"
       >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
@@ -259,7 +263,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import {
@@ -354,24 +358,24 @@ export default defineComponent({
     } = useStreams();
     const columns = ref<OTableColumnDef[]>([
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: 2,
-        meta: { align: "left" },
-      },
-      {
         id: "name",
         accessorKey: "name",
         header: t("logStream.name"),
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        minSize: 200,
+        // Elastic column: absorbs the table's leftover width so the fixed
+        // columns (#, type, sizes, actions) keep their exact widths.
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "stream_type",
         accessorKey: "stream_type",
         header: t("logStream.type"),
-        size: 30,
+        size: COL.streamType,
+        resizable: true,
+        hideable: true,
         meta: { align: "left" },
       },
       {
@@ -380,38 +384,48 @@ export default defineComponent({
           row.doc_num?.toLocaleString?.() ?? row.doc_num,
         header: t("logStream.docNum"),
         sortable: true,
-        size: 80,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
       },
       {
         id: "storage_size",
         accessorFn: (row: any) => formatSizeFromMB(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
-        size: 50,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.sizeBytes,
+        meta: { align: "right" },
       },
       {
         id: "compressed_size",
         accessorFn: (row: any) => formatSizeFromMB(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
-        size: 50,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.sizeBytes,
+        meta: { align: "right" },
       },
       {
         id: "index_size",
         accessorFn: (row: any) => formatSizeFromMB(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,
-        size: 50,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.sizeBytes,
+        meta: { align: "right" },
       },
       {
         id: "actions",
         header: t("user.actions"),
         isAction: true,
-        size: 50,
+        // Initial hint only — OTable measures the rendered buttons and sizes
+        // the column to fit them exactly.
+        size: 120,
         meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
       },
     ]);
@@ -477,7 +491,6 @@ export default defineComponent({
         logStream.value = [];
 
         const offset = (currentPage.value - 1) * pageSize.value;
-        let counter = 1 + (offset < 0 ? 0 : offset);
         let streamResponse;
         // if(selectedStreamType.value == "all") {
         //   streamResponse = getStreams(selectedStreamType.value || "", false, false);
@@ -515,7 +528,6 @@ export default defineComponent({
                   index_size = data.stats.index_size + " MB";
                 }
                 return {
-                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   _rowKey: `${data.name}-${data.stream_type}`,
                   name: data.name,
                   doc_num: doc_num,
