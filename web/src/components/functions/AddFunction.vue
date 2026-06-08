@@ -15,27 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
-    <div class="card-container tw:mb-[0.8rem] tw:shrink-0">
-      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
-          <FunctionsToolbar
-            v-model:name="formData.name"
-            v-model:trans-type="formData.transType"
-            ref="functionsToolbarRef"
-            :disable-name="beingUpdated"
-            :transform-type-options="transformTypeOptions"
-            @test="onTestFunction"
-            @save="onSubmit"
-            @back="closeAddFunction"
-            @cancel="cancelAddFunction"
-            @open:chat="openChat"
-            :is-add-function-component="isAddFunctionComponent"
-            class="tw:pr-4"
-          />
-      </div>
-    </div>
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+    <FunctionsToolbar
+      v-model:name="formData.name"
+      v-model:trans-type="formData.transType"
+      ref="functionsToolbarRef"
+      :disable-name="beingUpdated"
+      :transform-type-options="transformTypeOptions"
+      @test="onTestFunction"
+      @save="onSubmit"
+      @back="closeAddFunction"
+      @cancel="cancelAddFunction"
+      @open:chat="openChat"
+      :is-add-function-component="isAddFunctionComponent"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
 
-    <div class="tw:flex tw:flex-1 tw:min-h-0">
+    <div class="tw:flex tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2 tw:pb-2.5">
       <div
         class="tw:flex tw:overflow-hidden tw:min-h-0"
         :class="[

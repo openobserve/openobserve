@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh') || 'Refresh'" side="top" />
       </OButton>
     </Teleport>
-    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div
         data-test="pipeline-history-table"
         class="pipeline-history-table card-container tw:h-full"
