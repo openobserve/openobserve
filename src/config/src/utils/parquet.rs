@@ -13,7 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Cursor, path::PathBuf, pin::Pin, sync::Arc};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    path::PathBuf,
+    pin::Pin,
+    sync::Arc,
+};
 
 #[cfg(feature = "vortex")]
 use arrow::{array::StructArray, datatypes::DataType};
