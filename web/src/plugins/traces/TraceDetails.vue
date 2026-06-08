@@ -238,7 +238,7 @@ size="xs"
           >
             <OToggleGroup
               :model-value="activeTab"
-              @update:model-value="activeTab = $event as string"
+              @update:model-value="updateActiveTab"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
@@ -713,57 +713,6 @@ size="sm"
               "
               class="tw:w-full tw:h-full"
             >
-              <!-- View Toggle Header -->
-              <div class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:bg-[var(--o2-surface)] tw:border-b tw:border-[var(--o2-border)]">
-                <h3 class="tw:text-sm tw:font-medium tw:text-[var(--o2-text-primary)]">
-                  {{ t("traces.serviceMap") }}
-                </h3>
-
-                <div class="tw:flex tw:items-center tw:space-x-3 tw:ml-auto">
-                  <!-- Time Visualization Toggle (for trace graph) -->
-                  <OToggleGroup
-                    :model-value="timeVisualizationMode"
-                    @update:model-value="timeVisualizationMode = $event"
-                    size="sm"
-                    data-test="trace-time-visualization-toggle"
-                  >
-                    <OToggleGroupItem value="inclusive">
-                      <template #icon-left>
-                        <OIcon name="schedule" size="xs" />
-                      </template>
-                      Total Time
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="exclusive">
-                      <template #icon-left>
-                        <OIcon name="timer" size="xs" />
-                      </template>
-                      Self Time
-                    </OToggleGroupItem>
-                  </OToggleGroup>
-
-                  <!-- Pattern/Span View Toggle -->
-                  <OToggleGroup
-                    :model-value="mapViewMode"
-                    @update:model-value="mapViewMode = $event"
-                    size="sm"
-                    data-test="trace-map-view-toggle"
-                  >
-                    <OToggleGroupItem value="pattern">
-                      <template #icon-left>
-                        <OIcon name="account-tree" size="xs" />
-                      </template>
-                      {{ t("traces.patternView") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="span">
-                      <template #icon-left>
-                        <OIcon name="list" size="xs" />
-                      </template>
-                      {{ t("traces.spanView") }}
-                    </OToggleGroupItem>
-                  </OToggleGroup>
-                </div>
-              </div>
-
               <!-- Chart Container -->
               <div
                 style="
@@ -1096,14 +1045,6 @@ export default defineComponent({
       getNodeErrorRate: getPatternNodeErrorRate
     } = useTracePatternTree(consolidatedPatterns, isDarkMode);
 
-    /**
-     * Get tooltip content for pattern tree nodes
-     * Uses the new generateTracePatternTooltipContent helper
-     */
-    const getPatternNodeTooltip = (node: any): string => {
-      return generateTracePatternTooltipContent(node.metadata);
-    };
-
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
       if (mapViewMode.value === 'pattern') {
@@ -1122,6 +1063,7 @@ export default defineComponent({
           }
         );
 
+        console.log("chartOptions ", chartOptions);
         // Wrap in the format expected by ChartRenderer
         return {
           options: chartOptions,
@@ -1574,42 +1516,42 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Setup tooltips when chart options change and mode is Pattern View
-    watch(
-      () => traceServiceMapChartOptions.value,
-      async () => {
-        // Cleanup existing tooltips
-        if (tooltipCleanup) {
-          tooltipCleanup();
-          tooltipCleanup = null;
+    const updateActiveTab = (tab: string) => {
+      activeTab.value = tab;
+      if(tab === 'map') {
+        setupTooltips();
+      }
+    }
+
+    const setupTooltips = async () => {
+      // Cleanup existing tooltips
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+      // Only setup tooltips for Pattern View
+      if (mapViewMode.value !== 'pattern') return;
+
+      await nextTick();
+      // 300ms delay matches Service Graph tooltip setup timing
+      pendingTooltipSetup = setTimeout(() => {
+        pendingTooltipSetup = null;
+        const chart = chartRendererRef.value?.chart;
+        if (chart) {
+          const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+          tooltipCleanup = setupTraceNodeTooltips(chart, {
+            treeData: patternTreeData.value,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate
+          });
         }
-
-        if (pendingTooltipSetup) {
-          clearTimeout(pendingTooltipSetup);
-          pendingTooltipSetup = null;
-        }
-
-        // Only setup tooltips for Pattern View
-        if (mapViewMode.value !== 'pattern') return;
-
-        await nextTick();
-        // 300ms delay matches Service Graph tooltip setup timing
-        pendingTooltipSetup = setTimeout(() => {
-          pendingTooltipSetup = null;
-          const chart = chartRendererRef.value?.chart;
-          if (chart) {
-            const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
-            tooltipCleanup = setupTraceNodeTooltips(chart, {
-              treeData: patternTreeData.value,
-              getNodeTooltip: getPatternNodeTooltip,
-              getNodeErrorRate: getPatternNodeErrorRate
-            });
-          }
-        }, 300);
-      },
-      { flush: 'post' }
-    );
-
+      }, 300);
+    }
+    
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -2395,6 +2337,8 @@ export default defineComponent({
 
       // Build consolidated patterns for pattern view
       consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
+      // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
 
       traceServiceMap.value = convertTraceServiceMapData(
@@ -3074,7 +3018,8 @@ export default defineComponent({
       traceEvaluationsViewRef,
       fetchEvalPipeline,
       fetchEvalData,
-      formatLargeNumber
+      formatLargeNumber,
+      updateActiveTab
     };
   },
 });
