@@ -30,7 +30,7 @@ export class TracesPage {
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
     this.indexList = '[data-test="traces-search-index-list"]';
-    this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
+    this.fieldListCollapseButton = '[data-test="traces-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
 
     // Search Results
@@ -136,7 +136,7 @@ export class TracesPage {
     this.traceTreeSpanServiceNamePrefix = '[data-test^="trace-tree-span-service-name-"]';
 
     // Field List Toggle
-    this.fieldListToggleButton = '[data-test="logs-search-field-list-collapse-btn"]';
+    this.fieldListToggleButton = '[data-test="traces-search-field-list-collapse-btn"]';
 
     // Legacy/Common
     this.dateTimeButton = dateTimeButtonLocator;

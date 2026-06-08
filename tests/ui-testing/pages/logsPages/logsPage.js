@@ -4845,7 +4845,7 @@ export class LogsPage {
     async expectPaginationRowCountVisible(timeout = 10000) {
         const title = this.page.locator(this.paginationRowCountTitle);
         await expect(title).toBeVisible({ timeout });
-        await expect(title).toHaveText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/, { timeout });
+        await expect(title).toHaveText(/[1-9][\d,]* to \d+ out of [1-9][\d,]*/, { timeout });
     }
 
     /**

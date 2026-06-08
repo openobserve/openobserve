@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                Fullscreen/print hide the chrome, so there we keep the module icon
                as the only on-screen branding (no back affordance). -->
           <AppPageHeader
-            :title="currentDashboardData.data?.title"
             :subtitle="folderNameFromFolderId"
             :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
             :back="
@@ -55,6 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="tw:px-4 tw:border-b tw:border-border-default"
           >
+          <template #title>
+            <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+          </template>
           <template #actions>
             <OButton
               v-if="!isFullscreen"

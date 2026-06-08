@@ -299,6 +299,6 @@ export default class DashboardactionPage {
    * @returns {Locator} The dashboard row locator
    */
   getDashboardRow(dashboardName) {
-    return this.page.getByRole("row", { name: new RegExp(`.*${dashboardName}`) });
+    return this.page.locator(`[data-test="dashboard-name-cell-${dashboardName}"]`);
   }
 }
