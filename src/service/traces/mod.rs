@@ -87,11 +87,12 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const BLOCK_FIELDS: [&str; 7] = [
-    "_timestamp",
+const BLOCK_FIELDS: [&str; 8] = [
+    TIMESTAMP_COL_NAME,
     "duration",
     "start_time",
     "end_time",
+    "service_name",
     inferred::INFER_SERVICE_NAME,
     inferred::INFER_SERVICE_TYPE,
     inferred::INFER_SERVICE_SYSTEM,
@@ -1600,11 +1601,12 @@ mod tests {
     #[test]
     fn test_block_fields() {
         let block_fields = &super::BLOCK_FIELDS;
-        assert_eq!(block_fields.len(), 7);
+        assert_eq!(block_fields.len(), 8);
         assert!(block_fields.contains(&"_timestamp"));
         assert!(block_fields.contains(&"duration"));
         assert!(block_fields.contains(&"start_time"));
         assert!(block_fields.contains(&"end_time"));
+        assert!(block_fields.contains(&"service_name"));
         assert!(block_fields.contains(&"infer_service_name"));
         assert!(block_fields.contains(&"infer_service_type"));
         assert!(block_fields.contains(&"infer_service_system"));
