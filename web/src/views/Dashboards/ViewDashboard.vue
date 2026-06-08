@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
             :back="
               !isFullscreen && store.state.printMode !== true
-                ? { label: t('dashboard.header'), onClick: goBackToDashboardList }
+                ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
                 : undefined
             "
             class="tw:px-4 tw:border-b tw:border-border-default"

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
             :title="backLabel"
             :aria-label="backLabel"
-            data-test="app-page-header-back"
+            :data-test="props.back?.dataTest ?? 'app-page-header-back'"
             @click="onBack"
           >
             <OIcon name="chevron-left" size="md" />
@@ -165,6 +165,7 @@ interface BackTarget {
   label: string;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
+  dataTest?: string;
 }
 
 const props = withDefaults(
