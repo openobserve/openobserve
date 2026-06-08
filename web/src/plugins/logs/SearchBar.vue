@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden tw:border-b tw:solid tw:border-b-[var(--o2-border-color)]">
       <div
         ref="toolbarLeftRef"
         class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
@@ -964,7 +964,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below. -->
-    <div class="tw:flex query-editor-container tw:w-full tw:overflow-hidden tw:pr-1.5">
+    <div
+      ref="editorContainerRef"
+      class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
+      :class="{ 'editor-fullscreen': isFocused }"
+      :style="editorFullscreenStyle"
+    >
+      <!-- Expand / collapse button — always top-right of the full editor area -->
+      <OButton
+        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+        data-test="logs-query-editor-full_screen-btn"
+        variant="ghost"
+        size="icon-toolbar"
+        @click="toggleEditorFullscreen"
+        class="tw:absolute! tw:z-[51] tw:top-[0.1875rem] tw:right-[0.25rem] editor-expand-btn"
+      >
+        <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
+      </OButton>
       <div
         class="tw:flex tw:flex-col tw:h-full tw:w-full tw:min-w-0"
       >
@@ -977,7 +993,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:relative"
               :class="{
                 'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor
@@ -1045,7 +1061,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:rounded-l-none tw:border-l-0 tw:relative tw:h-full"
+                    class="tw:relative tw:h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
