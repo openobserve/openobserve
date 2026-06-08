@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('modelPricing.importTitle')"
     test-prefix="model-pricing"
     :is-importing="isImporting"
-    container-class="o2-custom-bg"
+    container-class=""
     container-style="height: calc(100vh - 50px);"
     :editor-heights="{
       urlEditor: 'calc(100vh - 286px)',

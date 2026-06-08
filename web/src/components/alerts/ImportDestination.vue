@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title="Import Destination"
     test-prefix="destination"
     :is-importing="isDestinationImporting"
-    container-class="o2-custom-bg"
+    container-class=""
     container-style="height: calc(100vh - 50px);"
     :editor-heights="{
       urlEditor: 'calc(100vh - 286px)',

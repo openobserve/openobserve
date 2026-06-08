@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:active-tab="handleTabChange"
     >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
           class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="tw:mt-4" />
         <div class="error-report-container">
               <!-- Regex Pattern Errors Section -->
               <div

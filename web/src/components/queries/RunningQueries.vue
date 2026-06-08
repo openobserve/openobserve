@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </AppPageHeader>
           <div
             data-test="running-queries-filter-container"
-            class="tw:flex tw:justify-end tw:items-center tw:gap-3"
+            class="tw:flex tw:justify-start tw:items-center tw:gap-3"
           >
             <OToggleGroup
               :model-value="selectedQueryTypeTab"
