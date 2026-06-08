@@ -193,15 +193,14 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
 
   return `
     <div class="tree-tooltip">
-      <div class="tooltip-header">${pathSignature}</div>
       <div class="tooltip-metrics">
         <div>Calls: ${count}</div>
         <div>Average: ${avg}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
-        <div>Min: ${min}ms | Max: ${max}ms</div>
-        <div>P75: ${p75}ms | P95: ${p95}ms | P99: ${p99}ms</div>
         <div>Error Rate: ${errorRate.toFixed(1)}%</div>
+        <div>Max: ${max}ms</div>
+        <div>P99: ${p99}ms</div>
+        <div>P95: ${p95}ms</div>
       </div>
-      <div class="tooltip-footer">Click to view individual spans</div>
     </div>
   `;
 };
