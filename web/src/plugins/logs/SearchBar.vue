@@ -260,6 +260,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.createSavedView") }}
             </ODropdownItem>
           </ODropdownGroup>
+
+          <ODropdownSeparator />
+
+          <!-- SYNTAX GUIDE -->
+          <SyntaxGuide
+            :sqlmode="searchObj.meta.sqlMode"
+            :menuItem="true"
+            ref="syntaxGuideRef"
+            data-test="logs-search-bar-syntax-guide-btn"
+          />
         </ODropdown>
       </div>
 
@@ -5357,23 +5367,21 @@ html.dark .file-type label,
 }
 
 .syntax-guide-menu-item {
-  :deep(.q-btn) {
-    padding: 0 !important;
-    min-height: unset !important;
-    border: none !important;
-    margin: 0 !important;
-    font-size: inherit !important;
-    font-weight: inherit !important;
-.q-btn__content {
-      gap: 0.5rem; // match tw:gap-2
-    }
+  :deep(button) {
+    width: 100%;
+    justify-content: flex-start;
+    height: auto;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    border: none;
+    margin: 0;
+    gap: 0.5rem;
+    color: var(--color-dropdown-item-text);
+    background: transparent;
+    font-size: var(--text-sm);
 
     &:hover {
-      background-color: transparent !important;
-    }
-
-    &::before {
-      display: none !important;
+      background-color: var(--color-dropdown-item-hover-bg);
     }
   }
 }

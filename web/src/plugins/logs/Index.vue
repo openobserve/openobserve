@@ -83,33 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </template>
-              <template #separator>
-                <OButton
-                  data-test="logs-search-field-list-collapse-btn"
-                  variant="sidebar-button"
-                  size="sidebar-button"
-                  :title="
-                    searchObj.meta.showFields
-                      ? 'Collapse Fields'
-                      : 'Open Fields'
-                  "
-                  :class="
-                    searchObj.meta.showFields
-                      ? 'logs-splitter-icon-expand'
-                      : 'logs-splitter-icon-collapse'
-                  "
-                  @click="collapseFieldList"
-                  ><template #icon-left>
-                    <OIcon
-                      :name="
-                        searchObj.meta.showFields
-                          ? 'chevron-left'
-                          : 'chevron-right'
-                      " size="sm"
-                    />
-                  </template>
-                </OButton>
-              </template>
               <template #after>
                 <div class="tw:h-full">
                   <div

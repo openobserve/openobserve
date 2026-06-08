@@ -31,9 +31,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="tw:flex tw:items-center tw:py-0.5 tw:shrink-0 result-bar tw:bg-surface-panel">
+      <div class="tw:flex tw:items-center tw:h-[2.25rem] tw:shrink-0 result-bar tw:bg-surface-panel">
+        <!-- Field panel toggle — same style as add-panel config sidebar -->
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          class="tw:ml-1.5 tw:shrink-0 tw:rotate-90"
+          data-test="logs-search-field-list-collapse-btn"
+          @click="toggleFieldList"
+        >
+          <OIcon
+            :name="searchObj.meta.showFields ? 'unfold-less' : 'unfold-more'"
+            size="sm"
+          />
+          <OTooltip
+            :content="searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'"
+            side="bottom"
+          />
+        </OButton>
         <div
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
+          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -43,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-4 warning tw:flex tw:items-center tw:flex-wrap tw:gap-1.5"
+          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 warning tw:flex tw:items-center tw:flex-wrap tw:gap-1.5"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
@@ -1329,6 +1346,13 @@ export default defineComponent({
       }
     };
 
+    const toggleFieldList = () => {
+      searchObj.meta.showFields = !searchObj.meta.showFields;
+      nextTick(() => {
+        if (searchObj.meta.showHistogram) reDrawChart();
+      });
+    };
+
     const changeMaxRecordToReturn = (val: any) => {
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
@@ -1879,6 +1903,7 @@ export default defineComponent({
       navigateRowDetail,
       totalHeight,
       reDrawChart,
+      toggleFieldList,
       expandLog,
       getImageURL,
       addFieldToTable,
