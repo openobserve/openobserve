@@ -147,10 +147,15 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
 
-            // check if the query is simple topn or simple distinct
+            // check if the query is simple topn, topn_multi or simple distinct
             if config::cluster::LOCAL_NODE.is_single_node() {
                 if let Some(index_optimize_mode) =
                     is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                } else if let Some(index_optimize_mode) =
+                    is_simple_topn_multi(Arc::clone(&plan), self.index_fields.clone())
                 {
                     *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                     return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));

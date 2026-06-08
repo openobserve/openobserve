@@ -346,8 +346,10 @@ impl TantivyResult {
                 min_doc_count: Some(1),
                 show_term_doc_count_error: Some(false),
                 segment_size: Some(inner_limit),
+                include: None,
+                exclude: None,
             }),
-            sub_aggregation: HashMap::new(),
+            sub_aggregation: Default::default(),
         };
 
         let outer_aggregation = Aggregation {
@@ -358,12 +360,14 @@ impl TantivyResult {
                 missing: None,
                 min_doc_count: Some(1),
                 show_term_doc_count_error: Some(false),
+                include: None,
+                exclude: None,
                 segment_size: Some(outer_limit),
             }),
-            sub_aggregation: HashMap::from([("inner".to_string(), inner_aggregation)]),
+            sub_aggregation: Aggregations::from_iter(vec![("inner".to_string(), inner_aggregation)]),
         };
 
-        let aggregations = HashMap::from([("outer".to_string(), outer_aggregation)]);
+        let aggregations = Aggregations::from_iter(vec![("outer".to_string(), outer_aggregation)]);
         let collector = AggregationCollector::from_aggs(aggregations, Default::default());
 
         let mut res = searcher.search(&query, &collector)?;
