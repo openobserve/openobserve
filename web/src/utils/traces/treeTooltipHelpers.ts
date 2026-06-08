@@ -186,11 +186,18 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
   } = metadata;
 
   return `
-    <div class="tree-tooltip">
-      <div class="tooltip-metrics">
-        <div>Spans: ${count}</div>
-        <div>Avg: ${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</div>
-        <div>Errors: ${metadata.errorCount || 0}</div>
+    <div class="tw:flex tw:flex-col tw:gap-0.5">
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Spans:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${count}</span>
+      </div>
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Average:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</span>
+      </div>
+      <div class="tw:flex tw:justify-between tw:gap-3">
+        <span class="tw:w-12 tw:text-left">Errors:</span>
+        <span class="tw:font-mono tw:text-left tw:flex-1">${metadata.errorCount || 0}</span>
       </div>
     </div>
   `;
