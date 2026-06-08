@@ -170,6 +170,10 @@
       "title": "No search history yet",
       "description": "Searches you run will be listed here so you can revisit and re-run them."
     },
+    "noSearchJobs": {
+      "title": "No scheduled search jobs",
+      "description": "Long-running searches you schedule will appear here, where you can track their status and explore results once they finish."
+    },
     "noUsers": {
       "title": "No users yet",
       "description": "Invite your teammates to collaborate in this organization.",
@@ -213,6 +217,7 @@
       "incidents": "incidents",
       "traces": "traces",
       "searches": "searches",
+      "searchJobs": "search jobs",
       "users": "users",
       "reports": "reports",
       "queries": "queries",

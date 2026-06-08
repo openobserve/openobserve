@@ -219,6 +219,12 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noSearchHistory.title",
     descriptionKey: "emptyState.noSearchHistory.description",
   },
+  "no-search-jobs": {
+    illustration: "schedule",
+    variant: "neutral",
+    titleKey: "emptyState.noSearchJobs.title",
+    descriptionKey: "emptyState.noSearchJobs.description",
+  },
   "no-users": {
     illustration: "users",
     variant: "create",
@@ -511,6 +517,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
   "no-search-history": "emptyState.nouns.searches",
+  "no-search-jobs": "emptyState.nouns.searchJobs",
   "no-users": "emptyState.nouns.users",
   "no-reports": "emptyState.nouns.reports",
   "no-queries": "emptyState.nouns.queries",

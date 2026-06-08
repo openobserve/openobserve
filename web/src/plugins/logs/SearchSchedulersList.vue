@@ -193,8 +193,8 @@
               </div>
             </template>
             <template #empty>
-              <div class="tw:flex tw:mx-auto">
-                <NoData />
+              <div v-if="!isLoading" class="tw:flex tw:w-full">
+                <OEmptyState size="hero" preset="no-search-jobs" />
               </div>
             </template>
           </OTable>
@@ -216,7 +216,7 @@
     </div>
   </div>
 
-  <!-- Show NoData component if there's no data to display -->
+  <!-- Empty state is rendered via OEmptyState in the table #empty slot -->
 </template>
 <script lang="ts">
 
@@ -242,7 +242,7 @@ import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
@@ -266,7 +266,7 @@ export default defineComponent({
   name: "SearchSchedulersList",
   components: {
     DateTime,
-    NoData,
+    OEmptyState,
     OTable,
     TenstackTable,
     ConfirmDialog,
