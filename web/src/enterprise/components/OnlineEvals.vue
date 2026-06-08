@@ -64,18 +64,15 @@ the Free Software Foundation, either version 3 of the License, or
             :rows="(filteredRows as ScoreConfig[])"
             :all-score-configs="scoreConfigs"
             :scorers="scorers"
-            :providers="providers"
-            :org-id="orgId"
             :search="filterQuery"
             :loading="isLoading"
-            :show-catalog="catalogOpenTab === 'scoreConfigs'"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
             @view="(row) => openViewDialog(row)"
             @edit="(row) => openEditDialog(row)"
             @delete="(row) => deleteRow(row)"
-            @imported="handleCatalogImported"
-            @toggle-catalog="toggleCatalog('scoreConfigs')"
+            @open-library="openScoreConfigLibrary"
+            @import-custom="goToImportScoreConfig"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -127,6 +124,27 @@ the Free Software Foundation, either version 3 of the License, or
         @saved="handleSaved"
         @cancel="closeDialog"
       />
+
+      <ODrawer
+        v-model:open="showScoreConfigLibrary"
+        side="right"
+        size="lg"
+        :title="t('onlineEvals.scoreConfig.import.libraryDrawerTitle')"
+        secondary-button-label="Cancel"
+        :primary-button-label="`Import (${scoreConfigLibrarySelectedCount})`"
+        :primary-button-disabled="scoreConfigLibrarySelectedCount === 0"
+        :primary-button-loading="scoreConfigLibraryImporting"
+        data-test="score-config-library-drawer"
+        @click:secondary="showScoreConfigLibrary = false"
+        @click:primary="triggerScoreConfigLibraryImport"
+      >
+        <ScoreConfigLibrary
+          ref="scoreConfigLibraryRef"
+          :org-id="orgId"
+          @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
+          @imported="handleScoreConfigLibraryImported"
+        />
+      </ODrawer>
 
       <ScoreConfigDetail
         v-if="viewRow"
@@ -209,6 +227,8 @@ import EvalJobDetail from "./onlineEvals/forms/EvalJobDetail.vue";
 import ScorerFormPage from "./onlineEvals/forms/ScorerFormPage.vue";
 import JobFormPage from "./onlineEvals/forms/JobFormPage.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 
 const store = useStore();
 const route = useRoute();
@@ -237,6 +257,10 @@ const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
 const catalogOpenTab = ref<ActiveTab | null>(null);
+const showScoreConfigLibrary = ref(false);
+const scoreConfigLibrarySelectedCount = ref(0);
+const scoreConfigLibraryImporting = ref(false);
+const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
 
 const {
   jobs,
@@ -475,6 +499,32 @@ async function handleCatalogImported() {
 
 function toggleCatalog(tab: ActiveTab) {
   catalogOpenTab.value = catalogOpenTab.value === tab ? null : tab;
+}
+
+function goToImportScoreConfig() {
+  router.push({
+    path: "/online-evals/score-configs/import",
+    query: { org_identifier: orgId.value },
+  });
+}
+
+function openScoreConfigLibrary() {
+  showScoreConfigLibrary.value = true;
+}
+
+async function triggerScoreConfigLibraryImport() {
+  if (!scoreConfigLibraryRef.value) return;
+  scoreConfigLibraryImporting.value = true;
+  try {
+    await scoreConfigLibraryRef.value.importSelected();
+  } finally {
+    scoreConfigLibraryImporting.value = false;
+  }
+}
+
+async function handleScoreConfigLibraryImported() {
+  showScoreConfigLibrary.value = false;
+  await loadAll(orgId.value);
 }
 
 function syncFromRoute() {

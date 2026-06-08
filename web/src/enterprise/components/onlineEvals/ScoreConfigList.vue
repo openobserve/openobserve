@@ -5,22 +5,12 @@
     :search="search"
     :search-placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
     :add-label="t('onlineEvals.scoreConfig.newButton')"
-    :show-empty="showEmptyState || shouldShowCatalog"
+    :show-empty="showEmptyState"
     @update:search="$emit('update:search', $event)"
     @create="$emit('create')"
   >
     <template #empty>
-      <OnlineEvalsCatalog
-        v-if="shouldShowCatalog"
-        kind="scoreConfigs"
-        :org-id="orgId"
-        :score-configs="allScoreConfigs"
-        :scorers="scorers"
-        :providers="providers"
-        @imported="$emit('imported')"
-      />
       <EvalEmptyState
-        v-else
         data-test="score-config-empty-state"
         icon="fact-check"
         :title="t('onlineEvals.scoreConfig.empty.title')"
@@ -32,19 +22,82 @@
         :cta-label="t('onlineEvals.scoreConfig.newButton')"
         cta-data-test="score-config-empty-create-btn"
         @create="$emit('create')"
-      />
+      >
+        <template #secondary>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="md"
+                data-test="score-config-empty-import"
+                icon-right="expand-more"
+              >
+                {{ t("onlineEvals.scoreConfig.import.button") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="$emit('import-custom')"
+              data-test="score-config-empty-import-custom"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+            <ODropdownItem
+              @select="$emit('open-library')"
+              data-test="score-config-empty-import-library"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+        </template>
+      </EvalEmptyState>
     </template>
 
     <template #actions>
-      <OButton
-        class="tw:ml-2"
-        variant="secondary"
-        size="sm"
-        data-test="score-config-browse-library-btn"
-        @click="$emit('toggle-catalog')"
-      >
-        {{ showCatalog ? "Hide Library" : "Browse Library" }}
-      </OButton>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="tw:ml-2"
+            data-test="score-config-import"
+            icon-right="expand-more"
+          >
+            {{ t("onlineEvals.scoreConfig.import.button") }}
+          </OButton>
+        </template>
+        <ODropdownItem
+          @select="$emit('import-custom')"
+          data-test="score-config-import-custom"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+        <ODropdownItem
+          @select="$emit('open-library')"
+          data-test="score-config-import-library"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+      </ODropdown>
     </template>
 
     <template #filter>
@@ -59,17 +112,7 @@
     </template>
 
     <template #table>
-      <OnlineEvalsCatalog
-        v-if="showCatalog"
-        kind="scoreConfigs"
-        :org-id="orgId"
-        :score-configs="allScoreConfigs"
-        :scorers="scorers"
-        :providers="providers"
-        @imported="$emit('imported')"
-      />
       <OTable
-        v-else
         data-test="score-config-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -144,12 +187,13 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { Provider, ScoreConfig, Scorer } from "@/services/online-evals.service";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
-import OnlineEvalsCatalog from "./OnlineEvalsCatalog.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
 type DataType = "numeric" | "categorical" | "boolean";
@@ -158,11 +202,8 @@ const props = defineProps<{
   rows: ScoreConfig[];
   allScoreConfigs: ScoreConfig[];
   scorers: Scorer[];
-  providers: Provider[];
-  orgId: string;
   search: string;
   loading?: boolean;
-  showCatalog?: boolean;
 }>();
 
 defineEmits<{
@@ -172,7 +213,8 @@ defineEmits<{
   (e: "view", row: ScoreConfig): void;
   (e: "delete", row: ScoreConfig): void;
   (e: "imported"): void;
-  (e: "toggle-catalog"): void;
+  (e: "import-custom"): void;
+  (e: "open-library"): void;
 }>();
 
 const { t } = useI18n();
@@ -273,10 +315,6 @@ const showEmptyState = computed(
     props.allScoreConfigs.length === 0 &&
     !props.search &&
     !typeFilter.value,
-);
-
-const shouldShowCatalog = computed(
-  () => !props.loading && props.rows.length === 0 && !props.search && !typeFilter.value,
 );
 
 function rowCreated(row: ScoreConfig) {

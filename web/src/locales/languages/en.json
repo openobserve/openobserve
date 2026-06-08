@@ -4480,6 +4480,20 @@
         "description": "Score Configs define the dimensions your scorers produce — name, data type, value range, and healthy threshold. Create one to start wiring online evaluation.",
         "chipTypes": "Numeric, Categorical, Boolean",
         "chipThreshold": "Healthy Threshold"
+      },
+      "import": {
+        "title": "Import Score Config",
+        "button": "Import",
+        "customLabel": "Custom",
+        "customSubtitle": "Import from JSON file or URL",
+        "libraryLabel": "Library",
+        "librarySubtitle": "Browse and import from curated catalog",
+        "libraryDrawerTitle": "Score Config Library",
+        "outputMessages": "Output Messages",
+        "creation": "Score Config Creation",
+        "errors": {
+          "title": "Validation Errors"
+        }
       }
     },
     "scorer": {
