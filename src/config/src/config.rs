@@ -210,24 +210,20 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = chain(
-        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
-            .bloom_filter_default_fields
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }),
-    )
-    .collect::<Vec<_>>();
+    let mut fields = get_config()
+        .common
+        .bloom_filter_default_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1731,7 +1727,7 @@ pub struct Limit {
         default = 0, // MB, default is 5% of total memory
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
-    pub footer_cache_max_size: usize,
+    pub inverted_index_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -1813,6 +1809,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
     // file_size, file_time, time_range
     pub strategy: String,
+    #[env_config(name = "ZO_COMPACT_FAST_MODE", default = false)]
+    pub fast_mode: bool,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
@@ -3007,12 +3005,12 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.footer_cache_max_size == 0 {
-        cfg.limit.footer_cache_max_size =
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }

@@ -432,7 +432,7 @@ sqlx = { version = "0.8.6", features = [
 strum = { version = "0.28", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.38"
-tantivy = { version = "0.25", features = ["quickwit"] }
+tantivy = { version = "0.26", features = ["quickwit"] }
 tantivy-fst = "0.5"
 tempfile = "3"
 thiserror = "2.0"
