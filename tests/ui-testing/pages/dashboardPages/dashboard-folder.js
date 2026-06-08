@@ -87,6 +87,8 @@ export default class DashboardFolder {
 
     await this.folderDialogSaveBtn.waitFor({ state: "visible", timeout: 5000 });
     await this.folderDialogSaveBtn.click();
+    // Wait for the dialog overlay to disappear before any subsequent interactions
+    await this.page.locator('[data-test="o-dialog-overlay"]').waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
   }
 
   // Delete folder

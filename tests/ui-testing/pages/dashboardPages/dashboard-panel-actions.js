@@ -290,7 +290,10 @@ export default class DashboardactionPage {
    */
   async waitForDashboardSearchVisible() {
     await this.dashboardSearchInput.waitFor({ state: 'visible', timeout: 30000 });
-    await this.page.waitForTimeout(2000);
+    // Wait for the dashboard data to finish loading before returning so that
+    // any subsequent search/filter operates on already-loaded data.
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await this.page.waitForTimeout(1000);
   }
 
   /**

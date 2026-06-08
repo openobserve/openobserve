@@ -34,11 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
     >
       <AppPageHeader
-        :title="activeSectionItem?.label || ''"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
-      />
+      >
+        <template #title>
+          <span :data-test="`settings-${activeSectionItem?.key}-page-title`">{{ activeSectionItem?.label || '' }}</span>
+        </template>
+      </AppPageHeader>
       <ConstrainedPage size="lg" class="tw:flex-1 tw:min-h-0">
         <router-view title="" />
       </ConstrainedPage>

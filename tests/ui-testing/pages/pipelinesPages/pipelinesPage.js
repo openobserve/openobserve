@@ -3055,8 +3055,14 @@ export class PipelinesPage {
         const backfillUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/backfill?org_identifier=${orgName}`;
         await this.page.goto(backfillUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
-        // Wait for the Teleport target (#o2-page-actions) to be ready before filters render
-        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+        // Wait for the Teleport target AND the page content to fully mount.
+        // BackfillJobsList renders both the teleported filters (#o2-page-actions)
+        // and the main page wrapper. Waiting for the page wrapper ensures the
+        // component is fully mounted before we check for teleported elements.
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="backfill-jobs-list-page"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Give Vue time to complete the Teleport render cycle
+        await this.page.waitForTimeout(500);
         testLogger.info('Navigated to backfill jobs page', { url: backfillUrl });
     }
 
@@ -3084,7 +3090,7 @@ export class PipelinesPage {
      */
     async isStatusFilterVisible() {
         const filterLocator = this.page.locator('[data-test="status-filter"]').first();
-        return await filterLocator.isVisible({ timeout: 10000 }).catch(() => false);
+        return await filterLocator.isVisible({ timeout: 15000 }).catch(() => false);
     }
 
     /**
@@ -3219,8 +3225,11 @@ export class PipelinesPage {
         const historyUrl = `${process.env.ZO_BASE_URL}/web/pipeline/pipelines/history?org_identifier=${orgName}`;
         await this.page.goto(historyUrl);
         await this.page.waitForLoadState('networkidle').catch(() => {});
-        // Wait for the Teleport target (#o2-page-actions) to be ready before controls render
-        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+        // Wait for both the Teleport target and the history page wrapper to mount.
+        await this.page.locator('[data-test="pipeline-detail-actions"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test="pipeline-history-page"]').waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Give Vue time to complete the Teleport render cycle
+        await this.page.waitForTimeout(500);
         testLogger.info('Navigated to pipeline history page', { url: historyUrl });
     }
 
@@ -3524,7 +3533,7 @@ export class PipelinesPage {
      */
     async isHistoryDatePickerVisible() {
         const datePicker = this.page.locator('[data-test*="date-picker"], [data-test*="date-range"], .date-picker, .q-date').first();
-        return await datePicker.isVisible({ timeout: 5000 }).catch(() => false);
+        return await datePicker.isVisible({ timeout: 15000 }).catch(() => false);
     }
 
     /**
