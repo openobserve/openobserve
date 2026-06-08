@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:before>
       <div class="tw:w-full tw:h-full">
         <div class="tw:h-full tw:bg-surface-panel el-border-radius">
-          <div class="tw:overflow-hidden tw:h-full" data-test="data-sources-recommended-tabs">
+          <div class="tw:overflow-hidden tw:h-full tw:pt-1.5" data-test="data-sources-recommended-tabs">
             <OTabs
               v-model="ingestTabType"
               orientation="vertical"
