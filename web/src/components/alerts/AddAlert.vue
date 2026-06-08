@@ -15,32 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:pt-1">
+  <div class="tw:w-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
       <div class="tw:flex tw:flex-col" style="height: calc(100vh - var(--navbar-height) - 5px);">
-      <div class="alert-v3-topbar card-container tw:mx-[0.625rem] tw:mb-2 tw:shrink-0">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[48px]">
-
-          <!-- Back + Title -->
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0 tw:min-w-0">
-
-            <!-- Back button — matches dashboard style -->
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              data-test="add-alert-back-btn"
-              @click="goBackToAlertsList"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
+      <AppPageHeader
+        class="alert-v3-topbar tw:mb-2 tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        :back="{
+          label: activeFolderName || t('alerts.header'),
+          onClick: goBackToAlertsList,
+          dataTest: 'add-alert-back-btn',
+        }"
+      >
+        <!-- Inline title editing (name + folder), kept in the header per the
+             AddPanel convention (#tabs slot renders inline beside the back tile). -->
+        <template #tabs>
+          <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0">
 
           <!-- EDIT MODE: (folder → chevron → name) -->
           <template v-if="beingUpdated || anomalyEditMode">
             <span
-              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:ml-2"
+              class="tw:text-xl tw:tracking-[0.005em] alert-folder-name tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm"
               @click="goBackToAlertsList"
             >{{ activeFolderName }}</span>
             <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
@@ -104,10 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <div class="tw:flex-1" />
           </div>
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <div class="tw:flex tw:flex-1 tw:min-h-0 tw:mx-[0.625rem] tw:gap-2 tw:mb-2">
 
@@ -459,6 +455,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -509,6 +506,7 @@ export default defineComponent({
     OTooltip,
     OInput,
     OSelect,
+    AppPageHeader,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
