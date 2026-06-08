@@ -14,26 +14,58 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <base-import
-    v-if="activeTab !== 'import_built_in_patterns'"
-    ref="baseImportRef"
-    title="Import Regex Pattern"
-    test-prefix="regex-pattern"
-    :is-importing="isImporting"
-    container-class="o2-custom-bg"
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 306px)',
-      outputContainer: 'calc(100vh - 128px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
-    :tabs="allTabs"
-    @back="arrowBackFn"
-    @cancel="arrowBackFn"
-    @import="importJson"
-    @update:active-tab="handleTabChange"
-  >
+  <div class="tw:flex tw:flex-col" style="height: calc(100vh - 50px);">
+    <!-- Standard page header (AppPageHeader), matching Add Panel / Import Dashboard.
+         BaseImport's built-in header is hidden (hide-header) so this single header
+         serves all three tabs. The title preserves the existing per-tab text: the
+         Built-in Patterns tab keeps t('regex_patterns.import_title') ("Import
+         Pattern") and the File / URL tabs keep "Import Regex Pattern" — no header
+         text is changed by this migration. -->
+    <AppPageHeader
+      :title="headerTitle"
+      :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
+      class="tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="arrowBackFn"
+          data-test="regex-pattern-import-cancel-btn"
+        >{{ t('function.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          @click="handleImportClick"
+          :loading="isImporting"
+          :disabled="isImporting"
+          data-test="regex-pattern-import-json-btn"
+        >{{ t('dashboard.import') }}</OButton>
+      </template>
+    </AppPageHeader>
+
+    <base-import
+      v-if="activeTab !== 'import_built_in_patterns'"
+      ref="baseImportRef"
+      title="Import Regex Pattern"
+      test-prefix="regex-pattern"
+      hide-header
+      container-class=""
+      container-style=""
+      :is-importing="isImporting"
+      :editor-heights="{
+        urlEditor: 'calc(100vh - 286px)',
+        fileEditor: 'calc(100vh - 306px)',
+        outputContainer: 'calc(100vh - 128px)',
+        errorReport: 'calc(100vh - 128px)',
+      }"
+      :tabs="allTabs"
+      @back="arrowBackFn"
+      @cancel="arrowBackFn"
+      @import="importJson"
+      @update:active-tab="handleTabChange"
+    >
     <template #output-content>
       <div class="tw:w-full" style="min-width: 400px;">
         <div
@@ -136,49 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
   </base-import>
 
-  <!-- Built-in Patterns Tab (full width, no custom import button handling) -->
-  <div
-    v-if="activeTab === 'import_built_in_patterns'"
-    class="o2-custom-bg"
-    style="height: calc(100vh - 50px);"
-  >
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
-        <div class="tw:flex tw:flex-col">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <OButton
-                variant="ghost"
-                size="icon"
-                @click="arrowBackFn"
-                data-test="regex-pattern-import-back-btn"
-              >
-                <OIcon name="arrow-back-ios-new" size="sm" />
-              </OButton>
-              <div class="tw:text-xl tw:font-semibold">
-                {{ t("regex_patterns.import_title") }}
-              </div>
-            </div>
-        </div>
-        <div class="tw:flex tw:gap-2 tw:justify-center">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="arrowBackFn"
-            data-test="regex-pattern-import-cancel-btn"
-          >{{ t('function.cancel') }}</OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            @click="handleImportClick"
-            data-test="regex-pattern-import-json-btn"
-          >{{ t('dashboard.import') }}</OButton>
-        </div>
-      </div>
-    </div>
-
-    <div class="editor-container-built-in">
-      <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
+    <!-- Built-in Patterns Tab (full width, no custom import button handling) -->
+    <div
+      v-if="activeTab === 'import_built_in_patterns'"
+      class="editor-container-built-in"
+    >
+      <div class="card-container tw:pt-2 tw:px-2.5">
         <div class="app-tabs-container tw:h-[36px] tw:w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"
@@ -214,8 +209,8 @@ import { useRouter } from "vue-router";
 
 
 import AppTabs from "../common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import BaseImport from "../common/BaseImport.vue";
@@ -273,6 +268,15 @@ export default defineComponent({
         }
       }
     });
+
+    // Page-header title preserves the existing per-tab text: the Built-in Patterns
+    // tab keeps t('regex_patterns.import_title') ("Import Pattern") while the
+    // File / URL tabs keep "Import Regex Pattern" (BaseImport's previous title).
+    const headerTitle = computed(() =>
+      activeTab.value === "import_built_in_patterns"
+        ? t("regex_patterns.import_title")
+        : "Import Regex Pattern",
+    );
 
     // All tabs including the built-in patterns tab
     const allTabs = ref([
@@ -517,8 +521,9 @@ export default defineComponent({
           builtInPatternsTabRef.value.importSelectedPatterns();
         }
       } else {
-        // For other tabs (file/url), BaseImport handles the import button click
-        // This shouldn't be called as BaseImport has its own import button
+        // For file/url tabs, BaseImport's built-in header is hidden, so the shared
+        // page-header Import button drives BaseImport's import flow directly.
+        baseImportRef.value?.handleImport?.();
       }
     };
 
@@ -548,14 +553,15 @@ export default defineComponent({
       builtInPatternsTabRef,
       isImporting,
       handleTabChange,
+      headerTitle,
     };
   },
   components: {
     OSeparator,
     BaseImport,
     AppTabs,
+    AppPageHeader,
     OButton,
-    OIcon,
     OInput,
     BuiltInPatternsTab: defineAsyncComponent(
       () => import("@/components/settings/BuiltInPatternsTab.vue"),
@@ -581,7 +587,8 @@ export default defineComponent({
 }
 .editor-container-built-in {
   width: 100%;
-  height: calc(100vh - 128px); /* Account for header, tabs, and padding */
+  flex: 1; /* Fill the space left by the page header instead of a fixed calc() */
+  min-height: 0; /* Allow the inner patterns list to scroll within the flex parent */
   overflow: hidden;
   display: flex;
   flex-direction: column;
