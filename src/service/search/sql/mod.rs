@@ -83,6 +83,7 @@ pub struct Sql {
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
     pub histogram_interval: Option<i64>,
+    pub timezone: Option<String>,
     pub sorted_by_time: bool, // if only order by _timestamp
     pub sampling_config: Option<proto::cluster_rpc::SamplingConfig>,
 }
@@ -257,17 +258,21 @@ impl Sql {
         if let Some(error) = histogram_interval_visitor.error {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(error)));
         }
-        let mut histogram_interval = if query.histogram_interval > 0 {
-            Some(validate_and_adjust_histogram_interval(
-                query.histogram_interval,
-                Some((query.start_time, query.end_time)),
-            ))
-        } else {
-            histogram_interval_visitor.interval
-        };
-        if !histogram_interval_visitor.is_histogram {
-            histogram_interval = None;
-        }
+
+        let histogram_interval = histogram_interval_visitor
+            .is_histogram
+            .then(|| {
+                if query.histogram_interval > 0 {
+                    Some(validate_and_adjust_histogram_interval(
+                        query.histogram_interval,
+                        Some((query.start_time, query.end_time)),
+                    ))
+                } else {
+                    histogram_interval_visitor.interval
+                }
+            })
+            .flatten();
+        let timezone = query.timezone.clone();
 
         //********************Change the sql start*********************************//
         // 11. add _timestamp and _o2_id if need
@@ -303,6 +308,7 @@ impl Sql {
             group_by,
             order_by,
             histogram_interval,
+            timezone,
             sorted_by_time: need_sort_by_time,
             sampling_config: parse_sampling_config(
                 query,

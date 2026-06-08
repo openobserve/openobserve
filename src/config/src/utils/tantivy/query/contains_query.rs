@@ -268,9 +268,9 @@ mod test {
         let query2 = ContainsQuery::new("diary", field, false)?;
         let query3 = ContainsQuery::new("Diary", field, false)?;
 
-        let docs1 = searcher.search(&query1, &TopDocs::with_limit(10))?;
-        let docs2 = searcher.search(&query2, &TopDocs::with_limit(10))?;
-        let docs3 = searcher.search(&query3, &TopDocs::with_limit(10))?;
+        let docs1 = searcher.search(&query1, &TopDocs::with_limit(10).order_by_score())?;
+        let docs2 = searcher.search(&query2, &TopDocs::with_limit(10).order_by_score())?;
+        let docs3 = searcher.search(&query3, &TopDocs::with_limit(10).order_by_score())?;
 
         assert_eq!(docs1.len(), docs2.len());
         assert_eq!(docs2.len(), docs3.len());
@@ -290,9 +290,9 @@ mod test {
         let query2 = ContainsQuery::new("diary", field, true)?;
         let query3 = ContainsQuery::new("DAIRY", field, true)?;
 
-        let docs1 = searcher.search(&query1, &TopDocs::with_limit(10))?;
-        let docs2 = searcher.search(&query2, &TopDocs::with_limit(10))?;
-        let docs3 = searcher.search(&query3, &TopDocs::with_limit(10))?;
+        let docs1 = searcher.search(&query1, &TopDocs::with_limit(10).order_by_score())?;
+        let docs2 = searcher.search(&query2, &TopDocs::with_limit(10).order_by_score())?;
+        let docs3 = searcher.search(&query3, &TopDocs::with_limit(10).order_by_score())?;
 
         // "Diary" should match 2 documents
         assert_eq!(docs1.len(), 2);
@@ -314,9 +314,14 @@ mod test {
         let case_insensitive_query = ContainsQuery::new_case_insensitive("diary", field)?;
         let case_sensitive_query = ContainsQuery::new_case_sensitive("Diary", field)?;
 
-        let docs_insensitive =
-            searcher.search(&case_insensitive_query, &TopDocs::with_limit(10))?;
-        let docs_sensitive = searcher.search(&case_sensitive_query, &TopDocs::with_limit(10))?;
+        let docs_insensitive = searcher.search(
+            &case_insensitive_query,
+            &TopDocs::with_limit(10).order_by_score(),
+        )?;
+        let docs_sensitive = searcher.search(
+            &case_sensitive_query,
+            &TopDocs::with_limit(10).order_by_score(),
+        )?;
 
         assert_eq!(docs_insensitive.len(), 2);
         assert_eq!(docs_sensitive.len(), 2);
@@ -331,7 +336,7 @@ mod test {
         let searcher = reader.searcher();
 
         let query = ContainsQuery::new("rust", field, false)?;
-        let docs = searcher.search(&query, &TopDocs::with_limit(10))?;
+        let docs = searcher.search(&query, &TopDocs::with_limit(10).order_by_score())?;
         assert_eq!(docs.len(), 2); // "Programming in Rust" and "Rust Programming Guide"
 
         Ok(())
@@ -358,7 +363,7 @@ mod test {
         let searcher = reader.searcher();
         {
             let scored_docs = searcher
-                .search(&query_matching, &TopDocs::with_limit(10))
+                .search(&query_matching, &TopDocs::with_limit(10).order_by_score())
                 .unwrap();
             assert!(!scored_docs.is_empty(), "Expected at least 1 document");
             for (score, _) in scored_docs {
@@ -366,7 +371,10 @@ mod test {
             }
         }
         let top_docs = searcher
-            .search(&query_not_matching, &TopDocs::with_limit(10))
+            .search(
+                &query_not_matching,
+                &TopDocs::with_limit(10).order_by_score(),
+            )
             .unwrap();
         assert!(top_docs.is_empty(), "Expected ZERO document");
     }

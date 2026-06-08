@@ -95,6 +95,7 @@ message SearchQuery {
     bool            skip_wal = 14;
     string         action_id = 15;
     int64 histogram_interval = 16;
+    optional string timezone = 17;
     // Simplified sampling: just specify ratio (0.0-1.0), backend uses optimal defaults
     // Backend converts this to SamplingConfig for internal node communication
     optional double sampling_ratio = 18;

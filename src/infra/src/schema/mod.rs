@@ -332,7 +332,7 @@ pub fn get_partition_time_level(stream_type: StreamType) -> PartitionTimeLevel {
     match stream_type {
         // file retention is always hourly for logs, metrics, and traces
         StreamType::Logs | StreamType::Metrics | StreamType::Traces => PartitionTimeLevel::Hourly,
-        // for file list dump streams, we want to compact by day
+        // for file list dump streams, we want to compact by daily
         StreamType::Filelist => PartitionTimeLevel::Daily,
         _ => PartitionTimeLevel::default(),
     }
@@ -1082,9 +1082,10 @@ mod tests {
 
     #[test]
     fn test_get_stream_setting_bloom_filter_fields() {
-        // Test with None
+        // Test with None: returns the configured default fields (empty unless
+        // ZO_BLOOM_FILTER_DEFAULT_FIELDS is set)
         let fields = get_stream_setting_bloom_filter_fields(&None);
-        assert!(!fields.is_empty()); // Should have default fields
+        assert_eq!(fields, BLOOM_FILTER_DEFAULT_FIELDS.clone());
 
         // Test with custom bloom filter fields
         let mut settings = StreamSettings::default();

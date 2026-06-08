@@ -104,6 +104,7 @@ pub async fn merge_parquet_files(
     log::debug!("merge_parquet_files sql: {sql}");
 
     let ctx = DataFusionContextBuilder::new()
+        .trace_id("merge_parquet_files")
         .sorted_by_time(true)
         .build(get_config().limit.datafusion_min_partition_num)
         .await?;

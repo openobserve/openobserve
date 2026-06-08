@@ -493,16 +493,19 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
             .with_label_values(&["query_for_merge", "file_list"])
             .inc();
 
+        let cfg = get_config();
+        let max_size = cfg.compact.max_file_size as i64 * 95 / 100;
         let sql = r#"
 SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, compressed_size, index_size, flattened
     FROM file_list
-    WHERE stream = $1 AND date >= $2 AND date <= $3;
+    WHERE stream = $1 AND date >= $2 AND date <= $3 AND original_size <= $4;
                 "#;
 
         let ret = sqlx::query_as::<_, super::FileRecord>(sql)
             .bind(stream_key)
             .bind(date_start)
             .bind(date_end)
+            .bind(max_size)
             .fetch_all(&pool)
             .await;
         let time = start.elapsed().as_secs_f64();
@@ -761,7 +764,7 @@ SELECT id, account, stream, date, file, min_ts, max_ts, records, original_size, 
         let sql = r#"
 SELECT date
     FROM file_list
-    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND records < $5 AND date >= $7 AND date < $8
+    WHERE stream = $1 AND max_ts >= $2 AND max_ts <= $3 AND min_ts <= $4 AND original_size <= $5 AND date >= $7 AND date < $8
     GROUP BY date HAVING count(*) >= $6;
             "#;
 
@@ -770,7 +773,7 @@ SELECT date
             .bind(time_start)
             .bind(max_ts_upper_bound)
             .bind(time_end)
-            .bind(cfg.compact.old_data_min_records)
+            .bind(cfg.compact.max_file_size as i64 / 2)
             .bind(cfg.compact.old_data_min_files)
             .bind(date_from)
             .bind(date_to)
@@ -1307,7 +1310,12 @@ DO UPDATE SET
         Ok(id)
     }
 
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<super::MergeJobRecord>> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1325,23 +1333,28 @@ DO UPDATE SET
             }
             return Err(e.into());
         }
-        // get pending jobs group by stream and order by num desc
+
         DB_QUERY_NUMS
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
-        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(
+
+        // get pending jobs group by stream and order by num desc
+        let sql = if fast_mode {
+            r#"SELECT stream, id, 0 as num FROM file_list_jobs WHERE status = $1 ORDER BY offsets DESC LIMIT $2;"#
+        } else {
             r#"
-SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
-    FROM file_list_jobs
-    WHERE status = $1
-    GROUP BY stream
-    ORDER BY num DESC
-    LIMIT $2;"#,
-        )
-        .bind(super::FileListJobStatus::Pending)
-        .bind(limit)
-        .fetch_all(&mut *tx)
-        .await
+    SELECT stream, max(id) as id, COUNT(*)::BIGINT AS num
+        FROM file_list_jobs
+        WHERE status = $1
+        GROUP BY stream
+        ORDER BY num DESC
+        LIMIT $2;"#
+        };
+        let ret = match sqlx::query_as::<_, super::MergeJobPendingRecord>(sql)
+            .bind(super::FileListJobStatus::Pending)
+            .bind(limit)
+            .fetch_all(&mut *tx)
+            .await
         {
             Ok(v) => v,
             Err(e) => {

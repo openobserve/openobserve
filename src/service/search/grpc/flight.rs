@@ -854,7 +854,9 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_default_features()
-            .with_optimizer_rule(Arc::new(RewriteHistogram::new(start_time, end_time, 60)))
+            .with_optimizer_rule(Arc::new(RewriteHistogram::new(
+                start_time, end_time, 60, None,
+            )))
             .build();
         let ctx = SessionContext::new_with_state(state);
         let provider = NewEmptyTable::new("default", schema.clone());

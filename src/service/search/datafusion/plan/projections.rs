@@ -672,6 +672,7 @@ mod tests {
             skip_wal: false,
             action_id: "".to_string(),
             histogram_interval: 5,
+            timezone: None,
             sampling_ratio: None,
         };
         Sql::new(&query, "parse_test", StreamType::Logs, None)

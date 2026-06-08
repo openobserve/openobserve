@@ -426,8 +426,7 @@ pub async fn delete_by_date(
         return handle_delete_by_date_done(org_id, stream_type, stream_name, date_range).await;
     }
 
-    let is_hourly = date_range.0.ends_with("00Z") || date_range.1.ends_with("00Z");
-    let mut date_start = if is_hourly {
+    let mut date_start = if date_range.0.ends_with("00Z") {
         DateTime::parse_from_rfc3339(date_range.0)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.0))?.with_timezone(&Utc)
@@ -436,7 +435,7 @@ pub async fn delete_by_date(
     if date_range.0.starts_with("1970-01-01") {
         date_start += Duration::try_milliseconds(1).unwrap();
     }
-    let date_end = if is_hourly {
+    let date_end = if date_range.1.ends_with("00Z") {
         DateTime::parse_from_rfc3339(date_range.1)?.with_timezone(&Utc)
     } else {
         DateTime::parse_from_rfc3339(&format!("{}T00:00:00Z", date_range.1))?.with_timezone(&Utc)
@@ -477,7 +476,7 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range, is_hourly)
+    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");

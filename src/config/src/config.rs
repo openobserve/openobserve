@@ -210,24 +210,20 @@ pub static DISTINCT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-const _DEFAULT_BLOOM_FILTER_FIELDS: [&str; 1] = ["trace_id"];
 pub static BLOOM_FILTER_DEFAULT_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = chain(
-        _DEFAULT_BLOOM_FILTER_FIELDS.iter().map(|s| s.to_string()),
-        get_config()
-            .common
-            .bloom_filter_default_fields
-            .split(',')
-            .filter_map(|s| {
-                let s = s.trim();
-                if s.is_empty() {
-                    None
-                } else {
-                    Some(s.to_string())
-                }
-            }),
-    )
-    .collect::<Vec<_>>();
+    let mut fields = get_config()
+        .common
+        .bloom_filter_default_fields
+        .split(',')
+        .filter_map(|s| {
+            let s = s.trim();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_string())
+            }
+        })
+        .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1693,11 +1689,11 @@ pub struct Limit {
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
     #[env_config(
-        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
+        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the file stat cache. Higher values allow caching more file statistics but increase memory usage."
     )]
-    pub datafusion_file_stat_cache_max_entries: usize,
+    pub datafusion_file_stat_cache_max_size: usize,
     #[env_config(
         name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
         default = 10000,
@@ -1731,7 +1727,7 @@ pub struct Limit {
         default = 0, // MB, default is 5% of total memory
         help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
     )]
-    pub footer_cache_max_size: usize,
+    pub inverted_index_footer_cache_max_size: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
@@ -1813,6 +1809,8 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
     // file_size, file_time, time_range
     pub strategy: String,
+    #[env_config(name = "ZO_COMPACT_FAST_MODE", default = false)]
+    pub fast_mode: bool,
     #[env_config(name = "ZO_COMPACT_SYNC_TO_DB_INTERVAL", default = 600)] // seconds
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 512)] // MB
@@ -1827,8 +1825,6 @@ pub struct Compact {
     pub old_data_max_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_HOURS", default = 2)] // hours
     pub old_data_min_hours: i64,
-    #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_RECORDS", default = 100)] // records
-    pub old_data_min_records: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_MIN_FILES", default = 10)] // files
     pub old_data_min_files: i64,
     #[env_config(name = "ZO_COMPACT_DELETE_FILES_DELAY_HOURS", default = 2)] // hours
@@ -3007,12 +3003,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.footer_cache_max_size == 0 {
-        cfg.limit.footer_cache_max_size =
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
+        cfg.limit.datafusion_file_stat_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }
@@ -3173,9 +3177,6 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.compact.old_data_min_hours < 1 {
         cfg.compact.old_data_min_hours = 2;
-    }
-    if cfg.compact.old_data_min_records < 1 {
-        cfg.compact.old_data_min_records = 100;
     }
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
