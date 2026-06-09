@@ -10,9 +10,15 @@ import {
   dataTypeOf,
   entityId,
 } from "../utils/evalEntity";
+import { thresholdForConfig, buildUnhealthyCaseBranches } from "../utils/scoreThreshold";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
 
-export type ConfigStatus = "unhealthy" | "warn" | "healthy" | "noThreshold";
+export type ConfigStatus =
+  | "unhealthy"
+  | "warn"
+  | "healthy"
+  | "noThreshold"
+  | "noData";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -47,70 +53,10 @@ interface TrendRow {
   c?: number | string;
 }
 
-function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
-  if (row == null) return undefined;
-  return row[camel] ?? row[snake];
-}
-
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-function escapeSqlString(s: string): string {
-  return s.replace(/'/g, "''");
-}
-
-interface ThresholdSql {
-  /** SQL fragment evaluating to truthy when the score is unhealthy */
-  unhealthyExpr: string | null;
-  /** Display label for the threshold ("≥ 0.7", "true", "good · great") */
-  label: string;
-}
-
-function thresholdForConfig(config: ScoreConfig): ThresholdSql {
-  const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
-  const type = dataTypeOf(config);
-  if (!ht) return { unhealthyExpr: null, label: "" };
-
-  if (type === "numeric") {
-    if (ht.value === undefined || ht.value === null || !ht.direction) {
-      return { unhealthyExpr: null, label: "" };
-    }
-    const op = ht.direction === "gte" ? "<" : ">";
-    const sym = ht.direction === "gte" ? "≥" : "≤";
-    return {
-      unhealthyExpr: `value_numeric ${op} ${Number(ht.value)}`,
-      label: `${sym} ${ht.value}`,
-    };
-  }
-
-  if (type === "categorical") {
-    const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
-    if (!Array.isArray(list) || list.length === 0) {
-      return { unhealthyExpr: null, label: "" };
-    }
-    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
-    return {
-      unhealthyExpr: `value_categorical NOT IN (${inList})`,
-      label: list.join(" · "),
-    };
-  }
-
-  if (type === "boolean") {
-    const healthy = ht.healthy_value ?? ht.healthyValue;
-    if (healthy === undefined || healthy === null) {
-      return { unhealthyExpr: null, label: "" };
-    }
-    const expected = healthy === true || healthy === "true";
-    return {
-      unhealthyExpr: `value_boolean = ${!expected}`,
-      label: String(expected),
-    };
-  }
-
-  return { unhealthyExpr: null, label: "" };
 }
 
 /** Rich aggregate SQL with per-config unhealthy CASE. Fails at parse time if
@@ -126,25 +72,10 @@ function joinId(config: ScoreConfig): string {
 }
 
 function buildRichAggSql(configs: ScoreConfig[]): string {
-  const caseBranches: string[] = [];
-  for (const cfg of configs) {
-    const cfgId = joinId(cfg);
-    if (!cfgId) continue;
-    const t = thresholdForConfig(cfg);
-    if (!t.unhealthyExpr) continue;
-    caseBranches.push(
-      `    WHEN CAST(score_config_id AS VARCHAR) = '${escapeSqlString(cfgId)}' AND (${t.unhealthyExpr}) THEN 1`,
-    );
-  }
-
-  const unhealthyExpr =
-    caseBranches.length > 0
-      ? [
-          "  COUNT(CASE",
-          ...caseBranches,
-          "  END) AS unhealthy_count,",
-        ].join("\n")
-      : "  CAST(NULL AS INTEGER) AS unhealthy_count,";
+  const caseFragment = buildUnhealthyCaseBranches(configs, "1");
+  const unhealthyExpr = caseFragment
+    ? `  COUNT(${caseFragment}) AS unhealthy_count,`
+    : "  CAST(NULL AS INTEGER) AS unhealthy_count,";
 
   return [
     "SELECT",
@@ -194,7 +125,12 @@ function statusOf(
   hasThreshold: boolean,
   unhealthyCount: number | null,
   dataType: ScoreConfigRow["dataType"],
+  totalScores: number,
 ): { status: ConfigStatus; priority: number } {
+  // No scores in the window — config exists but is dormant. Reported as a
+  // distinct status (gray dot, dimmed row, sorted to bottom) so it doesn't
+  // get mistaken for a "healthy" config that actually has passing scores.
+  if (totalScores === 0) return { status: "noData", priority: 5 };
   if (!hasThreshold) return { status: "noThreshold", priority: 4 };
   if (unhealthyCount != null && unhealthyCount > 0) {
     return { status: "unhealthy", priority: 1 };
@@ -302,7 +238,7 @@ export function useQualityScoreConfigs(
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
       const t = thresholdForConfig(config);
       const dataType = (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
-      const { status, priority } = statusOf(t.unhealthyExpr != null, unhealthy, dataType);
+      const { status, priority } = statusOf(t.unhealthyExpr != null, unhealthy, dataType, total);
 
       return {
         config,

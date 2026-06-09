@@ -94,6 +94,7 @@
         :columns="columns"
         row-key="configId"
         :loading="isLoading"
+        :row-class="rowClassOf"
         :footer-title="t('onlineEvals.quality.overview.title')"
         :show-global-filter="false"
         :page-size="20"
@@ -129,7 +130,8 @@
         </template>
 
         <template #cell-unhealthy="{ row }">
-          <span v-if="!row.hasThreshold" class="qsc-no-threshold">
+          <span v-if="row.status === 'noData'" class="qsc-muted">—</span>
+          <span v-else-if="!row.hasThreshold" class="qsc-no-threshold">
             {{ t("onlineEvals.quality.overview.noThreshold") }}
           </span>
           <div v-else class="qsc-unhealthy">
@@ -219,6 +221,13 @@ const filteredRows = computed(() => {
 const allZeroScores = computed(
   () => props.rows.length > 0 && props.rows.every((r) => r.totalScores === 0),
 );
+
+// De-emphasize configs that have no scores in the selected window. They
+// stay visible (so users can spot a scorer they defined but never wired
+// up) but visually recede beneath active rows.
+function rowClassOf(row: ScoreConfigRow): string {
+  return row.status === "noData" ? "qsc-row--no-data" : "";
+}
 
 const columns = computed(() => [
   {
@@ -552,6 +561,7 @@ function relativeTime(timestampMs: number): string {
 .qsc-status--warn { color: var(--o2-status-warning-text, #b25400); opacity: 0.7; }
 .qsc-status--healthy { color: var(--o2-status-success-text, #2e7d32); }
 .qsc-status--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
+.qsc-status--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
 
 .qsc-name {
   font-weight: 600;
@@ -648,4 +658,14 @@ function relativeTime(timestampMs: number): string {
 .qsc-spark--healthy { color: var(--o2-status-success-text, #2e7d32); }
 .qsc-spark--warn { color: var(--o2-status-warning-text, #b25400); }
 .qsc-spark--noThreshold { color: var(--color-text-secondary, var(--o2-text-secondary)); }
+.qsc-spark--noData { color: var(--color-text-secondary, var(--o2-text-secondary)); opacity: 0.55; }
+
+/* Dim no-data rows so active scorers stand out. `:deep` because OTable
+ * renders the <tr> outside this component's scope. */
+:deep(tr.qsc-row--no-data) {
+  opacity: 0.6;
+}
+:deep(tr.qsc-row--no-data:hover) {
+  opacity: 0.85;
+}
 </style>
