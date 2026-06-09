@@ -291,10 +291,11 @@ export class DashboardPage {
     // Search the dashboard by name. All locators are class members.
     await this.dashboardSearchInput.click();
     await this.dashboardSearchInput.fill(dashboardName);
-    await this.page.waitForTimeout(1000);
+    // Search is debounced at 600ms; wait for debounce + table re-render.
+    await this.page.waitForTimeout(1500);
 
     // Click the delete action on the first filtered row.
-    await this.firstTableRow.waitFor({ state: "visible", timeout: 10000 });
+    await this.firstTableRow.waitFor({ state: "visible", timeout: 15000 });
     await this.firstRowDeleteButton.click();
 
     // Confirm and verify the toast surface appears.
