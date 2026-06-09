@@ -27,8 +27,8 @@ import { routeGuard } from "@/utils/zincutils";
 
 const AIObservabilityShell = () =>
   import("@/enterprise/views/AIObservability/Index.vue");
-const AIOverviewPage = () =>
-  import("@/enterprise/views/AIObservability/OverviewPage.vue");
+const AILLMInsightsPage = () =>
+  import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
 const AISessionsPage = () =>
   import("@/enterprise/views/AIObservability/SessionsPage.vue");
 
@@ -70,20 +70,20 @@ const useEnvRoutes = () => {
         routeGuard(to, from, next);
       },
       meta: {
-        title: "AI Observability",
+        title: "AI Monitoring",
         keepAlive: false,
       },
       children: [
         {
           path: "",
           name: "aiObservability",
-          redirect: { name: "aiOverview" },
+          redirect: { name: "aiLLMInsights" },
         },
         {
-          path: "overview",
-          name: "aiOverview",
-          component: AIOverviewPage,
-          meta: { title: "Overview", keepAlive: false },
+          path: "llm-insights",
+          name: "aiLLMInsights",
+          component: AILLMInsightsPage,
+          meta: { title: "LLM Insights", keepAlive: false },
         },
         {
           path: "sessions",

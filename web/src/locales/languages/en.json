@@ -685,7 +685,7 @@
     "search": "Logs",
     "traces": "Traces",
     "evals": "Evaluations",
-    "aiObservability": "AI Observability",
+    "aiObservability": "AI Monitoring",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
@@ -4408,13 +4408,13 @@
     "tierConditionalName": "Conditional Tier"
   },
   "aiObservability": {
-    "title": "AI Observability",
+    "title": "AI Monitoring",
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evaluate"
     },
     "nav": {
-      "overview": "Overview",
+      "llmInsights": "LLM Insights",
       "sessions": "LLM Sessions",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
