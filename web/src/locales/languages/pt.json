@@ -3195,7 +3195,10 @@
         "spans": "Vãos"
       }
     },
-    "openInFullView": "Abrir à vista completa"
+    "openInFullView": "Abrir à vista completa",
+    "serviceMap": "Mapa de serviços",
+    "patternView": "Visualização de padrões",
+    "spanView": "Vista da Espanha"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
