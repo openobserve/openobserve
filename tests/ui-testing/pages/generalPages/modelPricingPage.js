@@ -19,7 +19,12 @@ export class ModelPricingPage {
         // ============================================================
         // List page — header controls
         // ============================================================
-        this.listTitle          = page.locator('[data-test="model-pricing-list-title"]');
+        // NOTE: model-pricing-list-title was removed in the fix/layout-exp1
+        // refactor. The list page now uses AppPageHeader without a data-test
+        // on the title span. The stable "list page is ready" anchor is the
+        // table element itself: [data-test="model-pricing-list-table"].
+        // listTitle is kept as an alias to listTable for backward-compat.
+        this.listTitle          = page.locator('[data-test="model-pricing-list-table"]');
         this.infoBtn            = page.locator('[data-test="model-pricing-info-btn"]');
         this.refreshBtn         = page.locator('[data-test="model-pricing-refresh-btn"]');
         this.testMatchBtn       = page.locator('[data-test="model-pricing-test-match-btn"]');
