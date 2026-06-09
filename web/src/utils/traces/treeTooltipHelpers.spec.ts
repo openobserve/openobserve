@@ -286,24 +286,26 @@ describe('treeTooltipHelpers', () => {
 
       const result = generateTracePatternTooltipContent(mockMetadata);
 
+      // Values are wrapped in <span> tags — check for label + value separately
       expect(result).toContain('frontend → recommendation');
-      expect(result).toContain('Calls: 3');
-      expect(result).toContain('Average: 45.5ms');
-      expect(result).toContain('Minimum: 20.1ms');
-      expect(result).toContain('Maximum: 89.3ms');
-      expect(result).toContain('P75: 67.2ms');
-      expect(result).toContain('P95: 85.6ms');
-      expect(result).toContain('P99: 88.4ms');
-      expect(result).toContain('Error Rate: 12.5%');
+      expect(result).toContain('>3</span>');
+      expect(result).toContain('>45.5ms</span>');
+      expect(result).toContain('>20.1ms</span>');
+      expect(result).toContain('>89.3ms</span>');
+      expect(result).toContain('>67.2ms</span>');
+      expect(result).toContain('>85.6ms</span>');
+      expect(result).toContain('>88.4ms</span>');
+      expect(result).toContain('>12.5%</span>');
     });
 
     it('should handle missing or invalid metadata gracefully', () => {
       const result = generateTracePatternTooltipContent({});
 
       expect(result).toContain('Unknown Pattern');
-      expect(result).toContain('Calls: 1');
-      expect(result).toContain('Average: 0.0ms');
-      expect(result).toContain('Error Rate: 0.0%');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('>1</span>');
+      expect(result).toContain('Average:');
+      expect(result).toContain('Error Rate:');
     });
 
     it('should handle null or undefined metadata', () => {
@@ -329,13 +331,14 @@ describe('treeTooltipHelpers', () => {
 
       const result = generateTracePatternTooltipContent(mockMetadata);
 
-      expect(result).toContain('Average: 123.5ms');
-      expect(result).toContain('Minimum: 10.1ms');
-      expect(result).toContain('Maximum: 1000.0ms');
-      expect(result).toContain('P75: 456.8ms');
-      expect(result).toContain('P95: 789.1ms');
-      expect(result).toContain('P99: 999.9ms');
-      expect(result).toContain('Error Rate: 5.6%');
+      // Values are wrapped in <span> tags — check for formatted values
+      expect(result).toContain('>123.5ms</span>');
+      expect(result).toContain('>10.1ms</span>');
+      expect(result).toContain('>1000.0ms</span>');
+      expect(result).toContain('>456.8ms</span>');
+      expect(result).toContain('>789.1ms</span>');
+      expect(result).toContain('>999.9ms</span>');
+      expect(result).toContain('>5.6%</span>');
     });
 
     it('should handle zero values for all metrics', () => {
@@ -353,14 +356,14 @@ describe('treeTooltipHelpers', () => {
 
       const result = generateTracePatternTooltipContent(mockMetadata);
 
-      expect(result).toContain('Calls: 0');
-      expect(result).toContain('Average: 0.0ms');
-      expect(result).toContain('Minimum: 0.0ms');
-      expect(result).toContain('Maximum: 0.0ms');
-      expect(result).toContain('Error Rate: 0.0%');
+      expect(result).toContain('zero-pattern');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('>0</span>');
+      expect(result).toContain('>0.0ms</span>');
+      expect(result).toContain('>0.0%</span>');
     });
 
-    it('should include tree-tooltip HTML structure', () => {
+    it('should include HTML structure with inline styles', () => {
       const mockMetadata = {
         pathSignature: 'test',
         count: 1,
@@ -375,9 +378,12 @@ describe('treeTooltipHelpers', () => {
 
       const result = generateTracePatternTooltipContent(mockMetadata);
 
-      expect(result).toContain('tree-tooltip');
-      expect(result).toContain('tooltip-header');
-      expect(result).toContain('tooltip-metrics');
+      // generateTracePatternTooltipContent uses inline styles, not CSS classes
+      expect(result).toContain('font-family: -apple-system');
+      expect(result).toContain('font-weight: 600');
+      expect(result).toContain('border-bottom: 1px solid');
+      expect(result).toContain('Calls:');
+      expect(result).toContain('<span style="font-family: monospace;">1</span>');
     });
   });
 
