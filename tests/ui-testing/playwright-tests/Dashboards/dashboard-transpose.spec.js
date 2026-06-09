@@ -43,6 +43,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "y"
@@ -84,6 +85,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("table");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "y"
@@ -237,6 +239,7 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_container_name",
       "x"
     );
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
     // Open the configuration panel and enable dynamic columns
@@ -288,6 +291,7 @@ test.describe("dashboard UI testcases", () => {
       "kubernetes_container_name",
       "x"
     );
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
     // Open the configuration panel and enable both the Transpose and Dynamic Column toggle buttons
