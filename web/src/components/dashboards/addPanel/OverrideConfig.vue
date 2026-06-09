@@ -67,11 +67,19 @@ export default defineComponent({
         // This ensures we get exactly what's shown in the table
         const columnNames = new Set<string>();
 
-        // Try to get columns from the actual rendered panelData first
+        // Try to get columns from the actual rendered panelData first.
+        // Use name-based heuristic for numeric detection: "value" and "value_*"
+        // columns are always numeric in PromQL. Do NOT use col.align — alignment
+        // can be overridden by the user's column formatting config, so a string
+        // column set to right-align would be wrongly treated as numeric.
+        const numericColumns = new Set<string>();
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
             if (col.name) {
               columnNames.add(col.name);
+              if (col.name === "value" || col.name?.startsWith("value_")) {
+                numericColumns.add(col.name);
+              }
             }
           });
         } else {
@@ -121,11 +129,19 @@ export default defineComponent({
         columns.value = columnArray.map((columnName) => ({
           alias: columnName,
           label: columnName,
+          // panelData path uses align; fallback uses name heuristic
+          isNumeric:
+            numericColumns.has(columnName) ||
+            columnName === "value" ||
+            columnName.startsWith("value_"),
         }));
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
         const y = dashboardPanelData.data.queries[0].fields.y || [];
-        columns.value = [...x, ...y];
+        columns.value = [
+          ...x.map((col: any) => ({ ...col, isNumeric: false })),
+          ...y.map((col: any) => ({ ...col, isNumeric: true })),
+        ];
       }
     };
 

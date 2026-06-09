@@ -446,6 +446,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pagination_rows_per_page: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    table_filtering: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     table_pivot_show_row_totals: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     table_pivot_show_col_totals: Option<bool>,
@@ -567,6 +569,56 @@ pub enum Config {
         #[serde(default)]
         auto_color: bool,
     },
+    #[serde(rename = "alignment")]
+    Alignment {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    #[serde(rename = "text_color")]
+    TextColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    #[serde(rename = "background_color")]
+    BackgroundColor {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+    },
+    #[serde(rename = "cell_type")]
+    CellType {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        value: Option<CellTypeValue>,
+    },
+    #[serde(rename = "conditional_styles")]
+    ConditionalStyles {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rules: Option<Vec<ConditionalRule>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct CellTypeValue {
+    #[serde(rename = "type")]
+    pub type_field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sparkline_style: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]
+#[serde(default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConditionalRule {
+    pub operator: String,
+    #[schema(value_type = f64)]
+    pub threshold: OrdF64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bg_color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema, Default)]

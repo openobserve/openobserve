@@ -132,7 +132,9 @@
     "error": "Erro",
     "db": "Banco de dados",
     "discardChanges": "Descartar alterações",
-    "unsavedChanges": "Alterações não salvas"
+    "unsavedChanges": "Alterações não salvas",
+    "clearFilter": "Filtro claro",
+    "noMatches": "Sem jogos"
   },
   "search": {
     "selectIndex": "Selecione Stream First",
@@ -1665,7 +1667,38 @@
     "multiSqlQueryLabelHint": "Nome personalizado para essa consulta em legendas (por exemplo, 'Produção')",
     "multiQueryWarning": "Somente a consulta 1 é renderizada para {chartType}",
     "trellisNotSupportedWithMultiQuery": "O layout do Trellis está desativado com várias consultas. Remova consultas extras para usar a treliça.",
-    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis."
+    "xAliasInconsistencyWarning": "Os aliases do eixo X são inconsistentes nas consultas: alguns usam histograma e outros não. Use o mesmo tipo de alias em todas as consultas para obter resultados previsíveis.",
+    "tableFiltering": "Filtragem de colunas",
+    "columnFormattingTitle": "Formatação de coluna",
+    "sectionValueFormatting": "Formatação de valor",
+    "sectionCellType": "Tipo de célula",
+    "cellTypeText": "Texto",
+    "cellTypeProgressBar": "Barra de progresso",
+    "cellTypeSparkline": "Sparkline",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sparklineStyle": "Estilo",
+    "sparklineStyleLine": "Linha",
+    "sparklineStyleBar": "Barra",
+    "sectionProgressBar": "Configuração da barra de progresso",
+    "progressMin": "Min",
+    "progressMax": "máximo",
+    "progressColor": "Cor da barra",
+    "sectionAlignment": "Alinhamento",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "Estilo",
+    "sectionConditionalStyling": "Estilo condicional",
+    "conditionThreshold": "Valor",
+    "conditionAddRule": "+ Adicionar regra",
+    "textColor": "Texto",
+    "bgColor": "Plano de fundo",
+    "colorNone": "nenhum"
   },
   "panel": {
     "header": "Painel",

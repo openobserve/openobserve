@@ -132,7 +132,9 @@
     "error": "[エラー]",
     "db": "[データベース]",
     "discardChanges": "変更を破棄",
-    "unsavedChanges": "未保存の変更"
+    "unsavedChanges": "未保存の変更",
+    "clearFilter": "フィルターをクリア",
+    "noMatches": "一致なし"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1682,7 +1684,38 @@
     "multiSqlQueryLabelHint": "このクエリの凡例でのカスタム名 (例:'Production')",
     "multiQueryWarning": "{chartType} ではクエリ 1 のみがレンダリングされます",
     "trellisNotSupportedWithMultiQuery": "Trellis レイアウトは複数のクエリで無効になります。トレリスを使用するには余分なクエリを削除してください。",
-    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。"
+    "xAliasInconsistencyWarning": "X 軸のエイリアスはクエリ間で一貫性がありません。ヒストグラムを使用するものと使用しないものがあります。予測可能な結果を得るには、すべてのクエリで同じエイリアスタイプを使用してください。",
+    "tableFiltering": "列フィルタリング",
+    "columnFormattingTitle": "列のフォーマット",
+    "sectionValueFormatting": "値のフォーマット",
+    "sectionCellType": "セルタイプ",
+    "cellTypeText": "[テキスト]",
+    "cellTypeProgressBar": "プログレスバー",
+    "cellTypeSparkline": "スパークライン",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sparklineStyle": "スタイル",
+    "sparklineStyleLine": "ライン",
+    "sparklineStyleBar": "バー",
+    "sectionProgressBar": "プログレスバー設定",
+    "progressMin": "最小",
+    "progressMax": "マックス",
+    "progressColor": "バーカラー",
+    "sectionAlignment": "アラインメント",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "スタイリング",
+    "sectionConditionalStyling": "条件付きスタイリング",
+    "conditionThreshold": "価値",
+    "conditionAddRule": "+ ルールを追加",
+    "textColor": "[テキスト]",
+    "bgColor": "バックグラウンド",
+    "colorNone": "無し"
   },
   "panel": {
     "header": "パネル",

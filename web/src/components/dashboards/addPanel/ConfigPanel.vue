@@ -1032,6 +1032,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OSwitch
+          v-show="isConfigOptionVisible('table', 'filtering')"
+          v-model="dashboardPanelData.data.config.table_filtering"
+          :label="t('dashboard.tableFiltering')"
+          data-test="dashboard-config-table-filtering"
+          size="lg"
+        />
+
+        <OSwitch
           v-show="isConfigOptionVisible('table', 'pagination')"
           v-model="dashboardPanelData.data.config.table_pagination"
           :label="t('dashboard.pagination')"
@@ -2001,6 +2009,11 @@ export default defineComponent({
       // by default, use wrap_table_cells as false
       if (!dashboardPanelData.data.config.wrap_table_cells) {
         dashboardPanelData.data.config.wrap_table_cells = false;
+      }
+
+      // by default, tableFiltering is disabled
+      if (dashboardPanelData.data.config.table_filtering === undefined) {
+        dashboardPanelData.data.config.table_filtering = false;
       }
 
       // by default, use table_transpose as false

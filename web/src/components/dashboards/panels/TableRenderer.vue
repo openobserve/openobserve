@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-row-expand="false"
       :enable-status-bar="false"
       :enable-ai-context-button="false"
+      :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
@@ -105,6 +106,11 @@ export default defineComponent({
       type: Number,
       default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
     },
+    enableFiltering: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["row-click"],
   setup(props) {
@@ -128,6 +134,19 @@ export default defineComponent({
     // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
     const autoColorCache = new Map<string, Map<string, string>>();
 
+    const evalCondition = (val: number, op: string, threshold: number): boolean => {
+      switch (op) {
+        case "<":  return val < threshold;
+        case ">":  return val > threshold;
+        case "<=": return val <= threshold;
+        case ">=": return val >= threshold;
+        case "=":
+        case "==": return val === threshold;
+        case "!=": return val !== threshold;
+        default:   return false;
+      }
+    };
+
     const cellStyleFn = computed(() => (cell: any): string => {
       const col = (cell.column.columnDef.meta as any)?._col;
       const value = cell.getValue();
@@ -150,6 +169,31 @@ export default defineComponent({
         const hex = found.color;
         if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
         return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+      }
+
+      // 3) Conditional styling rules — first matching rule wins.
+      const conditionalRules = col?.conditionalRules as any[] | undefined;
+      if (conditionalRules?.length) {
+        const numVal = parseFloat(String(value));
+        if (!isNaN(numVal)) {
+          for (const rule of conditionalRules) {
+            if (evalCondition(numVal, rule.operator, rule.threshold)) {
+              const parts: string[] = [];
+              if (rule.bgColor) parts.push(`background-color: ${rule.bgColor}`);
+              if (rule.textColor) parts.push(`color: ${rule.textColor}`);
+              if (parts.length) return parts.join("; ");
+            }
+          }
+        }
+      }
+
+      // 4) Column-level text / background color override.
+      const colDef = (cell.column.columnDef.meta as any)?._col;
+      if (colDef?.bgColor || colDef?.textColor) {
+        const parts: string[] = [];
+        if (colDef.bgColor) parts.push(`background-color: ${colDef.bgColor}`);
+        if (colDef.textColor) parts.push(`color: ${colDef.textColor}`);
+        return parts.join("; ");
       }
 
       return "";

@@ -132,7 +132,9 @@
     "error": "Hata",
     "db": "Veritabanı",
     "discardChanges": "Değişiklikleri iptal et",
-    "unsavedChanges": "Kaydedilmemiş değişiklikler"
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "clearFilter": "Filtreyi temizle",
+    "noMatches": "Eşleşme yok"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -1665,7 +1667,38 @@
     "multiSqlQueryLabelHint": "Açıklamalarda bu sorgu için özel ad (örn., 'Üretim')",
     "multiQueryWarning": "{chartType} için yalnızca Sorgu 1 oluşturulur",
     "trellisNotSupportedWithMultiQuery": "Kafes düzeni birden çok sorgu ile devre dışı bırakılır. Kafes kullanmak için ekstra sorguları kaldırın.",
-    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın."
+    "xAliasInconsistencyWarning": "X ekseni takma adları sorgular arasında tutarsızdır: bazıları histogram kullanır, bazıları kullanmaz. Öngörülebilir sonuçlar için tüm sorgularda aynı takma ad türünü kullanın.",
+    "tableFiltering": "Sütun Filtreleme",
+    "columnFormattingTitle": "Sütun Biçimlendirme",
+    "sectionValueFormatting": "Değer Biçimlendirme",
+    "sectionCellType": "Hücre Tipi",
+    "cellTypeText": "Metin",
+    "cellTypeProgressBar": "İlerleme Çubuğu",
+    "cellTypeSparkline": "Sparkline",
+    "configSectionFieldOverridesAliases": [
+      "Field Overrides",
+      "Override Config",
+      "Override",
+      "Column Formatting"
+    ],
+    "sparklineStyle": "Tarz",
+    "sparklineStyleLine": "Çizgi",
+    "sparklineStyleBar": "Bar",
+    "sectionProgressBar": "İlerleme çubuğu yapılandırması",
+    "progressMin": "Min",
+    "progressMax": "maksimum",
+    "progressColor": "Çubuk Rengi",
+    "sectionAlignment": "Hizalama",
+    "alignLeft": "Left",
+    "alignCenter": "Center",
+    "alignRight": "Right",
+    "sectionStyling": "Şekillendirme",
+    "sectionConditionalStyling": "Koşullu Stil",
+    "conditionThreshold": "Değer",
+    "conditionAddRule": "+ Kural ekle",
+    "textColor": "Metin",
+    "bgColor": "Arkaplan",
+    "colorNone": "hiçbiri"
   },
   "panel": {
     "header": "Panel",
