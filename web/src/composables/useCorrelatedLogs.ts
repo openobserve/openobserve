@@ -29,6 +29,13 @@ export interface CorrelatedLogsProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>;
+  matchedSetId?: string;
+  chipDimensions?: Record<string, string>;
+  sourceEvent?: {
+    timestamp?: number | string;
+    severity?: string;
+    message?: string;
+  };
   logStreams: StreamInfo[];
   sourceStream: string;
   sourceType: string;

@@ -77,6 +77,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Source event banner (dialog mode) -->
+      <div
+        v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
+        class="source-event-banner tw:flex tw:items-start tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
+        <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
+        <q-badge
+          v-if="sourceEvent.severity"
+          :class="severityClass(sourceEvent.severity)"
+          :label="sourceEvent.severity"
+          class="tw:px-2"
+        />
+        <span class="tw:text-xs tw:font-mono tw:opacity-80">
+          {{ formatEventTimestamp(sourceEvent.timestamp) }}
+        </span>
+        <span
+          v-if="sourceEvent.message"
+          class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+          :title="sourceEvent.message"
+        >
+          {{ sourceEvent.message }}
+        </span>
+      </div>
+
+      <!-- Selectable dimension chips (dialog mode) -->
+      <div
+        v-if="tabFilteredChips.length > 0"
+        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      >
+        <div
+          v-for="chip in visibleChips"
+          :key="chip.key"
+          class="dim-chip"
+          :class="{
+            'dim-chip-interactive': activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled,
+            'dim-chip-active': activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled),
+            'dim-chip-disabled': activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled,
+          }"
+          :style="
+            activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled)
+              ? { background: chipColors(chip.key).border, borderColor: chipColors(chip.key).border, color: '#fff' }
+              : { borderColor: chipColors(chip.key).border, color: chipColors(chip.key).text }
+          "
+          @click="onChipClick(chip)"
+        >
+          <OIcon v-if="activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled)" name="check" size="xs" class="dim-chip-check" />
+          <span class="dim-chip-label">{{ chip.label }}</span>
+          <span class="dim-chip-eq">=</span>
+          <span class="dim-chip-value">{{ chip.value }}</span>
+          <OIcon v-if="activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled && !chip.active" name="swap-horiz" size="xs" class="dim-chip-filter-hint" />
+          <q-tooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled">
+            No metric streams found for this {{ chip.label.toLowerCase() }}
+          </q-tooltip>
+        </div>
+        <div
+          v-if="hiddenChipCount > 0"
+          class="dim-chip-more"
+          @click="chipOverflowExpanded = !chipOverflowExpanded"
+        >
+          {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+        </div>
+      </div>
+
       <!-- Tabs (only in dialog mode, tw:hidden in embedded-tabs mode) -->
       <div class="tw:px-4">
       <OTabs
@@ -551,6 +614,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:dimension="handleDimensionUpdate"
       @apply="applyDimensionChanges"
     />
+
+    <!-- Source event banner (embedded mode) -->
+    <div
+      v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
+      class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
+      <q-badge
+        v-if="sourceEvent.severity"
+        :class="severityClass(sourceEvent.severity)"
+        :label="sourceEvent.severity"
+        class="tw:px-2"
+      />
+      <span class="tw:text-xs tw:font-mono tw:opacity-80">
+        {{ formatEventTimestamp(sourceEvent.timestamp) }}
+      </span>
+      <span
+        v-if="sourceEvent.message"
+        class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+        :title="sourceEvent.message"
+      >
+        {{ sourceEvent.message }}
+      </span>
+    </div>
+
+    <!-- Selectable dimension chips (embedded mode) -->
+    <div
+      v-if="tabFilteredChips.length > 0"
+      class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <div
+        v-for="chip in visibleChips"
+        :key="chip.key"
+        class="dim-chip"
+        :class="{
+          'dim-chip-interactive': activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled,
+          'dim-chip-active': activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled),
+          'dim-chip-disabled': activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled,
+        }"
+        :style="
+          activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled)
+            ? { background: chipColors(chip.key).border, borderColor: chipColors(chip.key).border, color: '#fff' }
+            : { borderColor: chipColors(chip.key).border, color: chipColors(chip.key).text }
+        "
+        @click="onChipClick(chip)"
+      >
+        <OIcon v-if="activeTab !== 'metrics' || chip.kind === 'context' || (chip.kind === 'subject' && chip.active && !chip.disabled)" name="check" size="xs" class="dim-chip-check" />
+        <span class="dim-chip-label">{{ chip.label }}</span>
+        <span class="dim-chip-eq">=</span>
+        <span class="dim-chip-value">{{ chip.value }}</span>
+        <OIcon v-if="activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled && !chip.active" name="swap-horiz" size="xs" class="dim-chip-filter-hint" />
+        <q-tooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled">
+          No metric streams found for this {{ chip.label.toLowerCase() }}
+        </q-tooltip>
+      </div>
+      <div
+        v-if="hiddenChipCount > 0"
+        class="dim-chip-more"
+        @click="chipOverflowExpanded = !chipOverflowExpanded"
+      >
+        {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+      </div>
+    </div>
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
@@ -1126,7 +1252,26 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  getUUID,
+  convertTimeFromNsToMs,
+  convertTimeFromMicroToMilli,
+  timestampToTimezoneDate,
+} from "@/utils/zincutils";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
+import {
+  INTENT_DEFINITIONS,
+  filterByIntent,
+  getEssentialStreams,
+  pickDefaultIntent,
+  type IntentId,
+} from "@/utils/metrics/metricIntent";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
@@ -1158,6 +1303,13 @@ export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
+  matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
+  chipDimensions?: Record<string, string>; // Semantic-id keyed dimensions for the chip row
+  sourceEvent?: {
+    timestamp?: number | string;
+    severity?: string;
+    message?: string;
+  };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -1498,19 +1650,350 @@ const uniqueMetricStreams = computed(() => {
   return getUniqueStreams(sortedMetricStreams.value);
 });
 
-// Selected metric streams � prefer curated defaults from group definitions,
-// fall back to first 6 unique streams for non-OTel deployments.
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions.
+// Selected metric streams — declared before chip/intent block because applyActivePill references it.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
     (() => {
       const unique = getUniqueStreams(sortedMetricStreams.value);
-      const defs =
-        props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
+      const defs = props.metricGroupDefinitions ?? DEFAULT_METRIC_GROUP_DEFINITIONS;
       const defaults = getDefaultMetricSelections(defs, unique);
       return defaults.length > 0 ? defaults : unique.slice(0, 6);
     })(),
   ),
+);
+
+// ── Chip row & subject/intent logic ───────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+const titleCaseWord = (w: string): string => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabelCache = new Map<string, string>();
+let dimensionDisplayLabelCacheKey: any = null;
+const dimensionDisplayLabel = (key: string): string => {
+  if (dimensionDisplayLabelCacheKey !== semanticGroups.value) {
+    dimensionDisplayLabelCache.clear();
+    dimensionDisplayLabelCacheKey = semanticGroups.value;
+  }
+  const cached = dimensionDisplayLabelCache.get(key);
+  if (cached !== undefined) return cached;
+  const group = semanticGroups.value.find((g) => g.id === key);
+  const label = group?.display ?? titleCase(key.replace(/[-_]/g, " "));
+  dimensionDisplayLabelCache.set(key, label);
+  return label;
+};
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+const sanitizeChipDimensions = (src: Record<string, unknown> | undefined | null): Record<string, string> => {
+  if (!src) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "") out[k] = s;
+  }
+  return out;
+};
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  if (props.chipDimensions && Object.keys(props.chipDimensions).length > 0) {
+    return sanitizeChipDimensions(props.chipDimensions as Record<string, unknown>);
+  }
+  return sanitizeChipDimensions({
+    ...(props.matchedDimensions ?? {}),
+    ...(props.additionalDimensions ?? {}),
+  });
+});
+const chipDimensionKeys = computed<string[]>(() => Object.keys(chipDimensionSource.value));
+
+const fieldKeysForSemanticId = (semanticId: string): string[] => {
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return semanticId in pendingDimensions.value ? [semanticId] : [];
+  const pending = group.fields.filter((f) => f in pendingDimensions.value);
+  if (pending.length > 0) return pending;
+  const avail = props.availableDimensions ?? {};
+  const sourceHit = group.fields.find((f) => avail[f] !== undefined && avail[f] !== null && avail[f] !== "");
+  return sourceHit ? [sourceHit] : [];
+};
+
+const activeChipKeysLocal = ref<Set<string>>(new Set());
+watch(chipDimensionKeys, (keys) => {
+  const next = new Set(activeChipKeysLocal.value);
+  let mutated = false;
+  for (const k of keys) {
+    const fields = fieldKeysForSemanticId(k);
+    if (fields.length === 0 && !next.has(k)) { next.add(k); mutated = true; }
+  }
+  if (mutated) activeChipKeysLocal.value = next;
+}, { immediate: true });
+
+const originalValueForKey = (key: string): string => {
+  const v = chipDimensionSource.value[key];
+  return v !== undefined && v !== SELECT_ALL_VALUE ? v : "";
+};
+
+type ChipKind = "context" | "subject";
+type DimensionChip = {
+  key: string; label: string; value: string;
+  kind: ChipKind; active: boolean; disabled?: boolean;
+};
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const specs = SUBJECT_BUTTONS_BY_SET[props.matchedSetId];
+  if (!specs?.length) return new Set();
+  return new Set(specs.flatMap((s) => s.semanticIds));
+});
+
+const activeSubject = ref<string | null>(null);
+
+const subjectButtons = computed<SubjectButton[]>(() =>
+  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
+);
+
+const subjectMatchCounts = computed<Record<string, number>>(() => {
+  const out: Record<string, number> = {};
+  const pool = props.metricStreams ?? [];
+  if (pool.length === 0) return out;
+  const cachedSchemas = (store.state.streams?.metrics as Record<string, any> | undefined) ?? {};
+  for (const button of subjectButtons.value) {
+    if (!button.semanticIds || button.poolPatterns.length === 0) continue;
+    const subjectFieldAliases = new Set<string>();
+    for (const sid of button.semanticIds) {
+      const group = semanticGroups.value.find((g) => g.id === sid);
+      if (group) for (const f of group.fields) subjectFieldAliases.add(f);
+    }
+    const seen = new Set<string>();
+    let matchCount = 0;
+    for (const stream of pool) {
+      if (seen.has(stream.stream_name)) continue;
+      seen.add(stream.stream_name);
+      const schema = cachedSchemas[stream.stream_name]?.schema as Array<{ name: string }> | undefined;
+      if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
+        if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
+      } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
+        matchCount++;
+      }
+    }
+    for (const sid of button.semanticIds) out[sid] = matchCount;
+  }
+  return out;
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  chipDimensionKeys.value
+    .map((key): DimensionChip => {
+      const isSubject = subjectSemanticIds.value.has(key);
+      const matchCount = isSubject ? subjectMatchCounts.value[key] ?? 0 : 0;
+      // Context chips: active when the field key has a real value in pendingDimensions (not SELECT_ALL_VALUE)
+      const contextActive = !isSubject && (() => {
+        const fields = fieldKeysForSemanticId(key);
+        if (fields.length > 0) return fields.some((f) => pendingDimensions.value[f] !== SELECT_ALL_VALUE);
+        return activeChipKeysLocal.value.has(key);
+      })();
+      return {
+        key,
+        label: dimensionDisplayLabel(key),
+        value: originalValueForKey(key),
+        kind: isSubject ? "subject" : "context",
+        active: isSubject ? activeSubject.value === key : contextActive,
+        disabled: isSubject && matchCount === 0,
+      };
+    })
+    .filter((c) => c.value && c.value !== SELECT_ALL_VALUE),
+);
+
+const CHIP_COLOR_PALETTE = [
+  { border: "#7c3aed", text: "#7c3aed" },
+  { border: "#ea580c", text: "#ea580c" },
+  { border: "#0d9488", text: "#0d9488" },
+  { border: "#dc2626", text: "#dc2626" },
+  { border: "#2563eb", text: "#2563eb" },
+  { border: "#65a30d", text: "#65a30d" },
+  { border: "#d97706", text: "#d97706" },
+  { border: "#0891b2", text: "#0891b2" },
+];
+const hashKey = (s: string): number => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+const chipColors = (key: string) => CHIP_COLOR_PALETTE[hashKey(key) % CHIP_COLOR_PALETTE.length];
+
+const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
+  let next = { ...pendingDimensions.value };
+  let mutated = false;
+  if (previousSubject && next[previousSubject] !== SELECT_ALL_VALUE) {
+    next[previousSubject] = SELECT_ALL_VALUE; mutated = true;
+  }
+  if (newSubject) {
+    const resolved = originalValueForKey(newSubject);
+    if (resolved && next[newSubject] !== resolved) { next[newSubject] = resolved; mutated = true; }
+  }
+  if (mutated) pendingDimensions.value = next;
+  return mutated;
+};
+
+const onChipClick = (chip: DimensionChip) => {
+  if (chip.kind !== "subject") return; // only subject chips are interactive
+  if (chip.disabled) return;
+  if (activeTab.value !== "metrics") return;
+  if (activeSubject.value === chip.key) return; // already active — radio, no toggle off
+  const previous = activeSubject.value;
+  activeSubject.value = chip.key;
+  pinSubject(chip.key, previous);
+  applyActivePill();
+  dashboardData.value = null;
+  applyDimensionChanges();
+};
+
+watch(
+  [subjectSemanticIds, () => props.matchedSetId, () => props.chipDimensions, subjectMatchCounts],
+  ([sids, matchedSetId]) => {
+    let mutated = false;
+    if (activeSubject.value && sids.has(activeSubject.value)) {
+      mutated = pinSubject(activeSubject.value, null);
+    } else if (!matchedSetId) {
+      activeSubject.value = null;
+    } else {
+      const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+      if (!specs?.length) {
+        activeSubject.value = null;
+      } else {
+        const counts = subjectMatchCounts.value;
+        const ordered = [...specs.filter((s) => s.defaultActive), ...specs.filter((s) => !s.defaultActive)];
+        let picked: string | null = null;
+        for (const spec of ordered) {
+          const sid = spec.semanticIds[0];
+          if (sid && sids.has(sid) && (counts[sid] ?? 0) > 0) { picked = sid; break; }
+        }
+        if (picked) { activeSubject.value = picked; mutated = pinSubject(picked, null); }
+      }
+    }
+    if (!mutated) return;
+    activeDimensions.value = { ...pendingDimensions.value };
+    if (initialLoadCompleted.value) {
+      dashboardData.value = null;
+      nextTick(() => { loadDashboard(); });
+    }
+  },
+  { immediate: true },
+);
+
+const CHIP_OVERFLOW_THRESHOLD = 4;
+const chipOverflowExpanded = ref(false);
+
+const tabFilteredChips = computed(() => unifiedChips.value);
+const visibleChips = computed(() =>
+  chipOverflowExpanded.value ? tabFilteredChips.value : tabFilteredChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+);
+const hiddenChipCount = computed(() =>
+  Math.max(0, tabFilteredChips.value.length - CHIP_OVERFLOW_THRESHOLD),
+);
+
+// ── Source event banner ────────────────────────────────────────────────────
+const TS_NS_MIN = 1e17;
+const TS_US_MIN = 1e14;
+const TS_MS_MIN = 1e11;
+const TS_S_MIN = 1e9;
+
+const formatEventTimestamp = (ts: number | string | undefined): string => {
+  if (ts == null || ts === "") return "";
+  if (typeof ts === "string" && !/^\d+$/.test(ts.trim())) return ts;
+  const n = typeof ts === "number" ? ts : Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return String(ts);
+  let ms: number;
+  if (n >= TS_NS_MIN) ms = convertTimeFromNsToMs(n);
+  else if (n >= TS_US_MIN) ms = convertTimeFromMicroToMilli(n);
+  else if (n >= TS_MS_MIN) ms = n;
+  else if (n >= TS_S_MIN) ms = n * 1000;
+  else ms = n;
+  try {
+    return `${timestampToTimezoneDate(ms, "UTC", "yyyy-MM-dd HH:mm:ss.SSS")} UTC`;
+  } catch { return String(ts); }
+};
+
+const severityClass = (sev: string | undefined): string => {
+  if (!sev) return "severity-badge severity-default";
+  const s = sev.toUpperCase();
+  if (s.includes("ERROR") || s.includes("FATAL")) return "severity-badge severity-error";
+  if (s.includes("WARN")) return "severity-badge severity-warn";
+  if (s.includes("DEBUG")) return "severity-badge severity-debug";
+  return "severity-badge severity-info";
+};
+
+// ── Intent pill row ────────────────────────────────────────────────────────
+const activeIntent = ref<IntentId>("all");
+
+const activeSubjectButtonId = computed<string | null>(() => {
+  const sid = activeSubject.value;
+  if (!sid) return null;
+  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+  return button?.id ?? null;
+});
+
+const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
+  const sid = activeSubject.value;
+  if (!sid || subjectButtons.value.length === 0) return streams;
+  const button = subjectButtons.value.find((b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid));
+  if (!button || button.poolPatterns.length === 0) return streams;
+  return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+};
+
+const streamsForActivePill = computed<StreamInfo[]>(() =>
+  filterByIntent(applyScopeFilter(uniqueMetricStreams.value), activeIntent.value, props.matchedSetId, activeSubjectButtonId.value),
+);
+
+const pillDescriptors = computed(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return INTENT_DEFINITIONS.map((def) => {
+    const matches = filterByIntent(scoped, def.id, props.matchedSetId, activeSubjectButtonId.value);
+    return { ...def, count: matches.length, disabled: def.id === "essentials" && matches.length === 0 };
+  });
+});
+
+const essentialStreamNames = computed<Set<string>>(() => {
+  const ess = getEssentialStreams(uniqueMetricStreams.value, props.matchedSetId, activeSubjectButtonId.value);
+  return new Set(ess.map((s) => s.stream_name));
+});
+
+const applyActivePill = () => {
+  selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
+};
+
+const setActiveIntent = (id: IntentId) => {
+  if (activeIntent.value === id) return;
+  activeIntent.value = id;
+  applyActivePill();
+  dashboardData.value = null;
+  loadDashboard();
+};
+
+let lastIntentInitKey: string | null = null;
+watch(
+  [() => props.matchedSetId, uniqueMetricStreams, subjectButtons],
+  ([matchedSetId, streams]) => {
+    if (streams.length === 0) return;
+    const key = `${matchedSetId ?? ""}|${streams.map((s) => s.stream_name).sort().join(",")}`;
+    if (lastIntentInitKey === key) return;
+    lastIntentInitKey = key;
+    activeIntent.value = pickDefaultIntent(streams, matchedSetId, activeSubjectButtonId.value);
+    applyActivePill();
+  },
+  { immediate: true },
 );
 
 // Filter metric streams based on search text
@@ -3125,5 +3608,88 @@ body.body--dark {
       background-color: rgba(255, 255, 255, 0.05);
     }
   }
+}
+
+// Chip row
+.dim-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1.5px solid var(--o2-border-color, #d4d4d4);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-size: 0.75rem;
+  line-height: 1;
+  user-select: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.dim-chip-interactive {
+  cursor: pointer;
+  &:hover { filter: brightness(0.9); }
+}
+.dim-chip-active { font-weight: 600; }
+.dim-chip-active .dim-chip-label { opacity: 0.9; }
+.dim-chip-active .dim-chip-eq { opacity: 0.7; }
+.dim-chip-check {
+  margin-right: 0.25rem;
+  color: #4ade80; // green-400 — visible on both filled and white backgrounds
+  flex-shrink: 0;
+}
+.dim-chip-filter-hint {
+  margin-left: 0.25rem;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.dim-chip-label { font-weight: 500; opacity: 0.8; }
+.dim-chip-eq { opacity: 0.5; }
+.dim-chip-value { font-weight: 700; }
+.dim-chip-disabled {
+  cursor: not-allowed !important;
+  opacity: 0.4;
+  border-style: dashed;
+  pointer-events: auto;
+}
+.dim-chip-disabled:hover { background: transparent; }
+.dim-chip-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--o2-text-3, #888);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0.5rem;
+  background: var(--o2-bg-color-2, #f4f4f4);
+}
+.dim-chip-more:hover { background: var(--o2-bg-color-3, #e8e8e8); }
+
+.source-event-banner {
+  background: var(--o2-card-bg, var(--o2-bg-color));
+}
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.severity-error  { background: rgba(220, 38, 38, 0.15); color: #f87171; }
+.severity-warn   { background: rgba(217, 119, 6, 0.15);  color: #fbbf24; }
+.severity-debug  { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
+.severity-info   { background: rgba(37, 99, 235, 0.15);  color: #60a5fa; }
+.severity-default { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+.source-event-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 </style>
