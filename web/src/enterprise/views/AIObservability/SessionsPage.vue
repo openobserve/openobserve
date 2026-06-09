@@ -17,49 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="ai-sessions-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
   >
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div
-            data-test="ai-sessions-title"
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          >
-            {{ t("aiObservability.nav.sessions") }}
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              menu-align="end"
-              :default-type="datetime.type"
-              :default-absolute-time="{
-                startTime: datetime.startTime,
-                endTime: datetime.endTime,
-              }"
-              :default-relative-time="datetime.relativeTimePeriod"
-              data-test="ai-sessions-date-time"
-              class="tw:h-[2rem]"
-              @on:date-change="onDateChange"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full">
-        <SessionsList
-          ref="sessionsRef"
-          :stream-name="streamName"
-          :start-time="timeRange.startTime"
-          :end-time="timeRange.endTime"
-          class="tw:h-full"
+    <AppPageHeader
+      :title="t('aiObservability.nav.sessions')"
+      icon="forum"
+      class="tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <date-time
+          ref="dateTimeRef"
+          auto-apply
+          menu-align="end"
+          :default-type="datetime.type"
+          :default-absolute-time="{
+            startTime: datetime.startTime,
+            endTime: datetime.endTime,
+          }"
+          :default-relative-time="datetime.relativeTimePeriod"
+          data-test="ai-sessions-date-time"
+          class="tw:h-[2rem]"
+          @on:date-change="onDateChange"
         />
-      </div>
+      </template>
+    </AppPageHeader>
+
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <SessionsList
+        ref="sessionsRef"
+        :stream-name="streamName"
+        :start-time="timeRange.startTime"
+        :end-time="timeRange.endTime"
+        class="tw:h-full"
+      />
     </div>
   </div>
 </template>
@@ -69,6 +59,7 @@ import { ref, reactive, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 
 defineOptions({ name: "AISessionsPage" });
