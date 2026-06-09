@@ -504,13 +504,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div class="splitter-vertical splitter-enabled"></div>
-                      <div
-                        class="tw:absolute tw:bg-button-primary tw:text-button-primary-foreground tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
-                        style="top: 10px; left: 3.5px; z-index: 100"
-                        data-test="panel-editor-custom-chart-drag-indicator"
-                      >
-                        <OIcon name="drag-indicator" size="xs" />
-                      </div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -1243,9 +1236,8 @@ defineExpose({
 }
 
 .splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
+  background-color: transparent;
+  transition: background-color 0.3s;
 }
 
 .splitter-enabled:hover {
