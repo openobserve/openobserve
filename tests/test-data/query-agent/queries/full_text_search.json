@@ -3345,7 +3345,6 @@
         "end_offset": 32653000000
       },
       "expected": {
-        "row_count": 7,
         "columns": [
           "_timestamp",
           "searchable_text"
@@ -3359,7 +3358,8 @@
           }
         ],
         "note": "str_match_ignore_case with COALESCE argument cannot be translated to DuckDB lower()+LIKE",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     }
   ],

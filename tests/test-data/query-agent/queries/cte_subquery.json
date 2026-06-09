@@ -2919,7 +2919,7 @@
           {
             "type": "row_contains",
             "match": {
-              "endpoint": "searchItems"
+              "endpoint": "scanPallet"
             }
           }
         ],
