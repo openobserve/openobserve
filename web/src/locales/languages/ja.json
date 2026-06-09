@@ -981,7 +981,8 @@
     "subscription_type": "プランタイプ",
     "proceed_subscription": "購読に進む",
     "subscription_plan": "サブスクリプションプラン",
-    "makeBilledMember": "この組織を {org} の請求メンバーにする"
+    "makeBilledMember": "この組織を {org} の請求メンバーにする",
+    "manage": "管理"
   },
   "template": {
     "header": "テンプレート",

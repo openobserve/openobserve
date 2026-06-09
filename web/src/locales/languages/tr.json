@@ -964,7 +964,8 @@
     "subscription_type": "Plan Türü",
     "proceed_subscription": "Aboneliğe Geçin",
     "subscription_plan": "Abonelik Planı",
-    "makeBilledMember": "Bu Kuruluşu {org} Faturalandırma Üyesi Yapın"
+    "makeBilledMember": "Bu Kuruluşu {org} Faturalandırma Üyesi Yapın",
+    "manage": "Yönetmek"
   },
   "template": {
     "header": "Şablonlar",

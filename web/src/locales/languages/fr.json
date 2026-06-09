@@ -964,7 +964,8 @@
     "subscription_type": "Type de plan",
     "proceed_subscription": "Procéder à l'abonnement",
     "subscription_plan": "Plan d'abonnement",
-    "makeBilledMember": "Faire de cette organisation un membre facturant de {org}"
+    "makeBilledMember": "Faire de cette organisation un membre facturant de {org}",
+    "manage": "Gérez"
   },
   "template": {
     "header": "Modèles",
