@@ -31,7 +31,6 @@ export function chooseBucketInterval(windowMs: number): string {
 export interface KpiCard {
   id:
     | "evaluated"
-    | "qualityIssueRate"
     | "evaluationCost"
     | "jobSuccess"
     | "scorerFailures"
@@ -47,7 +46,6 @@ export interface KpiCard {
 
 interface ScoresAggRow {
   evaluated_count?: number | string;
-  unhealthy_count?: number | string;
 }
 
 interface EvaluatorAggRow {
@@ -60,7 +58,6 @@ interface EvaluatorAggRow {
 interface ScoresBucketRow {
   bucket?: string | number;
   evaluated_c?: number | string;
-  unhealthy_c?: number | string;
 }
 
 interface EvaluatorBucketRow {
@@ -81,7 +78,6 @@ function toNumber(v: unknown): number | null {
 function emptyKpis(): KpiCard[] {
   return [
     { id: "evaluated", value: null, prevValue: null, sparkline: [], healthyDirection: "up", format: "percent" },
-    { id: "qualityIssueRate", value: null, prevValue: null, sparkline: [], healthyDirection: "down", format: "percent" },
     { id: "evaluationCost", value: null, prevValue: null, sparkline: [], healthyDirection: "neutral", format: "currency" },
     { id: "jobSuccess", value: null, prevValue: null, sparkline: [], healthyDirection: "up", format: "percent" },
     { id: "scorerFailures", value: null, prevValue: null, sparkline: [], healthyDirection: "down", format: "count" },
@@ -89,31 +85,32 @@ function emptyKpis(): KpiCard[] {
   ];
 }
 
-// Only references columns that always exist on `_llm_scores` (trace_id,
-// data_type, value_boolean). value_numeric / value_categorical are dropped
-// here because they only enter the schema once at least one score of that
-// data_type has been written. Per-config unhealthy detection (which can
-// reference all three) lives on the Tier 2 query instead.
+// Org-wide KPI aggregate over `_llm_scores`. Only the evaluated-spans count
+// is surfaced here — per-config unhealthy counts live on the Tier 2 table
+// in `useQualityScoreConfigs`. Scores are written per-span (each evaluated
+// span produces one row per scorer), so distinct span_id is the right unit
+// for "evaluated"; a single trace can have many evaluated spans.
 function scoresSql(): string {
-  // Scores are written per-span (each evaluated span produces one row per
-  // scorer), so the right unit for "evaluated" is distinct span_id, not
-  // trace_id. A single trace can have many evaluated spans.
   return [
     "SELECT",
-    "  COUNT(DISTINCT span_id) AS evaluated_count,",
-    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN span_id END) AS unhealthy_count",
+    "  COUNT(DISTINCT span_id) AS evaluated_count",
     'FROM "_llm_scores"',
   ].join("\n");
 }
 
 // `_evaluator` spans flatten OTel attributes under an `attributes_` prefix.
+// `attributes_latency_ms` is auto-inferred as Utf8 when the first ingested
+// value arrives quoted (OTel SDKs sometimes serialize numeric attributes as
+// strings). `approx_percentile_cont` requires a numeric input, so we
+// TRY_CAST to Double — TRY_CAST returns NULL on unparseable values and
+// the percentile aggregator skips NULLs, keeping the query robust.
 function evaluatorSql(): string {
   return [
     "SELECT",
     "  COUNT(*) AS total_runs,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success_runs,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failure_runs,",
-    "  approx_percentile_cont(attributes_latency_ms, 0.95) AS latency_p95_ms",
+    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms",
     'FROM "_evaluator"',
   ].join("\n");
 }
@@ -123,8 +120,7 @@ function scoresSparklineSql(interval: string): string {
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
-    "  COUNT(DISTINCT span_id) AS evaluated_c,",
-    "  COUNT(DISTINCT CASE WHEN data_type = 'boolean' AND value_boolean = false THEN span_id END) AS unhealthy_c",
+    "  COUNT(DISTINCT span_id) AS evaluated_c",
     'FROM "_llm_scores"',
     "GROUP BY bucket",
     "ORDER BY bucket",
@@ -138,7 +134,7 @@ function evaluatorSparklineSql(interval: string): string {
     "  COUNT(*) AS total,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failures,",
-    "  approx_percentile_cont(attributes_latency_ms, 0.95) AS latency_p95_ms",
+    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms",
     'FROM "_evaluator"',
     "GROUP BY bucket",
     "ORDER BY bucket",
@@ -204,11 +200,6 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
         ]);
 
       const evaluatedSpark = scoresSeries.map((r) => toNumber(r.evaluated_c) ?? 0);
-      const issueRateSpark = scoresSeries.map((r) => {
-        const e = toNumber(r.evaluated_c) ?? 0;
-        const u = toNumber(r.unhealthy_c) ?? 0;
-        return e > 0 ? (u / e) * 100 : 0;
-      });
       const jobSuccessSpark = evalSeries.map((r) => {
         const tot = toNumber(r.total) ?? 0;
         const ok = toNumber(r.success) ?? 0;
@@ -222,17 +213,6 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
 
       const evaluatedNow = toNumber(scoresNow?.evaluated_count);
       const evaluatedPrev = toNumber(scoresPrev?.evaluated_count);
-      const unhealthyNow = toNumber(scoresNow?.unhealthy_count);
-      const unhealthyPrev = toNumber(scoresPrev?.unhealthy_count);
-
-      const issueRateNow =
-        evaluatedNow && evaluatedNow > 0 && unhealthyNow != null
-          ? (unhealthyNow / evaluatedNow) * 100
-          : null;
-      const issueRatePrev =
-        evaluatedPrev && evaluatedPrev > 0 && unhealthyPrev != null
-          ? (unhealthyPrev / evaluatedPrev) * 100
-          : null;
 
       const totalNow = toNumber(evalNow?.total_runs);
       const successNow = toNumber(evalNow?.success_runs);
@@ -255,14 +235,6 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
           sparkline: evaluatedSpark,
           healthyDirection: "up",
           format: "count",
-        },
-        {
-          id: "qualityIssueRate",
-          value: issueRateNow,
-          prevValue: issueRatePrev,
-          sparkline: issueRateSpark,
-          healthyDirection: "down",
-          format: "percent",
         },
         {
           // EVALUATION COST is not yet captured in `_evaluator` attributes.

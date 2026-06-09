@@ -4482,11 +4482,6 @@
           "unit": "",
           "hint": "Distinct span IDs in _llm_scores within the window"
         },
-        "qualityIssueRate": {
-          "title": "Quality Issue Rate",
-          "unit": "%",
-          "hint": "Evaluated spans with any dimension below threshold"
-        },
         "evaluationCost": {
           "title": "Evaluation Cost",
           "unit": "$",
