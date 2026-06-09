@@ -367,47 +367,33 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Select all existing content and replace with our keyword
+    // Select all existing content and replace with a query that uses
+    // "default" as an unquoted identifier (the bug scenario from #4288:
+    // the SQL parser treats "default" as a reserved keyword)
     const isMac = process.platform === 'darwin';
     const modifier = isMac ? 'Meta' : 'Control';
     await page.keyboard.press(`${modifier}+a`);
     await page.waitForTimeout(200);
-    await page.keyboard.type('default', { delay: 50 });
+    await page.keyboard.type('SELECT * FROM default', { delay: 50 });
     await page.waitForTimeout(1000);
 
-    // Verify the rendered .view-lines contain the keyword
+    // Verify the rendered .view-lines contain "default"
     const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');
     testLogger.info(`Monaco view-lines content: "${linesText.substring(0, 100)}"`);
 
     expect(linesText,
-      'Bug #4288: "default" should be accepted in the SQL editor without error'
+      'Bug #4288: "default" keyword should be accepted in the SQL editor'
     ).toContain('default');
 
-    // Verify no app-level error (exclude Monaco's syntax squiggles, which
-    // legitimately appear for "default" as standalone-incomplete SQL)
-    const errorDetails = await page.evaluate(() => {
-      const errorEls = Array.from(
-        document.querySelectorAll('[class*="error"], [class*="negative"]')
-      );
-      const matches: string[] = [];
-      for (const el of errorEls) {
-        if (el.closest('.monaco-editor')) continue;
-        const visible = el.checkVisibility ? el.checkVisibility() : el.offsetParent !== null;
-        if (!visible) continue;
-        const text = (el.textContent || '').slice(0, 150);
-        if (/error|invalid|unexpected/i.test(text)) {
-          matches.push(`${el.tagName}.${el.className.slice(0, 60)}: "${text}"`);
-        }
-      }
-      return matches;
-    });
-    if (errorDetails.length > 0) {
-      testLogger.warn('Error elements found outside Monaco:', JSON.stringify(errorDetails));
-    }
+    // Verify no app-level error (check OToast error variant + ARIA alerts —
+    // the app's actual error notification mechanisms, not Monaco syntax squiggles)
+    const errorToastVisible = await page.locator(
+      '[data-test-variant="error"], [role="alert"]'
+    ).first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    expect(errorDetails.length,
+    expect(errorToastVisible,
       'Bug #4288: "default" keyword without quotes should not cause a UI error'
-    ).toBe(0);
+    ).toBeFalsy();
 
     testLogger.info('PASSED: Alert SQL default keyword verified');
   });
