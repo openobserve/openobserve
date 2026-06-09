@@ -33,7 +33,7 @@ impl From<ScoreConfigError> for Response {
             }
             ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
             ScoreConfigError::DuplicateName => {
-                MetaHttpResponse::bad_request("Score config name already exists")
+                MetaHttpResponse::conflict("Score config name already exists")
             }
             ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
         }
@@ -83,6 +83,7 @@ pub async fn list_score_configs(Path(org_id): Path<String>) -> Response {
     responses(
         (status = 200, body = inline(ScoreConfigResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
+        (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "ScoreConfigs", "operation": "create"})),
@@ -243,7 +244,7 @@ mod tests {
         let cases: Vec<(ScoreConfigError, u16)> = vec![
             (ScoreConfigError::MissingName, 400),
             (ScoreConfigError::NotFound, 404),
-            (ScoreConfigError::DuplicateName, 400),
+            (ScoreConfigError::DuplicateName, 409),
             (ScoreConfigError::InUseByScorer, 409),
         ];
         for (err, expected) in cases {

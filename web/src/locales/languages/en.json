@@ -4424,6 +4424,7 @@
     "actions": {
       "edit": "Edit",
       "delete": "Delete",
+      "export": "Export",
       "activate": "Activate",
       "pause": "Pause",
       "activated": "Job activated",
@@ -4731,6 +4732,23 @@
         "description": "Score Configs define the dimensions your scorers produce — name, data type, value range, and healthy threshold. Create one to start wiring online evaluation.",
         "chipTypes": "Numeric, Categorical, Boolean",
         "chipThreshold": "Healthy Threshold"
+      },
+      "import": {
+        "title": "Import Score Config",
+        "button": "Import",
+        "customLabel": "Custom",
+        "customSubtitle": "Import from JSON file or URL",
+        "libraryLabel": "Library",
+        "librarySubtitle": "Browse and import from curated catalog",
+        "libraryDrawerTitle": "Score Config Library",
+        "outputMessages": "Output Messages",
+        "creation": "Score Config Creation",
+        "errors": {
+          "title": "Validation Errors"
+        }
+      },
+      "export": {
+        "bulkButton": "Export"
       }
     },
     "scorer": {
@@ -4821,6 +4839,29 @@
         "chipLlmJudge": "LLM Judge",
         "chipRemote": "Remote",
         "chipCode": "Code"
+      },
+      "noProviders": {
+        "title": "Add a Provider First",
+        "description": "Scorers need an LLM Provider (OpenAI, Anthropic, etc.) to run. Add a provider in Settings before creating scorers.",
+        "chipRequired": "Required for LLM Judge",
+        "cta": "Add Provider"
+      },
+      "import": {
+        "title": "Import Scorer",
+        "button": "Import",
+        "customLabel": "Custom",
+        "customSubtitle": "Import from JSON file or URL",
+        "libraryLabel": "Library",
+        "librarySubtitle": "Browse and import from curated catalog",
+        "libraryDrawerTitle": "Scorer Library",
+        "outputMessages": "Output Messages",
+        "creation": "Scorer Creation",
+        "errors": {
+          "title": "Validation Errors"
+        }
+      },
+      "export": {
+        "bulkButton": "Export"
       },
       "backTo": "Back to Scorers",
       "badgeRemote": "Remote",

@@ -44,8 +44,8 @@ impl From<ScorerError> for Response {
             | ScorerError::ScorerTypeImmutable
             | ScorerError::ProducesScoreConfigIdImmutable
             | ScorerError::ScoreConfigVersionNotFound
-            | ScorerError::InvalidOutputSchema(_)
-            | ScorerError::DuplicateName => MetaHttpResponse::bad_request(value),
+            | ScorerError::InvalidOutputSchema(_) => MetaHttpResponse::bad_request(value),
+            ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
             ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
         }
     }
@@ -100,6 +100,7 @@ pub async fn list_scorers(
     responses(
         (status = 200, body = inline(ScorerResponseBody)),
         (status = 400, description = "Bad Request", body = ()),
+        (status = 409, description = "Conflict", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Scorers", "operation": "create"})),
@@ -521,7 +522,7 @@ mod tests {
             (ScorerError::ScorerTypeImmutable, 400),
             (ScorerError::ProducesScoreConfigIdImmutable, 400),
             (ScorerError::InvalidOutputSchema("bad".to_string()), 400),
-            (ScorerError::DuplicateName, 400),
+            (ScorerError::DuplicateName, 409),
             (ScorerError::InUseByEvalJob, 409),
         ];
         for (err, expected) in cases {
