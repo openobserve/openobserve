@@ -37,6 +37,7 @@ pub enum CacheEntry {
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
     TopN(Vec<(String, u64)>),                // simple top n optimization
+    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -59,6 +60,7 @@ impl From<CacheEntry> for TantivyResult {
                 TantivyResult::MultiHistogram(multi_histogram)
             }
             CacheEntry::TopN(top_n) => TantivyResult::TopN(top_n),
+            CacheEntry::TopNMulti(top_n) => TantivyResult::TopNMulti(top_n),
             CacheEntry::Distinct(distinct) => TantivyResult::Distinct(distinct),
         }
     }
@@ -94,6 +96,17 @@ impl CacheEntry {
                     .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
                     .sum::<usize>()
                     + std::mem::size_of::<Vec<(String, u64)>>()
+            }
+            CacheEntry::TopNMulti(top_n) => {
+                top_n
+                    .iter()
+                    .map(|(keys, _)| {
+                        keys.iter().map(|s| s.capacity()).sum::<usize>()
+                            + std::mem::size_of::<Vec<String>>()
+                            + std::mem::size_of::<u64>()
+                    })
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
             }
             CacheEntry::Distinct(distinct) => {
                 distinct.iter().map(|s| s.capacity()).sum::<usize>()
