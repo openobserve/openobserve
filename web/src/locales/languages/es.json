@@ -2946,7 +2946,8 @@
     "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación. Cree una en la página de plantillas de evaluación.",
     "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente",
     "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo",
-    "selectStream": "Selecciona una transmisión..."
+    "selectStream": "Selecciona una transmisión...",
+    "queryEditorPlaceholder": "Seleccione una secuencia o escriba una consulta SQL aquí..."
   },
   "reports": {
     "header": "Informes",

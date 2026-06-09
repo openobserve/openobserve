@@ -2969,7 +2969,8 @@
     "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
     "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました",
     "subtitle": "転送中のデータの変換、強化、ルーティング",
-    "selectStream": "ストリームを選択..."
+    "selectStream": "ストリームを選択...",
+    "queryEditorPlaceholder": "ストリームを選択するか、ここに SQL クエリを書き込んでください..."
   },
   "reports": {
     "header": "レポート",

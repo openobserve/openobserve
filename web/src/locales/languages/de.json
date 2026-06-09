@@ -2948,7 +2948,8 @@
     "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
     "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert",
     "subtitle": "Daten während des Fluges transformieren, anreichern und routen",
-    "selectStream": "Wählen Sie einen Stream aus..."
+    "selectStream": "Wählen Sie einen Stream aus...",
+    "queryEditorPlaceholder": "Wählen Sie hier einen Stream aus oder schreiben Sie eine SQL-Abfrage..."
   },
   "reports": {
     "header": "Berichte",
