@@ -25,6 +25,13 @@ import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
 import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
 import { routeGuard } from "@/utils/zincutils";
 
+const AIObservabilityShell = () =>
+  import("@/enterprise/views/AIObservability/Index.vue");
+const AIOverviewPage = () =>
+  import("@/enterprise/views/AIObservability/OverviewPage.vue");
+const AISessionsPage = () =>
+  import("@/enterprise/views/AIObservability/SessionsPage.vue");
+
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
   // The backend sets a cookie and redirects to Dex login
@@ -57,16 +64,46 @@ const useEnvRoutes = () => {
 
   const homeChildRoutes = [
     {
-      path: "online-evals",
-      name: "onlineEvals",
-      component: OnlineEvals,
+      path: "ai",
+      component: AIObservabilityShell,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
       meta: {
-        title: "Online Evals",
+        title: "AI Observability",
         keepAlive: false,
       },
+      children: [
+        {
+          path: "",
+          name: "aiObservability",
+          redirect: { name: "aiOverview" },
+        },
+        {
+          path: "overview",
+          name: "aiOverview",
+          component: AIOverviewPage,
+          meta: { title: "Overview", keepAlive: false },
+        },
+        {
+          path: "sessions",
+          name: "aiSessions",
+          component: AISessionsPage,
+          meta: { title: "Sessions", keepAlive: false },
+        },
+        {
+          path: "evaluations",
+          name: "aiEvaluations",
+          component: OnlineEvals,
+          props: { hideTabBar: true },
+          meta: { title: "Evaluations", keepAlive: false },
+        },
+      ],
+    },
+    {
+      // Legacy URL — keep saved/bookmarked links working
+      path: "online-evals",
+      redirect: { name: "aiEvaluations" },
     },
     {
       path: "billings",
@@ -104,7 +141,7 @@ const useEnvRoutes = () => {
   const pipelineChildren = [
     {
       path: "online-evals",
-      redirect: "/online-evals",
+      redirect: { name: "aiEvaluations" },
     },
     {
       path: "eval-templates",
