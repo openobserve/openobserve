@@ -450,6 +450,8 @@ interface ServiceRow {
   p50_latency_ns: number;
   p95_latency_ns: number;
   p99_latency_ns: number;
+  infer_service_name?: string;
+  infer_service_system?: string;
 }
 
 const isLoading = ref(false);
@@ -460,6 +462,7 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
+const useInferServiceFields = ref(true);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -771,7 +774,26 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  const sql = `SELECT
+  // Build SQL: try to group by infer_service_name first (with COALESCE fallback to service_name).
+  // If the infer columns don't exist in the schema, the error callback retries without them.
+  const useInfer = useInferServiceFields.value;
+  const sql = useInfer
+    ? `SELECT
+  COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
+  MAX(infer_service_name) AS infer_service_name,
+  MAX(infer_service_system) AS infer_service_system,
+  COUNT(*) AS total_requests,
+  SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
+  CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
+  AVG(duration) AS avg_duration_ns,
+  MAX(duration) AS max_duration_ns,
+  approx_percentile_cont(duration, 0.5) AS p50_latency_ns,
+  approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
+  approx_percentile_cont(duration, 0.99) AS p99_latency_ns
+FROM "${streamName}"
+GROUP BY COALESCE(NULLIF(infer_service_name, ''), service_name)
+ORDER BY total_requests DESC`
+    : `SELECT
   service_name,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
@@ -828,12 +850,22 @@ ORDER BY total_requests DESC`;
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
+              infer_service_name: hit.infer_service_name ?? undefined,
+              infer_service_system: hit.infer_service_system ?? undefined,
             });
           }
           services.value = Array.from(serviceMap.values());
         }
       },
       error: (_payload: any, _response: any) => {
+        // If the query failed because infer columns don't exist in the schema,
+        // retry with the fallback query that only uses service_name.
+        if (useInferServiceFields.value) {
+          useInferServiceFields.value = false;
+          isLoading.value = false;
+          loadServicesCatalog();
+          return;
+        }
         isLoading.value = false;
       },
       complete: (_payload: any, _response: any) => {
