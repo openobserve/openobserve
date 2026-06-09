@@ -275,7 +275,7 @@ export default defineComponent({
     },
     metaData: {
       type: Object,
-      default: undefined,
+      required: true,
     },
     data: {
       type: Object,
