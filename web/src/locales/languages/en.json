@@ -1472,7 +1472,8 @@
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
     "errorGettingResults": "Error while getting results",
     "save": "Save",
-    "evalTemplates": "Evaluation Templates"
+    "evalTemplates": "Evaluation Templates",
+    "selectStream": "Select a stream ..."
   },
   "evalTemplate": {
     "header": "Evaluation Templates",

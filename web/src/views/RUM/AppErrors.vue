@@ -20,13 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
         <div class="tw:flex tw:items-start tw:gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
-          <div class="tw:flex-1 tw:min-w-0">
+          <div class="tw:flex-1 tw:min-w-0 tw:relative">
             <query-editor
               editor-id="rum-errors-query-editor"
               :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
+              @focus="editorFocused = true"
+              @blur="editorFocused = false"
             />
+            <div
+              v-if="!errorTrackingState.data.editorValue && !editorFocused"
+              class="query-editor-placeholder-overlay"
+            >
+              <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+            </div>
           </div>
 
           <!-- Controls on the right -->
@@ -122,6 +130,7 @@ import {
   type Ref,
   defineAsyncComponent,
 } from "vue";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -158,6 +167,17 @@ const dateTime = ref({
 });
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
+const editorFocused = ref(false);
+
+// Dynamic placeholder based on actual error stream fields
+const _sqlMode = computed(() => false);
+const _noStream = computed(() => !errorTrackingState.data.stream.errorStream);
+const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+  streamFields,
+  computed(() => ({})),
+  _sqlMode,
+  _noStream,
+);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
 const store = useStore();
@@ -550,6 +570,36 @@ function updateUrlQueryParams() {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 }
+  }
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
   }
 }
 </style>
