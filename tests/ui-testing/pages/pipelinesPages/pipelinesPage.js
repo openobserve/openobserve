@@ -3090,7 +3090,7 @@ export class PipelinesPage {
      */
     async isStatusFilterVisible() {
         const filterLocator = this.page.locator('[data-test="status-filter"]').first();
-        return await filterLocator.isVisible({ timeout: 15000 }).catch(() => false);
+        return await filterLocator.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3098,8 +3098,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if filter is visible
      */
     async isPipelineFilterVisible() {
-        const filterLocator = this.page.locator('[data-test*="pipeline-filter"], select, .q-select').first();
-        return await filterLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        const filterLocator = this.page.locator('[data-test="pipeline-filter"]').first();
+        return await filterLocator.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3328,8 +3328,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isClearFiltersBtnVisible() {
-        const clearBtn = this.page.locator('[data-test*="clear-filter"], button:has-text("Clear"), [data-test*="reset"]').first();
-        return await clearBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const clearBtn = this.page.locator('[data-test="clear-filters-btn"]').first();
+        return await clearBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3351,8 +3351,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isBackfillRefreshBtnVisible() {
-        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
-        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const refreshBtn = this.page.locator('[data-test="refresh-btn"]').first();
+        return await refreshBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3532,8 +3532,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if date picker is visible
      */
     async isHistoryDatePickerVisible() {
-        const datePicker = this.page.locator('[data-test*="date-picker"], [data-test*="date-range"], .date-picker, .q-date').first();
-        return await datePicker.isVisible({ timeout: 15000 }).catch(() => false);
+        const datePicker = this.page.locator('[data-test="pipeline-history-date-picker"]').first();
+        return await datePicker.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3541,8 +3541,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if search select is visible
      */
     async isHistorySearchSelectVisible() {
-        const searchSelect = this.page.locator('[data-test*="search-select"], [data-test*="pipeline-select"], .q-select, select').first();
-        return await searchSelect.isVisible({ timeout: 5000 }).catch(() => false);
+        const searchSelect = this.page.locator('[data-test="pipeline-history-search-select"]').first();
+        return await searchSelect.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
@@ -3559,8 +3559,8 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if button is visible
      */
     async isHistoryRefreshBtnVisible() {
-        const refreshBtn = this.page.locator('[data-test*="refresh"], button:has-text("Refresh"), .refresh-btn').first();
-        return await refreshBtn.isVisible({ timeout: 5000 }).catch(() => false);
+        const refreshBtn = this.page.locator('[data-test="pipeline-history-refresh-btn"]').first();
+        return await refreshBtn.waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
     }
 
     /**
