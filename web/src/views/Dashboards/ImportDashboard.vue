@@ -896,14 +896,14 @@ export default defineComponent({
 }
 .editor-container-url {
   :deep(.monaco-editor) {
-    height: calc(100vh - 302px) !important;
+    height: calc(100vh - 285px) !important;
     overflow: hidden;
     resize: none;
   }
 }
 .dashboard-import-json-container {
   :deep(.monaco-editor) {
-    height: calc(100vh - 302px) !important;
+    height: calc(100vh - 282px) !important;
     overflow: hidden;
     resize: none;
   }
@@ -912,6 +912,11 @@ export default defineComponent({
   height: calc(81vh - 14px) !important;
   overflow: hidden;
   resize: none;
+}
+/* Border lives on the editor wrapper only (scoped, not pierced with :deep), so
+   Monaco's own internal .monaco-editor element doesn't get a second border.
+   Mirrors BaseImport.vue and removes the double-container look. */
+.monaco-editor {
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
 }

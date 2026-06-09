@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     container-class=""
     container-style="height: calc(100vh - 50px);"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 306px)',
+      urlEditor: 'calc(100vh - 285px)',
+      fileEditor: 'calc(100vh - 282px)',
       outputContainer: 'calc(100vh - 110px)',
       errorReport: 'calc(100vh - 128px)',
     }"

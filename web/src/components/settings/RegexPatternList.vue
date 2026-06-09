@@ -69,7 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!listLoading && filterQuery == ''">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
         </div>
-        <NoData v-else-if="!listLoading && filterQuery != ''" />
+        <OEmptyState
+          v-else-if="!listLoading && filterQuery != ''"
+          size="hero"
+          filtered
+          :title="t('emptyState.filtered.title', { noun: t('regex_patterns.header').toLowerCase() })"
+          :description="t('emptyState.filtered.description', { noun: t('regex_patterns.header').toLowerCase() })"
+          @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+        />
       </template>
       <template #cell-actions="{ row }">
         <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
@@ -164,7 +171,7 @@ import regexPatternsService from "@/services/regex_pattern";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -181,7 +188,7 @@ export default defineComponent({
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,
-    NoData,
+    OEmptyState,
     OButton,
     OSearchInput,
     OTable,
