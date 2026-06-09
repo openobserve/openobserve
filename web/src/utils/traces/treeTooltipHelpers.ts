@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { escapeHtml } from '@/utils/html'
+
 /**
  * Helper functions for tree view custom tooltips
  */
@@ -76,7 +78,7 @@ export const generateNodeTooltipContent = (
   errorRate: number
 ): string => {
   return `
-    <strong>${nodeName}</strong><br/>
+    <strong>${escapeHtml(nodeName)}</strong><br/>
     Requests: ${formatNumber(requests)}<br/>
     Errors: ${formatNumber(errors)}<br/>
     Error Rate: ${errorRate.toFixed(2)}%
@@ -162,7 +164,7 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
 
   return `
     <div class="tree-tooltip">
-      <div class="tooltip-header">${metadata.serviceName || 'Unknown Service'}</div>
+      <div class="tooltip-header">${escapeHtml(metadata.serviceName || 'Unknown Service')}</div>
       <div class="tooltip-metrics">
         <div>Requests: ${formatNumber(requests)}</div>
         <div>Errors: ${formatNumber(errors)}</div>
@@ -266,7 +268,7 @@ export const generateTracePatternTooltipContent = (metadata: any): string => {
         color: rgba(255, 255, 255, 0.95);
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         padding-bottom: 4px;
-      ">${pathSignature}</div>
+      ">${escapeHtml(pathSignature)}</div>
 
       <div>
         <div style="margin-bottom: 2px;">Calls: <span style="font-family: monospace;">${count}</span></div>
