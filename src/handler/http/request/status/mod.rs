@@ -349,8 +349,9 @@ pub async fn zo_config() -> impl IntoResponse {
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
-    // Anomaly detection is always on when the enterprise feature is compiled in — no runtime flag.
-    let anomaly_detection_enabled = enterprise_value!(false, true);
+    // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
+    // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
+    let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";

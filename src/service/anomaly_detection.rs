@@ -402,6 +402,9 @@ pub async fn create_config(
     // Immediately kick off training in the background rather than waiting up to
     // `training_check_interval_seconds` (default 1h) for the scheduler tick.
     #[cfg(feature = "enterprise")]
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
     {
         let anomaly_id_for_training = anomaly_id.clone();
         tokio::spawn(async move {
