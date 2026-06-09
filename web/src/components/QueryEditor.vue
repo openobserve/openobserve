@@ -100,6 +100,7 @@
         :disabled="props.disableAi"
         @click="nlpMode = true"
         class="ai-floating-button"
+        :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img :src="nlpIcon" alt="AI Mode" class="tw:w-[18px] tw:h-[18px] ai-icon" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
@@ -574,11 +575,11 @@ defineExpose({
   overflow: hidden;
 }
 
-/* Floating AI Button (top-right corner) - leaves room for the expand button at right:0.25rem */
+/* Floating AI Button (top-right corner) - right is set dynamically via :style based on hasExpandButton */
 .ai-floating-button {
   position: absolute;
   top: 0.1875rem;
-  right: 2.375rem;
+  right: 0.25rem;
   z-index: 100;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%) !important;
   color: white !important;

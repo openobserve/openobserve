@@ -669,6 +669,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @blur="onBlurInlineVrlEditor"
                       @update:query="(v) => { vrlFunctionContent = v; handleVrlFunctionUpdate(v); }"
                     />
+                    <div
+                      v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -907,6 +913,7 @@ hljs.registerLanguage("sql", sql);
 
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
@@ -1121,6 +1128,7 @@ export default defineComponent({
     // Placeholder flags for inline editors (show image when empty + not focused)
     const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
     // ─── Typewriter placeholder for the inline query editor ──────────
     const streamFieldsForPlaceholder = computed(() =>
@@ -2285,6 +2293,7 @@ export default defineComponent({
       getImageURL,
       queryEditorPlaceholderFlag,
       vrlEditorPlaceholderFlag,
+      vrlPlaceholder,
       onQueryEditorFocus,
       onBlurInlineSqlEditor,
       onBlurInlineVrlEditor,

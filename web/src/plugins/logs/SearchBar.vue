@@ -1105,6 +1105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
                     />
+                    <div
+                      v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
@@ -1661,6 +1667,7 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -4688,6 +4695,8 @@ export default defineComponent({
     );
     // [END] query editor placeholder overlay
 
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
+
     // [START] typewriter placeholder for AI query input
     const aiQueryPlaceholderPrompts = computed(() => [
       t("search.askAIPlaceholderRotation.one"),
@@ -4887,6 +4896,7 @@ export default defineComponent({
       toggleLiveMode,
       aiQueryPlaceholder,
       editorPlaceholder,
+      vrlPlaceholder,
       patternsState,
       cancelPatterns,
     };

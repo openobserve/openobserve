@@ -285,6 +285,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-end="handleAlertFunctionEditorGenerationEnd"
                       @generation-success="handleAlertFunctionEditorGenerationSuccess"
                     />
+                    <div
+                      v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -445,6 +451,7 @@ import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -599,6 +606,7 @@ const restoreVrlEditor = () => {
 // Editor state
 const queryEditorPlaceholderFlag = ref(true);
 const functionEditorPlaceholderFlag = ref(true);
+const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
 // ─── Typewriter placeholder for the full query editor ────────────────
 const streamFieldsForPlaceholder = computed(() =>

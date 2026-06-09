@@ -255,11 +255,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
+                    @focus="functionEditorPlaceholderFlag = false"
+                    @blur="functionEditorPlaceholderFlag = true"
                     @update:query="handleVrlFunctionUpdate"
                     @generation-start="handleVrlGenerationStart"
                     @generation-end="handleVrlGenerationEnd"
                     @generation-success="handleVrlGenerationSuccess"
                   />
+                  <div
+                    v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
+                    class="query-editor-placeholder-overlay"
+                  >
+                    <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                  </div>
                 </div>
                 <div style="flex-shrink: 0; width: 100%">
                   <div style="display: flex;" class="tw:items-center">
@@ -330,6 +338,7 @@ import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -512,6 +521,7 @@ export default defineComponent({
 
     const functionEditorPlaceholderFlag = ref(true);
     const vrlFnEditorRef = ref(null);
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
 
     // A table panel with a breakdown field is a pivot table, which only
@@ -957,6 +967,7 @@ export default defineComponent({
       currentEditorSuggestions,
       _sqlOnFocus,
       _sqlOnBlur,
+      vrlPlaceholder,
     };
   },
 });
@@ -1039,4 +1050,31 @@ export default defineComponent({
 // .query-tab.active {
 //     border-bottom: 3px solid #000;
 // }
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
+}
 </style>
