@@ -27,7 +27,8 @@ test.describe("Landing Page Regression Bug Fixes", () => {
   // ==========================================================================
   test("Slack button should open a functional page, not blank", {
     tag: ['@bug-11604', '@P1', '@regression', '@landingRegression']
-  }, async () => {
+  }, async ({ page }) => {
+    // page is available but unused — slack opens in a new tab via pm.homePage.clickSlackButton()
     testLogger.info('Test: Verify Slack button opens valid page (Bug #11604)');
 
     // Verify slack button is visible in header via POM

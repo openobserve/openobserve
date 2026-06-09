@@ -25,60 +25,52 @@ test.describe("Data Sources Regression Bug Fixes", () => {
   // Bug #11682: On clicking on AI integration the credentials disappear
   // https://github.com/openobserve/openobserve/issues/11682
   // ==========================================================================
-  test("AI integration credentials should persist when tab is re-clicked", {
+  test("AI integration content should persist when integration is re-clicked", {
     tag: ['@bug-11682', '@P1', '@regression', '@datasourcesRegression']
   }, async ({ page }) => {
-    testLogger.info('Test: Verify AI integration credentials persist on click (Bug #11682)');
+    testLogger.info('Test: Verify AI integration content persists on re-click (Bug #11682)');
 
-    // Navigate to Data Sources (Ingestion) page
+    // Navigate to Data Sources → AI Integrations via sidebar menu
     await pm.dataPage.gotoDataPage();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to Data Sources page');
 
-    // Switch to Custom tab to reveal the AI Integration section
-    const customTab = page.getByRole('tab', { name: /Custom/i });
-    if (await customTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await customTab.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Switched to Custom tab');
-    }
+    // Click the AI Integrations nav item in the sidebar
+    const aiNavItem = page.locator('[data-test="menu-link-\\/ai-integrations-item"]');
+    await expect(aiNavItem, 'AI Integrations nav item should be visible').toBeVisible({ timeout: 5000 });
+    await aiNavItem.click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Navigated to AI Integrations');
 
-    // Find and click the AI Integration section
-    const aiIntegrationTab = page.getByRole('tab', { name: /AI Integration/i });
-    await expect(aiIntegrationTab, 'AI Integration tab should be visible').toBeVisible({ timeout: 5000 });
-    testLogger.info('AI Integration tab found');
-
-    await aiIntegrationTab.click();
+    // Click the first available AI integration item to view its detail
+    const firstIntegration = page.locator('[data-test^="ai-integrations-item-"]').first();
+    await expect(firstIntegration, 'At least one AI integration should be visible').toBeVisible({ timeout: 5000 });
+    await firstIntegration.click();
     await page.waitForTimeout(1500);
+    testLogger.info('Clicked first AI integration item');
 
-    // Capture credential field count before re-click
-    const credentialFields = page.locator(
-      '[data-test*="credential"], [data-test*="api-key"], input[type="password"], [data-test*="ai-cred"]'
-    );
-    const credentialCountBefore = await credentialFields.count();
-    testLogger.info(`Credential fields before re-click: ${credentialCountBefore}`);
+    // Verify the detail content rendered (CopyContent shows markdown/instructions)
+    const detailContent = page.locator('[data-test="rum-content-text"]');
+    const contentBefore = await detailContent.textContent().catch(() => '');
+    testLogger.info(`Detail content length before re-click: ${contentBefore.length}`);
 
-    // Re-click the AI Integration tab — this was the bug trigger
-    await aiIntegrationTab.click();
-    await page.waitForTimeout(1500);
-
-    // Verify the page still has content after re-click
-    const pageContent = await page.locator('.q-page-container, main, .q-page')
-      .first().textContent().catch(() => '');
-    const contentLengthAfter = pageContent.trim().length;
-    testLogger.info(`Page content length after re-click: ${contentLengthAfter}`);
-
-    expect(contentLengthAfter,
-      'Bug #11682: AI Integration panel should not go blank when re-clicking its tab'
+    expect(contentBefore.length,
+      'Bug #11682: AI Integration detail should show content on first click'
     ).toBeGreaterThan(0);
 
-    // Verify credentials didn't disappear
-    const credentialCountAfter = await credentialFields.count();
-    expect(credentialCountAfter,
-      'Bug #11682: Credential fields should not disappear when re-clicking tab'
-    ).toBe(credentialCountBefore);
+    // Re-click the same integration — this was the bug trigger (#11682)
+    await firstIntegration.click();
+    await page.waitForTimeout(1500);
 
-    testLogger.info('PASSED: AI Integration content persists on tab re-click');
+    // Verify content is still present after re-click (not blank)
+    const contentAfter = await detailContent.textContent().catch(() => '');
+    testLogger.info(`Detail content length after re-click: ${contentAfter.length}`);
+
+    expect(contentAfter.length,
+      'Bug #11682: AI Integration content should not disappear when re-clicking'
+    ).toBeGreaterThan(0);
+
+    testLogger.info('PASSED: AI Integration content persists on re-click');
   });
 
   test.afterEach(async () => {

@@ -61,7 +61,8 @@ test.describe("Reports Regression Bug Fixes", () => {
       await pm.reportsPage.createReportSaveButton();
       testLogger.info(`Created report: ${TEST_REPORT_NAME}`);
 
-      await page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+      // Wait for success toast after report save (OToast component's success variant)
+      await page.locator('[data-test-variant="success"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
       // Navigate to reports list and edit the report to configure schedule

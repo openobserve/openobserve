@@ -549,15 +549,16 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await page.waitForTimeout(1000);
 
     // Verify no error/spurious notification appeared during the add/cancel flow
-    const notifications = page.locator('.q-notification, div[role="alert"]');
-    const notificationCount = await notifications.count();
-    testLogger.info(`Notifications visible after cancel: ${notificationCount}`);
+    // Use OToast component's explicit data-test attributes (not Quasar CSS classes)
+    const errorToasts = page.locator('[data-test-variant="error"]');
+    const errorToastCount = await errorToasts.count();
+    testLogger.info(`Error toasts visible after cancel: ${errorToastCount}`);
 
     // Bug #11483 was about duplicate success notifications on save.
-    // The UI must not show spurious duplicate notifications during the flow.
-    const positiveNotifications = page.locator('.q-notification.bg-positive, div[role="alert"].positive');
-    const successCount = await positiveNotifications.count();
-    expect(successCount, 'Bug #11483: No duplicate success notifications should appear during add/cancel').toBe(0);
+    // The UI must not show spurious success toasts during the add/cancel flow.
+    const successToasts = page.locator('[data-test-variant="success"]');
+    const successToastCount = await successToasts.count();
+    expect(successToastCount, 'Bug #11483: No duplicate success toasts should appear during add/cancel').toBe(0);
 
     testLogger.info('PASSED: No duplicate notifications detected');
   });

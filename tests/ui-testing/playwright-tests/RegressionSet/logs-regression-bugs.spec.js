@@ -1400,33 +1400,21 @@ test.describe("Logs Regression Bug Fixes", () => {
     const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
     const secondStream = 'e2e_8641_stream';
-    await sendRequest(page, getIngestionUrl(orgId, secondStream), {
+    await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
       level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
-    }, headers);
+    }], headers);
     testLogger.info(`Ingested data to stream: ${secondStream}`);
+    // Register for cleanup in afterEach
+    fieldCacheStreamsToCleanup.push(secondStream);
 
-    await pm.logsPage.navigateToLogs();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Ensure non-SQL (KQL/UI) mode by checking SQL toggle state
-    const sqlToggle = page.locator(pm.logsPage.sqlModeToggleBtn);
-    const sqlActive = await pm.logsPage.isSqlModeEnabled().catch(() => true);
-    if (sqlActive) {
-      // Toggle off SQL mode to enter non-SQL/KQL mode
-      await sqlToggle.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Switched to non-SQL (KQL) mode');
-    }
-
-    // Select multi-stream join via POM (secondStream + e2e_automate)
+    // selectIndexAndStreamJoinUnion handles its own navigation to logs
     await pm.logsPage.selectIndexAndStreamJoinUnion(secondStream, 'e2e_automate');
     testLogger.info('Multi-stream join selected');
 
-    await page.waitForTimeout(2000);
-
     // Run query and verify no error
     await pm.logsPage.clickRunQueryButton();
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
 
     const errorVisible = await page.locator('[class*="error"], [class*="negative"], .q-banner, .q-notification')
       .filter({ hasText: /error|failed|invalid/i })
@@ -1453,7 +1441,8 @@ test.describe("Logs Regression Bug Fixes", () => {
 
     // Run a query so the page has results state
     await pm.logsPage.clickRunQueryButton();
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
 
     // Open share via POM and verify success notification (link copied to clipboard)
     const shareBtn = page.locator(pm.logsPage.shareLinkButton);
@@ -1465,6 +1454,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     const linkCopiedNotification = page.getByText(/link copied|share.*success|success/i).first();
     const shareInteractionWorked = await linkCopiedNotification.isVisible({ timeout: 5000 }).catch(() => false);
     testLogger.info(`Share notification visible: ${shareInteractionWorked}`);
+    expect(shareInteractionWorked,
+      'Bug #5839: Share action should produce a success notification (link copied)'
+    ).toBeTruthy();
 
     // Bug #5839: share interaction must not fail and the current page searchbar
     // must remain visible and functional after the share action
