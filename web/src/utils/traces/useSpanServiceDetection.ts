@@ -42,21 +42,9 @@ export function useSpanServiceDetection(
   }
 
   function resolveSpanIdentity(span: Span): string {
-    const serviceName = span.service_name || "unknown";
+    const serviceName = span.infer_service_name || span.infer_service_system || span.service_name || "unknown";
 
-    if (!config.value || span.span_kind == null) return serviceName;
-
-    const spanKindStr = String(span.span_kind);
-    const mappedKind = SPAN_KIND_MAP[spanKindStr] ?? spanKindStr;
-
-    if (
-      config.value.server_kinds.includes(spanKindStr) ||
-      config.value.server_kinds.includes(mappedKind)
-    ) {
-      return serviceName;
-    }
-
-    return getServiceName(span) || serviceName;
+    return serviceName;
   }
 
   return { resolveSpanIdentity };
