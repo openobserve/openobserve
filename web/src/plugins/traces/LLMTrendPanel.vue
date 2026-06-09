@@ -687,6 +687,13 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// Match the KPI tiles' visible chrome — `.card-container`'s box-shadow
+// alone is too faint to read against the page bg, so we add an explicit
+// border the same way LLMInsightsDashboard does for `.kpi-card`.
+.llm-trend-panel {
+  border: 1px solid var(--o2-border-color);
+}
+
 .llm-trend-chart {
   height: 220px;
   width: 100%;
