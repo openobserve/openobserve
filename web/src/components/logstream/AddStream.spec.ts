@@ -407,13 +407,13 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.name = "test_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
       await flushPromises();
 
-      expect(mockGetStream).toHaveBeenCalledWith("test-stream", "logs", false);
+      expect(mockGetStream).toHaveBeenCalledWith("test_stream", "logs", false);
     });
 
     it("should not call createStream if stream already exists", async () => {
@@ -440,7 +440,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -458,7 +458,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -525,7 +525,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "new-stream";
+      vm.streamInputs.name = "new_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.saveStream();
@@ -543,7 +543,7 @@ describe("AddStream", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.streamInputs.name = "test-stream";
+      vm.streamInputs.name = "test_stream";
       vm.streamInputs.stream_type = "logs";
 
       await vm.submitForm();
