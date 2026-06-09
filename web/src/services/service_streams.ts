@@ -135,16 +135,8 @@ export function buildChipDimensionsFromFilters(
     candidates.push([key, value]);
   }
 
-  // Second pass: value dedup — if two fields survived with the same value
-  // (they belong to different semantic groups that happen to mean the same
-  // thing, e.g. "service-namespace" vs "k8s-namespace" both = "default"),
-  // keep only the alphabetically first field name.
-  candidates.sort(([a], [b]) => a.localeCompare(b));
-  const seenValues = new Set<string>();
   const result: Record<string, string> = {};
   for (const [key, value] of candidates) {
-    if (seenValues.has(value)) continue;
-    seenValues.add(value);
     result[key] = value;
   }
   return result;

@@ -160,8 +160,7 @@ export function useMetricsCorrelationDashboard() {
         return !skip;
       })
       .map(([field, value]) => {
-        // Quote field name if it contains special characters
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
+        const quotedField = `"${field.replace(/"/g, '""')}"`;
         const escapedValue = value.replace(/'/g, "''");
         return `${quotedField} = '${escapedValue}'`;
       })
@@ -356,7 +355,7 @@ ORDER BY x_axis_1`;
         );
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
+        const quotedField = `"${field.replace(/"/g, '""')}"`;
         const escapedValue = value.replace(/'/g, "''");
         return `${quotedField} = '${escapedValue}'`;
       })

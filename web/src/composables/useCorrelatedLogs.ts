@@ -164,9 +164,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         if (field.startsWith('_')) continue;
         if (value === null || value === undefined || value === '') continue;
 
-        const quotedField = /[^a-zA-Z0-9_]/.test(field)
-          ? `"${field.replace(/"/g, '""')}"`
-          : field;
+        const quotedField = `"${field.replace(/"/g, '""')}"`;
         const escapedValue = String(value).replace(/'/g, "''");
         conditions.push(`${quotedField} = '${escapedValue}'`);
       }
