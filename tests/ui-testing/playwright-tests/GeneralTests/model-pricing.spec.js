@@ -297,7 +297,8 @@ test.describe("Model Pricing — Create Model", () => {
             const templateBtn = page.locator('button').filter({ hasText: /openai/i }).first();
             if (await templateBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
                 await templateBtn.click();
-                await page.waitForTimeout(300);
+                // Wait for template to populate at least one price-value input
+                await page.getByPlaceholder('0.00').first().waitFor({ state: 'visible', timeout: 5000 });
                 // Template applies keys with 0 values — need at least one non-zero price to save.
                 // Find the first existing price-value input (not the add-row, which is .last()).
                 const firstValueInput = page.getByPlaceholder('0.00').first();
@@ -384,8 +385,7 @@ test.describe("Model Pricing — Form Validation", () => {
         await nameInput.press('Tab');
 
         // OInput renders error as data-test="{parentDataTest}-error"
-        const nameError = page.locator('[data-test="model-pricing-name-input-error"]');
-        await expect(nameError).toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -410,8 +410,7 @@ test.describe("Model Pricing — Form Validation", () => {
         await patternInput.click({ force: true });
         await patternInput.press('Tab');
 
-        const patternError = page.locator('[data-test="model-pricing-pattern-input-error"]');
-        await expect(patternError).toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -429,13 +428,12 @@ test.describe("Model Pricing — Form Validation", () => {
         // Fill with 257-char name — triggers nameError, OInput error shows after blur
         await pm.modelPricingPage.fillName('a'.repeat(257));
 
-        const nameError = page.locator('[data-test="model-pricing-name-input-error"]');
-        await expect(nameError).toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.nameInputError).toBeVisible({ timeout: 5000 });
         await expect(pm.modelPricingPage.saveBtn).toBeDisabled({ timeout: 3000 });
 
         // Fix by filling a valid short name
         await pm.modelPricingPage.fillName('a'.repeat(10));
-        await expect(nameError).not.toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.nameInputError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -452,12 +450,11 @@ test.describe("Model Pricing — Form Validation", () => {
 
         await pm.modelPricingPage.fillPattern('[invalid(');
 
-        const patternError = page.locator('[data-test="model-pricing-pattern-input-error"]');
-        await expect(patternError).toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.patternInputError).toBeVisible({ timeout: 5000 });
         await expect(pm.modelPricingPage.saveBtn).toBeDisabled({ timeout: 3000 });
 
         await pm.modelPricingPage.fillPattern('^gpt-4.*');
-        await expect(patternError).not.toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.patternInputError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -501,20 +498,11 @@ test.describe("Model Pricing — Form Validation", () => {
         await pm.modelPricingPage.fillName(`mp_val_spaces_${Date.now()}`);
         await pm.modelPricingPage.fillPattern(`^mp_val_spaces.*`);
 
-        await pm.modelPricingPage.addKeyInput.focus();
-        await pm.modelPricingPage.addKeyInput.selectText();
-        await page.keyboard.type('input tokens');
-        await pm.modelPricingPage.addValueInput.focus();
-        await page.keyboard.type('0.000002');
-
-        const addPriceBtn = page.locator('.price-add-row button').last();
-        await addPriceBtn.click();
-
-        const errorVisible = await pm.modelPricingPage.toastMessage.isVisible({ timeout: 5000 }).catch(() => false);
-        const inlineError = page.locator('.text-negative, [class*="error"]').first();
-        const inlineVisible = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
-
-        expect(errorVisible || inlineVisible).toBeTruthy();
+        // addPriceRow triggers addPrice() which calls notifyWarn when key contains spaces
+        await pm.modelPricingPage.addPriceRow('input tokens', 0.000002);
+        await expect(
+            pm.modelPricingPage.toastMessage.filter({ hasText: /must not contain spaces/i })
+        ).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -532,20 +520,11 @@ test.describe("Model Pricing — Form Validation", () => {
         await pm.modelPricingPage.fillName(`mp_val_intkey_${Date.now()}`);
         await pm.modelPricingPage.fillPattern(`^mp_val_intkey.*`);
 
-        await pm.modelPricingPage.addKeyInput.focus();
-        await pm.modelPricingPage.addKeyInput.selectText();
-        await page.keyboard.type('123');
-        await pm.modelPricingPage.addValueInput.focus();
-        await page.keyboard.type('0.000002');
-
-        const addPriceBtn = page.locator('.price-add-row button').last();
-        await addPriceBtn.click();
-
-        const errorVisible = await pm.modelPricingPage.toastMessage.isVisible({ timeout: 5000 }).catch(() => false);
-        const inlineError = page.locator('.text-negative, [class*="error"]').first();
-        const inlineVisible = await inlineError.isVisible({ timeout: 3000 }).catch(() => false);
-
-        expect(errorVisible || inlineVisible).toBeTruthy();
+        // addPriceRow triggers addPrice() which calls notifyWarn when key is a pure integer
+        await pm.modelPricingPage.addPriceRow('123', 0.000002);
+        await expect(
+            pm.modelPricingPage.toastMessage.filter({ hasText: /pure integer/i })
+        ).toBeVisible({ timeout: 5000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -931,7 +910,7 @@ test.describe("Model Pricing — Search and Filter", () => {
 
             await pm.modelPricingPage.gotoModelPricingPage();
 
-            const searchInput = page.locator('input[type="search"], input[placeholder*="search" i], [data-test*="search"] input').first();
+            const searchInput = pm.modelPricingPage.listSearch;
             if (await searchInput.isVisible({ timeout: 5000 }).catch(() => false)) {
                 await searchInput.fill(targetName);
                 await expect(pm.modelPricingPage.listTable.locator(`tr:has-text("${targetName}")`)).toBeVisible({ timeout: 5000 });
@@ -964,7 +943,7 @@ test.describe("Model Pricing — Search and Filter", () => {
 
             await pm.modelPricingPage.gotoModelPricingPage();
 
-            const searchInput = page.locator('input[type="search"], input[placeholder*="search" i], [data-test*="search"] input').first();
+            const searchInput = pm.modelPricingPage.listSearch;
             if (await searchInput.isVisible({ timeout: 5000 }).catch(() => false)) {
                 await searchInput.fill(`mp_pat_unique_${ts}`);
                 await expect(pm.modelPricingPage.listTable.locator(`tr:has-text("${name}")`)).toBeVisible({ timeout: 5000 });
@@ -1125,7 +1104,11 @@ test.describe("Model Pricing — Import", () => {
         await pm.modelPricingPage.clickImport();
 
         await pm.modelPricingPage.uploadImportJson(importJson);
-        await page.waitForTimeout(1000);
+        // Wait for Vue to parse the uploaded file before confirming
+        await Promise.race([
+            pm.modelPricingPage.importCreationTitle.waitFor({ state: 'visible', timeout: 5000 }),
+            pm.modelPricingPage.importPatternInput.waitFor({ state: 'visible', timeout: 5000 }),
+        ]).catch(() => {});
         await pm.modelPricingPage.clickImportConfirm();
 
         await Promise.race([
@@ -1169,7 +1152,7 @@ test.describe("Model Pricing — Import", () => {
             await pm.modelPricingPage.gotoModelPricingPage();
             await pm.modelPricingPage.clickImport();
             await pm.modelPricingPage.uploadImportJson(importJson);
-            await page.waitForTimeout(1000);
+            await pm.modelPricingPage.importCreationTitle.waitFor({ state: 'visible', timeout: 5000 });
             await pm.modelPricingPage.clickImportConfirm();
 
             await expect(pm.modelPricingPage.importNameInput).toBeVisible({ timeout: 10000 });
@@ -1214,7 +1197,11 @@ test.describe("Model Pricing — Import", () => {
         await pm.modelPricingPage.gotoModelPricingPage();
         await pm.modelPricingPage.clickImport();
         await pm.modelPricingPage.uploadImportJson(importJson);
-        await page.waitForTimeout(1000);
+        // Wait for Vue to parse the uploaded file before confirming
+        await Promise.race([
+            pm.modelPricingPage.importCreationTitle.waitFor({ state: 'visible', timeout: 5000 }),
+            pm.modelPricingPage.importPatternInput.waitFor({ state: 'visible', timeout: 5000 }),
+        ]).catch(() => {});
         await pm.modelPricingPage.clickImportConfirm();
 
         // Frontend validates missing pattern and renders the correction OInput
@@ -1255,7 +1242,7 @@ test.describe("Model Pricing — Import", () => {
             tiers: [{ name: 'Default', condition: null, prices: { input: 0.000002 } }],
         }]);
         await pm.modelPricingPage.uploadImportJson(importJson);
-        await page.waitForTimeout(500);
+        await pm.modelPricingPage.importCreationTitle.waitFor({ state: 'visible', timeout: 5000 });
 
         await pm.modelPricingPage.clickImportCancel();
 
@@ -1305,7 +1292,8 @@ test.describe("Model Pricing — Built-in Tab", () => {
 
         if (await pm.modelPricingPage.builtInSearch.isVisible({ timeout: 5000 }).catch(() => false)) {
             await pm.modelPricingPage.builtInSearch.fill('gpt');
-            await page.waitForTimeout(500);
+            // Client-side filter — wait for a row to be attached before counting
+            await pm.modelPricingPage.builtInTable.locator('tbody tr').first().waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
             const totalAfter = await pm.modelPricingPage.builtInTable.locator('tbody tr').count();
             expect(totalAfter).toBeLessThanOrEqual(totalBefore);
         } else {

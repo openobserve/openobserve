@@ -58,7 +58,9 @@ export class ModelPricingPage {
         this.editorBackBtn      = page.locator('[data-test="model-pricing-editor-back-btn"]');
         this.editorTitle        = page.locator('[data-test="model-pricing-editor-title"]');
         this.nameInput          = page.locator('[data-test="model-pricing-name-input"]');
+        this.nameInputError     = page.locator('[data-test="model-pricing-name-input-error"]');
         this.patternInput       = page.locator('[data-test="model-pricing-pattern-input"]');
+        this.patternInputError  = page.locator('[data-test="model-pricing-pattern-input-error"]');
         this.examplesDialog     = page.locator('[data-test="model-pricing-editor-examples-dialog"]');
         this.cancelBtn          = page.locator('[data-test="model-pricing-editor-cancel-btn"]');
         this.saveBtn            = page.locator('[data-test="model-pricing-editor-save-btn"]');
@@ -66,12 +68,17 @@ export class ModelPricingPage {
         // Price row add-inputs are scoped per tier in addPriceRow() — no class-level locators.
 
         // ============================================================
+        // List page — search (OSearchInput, placeholder from i18n modelPricing.searchPlaceholder)
+        // ============================================================
+        this.listSearch         = page.getByPlaceholder('Search models...');
+
+        // ============================================================
         // Built-in tab
         // NOTE: BuiltInModelPricingTab.vue is orphaned — all tabs use the same OTable.
         // The System/Built-in tab just filters filteredModels to show inherited rows.
         // builtInTable = same as listTable; builtInSearch = same OSearchInput in header.
         // ============================================================
-        this.builtInSearch      = page.getByPlaceholder(/search/i).first();
+        this.builtInSearch      = page.getByPlaceholder('Search models...');
         this.builtInRefreshBtn  = page.locator('[data-test="model-pricing-refresh-btn"]');
         this.builtInTable       = page.locator('[data-test="model-pricing-list-table"]');
 
