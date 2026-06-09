@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use config::utils::json;
 use o2_enterprise::enterprise::cloud::billings::{
     self, MeteringProvider,
@@ -20,7 +22,7 @@ use o2_enterprise::enterprise::cloud::billings::{
 };
 
 use crate::{
-    handler::http::models::billings::GetOrgUsageResponseBody,
+    handler::http::models::billings::{GetOrgUsageResponseBody, OrgUserData},
     service::self_reporting::search::get_usage,
 };
 
@@ -30,6 +32,7 @@ pub async fn get_org_usage(
     unit: &str,
 ) -> Result<GetOrgUsageResponseBody, billings::BillingError> {
     let mut cycle_details = None;
+    let mut pricing_map = HashMap::new();
 
     if let Ok(billings) =
         o2_enterprise::enterprise::cloud::customer_billings::get_by_org_id(org_id).await
@@ -38,16 +41,20 @@ pub async fn get_org_usage(
         // id is present, we will try to get the cycle based usage
         if let Some(b) = billings.first() {
             if b.provider == MeteringProvider::Stripe
-                && usage_range.unit == RangeUnit::Cycle
                 && let Some(id) = &b.subscription_id
             {
-                let sub =
-                    o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id).await?;
+                pricing_map =
+                    o2_enterprise::enterprise::cloud::billings::get_pricing_map(id).await?;
+                if usage_range.unit == RangeUnit::Cycle {
+                    let sub =
+                        o2_enterprise::enterprise::cloud::billings::get_stripe_subscription(id)
+                            .await?;
 
-                let end = sub.current_period_end;
-                let diff = sub.current_period_end - sub.current_period_start;
-                cycle_details = Some((end, diff));
-                log::info!("using end {end} diff {diff} for org {org_id} for usage query")
+                    let end = sub.current_period_end;
+                    let diff = sub.current_period_end - sub.current_period_start;
+                    cycle_details = Some((end, diff));
+                    log::info!("using end {end} diff {diff} for org {org_id} for usage query")
+                }
             }
         }
     }
@@ -79,8 +86,14 @@ pub async fn get_org_usage(
 
     usage_results.append(&mut data_retention_results);
 
+    let mut data = Vec::with_capacity(usage_results.len());
+    for result in usage_results {
+        let entry = OrgUserData::from_query_result(result, &pricing_map);
+        data.push(entry)
+    }
+
     let mut body = GetOrgUsageResponseBody {
-        data: usage_results.into_iter().map(From::from).collect(),
+        data,
         range: usage_range.to_string(),
         start_time,
         end_time,
