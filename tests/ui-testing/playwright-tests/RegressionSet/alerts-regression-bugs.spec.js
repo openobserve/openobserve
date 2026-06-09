@@ -16,9 +16,8 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-const RUN_ID = Date.now();
-const DESTINATION_NAME = `e2e_tpl_override_dest_${RUN_ID}`;
-const TEMPLATE_NAME = `e2e_tpl_override_tpl_${RUN_ID}`;
+let DESTINATION_NAME;
+let TEMPLATE_NAME;
 
 test.describe("Alerts Regression Bugs — Batch 1", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -28,9 +27,13 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
   // Setup: Create unique-named template + destination via API so that:
   //   1) The Add Alert button is enabled (requires at least one destination)
   //   2) Templates are available in the override template select
-  //   3) Per-run uniqueness avoids stale-state collisions from prior runs
+  //   3) Date.now() + Math.random() avoids parallel-worker collisions
   // ============================================================================
   test.beforeAll(async ({ browser }) => {
+    const RUN_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    DESTINATION_NAME = `e2e_tpl_override_dest_${RUN_ID}`;
+    TEMPLATE_NAME = `e2e_tpl_override_tpl_${RUN_ID}`;
+
     testLogger.info('Setting up prerequisites for template override test (beforeAll)');
 
     const context = await browser.newContext({ storageState: 'playwright-tests/utils/auth/user.json' });

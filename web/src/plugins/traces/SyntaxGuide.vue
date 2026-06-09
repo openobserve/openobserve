@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OButton
         data-cy="syntax-guide-button"
+        v-bind="$attrs"
         variant="outline"
         size="icon-xs"
         :class="[

@@ -108,8 +108,8 @@ export class AlertsPage {
             contextAttributeValueInput: '[data-test="alert-variables-value-input"]',
             rowTemplateTextarea: '[data-test="add-alert-row-input-textarea"]',
             templateOverrideSelect: '.template-select-field',
-            // Advanced tab: template override select uses .alert-v3-select class
-            advancedTemplateOverrideSelect: '.step-advanced .alert-v3-select',
+            // Advanced tab: template override select with explicit data-test
+            advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             advancedTabBtn: 'button:has-text("Advanced")',
