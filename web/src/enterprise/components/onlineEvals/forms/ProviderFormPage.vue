@@ -133,19 +133,19 @@
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
-        <div class="provider-field provider-field--auth">
+        <div class="provider-field">
           <label class="provider-field__label">
-            {{ t("onlineEvals.provider.authConfigLabel") }}
+            {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="provider-field__req">*</span>
           </label>
           <OInput
-            v-model="form.authConfig"
-            type="textarea"
+            v-model.trim="form.apiKey"
+            type="password"
             size="sm"
-            :rows="6"
-            data-test="provider-form-auth-config-input"
+            :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
+            data-test="provider-form-api-key-input"
           />
-          <div class="provider-field__help">{{ t("onlineEvals.provider.authConfigHelp") }}</div>
+          <div class="provider-field__help">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>
@@ -188,7 +188,7 @@ import {
   defaultModelOf,
   providerTypeOf,
 } from "../utils/evalEntity";
-import { parseJson, showError, splitCsv } from "../utils/evalFormat";
+import { showError, splitCsv } from "../utils/evalFormat";
 
 const props = defineProps<{
   orgId: string;
@@ -223,7 +223,7 @@ function initForm(row: Provider | null) {
       endpoint: "",
       defaultModel: "",
       availableModels: "",
-      authConfig: '{\n  "api_key": ""\n}',
+      apiKey: "",
     };
   }
   return {
@@ -232,7 +232,10 @@ function initForm(row: Provider | null) {
     endpoint: row.endpoint || "",
     defaultModel: defaultModelOf(row),
     availableModels: availableModelsOf(row).join(", "),
-    authConfig: '{\n  "api_key": ""\n}',
+    // Auth is write-only — never seed the existing secret. The user
+    // leaves the field blank to keep the stored value, or enters a new
+    // one to rotate it.
+    apiKey: "",
   };
 }
 
@@ -246,7 +249,10 @@ async function save() {
       endpoint: form.value.endpoint || null,
       defaultModel: form.value.defaultModel,
       availableModels: splitCsv(form.value.availableModels),
-      authConfig: parseJson(form.value.authConfig, t("onlineEvals.provider.authConfigLabel")),
+      // Backend expects an authConfig object; the form only collects an
+      // API key, which is the only auth secret the supported providers
+      // need today. Wrap it as { api_key: <value> }.
+      authConfig: { api_key: form.value.apiKey },
       // `isDefault` is no longer surfaced in the form. Always send false;
       // backend defaults to non-default and the user manages default-ness
       // (if ever needed) outside this create/edit flow.
