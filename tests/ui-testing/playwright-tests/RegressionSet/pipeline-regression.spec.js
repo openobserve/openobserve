@@ -519,6 +519,12 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await pageManager.pipelinesPage.settingsMenu.click();
     await page.waitForTimeout(1000);
 
+    // Pipeline Destinations tab is enterprise-only (v-if="config.isEnterprise == 'true'")
+    const tabExists = await pageManager.pipelinesPage.pipelineDestinationsTab.count();
+    if (!tabExists) {
+      test.skip(true, 'Pipeline Destinations tab not available (enterprise-only feature)');
+    }
+
     await expect(pageManager.pipelinesPage.pipelineDestinationsTab,
       'Pipeline Destinations tab should be visible').toBeVisible({ timeout: 5000 });
     await pageManager.pipelinesPage.pipelineDestinationsTab.click();
