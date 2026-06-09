@@ -1009,9 +1009,8 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
       testLogger.info("Panel saved, navigating away");
 
-      // Navigate back to dashboard list
+      // Navigate back to dashboard list (direct URL — avoids double navigation race)
       await navigateToDashboards(page);
-      await pm.dashboardList.menuItem("dashboards-item");
 
       // Wait for dashboard list to load
       await pm.dashboardPanelActions.waitForDashboardSearchVisible();

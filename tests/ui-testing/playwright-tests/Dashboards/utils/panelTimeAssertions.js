@@ -62,9 +62,10 @@ export async function assertPanelTimeInURL(page, panelId, expectedValue) {
 
   // Vue Router uses history.replaceState() which doesn't trigger networkidle.
   // Poll until the URL reflects the reactive write from onPanelTimeApply.
+  // Use 15 s in CI — Vue reactivity + router.replace can take a tick or two.
   await expect.poll(
     async () => page.url(),
-    { intervals: [100, 200, 500, 1000], timeout: 5000 }
+    { intervals: [100, 200, 500, 1000, 2000], timeout: 15000 }
   ).toContain(expectedParam);
 
   testLogger.info('Panel time parameter found in URL', { panelId, expectedValue });
