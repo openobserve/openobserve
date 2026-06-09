@@ -18,46 +18,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="card-container tw:border-b tw:border-border-default">
-          <div
-            class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
-          >
-           <syntax-guide />
-            <date-time
-              auto-apply
-              menu-align="end"
-              :default-type="sessionState.data.datetime.valueType"
-              :default-absolute-time="{
-                startTime: sessionState.data.datetime.startTime,
-                endTime: sessionState.data.datetime.endTime,
-              }"
-              :default-relative-time="
-                sessionState.data.datetime.relativeTimePeriod
-              "
-              data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateChange"
-            />
-            <OButton
-              data-test="metrics-explorer-run-query-button"
-              data-cy="metrics-explorer-run-query-button"
-              variant="primary"
-              size="sm-toolbar"
-              :title="t('metrics.runQuery')"
-              @click="runQuery"
-            >
-              {{ t("metrics.runQuery") }}
-            </OButton>
-          </div>
-          <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
-            <query-editor
-              editor-id="session-replay-query-editor"
-              class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]!"
-              v-model:query="sessionState.data.editorValue"
-              :debounce-time="300"
-            />
-          </div>
-        </div>
-      </div>
+        <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
+          <div class="tw:flex tw:items-start tw:gap-1">
+            <!-- Query editor (flex-grow to fill available space) -->
+            <div class="tw:flex-1 tw:min-w-0">
+              <query-editor
+                editor-id="session-replay-query-editor"
+                :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
+                v-model:query="sessionState.data.editorValue"
+                :debounce-time="300"
+              />
+            </div>
+
+            <!-- Controls on the right -->
+            <div class="tw:flex tw:items-start tw:gap-1 tw:shrink-0">
+              <syntax-guide />
+              <date-time
+                auto-apply
+                menu-align="end"
+                :default-type="sessionState.data.datetime.valueType"
+                :default-absolute-time="{
+                  startTime: sessionState.data.datetime.startTime,
+                  endTime: sessionState.data.datetime.endTime,
+                }"
+                :default-relative-time="
+                  sessionState.data.datetime.relativeTimePeriod
+                "
+                data-test="logs-search-bar-date-time-dropdown"
+                @on:date-change="updateDateChange"
+              />
+              <!-- Run query button -->
+              <OButton
+                data-test="sessions-run-query-button"
+                variant="primary"
+                size="sm-toolbar"
+                :title="t('metrics.runQuery')"
+                @click="runQuery"
+                class="tw:shrink-0"
+              >
+                {{ t("metrics.runQuery") }}
+              </OButton>
+            </div><!-- end controls -->
+          </div><!-- end flex row -->
+        </div><!-- end card-container -->
+      </div><!-- end toolbar wrapper -->
       <OSplitter
         class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
         v-model="splitterModel"
@@ -236,6 +240,14 @@ const completeQuery = computed(() => {
   return whereClause;
 });
 
+// Dynamic editor height based on content lines
+const queryEditorHeight = computed(() => {
+  const lines = (sessionState.data.editorValue.match(/\n/g) || []).length + 1;
+  if (lines === 1) return 'tw:h-[2rem]!';
+  if (lines === 2) return 'tw:h-[3.5rem]!';
+  return 'tw:h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+});
+
 const isMounted = ref(false);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
@@ -340,6 +352,8 @@ onMounted(async () => {
     getSessions();
   }
 });
+
+
 
 const getStreamFields = () => {
   isLoading.value.push(true);
