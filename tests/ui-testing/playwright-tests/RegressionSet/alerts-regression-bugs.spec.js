@@ -250,170 +250,146 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
   // Bug #11315: Bulk alert import failing saying alert already exists
   // https://github.com/openobserve/openobserve/issues/11315
   // ==========================================================================
-  test("Bulk alert import should not fail with 'alert already exists' error", {
+  test("Alert import dialog should open without premature duplicate errors", {
     tag: ['@bug-11315', '@P1', '@regression', '@alertsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Verify bulk alert import does not falsely report duplicates (Bug #11315)');
 
-    // Navigate to alerts page
     await pm.commonActions.navigateToAlerts();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('✓ Navigated to alerts page');
+    testLogger.info('Navigated to alerts page');
 
-    // Look for import button using data-test attribute
-    const importButton = page.locator('[data-test*="import-alert"], [data-test*="alert-import"]').filter({ hasText: /Import|import/i }).first();
+    // Open the import dialog via POM locator
+    const importButton = page.locator(pm.alertsPage.alertImportButton);
     await expect(importButton, 'Alert import button should be visible').toBeVisible({ timeout: 5000 });
-
-    testLogger.info('✓ Found alert import button');
-
-    // Click import to open the import dialog
     await importButton.click();
     await page.waitForTimeout(2000);
+    testLogger.info('Clicked import button');
 
-    // Look for file upload input in the import dialog
-    const fileInput = page.locator('input[type="file"]').first();
-    const dropZone = page.locator('[data-test*="file-upload"], .q-uploader, [class*="drop"]').first();
+    // Verify import dialog opened: the "Import JSON file" tab should be visible
+    const importFileTab = page.locator(pm.alertsPage.alertImportFileTab);
+    await expect(importFileTab, 'Import dialog should open with file tab visible').toBeVisible({ timeout: 5000 });
 
-    const importDialogVisible = (await fileInput.isVisible({ timeout: 3000 }).catch(() => false)) ||
-      (await dropZone.isVisible({ timeout: 3000 }).catch(() => false));
+    // Verify the file upload input is present
+    const fileInput = page.locator(pm.alertsPage.alertImportJsonFileInputField);
+    await expect(fileInput, 'Import dialog should have file upload input').toBeVisible({ timeout: 3000 });
 
-    expect(importDialogVisible, 'Import dialog should open after clicking import button').toBeTruthy();
+    testLogger.info('Import dialog opened with upload functionality');
 
-    testLogger.info('✓ Import dialog opened');
-
-    // Verify the dialog has proper UI elements (no immediate error message about duplicates)
-    const errorMessages = page.locator('[class*="error"], [class*="negative"], .q-banner').filter({ hasText: /already exists|duplicate/i });
+    // Bug verification: no premature "already exists" error before import
+    const errorMessages = page.locator('[class*="error"], [class*="negative"], .q-banner')
+      .filter({ hasText: /already exists|duplicate/i });
     const hasPrematureError = await errorMessages.first().isVisible({ timeout: 2000 }).catch(() => false);
 
     expect(hasPrematureError,
-      'Bug #11315: Import dialog should not show "already exists" error before import is attempted'
+      'Bug #11315: Import dialog should not show "already exists" error before import'
     ).toBeFalsy();
 
-    // Verify the import UI is functional (has upload area or file selector)
-    const uploadAreaPresent = (await fileInput.count().catch(() => 0) > 0) ||
-      (await dropZone.count().catch(() => 0) > 0);
-    expect(uploadAreaPresent,
-      'Bug #11315: Import dialog should have a functional upload area'
-    ).toBeTruthy();
-
-    testLogger.info('✓ PASSED: Bulk alert import dialog opens without premature errors');
+    testLogger.info('PASSED: Bulk alert import dialog opens without premature errors');
   });
 
   // ==========================================================================
   // Bug #4342: Alert name with #, %, : special chars fails with unauthorized
   // https://github.com/openobserve/openobserve/issues/4342
   // ==========================================================================
-  test("Alert name with special characters should not cause unauthorized error", {
+  test("Alert name with special characters should be accepted", {
     tag: ['@bug-4342', '@P2', '@regression', '@alertsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Verify alert name with special chars works (Bug #4342)');
 
     await pm.commonActions.navigateToAlerts();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('✓ Navigated to alerts page');
+    testLogger.info('Navigated to alerts page');
 
-    // Click Add Alert
     await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
-    testLogger.info('✓ Clicked Add Alert button');
+    testLogger.info('Clicked Add Alert button');
 
-    // Enter alert name with special characters: #, %, :
+    // Enter alert name with characters that triggered bug #4342: #, %, :
     const specialName = 'test#special%alert:chars';
     await pm.alertsPage.fillAlertName(specialName);
     await page.waitForTimeout(500);
 
-    // Get the value back to verify it was accepted
-    const nameInput = page.locator(pm.alertsPage.alertNameInput);
+    // Read back the value from the inner OInput field
+    const nameInput = page.locator(pm.alertsPage.alertNameInputField);
     const enteredValue = await nameInput.inputValue().catch(() => '');
     testLogger.info(`Alert name entered: "${enteredValue}"`);
 
-    // PRIMARY ASSERTION: The name input should accept all special characters
-    // The bug was that special chars caused "unauthorized" errors
-    expect(enteredValue,
-      'Bug #4342: Alert name input should accept special character #'
-    ).toContain('#');
-    expect(enteredValue,
-      'Bug #4342: Alert name input should accept special character %'
-    ).toContain('%');
-    expect(enteredValue,
-      'Bug #4342: Alert name input should accept special character :'
-    ).toContain(':');
+    expect(enteredValue, 'Bug #4342: name input should accept #').toContain('#');
+    expect(enteredValue, 'Bug #4342: name input should accept %').toContain('%');
+    expect(enteredValue, 'Bug #4342: name input should accept :').toContain(':');
 
-    testLogger.info('✓ PASSED: Alert name with special chars accepted');
+    testLogger.info('PASSED: Alert name with special chars accepted');
   });
 
   // ==========================================================================
   // Bug #4288: Alert SQL — "default" keyword without quotes causes issues
   // https://github.com/openobserve/openobserve/issues/4288
   // ==========================================================================
-  test("Alert SQL query with 'default' keyword should not error without quotes", {
+  test("Alert SQL editor should accept 'default' keyword without quotes", {
     tag: ['@bug-4288', '@P2', '@regression', '@alertsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Verify default keyword in alert SQL works (Bug #4288)');
 
     await pm.commonActions.navigateToAlerts();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('✓ Navigated to alerts page');
+    testLogger.info('Navigated to alerts page');
 
-    // Click Add Alert
     await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
-    testLogger.info('✓ Clicked Add Alert button');
-
-    // Fill alert name
-    const alertName = `test_sql_default_${Date.now()}`;
-    await pm.alertsPage.fillAlertName(alertName);
+    await pm.alertsPage.fillAlertName(`test_sql_default_${Date.now()}`);
 
     // Select stream type and name
     await pm.alertsPage.selectStreamType('logs');
-    testLogger.info('✓ Selected stream type: Logs');
     await pm.alertsPage.selectStreamByName('e2e_automate');
-    testLogger.info('✓ Selected stream: e2e_automate');
+    testLogger.info('Selected stream: logs / e2e_automate');
 
-    // Add a condition first so the query editor is available
+    // Add a condition so the inline query editor renders
     const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
     await expect(addConditionBtn, 'Add Condition button should be visible').toBeVisible({ timeout: 5000 });
     await addConditionBtn.click();
-    testLogger.info('✓ Added condition');
+    testLogger.info('Added condition');
 
-    // Switch to SQL tab in the query editor
-    const sqlTab = page.locator('[data-test="step2-query-tabs"] button').filter({ hasText: /SQL/i }).first();
-    await expect(sqlTab, 'SQL tab should be visible in query editor').toBeVisible({ timeout: 5000 });
+    // Switch to SQL tab using POM selectors
+    const sqlTab = page.locator(pm.alertsPage.queryTabsContainer).locator(pm.alertsPage.tabSql);
+    await expect(sqlTab, 'SQL tab should be visible').toBeVisible({ timeout: 5000 });
     await sqlTab.click();
     await page.waitForTimeout(1000);
-    testLogger.info('✓ Switched to SQL tab');
+    testLogger.info('Switched to SQL tab');
 
-    // Look for the SQL editor — use the POM-defined selector #alert-editor-sql
-    const sqlEditor = page.locator('#alert-editor-sql, .monaco-editor').first();
-    await expect(sqlEditor, 'SQL editor should be visible in alert form').toBeVisible({ timeout: 5000 });
+    // Click into the inline Monaco editor (use .last() per alert creation wizard pattern)
+    // then type via keyboard — same approach used by the POM wizard methods
+    const sqlEditor = page.locator('.monaco-editor').last();
+    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 5000 });
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
+
+    // Select all existing content and replace with our keyword
+    const isMac = process.platform === 'darwin';
+    const modifier = isMac ? 'Meta' : 'Control';
+    await page.keyboard.press(`${modifier}+a`);
+    await page.waitForTimeout(200);
     await page.keyboard.type('default', { delay: 50 });
     await page.waitForTimeout(1000);
 
-    // Verify the editor accepted the input — Monaco uses a hidden textarea
-    // and renders to .view-lines; check both
-    const monacoTextarea = sqlEditor.locator('textarea').first();
-    const monacoLines = sqlEditor.locator('.view-lines').first();
-    const textareaValue = await monacoTextarea.inputValue().catch(() => '');
-    const linesText = await monacoLines.textContent().catch(() => '');
-    const hasContent = textareaValue.includes('default') || linesText.includes('default');
-    testLogger.info(`Monaco textarea: "${textareaValue}", view-lines: "${linesText.substring(0, 100)}"`);
+    // Verify the rendered .view-lines contain the keyword
+    const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');
+    testLogger.info(`Monaco view-lines content: "${linesText.substring(0, 100)}"`);
 
-    expect(hasContent,
+    expect(linesText,
       'Bug #4288: "default" should be accepted in the SQL editor without error'
-    ).toBeTruthy();
+    ).toContain('default');
 
-    testLogger.info('✓ Typed "default" in SQL editor without quotes');
-
-    // The bug was that "default" without quotes caused errors
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"]').filter({ hasText: /error|invalid|unexpected/i }).first().isVisible({ timeout: 2000 }).catch(() => false);
+    // Verify no error banner appeared
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"]')
+      .filter({ hasText: /error|invalid|unexpected/i })
+      .first().isVisible({ timeout: 2000 }).catch(() => false);
 
     expect(errorVisible,
-      'Bug #4288: "default" keyword without quotes should not cause an error in SQL editor'
+      'Bug #4288: "default" keyword without quotes should not cause a UI error'
     ).toBeFalsy();
 
-    testLogger.info('✓ PASSED: Alert SQL default keyword verified');
+    testLogger.info('PASSED: Alert SQL default keyword verified');
   });
 
   test.afterEach(async () => {

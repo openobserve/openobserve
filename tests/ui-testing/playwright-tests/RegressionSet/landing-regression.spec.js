@@ -25,33 +25,32 @@ test.describe("Landing Page Regression Bug Fixes", () => {
   // Bug #11604: Clicking on slack url at the top left gives blank page
   // https://github.com/openobserve/openobserve/issues/11604
   // ==========================================================================
-  test("Slack button should open a functional page, not blank @bug-11604 @P1 @regression @landingRegression", async () => {
+  test("Slack button should open a functional page, not blank", {
+    tag: ['@bug-11604', '@P1', '@regression', '@landingRegression']
+  }, async () => {
     testLogger.info('Test: Verify Slack button opens valid page (Bug #11604)');
 
-    // Verify slack button is visible in header
-    await expect(pm.homePage.slackButton, 'Slack button should be visible in header').toBeVisible({ timeout: 10000 });
-    testLogger.info('✓ Slack button is visible');
+    // Verify slack button is visible in header via POM
+    await expect(pm.homePage.slackButton, 'Slack button should be visible in header')
+      .toBeVisible({ timeout: 10000 });
+    testLogger.info('Slack button is visible');
 
-    // Click slack button - it opens in a new tab
+    // Click opens in a new tab — POM method returns the new page handle
     const newPage = await pm.homePage.clickSlackButton();
 
-    // Wait for the new page to load
     await newPage.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
     await newPage.waitForTimeout(2000);
 
-    // Bug verification: the page should NOT be blank
     const bodyText = await newPage.evaluate(() => document.body.innerText).catch(() => '');
     const title = await newPage.title().catch(() => '');
-
     testLogger.info(`Slack page title: "${title}", body length: ${bodyText.length}`);
 
-    // The page should have some content (not blank)
-    expect(bodyText.length, 'Bug #11604: Slack link should not open a blank page').toBeGreaterThan(0);
+    expect(bodyText.length,
+      'Bug #11604: Slack link should not open a blank page'
+    ).toBeGreaterThan(0);
 
-    // Close the new page
     await newPage.close();
-
-    testLogger.info('✓ PASSED: Slack button opens a functional page, not blank');
+    testLogger.info('PASSED: Slack button opens a functional page, not blank');
   });
 
   test.afterEach(async () => {

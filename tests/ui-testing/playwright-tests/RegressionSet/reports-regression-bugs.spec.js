@@ -25,17 +25,18 @@ test.describe("Reports Regression Bug Fixes", () => {
   // Bug #11231: In reports each save shifts the timestamp by the timezone offset
   // https://github.com/openobserve/openobserve/issues/11231
   // ==========================================================================
-  test("Report save should not shift timestamp by timezone offset @bug-11231 @P1 @regression @reportsRegression", async ({ page }) => {
+  test("Report save should not shift timestamp by timezone offset", {
+    tag: ['@bug-11231', '@P1', '@regression', '@reportsRegression']
+  }, async ({ page }) => {
     testLogger.info('Test: Verify report save does not shift timestamp (Bug #11231)');
 
     const reportsUrl = `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/web/reports?org_identifier=${process.env.ORGNAME || 'default'}`;
     const TEST_REPORT_NAME = `e2e_tz_test_${Date.now()}`;
 
     try {
-      // Step 1: Dismiss any blocking overlays, then create a dashboard
+      // Create a dashboard prerequisite for the report
       await pm.commonActions.dismissBlockingOverlays();
       await page.waitForTimeout(500);
-
       await pm.dashboardPage.navigateToDashboards();
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info('Navigated to dashboards');
@@ -44,7 +45,7 @@ test.describe("Reports Regression Bug Fixes", () => {
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info(`Created dashboard: ${pm.dashboardPage.dashboardName}`);
 
-      // Step 2: Navigate to reports and create a report
+      // Create a report using the dashboard via POM methods
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info('Navigated to reports');
@@ -55,93 +56,91 @@ test.describe("Reports Regression Bug Fixes", () => {
       await pm.reportsPage.createReportDashboardInput(pm.dashboardPage.dashboardName);
       await pm.reportsPage.createReportDashboardTabInput();
       await pm.reportsPage.createReportContinueButtonStep1();
-      // Skip schedule configuration during creation — we'll configure it in the edit view
       await pm.reportsPage.createReportContinueButtonStep2();
       await pm.reportsPage.createReportFillDetail();
       await pm.reportsPage.createReportSaveButton();
       testLogger.info(`Created report: ${TEST_REPORT_NAME}`);
 
-      // Wait for save to complete
       await page.waitForSelector('div[role="alert"]', { state: 'visible', timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(2000);
 
-      // Step 3: Navigate to reports list and edit the report
+      // Navigate to reports list and edit the report to configure schedule
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await pm.reportsPage.reportSearchInput.fill(TEST_REPORT_NAME);
+      await pm.reportsPage.reportSearchInputField.fill(TEST_REPORT_NAME);
       await page.waitForTimeout(2000);
-      testLogger.info(`Searched for report: ${TEST_REPORT_NAME}`);
 
-      const editBtn = page.locator(`[data-test="report-list-${TEST_REPORT_NAME}-edit-report"]`);
+      const editBtn = pm.reportsPage.editReportBtn(TEST_REPORT_NAME);
       await expect(editBtn, 'Edit button should be visible').toBeVisible({ timeout: 5000 });
       await editBtn.click();
       await page.waitForTimeout(3000);
       testLogger.info('Opened report for editing');
 
-      // Navigate to the Schedule step in the stepper
-      const scheduleStep = page.locator('[data-test="add-report-select-schedule-step"]');
-      await expect(scheduleStep, 'Schedule stepper step should be visible').toBeVisible({ timeout: 5000 });
-      await scheduleStep.click();
-      await page.waitForTimeout(1000);
-      testLogger.info('Navigated to Schedule step in edit view');
+      // Navigate through step 1 (dashboard) to reach step 2 (schedule)
+      await pm.reportsPage.createReportContinueButtonStep1();
+      testLogger.info('Navigated to Schedule step');
 
-      // Click "Schedule later" to expand the date/time fields
+      // Configure schedule: "Schedule later" with fixed start time and UTC timezone
+      await expect(pm.reportsPage.scheduleLaterBtn,
+        'Schedule Later button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.createReportScheduleLater();
       await page.waitForTimeout(1000);
 
-      // Set a fixed start time and UTC timezone to detect subsequent shifts
       const TEST_START_TIME = '10:30';
-      const startTimeInput = page.getByLabel('Start Time *');
-      await expect(startTimeInput, 'Start Time input should be visible').toBeVisible({ timeout: 5000 });
-      await startTimeInput.fill(TEST_START_TIME);
+      const TEST_START_HOUR = 10;
+
+      // OTime wraps a hidden <input type="time"> inside the role="group" div.
+      // Fill with force:true since the native input is visually hidden.
+      const startTimeInput = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      await expect(startTimeInput, 'Start Time input should exist').toHaveCount(1, { timeout: 5000 });
+      await startTimeInput.fill(TEST_START_TIME, { force: true });
       testLogger.info(`Set start time to: "${TEST_START_TIME}"`);
 
-      // Set timezone to UTC
       await pm.reportsPage.createReportZone();
       testLogger.info('Set timezone to UTC');
 
-      // Save the report with schedule configured
+      // Save with schedule
       await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.saveButton.click({ force: true });
       await page.waitForTimeout(3000);
-      await expect(page.getByRole('alert').first(), 'Save success alert should appear').toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('alert').first(),
+        'Save success alert should appear').toBeVisible({ timeout: 15000 });
       testLogger.info('Saved report with schedule configured');
 
-      // Step 4: Re-open and verify time hasn't shifted from the re-save
+      // Re-open to verify time has NOT shifted (the bug: each save shifts by TZ offset)
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await pm.reportsPage.reportSearchInput.fill(TEST_REPORT_NAME);
+      await pm.reportsPage.reportSearchInputField.fill(TEST_REPORT_NAME);
       await page.waitForTimeout(2000);
 
-      const editBtnAfter = page.locator(`[data-test="report-list-${TEST_REPORT_NAME}-edit-report"]`);
-      await expect(editBtnAfter, 'Edit button should still be visible after save').toBeVisible({ timeout: 5000 });
-      await editBtnAfter.click();
+      const editBtnReopen = pm.reportsPage.editReportBtn(TEST_REPORT_NAME);
+      await expect(editBtnReopen, 'Edit button should still be visible after re-save').toBeVisible({ timeout: 5000 });
+      await editBtnReopen.click();
       await page.waitForTimeout(3000);
 
-      // Navigate to Schedule step again in the re-opened edit view
-      const scheduleStepAfter = page.locator('[data-test="add-report-select-schedule-step"]');
-      await expect(scheduleStepAfter, 'Schedule stepper step should be visible after re-open').toBeVisible({ timeout: 5000 });
-      await scheduleStepAfter.click();
-      await page.waitForTimeout(1000);
+      // Navigate through step 1 to reach schedule step
+      await pm.reportsPage.createReportContinueButtonStep1();
+      await expect(pm.reportsPage.scheduleLaterBtn,
+        'Schedule Later button should be visible after re-open').toBeVisible({ timeout: 5000 });
 
-      const startTimeInputAfter = page.getByLabel('Start Time *');
-      await expect(startTimeInputAfter, 'Start Time input should be visible after re-save').toBeVisible({ timeout: 5000 });
-      const afterStartTime = await startTimeInputAfter.inputValue();
-      testLogger.info(`After re-save start time: "${afterStartTime}"`);
+      // Read back from the hidden <input type="time">
+      const startTimeInputAfter = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      await expect(startTimeInputAfter, 'Start Time input should exist after re-open').toHaveCount(1, { timeout: 5000 });
+      const afterStartTime = await startTimeInputAfter.inputValue({ timeout: 5000 });
+      testLogger.info(`After re-open start time: "${afterStartTime}"`);
 
-      // Verify time hasn't shifted by timezone offset
-      const initialHour = parseInt(TEST_START_TIME.split(':')[0]);
-      const afterHour = parseInt(afterStartTime.split(':')[0]);
-      const hourDiff = Math.abs(initialHour - afterHour);
+      // Bug assertion: the hour component must not have shifted
+      const afterHour = parseInt(afterStartTime?.split(':')[0] || '-1');
+      const hourDiff = Math.abs(TEST_START_HOUR - afterHour);
+      testLogger.info(`Expected hour: ${TEST_START_HOUR}, Got: ${afterHour}, Diff: ${hourDiff}`);
 
-      testLogger.info(`Hour difference: ${hourDiff}`);
       expect(hourDiff,
         'Bug #11231: Timestamp should not shift by timezone offset after save'
       ).toBe(0);
 
       testLogger.info('PASSED: Report save does not shift timestamp');
     } finally {
-      // Cleanup always runs, even if test fails mid-way
+      // Cleanup: delete report and dashboard regardless of test outcome
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
