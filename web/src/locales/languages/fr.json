@@ -2948,7 +2948,8 @@
     "noTemplatesFound": "Aucun modèle d'évaluation n'a été trouvé. Créez-en un sur la page Modèles d'évaluation.",
     "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès",
     "subtitle": "Transformez, enrichissez et acheminez les données en vol",
-    "selectStream": "Sélectionnez un stream..."
+    "selectStream": "Sélectionnez un stream...",
+    "queryEditorPlaceholder": "Sélectionnez un flux ou écrivez une requête SQL ici..."
   },
   "reports": {
     "header": "Rapports",

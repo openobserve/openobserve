@@ -2961,7 +2961,8 @@
     "noTemplatesFound": "Değerlendirme şablonu bulunamadı. Değerlendirme Şablonları sayfasında bir tane oluşturun.",
     "evalTemplatesRefreshed": "Değerlendirme şablonları başarıyla yenilendi",
     "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin",
-    "selectStream": "Bir akış seçin..."
+    "selectStream": "Bir akış seçin...",
+    "queryEditorPlaceholder": "Buraya bir akış seçin veya SQL sorgusu yazın..."
   },
   "reports": {
     "header": "Raporlar",

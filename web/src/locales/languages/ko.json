@@ -2961,7 +2961,8 @@
     "noTemplatesFound": "평가 템플릿을 찾을 수 없습니다.평가 템플릿 페이지에서 새로 생성하십시오.",
     "evalTemplatesRefreshed": "평가 템플릿이 성공적으로 새로 고쳐졌습니다.",
     "subtitle": "이동 중 데이터 변환, 강화 및 라우팅",
-    "selectStream": "스트림 선택..."
+    "selectStream": "스트림 선택...",
+    "queryEditorPlaceholder": "스트림을 선택하거나 여기에 SQL 쿼리를 작성하십시오..."
   },
   "reports": {
     "header": "보고서",

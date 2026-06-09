@@ -2961,7 +2961,8 @@
     "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
     "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd",
     "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
-    "selectStream": "Selecteer een stream..."
+    "selectStream": "Selecteer een stream...",
+    "queryEditorPlaceholder": "Selecteer een stream of schrijf hier een SQL-query..."
   },
   "reports": {
     "header": "Rapporten",
