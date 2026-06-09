@@ -37,10 +37,17 @@
     --color-surface-overlay: var(--color-grey-800);
     --color-surface-subtle: var(--color-grey-800);
     --color-surface-subtle-hover: var(--color-grey-700);
+    /* App chrome — a quiet dark backdrop, just slightly lifted from the content
+       card (grey-950) so the card still reads as a distinct floating surface. */
+    --color-surface-chrome: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-grey-900));
+    --color-surface-chrome-deeper: color-mix(in srgb, var(--color-primary-500) 20%, var(--color-grey-950));
 
     /* --- Borders --- */
     --color-border-default: var(--color-grey-700);
     --color-border-strong: var(--color-grey-500);
+    /* Soft divider on the dark card — one step quieter than border-default so
+       row/section splits don't read as hard structural lines. */
+    --color-border-subtle: var(--color-grey-800);
 
     /* ---- Button overrides ---- */
 
@@ -53,9 +60,9 @@
 
     /* outline */
     --color-button-outline-text: var(--color-text-primary);
-    --color-button-outline-border: var(--color-primary-700);
+    --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
-    --color-button-outline-hover-border: var(--color-primary-600);
+    --color-button-outline-hover-border: var(--color-border-strong);
     --color-button-outline-active-bg: var(--color-primary-800);
 
     /* ghost */
@@ -172,7 +179,7 @@
        sits noticeably brighter than the enabled `surface-panel` grey-900
        (#171717) so disabled fields are visually obvious in dark mode. */
     --color-input-bg: var(--color-surface-panel);
-    --color-input-border: var(--color-border-strong);
+    --color-input-border: var(--color-border-default);
     --color-input-disabled-bg: var(--color-grey-700);
     --color-input-disabled-text: var(--color-text-secondary);
     --color-input-placeholder: var(--color-text-disabled);
@@ -181,7 +188,7 @@
 
     /* Select (OSelect) — same disabled-bg strategy as input. */
     --color-select-bg: var(--color-surface-panel);
-    --color-select-border: var(--color-border-strong);
+    --color-select-border: var(--color-border-default);
     --color-select-disabled-bg: var(--color-grey-700);
     --color-select-disabled-text: var(--color-text-secondary);
     --color-select-placeholder: var(--color-text-disabled);
@@ -314,6 +321,9 @@
     /* Skeleton */
     --color-skeleton-base: var(--color-grey-700);
     --color-skeleton-highlight: var(--color-grey-600);
+    --color-skeleton-shimmer: rgba(255, 255, 255, 0.07);
+    /* Datepicker inner border — quieter on dark surfaces */
+    --color-datepicker-inner-border: var(--color-grey-600);
 
     /* ProgressBar */
     --color-progress-bar-default: var(--color-primary-500);

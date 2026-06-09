@@ -298,8 +298,8 @@ const sharedStubs = {
   },
   SyntaxGuide: {
     template:
-      '<div data-test="logs-search-bar-sql-mode-toggle-btn" class="syntax-guide-stub" />',
-    props: ["sqlmode"],
+      '<div data-test="traces-search-bar-syntax-guide-btn" class="syntax-guide-stub" />',
+    props: ["sqlmode", "menuItem"],
   },
   ShareButton: {
     template:
@@ -887,7 +887,7 @@ describe("SearchBar", () => {
 
       expect(
         wrapper
-          .find('[data-test="logs-search-bar-sql-mode-toggle-btn"]')
+          .find('[data-test="traces-search-bar-syntax-guide-btn"]')
           .exists(),
       ).toBe(true);
     });

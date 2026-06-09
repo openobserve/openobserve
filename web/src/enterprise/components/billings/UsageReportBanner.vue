@@ -96,15 +96,17 @@ export default defineComponent({
 }
 
 .o2-usage-message {
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 600;
-  line-height: 32px;
+  line-height: var(--leading-xl);
+  color: var(--color-text-heading);
 }
 
 .o2-usage-subtitle {
-  font-size: 16px;
+  font-size: var(--text-md);
   font-weight: 400;
-  line-height: 22px;
+  line-height: var(--leading-md);
+  color: var(--color-text-body);
 }
 
 .body--dark {

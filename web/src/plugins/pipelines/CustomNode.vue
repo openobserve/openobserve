@@ -1253,7 +1253,7 @@ function getIcon(data, ioType) {
 // Node label text styling
 .node-label-text {
   font-size: 15px !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
   line-height: 1.4 !important;
 }
 

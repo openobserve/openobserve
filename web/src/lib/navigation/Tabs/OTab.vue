@@ -39,6 +39,30 @@ const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name)
 const isDense = computed<boolean>(() => context?.value.dense ?? false)
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false)
+const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false)
+/** This tab is the one being dragged → dim it. */
+const isDragging = computed<boolean>(
+  () => isReorderable.value && context?.value.draggingName === props.name,
+)
+/** Pointer is hovering this tab as a drop target → show an insertion line. */
+const isDropTarget = computed<boolean>(
+  () =>
+    isReorderable.value &&
+    context?.value.dropTargetName != null &&
+    context.value.dropTargetName === props.name,
+)
+/** Position class for the insertion line (which edge, and orientation). */
+const dropIndicatorClass = computed<string>(() => {
+  const before = context?.value.dropBefore ?? true
+  if (isVertical.value) {
+    return before
+      ? 'tw:top-0 tw:left-1 tw:right-1 tw:h-0.5'
+      : 'tw:bottom-0 tw:left-1 tw:right-1 tw:h-0.5'
+  }
+  return before
+    ? 'tw:left-0 tw:top-1 tw:bottom-1 tw:w-0.5'
+    : 'tw:right-0 tw:top-1 tw:bottom-1 tw:w-0.5'
+})
 
 /** True when the icon prop uses Quasar's `img:` prefix (renders as <img>) */
 const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith('img:')))
@@ -55,7 +79,7 @@ const baseClasses = computed<string>(() => [
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
   'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
-  isVertical.value ? 'tw:rounded-md' : 'tw:rounded-t-md',
+  isVertical.value ? 'tw:rounded-lg' : 'tw:rounded-t-md',
   'tw:outline-none tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150',
   'tw:select-none',
   'tw:ring-offset-1 tw:ring-offset-surface-base',
@@ -69,18 +93,26 @@ const stateClasses = computed<string>(() => {
     ].join(' ')
   }
   if (isActive.value) {
+    // Horizontal tabs: colored text only. The active underline is a single
+    // shared bar in OTabs that slides between tabs, so each tab keeps a
+    // transparent 2px border (layout parity with inactive) rather than drawing
+    // its own colored one.
+    // Vertical tabs (side rail): tint bg + primary text, NO left bar — identical
+    // to SectionRail and the prototype .l2-link so every vertical nav matches.
     return [
-      'tw:text-tabs-active-text tw:cursor-pointer tw:bg-tabs-active-bg',
+      'tw:text-tabs-active-text tw:cursor-pointer',
       isVertical.value
-        ? 'tw:border-l-2 tw:border-tabs-indicator'
-        : 'tw:border-b-2 tw:border-tabs-indicator',
+        ? 'tw:bg-tabs-active-bg'
+        : 'tw:border-b-2 tw:border-transparent',
     ].join(' ')
   }
   return [
     'tw:text-tabs-inactive-text tw:cursor-pointer',
-    'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg',
-    // Always render the border (transparent when inactive) to prevent layout shift on activation.
-    isVertical.value ? 'tw:border-l-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
+    isVertical.value
+      ? 'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg'
+      : 'tw:enabled:hover:text-tabs-hover-text',
+    // Horizontal keeps a transparent bottom border to avoid activation layout shift.
+    isVertical.value ? '' : 'tw:border-b-2 tw:border-transparent',
   ].join(' ')
 })
 
@@ -114,9 +146,34 @@ const heightClasses = computed<string>(() => {
       :aria-disabled="disable || undefined"
       :id="`tab-${name}`"
       :aria-controls="`tab-panel-${name}`"
-      :class="[baseClasses, stateClasses, heightClasses]"
+      :class="[
+        baseClasses,
+        stateClasses,
+        heightClasses,
+        isReorderable ? 'tw:cursor-grab tw:active:cursor-grabbing' : '',
+        isDragging ? 'tw:opacity-40' : '',
+      ]"
+      :draggable="isReorderable || undefined"
+      :data-otab-name="name"
       v-bind="$attrs"
     >
+      <!-- Insertion line — shows where the dragged tab will land (before/after
+           this drop-target tab) so the drop position is visible during drag. -->
+      <span
+        v-if="isDropTarget"
+        aria-hidden="true"
+        class="tw:absolute tw:rounded-full tw:bg-primary-600 tw:pointer-events-none tw:z-20"
+        :class="dropIndicatorClass"
+      />
+      <!-- Drag handle — shown only in reorderable mode to signal the tab can be
+           dragged to reorder. Purely an affordance; the whole tab is draggable. -->
+      <OIcon
+        v-if="isReorderable"
+        name="drag-indicator"
+        size="sm"
+        class="o-tab__drag-handle tw:shrink-0 tw:opacity-40 tw:-ml-0.5"
+        aria-hidden="true"
+      />
       <!--
         If label or icon props are provided, render them (prop-driven mode).
         If neither is set, fall back to the default slot (custom content mode:

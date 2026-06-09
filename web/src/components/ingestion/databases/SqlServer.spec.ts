@@ -155,8 +155,8 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 6: Component renders template correctly
   it('should render template with correct structure', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+    expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
   });
 
   // Test 7: CopyContent component is rendered
@@ -177,9 +177,10 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   it('should have correct styling for documentation link', () => {
     wrapper = createWrapper();
     const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('text-blue-500');
-    expect(link.classes()).toContain('hover:text-blue-600');
-    expect(link.attributes('style')).toContain('text-decoration: underline');
+    expect(link.classes()).toContain('tw:text-text-link');
+    expect(link.classes()).toContain('hover:tw:text-text-link-hover');
+    expect(link.classes()).toContain('tw:underline');
+    expect(link.classes()).toContain('tw:font-medium');
   });
 
   // Test 10: Name is correctly set to sqlServer
@@ -280,11 +281,9 @@ describe('SqlServer.vue Component - Comprehensive Coverage', () => {
   // Test 35: Template structure validation
   it('should have correct template structure and classes', () => {
     wrapper = createWrapper();
-    expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pt-6').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pb-2').exists()).toBe(true);
+    expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+    expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
+    expect(wrapper.find('a').exists()).toBe(true);
   });
 
   // Test 36: Link attributes validation

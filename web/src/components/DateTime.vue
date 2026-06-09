@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="date-time-button"
           ref="datetimeBtn"
           data-cy="date-time-button"
-          variant="outline"
+          :variant="variant"
           class="date-time-button"
           :class="{
             [selectedType + 'type']: !disableRelative,
@@ -359,6 +359,10 @@ export default defineComponent({
     menuAlign: {
       type: String,
       default: "end",
+    },
+    variant: {
+      type: String,
+      default: "outline",
     },
   },
 

@@ -169,6 +169,14 @@ describe("ImportPipeline.vue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // The page header actions are teleported into the pipeline shell's
+    // #o2-page-actions target (Functions.vue); provide it so Teleport mounts.
+    if (!document.getElementById("o2-page-actions")) {
+      const target = document.createElement("div");
+      target.id = "o2-page-actions";
+      document.body.appendChild(target);
+    }
+
     store.state.selectedOrganization = {
       identifier: "default",
       label: "Default Organization",
@@ -199,6 +207,7 @@ describe("ImportPipeline.vue", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
+    document.getElementById("o2-page-actions")?.remove();
   });
 
   // -----------------------------------------------------------------------

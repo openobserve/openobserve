@@ -16,47 +16,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-    <div class="tw:pb-[0.625rem]">
-      <div class="card-container">
-        <div
-          class="tw:text-right tw:p-[0.375rem] tw:flex tw:gap-x-2 align-center tw:justify-end metrics-date-time"
-        >
-          <syntax-guide />
-          <date-time
-            auto-apply
-            menu-align="end"
-            :default-type="errorTrackingState.data.datetime?.valueType"
-            :default-absolute-time="{
-              startTime: errorTrackingState.data.datetime.startTime,
-              endTime: errorTrackingState.data.datetime.endTime,
-            }"
-            :default-relative-time="
-              errorTrackingState.data.datetime.relativeTimePeriod
-            "
-            data-test="logs-search-bar-date-time-dropdown"
-            @on:date-change="updateDateChange"
-          />
-          <OButton
-            data-test="metrics-explorer-run-query-button"
-            data-cy="metrics-explorer-run-query-button"
-            variant="primary"
-            size="sm-toolbar"
-            :title="t('metrics.runQuery')"
-            @click="runQuery"
-          >
-            {{ t("metrics.runQuery") }}
-          </OButton>
-        </div>
-        <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
-          <query-editor
-            editor-id="rum-errors-query-editor"
-            class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]!"
-            v-model:query="errorTrackingState.data.editorValue"
-            :debounce-time="300"
-          />
-        </div>
-      </div>
-    </div>
+    <div>
+      <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
+        <div class="tw:flex tw:items-start tw:gap-1">
+          <!-- Query editor (flex-grow to fill available space) -->
+          <div class="tw:flex-1 tw:min-w-0 tw:relative">
+            <query-editor
+              ref="errorQueryEditorRef"
+              editor-id="rum-errors-query-editor"
+              :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', errorEditorHeight]"
+              v-model:query="errorTrackingState.data.editorValue"
+              :debounce-time="300"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              @focus="onQueryEditorFocus"
+              @blur="onQueryEditorBlur"
+              @update:query="updateAutoComplete"
+            />
+            <div
+              v-if="!errorTrackingState.data.editorValue && !editorFocused"
+              class="query-editor-placeholder-overlay"
+            >
+              <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+            </div>
+          </div>
+
+          <!-- Controls on the right -->
+          <div class="tw:flex tw:items-start tw:gap-1 tw:shrink-0">
+            <syntax-guide />
+            <date-time
+              auto-apply
+              menu-align="end"
+              :default-type="errorTrackingState.data.datetime?.valueType"
+              :default-absolute-time="{
+                startTime: errorTrackingState.data.datetime.startTime,
+                endTime: errorTrackingState.data.datetime.endTime,
+              }"
+              :default-relative-time="
+                errorTrackingState.data.datetime.relativeTimePeriod
+              "
+              data-test="logs-search-bar-date-time-dropdown"
+              @on:date-change="updateDateChange"
+            />
+            <!-- Run query button -->
+            <OButton
+              data-test="errors-run-query-button"
+              variant="primary"
+              size="sm-toolbar"
+              :title="t('metrics.runQuery')"
+              @click="runQuery"
+              class="tw:shrink-0"
+            >
+              {{ t("metrics.runQuery") }}
+            </OButton>
+          </div><!-- end controls -->
+        </div><!-- end flex row -->
+      </div><!-- end card-container -->
+    </div><!-- end toolbar wrapper -->
     <OSplitter
       class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
       v-model="splitterModel"
@@ -64,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal="false"
     >
       <template #before>
-        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto">
+        <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -118,6 +134,9 @@ import {
   type Ref,
   defineAsyncComponent,
 } from "vue";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -154,6 +173,55 @@ const dateTime = ref({
 });
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
+const editorFocused = ref(false);
+const errorQueryEditorRef = ref<any>(null);
+
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef: errorQueryEditorRef,
+    sqlMode: computed(() => false),
+    query: computed(() => errorTrackingState.data.editorValue ?? ""),
+    streamName: computed(() => errorTrackingState.data.stream.errorStream),
+  });
+
+const onQueryEditorFocus = () => {
+  editorFocused.value = true;
+  _sqlOnFocus();
+};
+const onQueryEditorBlur = async () => {
+  editorFocused.value = false;
+  await _sqlOnBlur();
+};
+
+// Autosuggestions — field names, operators, filter values
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+} = useSqlSuggestions();
+
+const updateAutoComplete = (value: string) => {
+  _sqlOnQueryChange();
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+  getSuggestions();
+};
+
+// Dynamic placeholder based on actual error stream fields
+const _sqlMode = computed(() => false);
+const _noStream = computed(() => !errorTrackingState.data.stream.errorStream);
+const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+  streamFields,
+  computed(() => ({})),
+  _sqlMode,
+  _noStream,
+);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { errorTrackingState } = useErrorTracking();
 const store = useStore();
@@ -171,6 +239,15 @@ const tableErrors = computed(() => {
     ...e,
   }));
 });
+
+// Dynamic editor height based on content lines
+const errorEditorHeight = computed(() => {
+  const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
+  if (lines === 1) return 'tw:h-[2rem]!';
+  if (lines === 2) return 'tw:h-[3.5rem]!';
+  return 'tw:h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+});
+
 const tableColumns = [
   {
     id: "error",
@@ -259,6 +336,7 @@ onMounted(async () => {
   runQuery();
 });
 
+
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
     errorTrackingState.data.editorValue = applyFilterTerm(
@@ -290,6 +368,9 @@ const getStreamFields = () => {
             });
           }
         });
+
+        // Feed all schema fields (not just userDataSet) into autosuggestion engine
+        updateFieldKeywords(stream.schema);
       })
       .finally(() => {
         resolve(true);
@@ -536,6 +617,36 @@ function updateUrlQueryParams() {
       background: $secondary;
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 }
+  }
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
   }
 }
 </style>

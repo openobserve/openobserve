@@ -182,12 +182,30 @@ describe("PipelineEditor", () => {
       comparePipelinesById: vi.fn(),
     }));
 
+    // Create teleport target so Teleport to="#o2-page-actions" doesn't error
+    const teleportTarget = document.createElement("div");
+    teleportTarget.id = "o2-page-actions";
+    document.body.appendChild(teleportTarget);
+
     wrapper = mount(PipelineEditor, {
+      attachTo: document.body,
       global: {
         provide: { store },
         plugins: [i18n, router],
         stubs: {
           ODrawer: ODrawerStub,
+          NodeSidebar: true,
+          PipelineFlow: true,
+          QueryForm: true,
+          ConditionForm: true,
+          AssociateFunction: true,
+          StreamNode: true,
+          ExternalDestination: true,
+          LlmEvaluation: true,
+          ConfirmDialog: true,
+          "confirm-dialog": true,
+          OTooltip: true,
+          Teleport: false,
         },
       },
     });
@@ -195,10 +213,18 @@ describe("PipelineEditor", () => {
 
   afterEach(async () => {
     await flushPromises();
+    const teleportTarget = document.getElementById("o2-page-actions");
+    if (teleportTarget) {
+      teleportTarget.remove();
+    }
     if (wrapper) {
-      wrapper.vm.confirmDialogMeta.show = false;
-      wrapper.vm.showJsonEditorDialog = false;
-      wrapper.vm.confirmDialogBasicPipeline = false;
+      try {
+        wrapper.vm.confirmDialogMeta.show = false;
+        wrapper.vm.showJsonEditorDialog = false;
+        wrapper.vm.confirmDialogBasicPipeline = false;
+      } catch (_) {
+        // ignore cleanup errors
+      }
       wrapper.unmount();
       wrapper = null;
     }
@@ -230,7 +256,8 @@ describe("PipelineEditor", () => {
     });
 
     it("initializes pipelineNameError as false", () => {
-      expect(wrapper.vm.pipelineNameError).toBe(false);
+      // pipelineNameError lives on pipelineObj (from useDnD), not on vm directly
+      expect(mockPipelineObj.pipelineNameError).toBeFalsy();
     });
 
     it("initializes confirmDialogMeta as hidden", () => {
@@ -238,15 +265,16 @@ describe("PipelineEditor", () => {
     });
 
     it("exposes correct data attributes", () => {
-      expect(wrapper.find('[data-test="pipeline-json-edit-btn"]').exists()).toBe(
-        true
-      );
+      // These buttons are inside <Teleport to="#o2-page-actions">, query from document
       expect(
-        wrapper.find('[data-test="add-pipeline-cancel-btn"]').exists()
-      ).toBe(true);
-      expect(wrapper.find('[data-test="add-pipeline-save-btn"]').exists()).toBe(
-        true
-      );
+        document.querySelector('[data-test="pipeline-json-edit-btn"]')
+      ).not.toBeNull();
+      expect(
+        document.querySelector('[data-test="add-pipeline-cancel-btn"]')
+      ).not.toBeNull();
+      expect(
+        document.querySelector('[data-test="add-pipeline-save-btn"]')
+      ).not.toBeNull();
     });
   });
 
@@ -530,7 +558,8 @@ describe("PipelineEditor", () => {
     it("sets pipelineNameError to true when name is empty", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "";
       await wrapper.vm.savePipeline();
-      expect(wrapper.vm.pipelineNameError).toBe(true);
+      // pipelineNameError is set on pipelineObj (from useDnD mock)
+      expect(mockPipelineObj.pipelineNameError).toBe(true);
     });
 
     it("shows error notification when source node is missing", async () => {
@@ -738,8 +767,10 @@ describe("PipelineEditor", () => {
     });
 
     it("clicking pipeline-json-edit-btn opens the JSON-editor ODrawer", async () => {
-      const btn = wrapper.find('[data-test="pipeline-json-edit-btn"]');
-      await btn.trigger("click");
+      // Button is inside <Teleport to="#o2-page-actions">, query from document
+      const btn = document.querySelector('[data-test="pipeline-json-edit-btn"]');
+      expect(btn).not.toBeNull();
+      btn.click();
       await flushPromises();
 
       const drawers = wrapper.findAllComponents(ODrawerStub);

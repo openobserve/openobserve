@@ -126,14 +126,14 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render the component correctly', () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
     });
 
     it('should render with correct CSS classes', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-      expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
+      expect(wrapper.find('a').exists()).toBe(true);
     });
 
     it('should render CopyContent component', () => {
@@ -152,23 +152,24 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation link', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('text-blue-500');
-      expect(docLink.classes()).toContain('hover:text-blue-600');
-      expect(docLink.attributes('style')).toContain('text-decoration: underline');
+      expect(docLink.classes()).toContain('tw:text-text-link');
+      expect(docLink.classes()).toContain('hover:tw:text-text-link-hover');
+      expect(docLink.classes()).toContain('tw:underline');
+      expect(docLink.classes()).toContain('tw:font-medium');
     });
 
     it('should render documentation text correctly', () => {
       wrapper = createWrapper();
-      const docText = wrapper.find('.tw\\:font-bold');
-      expect(docText.text()).toContain('Click');
-      expect(docText.text()).toContain('here');
-      expect(docText.text()).toContain('to check further documentation.');
+      expect(wrapper.find('a').exists()).toBe(true);
+      expect(wrapper.text()).toContain('Click');
+      expect(wrapper.text()).toContain('here');
+      expect(wrapper.text()).toContain('to check further documentation.');
     });
 
     it('should render with proper component structure', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-      expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('a').exists()).toBe(true);
     });
   });
 
@@ -209,7 +210,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render correctly with various prop states', () => {
       wrapper = createWrapper({ currUserEmail: 'test@example.com' });
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
     });
 
     it('should maintain component structure regardless of props', () => {
@@ -266,7 +267,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       const vm = wrapper.vm as any;
       
       // Test that component structure is correct
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
       expect(typeof vm).toBe('object');
     });
 
@@ -282,8 +283,8 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
 
       // Test that all required template elements are present
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
-      expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
+      expect(wrapper.find('a').exists()).toBe(true);
       expect(wrapper.findComponent(CopyContent).exists()).toBe(true);
       expect(wrapper.find('a').exists()).toBe(true);
     });
@@ -399,7 +400,7 @@ describe('Oracle.vue Comprehensive Coverage', () => {
       
       // Test that component remains stable during updates
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
     });
 
     it('should maintain functionality after props update', async () => {
@@ -460,26 +461,25 @@ describe('Oracle.vue Comprehensive Coverage', () => {
     it('should render all template elements correctly', () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.tw\\:p-2').exists()).toBe(true);
+      expect(wrapper.find('.tw\\:p-3').exists()).toBe(true);
       expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-      expect(wrapper.find('.copy-content-container-cls').exists()).toBe(true);
-      expect(wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2').exists()).toBe(true);
+      expect(wrapper.find('a').exists()).toBe(true);
     });
 
     it('should pass correct CSS classes', () => {
       wrapper = createWrapper();
       const copyContent = wrapper.findComponent(CopyContent);
-      
-      expect(copyContent.classes()).toContain('copy-content-container-cls');
+
+      expect(copyContent.exists()).toBe(true);
     });
 
     it('should render documentation link with correct attributes', () => {
       wrapper = createWrapper();
       const link = wrapper.find('a');
-      
+
       expect(link.attributes('target')).toBe('_blank');
-      expect(link.classes()).toContain('text-blue-500');
-      expect(link.classes()).toContain('hover:text-blue-600');
+      expect(link.classes()).toContain('tw:text-text-link');
+      expect(link.classes()).toContain('hover:tw:text-text-link-hover');
     });
   });
 

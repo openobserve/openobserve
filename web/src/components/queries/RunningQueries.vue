@@ -20,62 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="running-queries-page tw:rounded-md tw:p-0 tw:flex tw:flex-col tw:h-full"
   >
     <div class="tw:flex-none">
-      <div class="card-container tw:mb-[0.625rem]">
+      <div class="card-container">
         <div
           class="tw:flex tw:flex-col tw:px-4 tw:py-3 tw:border-b-[1px]"
           style="position: sticky; top: 0; z-index: 1000;"
         >
-          <div class="tw:flex tw:justify-between tw:items-center">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="log-stream-title-text">
-              {{ t("queries.runningQueries") }}
-            </div>
-            <div
-              data-test="running-queries-filter-container"
-              class="tw:flex tw:items-center tw:gap-3"
-            >
-              <OToggleGroup
-                :model-value="selectedQueryTypeTab"
-                @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
-                data-test="running-queries-query-type-tabs"
-              >
-                <OToggleGroupItem
-                  v-for="visual in runningQueryTypes"
-                  :key="visual.value"
-                  :value="visual.value"
-                  size="sm"
-                >
-                  {{ visual.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-              <div class="o2-select-input o2-input">
-                <OSelect
-                  v-model="selectedSearchField"
-                  :options="searchFieldOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  class="tw:p-0 tw:w-[140px]"
-                  data-test="running-queries-search-fields-select"
-                  @update:model-value="filterQuery = ''"
-                />
-              </div>
-              <OSearchInput
-                v-if="selectedSearchField == 'all'"
-                v-model="filterQuery"
-                class=" no-border o2-search-input"
-                :placeholder="t('queries.search')"
-                data-test="running-queries-search-input"
-              />
-              <div v-else class="o2-select-input o2-input">
-                <OSelect
-                  v-model="filterQuery"
-                  placeholder="Select option"
-                  :options="otherFieldOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  class="no-border search-input"
-                  data-test="running-queries-search-input"
-                />
-              </div>
+          <!-- Standard section header: title + actions only. Filters live in the
+               band below (directly above the table). -->
+          <AppPageHeader
+            :title="t('queries.runningQueries')"
+            icon="query-stats"
+            :subtitle="'Inspect and cancel running queries'"
+            class="tw:-mx-4 tw:px-4 tw:border-b tw:border-border-default tw:mb-3"
+          >
+            <template #actions>
               <OButton
                 data-test="running-queries-refresh-btn"
                 variant="primary"
@@ -84,6 +42,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t(`queries.refreshQuery`) }}
               </OButton>
+            </template>
+          </AppPageHeader>
+          <div
+            data-test="running-queries-filter-container"
+            class="tw:flex tw:justify-start tw:items-center tw:gap-3"
+          >
+            <OToggleGroup
+              :model-value="selectedQueryTypeTab"
+              @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
+              data-test="running-queries-query-type-tabs"
+            >
+              <OToggleGroupItem
+                v-for="visual in runningQueryTypes"
+                :key="visual.value"
+                :value="visual.value"
+                size="sm"
+              >
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="o2-select-input o2-input">
+              <OSelect
+                v-model="selectedSearchField"
+                :options="searchFieldOptions"
+                labelKey="label"
+                valueKey="value"
+                class="tw:p-0 tw:w-[140px]"
+                data-test="running-queries-search-fields-select"
+                @update:model-value="filterQuery = ''"
+              />
+            </div>
+            <OSearchInput
+              v-if="selectedSearchField == 'all'"
+              v-model="filterQuery"
+              class=" no-border o2-search-input"
+              :placeholder="t('queries.search')"
+              data-test="running-queries-search-input"
+            />
+            <div v-else class="o2-select-input o2-input">
+              <OSelect
+                v-model="filterQuery"
+                placeholder="Select option"
+                :options="otherFieldOptions"
+                labelKey="label"
+                valueKey="value"
+                class="no-border search-input"
+                data-test="running-queries-search-input"
+              />
             </div>
           </div>
           <div class="tw:flex tw:justify-end tw:items-center tw:gap-4 tw:mt-3">
@@ -189,10 +195,11 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
+  components: { AppPageHeader, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OButton, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();

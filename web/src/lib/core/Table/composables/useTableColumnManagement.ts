@@ -60,19 +60,6 @@ export function useTableColumnManagement(
     emit("column-order-change", props.columnOrder.value);
   }
 
-  function closeColumn(columnId: string) {
-    // Remove from column order
-    const newOrder = props.columnOrder.value.filter(
-      (id) => id !== columnId,
-    );
-    props.columnOrder.value = newOrder;
-    // Update visibility
-    const newVisibility = { ...props.columnVisibility };
-    newVisibility[columnId] = false;
-    emit("column-visibility-change", newVisibility);
-    emit("column-close", columnId);
-  }
-
   function toggleColumnVisibility(columnId: string) {
     const newVisibility = { ...props.columnVisibility };
     newVisibility[columnId] = !(newVisibility[columnId] ?? true);
@@ -92,7 +79,6 @@ export function useTableColumnManagement(
     onResizeEnd,
     onDragStart,
     onDragEnd,
-    closeColumn,
     toggleColumnVisibility,
     visibleColumnCount,
   };

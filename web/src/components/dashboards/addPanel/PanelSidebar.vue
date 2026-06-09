@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sidebar"
+    class="sidebar tw:bg-surface-panel"
     :class="{ open: isOpen }"
     data-test="panel-sidebar-root"
   >

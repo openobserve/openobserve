@@ -121,6 +121,17 @@ const useRoutes = () => {
         title: "Home",
       },
     },
+    // TEMPORARY: preview route for the OEmptyState design sample. Remove once
+    // the empty-state design is approved (along with src/views/EmptyStateDemo.vue).
+    {
+      path: "empty-state-demo",
+      name: "emptyStateDemo",
+      component: () => import("@/views/EmptyStateDemo.vue"),
+      meta: {
+        keepAlive: false,
+        title: "Empty State Demo",
+      },
+    },
     {
       path: "logs",
       name: "logs",

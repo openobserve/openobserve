@@ -1,9 +1,18 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:p-1.5! tw:flex tw:flex-col">
-    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold tw:flex-shrink-0">
-      {{ t("panel.fields") }}
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel tw:border-r tw:border-border-default">
+    <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:my-3">
+      <span class="tw:text-base tw:font-bold">{{ t("panel.fields") }}</span>
+      <OButton
+        variant="outline"
+        size="icon-xs-sq"
+        class="tw:rotate-90"
+        icon-left="unfold-less"
+        :title="t('panel.collapseFields')"
+        data-test="panel-field-list-collapse-btn"
+        @click="emit('collapse')"
+      />
     </div>
     <OFieldList
       ref="fieldListRef"
@@ -465,6 +474,7 @@ const { t } = useI18n();
 const { getStreams, getStream } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
+const emit = defineEmits<{ collapse: [] }>();
 
 const {
   dashboardPanelData,

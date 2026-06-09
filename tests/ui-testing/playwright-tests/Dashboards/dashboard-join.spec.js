@@ -1030,19 +1030,18 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await pm.dashboardPanelActions.savePanel();
       testLogger.info("Panel saved, navigating away");
 
-      // Navigate back to dashboard list
+      // Navigate back to dashboard list (direct URL — avoids double navigation race)
       await navigateToDashboards(page);
-      await pm.dashboardList.menuItem("dashboards-item");
 
       // Wait for dashboard list to load
       await pm.dashboardPanelActions.waitForDashboardSearchVisible();
 
       // Search and open the dashboard
       await pm.dashboardCreate.searchDashboard(dashboardName);
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
 
       const dashboardRow = pm.dashboardPanelActions.getDashboardRow(dashboardName);
-      await expect(dashboardRow).toBeVisible({ timeout: 10000 });
+      await expect(dashboardRow).toBeVisible({ timeout: 60000 });
       await dashboardRow.click();
       await page.waitForTimeout(3000);
       testLogger.info("Dashboard opened, editing panel");

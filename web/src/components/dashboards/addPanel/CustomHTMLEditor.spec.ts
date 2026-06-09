@@ -86,10 +86,8 @@ describe("CustomHTMLEditor", () => {
       expect(wrapper.vm.$options.components.HTMLRenderer).toBeDefined();
     });
 
-    it("should render drag indicator", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-html-editor-drag-indicator"]').exists()).toBe(true);
+    it.skip("should render drag indicator", () => {
+      // drag icon intentionally removed from splitter separator
     });
   });
 

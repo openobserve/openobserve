@@ -1812,7 +1812,7 @@ export class LogsPage {
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                await expect(searchResult).toContainText('1 to 10', { timeout: 10000 });
                 return;
             } catch (e) {
                 if (attempt < 3) {
@@ -1821,7 +1821,7 @@ export class LogsPage {
             }
         }
         // Final attempt — let it throw
-        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
+        await expect(searchResult).toContainText('1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
@@ -1829,13 +1829,13 @@ export class LogsPage {
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
-                expectedPattern = 'Showing 11 to 20 out of';
+                expectedPattern = '11 to 20 out of';
                 break;
             case '3':
-                expectedPattern = 'Showing 21 to 30 out of';
+                expectedPattern = '21 to 30 out of';
                 break;
             case '4':
-                expectedPattern = 'Showing 31 to';
+                expectedPattern = '31 to';
                 break;
             default:
                 expectedPattern = expectedText;
@@ -4391,7 +4391,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('button[data-test="function-stream-tab"]').click();
+        return await this.page.locator('[data-test="pipeline-section-tab-functions"]').click();
     }
 
     async clickSearchFunctionInput() {
@@ -4845,7 +4845,7 @@ export class LogsPage {
     async expectPaginationRowCountVisible(timeout = 10000) {
         const title = this.page.locator(this.paginationRowCountTitle);
         await expect(title).toBeVisible({ timeout });
-        await expect(title).toHaveText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/, { timeout });
+        await expect(title).toHaveText(/[1-9][\d,]* to \d+ out of [1-9][\d,]*/, { timeout });
     }
 
     /**
@@ -6507,22 +6507,27 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isDimensionSidebarVisible() {
-        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
     }
 
     /**
      * Toggle dimension selector sidebar via collapse button
      */
     async toggleDimensionSidebar() {
-        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const sidebar = this.page.locator(this.dimensionSelectorSidebar);
-            const wasVisible = await sidebar.isVisible().catch(() => false);
+        const sidebar = this.page.locator(this.dimensionSelectorSidebar);
+        const sidebarVisible = await sidebar.isVisible().catch(() => false);
+        if (sidebarVisible) {
+            // Sidebar is open — click the collapse btn inside it
+            const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
             await btn.click();
-            // Wait for the sidebar visibility state to flip (deterministic transition)
-            await sidebar.waitFor({ state: wasVisible ? 'hidden' : 'visible', timeout: 5000 }).catch(() => {});
-            testLogger.info('Toggled Dimension Selector sidebar');
+            await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        } else {
+            // Sidebar is collapsed — click the collapsed bar to expand
+            const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
+            await collapsedBar.click();
+            await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         }
+        testLogger.info('Toggled Dimension Selector sidebar');
     }
 
     /**

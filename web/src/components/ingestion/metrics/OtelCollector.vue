@@ -1,20 +1,21 @@
 <template>
-  <div>
-    <div class="tw:p-2">
-      <div class="tw:text-base tw:font-medium tw:font-bold tw:pl-1">OTLP HTTP</div>
+  <IngestionContent>
+    <div class="tw:flex tw:flex-col tw:gap-2">
+      <div class="tw:text-base tw:font-semibold">OTLP HTTP</div>
       <ContentCopy :content="getOtelHttpConfig" />
     </div>
-    <div class="tw:p-2" v-if="config.isCloud == 'false'">
-      <div class="tw:text-base tw:font-medium tw:font-bold tw:mt-2 tw:pl-1">OTLP gRPC</div>
+    <div class="tw:flex tw:flex-col tw:gap-2" v-if="config.isCloud == 'false'">
+      <div class="tw:text-base tw:font-semibold">OTLP gRPC</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
-  </div>
+  </IngestionContent>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, type Ref } from "vue";
 import type { Endpoint } from "@/ts/interfaces";
 import ContentCopy from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { useStore } from "vuex";
 import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";

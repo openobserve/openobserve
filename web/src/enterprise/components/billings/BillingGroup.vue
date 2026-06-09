@@ -883,7 +883,7 @@ export default defineComponent({
   }
   &__headline {
     font-size: 2.4rem;
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.6px;
     margin-bottom: 16px;

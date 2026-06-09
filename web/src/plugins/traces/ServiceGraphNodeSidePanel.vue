@@ -2422,7 +2422,7 @@ export default defineComponent({
 
         .total-value {
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 700;
           color: #e0e7ff;
           letter-spacing: -0.02em;
         }

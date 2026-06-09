@@ -74,8 +74,8 @@ export class SanityPage {
         // ============================================================
         this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
         this.realtimeTab = page.locator('[data-test="tab-realtime"]');
-        this.streamPipelinesTab = page.locator('button[data-test="stream-pipelines-tab"]');
-        this.functionStreamTab = page.locator('button[data-test="function-stream-tab"]');
+        this.streamPipelinesTab = page.locator('[data-test="pipeline-section-tab-streamPipelines"]');
+        this.functionStreamTab = page.locator('[data-test="pipeline-section-tab-functions"]');
         this.dashboardsMenuItem = page.locator('[data-test="menu-link-\\/dashboards-item"]');
         this.streamsMenuItem = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.homeMenuItem = page.locator('[data-test="menu-link-\\/-item"]');
@@ -122,7 +122,7 @@ export class SanityPage {
         // ============================================================
         // Settings locators
         // ============================================================
-        this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+        this.settingsMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         // general-settings-tab data-test added in settings/index.vue this pass.
         this.generalSettingsTab = page.locator('button[data-test="general-settings-tab"]');
         // OInput auto-generates `-field` for the native input.
@@ -219,7 +219,7 @@ export class SanityPage {
         await this.refreshButton.click();
         await searchPromise;
 
-        await expect(this.searchResultTitle).toContainText(/Showing 1 to/, { timeout: 15000 });
+        await expect(this.searchResultTitle).toContainText(/1 to/, { timeout: 15000 });
 
         try {
             await expect(this.searchResultPagination).toBeVisible({ timeout: 10000 });
@@ -347,7 +347,7 @@ export class SanityPage {
         await this.refreshButton.click({ force: true });
         await limitSearchPromise;
 
-        await expect(this.searchResultTitle).toContainText(/Showing 1 to 5/, { timeout: 15000 });
+        await expect(this.searchResultTitle).toContainText(/1 to 5/, { timeout: 15000 });
 
         // Reset filters button is now directly on the toolbar
         await this.resetFiltersButton.click();

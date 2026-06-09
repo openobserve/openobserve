@@ -2,8 +2,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { createRouter, createMemoryHistory } from "vue-router";
 import ONavbar from "./ONavbar.vue";
 import type { NavItem } from "./ONavbar.types";
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/", component: { template: "<div />" } }],
+});
 
 const mockLinks: NavItem[] = [
   { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -26,6 +32,7 @@ describe("ONavbar", () => {
         ...props,
       },
       global: {
+        plugins: [router],
         stubs: {
           "menu-link": {
             template:

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:p-2">
+  <IngestionContent>
     <CopyContent class="copy-content-container-cls" :content="content" />
-  </div>
+  </IngestionContent>
 </template>
 
 <script lang="ts">
@@ -26,6 +26,7 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 export default defineComponent({
   name: "fluentd-mechanism",
   props: {
@@ -36,7 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({

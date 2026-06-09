@@ -11,7 +11,7 @@ export
 
         //this.managementMenuItem = page.locator('[data-test="menu-link-/settings/-item"]');
 
-         this.managementMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+         this.managementMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
 
 
         this.submitButton = page.locator('[data-test="dashboard-add-submit"]'); // Add appropriate data-test attribute
@@ -25,7 +25,7 @@ export
     async navigateToManagement() {
         await this.page.waitForSelector("[name ='home']");
         await this.homeIcon.hover();
-        await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
+        await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
         await this.managementMenuItem.click({ force: true });
     }
 
@@ -33,7 +33,7 @@ export
  // Follow same pattern as navigateToManagement() but with validation
     await this.page.waitForSelector("[name ='home']");
     await this.homeIcon.hover();
-    await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
+    await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
         await this.managementMenuItem.click({ force: true });
         await expect(this.page.getByRole('main')).toContainText('General Settings');
     }
@@ -99,7 +99,7 @@ export
           // Wait for logs page to fully load before navigating away
           await this.page.waitForTimeout(2000);
 
-          await this.page.locator('[data-test="menu-link-settings-item"]').click();
+          await this.page.locator('[data-test="menu-link-/settings-item"]').click();
           await this.page.goto(
             process.env["ZO_BASE_URL"] + "/web/settings/general?org_identifier=" + process.env["ORGNAME"]
           );
@@ -135,7 +135,7 @@ export
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
     // Navigate to the General Settings page
-    await this.page.locator('[data-test="menu-link-settings-item"]').click();
+    await this.page.locator('[data-test="menu-link-/settings-item"]').click();
     await this.page.goto(
       process.env["ZO_BASE_URL"] +
         "/web/settings/general?org_identifier=default"
@@ -170,7 +170,7 @@ export
     );
     await this.page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
 
-    await this.page.locator('[data-test="menu-link-settings-item"]').click();
+    await this.page.locator('[data-test="menu-link-/settings-item"]').click();
     await this.page.goto(
       process.env["ZO_BASE_URL"] +
         "/web/settings/general?org_identifier=default"

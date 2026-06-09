@@ -198,6 +198,24 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
+    PageLayout: {
+      name: "PageLayout",
+      template: '<div data-test-stub="page-layout"><slot name="header" /><slot /><slot name="footer" /></div>',
+    },
+    AppPageHeader: {
+      name: "AppPageHeader",
+      template: '<div data-test-stub="app-page-header"><slot /><slot name="actions" /></div>',
+    },
+    FolderList: true,
+    OTable: {
+      name: "OTable",
+      template: '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="bottom" /></div>',
+    },
+    OEmptyState: true,
+    OInput: true,
+    ODropdown: true,
+    ODropdownItem: true,
+    AddDashboardFromGitHub: true,
     "q-page": true,
     "q-input": true,
     "q-btn": true,

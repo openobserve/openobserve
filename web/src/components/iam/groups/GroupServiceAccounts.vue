@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -82,7 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-service-accounts"
+              :filtered="!!userSearchKey"
+              :hide-action="!userSearchKey"
+              @action="(id) => id === 'clear-filters' ? (userSearchKey = '') : null"
+            />
           </template>
         </OTable>
       </div>
@@ -92,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script setup lang="ts">
   import OTable from "@/lib/core/Table/OTable.vue";
   import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-  import NoData from "@/components/shared/grid/NoData.vue";
+  import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
   import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
   import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
   import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -104,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
+  import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
   
   // show selected users in the table
   // Add is_selected to the user object
@@ -166,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },

@@ -17,39 +17,38 @@
         @update:expanded-ids="onExpandedIdsChange"
         @row-click="onRowClick"
       >
-        <!-- Field row: render field name with expand chevron when expandable -->
+        <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
-          <span class="field-type-container">
-            <OIcon
-              v-if="isExpandable(row)"
-              class="field-expand-icon"
-              :name="expandedRows[row.name] ? 'expand-less' : 'expand-more'"
-              size="sm"
-            />
-          </span>
-          <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-        </template>
-
-        <!-- Field actions: always add button, copy for expandable -->
-        <template #field-actions="{ row }">
-          <OButton
-            v-if="!hideAddSearchTerm"
-            variant="ghost"
-            size="icon-xs-circle"
-            :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
-            @click.stop="addSearchTerm(`${row.name}=''`)"
-          >
-            <OIcon name="add" size="sm" />
-          </OButton>
-          <OButton
-            v-if="!hideCopyValue && isExpandable(row)"
-            variant="ghost"
-            size="icon-xs-circle"
-            :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
-            @click.stop="copyContentValue(row.name)"
-          >
-            <OIcon name="content-copy" size="sm" />
-          </OButton>
+          <OFieldRow :highlight="!!expandedRows[row.name]">
+            <span class="field-type-container">
+              <OIcon
+                class="field-expand-icon"
+                :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
+                size="sm"
+              />
+            </span>
+            <OFieldLabel :field="row" />
+            <template #actions>
+              <OButton
+                v-if="!hideAddSearchTerm"
+                variant="ghost-neutral"
+                size="icon"
+                :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
+                @click.stop="addSearchTerm(`${row.name}=''`)"
+              >
+                <OIcon name="add" size="sm" />
+              </OButton>
+              <OButton
+                v-if="!hideCopyValue && isExpandable(row)"
+                variant="ghost-neutral"
+                size="icon"
+                :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
+                @click.stop="copyContentValue(row.name)"
+              >
+                <OIcon name="content-copy" size="sm" />
+              </OButton>
+            </template>
+          </OFieldRow>
         </template>
 
         <!-- Expansion: FieldValuesPanel -->
@@ -190,6 +189,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -616,11 +616,20 @@ const copyContentValue = (value: string) => {
   }
 
   .field-type-container {
-    width: 1.25rem;
+    width: 0.55rem;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .field-expand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1rem;
+    color: var(--o2-text-muted);
   }
 }
 </style>

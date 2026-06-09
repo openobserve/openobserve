@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-surface-panel tw:border-b tw:border-border-default tw:shrink-0">
+  <div class="tw:flex tw:flex-nowrap tw:items-center tw:h-10 tw:w-full tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0">
     <!-- LEFT SIDE: Logo -->
     <div class="tw:flex tw:items-center tw:justify-start tw:shrink-0 tw:pl-3">
     <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
     <!-- Shows custom logo/text if configured in enterprise mode -->
     <div
-      class="tw:flex relative-position tw:mr-2"
+      class="tw:flex relative-position"
       v-if="
         (config.isEnterprise == 'true' &&
           store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OpenObserve logo (shown alongside custom logo if configured) -->
       <div
         v-if="store.state.zoConfig.custom_hide_self_logo == false"
-        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10 tw:min-w-[150px]"
+        class="logo-container tw:relative tw:inline-flex tw:items-center tw:min-h-10"
       >
         <img
           data-test="header-openobserve-logo"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Default OpenObserve logo (when no custom logo) -->
-    <div v-else class="tw:flex relative-position tw:mr-2 logo-container">
+    <div v-else class="tw:flex relative-position logo-container">
       <img
         data-test="header-openobserve-logo"
         class="openobserve-logo tw:cursor-pointer tw:h-8 tw:max-w-[150px] tw:block tw:transition-opacity tw:duration-200 hover:tw:opacity-80"
@@ -129,8 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     </div><!-- end left side -->
 
+    <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
+    <div class="tw:flex-1 tw:min-w-0" />
+
     <!-- RIGHT SIDE: Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:flex-1 tw:min-w-0 tw:pr-3 tw:gap-1">
+    <div class="tw:flex tw:items-center tw:justify-end tw:shrink-0 tw:pr-3 tw:gap-1">
     <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
     <div
       class="headerMenu tw:flex tw:items-center tw:gap-1"
@@ -158,7 +161,7 @@ size="xs" class="warning" />{{
     </div>
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
-    <div class="header-menu tw:flex tw:items-center tw:gap-1">
+    <div class="header-menu tw:flex tw:items-center tw:gap-x-2">
       <!-- EDITION BADGE / UPGRADE BUTTON -->
       <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
       <!-- Open Source: primary CTA to drive upgrades -->
@@ -186,139 +189,45 @@ size="xs" class="warning" />{{
       >
         <OIcon
           name="warning"
-          size="md"
-          class="tw:opacity-70"
+          size="sm"
+          class="tw:opacity-60"
           :style="{ color: ingestionQuotaColor }"
         />
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
       </OButton>
 
-      <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel -->
-      <OButton
-        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-        variant="ghost"
-        size="icon-toolbar"
-        @click="toggleAIChat"
-        data-test="menu-link-ai-item"
-        class="ai-hover-btn"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-        @mouseenter="handleMouseEnter"
-        @mouseleave="handleMouseLeave"
-      >
-        <img :src="getBtnLogo" class="ai-icon tw:w-4.5 tw:h-4.5 tw:shrink-0" />
-      </OButton>
-
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
-      <div data-test="navbar-organizations-select">
-        <ODropdown
-          v-model:open="orgMenuOpen"
-          side="bottom"
-          align="center"
-        >
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm-toolbar"
-              data-test="navbar-organizations-select-trigger"
-              class="tw:w-56"
-            >
-              <span class="tw:truncate tw:flex-1 tw:min-w-0 tw:text-left">{{ userClickedOrg?.label || "" }}</span>
-              <template #icon-right>
-                <OIcon name="arrow-drop-down" size="sm" class="tw:opacity-70 tw:shrink-0" />
-              </template>
-            </OButton>
-          </template>
-
-          <!-- Organization table with search functionality -->
-          <div data-test="organization-menu-list" class="tw:p-0">
-            <OTable
-              data-test="organization-menu-table"
-              :data="filteredOrganizations"
-              row-key="identifier"
-              :columns="[
-                {
-                  id: 'label',
-                  header: 'Organization',
-                  accessorKey: 'label',
-                  meta: { align: 'left' },
-                },
-              ]"
-              :show-header="false"
-              :show-global-filter="false"
-              pagination="client"
-              :page-size="rowsPerPage"
-              :page-size-options="[]"
-              class="org-table"
-              row-class="tw:cursor-pointer"
-              style="width: 470px; min-height: 420px; height: 420px"
-              @row-click="(row) => handleOrgSelection(row)"
-            >
-              <!-- Search input for filtering organizations -->
-              <template #top>
-                <div class="tw:w-full">
-                  <OSearchInput
-                    data-test="organization-search-input"
-                    v-model="searchQuery"
-                    clearable
-                    :debounce="1"
-                    autofocus
-                    placeholder="Search Organization"
-                  />
-                </div>
-              </template>
-
-              <!-- Organization list item — both a generic data-test (kept for
-                   legacy specs) and a per-identifier data-test so e2e can pick
-                   an exact org without text/role matching. -->
-              <template #cell-label="{ row, value }">
-                <div
-                  class="org-menu-item"
-                  data-test="organization-menu-item-label-item-label"
-                  :data-test-org-identifier="row.identifier"
-                  :class="{
-                    'org-menu-item--active':
-                      row.identifier === userClickedOrg?.identifier,
-                  }"
-                >
-                  {{
-                    row.label.length > 30
-                      ? row.label.substring(0, 30) +
-                        "... | " +
-                        row.identifier
-                      : row.label + " | " + row.identifier
-                  }}
-                  <OTooltip
-                    v-if="row.label.length > 30"
-                    side="bottom"
-                    align="start"
-                    :content="row.label"
-                  />
-                </div>
-              </template>
-
-              <!-- No data message -->
-              <template #empty>
-                <div
-                  data-test="organization-menu-no-data"
-                  class="tw:text-center tw:p-2 tw:w-full tw:flex tw:justify-center"
-                >
-                  No organizations found
-                </div>
-              </template>
-
-              <!-- Custom pagination: suppress left-side total count -->
-              <template #bottom></template>
-            </OTable>
-          </div>
-        </ODropdown>
-      </div>
+      <OrganizationSelector
+        :organizations="organizations"
+        :current="userClickedOrg"
+        @select="handleOrgSelection"
+      />
 
       <!-- Visual separator between org context and utility icons. Parent's
            gap-1 (4px) provides equal spacing on both sides via flex gap, so
            no per-element margin needed here. -->
-      <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
+      <!-- <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" /> -->
 
-      <div class="header-utility-icons tw:flex tw:items-center tw:gap-1">
+      <div class="header-utility-icons tw:flex tw:items-center tw:gap-x-2">
+      <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
+           Leads the utility-icon cluster, set off by a separator from the
+           org selector so it reads as the primary action in this group. -->
+      <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
+        <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
+        <OButton
+          variant="ghost"
+          size="icon-toolbar"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          class="ai-hover-btn"
+          :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+          @mouseenter="handleMouseEnter"
+          @mouseleave="handleMouseLeave"
+        >
+          <img :src="getBtnLogo" class="ai-icon tw:w-5 tw:h-5 tw:shrink-0" />
+        </OButton>
+      </template>
+
       <!-- THEME SWITCHER: Toggle between light and dark mode -->
       <ThemeSwitcher></ThemeSwitcher>
 
@@ -329,7 +238,7 @@ size="xs" class="warning" />{{
         data-test="menu-link-slack-item"
         @click="openSlack"
       >
-        <component :is="slackIcon" class="tw:opacity-70 tw:size-6 tw:shrink-0" />
+        <component :is="slackIcon" class="tw:opacity-60 tw:size-5 tw:shrink-0" />
         <OTooltip side="top" align="center" :content="t('menu.slack')" />
       </OButton>
 
@@ -337,7 +246,7 @@ size="xs" class="warning" />{{
       <ODropdown side="bottom" align="end">
         <template #trigger>
           <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
-            <OIcon name="help-outline" size="md" class="tw:opacity-70" />
+            <OIcon name="help-outline" size="sm" class="tw:opacity-60 tw:size-5!" />
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
@@ -379,17 +288,6 @@ size="xs" class="warning" />{{
         </div>
       </ODropdown>
 
-      <!-- SETTINGS BUTTON -->
-      <OButton
-        variant="ghost"
-        size="icon-toolbar"
-        data-test="menu-link-settings-item"
-        @click="router.push({ name: 'settings' })"
-      >
-        <OIcon name="settings" size="md" class="tw:opacity-70" />
-        <OTooltip side="top" align="center" :content="t('menu.settings')" />
-      </OButton>
-
       <!-- USER PROFILE MENU: Profile, language, theme, and logout -->
       <ODropdown
         side="bottom"
@@ -404,8 +302,8 @@ size="xs" class="warning" />{{
           >
             <OIcon
               :name="user.picture ? user.picture : 'person'"
-              size="md"
-              class="tw:opacity-70"
+              size="sm"
+              class="tw:opacity-60 tw:size-5!"
             />
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
@@ -526,12 +424,11 @@ import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
+import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -543,12 +440,11 @@ export default defineComponent({
   components: {
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
+    OrganizationSelector,
     OButton,
     OIcon,
     OTooltip,
-    OSearchInput,
     ODropdown,
-    OTable,
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
@@ -722,34 +618,8 @@ export default defineComponent({
       emit("update:isHovered", false);
     };
 
-    // Internal search state for the org table
-    const searchQuery = ref("");
-    const rowsPerPage = 10;
-    const orgMenuOpen = ref(false);
-
-    watch(orgMenuOpen, async (isOpen) => {
-      if (isOpen) {
-        await nextTick();
-        const input = document.querySelector(
-          '[data-test="organization-search-input"] input',
-        ) as HTMLInputElement | null;
-        input?.focus();
-      }
-    });
-
-    const filteredOrganizations = computed(() => {
-      if (!searchQuery.value) return props.organizations;
-      const q = searchQuery.value.toLowerCase();
-      return props.organizations.filter(
-        (org: any) =>
-          org.label?.toLowerCase().includes(q) ||
-          org.identifier?.toLowerCase().includes(q),
-      );
-    });
-
-    // Handle organization selection from the table
+    // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
-      orgMenuOpen.value = false;
       emit("update:selectedOrg", org);
       emit("updateOrganization");
     };
@@ -779,10 +649,6 @@ export default defineComponent({
       signout,
       handleMouseEnter,
       handleMouseLeave,
-      searchQuery,
-      rowsPerPage,
-      orgMenuOpen,
-      filteredOrganizations,
       handleOrgSelection,
       openEnterpriseDialog,
     };
@@ -897,7 +763,9 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   min-height: 2.5rem;
-  min-width: 9.375rem;
+  /* No min-width: the wordmark is ~120px, so reserving 150px left an empty gap
+     before the breadcrumb. The enterprise custom-logo branch keeps its own
+     Tailwind min-w-[150px] where it's still wanted. */
 }
 
 .openobserve-logo {

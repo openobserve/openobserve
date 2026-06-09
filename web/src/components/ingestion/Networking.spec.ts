@@ -121,11 +121,9 @@ describe("Networking Component", () => {
     });
 
     it("should initialize with correct data", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
       expect(wrapper.vm.currentUserEmail).toBeDefined();
       expect(wrapper.vm.tabs).toBe("");
       expect(wrapper.vm.ingestTabType).toBe("netflow");
-      expect(wrapper.vm.tabsFilter).toBe("");
     });
 
     it("should have correct prop type definition", () => {
@@ -260,12 +258,12 @@ describe("Networking Component", () => {
         contentClass: "tab_content",
       };
       
-      // Access networkingTabs through the component (we might need to expose it)
-      expect(wrapper.vm.filteredList).toBeDefined();
-      expect(Array.isArray(wrapper.vm.filteredList)).toBe(true);
-      expect(wrapper.vm.filteredList.length).toBeGreaterThan(0);
-      
-      const firstTab = wrapper.vm.filteredList[0];
+      // Access networkingTabs through the component
+      expect(wrapper.vm.networkingTabs).toBeDefined();
+      expect(Array.isArray(wrapper.vm.networkingTabs)).toBe(true);
+      expect(wrapper.vm.networkingTabs.length).toBeGreaterThan(0);
+
+      const firstTab = wrapper.vm.networkingTabs[0];
       expect(firstTab.name).toBe(expectedTab.name);
       expect(firstTab.to.name).toBe(expectedTab.to.name);
       expect(firstTab.to.query.org_identifier).toBe(expectedTab.to.query.org_identifier);
@@ -273,68 +271,16 @@ describe("Networking Component", () => {
     });
 
     it("should use correct organization identifier in tab configuration", () => {
-      const firstTab = wrapper.vm.filteredList[0];
+      const firstTab = wrapper.vm.networkingTabs[0];
       expect(firstTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
     });
 
     it("should have correct netflow tab properties", () => {
-      const netflowTab = wrapper.vm.filteredList.find((tab: any) => tab.name === "netflow");
+      const netflowTab = wrapper.vm.networkingTabs.find((tab: any) => tab.name === "netflow");
       expect(netflowTab).toBeDefined();
       expect(netflowTab.name).toBe("netflow");
       expect(netflowTab.icon).toContain("img:");
       expect(netflowTab.contentClass).toBe("tab_content");
-    });
-  });
-
-  describe("Filtered List Computed Property", () => {
-    it("should return all tabs when filter is empty", () => {
-      wrapper.vm.tabsFilter = "";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should filter tabs based on label (case insensitive)", () => {
-      // Set filter to match netflow
-      wrapper.vm.tabsFilter = "netflow";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should filter tabs with partial match", () => {
-      wrapper.vm.tabsFilter = "net";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should return empty array when no match found", () => {
-      wrapper.vm.tabsFilter = "nonexistent";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should handle case insensitive filtering", () => {
-      wrapper.vm.tabsFilter = "NETFLOW";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should handle mixed case filtering", () => {
-      wrapper.vm.tabsFilter = "NetFlow";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should filter with whitespace", () => {
-      wrapper.vm.tabsFilter = "net";
-      expect(wrapper.vm.filteredList.length).toBe(1);
-      expect(wrapper.vm.filteredList[0].name).toBe("netflow");
-    });
-
-    it("should handle empty filter after having content", () => {
-      wrapper.vm.tabsFilter = "something";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-      
-      wrapper.vm.tabsFilter = "";
-      expect(wrapper.vm.filteredList.length).toBe(1);
     });
   });
 
@@ -356,11 +302,6 @@ describe("Networking Component", () => {
       expect(wrapper.vm.currentOrgIdentifier).toBe(store.state.selectedOrganization.identifier);
     });
 
-    it("should expose splitterModel with correct value", () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
-    });
-
     it("should expose tabs with correct initial value", () => {
       expect(wrapper.vm.tabs).toBe("");
       expect(typeof wrapper.vm.tabs).toBe("string");
@@ -369,11 +310,6 @@ describe("Networking Component", () => {
     it("should expose ingestTabType with correct initial value", () => {
       expect(wrapper.vm.ingestTabType).toBe("netflow");
       expect(typeof wrapper.vm.ingestTabType).toBe("string");
-    });
-
-    it("should expose tabsFilter with correct initial value", () => {
-      expect(wrapper.vm.tabsFilter).toBe("");
-      expect(typeof wrapper.vm.tabsFilter).toBe("string");
     });
   });
 
@@ -430,15 +366,6 @@ describe("Networking Component", () => {
       expect(wrapper.vm.tabs).toBe("netflow");
     });
 
-    it("should update splitterModel reactively", async () => {
-      expect(wrapper.vm.splitterModel).toBe(270);
-      
-      wrapper.vm.splitterModel = 300;
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.splitterModel).toBe(300);
-    });
-
     it("should update ingestTabType reactively", async () => {
       expect(wrapper.vm.ingestTabType).toBe("netflow");
       
@@ -446,15 +373,6 @@ describe("Networking Component", () => {
       await wrapper.vm.$nextTick();
       
       expect(wrapper.vm.ingestTabType).toBe("customflow");
-    });
-
-    it("should update tabsFilter reactively", async () => {
-      expect(wrapper.vm.tabsFilter).toBe("");
-      
-      wrapper.vm.tabsFilter = "test";
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.tabsFilter).toBe("test");
     });
 
     it("should have reactive currentOrgIdentifier", () => {
@@ -548,44 +466,13 @@ describe("Networking Component", () => {
   });
 
   describe("Template Rendering", () => {
-    it("should render OSplitter with correct props", () => {
+    it("should render the component template", () => {
       expect(wrapper.html()).toContain('div');
     });
 
     it("should pass correct props to router-view", () => {
       const routerView = wrapper.findComponent({ name: 'router-view' });
       expect(routerView.exists()).toBe(true);
-    });
-
-    it("should render search input with correct attributes", () => {
-      const input = wrapper.findComponent({ name: 'OSearchInput' });
-      expect(input.exists()).toBe(true);
-    });
-  });
-
-  describe("Advanced Filtering Scenarios", () => {
-    it("should handle special characters in filter", () => {
-      wrapper.vm.tabsFilter = "net@flow";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-      
-      wrapper.vm.tabsFilter = "net-flow";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-      
-      wrapper.vm.tabsFilter = "net_flow";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should handle numeric filter", () => {
-      wrapper.vm.tabsFilter = "123";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-      
-      wrapper.vm.tabsFilter = "0";
-      expect(wrapper.vm.filteredList.length).toBe(0);
-    });
-
-    it("should handle very long filter string", () => {
-      wrapper.vm.tabsFilter = "a".repeat(1000);
-      expect(wrapper.vm.filteredList.length).toBe(0);
     });
   });
 
