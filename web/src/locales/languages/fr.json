@@ -455,7 +455,8 @@
     "language": "Langue",
     "actions": "Actions",
     "incidents": "Incidents",
-    "evals": "Evals"
+    "evals": "Evals",
+    "aiObservability": "Observabilité de l'IA"
   },
   "rum": {
     "title": "Surveillance réelle des utilisateurs",
@@ -4651,6 +4652,21 @@
     "empty": {
       "title": "Pas encore de fournisseurs LLM",
       "description": "Les fournisseurs LLM stockent les informations de connexion (point de terminaison + informations d'identification) pour les modèles linguistiques que vos évaluateurs LLM Judge appellent. Ajoutez-en un pour commencer à effectuer des évaluations par des juges."
+    }
+  },
+  "aiObservability": {
+    "title": "Observabilité LLM",
+    "sections": {
+      "monitor": "Moniteur",
+      "evaluate": "Evaluer"
+    },
+    "nav": {
+      "overview": "Vue d'ensemble",
+      "sessions": "Séances",
+      "quality": "Qualité",
+      "evalJobs": "Emplois chez Eval",
+      "scorers": "Buteurs",
+      "scoreConfigs": "Configurations de score"
     }
   }
 }

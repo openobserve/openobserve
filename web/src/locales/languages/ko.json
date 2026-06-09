@@ -455,7 +455,8 @@
     "language": "언어",
     "actions": "액션",
     "incidents": "인시던트",
-    "evals": "평가"
+    "evals": "평가",
+    "aiObservability": "AI 옵저버빌리티"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -4664,6 +4665,21 @@
     "empty": {
       "title": "LLM 공급자가 아직 없습니다",
       "description": "LLM 제공자는 LLM 판사 채점자가 호출하는 언어 모델에 대한 연결 세부 정보 (엔드포인트+자격 증명) 를 저장합니다.하나를 추가하여 심사 기반 평가 실행을 시작하세요."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM 옵저버빌리티",
+    "sections": {
+      "monitor": "모니터",
+      "evaluate": "평가"
+    },
+    "nav": {
+      "overview": "개요",
+      "sessions": "세션",
+      "quality": "품질",
+      "evalJobs": "평가 작업",
+      "scorers": "득점자",
+      "scoreConfigs": "스코어 구성"
     }
   }
 }

@@ -455,7 +455,8 @@
     "language": "taal",
     "actions": "Acties",
     "incidents": "Incidenten",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "aiObservability": "AI-waarneembaarheid"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -4664,6 +4665,21 @@
     "empty": {
       "title": "Nog geen LLM-aanbieders",
       "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM-waarneembaarheid",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evalueer"
+    },
+    "nav": {
+      "overview": "Overzicht",
+      "sessions": "Sessies",
+      "quality": "Kwaliteit",
+      "evalJobs": "Vacatures bij Eval",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score-configuraties"
     }
   }
 }

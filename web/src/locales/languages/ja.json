@@ -455,7 +455,8 @@
     "language": "言語",
     "actions": "アクション",
     "incidents": "インシデント",
-    "evals": "評価"
+    "evals": "評価",
+    "aiObservability": "AI オブザーバビリティ"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
@@ -4651,6 +4652,21 @@
     "empty": {
       "title": "LLM プロバイダーはまだありません",
       "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
+    }
+  },
+  "aiObservability": {
+    "title": "LLM オブザーバビリティ",
+    "sections": {
+      "monitor": "モニター",
+      "evaluate": "評価する"
+    },
+    "nav": {
+      "overview": "概要",
+      "sessions": "セッション",
+      "quality": "クオリティ",
+      "evalJobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成"
     }
   }
 }
