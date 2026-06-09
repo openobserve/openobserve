@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use tantivy::{
+    DocId, Score, SegmentOrdinal, SegmentReader,
+    collector::{Collector, SegmentCollector},
+};
+
 /// A collector for single-segment indexes that gathers all matching doc IDs.
 ///
 /// Assumes the index has exactly one segment. `merge_fruits` pops the single
@@ -20,35 +25,35 @@
 pub struct SingleSegmentDocIdCollector;
 
 pub struct SingleSegmentDocIdSegmentCollector {
-    pub(crate) docs: Vec<tantivy::DocId>,
+    pub(crate) docs: Vec<DocId>,
 }
 
-impl tantivy::collector::SegmentCollector for SingleSegmentDocIdSegmentCollector {
-    type Fruit = Vec<tantivy::DocId>;
+impl SegmentCollector for SingleSegmentDocIdSegmentCollector {
+    type Fruit = Vec<DocId>;
 
     #[inline]
-    fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
+    fn collect(&mut self, doc: DocId, _score: Score) {
         self.docs.push(doc);
     }
 
     #[inline]
-    fn collect_block(&mut self, docs: &[tantivy::DocId]) {
+    fn collect_block(&mut self, docs: &[DocId]) {
         self.docs.extend_from_slice(docs);
     }
 
-    fn harvest(self) -> Vec<tantivy::DocId> {
+    fn harvest(self) -> Vec<DocId> {
         self.docs
     }
 }
 
-impl tantivy::collector::Collector for SingleSegmentDocIdCollector {
-    type Fruit = Vec<tantivy::DocId>;
+impl Collector for SingleSegmentDocIdCollector {
+    type Fruit = Vec<DocId>;
     type Child = SingleSegmentDocIdSegmentCollector;
 
     fn for_segment(
         &self,
-        _segment_local_id: tantivy::SegmentOrdinal,
-        segment: &tantivy::SegmentReader,
+        _segment_local_id: SegmentOrdinal,
+        segment: &SegmentReader,
     ) -> tantivy::Result<Self::Child> {
         Ok(SingleSegmentDocIdSegmentCollector {
             docs: Vec::with_capacity(segment.max_doc() as usize),
@@ -59,10 +64,7 @@ impl tantivy::collector::Collector for SingleSegmentDocIdCollector {
         false
     }
 
-    fn merge_fruits(
-        &self,
-        mut segment_fruits: Vec<Vec<tantivy::DocId>>,
-    ) -> tantivy::Result<Vec<tantivy::DocId>> {
+    fn merge_fruits(&self, mut segment_fruits: Vec<Vec<DocId>>) -> tantivy::Result<Vec<DocId>> {
         Ok(segment_fruits.pop().unwrap_or_default())
     }
 }
