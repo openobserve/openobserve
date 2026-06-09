@@ -88,6 +88,11 @@ pub struct ServiceNode {
     pub error_rate: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_name: Option<String>,
+    /// Inferred-service category ("database"/"queue"/"rpc"/"external") when this
+    /// node is an uninstrumented dependency; `None` for instrumented services.
+    /// The UI renders inferred nodes with a dotted style + type icon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<String>,
 }
 
 /// Edge in service graph
@@ -110,6 +115,11 @@ pub struct ServiceEdge {
     pub baseline_p95_latency_ns: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub baseline_p99_latency_ns: Option<u64>,
+    /// Inferred-dependency category ("database"/"queue"/"rpc"/"external") when the
+    /// target (`to`) is an uninstrumented dependency; `None` for instrumented
+    /// service-to-service edges. Presence signals the UI to draw a dotted edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_type: Option<String>,
 }
 
 /// One time-series data point in an edge latency trend
@@ -195,6 +205,7 @@ mod tests {
             baseline_p50_latency_ns: None,
             baseline_p95_latency_ns: None,
             baseline_p99_latency_ns: None,
+            connection_type: None,
         };
         let val = serde_json::to_value(&edge).unwrap();
         // skip_serializing_if = "Option::is_none" → absent from JSON when None
@@ -218,6 +229,7 @@ mod tests {
             baseline_p50_latency_ns: Some(40),
             baseline_p95_latency_ns: Some(180),
             baseline_p99_latency_ns: Some(350),
+            connection_type: None,
         };
         let val = serde_json::to_value(&edge).unwrap();
         assert_eq!(val["baseline_p50_latency_ns"], 40_u64);
@@ -236,6 +248,7 @@ mod tests {
             errors: 2,
             error_rate: 2.0,
             stream_name: None,
+            service_type: None,
         };
         let val = serde_json::to_value(&node).unwrap();
         // skip_serializing_if = "Option::is_none" → absent when None
@@ -251,6 +264,7 @@ mod tests {
             errors: 2,
             error_rate: 2.0,
             stream_name: Some("my_stream".to_string()),
+            service_type: None,
         };
         let val = serde_json::to_value(&node).unwrap();
         assert_eq!(val["stream_name"], "my_stream");
@@ -326,6 +340,7 @@ mod tests {
             errors: 0,
             error_rate: 0.0,
             stream_name: None,
+            service_type: None,
         };
         let edge = ServiceEdge {
             from: None,
@@ -339,6 +354,7 @@ mod tests {
             baseline_p50_latency_ns: None,
             baseline_p95_latency_ns: None,
             baseline_p99_latency_ns: None,
+            connection_type: None,
         };
         let graph = ServiceGraphData {
             nodes: vec![node],
@@ -348,5 +364,55 @@ mod tests {
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.nodes[0].id, "n1");
         assert!(graph.edges[0].from.is_none());
+    }
+
+    #[test]
+    fn test_inferred_node_and_edge_type_serialization() {
+        // Instrumented node/edge: type fields omitted from JSON.
+        let node = ServiceNode {
+            id: "checkout".to_string(),
+            label: "checkout".to_string(),
+            requests: 10,
+            errors: 0,
+            error_rate: 0.0,
+            stream_name: None,
+            service_type: None,
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        assert!(val.get("service_type").is_none());
+
+        // Inferred dependency node: service_type present for dotted rendering.
+        let node = ServiceNode {
+            id: "redis-master.prod".to_string(),
+            label: "redis-master.prod".to_string(),
+            requests: 10,
+            errors: 0,
+            error_rate: 0.0,
+            stream_name: None,
+            service_type: Some("database".to_string()),
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        assert_eq!(val["service_type"], "database");
+
+        // Inferred edge: connection_type present signals a dotted edge.
+        let edge = ServiceEdge {
+            from: Some("checkout".to_string()),
+            to: "redis-master.prod".to_string(),
+            total_requests: 10,
+            failed_requests: 0,
+            error_rate: 0.0,
+            p50_latency_ns: 100,
+            p95_latency_ns: 200,
+            p99_latency_ns: 300,
+            baseline_p50_latency_ns: None,
+            baseline_p95_latency_ns: None,
+            baseline_p99_latency_ns: None,
+            connection_type: Some("database".to_string()),
+        };
+        let val = serde_json::to_value(&edge).unwrap();
+        assert_eq!(val["connection_type"], "database");
+        // Roundtrip back through Deserialize keeps the field.
+        let back: ServiceEdge = serde_json::from_value(val).unwrap();
+        assert_eq!(back.connection_type.as_deref(), Some("database"));
     }
 }
