@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onDeactivated, onUnmounted, watch } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
@@ -47,7 +47,6 @@ import type {
   SectionHubGroup,
   SectionHubItem,
 } from "@/components/common/SectionHub.vue";
-import { useAppBreadcrumb, type Crumb } from "@/composables/useAppBreadcrumb";
 
 defineOptions({ name: "AIObservabilityShell" });
 
@@ -153,27 +152,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
     .sort((a, b) => rank(a) - rank(b))
     .map((label) => ({ label, items: buckets.get(label)! }));
 });
-
-// Top chrome breadcrumb: AI Observability › <Section ▾>.
-const crumbs = computed<Crumb[]>(() => [
-  {
-    label: t("aiObservability.title"),
-    icon: "auto-awesome",
-    to: { name: "aiOverview", query: orgQuery.value },
-    dataTest: "breadcrumb-ai-observability-root",
-  },
-  {
-    dropdown: sectionGroups.value,
-    activeKey: activeSection.value,
-    dataTest: "breadcrumb-ai-observability-section",
-  },
-]);
-
-const { publish, clear } = useAppBreadcrumb();
-watch(crumbs, (c) => publish(c), { immediate: true });
-onActivated(() => publish(crumbs.value));
-onDeactivated(clear);
-onUnmounted(clear);
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'
 // activeSectionItem use). Keeping the reference live for clarity.
