@@ -1099,6 +1099,9 @@ watch(
   () => [
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       ?.fields?.stream,
+    // Rebuild the auto query once the stream schema loads (makeAutoSQLQuery bails
+    // out while groupedFields is empty).
+    dashboardPanelData.meta?.streamFields?.groupedFields?.length,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       ?.fields?.x,
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]

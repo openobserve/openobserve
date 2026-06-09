@@ -133,11 +133,7 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
-import {
-  DEFAULT_METRICS_X_FIELD,
-  DEFAULT_METRICS_Y_FIELD,
-  DEFAULT_METRICS_Y_FIELD_COUNT,
-} from "@/utils/metrics/constants";
+import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -175,9 +171,8 @@ export default defineComponent({
       resetDashboardPanelData,
       resetAggregationFunction,
       validatePanel,
-      updateGroupedFields,
-      makeAutoSQLQuery,
     } = useDashboardPanelData("metrics");
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref({
       valueType: "relative",
@@ -212,33 +207,6 @@ export default defineComponent({
       // disappear after every org switch. The new instance's onBeforeMount
       // already resets and re-initialises the state correctly.
     });
-
-    /** Apply default SQL builder fields for metrics.
-     *  Uses avg(value) if the stream has a "value" field, otherwise count(_timestamp). */
-    const applyMetricsDefaults = () => {
-      const query = dashboardPanelData.data.queries[0];
-      query.customQuery = false;
-      query.fields.x = [DEFAULT_METRICS_X_FIELD()];
-
-      // Check if the current stream has a "value" field
-      const streamFields =
-        dashboardPanelData.meta?.streamFields?.groupedFields ?? [];
-      const hasValueField = streamFields.some((stream: any) =>
-        stream?.schema?.some((field: any) => field?.name === "value"),
-      );
-
-      query.fields.y = [
-        hasValueField
-          ? DEFAULT_METRICS_Y_FIELD()
-          : DEFAULT_METRICS_Y_FIELD_COUNT(),
-      ];
-      query.fields.breakdown = [];
-      query.fields.filter = {
-        filterType: "group",
-        logicalOperator: "AND",
-        conditions: [],
-      };
-    };
 
     // Initialize state before any child components mount so FieldList.vue sees
     // stream_type = "metrics" from the start, preventing a spurious
@@ -280,6 +248,17 @@ export default defineComponent({
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
+
+      // Seed the default builder query on initial load (the PromQL builder only
+      // rebuilds on label/operation change, so the bar would otherwise be empty).
+      const initialQuery = dashboardPanelData.data.queries[0];
+      if (
+        initialQuery?.fields?.stream &&
+        !initialQuery.customQuery &&
+        !initialQuery.query
+      ) {
+        await applyDefaultPanelFields();
+      }
     });
 
     watch(
@@ -312,84 +291,17 @@ export default defineComponent({
           );
         }
 
-        // When stream changes while in SQL builder mode and query is empty,
-        // apply defaults and regenerate query. Skip for custom mode.
+        // Seed the default query when a stream becomes available in builder mode
+        // with an empty query (the !query guard avoids overwriting an existing one).
         const query = dashboardPanelData.data.queries[0];
         if (
           isPanelConfigWatcherActivated &&
           stream &&
-          oldStream &&
           stream !== oldStream &&
-          dashboardPanelData.data.queryType === "sql" &&
           !query?.customQuery &&
           !query?.query
         ) {
-          await updateGroupedFields();
-          applyMetricsDefaults();
-          await makeAutoSQLQuery();
-        }
-      },
-    );
-
-    // Handle query type switches on metrics page.
-    // We use nextTick() to ensure this runs AFTER changeToggle's removeXYFilters()
-    // has completed, so the defaults we apply here don't get immediately cleared.
-    // Only applies for builder mode (not custom mode).
-    watch(
-      () => dashboardPanelData.data.queryType,
-      async (newType: string, oldType: string) => {
-        if (!isPanelConfigWatcherActivated) return;
-
-        const query = dashboardPanelData.data.queries[0];
-        const stream = query?.fields?.stream;
-        const isCustomMode = query?.customQuery;
-
-        if (newType === "sql" && oldType === "promql" && !isCustomMode) {
-          // Switching to SQL builder: load stream fields first so applyMetricsDefaults
-          // can check whether the current stream has a "value" field
-          await nextTick();
-          if (stream) {
-            await updateGroupedFields();
-          }
-          applyMetricsDefaults();
-
-          if (stream) {
-            await makeAutoSQLQuery();
-          }
-        } else if (newType === "promql" && oldType === "sql" && !isCustomMode) {
-          // Switching to PromQL builder: set default builder query (streamName{})
-          await nextTick();
-          if (stream) {
-            query.query = `${stream}{}`;
-          }
-        }
-      },
-    );
-
-    // When switching from custom to builder mode, apply defaults.
-    // changeToggle's removeXYFilters() wipes the builder fields, so we
-    // always need to re-apply defaults regardless of whether query text is empty.
-    watch(
-      () => dashboardPanelData.data.queries[0]?.customQuery,
-      async (isCustom: boolean, wasCustom: boolean) => {
-        if (!isPanelConfigWatcherActivated) return;
-        // Only act when switching from custom (true) to builder (false)
-        if (wasCustom && !isCustom) {
-          await nextTick();
-          const query = dashboardPanelData.data.queries[0];
-          const stream = query?.fields?.stream;
-
-          if (dashboardPanelData.data.queryType === "sql") {
-            if (stream) {
-              await updateGroupedFields();
-            }
-            applyMetricsDefaults();
-            if (stream) {
-              await makeAutoSQLQuery();
-            }
-          } else if (dashboardPanelData.data.queryType === "promql" && stream) {
-            query.query = `${stream}{}`;
-          }
+          await applyDefaultPanelFields();
         }
       },
     );
