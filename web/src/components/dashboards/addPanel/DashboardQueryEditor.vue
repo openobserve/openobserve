@@ -955,6 +955,8 @@ export default defineComponent({
       cancelQueryNameEdit,
       currentEditorKeywords,
       currentEditorSuggestions,
+      _sqlOnFocus,
+      _sqlOnBlur,
     };
   },
 });

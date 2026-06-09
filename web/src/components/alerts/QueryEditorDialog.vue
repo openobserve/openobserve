@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @language-change="handleLanguageChange"
                         @ask-ai="handleAskAI"
                         @run-query="handleRunQuery(localTab)"
-                        @focus="queryEditorPlaceholderFlag = false"
+                        @focus="onQueryEditorFocus"
                         @blur="onBlurQueryEditor"
                         editor-height="100%"
                         data-test-prefix="alert"
@@ -444,6 +444,7 @@ import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -690,10 +691,10 @@ const updateVrlFunction = (value: string) => {
   emit("update:vrlFunction", value);
 };
 
-const onBlurQueryEditor = debounce(() => {
+const onBlurQueryEditor = debounce(async () => {
   queryEditorPlaceholderFlag.value = localTab.value === 'sql' ? localSqlQuery.value === '' : localPromqlQuery.value === '';
-  // Only validate SQL queries on blur, not PromQL
   if (localTab.value === 'sql') {
+    await _sqlOnBlur();
     emit("validate-sql");
   }
 }, 10);
@@ -955,6 +956,19 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef,
+    sqlMode: computed(() => localTab.value === 'sql'),
+    query: computed(() => localSqlQuery.value ?? ""),
+    streamName: computed(() => props.streamName),
+  });
+
+const onQueryEditorFocus = () => {
+  queryEditorPlaceholderFlag.value = false;
+  _sqlOnFocus();
+};
+
 // ── Autocomplete ──────────────────────────────────────────────────────────
 const {
   autoCompleteData,
@@ -1051,6 +1065,7 @@ const availableLanguages = computed(() => {
 
 // Unified Query Editor handlers
 const handleQueryUpdate = (newQuery: string) => {
+  _sqlOnQueryChange();
   if (localTab.value === 'sql') {
     updateSqlQuery(newQuery);
   } else {
