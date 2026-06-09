@@ -277,7 +277,7 @@ class TestScoreConfigs:
 
     def test_09_update_not_found(self):
         _api(self.s, self.base, self.org, "score_configs/nope-xyz",
-             method="PUT", json_data={"name": "nope", "dataType": "numeric"},
+             method="PUT", json_data={"name": "nope"},
              expected_status=404, label="update missing")
 
 
