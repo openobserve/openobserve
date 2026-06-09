@@ -964,7 +964,8 @@
     "subscription_type": "订阅类型",
     "proceed_subscription": "继续订阅",
     "subscription_plan": "订阅计划",
-    "makeBilledMember": "将此组织设为 {org} 的计费会员"
+    "makeBilledMember": "将此组织设为 {org} 的计费会员",
+    "manage": "管理"
   },
   "template": {
     "header": "模板",

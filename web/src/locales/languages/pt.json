@@ -964,7 +964,8 @@
     "subscription_type": "Tipo de plano",
     "proceed_subscription": "Prosseguir com a assinatura",
     "subscription_plan": "Plano de assinatura",
-    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}"
+    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}",
+    "manage": "Gerenciar"
   },
   "template": {
     "header": "Modelos",
