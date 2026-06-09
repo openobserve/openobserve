@@ -27,6 +27,7 @@ use crate::{
 };
 
 pub async fn get_org_usage(
+    parent_org: &str,
     org_id: &str,
     usage_range: &org_usage::UsageRange,
     unit: &str,
@@ -35,7 +36,7 @@ pub async fn get_org_usage(
     let mut pricing_map = HashMap::new();
 
     if let Ok(billings) =
-        o2_enterprise::enterprise::cloud::customer_billings::get_by_org_id(org_id).await
+        o2_enterprise::enterprise::cloud::customer_billings::get_by_org_id(parent_org).await
     {
         // if subscription is present, and stripe is provider , and range is cycle and subscription
         // id is present, we will try to get the cycle based usage
