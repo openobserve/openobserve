@@ -473,14 +473,11 @@ test.describe("Model Pricing — Form Validation", () => {
         await pm.modelPricingPage.fillPattern(`^mp_val_noprice.*`);
         await pm.modelPricingPage.saveBtn.click();
 
-        await Promise.race([
-            pm.modelPricingPage.editorTitle.waitFor({ state: 'visible', timeout: 5000 }),
-            pm.modelPricingPage.toastMessage.waitFor({ state: 'visible', timeout: 5000 }),
-        ]);
-
-        const onEditor = await pm.modelPricingPage.editorTitle.isVisible();
-        const hasToast = await pm.modelPricingPage.toastMessage.isVisible();
-        expect(onEditor || hasToast).toBeTruthy();
+        // Validation fires a specific toast — editor must stay open (no redirect to list)
+        await expect(
+            pm.modelPricingPage.toastMessage.filter({ hasText: /at least one.*price/i })
+        ).toBeVisible({ timeout: 5000 });
+        await expect(pm.modelPricingPage.editorTitle).toBeVisible({ timeout: 3000 });
 
         testLogger.info('Test completed successfully');
     });
@@ -870,10 +867,16 @@ test.describe("Model Pricing — Enable/Disable Toggle", () => {
             await pm.modelPricingPage.gotoModelPricingPage();
             await pm.modelPricingPage.verifyModelInList(name);
 
+            // Toggle off — button title flips to "Enable" (the action to re-enable it)
             await pm.modelPricingPage.toggleBtnForModel(name).click();
+            await expect(pm.modelPricingPage.toggleBtnForModel(name))
+                .toHaveAttribute('title', 'Enable', { timeout: 5000 });
             await pm.modelPricingPage.verifyModelInList(name);
 
+            // Toggle on — button title flips back to "Disable"
             await pm.modelPricingPage.toggleBtnForModel(name).click();
+            await expect(pm.modelPricingPage.toggleBtnForModel(name))
+                .toHaveAttribute('title', 'Disable', { timeout: 5000 });
             await pm.modelPricingPage.verifyModelInList(name);
         } finally {
             if (createdId) await apiDeleteModel(createdId);
