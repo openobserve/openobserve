@@ -74,6 +74,12 @@
       "action": "New destination",
       "actionDesc": "Connect a notification channel"
     },
+    "noPipelineDestinations": {
+      "title": "No destinations yet",
+      "description": "External targets for pipeline output — HTTP endpoints and remote write targets.",
+      "action": "New destination",
+      "actionDesc": "Connect a pipeline destination"
+    },
     "noAlertTemplates": {
       "title": "No templates yet",
       "description": "Templates define the format of alert notification messages.",
@@ -231,6 +237,7 @@
       "ingestionTokens": "ingestion tokens",
       "organizations": "organizations",
       "alertDestinations": "destinations",
+      "pipelineDestinations": "destinations",
       "alertTemplates": "templates",
       "enrichmentTables": "enrichment tables",
       "cipherKeys": "cipher keys",
