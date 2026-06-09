@@ -545,24 +545,44 @@ pub async fn get_latest_traces(
     // Check whether reference_parent_span_id exists in the stream schema.
     // If missing (rare — it is a mandatory traces field), omit root-span
     // logic rather than failing the entire query.
-    let has_ref_parent_id = infra::schema::get_stream_schema_from_cache(
+    let trace_schema = infra::schema::get_stream_schema_from_cache(
         org_id.as_str(),
         stream_name.as_str(),
         StreamType::Traces,
     )
-    .await
-    .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
-    .unwrap_or(true);
-
-    let root_service_name_expr = if has_ref_parent_id {
-        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)"
+    .await;
+    let has_ref_parent_id = trace_schema
+        .as_ref()
+        .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+        .unwrap_or(false);
+    // Inferred-service fields are written at ingestion only for CLIENT/PRODUCER spans
+    // that call uninstrumented dependencies (db/queue/external/rpc). Gate the SQL on
+    // their presence so streams that predate the feature — or never call such deps —
+    // keep working unchanged. Default to absent when the schema isn't cached.
+    let has_infer = trace_schema
+        .as_ref()
+        .map(|s| {
+            s.field_with_name(traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
+        .unwrap_or(false);
+    // Re-attribute spans that call an uninstrumented dependency to the inferred
+    // entity, so databases/queues/external APIs show up in the per-service time
+    // breakdown. COALESCE falls back to service_name for normal spans and for old
+    // parquet where the field reads NULL.
+    let service_key_expr = if has_infer {
+        "COALESCE(infer_service_name, service_name)"
     } else {
-        "null"
+        "service_name"
     };
-    let root_operation_name_expr = if has_ref_parent_id {
-        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)"
+
+    let (root_service_name_expr, root_operation_name_expr) = if has_ref_parent_id {
+        (
+            "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)",
+            "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)",
+        )
     } else {
-        "null"
+        ("null", "null")
     };
 
     let sanitized_ids: Vec<String> = traces_data
@@ -583,7 +603,7 @@ pub async fn get_latest_traces(
             min(start_time) AS min_start_time, \
             max(end_time) AS max_end_time, \
             max(duration) AS max_duration, \
-            count(DISTINCT service_name) AS service_count, \
+            count(DISTINCT {service_key_expr}) AS service_count, \
             {root_service_name_expr} AS root_service_name, \
             {root_operation_name_expr} AS root_operation_name, \
             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
@@ -722,6 +742,8 @@ pub async fn get_latest_traces(
                         service_name: event_service_name,
                         count: span_count.try_into().unwrap_or_default(),
                         duration: max_duration,
+                        // Single-entity traces are the instrumented service itself.
+                        service_type: None,
                     });
                 }
             } else {
@@ -745,10 +767,19 @@ pub async fn get_latest_traces(
             .filter(|tid| !tid.is_empty())
             .collect::<Vec<String>>()
             .join("','");
+        // max(infer_service_type) over a COALESCE group is the group's inferred type
+        // ("database"/"queue"/...) for inferred entities and NULL for instrumented
+        // services, which the UI uses to render inferred nodes with a dotted style.
+        let svc_type_select = if has_infer {
+            ", max(infer_service_type) AS service_type"
+        } else {
+            ""
+        };
         let svc_sql = format!(
-            "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
+            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
+             count(*) AS svc_count, max(duration) AS svc_duration \
              FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, service_name"
+             GROUP BY trace_id, {service_key_expr}"
         );
         req.query.sql = svc_sql;
         req.query.from = 0;
@@ -812,11 +843,18 @@ pub async fn get_latest_traces(
                 .to_string();
             let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
             let svc_duration = json::get_int_value(item.get("svc_duration").unwrap_or_default());
+            // Present only for inferred entities; absent => instrumented service.
+            let svc_type = item
+                .get("service_type")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from);
             if let Some(trace) = traces_data.get_mut(&tid) {
                 trace.service_name.push(TraceServiceNameItem {
                     service_name: svc_name,
                     count: svc_count.try_into().unwrap_or_default(),
                     duration: svc_duration,
+                    service_type: svc_type,
                 });
             }
         }
@@ -1798,21 +1836,34 @@ async fn run_q2_for_traces(
         .filter(|tid| !tid.is_empty())
         .collect();
 
-    let has_ref_parent_id =
-        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
-            .await
-            .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
-            .unwrap_or(true);
-
-    let root_svc_expr = if has_ref_parent_id {
-        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)"
+    let trace_schema =
+        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces).await;
+    let has_ref_parent_id = trace_schema
+        .as_ref()
+        .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+        .unwrap_or(false);
+    // See get_latest_traces: gate inferred-service SQL on the field's presence and
+    // re-attribute uninstrumented-dependency spans via COALESCE.
+    let has_infer = trace_schema
+        .as_ref()
+        .map(|s| {
+            s.field_with_name(traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
+        .unwrap_or(false);
+    let service_key_expr = if has_infer {
+        "COALESCE(infer_service_name, service_name)"
     } else {
-        "null"
+        "service_name"
     };
-    let root_op_expr = if has_ref_parent_id {
-        "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)"
+
+    let (root_svc_expr, root_op_expr) = if has_ref_parent_id {
+        (
+            "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)",
+            "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN operation_name END)",
+        )
     } else {
-        "null"
+        ("null", "null")
     };
 
     let trace_ids_str = sanitized_ids.join("','");
@@ -1823,7 +1874,7 @@ async fn run_q2_for_traces(
             min(start_time) AS min_start_time, \
             max(end_time) AS max_end_time, \
             max(duration) AS max_duration, \
-            count(DISTINCT service_name) AS service_count, \
+            count(DISTINCT {service_key_expr}) AS service_count, \
             {root_svc_expr} AS root_service_name, \
             {root_op_expr} AS root_operation_name, \
             first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
@@ -1935,6 +1986,8 @@ async fn run_q2_for_traces(
                         service_name: event_service_name,
                         count: span_count.try_into().unwrap_or_default(),
                         duration: max_duration,
+                        // Single-entity traces are the instrumented service itself.
+                        service_type: None,
                     });
                 }
             } else {
@@ -1955,10 +2008,16 @@ async fn run_q2_for_traces(
             .filter(|tid| !tid.is_empty())
             .collect::<Vec<String>>()
             .join("','");
+        let svc_type_select = if has_infer {
+            ", max(infer_service_type) AS service_type"
+        } else {
+            ""
+        };
         let svc_sql = format!(
-            "SELECT trace_id, service_name, count(*) AS svc_count, max(duration) AS svc_duration \
+            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
+             count(*) AS svc_count, max(duration) AS svc_duration \
              FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, service_name"
+             GROUP BY trace_id, {service_key_expr}"
         );
         let mut req3 = base_req.clone();
         req3.query.sql = svc_sql;
@@ -2003,11 +2062,18 @@ async fn run_q2_for_traces(
                 .to_string();
             let svc_count = json::get_int_value(item.get("svc_count").unwrap_or_default());
             let svc_duration = json::get_int_value(item.get("svc_duration").unwrap_or_default());
+            // Present only for inferred entities; absent => instrumented service.
+            let svc_type = item
+                .get("service_type")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from);
             if let Some(trace) = traces_data.get_mut(&tid) {
                 trace.service_name.push(TraceServiceNameItem {
                     service_name: svc_name,
                     count: svc_count.try_into().unwrap_or_default(),
                     duration: svc_duration,
+                    service_type: svc_type,
                 });
             }
         }
@@ -2038,6 +2104,11 @@ struct TraceServiceNameItem {
     service_name: String,
     count: u16,
     duration: i64,
+    /// Inferred-service category ("database"/"queue"/"rpc"/"external") when this
+    /// entity is an uninstrumented dependency; `None` for instrumented services.
+    /// The UI renders inferred entities with a dotted style.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_type: Option<String>,
 }
 
 #[cfg(test)]
@@ -2050,6 +2121,7 @@ mod tests {
         assert_eq!(item.service_name, "");
         assert_eq!(item.count, 0);
         assert_eq!(item.duration, 0);
+        assert_eq!(item.service_type, None);
     }
 
     #[test]
@@ -2058,9 +2130,36 @@ mod tests {
             service_name: "my-service".to_string(),
             count: 42,
             duration: 1000,
+            service_type: None,
         };
         assert_eq!(item.service_name, "my-service");
         assert_eq!(item.count, 42);
         assert_eq!(item.duration, 1000);
+    }
+
+    #[test]
+    fn test_trace_service_name_item_inferred_serializes_service_type() {
+        // Instrumented service: service_type omitted from JSON.
+        let instrumented = TraceServiceNameItem {
+            service_name: "checkout".to_string(),
+            count: 3,
+            duration: 100,
+            service_type: None,
+        };
+        let json = serde_json::to_value(&instrumented).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("service_type"));
+
+        // Inferred dependency: service_type present for dotted rendering.
+        let inferred = TraceServiceNameItem {
+            service_name: "redis-master.prod".to_string(),
+            count: 5,
+            duration: 200,
+            service_type: Some("database".to_string()),
+        };
+        let json = serde_json::to_value(&inferred).unwrap();
+        assert_eq!(
+            json.get("service_type").and_then(|v| v.as_str()),
+            Some("database")
+        );
     }
 }

@@ -34,6 +34,8 @@
 
               <slot name="filter" />
 
+              <slot name="actions" />
+
               <OButton
                 :data-test="`${dataTest}-list-add-btn`"
                 class="tw:ml-2"
