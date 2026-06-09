@@ -4415,7 +4415,7 @@
     },
     "nav": {
       "overview": "Overview",
-      "sessions": "Sessions",
+      "sessions": "LLM Sessions",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
