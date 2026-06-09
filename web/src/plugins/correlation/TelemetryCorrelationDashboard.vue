@@ -1721,13 +1721,12 @@ const fieldKeysForSemanticId = (semanticId: string): string[] => {
 
 const activeChipKeysLocal = ref<Set<string>>(new Set());
 watch(chipDimensionKeys, (keys) => {
-  const next = new Set(activeChipKeysLocal.value);
-  let mutated = false;
+  const next = new Set<string>();
   for (const k of keys) {
     const fields = fieldKeysForSemanticId(k);
-    if (fields.length === 0 && !next.has(k)) { next.add(k); mutated = true; }
+    if (fields.length === 0) next.add(k);
   }
-  if (mutated) activeChipKeysLocal.value = next;
+  activeChipKeysLocal.value = next;
 }, { immediate: true });
 
 const originalValueForKey = (key: string): string => {
