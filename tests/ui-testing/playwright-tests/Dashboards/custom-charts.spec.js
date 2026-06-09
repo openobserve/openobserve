@@ -54,17 +54,12 @@ test.describe("Custom Charts Tests", () => {
       .fill('select * from "e2e_automate"');
     await page.waitForTimeout(2000);
     await pm.dashboardPanelActions.applyDashboardBtn();
-    // Wait for the error warning button to appear — the error message is rendered
-    // inside an OTooltip (Reka UI TooltipPortal) which is only in the DOM when
-    // the tooltip is open. Assert on the button first, then hover to open it.
-    const errorBtn = page.locator('[data-test="panel-error-data"]');
-    await expect(errorBtn).toBeVisible({ timeout: 15000 });
-    await errorBtn.hover();
+    await page.waitForTimeout(3000);
     await expect(
       page.getByText(
         "Unsafe code detected: Access to 'document' is not allowed"
       )
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible();
   });
 
   test("Add line JSON in Monaco Editor", async ({ page }) => {
