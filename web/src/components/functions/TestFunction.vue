@@ -41,7 +41,7 @@
           </template>
         </FullViewContainer>
         <div
-          class="tw:flex tw:items-center tw:flex-wrap tw:px-3 tw:py-2 tw:w-[100%]"
+          class="tw:flex tw:items-center tw:flex-wrap tw:py-2 tw:w-[100%]"
           :class="
             store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
           "
@@ -167,6 +167,7 @@
         name="function"
         v-model:is-expanded="expandState.events"
         :label="t('common.events')"
+        min-header-height="2.125rem"
       >
         <template #left>
           <div
@@ -225,6 +226,7 @@
         v-model:is-expanded="expandState.output"
         :label="t('common.output')"
         data-test="test-function-output-title-section"
+        min-header-height="2.125rem"
       >
         <template #left>
           <div
@@ -840,7 +842,6 @@ defineExpose({
 .monaco-editor {
   width: 100%;
   min-height: 10rem;
-  border-radius: 5px;
 }
 
 .query-editor-placeholder-overlay {

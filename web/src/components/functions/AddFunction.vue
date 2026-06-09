@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     />
 
-    <div class="tw:flex tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pt-2 tw:pb-2.5">
+    <div class="tw:flex tw:flex-1 tw:min-h-0">
       <div
         class="tw:flex tw:overflow-hidden tw:min-h-0"
         :class="[
@@ -45,18 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[30, 100]"
           class="tw:overflow-hidden tw:w-full"
           :horizontal="false"
+          separator-class="tw:w-[0.0625rem] tw:bg-[var(--o2-border-color)]"
         >
           <template v-slot:before>
-            <div class="tw:px-3 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
+            <div class="tw:px-2 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
               <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
                     :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
+                    min-header-height="2.125rem"
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -117,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max tw:ml-2 card-container">
+            <div class="tw:px-2 tw:pt-2 tw:pb-3 tw:h-full tw:overflow-y-auto card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"

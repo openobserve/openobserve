@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-    <div v-else>
+    <div v-else class="tw:flex-1 tw:min-h-0">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
