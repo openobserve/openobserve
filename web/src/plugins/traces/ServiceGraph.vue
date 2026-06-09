@@ -1143,6 +1143,7 @@ export default defineComponent({
           errors: node.errors || 0,
           error_rate: node.error_rate || 0,
           is_virtual: node.is_virtual || false,
+          service_type: node.service_type || undefined,
         }));
 
         // Ensure edges have all required fields and valid node references

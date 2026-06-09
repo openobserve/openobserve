@@ -427,7 +427,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 
 const emit = defineEmits<{
-  "view-traces": [serviceName: string];
+  "view-traces": [data: string | { serviceName: string; serviceType?: string }];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -452,6 +452,7 @@ interface ServiceRow {
   p99_latency_ns: number;
   infer_service_name?: string;
   infer_service_system?: string;
+  infer_service_type?: string;
 }
 
 const isLoading = ref(false);
@@ -501,6 +502,7 @@ const selectedServiceNode = computed(() =>
     ? {
         id: selectedServiceRow.value.service_name,
         name: selectedServiceRow.value.service_name,
+        service_type: selectedServiceRow.value.infer_service_type,
       }
     : null,
 );
@@ -712,9 +714,14 @@ function handleCloseSidePanel() {
 }
 
 function viewTraces(data: string | Record<string, any>) {
-  const serviceName =
-    typeof data === "string" ? data : (data?.serviceName ?? "");
-  emit("view-traces", serviceName);
+  if (typeof data === "string") {
+    emit("view-traces", data);
+  } else {
+    emit("view-traces", {
+      serviceName: data?.serviceName ?? "",
+      serviceType: data?.serviceType,
+    });
+  }
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
@@ -781,8 +788,9 @@ async function loadServicesCatalog() {
   const sql = useInfer
     ? `SELECT
   COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
-  MAX(infer_service_name) AS infer_service_name,
-  MAX(infer_service_system) AS infer_service_system,
+  MAX(infer_service_name) AS _infer_service_name,
+  MAX(infer_service_system) AS _infer_service_system,
+  MAX(infer_service_type) AS _infer_service_type,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
   CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
@@ -851,8 +859,9 @@ ORDER BY total_requests DESC`;
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
-              infer_service_name: hit.infer_service_name ?? undefined,
-              infer_service_system: hit.infer_service_system ?? undefined,
+              infer_service_name: hit._infer_service_name ?? undefined,
+              infer_service_system: hit._infer_service_system ?? undefined,
+              infer_service_type: hit._infer_service_type ?? undefined,
             });
           }
           services.value = Array.from(serviceMap.values());

@@ -808,6 +808,11 @@ export default defineComponent({
       return escapeSingleQuotes(name);
     };
 
+    // Returns the correct SQL field name based on whether the node is an inferred service
+    const serviceNameField = computed(() =>
+      props.selectedNode?.service_type ? "infer_service_name" : "service_name",
+    );
+
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
         dashboardData.value = {};
@@ -832,7 +837,7 @@ export default defineComponent({
       const convertedDashboard = convertDashboardSchemaVersion(
         deepCopy(metrics),
       );
-      const serviceFilter = `service_name = '${serviceName}'`;
+      const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
         let whereClause: string;
@@ -1125,7 +1130,7 @@ export default defineComponent({
           org_identifier: org,
           query: {
             query: {
-              sql: `SELECT * FROM "${streamName}" WHERE service_name = '${escapeSingleQuotes(serviceName)}' ORDER BY _timestamp DESC`,
+              sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${escapeSingleQuotes(serviceName)}' ORDER BY _timestamp DESC`,
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
@@ -1608,7 +1613,7 @@ export default defineComponent({
       try {
         const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
-        const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' GROUP BY operation_name`;
+        const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY operation_name`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1666,7 +1671,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE service_name = '${serviceName}' AND span_status = 'ERROR' ORDER BY start_time DESC`,
+                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND span_status = 'ERROR' ORDER BY start_time DESC`,
                 ...timeParams,
                 size: 5,
               },
@@ -1677,7 +1682,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE service_name = '${serviceName}' ORDER BY duration DESC`,
+                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY duration DESC`,
                 ...timeParams,
                 size: 20,
               },
@@ -1753,7 +1758,7 @@ export default defineComponent({
         const groupField = config.groupField;
         const alias = config.colId + "_name";
 
-        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE service_name = '${serviceName}' AND ${groupField} IS NOT NULL GROUP BY ${groupField} ORDER BY request_count DESC`;
+        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND ${groupField} IS NOT NULL GROUP BY ${groupField} ORDER BY request_count DESC`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1972,6 +1977,7 @@ export default defineComponent({
           props.selectedNode?.name ||
           props.selectedNode?.label ||
           props.selectedNode?.id,
+        serviceType: props.selectedNode?.service_type,
         operationName: params.operationName,
         nodeName: params.nodeName,
         podName: params.podName,
@@ -2000,7 +2006,7 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
 
       let streamName: string | undefined;
-      let filterQuery = `service_name='${escapeSingleQuotes(serviceName)}'`;
+      let filterQuery = `${serviceNameField.value}='${escapeSingleQuotes(serviceName)}'`;
 
       try {
         const correlateResponse = await correlateStreams(org, {

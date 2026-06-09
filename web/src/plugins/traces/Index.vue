@@ -2209,7 +2209,8 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    let filterQuery = `service_name = '${escapedServiceName}'`;
+    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
+    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
     if (data.operationName) {
       const escapedOpName = escapeSingleQuotes(data.operationName);
       filterQuery += ` AND operation_name = '${escapedOpName}'`;
@@ -2257,9 +2258,12 @@ const handleServiceGraphViewTraces = (data: any) => {
 };
 
 // Handler for services catalog row click — switches to traces mode filtered by service
-const handleServicesCatalogViewTraces = (serviceName: string) => {
+const handleServicesCatalogViewTraces = (data: string | { serviceName: string; serviceType?: string }) => {
+  const serviceName = typeof data === "string" ? data : data.serviceName;
+  const serviceType = typeof data === "string" ? undefined : data.serviceType;
   const escapedName = escapeSingleQuotes(serviceName);
-  searchObj.data.editorValue = `service_name = '${escapedName}'`;
+  const serviceField = serviceType ? "infer_service_name" : "service_name";
+  searchObj.data.editorValue = `${serviceField} = '${escapedName}'`;
   searchObj.data.query = searchObj.data.editorValue;
   searchObj.meta.sqlMode = false;
   searchObj.meta.searchMode = "traces";
