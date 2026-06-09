@@ -402,6 +402,7 @@ import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import streamService from "@/services/stream";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import {
   b64EncodeUnicode,
@@ -427,7 +428,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 
 const emit = defineEmits<{
-  "view-traces": [data: string | { serviceName: string; serviceType?: string }];
+  "view-traces": [data: string | Record<string, any>];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -463,8 +464,8 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
-const useInferServiceFields = ref(true);
-const isLoadingFallback = ref(false);
+// null = not yet checked; boolean = whether infer_service_name column exists in the stream schema
+const hasInferColumns = ref<boolean | null>(null);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -714,14 +715,7 @@ function handleCloseSidePanel() {
 }
 
 function viewTraces(data: string | Record<string, any>) {
-  if (typeof data === "string") {
-    emit("view-traces", data);
-  } else {
-    emit("view-traces", {
-      serviceName: data?.serviceName ?? "",
-      serviceType: data?.serviceType,
-    });
-  }
+  emit("view-traces", data);
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
@@ -756,6 +750,7 @@ const loadAvailableStreams = async () => {
 const onStreamFilterChange = (stream: string) => {
   streamFilter.value = stream;
   localStorage.setItem("servicesCatalog_streamFilter", stream);
+  hasInferColumns.value = null; // re-check schema for new stream
   loadServicesCatalog();
 };
 
@@ -782,9 +777,28 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  // Build SQL: try to group by infer_service_name first (with COALESCE fallback to service_name).
-  // If the infer columns don't exist in the schema, the error callback retries without them.
-  const useInfer = useInferServiceFields.value;
+  // Check stream schema for infer_service_name column (cache result per stream)
+  if (hasInferColumns.value === null) {
+    try {
+      const org = searchObj.organizationIdentifier;
+      const schemaResponse = await streamService.schema(
+        org,
+        streamName,
+        "traces",
+      );
+      const schemaFields =
+        schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      hasInferColumns.value = schemaFields.some(
+        (f: any) => f.name === "infer_service_name",
+      );
+    } catch {
+      // If schema check fails, default to false (use service_name only)
+      hasInferColumns.value = false;
+    }
+  }
+
+  // Build SQL: use infer_service_name when the column exists in the schema
+  const useInfer = hasInferColumns.value;
   const sql = useInfer
     ? `SELECT
   COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
@@ -868,21 +882,10 @@ ORDER BY total_requests DESC`;
         }
       },
       error: (_payload: any, _response: any) => {
-        // If the query failed because infer columns don't exist in the schema,
-        // retry once with the fallback query that only uses service_name.
-        // Guard against re-entry: only retry if we haven't already fallen back.
-        if (useInferServiceFields.value && !isLoadingFallback.value) {
-          useInferServiceFields.value = false;
-          isLoadingFallback.value = true;
-          isLoading.value = false;
-          loadServicesCatalog();
-          return;
-        }
         isLoading.value = false;
       },
       complete: (_payload: any, _response: any) => {
         isLoading.value = false;
-        isLoadingFallback.value = false;
       },
       reset: (_payload: any, _response: any) => {
         services.value = [];

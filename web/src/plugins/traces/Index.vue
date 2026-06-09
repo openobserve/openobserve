@@ -2258,18 +2258,10 @@ const handleServiceGraphViewTraces = (data: any) => {
 };
 
 // Handler for services catalog row click — switches to traces mode filtered by service
-const handleServicesCatalogViewTraces = (data: string | { serviceName: string; serviceType?: string }) => {
-  const serviceName = typeof data === "string" ? data : data.serviceName;
-  const serviceType = typeof data === "string" ? undefined : data.serviceType;
-  const escapedName = escapeSingleQuotes(serviceName);
-  const serviceField = serviceType ? "infer_service_name" : "service_name";
-  searchObj.data.editorValue = `${serviceField} = '${escapedName}'`;
-  searchObj.data.query = searchObj.data.editorValue;
-  searchObj.meta.sqlMode = false;
-  searchObj.meta.searchMode = "traces";
-  nextTick(() => {
-    runQueryFn();
-  });
+const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
+  // Normalize plain string to object then delegate to the full handler
+  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
+  handleServiceGraphViewTraces(payload);
 };
 
 // watch(updateSelectedColumns, () => {
