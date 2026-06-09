@@ -65,20 +65,9 @@
         </div>
       </template>
       <template #separator>
-        <!-- Allow page to override the separator (e.g. for custom data-test attrs) -->
+        <!-- Allow page to override the separator (e.g. for custom toggle placement) -->
         <slot name="separator">
-          <OButton
-            variant="sidebar-button"
-            size="sidebar-button"
-            :class="sidebarVisible ? 'page-layout-separator-btn splitter-icon-collapse' : 'page-layout-separator-btn splitter-icon-expand'"
-            :title="sidebarVisible ? 'Collapse sidebar' : 'Expand sidebar'"
-            @click="toggleSidebar"
-          >
-            <OIcon
-              :name="sidebarVisible ? 'chevron-left' : 'chevron-right'"
-              size="xs"
-            />
-          </OButton>
+          <div class="splitter-vertical splitter-enabled"></div>
         </slot>
       </template>
       <template #after>
@@ -130,8 +119,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 
 const props = withDefaults(
@@ -189,12 +176,3 @@ const toggleSidebar = () => {
 };
 </script>
 
-<style>
-/* Separator button positioning — mirrors the pattern used in individual page SFCs.
-   These are non-scoped so they apply to OButton's root element. */
-.page-layout-separator-btn {
-  position: absolute !important;
-  top: 0.25rem !important;
-  left: 0 !important;
-}
-</style>

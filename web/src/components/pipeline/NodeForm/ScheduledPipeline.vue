@@ -21,17 +21,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:mb-2 stepper-header tw:w-full tw:flex tw:h-full">
       <div
         :class="store.state.isAiChatEnabled ? 'tw:w-[75%]' : 'tw:w-[100%]'"
-        style="height: 100% !important"
+        style="height: 100% !important; display: flex;"
       >
+        <!-- Collapsed field list bar (shown when hidden) -->
+        <div
+          v-if="collapseFields"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer"
+          style="width: 50px; height: 100%"
+          data-test="scheduled-pipeline-field-list-collapsed-bar"
+          @click="collapseFieldList"
+        >
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90" />
+          <div class="field-list-collapsed-title">{{ t("pipeline.buildQuery") }}</div>
+        </div>
+
         <OSplitter
           v-model="splitterModel"
-          style="width: 100%"
+          :style="{ width: collapseFields ? 'calc(100% - 50px)' : '100%' }"
           class="o2-custom-splitter"
         >
           <template #before>
+            <!-- Left panel header with collapse button -->
+            <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:px-2 tw:py-1.5 tw:border-b tw:border-border-default tw:bg-surface-panel">
+              <span class="tw:font-semibold tw:text-sm">{{ t("pipeline.buildQuery") }}</span>
+              <OButton
+                variant="outline"
+                size="icon-xs-sq"
+                class="tw:rotate-90"
+                icon-left="unfold-less"
+                :title="t('search.collapseFields')"
+                data-test="scheduled-pipeline-collapse-btn"
+                @click="collapseFieldList"
+              />
+            </div>
             <OSplitter
               v-model="sideBarSplitterModel"
-              style="width: 100%; height: calc(100vh - 90px) !important"
+              style="width: 100%; height: calc(100vh - 126px) !important"
               class="tw:h-full"
               horizontal
             >
@@ -799,19 +824,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSplitter>
           </template>
           <template #separator>
-            <OButton
-              data-test="logs-search-field-list-collapse-btn"
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
-              :title="
-                collapseFields
-                  ? t('search.collapseFields')
-                  : t('search.openFields')
-              "
-              @click="collapseFieldList"
-              :icon-left="collapseFields ? 'chevron-right' : 'chevron-left'"
-            />
+            <div class="splitter-vertical splitter-enabled"></div>
           </template>
           <template #after>
             <div class="tw:w-full tw:flex tw:flex-col" style="height: 100%">
@@ -2824,6 +2837,32 @@ defineExpose({
   .query-editor-placeholder-typewriter {
     color: #718096;
   }
+}
+
+// Collapsed sidebar bar (mirrors PanelEditor pattern)
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+  font-size: 12px;
 }
 </style>
 <style lang="scss">

@@ -116,11 +116,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden">
+      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex">
+        <!-- Collapsed dimension sidebar bar (shown when hidden) -->
+        <div
+          v-if="!showDimensionSelector"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer"
+          style="width: 50px; height: 100%"
+          data-test="dimension-selector-collapsed-bar"
+          @click="toggleDimensionSelector"
+        >
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90" />
+          <div class="field-list-collapsed-title">Dimensions</div>
+        </div>
+
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
-          class="full-height tw:w-full analysis-splitter-smooth"
+          :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
+          class="analysis-splitter-smooth"
           @update:model-value="onSplitterUpdate"
         >
           <!-- LEFT: Dimension Selector Sidebar -->
@@ -131,11 +144,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col"
                 data-test="dimension-selector-sidebar"
               >
-                <!-- Sidebar Header -->
+                <!-- Sidebar Header with collapse button -->
+                <div
+                  class="tw:px-3 tw:py-2 tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                >
+                  <span class="tw:font-semibold tw:text-sm">Dimensions</span>
+                  <OButton
+                    variant="outline"
+                    size="icon-xs-sq"
+                    class="tw:rotate-90"
+                    icon-left="unfold-less"
+                    title="Collapse Dimensions"
+                    data-test="dimension-selector-collapse-btn"
+                    @click="toggleDimensionSelector"
+                  />
+                </div>
+                <!-- Search Input -->
                 <div
                   class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
                 >
-                  <!-- Search Input -->
                   <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
@@ -200,25 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <!-- SEPARATOR: Collapse/Expand Button -->
           <template #separator>
-            <OButton
-              data-test="dimension-selector-collapse-btn"
-              :title="
-                showDimensionSelector
-                  ? 'Collapse Dimensions'
-                  : 'Expand Dimensions'
-              "
-              :icon-left="showDimensionSelector ? 'chevron-left' : 'chevron-right'"
-              :class="
-                showDimensionSelector
-                  ? 'splitter-icon-expand'
-                  : 'splitter-icon-collapse'
-              "
-              variant="sidebar-button"
-              size="sidebar-button"
-              @click="toggleDimensionSelector"
-            />
+            <div class="splitter-vertical splitter-enabled"></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -1215,6 +1225,32 @@ watch(
 // Splitter smooth transition
 .analysis-splitter-smooth {
   transition: all 0.3s ease;
+}
+
+// Collapsed sidebar bar (mirrors PanelEditor pattern)
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 // Splitter icon positioning (at top, like logs page)

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component tw:h-full" id="searchBarComponent">
+  <div class="search-bar-component tw:h-full tw:flex tw:flex-col" id="searchBarComponent">
     <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
       <div ref="toolbarLeftRef" class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem] tw:flex-1 tw:min-w-0 tw:overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
@@ -419,10 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
-      class="tw:flex tw:h-full!"
+      class="tw:flex tw:flex-1 tw:min-h-0 tw:border-b tw:border-border-default"
     >
       <div
-        class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full! tw:w-full tw:relative"
+        class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:w-full tw:relative"
       >
         <code-query-editor
           ref="queryEditorRef"

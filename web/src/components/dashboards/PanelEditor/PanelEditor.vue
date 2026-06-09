@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="fieldListContainerStyle"
               >
                 <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" />
+                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
@@ -90,29 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <OButton
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
-              :class="
-                dashboardPanelData.layout.showFieldList
-                  ? 'splitter-icon-collapse'
-                  : 'splitter-icon-expand'
-              "
-              class="tw:absolute!"
-              @click.stop="collapseFieldList"
-            >
-              <template #icon-left>
-                <OIcon
-                  :name="
-                    dashboardPanelData.layout.showFieldList
-                      ? 'chevron-left'
-                      : 'chevron-right'
-                  "
-                  size="sm"
-                />
-              </template>
-            </OButton>
           </template>
 
           <!-- Main content area (after slot) -->
@@ -450,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="height: 100%"
                 >
                   <div class="tw:flex tw:flex-col" style="width: 100%">
-                    <PanelFieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                   </div>
                 </div>
               </div>
@@ -460,24 +437,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart splitter separator -->
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
-            <OButton
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ zIndex: 100 }"
-              class="tw:top-[0.875rem]! tw:left-[0rem]! tw:absolute!"
-              @click="collapseFieldList"
-            >
-              <template #icon-left>
-                <OIcon
-                  :name="
-                    dashboardPanelData.layout.showFieldList
-                      ? 'chevron-left'
-                      : 'chevron-right'
-                  "
-                  size="sm"
-                />
-              </template>
-            </OButton>
           </template>
 
           <!-- Custom chart content area -->
