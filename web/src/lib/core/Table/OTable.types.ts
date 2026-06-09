@@ -369,7 +369,6 @@ export interface OTableEmits<TData = any> {
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
-  "column-close": [columnId: string];
   "update:columnSizes": [
     sizes: Record<string, number>,
     idMap: Record<string, string>,

@@ -42,6 +42,7 @@ export function useTableCore<TData>(
     sorting: string;
     rowHeight?: number;
     filterMode?: string;
+    horizontalScroll?: boolean;
     /** Initial column sizes loaded from localStorage (for persistence) */
     initialColumnSizes?: Record<string, number> | null;
   },
@@ -78,9 +79,43 @@ export function useTableCore<TData>(
     };
   });
 
-  const effectiveColumns = computed<OTableColumnDef<TData>[]>(() =>
-    indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns,
-  );
+  // Invisible trailing spacer that absorbs the table's leftover width so the
+  // real columns keep their exact widths (Excel-style resize) and an action
+  // column can stay pinned flush-right. Only added when resizing is on and the
+  // table has no explicit elastic (`autoWidth`) column — if a column is marked
+  // autoWidth, THAT column is the filler instead and no spacer is needed.
+  const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
+    const base = indexColumn.value
+      ? [indexColumn.value, ...props.columns]
+      : props.columns;
+    // An `autoWidth` column flexes permanently and absorbs leftover on its own,
+    // so those tables need no spacer. Every other resizable table gets an
+    // invisible trailing spacer: it sits before the pinned actions column and
+    // absorbs leftover width so the table stays ≥ container (actions stays
+    // flush-right) and blank space lands in the spacer when a column shrinks.
+    // `flex` tables need it too — the flex column freezes after the first resize
+    // and no longer re-absorbs, so the spacer takes over.
+    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
+    const wantSpacer =
+      (props.enableColumnResize ?? false) &&
+      !props.horizontalScroll &&
+      !props.defaultColumns &&
+      !hasAutoWidth;
+    if (!wantSpacer) return base;
+    const spacer: OTableColumnDef<TData> = {
+      id: "__spacer__",
+      header: "",
+      sortable: false,
+      hideable: false,
+      resizable: false,
+      size: 0,
+      minSize: 0,
+      // Not `autoWidth`: its width is driven explicitly by OTable (0 while
+      // filling, the leftover once frozen). `spacer` marks it for skip logic.
+      meta: { align: "left", spacer: true },
+    };
+    return [...base, spacer];
+  });
 
   // A column is "rigid" — width pinned independently of the other columns —
   // when it's the selection-driven row index, or an action/buttons column.
@@ -158,16 +193,19 @@ export function useTableCore<TData>(
             })
           : undefined,
         size,
-        // Resize floor: never let a column be dragged below ~80px (or its own
-        // size if it's intentionally narrower). Rigid columns are locked.
-        minSize: rigid ? size : (col.minSize ?? (col.size !== undefined && col.size < 80 ? col.size : 80)),
+        // Resize floor: just enough that the dragged column stays usable (its
+        // resize handle is still grabbable and content can ellipsize) — NOT a
+        // layout guard, since the Excel-style width strategy means a drag only
+        // ever changes the dragged column. Columns that need a larger minimum
+        // (e.g. the name column) set their own `minSize`. Rigid columns locked.
+        minSize: rigid ? size : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
-        // Rigid (actions / #) and elastic (autoWidth) columns are never
-        // resizable — the elastic column flexes to fill, so a handle on it
-        // would do nothing useful and would skew the table-width math.
-        enableResizing: (rigid || col.meta?.autoWidth) ? false : (col.resizable ?? props.enableColumnResize ?? false),
+        // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
+        // spacer are never resizable. `flex` columns ARE resizable — dragging one
+        // freezes it (OTable) then resizes it like any other column.
+        enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           align: col.meta?.align ?? "left",

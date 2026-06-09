@@ -72,9 +72,10 @@ const slotAlignClass = computed(() => {
   // Action cells shrink to their content (inline-flex, no w-full) so the
   // column can be measured and sized to the buttons with no dead space.
   if (isAction.value) return "tw:inline-flex tw:items-center";
-  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full";
-  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full";
-  return "tw:flex tw:items-center tw:w-full";
+  // `min-w-0` lets the inner truncation wrapper actually shrink.
+  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full tw:min-w-0";
+  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full tw:min-w-0";
+  return "tw:flex tw:items-center tw:w-full tw:min-w-0";
 });
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
@@ -99,12 +100,12 @@ const displayValue = computed(() => {
   return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
 });
 
-const isAutoWidth = computed(() => meta.value?.autoWidth === true);
-
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",
   null,
 );
+
+const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
@@ -198,7 +199,7 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
-      meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle',
+      meta?.spacer ? 'tw:px-0 tw:align-middle' : (meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle'),
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
       alignClass,
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
@@ -212,7 +213,7 @@ function handleClick() {
         : horizontalScroll?.value
           ? 'tw:whitespace-nowrap'
           : isAction
-            ? 'tw:whitespace-nowrap'
+            ? 'tw:whitespace-nowrap tw:overflow-hidden'
             : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
       isTreeColumn ? 'o2-tree-cell' : '',
@@ -262,7 +263,10 @@ function handleClick() {
         />
       </span>
       <div class="tw:flex-1 tw:min-w-0">
-        <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+        <div v-if="$slots.default" :class="slotAlignClass">
+          <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+          <slot v-else />
+        </div>
         <FlexRender
           v-else-if="cell.column.columnDef.cell"
           :render="cell.column.columnDef.cell"
@@ -280,7 +284,11 @@ function handleClick() {
     </div>
 
     <template v-else>
-      <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+      <div v-if="$slots.default" :class="slotAlignClass">
+        <!-- Non-action slot content truncates with an ellipsis by default. -->
+        <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+        <slot v-else />
+      </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
         v-else-if="cell.column.columnDef.cell"

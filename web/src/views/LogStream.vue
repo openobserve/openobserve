@@ -365,12 +365,11 @@ export default defineComponent({
         accessorKey: "name",
         header: t("logStream.name"),
         sortable: true,
-        resizable: true,
         hideable: true,
-        minSize: 200,
-        // Elastic column: absorbs the table's leftover width so the fixed
-        // columns (#, type, sizes, actions) keep their exact widths.
-        meta: { align: "left", autoWidth: true },
+        size: 320,
+        minSize: 160,
+        // Flex: fills the leftover width on load, freezes on first resize.
+        meta: { align: "left", flex: true },
       },
       {
         id: "stream_type",
