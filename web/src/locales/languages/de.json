@@ -449,7 +449,8 @@
     "language": "Sprache",
     "actions": "Aktionen",
     "incidents": "Vorfälle",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "aiObservability": "KI-Beobachtbarkeit"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -4410,6 +4411,21 @@
     "empty": {
       "title": "Noch keine LLM-Anbieter",
       "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM Beobachtbarkeit",
+    "sections": {
+      "monitor": "Überwachen",
+      "evaluate": "Evaluieren"
+    },
+    "nav": {
+      "overview": "Überblick",
+      "sessions": "Sessions",
+      "quality": "Qualität",
+      "evalJobs": "Stellenangebote evaluieren",
+      "scorers": "Torschützen",
+      "scoreConfigs": "Score-Konfigurationen"
     }
   }
 }

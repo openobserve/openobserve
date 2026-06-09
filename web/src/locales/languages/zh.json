@@ -449,7 +449,8 @@
     "language": "语言",
     "actions": "操作",
     "incidents": "事件",
-    "evals": "Evals"
+    "evals": "Evals",
+    "aiObservability": "AI 可观测性"
   },
   "rum": {
     "title": "用户体验监控",
@@ -4414,6 +4415,21 @@
     "empty": {
       "title": "还没有 LLM 提供商",
       "description": "LLM 提供商存储您的 LLM Judge 评分员调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
+    }
+  },
+  "aiObservability": {
+    "title": "LLM 可观测性",
+    "sections": {
+      "monitor": "监视器",
+      "evaluate": "评估"
+    },
+    "nav": {
+      "overview": "概述",
+      "sessions": "会话",
+      "quality": "质量",
+      "evalJobs": "评估职位",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置"
     }
   }
 }
