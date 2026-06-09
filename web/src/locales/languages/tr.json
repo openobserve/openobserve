@@ -4316,6 +4316,12 @@
     "noSearchJobs": {
       "title": "Planlanmış arama işi yok",
       "description": "Planladığınız uzun süren aramalar burada görünecektir, burada durumlarını takip edebilir ve tamamlandıktan sonra sonuçları keşfedebilirsiniz."
+    },
+    "noPipelineDestinations": {
+      "title": "Henüz destinasyon yok",
+      "description": "Boru hattı çıktısı için harici hedefler - HTTP uç noktaları ve uzaktan yazma hedefleri.",
+      "action": "Yeni hedef",
+      "actionDesc": "Bir boru hattı hedefini bağlama"
     }
   },
   "onlineEvals": {

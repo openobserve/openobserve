@@ -4316,6 +4316,12 @@
     "noSearchJobs": {
       "title": "Geen geplande zoekopdrachten",
       "description": "Langlopende zoekopdrachten die je plant, worden hier weergegeven, waar je hun status kunt volgen en de resultaten kunt bekijken zodra ze zijn voltooid."
+    },
+    "noPipelineDestinations": {
+      "title": "Nog geen bestemmingen",
+      "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
+      "action": "Nieuwe bestemming",
+      "actionDesc": "Een pijplijnbestemming aansluiten"
     }
   },
   "onlineEvals": {

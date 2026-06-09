@@ -4316,6 +4316,12 @@
     "noSearchJobs": {
       "title": "예약된 검색 작업 없음",
       "description": "예약한 장기 실행 검색이 여기에 표시되며, 검색 상태를 추적하고 검색이 완료되면 결과를 탐색할 수 있습니다."
+    },
+    "noPipelineDestinations": {
+      "title": "아직 목적지가 없습니다",
+      "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
+      "action": "새 목적지",
+      "actionDesc": "파이프라인 대상 연결"
     }
   },
   "onlineEvals": {

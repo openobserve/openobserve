@@ -4303,6 +4303,12 @@
     "noSearchJobs": {
       "title": "Keine geplanten Suchaufträge",
       "description": "Langfristige Suchanfragen, die Sie planen, werden hier angezeigt. Dort können Sie ihren Status verfolgen und die Ergebnisse einsehen, sobald sie abgeschlossen sind."
+    },
+    "noPipelineDestinations": {
+      "title": "Noch keine Ziele",
+      "description": "Externe Ziele für die Pipeline-Ausgabe — HTTP-Endpunkte und Remote-Schreibziele.",
+      "action": "Neues Reiseziel",
+      "actionDesc": "Pipeline-Ziel verbinden"
     }
   },
   "onlineEvals": {

@@ -4303,6 +4303,12 @@
     "noSearchJobs": {
       "title": "Nenhum trabalho de pesquisa agendado",
       "description": "As pesquisas de longa duração que você agendar aparecerão aqui, onde você poderá acompanhar seu status e explorar os resultados assim que terminarem."
+    },
+    "noPipelineDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota.",
+      "action": "Novo destino",
+      "actionDesc": "Conecte um destino de pipeline"
     }
   },
   "onlineEvals": {

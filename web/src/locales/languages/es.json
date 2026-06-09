@@ -4301,6 +4301,12 @@
     "noSearchJobs": {
       "title": "No hay trabajos de búsqueda programados",
       "description": "Las búsquedas de larga duración que programes aparecerán aquí, donde podrás realizar un seguimiento de su estado y explorar los resultados una vez finalizadas."
+    },
+    "noPipelineDestinations": {
+      "title": "Aún no hay destinos",
+      "description": "Destinos externos para la salida de canalización: puntos finales HTTP y destinos de escritura remota.",
+      "action": "Nuevo destino",
+      "actionDesc": "Conectar un destino de canalización"
     }
   },
   "onlineEvals": {

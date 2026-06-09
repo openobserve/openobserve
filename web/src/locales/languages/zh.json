@@ -4307,6 +4307,12 @@
     "noSearchJobs": {
       "title": "没有预定的搜索任务",
       "description": "您安排的长时间搜索将显示在此处，您可以在其中跟踪其状态并在搜索完成后浏览结果。"
+    },
+    "noPipelineDestinations": {
+      "title": "还没有目的地",
+      "description": "管道输出的外部目标 — HTTP 端点和远程写入目标。",
+      "action": "新目的地",
+      "actionDesc": "连接管道目的地"
     }
   },
   "onlineEvals": {
