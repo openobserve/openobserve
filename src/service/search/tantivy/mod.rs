@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod cache;
 mod partition;
-pub mod result_cache;
 pub mod search;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
@@ -50,7 +50,10 @@ use tantivy_utils::puffin_directory::{
 use tokio::sync::Semaphore;
 use tokio_stream::StreamExt as _;
 
-use self::{partition::partition_tantivy_files, result_cache::{self as tantivy_result_cache, CacheEntry}};
+use self::{
+    cache::{self as tantivy_result_cache, CacheEntry},
+    partition::partition_tantivy_files,
+};
 use crate::service::search::{
     grpc::{QueryParams, storage::cache_files},
     index::IndexCondition,
@@ -909,5 +912,4 @@ mod tests {
             _ => panic!("Expected Distinct cache entry"),
         }
     }
-
 }
