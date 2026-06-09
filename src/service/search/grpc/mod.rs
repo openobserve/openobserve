@@ -47,6 +47,13 @@ pub struct QueryParams {
     pub use_inverted_index: bool,
 }
 
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ratio: f64) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
+}
+
 /// Create tables from files, automatically splitting them based on time range overlap:
 /// - Files completely within the query time range: no timestamp filter applied
 /// - Files partially overlapping with the query time range: timestamp filter applied

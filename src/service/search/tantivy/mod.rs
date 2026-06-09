@@ -55,7 +55,7 @@ use self::{
     partition::partition_tantivy_files,
 };
 use crate::service::search::{
-    grpc::{QueryParams, storage::cache_files},
+    grpc::{QueryParams, calc_target_partitions, storage::cache_files},
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
@@ -635,13 +635,6 @@ async fn search_tantivy_index(
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
-}
-
-/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
-pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ratio: f64) -> usize {
-    (cpu_num as i64
-        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
-        as usize
 }
 
 /// if simple distinct without filter, we need to warm up the field
