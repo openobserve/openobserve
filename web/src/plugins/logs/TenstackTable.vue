@@ -891,7 +891,6 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 // +22 adds bottom padding so the last virtual row isn't clipped by the container
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 30);
 
-
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
     const virtualIndex = calculateVirtualIndex(index);
