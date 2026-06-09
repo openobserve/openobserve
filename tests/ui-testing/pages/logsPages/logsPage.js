@@ -9048,7 +9048,63 @@ export class LogsPage {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         }
 
+        // Phase 3: When in SQL mode on the Build tab, the chart-type-selected signal (Phase 2)
+        // can fire before makeAutoSQLQuery() has finished populating the query editor. Wait
+        // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
+        // non-empty content — this confirms that onBuildQueryGenerated() has been called and
+        // queries[0].query is ready for any Auto→Custom mode switch.
+        try {
+            await this.page.waitForFunction(
+                (editorSelector) => {
+                    const host = document.querySelector(editorSelector);
+                    if (!host) return true; // editor absent — skip
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
+                    }
+                    return false; // editor found but value not yet set
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout: 10000, polling: 500 }
+            );
+            testLogger.info('Build tab query editor populated');
+        } catch (error) {
+            // Phase 3 is best-effort — editor may legitimately be empty (SQL mode OFF, empty query)
+            testLogger.warn('Build tab query editor did not populate within 10s, proceeding');
+        }
+
         return true;
+    }
+
+    /**
+     * Wait for the search-bar query editor to contain non-empty content.
+     * Use this after switching to Build tab in SQL mode to ensure makeAutoSQLQuery()
+     * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
+     * Fails the test if the editor stays empty beyond the timeout.
+     */
+    async expectQueryEditorPopulated(timeout = 30000) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const domNode = ed.getDomNode?.();
+                    if (domNode && host.contains(domNode)) {
+                        const val = ed.getValue();
+                        return val && val.trim().length > 0;
+                    }
+                }
+                return false;
+            },
+            '[data-test="logs-search-bar-query-editor"]',
+            { timeout, polling: 500 }
+        );
+        testLogger.info('Query editor populated');
     }
 
     /**
