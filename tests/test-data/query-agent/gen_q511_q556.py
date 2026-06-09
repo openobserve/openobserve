@@ -4,6 +4,10 @@ Adapts real-world SQL patterns to use the existing FIELD_POOL fields
 from data_gen.py.  Run from the repo root:
 
     python3 tests/test-data/query-agent/gen_q511_q556.py
+
+WARNING: This script is NOT idempotent. Running it multiple times will
+append duplicate queries to the JSON files. Check that the target query
+IDs do not already exist before running.
 """
 
 import json

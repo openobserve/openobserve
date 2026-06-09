@@ -47,13 +47,13 @@
         ],
         "results": [
           [
-            "ZONE-2",
+            "ZONE-1",
             "4",
             "2",
             "50.0"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "4",
             "2",
             "50.0"
@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "manual",
+            "hybrid",
             "2"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "258.0"
-          ],
-          [
             "ZONE-4",
             "4",
             "483.0"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "258.0"
           ],
           [
             "ZONE-3",
@@ -1409,15 +1409,6 @@
             "26.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
-            "auto",
-            "2",
-            "437.5",
-            "45.3",
-            "32.5"
-          ],
-          [
             "ZONE-3",
             "SORT-X1",
             "manual",
@@ -1425,6 +1416,15 @@
             "437.5",
             "72.8",
             "19.2"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "auto",
+            "2",
+            "437.5",
+            "45.3",
+            "32.5"
           ],
           [
             "ZONE-4",
@@ -1508,14 +1508,14 @@
             "88.1"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
             "1",
             "150.0",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1814,12 +1814,12 @@
         ],
         "results": [
           [
-            "navigation",
+            "performanceMetric",
             "itemPage",
             "2"
           ],
           [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "2"
           ],
@@ -1931,13 +1931,13 @@
         ],
         "results": [
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
@@ -2148,6 +2148,11 @@
           ],
           [
             "performanceMetric",
+            "cartPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
             "searchPage",
             "1"
           ],
@@ -2159,11 +2164,6 @@
           [
             "performanceMetric",
             "checkoutPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "cartPage",
             "1"
           ]
         ],
@@ -2193,13 +2193,13 @@
             "2"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "1",
-            "1",
-            "567.0"
-          ],
-          [
             "itemPage",
             "2",
             "1",
             "89.0"
+          ],
+          [
+            "checkoutPage",
+            "1",
+            "1",
+            "567.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2944,16 +2944,16 @@
         ],
         "results": [
           [
-            "warehouse-west",
-            "2",
-            "15.0",
-            "0"
-          ],
-          [
             "warehouse-south",
             "2",
             "45.0",
             "2"
+          ],
+          [
+            "warehouse-west",
+            "2",
+            "15.0",
+            "0"
           ],
           [
             "warehouse-east",
@@ -2962,15 +2962,15 @@
             "0"
           ],
           [
-            "warehouse-north",
-            "1",
-            "12.0",
-            "1"
-          ],
-          [
             "warehouse-central",
             "1",
             "230.0",
+            "1"
+          ],
+          [
+            "warehouse-north",
+            "1",
+            "12.0",
             "1"
           ]
         ],

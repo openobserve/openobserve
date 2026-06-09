@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-Q5",
@@ -1589,11 +1589,11 @@
             "2"
           ],
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ],
           [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
+            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
@@ -6356,7 +6356,7 @@
     },
     {
       "id": "Q555",
-      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message) AS msg, COALESCE(response_code, 0) AS status, latency_ms FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY latency_ms DESC NULLS LAST LIMIT 10",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message) AS msg, COALESCE(response_code, 0) AS status, latency_ms FROM \"{stream}\" WHERE latency_ms IS NOT NULL ORDER BY latency_ms DESC LIMIT 10",
       "category": "basic_select",
       "time_offset": {
         "start_offset": 33239000000,

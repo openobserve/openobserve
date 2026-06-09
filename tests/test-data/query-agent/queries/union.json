@@ -432,14 +432,14 @@
         ],
         "results": [
           [
-            "PL-006",
-            "ZONE-4",
+            "PL-004",
+            "ZONE-2",
             "88.1",
             "day_shift"
           ],
           [
-            "PL-004",
-            "ZONE-2",
+            "PL-006",
+            "ZONE-4",
             "88.1",
             "day_shift"
           ],
@@ -447,6 +447,12 @@
             "PL-002",
             "ZONE-4",
             "55.2",
+            "day_shift"
+          ],
+          [
+            "PL-007",
+            "ZONE-1",
+            "33.0",
             "day_shift"
           ],
           [
@@ -458,24 +464,18 @@
           [
             "PL-007",
             "ZONE-1",
-            "33.0",
-            "day_shift"
-          ],
-          [
-            "PL-007",
-            "ZONE-1",
             "94.6",
-            "night_shift"
-          ],
-          [
-            "PL-005",
-            "ZONE-3",
-            "72.8",
             "night_shift"
           ],
           [
             "PL-003",
             "ZONE-1",
+            "72.8",
+            "night_shift"
+          ],
+          [
+            "PL-005",
+            "ZONE-3",
             "72.8",
             "night_shift"
           ],
@@ -811,14 +811,14 @@
         "results": [
           [
             "AP-CENTRAL",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "900.0",
             "94.6"
           ],
           [
             "AP-CENTRAL",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "900.0",
             "94.6"
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
@@ -1261,18 +1261,13 @@
         "results": [
           [
             "error_bucket",
-            "E004",
-            "2"
-          ],
-          [
-            "error_bucket",
             "E002",
             "2"
           ],
           [
             "error_bucket",
-            "E005",
-            "1"
+            "E004",
+            "2"
           ],
           [
             "error_bucket",
@@ -1282,6 +1277,11 @@
           [
             "error_bucket",
             "E003",
+            "1"
+          ],
+          [
+            "error_bucket",
+            "E005",
             "1"
           ],
           [

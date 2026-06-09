@@ -492,7 +492,16 @@
         "results": [
           [
             "1780736700000000",
-            "ZONE-2",
+            "ZONE-1",
+            "1",
+            "320.0",
+            "19.2",
+            "75.3",
+            "410"
+          ],
+          [
+            "1780736700000000",
+            "ZONE-4",
             "1",
             "480.0",
             "24.8",
@@ -510,16 +519,7 @@
           ],
           [
             "1780736700000000",
-            "ZONE-1",
-            "1",
-            "320.0",
-            "19.2",
-            "75.3",
-            "410"
-          ],
-          [
-            "1780736700000000",
-            "ZONE-4",
+            "ZONE-2",
             "1",
             "480.0",
             "24.8",
@@ -546,21 +546,21 @@
           ],
           [
             "1780736640000000",
-            "ZONE-4",
-            "1",
-            "190.0",
-            "26.3",
-            "25.0",
-            "340"
-          ],
-          [
-            "1780736640000000",
             "ZONE-2",
             "1",
             "150.0",
             "35.7",
             "58.0",
             "155"
+          ],
+          [
+            "1780736640000000",
+            "ZONE-4",
+            "1",
+            "190.0",
+            "26.3",
+            "25.0",
+            "340"
           ],
           [
             "1780736580000000",
@@ -570,6 +570,15 @@
             "26.3",
             "25.0",
             "460"
+          ],
+          [
+            "1780736580000000",
+            "ZONE-3",
+            "1",
+            "840.0",
+            "40.0",
+            "33.3",
+            "50"
           ],
           [
             "1780736580000000",
@@ -588,15 +597,6 @@
             "18.5",
             "66.6",
             "120"
-          ],
-          [
-            "1780736580000000",
-            "ZONE-3",
-            "1",
-            "840.0",
-            "40.0",
-            "33.3",
-            "50"
           ]
         ],
         "results_mode": "rowsort"
@@ -620,15 +620,15 @@
         "results": [
           [
             "first_minute",
-            "ZONE-4",
-            "4",
-            "421.25"
-          ],
-          [
-            "first_minute",
             "ZONE-3",
             "4",
             "667.5"
+          ],
+          [
+            "first_minute",
+            "ZONE-4",
+            "4",
+            "421.25"
           ],
           [
             "first_minute",
@@ -727,16 +727,16 @@
         ],
         "results": [
           [
-            "navigation",
-            "2",
-            "1780743234000000",
-            "1780743240000000"
-          ],
-          [
             "performanceMetric",
             "4",
             "1780743180000000",
             "1780743252000000"
+          ],
+          [
+            "navigation",
+            "2",
+            "1780743234000000",
+            "1780743240000000"
           ]
         ],
         "results_mode": "rowsort"
@@ -1327,7 +1327,7 @@
     },
     {
       "id": "Q523",
-      "sql": "SELECT _timestamp, to_timestamp_micros(MAX(_timestamp)) AS max_ts_converted, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY _timestamp ORDER BY _timestamp ASC LIMIT 5",
+      "sql": "SELECT _timestamp, to_timestamp_micros(_timestamp + latency_ms * 1000) AS adjusted_ts, latency_ms FROM \"{stream}\" ORDER BY _timestamp ASC LIMIT 5",
       "category": "date_time",
       "time_offset": {
         "start_offset": 31319000000,
@@ -1337,8 +1337,8 @@
         "row_count": 5,
         "columns": [
           "_timestamp",
-          "max_ts_converted",
-          "cnt"
+          "adjusted_ts",
+          "latency_ms"
         ],
         "note": "to_timestamp_micros() is OO-specific (DataFusion); DuckDB cannot replicate",
         "skip_sqllogictest": true

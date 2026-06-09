@@ -152,16 +152,16 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "4",
-            "667.5",
-            "SORT-M3"
-          ],
-          [
             "ZONE-4",
             "4",
             "277.5",
             "SORT-A7"
+          ],
+          [
+            "ZONE-1",
+            "4",
+            "667.5",
+            "SORT-M3"
           ],
           [
             "ZONE-3",
@@ -738,17 +738,17 @@
             "0.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
-            "498.33",
-            "29.7",
-            "0.0"
-          ],
-          [
             "ZONE-1",
             "SORT-M3",
             "581.25",
             "68.18",
+            "0.0"
+          ],
+          [
+            "ZONE-4",
+            "SORT-A7",
+            "498.33",
+            "29.7",
             "0.0"
           ],
           [
@@ -864,18 +864,6 @@
           ],
           [
             "2",
-            "syncZone"
-          ],
-          [
-            "1",
-            "mergeBatch"
-          ],
-          [
-            "1",
-            "archiveLog"
-          ],
-          [
-            "2",
             "updateBatch"
           ],
           [
@@ -884,11 +872,23 @@
           ],
           [
             "2",
+            "syncZone"
+          ],
+          [
+            "2",
             "checkThreshold"
           ],
           [
             "2",
             "deleteRecord"
+          ],
+          [
+            "1",
+            "mergeBatch"
+          ],
+          [
+            "1",
+            "archiveLog"
           ]
         ],
         "results_mode": "rowsort"
@@ -985,17 +985,17 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "421.25",
-            "2",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "653.75",
             "0",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "421.25",
+            "2",
             "2"
           ],
           [
@@ -1026,10 +1026,10 @@
         ],
         "results": [
           [
-            "SyncZone",
-            "retrying",
+            "RetryScan",
+            "ok",
             "2",
-            "12.0"
+            "15.0"
           ],
           [
             "CheckThreshold",
@@ -1038,16 +1038,16 @@
             "78.0"
           ],
           [
+            "SyncZone",
+            "retrying",
+            "2",
+            "12.0"
+          ],
+          [
             "MergeBatch",
             "queued",
             "2",
             "3200.0"
-          ],
-          [
-            "RetryScan",
-            "ok",
-            "2",
-            "15.0"
           ],
           [
             "ScanPallet",
@@ -1056,16 +1056,16 @@
             "89.0"
           ],
           [
-            "DeleteRecord",
-            "pending",
-            "1",
-            "1450.0"
-          ],
-          [
             "SearchItems",
             "syncing",
             "1",
             "45.0"
+          ],
+          [
+            "ArchiveLog",
+            "warning",
+            "1",
+            "1900.0"
           ],
           [
             "RerouteTrack",
@@ -1074,10 +1074,10 @@
             "567.0"
           ],
           [
-            "ArchiveLog",
-            "warning",
+            "DeleteRecord",
+            "pending",
             "1",
-            "1900.0"
+            "1450.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1134,7 +1134,7 @@
             "84.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "AUTO",
             "1",
             "45.3",
@@ -1144,7 +1144,7 @@
             "0.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "AUTO",
             "1",
             "45.3",
@@ -1323,6 +1323,11 @@
         ],
         "results": [
           [
+            "https://shop.example.com/item/1003",
+            "2",
+            "1"
+          ],
+          [
             "https://shop.example.com/item/1004",
             "2",
             "1"
@@ -1331,11 +1336,6 @@
             "itemPage-fallback",
             "2",
             "2"
-          ],
-          [
-            "https://shop.example.com/item/1003",
-            "2",
-            "1"
           ],
           [
             "https://shop.example.com/search?q=test",
@@ -1450,14 +1450,14 @@
         ],
         "results": [
           [
-            "monitoring",
-            "6",
-            "2"
-          ],
-          [
             "browse",
             "1",
             "1"
+          ],
+          [
+            "monitoring",
+            "6",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,11 +1479,6 @@
         ],
         "results": [
           [
-            "E006",
-            "2",
-            "1"
-          ],
-          [
             "E005",
             "1",
             "1"
@@ -1491,6 +1486,11 @@
           [
             "E009",
             "1",
+            "1"
+          ],
+          [
+            "E006",
+            "2",
             "1"
           ]
         ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Computer",
-            "1",
-            "1",
-            "230.0"
-          ],
-          [
             "Mobile",
             "4",
             "4",
             "747.5"
+          ],
+          [
+            "Computer",
+            "1",
+            "1",
+            "230.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1571,23 +1571,23 @@
         ],
         "results": [
           [
-            "timeout",
-            "success",
-            "2"
-          ],
-          [
             "fast",
             "error",
             "2"
           ],
           [
-            "fast",
+            "timeout",
             "success",
+            "2"
+          ],
+          [
+            "timeout",
+            "error",
             "1"
           ],
           [
-            "timeout",
-            "error",
+            "fast",
+            "success",
             "1"
           ],
           [
@@ -1614,11 +1614,11 @@
         ],
         "results": [
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ],
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ]
         ],
@@ -1680,7 +1680,13 @@
         ],
         "results": [
           [
-            "checkoutPage",
+            "searchPage",
+            "1",
+            "1",
+            "100.0"
+          ],
+          [
+            "itemPage",
             "2",
             "2",
             "100.0"
@@ -1692,13 +1698,7 @@
             "100.0"
           ],
           [
-            "searchPage",
-            "1",
-            "1",
-            "100.0"
-          ],
-          [
-            "itemPage",
+            "checkoutPage",
             "2",
             "2",
             "100.0"
@@ -1801,13 +1801,13 @@
             "2"
           ],
           [
-            "track",
-            "navigation",
+            "sort",
+            "performanceMetric",
             "1"
           ],
           [
-            "sort",
-            "performanceMetric",
+            "track",
+            "navigation",
             "1"
           ]
         ],
@@ -2310,12 +2310,12 @@
         ],
         "results": [
           [
-            "app_error",
+            "auth_failure",
             "3",
             "2"
           ],
           [
-            "auth_failure",
+            "app_error",
             "3",
             "2"
           ],
@@ -2473,10 +2473,10 @@
             "658.5"
           ],
           [
-            "none",
-            "passthrough",
+            "Allowlisted",
+            "threat",
             "1",
-            "3200.0"
+            "78.0"
           ],
           [
             "none",
@@ -2485,10 +2485,10 @@
             "567.0"
           ],
           [
-            "Allowlisted",
-            "threat",
+            "none",
+            "passthrough",
             "1",
-            "78.0"
+            "3200.0"
           ]
         ],
         "results_mode": "rowsort"
