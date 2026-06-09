@@ -69,11 +69,12 @@ async function addAndConfigureSecondQuery(pm, { yField = "kubernetes_namespace_n
   await msql.addQueryTab(1);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
+  // A new tab auto-seeds x_axis_1 = histogram(_timestamp) and y_axis_1 = count(_timestamp).
+  // Always remove the seeded field, then add this tab's own x/y.
   if (xField) {
+    await pm.chartTypeSelector.removeField("x_axis_1", "x");
     await pm.chartTypeSelector.searchAndAddField(xField, "x");
   }
-  // Add Panel now auto-seeds y_axis_1 = count(_timestamp) on the new tab.
-  // Remove it before adding this tab's own y-field.
   await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
 }
@@ -227,14 +228,12 @@ test.describe("Multi-SQL Query Support", () => {
       await msql.addQueryTab(1);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
       await msql.addQueryTab(2);
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
       await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
 
@@ -469,8 +468,6 @@ test.describe("Multi-SQL Query Support", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
       await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
-
       await msql.switchToQueryTab(0);
       await msql.configLegend(0).waitFor({ state: "visible", timeout: 10000 });
       await msql.configLegend(0).clear();
@@ -1007,8 +1004,9 @@ test.describe("Multi-SQL Query Support", () => {
 
     // NOTE: When addPanel() is called, the panel editor auto-populates
     // histogram(_timestamp) into Q1's x-axis. So buildPanel() must NOT pass
-    // xField — Q1 already has the histogram x-field. New query tabs (Q2+)
-    // always start empty, so addField calls on those work normally.
+    // xField — Q1 already has the histogram x-field. New query tabs (Q2+) now
+    // also auto-seed x_axis_1 = histogram(_timestamp) + y_axis_1 = count(_timestamp),
+    // so tests remove the seeded field before adding a different x/y of their own.
 
     test(
       "no warning with a single query using histogram x-alias",
@@ -1046,11 +1044,10 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Add Q2 also with _timestamp (histogram) — Q2 starts empty so +X works
+        // Q2 keeps its auto-seeded histogram(_timestamp) x
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1081,10 +1078,13 @@ test.describe("Multi-SQL Query Support", () => {
         await removeFirstXField(page); // removes auto _timestamp
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
 
-        // Add Q2 also with non-histogram x — Q2 starts empty so +X works
+        // Add Q2 with non-histogram x (replaces the seeded histogram x)
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        // New tab seeds histogram(_timestamp) x; replace it with this tab's
+        // non-histogram x-field.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
@@ -1115,10 +1115,13 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Q2: non-histogram x (kubernetes_host) — Q2 starts empty so +X works
+        // Q2: non-histogram x (kubernetes_host), replacing the seeded histogram x
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        // New tab seeds histogram(_timestamp) x; replace it with this tab's
+        // non-histogram x-field.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
@@ -1151,11 +1154,10 @@ test.describe("Multi-SQL Query Support", () => {
         await removeFirstXField(page); // removes auto _timestamp
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
 
-        // Q2: histogram(_timestamp) — Q2 starts empty so +X works
+        // Q2 keeps its auto-seeded histogram(_timestamp) x
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1187,6 +1189,9 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        // New tab seeds histogram(_timestamp) x; replace it with this tab's
+        // non-histogram x-field.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
@@ -1225,10 +1230,11 @@ test.describe("Multi-SQL Query Support", () => {
           yField: "kubernetes_container_hash",
         });
 
-        // Q2 with ONLY a y-field — no x-field added
+        // Q2 with ONLY a y-field — remove both auto-seeded fields, add only y
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1262,6 +1268,9 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        // New tab seeds histogram(_timestamp) x; replace it with this tab's
+        // non-histogram x-field.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
@@ -1300,6 +1309,9 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        // New tab seeds histogram(_timestamp) x; replace it with this tab's
+        // non-histogram x-field.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
@@ -1380,8 +1392,7 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        // Q2 starts with empty x-axis; add _timestamp so the bar chart renders
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1420,7 +1431,6 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1502,7 +1512,6 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1545,8 +1554,7 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        // Q2 starts with empty x-axis; add _timestamp so save validates cleanly
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+        // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1613,7 +1621,6 @@ test.describe("Multi-SQL Query Support", () => {
         await msql.addQueryTab(1);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
-        await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
         await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_namespace_name",
@@ -1703,8 +1710,7 @@ test.describe("Multi-SQL Query Support", () => {
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
           await pm.chartTypeSelector.selectStream(streamB);
-          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
-          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
           await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
@@ -1769,8 +1775,7 @@ test.describe("Multi-SQL Query Support", () => {
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
           await pm.chartTypeSelector.selectStream(streamB);
-          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
-          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
           await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
@@ -1830,8 +1835,7 @@ test.describe("Multi-SQL Query Support", () => {
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
           await pm.chartTypeSelector.selectStream(streamB);
-          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
-          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
           await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",
@@ -1883,8 +1887,7 @@ test.describe("Multi-SQL Query Support", () => {
           await msql.addQueryTab(1);
           await pm.chartTypeSelector.selectStreamType("logs");
           await pm.chartTypeSelector.selectStream(streamB);
-          // Q2 needs x-field so the bar chart renders and the panel saves cleanly
-          await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+          // Q2 keeps its auto-seeded histogram(_timestamp) x; swap the seeded y.
           await pm.chartTypeSelector.removeField("y_axis_1", "y");
           await pm.chartTypeSelector.searchAndAddField(
             "kubernetes_namespace_name",

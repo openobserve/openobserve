@@ -145,11 +145,15 @@ describe("useDashboardPanel", () => {
     expect(panel.dashboardPanelData.data.queries).toHaveLength(1);
   });
 
-  it("resets panel data and adds default timestamp field", () => {
+  it("resets panel data and seeds default histogram x + count y fields", () => {
     const panel = useDashboardPanelData("dashboard-panel-test-2");
     panel.resetDashboardPanelDataAndAddTimeField();
 
-    expect(addXAxisItemMock).toHaveBeenCalledWith({ name: "_ts" });
+    const fields = panel.dashboardPanelData.data.queries[0].fields;
+    expect(fields.x).toHaveLength(1);
+    expect(fields.x[0].functionName).toBe("histogram");
+    expect(fields.y).toHaveLength(1);
+    expect(fields.y[0].functionName).toBe("count");
   });
 
   it("turns off VRL toggle when query type changes to promql", async () => {

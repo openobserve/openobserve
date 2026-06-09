@@ -33,7 +33,10 @@ import {
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
-import { DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
+import {
+  DEFAULT_SQL_X_FIELD,
+  DEFAULT_SQL_Y_FIELD_COUNT,
+} from "@/utils/dashboard/defaultFields";
 import {
   getDefaultDashboardPanelData,
   getDefaultCustomChartText,
@@ -196,13 +199,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const resetDashboardPanelDataAndAddTimeField = () => {
     resetDashboardPanelData();
 
-    // add _timestamp field in x axis as default
-    addXAxisItem({
-      name: store.state.zoConfig.timestamp_column ?? "_timestamp",
-    });
-
-    // Seed a default count(_timestamp) y-axis so a bar chart renders on open.
+    // Seed default x (histogram(_timestamp)) and y (count(_timestamp)) from the
+    // shared default-fields builder so a bar chart renders on open — the same
+    // fields applyDefaultPanelFields seeds on stream/builder changes.
     const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+    dashboardPanelData.data.queries[currentQueryIndex].fields.x = [
+      DEFAULT_SQL_X_FIELD(),
+    ];
     dashboardPanelData.data.queries[currentQueryIndex].fields.y = [
       DEFAULT_SQL_Y_FIELD_COUNT(),
     ];
