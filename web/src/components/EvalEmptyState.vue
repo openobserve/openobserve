@@ -29,15 +29,18 @@
       </span>
     </div>
 
-    <OButton
-      :data-test="ctaDataTest"
-      variant="primary"
-      size="md"
-      class="ev-empty__btn"
-      @click="$emit('create')"
-    >
-      {{ ctaLabel }}
-    </OButton>
+    <div class="ev-empty__actions">
+      <OButton
+        :data-test="ctaDataTest"
+        variant="primary"
+        size="md"
+        class="ev-empty__btn"
+        @click="$emit('create')"
+      >
+        {{ ctaLabel }}
+      </OButton>
+      <slot name="secondary" />
+    </div>
   </div>
 </template>
 
@@ -154,6 +157,12 @@ const isDark = computed(() => store.state.theme === "dark");
       background: rgba(255, 255, 255, 0.06);
       border-color: rgba(255, 255, 255, 0.1);
     }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   &__btn {
