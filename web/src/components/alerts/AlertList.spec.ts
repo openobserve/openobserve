@@ -885,12 +885,14 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     delete (store.state as any).zoConfig.build_type;
+    delete (store.state as any).zoConfig.anomaly_detection_enabled;
   });
 
   it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
@@ -911,6 +913,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "true";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
@@ -938,6 +941,7 @@ describe("AlertList - isAnomalyDetectionEnabled", () => {
     (config as any).isEnterprise = "true";
     (config as any).isCloud = "false";
     (store.state as any).zoConfig.build_type = "enterprise";
+    (store.state as any).zoConfig.anomaly_detection_enabled = true;
 
     const wrapper: any = await mountAlertList();
     const tabValues = wrapper.vm.alertTabs.map((t: any) => t.value);
