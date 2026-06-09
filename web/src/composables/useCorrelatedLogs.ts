@@ -82,18 +82,29 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const totalHits = ref(0);
   const took = ref(0);
 
-  // Current filters (combined matched + additional dimensions)
-  const currentFilters = ref<Record<string, string>>({
-    ...props.matchedDimensions,
-    ...props.additionalDimensions,
-  });
+  // User-overridable filter values, keyed by raw field name.
+  // Seeded from the union of StreamInfo.filters across all log streams so that
+  // every key here corresponds to a real SQL WHERE condition.
+  // When the user changes a chip value we update this map; buildSQLQueries
+  // then applies it as an overlay on top of each stream's own filters.
+  const buildInitialFilters = (): Record<string, string> => {
+    const merged: Record<string, string> = {};
+    for (const stream of props.logStreams) {
+      for (const [k, v] of Object.entries(stream.filters ?? {})) {
+        if (v && v !== SELECT_ALL_VALUE && !k.startsWith('_')) merged[k] = v;
+      }
+    }
+    return merged;
+  };
+  const currentFilters = ref<Record<string, string>>(buildInitialFilters());
 
   // Current time range
   const currentTimeRange = ref<TimeRange>({ ...props.timeRange });
 
-  // Pagination state
+  // Pagination state — fetch up to 100, display 20 per page client-side
   const currentPage = ref(1);
   const pageSize = ref(100);
+  const displayPageSize = 30;
 
   // Current trace ID for request cancellation
   let currentTraceId: string | null = null;
@@ -103,6 +114,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const isLoading = computed(() => loading.value);
   const hasError = computed(() => !!error.value);
   const isEmpty = computed(() => !loading.value && !error.value && !hasResults.value);
+  const totalPages = computed(() => Math.ceil(searchResults.value.length / displayPageSize) || 1);
+  const pagedResults = computed(() => {
+    const start = (currentPage.value - 1) * displayPageSize;
+    return searchResults.value.slice(start, start + displayPageSize);
+  });
 
   // Number of correlated log streams available
   const logStreamsCount = computed(() => props.logStreams.length);
@@ -132,35 +148,24 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     for (const streamInfo of props.logStreams) {
       const conditions: string[] = [];
 
-      // ALWAYS use the exact filters from StreamInfo - the /_correlate API has the correct field names
-      // Note: backend omits `filters` when empty (skip_serializing_if = "HashMap::is_empty"), so default to {}
-      const exactFilters = streamInfo.filters ?? {};
+      // Merge stream's base filters with user overrides from currentFilters.
+      // currentFilters keys are raw field names (same namespace as streamInfo.filters),
+      // so a key present in both takes the user-modified value.
+      const baseFilters = streamInfo.filters ?? {};
+      const effectiveFilters: Record<string, string> = { ...baseFilters };
+      for (const [k, v] of Object.entries(currentFilters.value)) {
+        if (k in baseFilters) effectiveFilters[k] = v;
+      }
 
-      // Add dimension filters using exact field names from StreamInfo
-      for (const [field, value] of Object.entries(exactFilters)) {
-        // Skip wildcard values (SELECT_ALL_VALUE = "_o2_all_")
-        if (value === SELECT_ALL_VALUE) {
-          continue;
-        }
+      for (const [field, value] of Object.entries(effectiveFilters)) {
+        if (value === SELECT_ALL_VALUE) continue;
+        if (field.startsWith('_')) continue;
+        if (value === null || value === undefined || value === '') continue;
 
-        // Skip internal fields (start with underscore)
-        if (field.startsWith('_')) {
-          continue;
-        }
-
-        // Skip null/undefined values
-        if (value === null || value === undefined || value === '') {
-          continue;
-        }
-
-        // Quote field names if they contain special characters (dots, hyphens, etc.)
         const quotedField = /[^a-zA-Z0-9_]/.test(field)
           ? `"${field.replace(/"/g, '""')}"`
           : field;
-
-        // Escape single quotes in values
         const escapedValue = String(value).replace(/'/g, "''");
-
         conditions.push(`${quotedField} = '${escapedValue}'`);
       }
 
@@ -201,6 +206,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     error.value = null;
     searchResults.value = []; // Clear previous results
     totalHits.value = 0; // Reset before accumulating multi-stream results
+    currentPage.value = 1; // Reset to first page on new fetch
     took.value = 0;
 
     try {
@@ -345,10 +351,10 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   };
 
   /**
-   * Reset filters to initial matched dimensions only
+   * Reset filters to the initial per-stream filter values from _correlate
    */
   const resetFilters = () => {
-    currentFilters.value = { ...props.matchedDimensions };
+    currentFilters.value = buildInitialFilters();
     currentPage.value = 1;
     fetchCorrelatedLogs();
   };
@@ -389,12 +395,9 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     fetchCorrelatedLogs();
   }, { deep: true });
 
-  watch(() => props.matchedDimensions, (newDimensions) => {
-    // Merge with existing additional dimensions
-    currentFilters.value = {
-      ...newDimensions,
-      ...currentFilters.value,
-    };
+  watch(() => props.logStreams, () => {
+    // Re-seed currentFilters when the stream list changes (e.g. new correlation result)
+    currentFilters.value = buildInitialFilters();
     fetchCorrelatedLogs();
   }, { deep: true });
 
@@ -411,17 +414,24 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     searchResults.value = [];
   });
 
+  const goToPage = (page: number) => {
+    currentPage.value = Math.max(1, Math.min(page, totalPages.value));
+  };
+
   return {
     // State
     loading: computed(() => loading.value),
     error: computed(() => error.value),
     searchResults: computed(() => searchResults.value),
+    pagedResults,
     totalHits: computed(() => totalHits.value),
     took: computed(() => took.value),
     currentFilters: computed(() => currentFilters.value),
     currentTimeRange: computed(() => currentTimeRange.value),
     currentPage: computed(() => currentPage.value),
     pageSize: computed(() => pageSize.value),
+    displayPageSize,
+    totalPages,
     logStreamsCount: computed(() => logStreamsCount.value),
 
     // Computed
@@ -432,6 +442,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     // Methods
     fetchCorrelatedLogs,
+    goToPage,
     updateFilter,
     updateFilters,
     removeFilter,

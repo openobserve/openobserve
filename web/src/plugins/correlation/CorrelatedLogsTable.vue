@@ -186,9 +186,9 @@ class="tw:mr-1" />
       </span>
     </div>
 
-    <!-- Dimension chips -->
+    <!-- Dimension chips (always rendered when hideDimensionFilters=true to keep wrap button visible) -->
     <div
-      v-if="unifiedChips.length > 0"
+      v-if="unifiedChips.length > 0 || props.hideDimensionFilters"
       class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <div
@@ -209,29 +209,29 @@ class="tw:mr-1" />
       >
         {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
       </div>
+      <!-- Wrap Content Button (co-located with chips) -->
+      <OButton
+        variant="ghost"
+        size="icon"
+        class="tw:ml-auto"
+        :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
+        data-test="correlated-logs-table-wrap-content-btn"
+        @click="wrapTableCells = !wrapTableCells"
+      >
+        <OIcon name="wrap-text" size="sm" />
+        <OTooltip :content="t('search.messageWrapContent')" />
+      </OButton>
     </div>
 
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
-      <!-- Wrap Content Button -->
-      <div class="tw:flex tw:items-center tw:w-full tw:pb-1.5 tw:justify-end tw:px-2">
-        <OButton
-          variant="ghost"
-          size="icon"
-          :class="{ 'tw:text-white! tw:bg-[var(--o2-theme-color)]! tw:hover:opacity-80': wrapTableCells }"
-          data-test="correlated-logs-table-wrap-content-btn"
-          @click="wrapTableCells = !wrapTableCells"
-        >
-          <OIcon name="wrap-text" size="sm" />
-          <OTooltip :content="t('search.messageWrapContent')" />
-        </OButton>
-      </div>
       <!-- Logs Table or Skeleton -->
       <div class="tw:h-full tw:w-full tw:overflow-auto logs-table-container">
         <!-- Actual Table (when data is loaded) -->
         <TenstackTable
           v-if="hasResults"
-          :rows="searchResults"
+          :key="`page-${currentPage}`"
+          :rows="pagedResults"
           :columns="tableColumns"
           :wrap="wrapTableCells"
           :loading="isLoading"
@@ -304,6 +304,24 @@ class="tw:mr-1" />
           </p>
         </div>
       </div>
+
+      <!-- Pagination bar -->
+      <div
+        v-if="hasResults && totalPages > 1"
+        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-2 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-xs tw:shrink-0"
+        data-test="correlated-logs-pagination"
+      >
+        <span class="tw:opacity-60">
+          {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+        </span>
+        <OPagination
+          :model-value="currentPage"
+          :max="totalPages"
+          :max-pages="5"
+          data-test="correlated-logs-pagination-control"
+          @update:model-value="goToPage"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -314,6 +332,7 @@ import {
   buildSubjectButtons,
   streamMatchesPatterns,
   SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
   type SubjectButton,
 } from "@/composables/useMetricSubjectButtons";
 import {
@@ -325,6 +344,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -370,16 +390,21 @@ const {
   loading,
   error,
   searchResults,
+  pagedResults,
   totalHits,
   took,
   currentFilters,
   currentTimeRange,
+  currentPage,
+  totalPages,
+  displayPageSize,
   logStreamsCount,
   hasResults,
   isLoading,
   hasError,
   isEmpty,
   fetchCorrelatedLogs,
+  goToPage,
   updateFilter,
   updateFilters,
   resetFilters,
@@ -1264,10 +1289,8 @@ const titleCaseWord = (w: string) => {
 };
 const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
 
-const dimensionDisplayLabel = (key: string): string => {
-  const group = semanticGroups.value.find((g: any) => g.id === key);
-  return group?.display ?? titleCase(key.replace(/[-_]/g, " "));
-};
+const dimensionDisplayLabel = (key: string): string =>
+  titleCase(key.replace(/[-_.]/g, " "));
 
 const toChipString = (v: unknown): string | null => {
   if (v == null) return null;
@@ -1293,17 +1316,20 @@ type DimensionChip = { key: string; label: string; value: string; kind: ChipKind
 
 const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
-  const specs = SUBJECT_BUTTONS_BY_SET[props.matchedSetId];
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
   return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>
-  Object.keys(chipDimensionSource.value).map((key): DimensionChip => ({
-    key,
-    label: dimensionDisplayLabel(key),
-    value: chipDimensionSource.value[key],
-    kind: subjectSemanticIds.value.has(key) ? "subject" : "context",
-  })),
+  Object.keys(chipDimensionSource.value)
+    .filter((key) => !subjectSemanticIds.value.has(key))
+    .map((key): DimensionChip => ({
+      key,
+      label: dimensionDisplayLabel(key),
+      value: chipDimensionSource.value[key],
+      kind: "context",
+    })),
 );
 
 const CHIP_COLOR_PALETTE = [

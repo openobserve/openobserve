@@ -72,6 +72,84 @@ export interface CorrelationResponse {
   matched_set_id?: string;
 }
 
+/**
+ * Build chip dimensions from the actual per-stream filters returned by _correlate.
+ *
+ * Keys are raw field names (e.g. "k8s_namespace_name") so every chip maps
+ * directly to a real SQL WHERE condition. When multiple raw fields belong to
+ * the same semantic group (e.g. "k8s_namespace_name" and
+ * "service_k8s_namespace_name" both map to "k8s-namespace"), only the
+ * alphabetically first field name is kept — deduplicating same-concept chips.
+ *
+ * Falls back to `matched_dimensions` (semantic IDs) only when no stream has
+ * filters, preserving backward compatibility with older backends.
+ *
+ * @param correlationResponse  Response from the _correlate API
+ * @param semanticGroups       Org's field alias groups for dedup (optional)
+ */
+export function buildChipDimensionsFromFilters(
+  correlationResponse: CorrelationResponse,
+  semanticGroups: FieldAlias[] = [],
+): Record<string, string> {
+  const allStreams = [
+    ...correlationResponse.related_streams.logs,
+    ...correlationResponse.related_streams.traces,
+    ...correlationResponse.related_streams.metrics,
+  ].filter((s) => s.filters && Object.keys(s.filters).length > 0);
+
+  if (allStreams.length === 0) {
+    return { ...correlationResponse.matched_dimensions };
+  }
+
+  // Collect all unique (field, value) pairs across all streams.
+  const valueMap = new Map<string, string>();
+  for (const stream of allStreams) {
+    for (const [key, value] of Object.entries(stream.filters!)) {
+      if (!value || value === "_o2_all_" || key.startsWith("_")) continue;
+      if (!valueMap.has(key)) valueMap.set(key, value);
+    }
+  }
+
+  // Build reverse lookup: raw field name → semantic group ID
+  const fieldToGroupId = new Map<string, string>();
+  for (const group of semanticGroups) {
+    for (const field of group.fields) {
+      if (!fieldToGroupId.has(field)) fieldToGroupId.set(field, group.id);
+    }
+  }
+
+  // For each semantic group, keep only the alphabetically first field name.
+  // Fields with no group are kept as-is (no dedup needed).
+  const groupWinner = new Map<string, string>(); // groupId → winning field name
+  for (const key of Array.from(valueMap.keys()).sort()) {
+    const groupId = fieldToGroupId.get(key);
+    if (!groupId) continue;
+    if (!groupWinner.has(groupId)) groupWinner.set(groupId, key);
+  }
+
+  // First pass: per-group dedup — only keep the alphabetically first field per group.
+  const candidates: Array<[string, string]> = [];
+  for (const [key, value] of valueMap.entries()) {
+    const groupId = fieldToGroupId.get(key);
+    if (groupId && groupWinner.get(groupId) !== key) continue;
+    candidates.push([key, value]);
+  }
+
+  // Second pass: value dedup — if two fields survived with the same value
+  // (they belong to different semantic groups that happen to mean the same
+  // thing, e.g. "service-namespace" vs "k8s-namespace" both = "default"),
+  // keep only the alphabetically first field name.
+  candidates.sort(([a], [b]) => a.localeCompare(b));
+  const seenValues = new Set<string>();
+  const result: Record<string, string> = {};
+  for (const [key, value] of candidates) {
+    if (seenValues.has(value)) continue;
+    seenValues.add(value);
+    result[key] = value;
+  }
+  return result;
+}
+
 export type CardinalityClass = "VeryLow" | "Low" | "Medium" | "High" | "VeryHigh";
 
 export interface DimensionAnalytics {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { StreamInfo } from "@/services/service_streams";
+import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface MetricsCorrelationConfig {
@@ -31,6 +31,7 @@ export interface MetricsCorrelationConfig {
   sourceType?: string; // Type of source stream
   availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
   metricSchemas?: Record<string, any>; // Cached metric schemas with metrics_meta
+  semanticGroups?: FieldAlias[]; // For resolving semantic IDs to raw field names in subject filters
 }
 
 /**
@@ -121,11 +122,36 @@ export function useMetricsCorrelationDashboard() {
     const isCounter = metricType === "counter";
     const aggregationFunc = isCounter ? "sum" : "avg";
 
-    // Build WHERE clause from stream filters
+    // Resolve active subject dimensions (semantic IDs like "k8s-pod-name") to raw
+    // field names that exist on this specific metric stream. Walk each semantic
+    // group's field aliases and pick the first one present in the stream schema.
+    const subjectOverrides: Record<string, string> = {};
+    const semanticGroups = config.semanticGroups ?? [];
+    const streamSchema: Set<string> = new Set(
+      (config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined)
+        ?.map((c) => c.name) ?? [],
+    );
+    for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
+      if (!value || value === SELECT_ALL_VALUE) continue;
+      const group = semanticGroups.find((g) => g.id === semanticId);
+      if (!group) continue; // not a semantic ID key — skip (raw field names handled below)
+      // Find the first alias field that appears in this stream's schema.
+      // Fallback when schema is unavailable: prefer the field whose name matches
+      // the group ID (dashes → underscores), e.g. "k8s-node-name" → "k8s_node_name".
+      const groupIdAsField = semanticId.replace(/-/g, "_");
+      const fallback = group.fields.find((f) => f === groupIdAsField) ?? group.fields[0];
+      const hit = streamSchema.size > 0
+        ? group.fields.find((f) => streamSchema.has(f))
+        : fallback;
+      if (hit) subjectOverrides[hit] = value;
+    }
+
+    // Build WHERE clause from stream filters merged with active subject overrides.
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
+    const effectiveFilters = { ...(stream.filters ?? {}), ...subjectOverrides };
 
-    const whereConditions = Object.entries(stream.filters ?? {})
+    const whereConditions = Object.entries(effectiveFilters)
       .filter(([field, value]) => {
         const skip = value === SELECT_ALL_VALUE;
         // if (skip) {
