@@ -357,6 +357,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
                 }else{
                     usageCost.value[key] = null;
                 }
+              }else{
+                usageData.value[key] = "0.00";
               }
             });
             startTime.value = res.data.start_time;
