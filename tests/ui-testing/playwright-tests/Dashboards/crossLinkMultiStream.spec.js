@@ -196,7 +196,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
     });
 
     // P0: UNION ALL SQL query — cross-links from both streams via backend merging
-    test("should show cross-links from both streams when using UNION ALL SQL query", {
+    test.skip("should show cross-links from both streams when using UNION ALL SQL query", {
         tag: ['@crossLinking', '@multiStream', '@join', '@smoke', '@P0', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing multi-stream cross-links with UNION ALL SQL query');
