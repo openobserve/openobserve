@@ -84,6 +84,7 @@
               v-model="selectedStream.name"
               :options="filteredStreams"
               :loading="isFetchingStreams"
+              :placeholder="t('pipeline.selectStream')"
               searchable
               style="min-width: 120px"
               @search="filterStreams"
@@ -137,7 +138,17 @@
               class="monaco-editor"
               v-model:query="inputQuery"
               language="sql"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              @focus="queryEditorPlaceholderFlag = false"
+              @blur="queryEditorPlaceholderFlag = true"
             />
+            <div
+              v-if="!inputQuery && queryEditorPlaceholderFlag"
+              class="query-editor-placeholder-overlay"
+            >
+              <span class="query-editor-placeholder-typewriter">{{ queryEditorPlaceholder }}</span>
+            </div>
             <div
               class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
             >
@@ -291,11 +302,15 @@ import {
   nextTick,
   onMounted,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
+import useSqlSuggestions from "@/composables/useSuggestions";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
@@ -377,7 +392,7 @@ const selectedStream = ref<{
   type: "logs" | "metrics" | "traces";
 }>({ name: "", type: "logs" });
 
-const { getStreams } = useStreams();
+const { getStreams, getStream } = useStreams();
 
 const { buildQueryPayload } = useQuery();
 
@@ -404,6 +419,29 @@ const expandState = ref({
 });
 
 const filteredStreams = ref<any[]>([]);
+const streamFields = ref<any[]>([]);
+const queryEditorPlaceholderFlag = ref(true);
+
+// ─── Auto-suggestions (same composable as logs/pipeline query node) ───
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+  updateStreamKeywords,
+} = useSqlSuggestions();
+
+// ─── Query editor typewriter placeholder ─────────────────────────────
+const isSqlMode = computed(() => true);
+const noStream = computed(() => !selectedStream.value.name);
+const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
+  streamFields,
+  ref({}),
+  isSqlMode,
+  noStream,
+  { noStreamText: t("pipeline.queryEditorPlaceholder") },
+);
 
 const sqlQueryErrorMsg = ref<string>("");
 
@@ -483,15 +521,67 @@ const updateStreams = async (resetStream = true) => {
   isFetchingStreams.value = true;
   return getStreams(selectedStream.value.type, false)
     .then((res: any) => {
-      streams.value = res.list.map((data: any) => {
-        return data.name;
-      });
-
+      streams.value = res.list.map((data: any) => data.name);
+      // Show all streams on open (not just on search)
+      filteredStreams.value = [...streams.value];
+      // Keep FROM-clause auto-suggest in sync
+      updateStreamKeywords(res.list.map((data: any) => ({ name: data.name })));
       return Promise.resolve();
     })
     .catch(() => Promise.reject())
     .finally(() => (isFetchingStreams.value = false));
 };
+
+// Load field keywords whenever the selected stream changes
+watch(
+  () => selectedStream.value.name,
+  async (name) => {
+    if (!name) {
+      streamFields.value = [];
+      updateFieldKeywords([]);
+      return;
+    }
+    try {
+      const stream = await getStream(name, selectedStream.value.type, true);
+      streamFields.value = stream?.schema?.map((f: any) => ({
+        ...f,
+        dataType: f.type,
+      })) || [];
+      updateFieldKeywords(streamFields.value);
+    } catch {
+      // ignore — field suggestions are best-effort
+    }
+  },
+);
+
+// Feed auto-suggest on every query change
+watch(inputQuery, (value) => {
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = selectedStream.value.type;
+  autoCompleteData.value.streamName = selectedStream.value.name;
+  getSuggestions();
+  debouncedSyncStreamFromQuery(value);
+});
+
+// Sync the stream-name dropdown from the SQL query the user is typing.
+// Setting selectedStream.name directly (not via OSelect interaction) will NOT
+// trigger @update:model-value="updateQuery", so there is no risk of overwriting
+// the SQL the user typed.
+const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
+  if (!sql || !parser) return;
+  try {
+    const parsed = parser.parse(sql);
+    const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+    if (fromStream && fromStream !== selectedStream.value.name) {
+      selectedStream.value.name = fromStream;
+    }
+  } catch {
+    // ignore parse errors while user is mid-typing
+  }
+}, 600);
 
 const updateDateTime = (value: any) => {
   dateTime.value = value;
@@ -733,6 +823,36 @@ defineExpose({
   width: 100%;
   min-height: 10rem;
   border-radius: 5px;
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
 }
 
 // .test-function-input-editor,
