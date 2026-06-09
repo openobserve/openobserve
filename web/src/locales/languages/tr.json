@@ -3208,7 +3208,10 @@
         "spans": "Açıklıklar"
       }
     },
-    "openInFullView": "Tam görünümde aç"
+    "openInFullView": "Tam görünümde aç",
+    "serviceMap": "Servis Haritası",
+    "patternView": "Desen Görünümü",
+    "spanView": "Açıklık Görünümü"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

@@ -89,6 +89,7 @@ export interface EnrichedSpan extends Span {
   isOnCriticalPath: boolean; // Part of critical path
 
   // Computed values
+  resolvedIdentity: string; // e.g. "postgresql:orders", "kafka:user-events", "checkout-api"
   color: string; // Service color from palette
   durationMs: number; // Duration in milliseconds
   durationPercent: number; // % of total trace duration
