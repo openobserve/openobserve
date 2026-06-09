@@ -2907,7 +2907,7 @@ describe("AddAlert Component", () => {
     };
 
     const mountWithStub = () =>
-      mount(AddAlert, {
+      shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router],
