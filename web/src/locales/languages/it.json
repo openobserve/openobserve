@@ -3206,7 +3206,10 @@
         "spans": "Spaziate"
       }
     },
-    "openInFullView": "Apri a piena vista"
+    "openInFullView": "Apri a piena vista",
+    "serviceMap": "Mappa dei servizi",
+    "patternView": "Visualizzazione del modello",
+    "spanView": "Vista Span"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

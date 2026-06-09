@@ -86,6 +86,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("area");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Step 3: Apply the query to render the chart initially
@@ -223,6 +224,7 @@ test.describe("Dashboard series color with multi-window (time shift)", () => {
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Step 2: Apply initial query

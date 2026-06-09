@@ -106,6 +106,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select stream and breakdown fields
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
       "y"
@@ -149,6 +150,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Configure the chart
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
       "y"
@@ -231,6 +233,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select stream and add fields to chart
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_hash",
       "y"
@@ -273,6 +276,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Select chart type and stream
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_labels_app_kubernetes_io_component",
       "b"
@@ -332,6 +336,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -398,6 +403,7 @@ test.describe("dashboard UI testcases", () => {
     // Select a stream
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -450,6 +456,7 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -518,6 +525,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Add a panel name and save again
     await pm.dashboardPanelActions.addPanelName(panelName);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -550,6 +558,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.selectChartType("area");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
 
     // Add fields to chart
     await pm.chartTypeSelector.searchAndAddField(
@@ -621,6 +630,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectChartType("area");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
 
     // Add a non-required field (B-axis), but skip Y-axis
     await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "b");
@@ -661,6 +671,7 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_annotations_kubernetes_io_psp",
       "y"
@@ -699,8 +710,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Configure table chart with custom SQL using camelCase aliases
+    // Configure table chart with custom SQL using camelCase aliases.
+    // Remove both auto-seeded builder fields — this test supplies its own
+    // xAxis1/yAxis1 columns, and a stale y_axis_1 would add an empty column.
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.selectChartType("table");
 
     await pm.chartTypeSelector.setCustomSQL(

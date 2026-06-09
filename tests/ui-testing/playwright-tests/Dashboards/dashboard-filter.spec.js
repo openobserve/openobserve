@@ -69,8 +69,6 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
-
     await waitForDateTimeButtonToBeEnabled(page);
 
     await pm.dashboardTimeRefresh.setRelative("30", "m");
@@ -198,8 +196,6 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
-
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "filter"
@@ -285,8 +281,6 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
 
     await pm.chartTypeSelector.selectStream("e2e_automate");
-
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await waitForDateTimeButtonToBeEnabled(page);
 
@@ -392,6 +386,7 @@ test.describe("dashboard filter testcases", () => {
       "kubernetes_container_name",
       "x"
     );
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_image",
       "y"
@@ -470,7 +465,6 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
 
@@ -535,7 +529,6 @@ test.describe("dashboard filter testcases", () => {
     // Select stream and add Y field
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -624,7 +617,6 @@ test.describe("dashboard filter testcases", () => {
     // Select stream and add fields
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "b"
@@ -731,6 +723,7 @@ test.describe("dashboard filter testcases", () => {
     // Select stream and add fields
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_container_name",
       "y"
@@ -830,8 +823,6 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
 
     await pm.chartTypeSelector.selectStream("e2e_automate");
-
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
 
     await waitForDateTimeButtonToBeEnabled(page);
 
@@ -950,9 +941,6 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    // Add Y-axis field
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
-
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -1051,6 +1039,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1147,9 +1136,6 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
-    // Add Y-axis field
-    await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
-
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -1245,6 +1231,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1342,6 +1329,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1437,6 +1425,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1532,6 +1521,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1629,6 +1619,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1726,6 +1717,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1823,6 +1815,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y-axis field
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     await pm.dashboardPanelActions.applyDashboardBtn();

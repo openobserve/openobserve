@@ -22,7 +22,6 @@ import type {
   FieldAlias,
   CorrelationResponse,
   StreamInfo,
-  ServiceIdentityConfig,
 } from "@/services/service_streams";
 import type { TelemetryContext, TelemetryType, CorrelationResult } from "@/utils/telemetryCorrelation";
 import {
@@ -32,6 +31,7 @@ import {
   filterDimensionsForCorrelation,
 } from "@/utils/telemetryCorrelation";
 import { loadIdentityConfig, clearIdentityConfigCache, clearAllIdentityConfigCache } from "@/utils/identityConfig";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 
 // Cache TTL in milliseconds (5 minutes)
 const SEMANTIC_GROUPS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -54,6 +54,7 @@ const pendingSemanticGroupsRequests = new Map<string, Promise<FieldAlias[]>>();
 export interface KeyFieldsSpec {
   fields: string[];
   groups: string[];
+  service_detection?: ServiceDetectionConfig;
 }
 export type KeyFieldsConfig = Record<string, KeyFieldsSpec>;
 

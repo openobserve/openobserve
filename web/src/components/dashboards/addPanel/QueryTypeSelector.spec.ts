@@ -86,6 +86,15 @@ vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   }),
 }));
 
+// Mock useDefaultPanelFields — the selector only needs applyDefaultPanelFields to
+// be callable on the Builder toggle; its seeding internals are covered by its own spec.
+const mockApplyDefaultPanelFields = vi.fn();
+vi.mock("@/composables/dashboard/useDefaultPanelFields", () => ({
+  default: () => ({
+    applyDefaultPanelFields: mockApplyDefaultPanelFields,
+  }),
+}));
+
 // Mock ConfirmDialog component
 const ConfirmDialogStub = {
   template: `
