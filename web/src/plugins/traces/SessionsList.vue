@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="sessions-list tw:h-full! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
   >
-    <!-- Toolbar: stream selector + count pill + pagination -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:py-[0.625rem]">
+    <!-- Toolbar: stream selector + count pill + pagination.
+         Padding mirrors LLMInsightsDashboard so the upper band height is
+         consistent across the AI Observability sections. -->
+    <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:py-[0.5rem]">
       <!-- Stream selector — hidden when there are no LLM streams (empty state is shown below) -->
       <div
         v-if="availableStreams.length > 0"
@@ -29,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-model="activeStream"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
-          size="sm"
           class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
           @update:model-value="onStreamChange"
         />

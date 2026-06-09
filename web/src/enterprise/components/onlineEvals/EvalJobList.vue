@@ -1,13 +1,7 @@
 <template>
   <EvalListShell
     data-test="eval-job"
-    :title="t('onlineEvals.job.listTitle')"
-    :search="search"
-    :search-placeholder="t('onlineEvals.job.searchPlaceholder')"
-    :add-label="t('onlineEvals.job.newButton')"
     :show-empty="showEmptyState"
-    @update:search="$emit('update:search', $event)"
-    @create="$emit('create')"
   >
     <template #empty>
       <EvalEmptyState
@@ -23,17 +17,6 @@
         :cta-label="t('onlineEvals.job.newButton')"
         cta-data-test="eval-job-empty-create-btn"
         @create="$emit('create')"
-      />
-    </template>
-
-    <template #filter>
-      <OSelect
-        v-model="statusFilter"
-        :options="statusOptions"
-        :placeholder="t('onlineEvals.job.allStatuses')"
-        size="md"
-        class="tw:ml-2 tw:w-[150px]"
-        data-test="eval-job-list-status-filter"
       />
     </template>
 
@@ -53,6 +36,26 @@
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #toolbar>
+          <OSearchInput
+            :model-value="search"
+            class="tw:flex-1 tw:min-w-0"
+            :placeholder="t('onlineEvals.job.searchPlaceholder')"
+            data-test="eval-job-list-search-input"
+            clearable
+            @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OSelect
+            v-model="statusFilter"
+            :options="statusOptions"
+            :placeholder="t('onlineEvals.job.allStatuses')"
+            size="md"
+            width="sm"
+            class="tw:shrink-0"
+            data-test="eval-job-list-status-filter"
+          />
+        </template>
+
         <template #cell-status="{ row }">
           <span class="ej-status-chip" :class="`ej-status-chip--${statusOf(row)}`">
             <span class="ej-status-chip__dot" />
@@ -129,6 +132,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type {
   EvalJob,
   EvalJobStatus,

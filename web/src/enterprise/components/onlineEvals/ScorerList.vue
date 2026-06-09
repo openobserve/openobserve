@@ -1,13 +1,7 @@
 <template>
   <EvalListShell
     data-test="scorer"
-    :title="t('onlineEvals.scorer.listTitle')"
-    :search="search"
-    :search-placeholder="t('onlineEvals.scorer.searchPlaceholder')"
-    :add-label="t('onlineEvals.scorer.newButton')"
     :show-empty="showEmptyState"
-    @update:search="$emit('update:search', $event)"
-    @create="$emit('create')"
   >
     <template #empty>
       <EvalEmptyState
@@ -76,55 +70,6 @@
       </EvalEmptyState>
     </template>
 
-    <template #actions>
-      <ODropdown side="bottom" align="end">
-        <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="tw:ml-2"
-            data-test="scorer-import"
-            icon-right="expand-more"
-          >
-            {{ t("onlineEvals.scorer.import.button") }}
-          </OButton>
-        </template>
-        <ODropdownItem
-          @select="$emit('import-custom')"
-          data-test="scorer-import-custom"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scorer.import.customLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scorer.import.customSubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-        <ODropdownItem
-          @select="$emit('open-library')"
-          data-test="scorer-import-library"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scorer.import.libraryLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scorer.import.librarySubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-      </ODropdown>
-    </template>
-
-    <template #filter>
-      <OSelect
-        v-model="typeFilter"
-        :options="typeOptions"
-        :placeholder="t('onlineEvals.scorer.allTypes')"
-        size="md"
-        class="tw:ml-2 tw:w-[150px]"
-        data-test="scorer-list-type-filter"
-      />
-    </template>
-
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -143,6 +88,26 @@
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #toolbar>
+          <OSearchInput
+            :model-value="search"
+            class="tw:flex-1 tw:min-w-0"
+            :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
+            data-test="scorer-list-search-input"
+            clearable
+            @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OSelect
+            v-model="typeFilter"
+            :options="typeOptions"
+            :placeholder="t('onlineEvals.scorer.allTypes')"
+            size="md"
+            width="sm"
+            class="tw:shrink-0"
+            data-test="scorer-list-type-filter"
+          />
+        </template>
+
         <template #bottom="{ totalRows }">
           <span class="o2-table-footer-title tw:text-primary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
@@ -221,6 +186,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type {

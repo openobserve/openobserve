@@ -1,33 +1,5 @@
 <template>
   <div class="quality-page" data-test="quality-page">
-    <div class="quality-page__scope-row">
-      <span class="quality-page__scope-label">{{ t("onlineEvals.quality.scopeLabel") }}</span>
-      <div class="quality-page__controls">
-        <DateTimePickerDashboard
-          ref="dateTimePickerRef"
-          v-model="selectedDate"
-          :auto-apply-dashboard="true"
-          class="quality-page__date-picker"
-          data-test="quality-time-range-picker"
-        />
-        <!--
-          Stream selector is intentionally hidden. All evaluation scores land in
-          the single `_llm_scores` stream, so filtering by source is meaningless
-          for the current single-stream setup. Re-enable when multi-stream
-          score sinks become a real use case.
-        -->
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isLoading || isConfigsLoading || isDetailLoading || isChartsLoading"
-          :title="t('onlineEvals.quality.refresh')"
-          data-test="quality-refresh-btn"
-          @click="refreshAll"
-        />
-      </div>
-    </div>
-
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
@@ -109,8 +81,6 @@ import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
 import {
@@ -127,6 +97,10 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
+  // Date window is owned by OnlineEvals (so the picker + refresh button live
+  // in the embedded AppPageHeader). Quality just consumes it as a reactive
+  // input to its data loaders.
+  dateWindow: DateWindow;
 }>();
 
 const { t } = useI18n();
@@ -134,63 +108,12 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 
-// Time-range picker state — mirrors LLM Insights / Metrics pattern.
-// Persisted in localStorage so navigating away from Quality and coming back
-// keeps the user's selection (same approach LLM Insights uses for stream).
-const DATE_LS_KEY = "evaluations:quality:dateRange";
-
-interface PersistedDate {
-  valueType: "relative" | "absolute";
-  startTime: number | null;
-  endTime: number | null;
-  relativeTimePeriod: string | null;
-}
-
-function loadPersistedDate(): PersistedDate {
-  const defaults: PersistedDate = {
-    valueType: "relative",
-    startTime: null,
-    endTime: null,
-    relativeTimePeriod: "7d",
-  };
-  try {
-    const raw = localStorage.getItem(DATE_LS_KEY);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return defaults;
-    return {
-      valueType: parsed.valueType === "absolute" ? "absolute" : "relative",
-      startTime: typeof parsed.startTime === "number" ? parsed.startTime : null,
-      endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
-      relativeTimePeriod:
-        typeof parsed.relativeTimePeriod === "string" ? parsed.relativeTimePeriod : "7d",
-    };
-  } catch {
-    return defaults;
-  }
-}
-
-const dateTimePickerRef = ref<{ getConsumableDateTime: () => { startTime: number; endTime: number } } | null>(null);
-const selectedDate = ref<any>(loadPersistedDate());
-const dateWindow = ref<DateWindow>({
-  startUs: (Date.now() - 7 * 24 * 60 * 60 * 1000) * 1000,
-  endUs: Date.now() * 1000,
-});
-
-function syncDateWindow() {
-  const picker = dateTimePickerRef.value;
-  if (!picker) return;
-  const dt = picker.getConsumableDateTime();
-  // DateTime.getConsumableDateTime returns startTime/endTime in microseconds.
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
-    dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
-  }
-}
+const dateWindowRef = toRef(props, "dateWindow");
 
 // `sourceStream` is intentionally not destructured — the composable keeps its
 // internal default ("__all__"), which is correct now that the UI selector is
 // hidden and we only have one score sink (`_llm_scores`).
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
@@ -206,7 +129,7 @@ const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindow);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const splitByScorer = ref(false);
@@ -225,7 +148,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindow);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef);
 
 const {
   isLoading: isChartsLoading,
@@ -234,7 +157,7 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindow, splitByScorer, splitBySourceType);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, splitByScorer, splitBySourceType);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
@@ -253,9 +176,20 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  syncDateWindow();
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
 }
+
+const isAnyLoading = computed(
+  () =>
+    isLoading.value ||
+    isConfigsLoading.value ||
+    isDetailLoading.value ||
+    isChartsLoading.value,
+);
+
+// Surface refresh + an aggregated loading flag so OnlineEvals can drive the
+// Refresh button it now renders in the embedded AppPageHeader actions slot.
+defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the skeleton only on the *initial* load — i.e. when we're loading AND
  * no KPI values have been populated yet. Subsequent refreshes keep the rendered
@@ -269,14 +203,8 @@ onMounted(() => {
 });
 
 watch(
-  selectedDate,
-  (next) => {
-    try {
-      localStorage.setItem(DATE_LS_KEY, JSON.stringify(next));
-    } catch {
-      // ignore storage failures (private mode, quota, etc.)
-    }
-    syncDateWindow();
+  dateWindowRef,
+  () => {
     void refreshAll();
   },
   { deep: true },

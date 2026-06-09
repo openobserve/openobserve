@@ -60,6 +60,102 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
       </div>
 
+      <AppPageHeader
+        v-if="hideTabBar && embeddedHeader"
+        :title="embeddedHeader.title"
+        :icon="embeddedHeader.icon"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template
+          v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"
+          #actions
+        >
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                :data-test="`${activeTab}-import`"
+                icon-right="expand-more"
+              >
+                {{ t(`onlineEvals.${importI18nKey}.import.button`) }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              :data-test="`${activeTab}-import-custom`"
+              @select="
+                activeTab === 'scorers'
+                  ? goToImportScorer()
+                  : goToImportScoreConfig()
+              "
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>
+                  {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
+                </span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
+                </span>
+              </div>
+            </ODropdownItem>
+            <ODropdownItem
+              :data-test="`${activeTab}-import-library`"
+              @select="
+                activeTab === 'scorers'
+                  ? openScorerLibrary()
+                  : openScoreConfigLibrary()
+              "
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>
+                  {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
+                </span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
+                </span>
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+          <OButton
+            v-if="addButtonLabel"
+            :data-test="`${activeTab}-list-add-btn`"
+            variant="primary"
+            size="sm"
+            @click="openCreateDialog"
+          >
+            {{ addButtonLabel }}
+          </OButton>
+        </template>
+        <template v-else-if="activeTab === 'jobs'" #actions>
+          <OButton
+            v-if="addButtonLabel"
+            data-test="eval-job-list-add-btn"
+            variant="primary"
+            size="sm"
+            @click="openCreateDialog"
+          >
+            {{ addButtonLabel }}
+          </OButton>
+        </template>
+        <template v-else-if="activeTab === 'quality'" #actions>
+          <DateTimePickerDashboard
+            ref="qualityDatePickerRef"
+            v-model="qualitySelectedDate"
+            :auto-apply-dashboard="true"
+            data-test="quality-time-range-picker"
+          />
+          <OButton
+            variant="outline"
+            size="sm-toolbar"
+            :loading="qualityRefreshing"
+            data-test="quality-refresh-btn"
+            @click="onQualityRefresh"
+          >
+            Refresh
+          </OButton>
+        </template>
+      </AppPageHeader>
+
       <section class="online-evals__content card-container">
         <div v-if="!hideTabBar" class="online-evals__tabs">
           <button
@@ -77,6 +173,8 @@ the Free Software Foundation, either version 3 of the License, or
         <div class="online-evals__body">
           <QualityPage
             v-if="activeTab === 'quality'"
+            ref="qualityPageRef"
+            :date-window="qualityDateWindow"
             :score-configs="scoreConfigs"
           />
           <ScoreConfigList
@@ -279,6 +377,13 @@ import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import type { DateWindow } from "./onlineEvals/composables/useQualityData";
 import { downloadFile } from "@/utils/dom";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
@@ -382,6 +487,137 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
   { value: "scoreConfigs", label: t("onlineEvals.tabs.scoreConfigs") },
 ]);
+
+// Header chrome shown only when embedded in the AI Observability shell —
+// mirrors the LLM Insights / Sessions pages so every section in the rail
+// shares the same title strip. Title + icon track the active rail item.
+const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: string; icon: IconName }> = {
+  quality: { i18nKey: "aiObservability.nav.quality", icon: "star-rate" },
+  jobs: { i18nKey: "aiObservability.nav.evalJobs", icon: "event" },
+  scorers: { i18nKey: "aiObservability.nav.scorers", icon: "rule" },
+  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", icon: "tune" },
+};
+
+const embeddedHeader = computed<{ title: string; icon: IconName } | null>(() => {
+  const meta = EMBEDDED_HEADER_META[activeTab.value];
+  if (!meta) return null;
+  return { title: t(meta.i18nKey), icon: meta.icon };
+});
+
+// Per-tab "create" button label for the embedded AppPageHeader. Quality has
+// no list-style create, so it returns an empty string and the button is
+// suppressed via v-if.
+const addButtonLabel = computed<string>(() => {
+  switch (activeTab.value) {
+    case "jobs":
+      return t("onlineEvals.job.newButton");
+    case "scorers":
+      return t("onlineEvals.scorer.newButton");
+    case "scoreConfigs":
+      return t("onlineEvals.scoreConfig.newButton");
+    default:
+      return "";
+  }
+});
+
+// Maps the active tab to the i18n namespace used by the import dropdown's
+// label/subtitle keys — scorers + scoreConfigs share the same shape.
+const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
+  activeTab.value === "scorers" ? "scorer" : "scoreConfig",
+);
+
+// ── Quality tab: date picker + refresh state ─────────────────────────────
+// Lifted out of QualityPage so the picker + refresh button live in the
+// embedded AppPageHeader's #actions slot (matching LLM Insights / Sessions).
+// QualityPage consumes `qualityDateWindow` as a prop and exposes
+// `refreshAll` + `isAnyLoading` for the Refresh button below.
+const QUALITY_DATE_LS_KEY = "evaluations:quality:dateRange";
+
+interface QualityPersistedDate {
+  valueType: "relative" | "absolute";
+  startTime: number | null;
+  endTime: number | null;
+  relativeTimePeriod: string | null;
+}
+
+function loadQualityPersistedDate(): QualityPersistedDate {
+  const defaults: QualityPersistedDate = {
+    valueType: "relative",
+    startTime: null,
+    endTime: null,
+    relativeTimePeriod: "7d",
+  };
+  try {
+    const raw = localStorage.getItem(QUALITY_DATE_LS_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return defaults;
+    return {
+      valueType: parsed.valueType === "absolute" ? "absolute" : "relative",
+      startTime: typeof parsed.startTime === "number" ? parsed.startTime : null,
+      endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
+      relativeTimePeriod:
+        typeof parsed.relativeTimePeriod === "string"
+          ? parsed.relativeTimePeriod
+          : "7d",
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+const qualitySelectedDate = ref<QualityPersistedDate>(loadQualityPersistedDate());
+const qualityDateWindow = ref<DateWindow>({
+  startUs: (Date.now() - 7 * 24 * 60 * 60 * 1000) * 1000,
+  endUs: Date.now() * 1000,
+});
+const qualityDatePickerRef = ref<{
+  getConsumableDateTime: () => { startTime: number; endTime: number };
+} | null>(null);
+const qualityPageRef = ref<{
+  refreshAll: () => Promise<void>;
+  isAnyLoading: boolean;
+} | null>(null);
+
+function syncQualityDateWindow() {
+  const picker = qualityDatePickerRef.value;
+  if (!picker) return;
+  const dt = picker.getConsumableDateTime();
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+    qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
+  }
+}
+
+watch(
+  qualitySelectedDate,
+  (next) => {
+    try {
+      localStorage.setItem(QUALITY_DATE_LS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore storage failures (private mode, quota, etc.)
+    }
+    syncQualityDateWindow();
+  },
+  { deep: true },
+);
+
+// Aggregated "is any quality query in flight" — exposed by QualityPage so the
+// Refresh button can show its spinner regardless of which loader is running.
+const qualityRefreshing = computed(
+  () => qualityPageRef.value?.isAnyLoading ?? false,
+);
+
+async function onQualityRefresh() {
+  syncQualityDateWindow();
+  await qualityPageRef.value?.refreshAll?.();
+}
+
+// Sync the initial dateWindow once the picker mounts (it only mounts while
+// the Quality tab is active). Without this the first render uses the
+// 7-day default instead of the user's persisted/picked range.
+watch(qualityDatePickerRef, (next) => {
+  if (next) syncQualityDateWindow();
+});
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
 
@@ -820,13 +1056,14 @@ async function performDelete() {
   color: var(--o2-text);
 }
 
-// When rendered inside the AI Observability shell, the splitter sits to
-// the left and already provides spacing; we only need padding on the
-// right edge to mirror the PipelinesList layout pattern. Height is also
-// owned by the shell's <router-view> wrapper, so drop the viewport calc.
+// When rendered inside the AI Observability shell, the AppPageHeader at the
+// top spans flush to the edges (matching LLM Insights / Sessions), so the
+// outer container drops its padding and gap — the header owns the top strip,
+// and the inner section's children handle their own internal padding.
 .online-evals--embedded {
   height: 100%;
-  padding: 4px 10px 10px 0;
+  padding: 0;
+  gap: 0;
 }
 
 .online-evals__header,
