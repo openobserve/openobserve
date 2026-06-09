@@ -23,7 +23,12 @@ use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
-    meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode, search::ScanStats, stream::FileKey},
+    meta::{
+        bitvec::BitVec,
+        inverted_index::IndexOptimizeMode,
+        search::ScanStats,
+        stream::{FileKey, StreamType},
+    },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     utils::{
         inverted_index::to_tantivy_name,
@@ -151,7 +156,7 @@ pub async fn tantivy_search(
 
     if scan_stats.querier_files > 0 {
         QUERY_PARQUET_CACHE_RATIO_NODE
-            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .with_label_values(&[&query.org_id, &StreamType::Index.to_string()])
             .observe(cached_ratio);
     }
 
