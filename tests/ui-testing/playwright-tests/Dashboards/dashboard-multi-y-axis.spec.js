@@ -48,6 +48,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.chartTypeSelector.selectChartType("stacked");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_namespace_name",
       "y"
@@ -111,6 +112,7 @@ test.describe("dashboard multi y axis testcases", () => {
     await pm.chartTypeSelector.selectChartType("stacked");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField(
       "kubernetes_namespace_name",
       "y"
