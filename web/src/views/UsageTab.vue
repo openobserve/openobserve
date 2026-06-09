@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem] tw:overflow-y-auto"
+      class="tw:w-full tw:h-full tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
