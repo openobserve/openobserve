@@ -30,9 +30,8 @@ use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 
 pub mod flight;
 pub mod storage;
-pub(crate) mod tantivy;
-pub(crate) mod tantivy_result_cache;
 pub mod wal;
+pub(crate) use super::{tantivy, tantivy::result_cache as tantivy_result_cache};
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 
