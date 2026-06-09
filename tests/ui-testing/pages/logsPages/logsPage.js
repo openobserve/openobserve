@@ -9043,6 +9043,35 @@ export class LogsPage {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         }
 
+        // Phase 3: When in SQL mode on the Build tab, the chart-type-selected signal (Phase 2)
+        // can fire before makeAutoSQLQuery() has finished populating the query editor. Wait
+        // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
+        // non-empty content — this confirms that onBuildQueryGenerated() has been called and
+        // queries[0].query is ready for any Auto→Custom mode switch.
+        try {
+            await this.page.waitForFunction(
+                (editorSelector) => {
+                    const host = document.querySelector(editorSelector);
+                    if (!host) return true; // editor absent — skip
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
+                    }
+                    return false; // editor found but value not yet set
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout: 10000, polling: 500 }
+            );
+            testLogger.info('Build tab query editor populated');
+        } catch (error) {
+            // Phase 3 is best-effort — editor may legitimately be empty (SQL mode OFF, empty query)
+            testLogger.warn('Build tab query editor did not populate within 10s, proceeding');
+        }
+
         return true;
     }
 
