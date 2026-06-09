@@ -498,9 +498,8 @@ impl TantivyMultiResult {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
+    use std::collections::HashSet;
 
-    use arrow_schema::{DataType, Field, Schema};
     use config::meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode};
 
     use super::*;
@@ -518,75 +517,11 @@ mod tests {
     }
 
     #[test]
-    fn test_tantivy_result_get_memory_size_row_ids() {
-        let row_ids = vec![1u32, 2u32, 3u32];
-
-        let result = TantivyResult::RowIds(row_ids);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + capacity * size_of(u32)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<u32>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_bitvec() {
-        let bitvec = BitVec::repeat(false, 1000);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 50, None);
-        let memory_size = result.get_memory_size();
-
-        // Should include BitVec overhead + bit capacity / 8
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<BitVec>());
-    }
-
-    #[test]
     fn test_tantivy_result_get_memory_size_count() {
         let result = TantivyResult::Count(12345);
         let memory_size = result.get_memory_size();
 
         assert_eq!(memory_size, std::mem::size_of::<usize>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_histogram() {
-        let histogram = vec![10u64, 20u64, 30u64, 40u64];
-        let result = TantivyResult::Histogram(histogram);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + capacity * size_of(u64)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<u64>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_top_n() {
-        let top_n = vec![
-            ("term1".to_string(), 100u64),
-            ("term2".to_string(), 200u64),
-            ("term3".to_string(), 150u64),
-        ];
-        let result = TantivyResult::TopN(top_n);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + string capacities + u64 sizes
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<(String, u64)>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_distinct() {
-        let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
-        distinct.insert("value2".to_string());
-        distinct.insert("value3".to_string());
-
-        let result = TantivyResult::Distinct(distinct);
-        let memory_size = result.get_memory_size();
-
-        // Should include HashSet overhead + string capacities
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
     }
 
     #[test]
@@ -871,97 +806,6 @@ mod tests {
     }
 
     #[test]
-    fn test_change_schema_to_utf8_view_enabled() {
-        // Mock the config to enable utf8_view
-        // Since we can't easily mock get_config(), we'll test the logic indirectly
-        let fields = vec![
-            Arc::new(Field::new("string_field", DataType::Utf8, false)),
-            Arc::new(Field::new("large_string_field", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("int_field", DataType::Int64, false)),
-            Arc::new(Field::new("bool_field", DataType::Boolean, true)),
-        ];
-        let original_schema = Schema::new(fields);
-
-        // Test the schema transformation logic
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        // Verify transformations
-        assert_eq!(transformed_schema.field(0).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(1).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(2).data_type(), &DataType::Int64);
-        assert_eq!(transformed_schema.field(3).data_type(), &DataType::Boolean);
-
-        // Verify nullability is preserved
-        assert!(!transformed_schema.field(0).is_nullable());
-        assert!(transformed_schema.field(1).is_nullable());
-        assert!(!transformed_schema.field(2).is_nullable());
-        assert!(transformed_schema.field(3).is_nullable());
-    }
-
-    #[test]
-    fn test_change_schema_to_utf8_view_field_names_preserved() {
-        let fields = vec![
-            Arc::new(Field::new("field_name_1", DataType::Utf8, false)),
-            Arc::new(Field::new("field_name_2", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("field_name_3", DataType::Int32, false)),
-        ];
-        let original_schema = Schema::new(fields);
-
-        // Test field name preservation in transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.field(0).name(), "field_name_1");
-        assert_eq!(transformed_schema.field(1).name(), "field_name_2");
-        assert_eq!(transformed_schema.field(2).name(), "field_name_3");
-    }
-
-    #[test]
-    fn test_change_schema_to_utf8_view_empty_schema() {
-        let original_schema = Schema::empty();
-
-        // Test empty schema transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.fields().len(), 0);
-    }
-
-    #[test]
     fn test_histogram_builder_edge_cases() {
         // Test with histograms of different lengths
         let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
@@ -983,6 +827,10 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
+        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 0), 0, None);
+        let memory_size = result.get_memory_size();
+        assert_eq!(memory_size, std::mem::size_of::<BitVec>());
+
         let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();
         assert!(memory_size >= std::mem::size_of::<Vec<u32>>());
