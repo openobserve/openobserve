@@ -162,6 +162,55 @@ class="tw:mr-1" />
       </div> -->
     </div>
 
+    <!-- Source event banner -->
+    <div
+      v-if="props.sourceEvent && (props.sourceEvent.timestamp || props.sourceEvent.message)"
+      class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
+      <q-badge
+        v-if="props.sourceEvent.severity"
+        :class="severityClass(props.sourceEvent.severity)"
+        :label="props.sourceEvent.severity"
+        class="tw:px-2"
+      />
+      <span class="tw:text-xs tw:font-mono tw:opacity-80">
+        {{ formatEventTimestamp(props.sourceEvent.timestamp) }}
+      </span>
+      <span
+        v-if="props.sourceEvent.message"
+        class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
+        :title="props.sourceEvent.message"
+      >
+        {{ props.sourceEvent.message }}
+      </span>
+    </div>
+
+    <!-- Dimension chips -->
+    <div
+      v-if="unifiedChips.length > 0"
+      class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    >
+      <div
+        v-for="chip in visibleChips"
+        :key="chip.key"
+        class="dim-chip dim-chip-active"
+        :style="{ background: chipColors(chip.key).border, borderColor: chipColors(chip.key).border, color: '#fff' }"
+      >
+        <OIcon name="check" size="xs" class="dim-chip-check" />
+        <span class="dim-chip-label">{{ chip.label }}</span>
+        <span class="dim-chip-eq">=</span>
+        <span class="dim-chip-value">{{ chip.value }}</span>
+      </div>
+      <div
+        v-if="hiddenChipCount > 0"
+        class="dim-chip-more"
+        @click="chipOverflowExpanded = !chipOverflowExpanded"
+      >
+        {{ chipOverflowExpanded ? "show less" : `+${hiddenChipCount} more` }}
+      </div>
+    </div>
+
     <!-- Main Content Area -->
     <div class="tw:flex-1 tw:overflow-hidden tw:relative">
       <!-- Wrap Content Button -->
@@ -261,6 +310,17 @@ class="tw:mr-1" />
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
+import {
+  convertTimeFromNsToMs,
+  convertTimeFromMicroToMilli,
+  timestampToTimezoneDate,
+} from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -303,7 +363,7 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
-const { loadKeyFields } = useServiceCorrelation();
+const { loadKeyFields, semanticGroups } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
@@ -1188,6 +1248,107 @@ watch(
   { deep: true },
 );
 
+// ── Chip row ───────────────────────────────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
+  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
+  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
+  "k8s", "faas", "otel", "sql", "http", "https",
+]);
+const titleCaseWord = (w: string) => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabel = (key: string): string => {
+  const group = semanticGroups.value.find((g: any) => g.id === key);
+  return group?.display ?? titleCase(key.replace(/[-_]/g, " "));
+};
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  const src = props.chipDimensions && Object.keys(props.chipDimensions).length > 0
+    ? props.chipDimensions
+    : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "" && s !== SELECT_ALL_VALUE) out[k] = s;
+  }
+  return out;
+});
+
+type ChipKind = "context" | "subject";
+type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const specs = SUBJECT_BUTTONS_BY_SET[props.matchedSetId];
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  Object.keys(chipDimensionSource.value).map((key): DimensionChip => ({
+    key,
+    label: dimensionDisplayLabel(key),
+    value: chipDimensionSource.value[key],
+    kind: subjectSemanticIds.value.has(key) ? "subject" : "context",
+  })),
+);
+
+const CHIP_COLOR_PALETTE = [
+  { border: "#7c3aed", text: "#7c3aed" },
+  { border: "#ea580c", text: "#ea580c" },
+  { border: "#0d9488", text: "#0d9488" },
+  { border: "#dc2626", text: "#dc2626" },
+  { border: "#2563eb", text: "#2563eb" },
+  { border: "#65a30d", text: "#65a30d" },
+  { border: "#d97706", text: "#d97706" },
+  { border: "#0891b2", text: "#0891b2" },
+];
+const hashKey = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
+const chipColors = (key: string) => CHIP_COLOR_PALETTE[hashKey(key) % CHIP_COLOR_PALETTE.length];
+
+const CHIP_OVERFLOW_THRESHOLD = 4;
+const chipOverflowExpanded = ref(false);
+const visibleChips = computed(() =>
+  chipOverflowExpanded.value ? unifiedChips.value : unifiedChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+);
+const hiddenChipCount = computed(() => Math.max(0, unifiedChips.value.length - CHIP_OVERFLOW_THRESHOLD));
+
+// Source event banner
+const TS_NS_MIN = 1e17; const TS_US_MIN = 1e14; const TS_MS_MIN = 1e11; const TS_S_MIN = 1e9;
+const formatEventTimestamp = (ts: number | string | undefined): string => {
+  if (ts == null || ts === "") return "";
+  if (typeof ts === "string" && !/^\d+$/.test(ts.trim())) return ts;
+  const n = typeof ts === "number" ? ts : Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return String(ts);
+  let ms: number;
+  if (n >= TS_NS_MIN) ms = convertTimeFromNsToMs(n);
+  else if (n >= TS_US_MIN) ms = convertTimeFromMicroToMilli(n);
+  else if (n >= TS_MS_MIN) ms = n;
+  else if (n >= TS_S_MIN) ms = n * 1000;
+  else ms = n;
+  try { return `${timestampToTimezoneDate(ms, "UTC", "yyyy-MM-dd HH:mm:ss.SSS")} UTC`; } catch { return String(ts); }
+};
+const severityClass = (sev: string | undefined): string => {
+  if (!sev) return "severity-badge severity-default";
+  const s = sev.toUpperCase();
+  if (s.includes("ERROR") || s.includes("FATAL")) return "severity-badge severity-error";
+  if (s.includes("WARN")) return "severity-badge severity-warn";
+  if (s.includes("DEBUG")) return "severity-badge severity-debug";
+  return "severity-badge severity-info";
+};
 </script>
 
 <style lang="scss" scoped>
@@ -1297,6 +1458,70 @@ watch(
       flex-direction: column;
     }
   }
+}
+
+.dim-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1.5px solid var(--o2-border-color, #d4d4d4);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-size: 0.75rem;
+  line-height: 1;
+  user-select: none;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.dim-chip-active { font-weight: 600; }
+.dim-chip-active .dim-chip-label { opacity: 0.9; }
+.dim-chip-active .dim-chip-eq { opacity: 0.7; }
+.dim-chip-check {
+  margin-right: 0.25rem;
+  color: #4ade80;
+  flex-shrink: 0;
+}
+.dim-chip-label { font-weight: 500; opacity: 0.8; }
+.dim-chip-eq { opacity: 0.5; }
+.dim-chip-value { font-weight: 700; }
+.dim-chip-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--o2-text-3, #888);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0.5rem;
+  background: var(--o2-bg-color-2, #f4f4f4);
+  &:hover { background: var(--o2-bg-color-3, #e8e8e8); }
+}
+.source-event-banner {
+  background: var(--o2-card-bg, var(--o2-bg-color));
+}
+.severity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.severity-error  { background: rgba(220, 38, 38, 0.15); color: #f87171; }
+.severity-warn   { background: rgba(217, 119, 6, 0.15);  color: #fbbf24; }
+.severity-debug  { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
+.severity-info   { background: rgba(37, 99, 235, 0.15);  color: #60a5fa; }
+.severity-default { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+.source-event-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  line-height: 1.4;
 }
 </style>
 
