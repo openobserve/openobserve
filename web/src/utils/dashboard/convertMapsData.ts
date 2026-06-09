@@ -27,11 +27,10 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 
 export const convertMapsData = (panelSchema: any, mapData: any) => {
   //if no name and value than return it
-  if (
-    !panelSchema.queries[0]?.fields?.name ||
-    !panelSchema.queries[0]?.fields?.value_for_maps ||
-    !mapData
-  ) {
+  const hasValidQuery = panelSchema.queries?.some(
+    (query: any) => query.fields?.name && query.fields?.value_for_maps,
+  );
+  if (!hasValidQuery || !mapData) {
     return { options: null };
   }
 
@@ -90,6 +89,9 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   options.xAxis = [];
   options.yAxis = [];
   options.series = panelSchema.queries.map((query: any, index: any) => {
+    if (!query.fields?.name || !query.fields?.value_for_maps) {
+      return { type: "map", data: [] };
+    }
     return {
       type: "map",
       map: panelSchema.config?.map_type.type || "world",

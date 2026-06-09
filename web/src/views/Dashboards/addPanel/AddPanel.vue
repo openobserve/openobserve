@@ -229,6 +229,7 @@ import { provide, inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
@@ -556,15 +557,12 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
-        // check if vrl function exists
-        if (
+        // Set the VRL toggle for the active query: on iff it has a VRL function.
+        dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].vrlFunctionQuery
-        ) {
-          // enable vrl function editor
-          dashboardPanelData.layout.vrlFunctionToggle = true;
-        }
+          ],
+        );
 
         await nextTick();
         // Initialize PanelEditor's chartData after loading panel data
@@ -578,9 +576,10 @@ export default defineComponent({
         // set the value of the date time after the reset
         updateDateTime(selectedDate.value);
       }
-      // let it call the wathcers and then mark the panel config watcher as activated
+      // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
+
 
       //event listener before unload and data is updated
       window.addEventListener("beforeunload", beforeUnloadHandler);
@@ -830,6 +829,8 @@ export default defineComponent({
     const isOutDated = computed(() => {
       //check that is it addpanel initial call
       if (isInitialDashboardPanelData() && !editMode.value) return false;
+      // chartData not yet initialized — don't show "not up to date" banner
+      if (!chartData.value) return false;
       //compare chartdata and dashboardpaneldata and variables data as well
 
       const normalizeVariables = (obj: any) => {

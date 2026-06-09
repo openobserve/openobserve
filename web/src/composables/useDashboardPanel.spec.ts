@@ -236,6 +236,23 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data.queries.length).toBe(
         initialLength + 1,
       );
+      const newQuery = panel.dashboardPanelData.data.queries[initialLength];
+      expect(newQuery.vrlFunctionFieldList).toEqual([]);
+    });
+
+    it("adds a custom-mode query (customQuery=true) for custom_chart panels", () => {
+      panel.dashboardPanelData.data.type = "custom_chart";
+      const idx = panel.dashboardPanelData.data.queries.length;
+      panel.addQuery();
+      // Custom charts use hand-written queries, so the editor must be editable.
+      expect(panel.dashboardPanelData.data.queries[idx].customQuery).toBe(true);
+    });
+
+    it("adds a builder-mode query (customQuery=false) for non-custom_chart panels", () => {
+      panel.dashboardPanelData.data.type = "bar";
+      const idx = panel.dashboardPanelData.data.queries.length;
+      panel.addQuery();
+      expect(panel.dashboardPanelData.data.queries[idx].customQuery).toBe(false);
     });
 
     it("should remove queries when more than one exists", () => {
@@ -4939,6 +4956,11 @@ describe("useDashboardPanel", () => {
 
     beforeEach(() => {
       panel = useDashboardPanelData();
+      // useDashboardPanelData() returns shared singleton state, so reset the
+      // active query index between tests — otherwise a test that selects a
+      // non-zero query tab (e.g. the resetAggregationFunction multi-query
+      // cases) leaks currentQueryIndex into later tests that assume index 0.
+      panel.dashboardPanelData.layout.currentQueryIndex = 0;
       panel.dashboardPanelData.meta.dateTime = {
         start_time: new Date("2024-01-01"),
         end_time: new Date("2024-01-02"),
@@ -5717,8 +5739,10 @@ describe("useDashboardPanel", () => {
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(0);
-      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      // For sql queryType, multi-query is preserved and the active query
+      // index is left unchanged (resetAggregationFunction must not move tabs).
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(2);
     });
 
     it("should cover resetAggregationFunction for line chart with multiple x and empty breakdown", () => {
@@ -5759,6 +5783,7 @@ describe("useDashboardPanel", () => {
     it("should cover resetAggregationFunction for area chart with sql queryType", () => {
       panel.dashboardPanelData.data.type = "area";
       panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.layout.currentQueryIndex = 1;
       panel.dashboardPanelData.data.queries = [
         { fields: { x: [], y: [], z: [] }, config: {} },
         { fields: { x: [], y: [], z: [] }, config: {} },
@@ -5766,7 +5791,10 @@ describe("useDashboardPanel", () => {
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      // For sql queryType, multi-query is preserved and the active query
+      // index is left unchanged (resetAggregationFunction must not move tabs).
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(2);
     });
 
     it("should cover resetAggregationFunction for pie chart with multiple x fields", () => {
@@ -5796,16 +5824,20 @@ describe("useDashboardPanel", () => {
     it("should cover resetAggregationFunction for gauge with sql queryType", () => {
       panel.dashboardPanelData.data.type = "gauge";
       panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.layout.currentQueryIndex = 1;
       panel.dashboardPanelData.data.queries = [
-        { fields: { x: [], y: [], z: [] }, config: { time_shift: ["1h"] } },
         { fields: { x: [], y: [], z: [] }, config: {} },
+        { fields: { x: [], y: [], z: [] }, config: { time_shift: ["1h"] } },
       ];
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      // For sql queryType, multi-query is preserved and the active query index
+      // is left unchanged; the active query's time_shift is cleared.
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(2);
       expect(
-        panel.dashboardPanelData.data.queries[0].config.time_shift,
+        panel.dashboardPanelData.data.queries[1].config.time_shift,
       ).toEqual([]);
     });
 
@@ -5825,6 +5857,7 @@ describe("useDashboardPanel", () => {
     it("should cover resetAggregationFunction for metric with sql queryType", () => {
       panel.dashboardPanelData.data.type = "metric";
       panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.layout.currentQueryIndex = 1;
       panel.dashboardPanelData.data.queries = [
         { fields: { x: [], y: [], z: [] }, config: {} },
         { fields: { x: [], y: [], z: [] }, config: {} },
@@ -5832,7 +5865,10 @@ describe("useDashboardPanel", () => {
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      // For sql queryType, multi-query is preserved and the active query
+      // index is left unchanged (resetAggregationFunction must not move tabs).
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(2);
     });
 
     it("should cover resetAggregationFunction for geomap chart", () => {
@@ -5886,6 +5922,7 @@ describe("useDashboardPanel", () => {
     it("should cover resetAggregationFunction for table with sql queryType", () => {
       panel.dashboardPanelData.data.type = "table";
       panel.dashboardPanelData.data.queryType = "sql";
+      panel.dashboardPanelData.layout.currentQueryIndex = 1;
       panel.dashboardPanelData.data.queries = [
         { fields: { x: [], y: [], z: [], breakdown: [] }, config: {} },
         { fields: { x: [], y: [], z: [], breakdown: [] }, config: {} },
@@ -5893,7 +5930,10 @@ describe("useDashboardPanel", () => {
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(1);
+      // For sql queryType, multi-query is preserved and the active query
+      // index is left unchanged (resetAggregationFunction must not move tabs).
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
+      expect(panel.dashboardPanelData.data.queries.length).toBe(2);
     });
 
     it("should cover addMapName with isDerived field", () => {

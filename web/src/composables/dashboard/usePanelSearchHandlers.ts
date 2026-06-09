@@ -135,6 +135,13 @@ export const usePanelSearchHandlers = ({
       state.data[queryIndex] = [];
     }
 
+    // Initialize metadata array if not exists (mirrors the data init above).
+    // The push() below assumes this slot is an array; don't rely on the caller
+    // having pre-initialized it.
+    if (!state.resultMetaData[queryIndex]) {
+      state.resultMetaData[queryIndex] = [];
+    }
+
     // Detect chunking direction on first chunk for this query
     if (
       !state.resultMetaData[queryIndex] ||
@@ -244,7 +251,7 @@ export const usePanelSearchHandlers = ({
     }
 
     const lastPartitionIndex = Math.max(
-      state?.resultMetaData?.[queryIndex]?.length - 1,
+      (state?.resultMetaData?.[queryIndex]?.length ?? 0) - 1,
       0,
     );
     // is streaming aggs

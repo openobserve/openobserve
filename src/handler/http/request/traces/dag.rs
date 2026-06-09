@@ -189,7 +189,7 @@ pub async fn get_trace_dag(
     )
     .await
     .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
-    .unwrap_or(true);
+    .unwrap_or(false);
 
     let ref_parent_col = if has_ref_parent_id {
         "reference_parent_span_id, "

@@ -676,124 +676,6 @@
       }
     },
     {
-      "id": "Q025",
-      "sql": "SELECT _timestamp, pallet_id, conveyor_lane, load_factor, charge_remaining, ROUND((load_factor * charge_remaining) / 100.0, 2) AS utilization_index, ROUND(CAST(item_count AS FLOAT) / NULLIF(CAST(scan_attempts AS FLOAT), 0), 1) AS items_per_scan FROM \"{stream}\" WHERE load_factor IS NOT NULL AND charge_remaining IS NOT NULL AND item_count > 0 AND scan_attempts > 0 ORDER BY utilization_index DESC LIMIT 12",
-      "category": "basic_select",
-      "expected": {
-        "columns": [
-          "pallet_id",
-          "conveyor_lane",
-          "load_factor",
-          "charge_remaining",
-          "utilization_index",
-          "items_per_scan"
-        ],
-        "results": [
-          [
-            "PL-007",
-            "LANE-B",
-            "99.0",
-            "95.0",
-            "94.05",
-            "60.0"
-          ],
-          [
-            "PL-001",
-            "LANE-D",
-            "99.0",
-            "95.0",
-            "94.05",
-            "60.0"
-          ],
-          [
-            "PL-005",
-            "LANE-D",
-            "67.9",
-            "75.3",
-            "51.13",
-            "205.0"
-          ],
-          [
-            "PL-001",
-            "LANE-D",
-            "94.6",
-            "42.5",
-            "40.21",
-            "17.600000381469727"
-          ],
-          [
-            "PL-003",
-            "LANE-B",
-            "94.6",
-            "42.5",
-            "40.21",
-            "17.600000381469727"
-          ],
-          [
-            "PL-006",
-            "LANE-A",
-            "55.2",
-            "66.6",
-            "36.76",
-            "120.0"
-          ],
-          [
-            "PL-002",
-            "LANE-A",
-            "45.3",
-            "58.0",
-            "26.27",
-            "155.0"
-          ],
-          [
-            "PL-004",
-            "LANE-C",
-            "45.3",
-            "58.0",
-            "26.27",
-            "155.0"
-          ],
-          [
-            "PL-008",
-            "LANE-C",
-            "88.1",
-            "25.0",
-            "22.03",
-            "170.0"
-          ],
-          [
-            "PL-006",
-            "LANE-A",
-            "21.4",
-            "88.7",
-            "18.98",
-            "91.69999694824219"
-          ],
-          [
-            "PL-008",
-            "LANE-C",
-            "21.4",
-            "88.7",
-            "18.98",
-            "91.69999694824219"
-          ],
-          [
-            "PL-007",
-            "LANE-B",
-            "72.8",
-            "10.0",
-            "7.28",
-            "66.69999694824219"
-          ]
-        ],
-        "results_mode": "rowsort"
-      },
-      "time_offset": {
-        "start_offset": 1439000000,
-        "end_offset": 1603000000
-      }
-    },
-    {
       "id": "Q026",
       "sql": "SELECT _timestamp, log, control_center, operation_mode, cell_temp, CASE WHEN cell_temp >= 35.0 AND operation_mode = 'auto' THEN 'OVERTEMP-AUTO' WHEN cell_temp >= 35.0 THEN 'OVERTEMP' WHEN cell_temp >= 28.0 AND charge_remaining < 30.0 THEN 'WARNING-LOWCHARGE' WHEN cell_temp >= 28.0 THEN 'WARM' ELSE 'NORMAL' END AS alert_status FROM \"{stream}\" WHERE (cell_temp >= 28.0) OR (charge_remaining < 30.0 AND operation_mode != 'hybrid') ORDER BY cell_temp DESC, charge_remaining ASC LIMIT 20",
       "category": "basic_select",
@@ -1699,10 +1581,6 @@
         ],
         "results": [
           [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "2"
-          ],
-          [
             "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
@@ -1712,6 +1590,10 @@
           ],
           [
             "[\"credential_stuffing\"]",
+            "2"
+          ],
+          [
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ]
         ],
@@ -5936,6 +5818,488 @@
             "performanceMetric",
             "None",
             "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q416",
+      "sql": "SELECT _timestamp, COALESCE(page_url, endpoint_path, resource_path, page_slug) AS resolved_page, action_category, latency_ms FROM \"{stream}\" WHERE action_category = 'interaction' ORDER BY latency_ms DESC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 24899000000,
+        "end_offset": 24973000000
+      },
+      "expected": {
+        "columns": [
+          "resolved_page",
+          "action_category",
+          "latency_ms"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/item/1007",
+            "interaction",
+            "15"
+          ],
+          [
+            "https://shop.example.com/item/1007",
+            "interaction",
+            "15"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q417",
+      "sql": "SELECT _timestamp, CASE WHEN page_url IS NOT NULL THEN page_url WHEN endpoint_path IS NOT NULL THEN endpoint_path WHEN resource_path IS NOT NULL THEN resource_path ELSE CONCAT('fallback:', page_slug) END AS best_url, visitor_session_id FROM \"{stream}\" WHERE action_category IN ('navigation', 'interaction') ORDER BY _timestamp DESC LIMIT 15",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 24959000000,
+        "end_offset": 25033000000
+      },
+      "expected": {
+        "columns": [
+          "best_url",
+          "visitor_session_id"
+        ],
+        "results": [
+          [
+            "https://shop.example.com/item/1002",
+            "sess_005"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q418",
+      "sql": "SELECT _timestamp, component_name, exception_message FROM \"{stream}\" WHERE (exception_message LIKE '%Exception%' OR exception_message LIKE '%Timeout%' OR exception_message LIKE '%Overflow%') AND component_name LIKE '%engine%' ORDER BY _timestamp ASC",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25019000000,
+        "end_offset": 25093000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "exception_message"
+        ],
+        "results": [
+          [
+            "sorter-engine",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q419",
+      "sql": "SELECT _timestamp, pallet_id, sorter_model, facility_zone, throughput_rate FROM \"{stream}\" WHERE pallet_id IN ('PL-001', 'PL-003', 'PL-005', 'PL-007') AND sorter_model IN ('SORT-X1', 'SORT-M3', 'SORT-Q5') AND throughput_rate > 0 AND facility_zone IS NOT NULL ORDER BY throughput_rate DESC, pallet_id ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25079000000,
+        "end_offset": 25153000000
+      },
+      "expected": {
+        "columns": [
+          "pallet_id",
+          "sorter_model",
+          "facility_zone",
+          "throughput_rate"
+        ],
+        "results": [
+          [
+            "PL-001",
+            "SORT-X1",
+            "ZONE-3",
+            "900.0"
+          ],
+          [
+            "PL-007",
+            "SORT-M3",
+            "ZONE-1",
+            "900.0"
+          ],
+          [
+            "PL-003",
+            "SORT-M3",
+            "ZONE-1",
+            "320.0"
+          ],
+          [
+            "PL-005",
+            "SORT-X1",
+            "ZONE-3",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q420",
+      "sql": "SELECT _timestamp, (_timestamp / 1000000) AS ts_seconds, (_timestamp % 60000000) AS within_minute, action_category, page_slug FROM \"{stream}\" WHERE action_category = 'performanceMetric' ORDER BY _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25139000000,
+        "end_offset": 25213000000
+      },
+      "expected": {
+        "columns": [
+          "ts_seconds",
+          "within_minute",
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "1780750500.0",
+            "0",
+            "performanceMetric",
+            "itemPage"
+          ],
+          [
+            "1780750536.0",
+            "36000000",
+            "performanceMetric",
+            "searchPage"
+          ],
+          [
+            "1780750554.0",
+            "54000000",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "1780750560.0",
+            "0",
+            "performanceMetric",
+            "cartPage"
+          ],
+          [
+            "1780750572.0",
+            "12000000",
+            "performanceMetric",
+            "itemPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q421",
+      "sql": "SELECT _timestamp, alert_tags, auth_token, bin_code, action_category FROM \"{stream}\" WHERE alert_tags IN ('latency', 'error', 'capacity') AND bin_code LIKE 'BIN-%' AND action_category = 'performanceMetric' ORDER BY alert_tags ASC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25199000000,
+        "end_offset": 25273000000
+      },
+      "expected": {
+        "columns": [
+          "alert_tags",
+          "auth_token",
+          "bin_code",
+          "action_category"
+        ],
+        "results": [
+          [
+            "capacity",
+            "tok-wh-abc123def456",
+            "BIN-C3",
+            "performanceMetric"
+          ],
+          [
+            "capacity",
+            "tok-wh-abc123def456",
+            "BIN-C3",
+            "performanceMetric"
+          ],
+          [
+            "error",
+            "tok-wh-cde567fgh890",
+            "BIN-B2",
+            "performanceMetric"
+          ],
+          [
+            "latency",
+            "tok-wh-ghi789jkl012",
+            "BIN-D4",
+            "performanceMetric"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q422",
+      "sql": "SELECT _timestamp, client_agent, geo_org, geo_country, action_category FROM \"{stream}\" WHERE geo_org IS NOT NULL ORDER BY geo_org ASC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25259000000,
+        "end_offset": 25333000000
+      },
+      "expected": {
+        "columns": [
+          "client_agent",
+          "geo_org",
+          "geo_country",
+          "action_category"
+        ],
+        "results": [
+          [
+            "Go-http-client/2.0 conveyor-monitor",
+            "Acme Corp",
+            "UK",
+            "interaction"
+          ],
+          [
+            "okhttp/4.12.0 (Android; sort-app)",
+            "CloudServe GmbH",
+            "US",
+            "interaction"
+          ],
+          [
+            "okhttp/4.12.0 (Android; sort-app)",
+            "CloudServe GmbH",
+            "US",
+            "interaction"
+          ],
+          [
+            "Alamofire/5.8.0 (iOS; scan-app)",
+            "DataCenter EU",
+            "JP",
+            "performanceMetric"
+          ],
+          [
+            "axios/1.6.0 (Node.js; warehouse-ui)",
+            "HostPro Inc",
+            "BR",
+            "performanceMetric"
+          ],
+          [
+            "PostmanRuntime/7.35.0",
+            "NetGuard AS",
+            "US",
+            "navigation"
+          ],
+          [
+            "PostmanRuntime/7.35.0",
+            "NetGuard AS",
+            "US",
+            "navigation"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q423",
+      "sql": "SELECT _timestamp, guard_mode, inp_micros, cls_score, device_type FROM \"{stream}\" WHERE guard_mode IN ('active', 'passive') AND inp_micros > 100000 AND cls_score > 0.05 AND device_type = 'Mobile' ORDER BY inp_micros DESC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25319000000,
+        "end_offset": 25393000000
+      },
+      "expected": {
+        "columns": [
+          "guard_mode",
+          "inp_micros",
+          "cls_score",
+          "device_type"
+        ],
+        "results": [
+          [
+            "active",
+            "160000",
+            "0.1",
+            "Mobile"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q424",
+      "sql": "SELECT _timestamp, operation_name, payload_size, route_key, response_code FROM \"{stream}\" WHERE operation_name IS NOT NULL AND payload_size > 256 ORDER BY payload_size DESC, operation_name ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25379000000,
+        "end_offset": 25453000000
+      },
+      "expected": {
+        "columns": [
+          "operation_name",
+          "payload_size",
+          "route_key",
+          "response_code"
+        ],
+        "results": [
+          [
+            "RetryScan",
+            "65536",
+            "rk-warehouse-003",
+            "503"
+          ],
+          [
+            "RetryScan",
+            "65536",
+            "rk-warehouse-003",
+            "503"
+          ],
+          [
+            "ArchiveLog",
+            "32768",
+            "rk-warehouse-002",
+            "500"
+          ],
+          [
+            "UpdateBatch",
+            "1024",
+            "rk-warehouse-006",
+            "200"
+          ],
+          [
+            "SearchItems",
+            "512",
+            "rk-warehouse-005",
+            "403"
+          ],
+          [
+            "SearchItems",
+            "512",
+            "rk-warehouse-005",
+            "403"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q425",
+      "sql": "SELECT _timestamp, query_source, render_scope, route_key, site_name FROM \"{stream}\" WHERE query_source IN ('dashboard', 'api', 'cli') AND render_scope IN ('SSR', 'CSR') AND site_name LIKE 'site-%' ORDER BY query_source ASC, site_name ASC, _timestamp DESC LIMIT 12",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25439000000,
+        "end_offset": 25513000000
+      },
+      "expected": {
+        "columns": [
+          "query_source",
+          "render_scope",
+          "route_key",
+          "site_name"
+        ],
+        "results": [
+          [
+            "api",
+            "SSR",
+            "rk-warehouse-008",
+            "site-nyc-01"
+          ],
+          [
+            "api",
+            "SSR",
+            "rk-warehouse-008",
+            "site-nyc-01"
+          ],
+          [
+            "cli",
+            "SSR",
+            "rk-warehouse-005",
+            "site-sin-08"
+          ],
+          [
+            "cli",
+            "CSR",
+            "rk-warehouse-007",
+            "site-tor-10"
+          ],
+          [
+            "dashboard",
+            "SSR",
+            "rk-warehouse-006",
+            "site-mum-09"
+          ],
+          [
+            "dashboard",
+            "SSR",
+            "rk-warehouse-006",
+            "site-mum-09"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q426",
+      "sql": "SELECT _timestamp, array_extract(regexp_match(client_agent, '([A-Za-z]+)/[0-9.]+'), 1) AS agent_family, action_category, page_slug FROM \"{stream}\" WHERE client_agent IS NOT NULL AND action_category = 'navigation' ORDER BY agent_family ASC, _timestamp ASC LIMIT 10",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25499000000,
+        "end_offset": 25573000000
+      },
+      "expected": {
+        "columns": [
+          "agent_family",
+          "action_category",
+          "page_slug"
+        ],
+        "results": [
+          [
+            "fetch",
+            "navigation",
+            "itemPage"
+          ],
+          [
+            "fetch",
+            "navigation",
+            "itemPage"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q427",
+      "sql": "SELECT _timestamp, action_category, (CASE WHEN page_url IS NULL AND endpoint_path IS NULL THEN 'both_missing' WHEN page_url IS NULL THEN 'only_page_url_missing' WHEN endpoint_path IS NULL THEN 'only_endpoint_missing' ELSE 'both_present' END) AS url_status FROM \"{stream}\" WHERE action_category IN ('performanceMetric', 'interaction') ORDER BY url_status, _timestamp ASC LIMIT 15",
+      "category": "basic_select",
+      "time_offset": {
+        "start_offset": 25559000000,
+        "end_offset": 25633000000
+      },
+      "expected": {
+        "columns": [
+          "action_category",
+          "url_status"
+        ],
+        "results": [
+          [
+            "performanceMetric",
+            "both_missing"
+          ],
+          [
+            "performanceMetric",
+            "both_missing"
+          ],
+          [
+            "performanceMetric",
+            "both_missing"
+          ],
+          [
+            "performanceMetric",
+            "both_present"
+          ],
+          [
+            "performanceMetric",
+            "both_present"
+          ],
+          [
+            "performanceMetric",
+            "both_present"
           ]
         ],
         "results_mode": "rowsort"

@@ -22,7 +22,7 @@ use config::{meta::bitvec::BitVec, metrics};
 use dashmap::DashMap;
 use roaring::RoaringBitmap;
 
-use crate::service::search::grpc::tantivy::TantivyResult;
+use super::TantivyResult;
 
 pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
     Lazy::new(|| Arc::new(TantivyResultCache::default()));

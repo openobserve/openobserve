@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import sys
+import time
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from data_gen import BASE_TS, build_dataset  # noqa: E402
 # the same environment.
 import os as _os
 STREAM = f"query_agent_test_{BASE_TS}_{_os.getpid()}"
+STREAM2 = f"query_agent_test2_{BASE_TS}_{_os.getpid()}"
 
 
 # ── Shared query loader ────────────────────────────────────────────────────
@@ -85,7 +87,7 @@ def run_query(client, query, *, skip_fts_count=False):
     qid = query["id"]
     size = 500
     offset = query["time_offset"]
-    sql = query["sql"].replace("{stream}", STREAM)
+    sql = query["sql"].replace("{stream}", STREAM).replace("{stream2}", STREAM2)
     json_data = search_payload(
         sql,
         start_time=BASE_TS + offset["start_offset"],
@@ -219,64 +221,123 @@ def _run_content_assertions(query, sql, hits):
 # ── Session fixture: ingest data (no flush) ────────────────────────────────
 @pytest.fixture(scope="session")
 def ingest_query_agent_data():
-    """Ingest deterministic data and wait for it to be searchable.
+    """Ingest deterministic data into both streams and wait for searchability.
 
-    Does NOT flush — the data stays in memtable for the pre-flush phase.
-    The post-flush phase triggers its own flush + re-poll.
+    Does NOT flush — data stays in memtable for the pre-flush phase.
+    Stream 2 uses stream_offset=7 for different but join-key-overlapping data.
     """
 
     client = OpenObserveClient()
-    stream = STREAM
 
-    # Generate data in-memory — no external JSON file dependency
-    records = build_dataset()
-    data = json.dumps(records)
-
-    resp = client.post(f"{stream}/_json", data=data,
-                       headers={"Content-Type": "application/json"})
-    if resp.status_code == 200:
-        logging.info("Ingested %d generated records (%d bytes)", len(records), len(data))
+    # Stream 1 (primary)
+    records1 = build_dataset()
+    data1 = json.dumps(records1)
+    resp1 = client.post(f"{STREAM}/_json", data=data1,
+                        headers={"Content-Type": "application/json"})
+    if resp1.status_code == 200:
+        logging.info("Stream1: ingested %d records (%d bytes)", len(records1), len(data1))
     else:
-        pytest.fail(f"Ingestion failed: {resp.status_code} — {resp.text[:300]}")
+        pytest.fail(f"Stream1 ingestion failed: {resp1.status_code} — {resp1.text[:300]}")
 
-    # Poll until all records are searchable (no flush — memtable only)
-    expected = len(records)
-    _max_ts = max(r["_timestamp"] for r in records)
+    # Stream 2 (secondary, offset=7 for different but overlapping join keys)
+    records2 = build_dataset(stream_offset=7)
+    data2 = json.dumps(records2)
+    resp2 = client.post(f"{STREAM2}/_json", data=data2,
+                        headers={"Content-Type": "application/json"})
+    if resp2.status_code == 200:
+        logging.info("Stream2: ingested %d records (%d bytes)", len(records2), len(data2))
+    else:
+        pytest.fail(f"Stream2 ingestion failed: {resp2.status_code} — {resp2.text[:300]}")
+
+    # Poll until all records from both streams are searchable.
+    # Each stream is checked independently so cross-stream queries
+    # never run against a partially-ready stream.
+    expected1 = len(records1)
+    expected2 = len(records2)
+    _max_ts = max(r["_timestamp"] for r in records1 + records2)
+
+    # Vortex servers do not expose WAL/memtable data — searches return
+    # NewEmptyExec until data is flushed to vortex files.  Detect this by
+    # attempting 3 quick polls; if no data appears, flush once and continue.
+    def _quick_count(stream: str) -> int:
+        now = datetime.now(UTC)
+        end_us = max(int(now.timestamp() * 1_000_000), _max_ts) + 3_600_000_000
+        start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
+        r = client.post("_search?type=logs", json={
+            "query": {"sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                      "start_time": start_us, "end_time": end_us,
+                      "from": 0, "size": 1}
+        })
+        if r.status_code != 200:
+            return 0
+        hits = r.json().get("hits", [])
+        return int(hits[0].get("c", 0)) if hits else 0
+
+    _memtable_visible = False
+    for _ in range(3):
+        if _quick_count(STREAM) > 0:
+            _memtable_visible = True
+            break
+        time.sleep(1.0)
+
+    if not _memtable_visible:
+        # No memtable data after 3s — flush so vortex files are created.
+        flush_r = client.put("node/flush", prefix="")
+        logging.info("Auto-flush after 3s (vortex or slow memtable): %s", flush_r.status_code)
+        time.sleep(2.0)
 
     def _data_is_searchable():
         now = datetime.now(UTC)
-        end_us = int(now.timestamp() * 1_000_000)
+        # Records have timestamps from BASE_TS to BASE_TS + ~66 min (future).
+        # Extend end_us past _max_ts so the COUNT(*) window covers all records.
+        # The vortex search engine enforces end_time strictly; parquet WAL does not.
+        end_us = max(int(now.timestamp() * 1_000_000), _max_ts) + 3_600_000_000
         start_us = int((now - timedelta(weeks=4)).timestamp() * 1_000_000)
-        payload = {
+        # Check stream 1
+        r1 = client.post("_search?type=logs", json={
             "query": {
-                "sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
                 "start_time": start_us,
                 "end_time": end_us,
                 "from": 0,
                 "size": 1,
             }
-        }
-        r = client.post("_search?type=logs", json=payload)
-        if r.status_code != 200:
+        })
+        if r1.status_code != 200:
             return False
-        hits = r.json().get("hits", [])
-        if not (hits and hits[0].get("c", 0) >= expected):
+        hits1 = r1.json().get("hits", [])
+        if not (hits1 and hits1[0].get("c", 0) >= expected1):
             return False
-        tail_payload = {
+        # Check stream 2
+        r2 = client.post("_search?type=logs", json={
             "query": {
-                "sql": f'SELECT COUNT(*) AS c FROM "{stream}"',
-                "start_time": _max_ts - 60_000_000,
-                "end_time": _max_ts + 60_000_000,
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM2}"',
+                "start_time": start_us,
+                "end_time": end_us,
                 "from": 0,
                 "size": 1,
             }
-        }
-        tr = client.post("_search?type=logs", json=tail_payload)
-        if tr.status_code != 200:
+        })
+        if r2.status_code != 200:
             return False
-        thits = tr.json().get("hits", [])
-        return bool(thits and thits[0].get("c", 0) >= 1)
+        hits2 = r2.json().get("hits", [])
+        if not (hits2 and hits2[0].get("c", 0) >= expected2):
+            return False
+        # Tail poll: verify a record near max_ts is searchable
+        tail_r = client.post("_search?type=logs", json={
+            "query": {
+                "sql": f'SELECT COUNT(*) AS c FROM "{STREAM}"',
+                "start_time": _max_ts - 60_000_000,
+                "end_time": _max_ts + 3_600_000_000,
+                "from": 0,
+                "size": 1,
+            }
+        })
+        if tail_r.status_code != 200:
+            return False
+        tail_hits = tail_r.json().get("hits", [])
+        return bool(tail_hits and tail_hits[0].get("c", 0) >= 1)
 
     wait_until(_data_is_searchable, timeout=300, interval=1.0,
-               msg=f"{stream} data not searchable ({expected} records)")
-    logging.info("%s data is searchable (%d records)", stream, expected)
+               msg=f"Stream data not searchable ({len(records1)} records)")
+    logging.info("Both streams data is searchable (%d + %d records)", len(records1), len(records2))
