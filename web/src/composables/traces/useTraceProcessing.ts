@@ -127,7 +127,6 @@ export function useTraceProcessing(
     // First pass: convert to enriched spans
     spanList.forEach((span) => {
       const resolvedIdentity = resolveSpanIdentity(span);
-      console.log("resolvedIdentity", resolvedIdentity);
       const enriched: EnrichedSpan = {
         ...span,
         depth: 0,

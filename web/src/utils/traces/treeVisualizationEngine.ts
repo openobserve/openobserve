@@ -425,7 +425,6 @@ export function createTreeVisualizationEngine() {
 
       // Use node name to find matching TreeNode instead of unreliable dataIndex
       const hoveredNode = findNodeByName(data.treeData, params.data.name);
-      console.log("findNodeByName --------",data, params.data.name);
       if (hoveredNode && hoveredNode.id !== activeNodeId) {
 
         // Clear any existing timer to prevent race conditions
