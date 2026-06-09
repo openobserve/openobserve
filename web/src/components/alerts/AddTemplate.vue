@@ -129,12 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container"
+          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container tw:border-l tw:border-border-default"
         >
           <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <OSeparator class="tw:w-full" />
+          <OSeparator class="tw:-ml-2 tw:mr-2" />
           <div class="tw:py-3 tw:px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
