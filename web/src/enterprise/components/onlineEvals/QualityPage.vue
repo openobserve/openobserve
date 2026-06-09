@@ -29,10 +29,10 @@
     </div>
 
     <QualityKpiSkeleton
-      v-if="!selectedConfig && showKpiSkeleton"
+      v-if="showKpiSkeleton"
       :count="visibleKpis.length"
     />
-    <section v-else-if="!selectedConfig" class="quality-page__kpis" aria-label="Tier 1 KPIs">
+    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -41,22 +41,43 @@
       />
     </section>
 
-    <div class="quality-page__tier2" :class="{ 'quality-page__tier2--split': !!selectedConfig }">
+    <!-- Tier 2: the configs table is now the persistent view; selecting a
+         row opens the detail in a right-side ODrawer (70% width) instead
+         of replacing the whole page. The user keeps full context of the
+         list behind the drawer. -->
+    <div class="quality-page__tier2">
       <QualityScoreConfigsTable
-        v-if="!selectedConfig"
         :rows="configRows"
         :is-loading="isConfigsLoading"
         @select="selectConfig"
         @refresh="refreshAll"
       />
+    </div>
 
-      <QualityConfigSidebar
-        v-else
-        :rows="configRows"
-        :selected-id="selectedConfigId"
-        @select="selectConfig"
-        @clear="clearSelection"
-      />
+    <ODrawer
+      v-model:open="detailDrawerOpen"
+      side="right"
+      :width="70"
+      :title="selectedConfig?.name || ''"
+      data-test="quality-config-detail-drawer"
+    >
+      <!-- Type badge + version pulled out of the inner panel header so
+           the drawer chrome owns the entire identification block;
+           the inner panel no longer renders its own title row. -->
+      <template #header-right>
+        <span
+          class="qpd-type"
+          :class="`qpd-type--${detailDataType}`"
+          data-test="quality-detail-type-badge"
+        >
+          {{ shortType(detailDataType) }}
+        </span>
+        <span
+          v-if="selectedConfig?.version"
+          class="qpd-version"
+          data-test="quality-detail-version-badge"
+        >v{{ selectedConfig.version }}</span>
+      </template>
 
       <QualityDetailPanel
         v-if="selectedConfig"
@@ -79,7 +100,7 @@
         @back="clearSelection"
         @drill="onDrill"
       />
-    </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -101,8 +122,8 @@ import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
 import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
-import QualityConfigSidebar from "./quality/QualityConfigSidebar.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
@@ -288,6 +309,17 @@ function clearSelection() {
   router.replace({ name: route.name as string, query }).catch(() => {});
 }
 
+// ODrawer drives its `:open` via the presence of a selected config. Opening
+// is owned by selectConfig() (from a row click); closing the drawer
+// (backdrop click, Esc, header ×) routes through clearSelection so the
+// `?config=` query param drops in sync.
+const detailDrawerOpen = computed<boolean>({
+  get: () => selectedConfigId.value != null,
+  set: (open) => {
+    if (!open) clearSelection();
+  },
+});
+
 function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
@@ -358,7 +390,54 @@ function onDrill(kpiId: string) {
 
   router.push({ name: "logs", query: queryParams }).catch(() => {});
 }
+
+// Used by the drawer header's #header-right slot — same mapping the
+// detail panel used for its in-panel badge so type/version chrome looks
+// identical, just relocated into the drawer header.
+function shortType(type: string): string {
+  if (type === "numeric") return "Num";
+  if (type === "categorical") return "Cat";
+  if (type === "boolean") return "Bool";
+  return "—";
+}
 </script>
+
+<style lang="scss" scoped>
+// Type + version chrome relocated from QualityDetailPanel's `qdp__head`
+// into the drawer header (#header-right). Visuals are kept identical to
+// the previous in-panel pill so the move feels purely structural.
+.qpd-type {
+  display: inline-flex;
+  padding: 0 4px;
+  border-radius: 2px;
+  font: 700 8px/1.4 inherit;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, #6b76e3 14%, transparent);
+  color: #4f5bcf;
+}
+
+.qpd-type--numeric {
+  background: color-mix(in srgb, #6b76e3 14%, transparent);
+  color: #4f5bcf;
+}
+
+.qpd-type--categorical {
+  background: color-mix(in srgb, #9333ea 14%, transparent);
+  color: #7c3aed;
+}
+
+.qpd-type--boolean {
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+  color: #15803d;
+}
+
+.qpd-version {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+</style>
 
 <style lang="scss" scoped>
 .quality-page {
