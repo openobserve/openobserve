@@ -15,10 +15,7 @@
 
 use std::sync::Arc;
 
-use config::{
-    meta::destinations::{Module, Template},
-    prebuilt_loader::is_prebuilt_template_name,
-};
+use config::meta::destinations::{Module, Template};
 use infra::table;
 use itertools::Itertools;
 
@@ -168,13 +165,8 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
             .into_iter()
             .filter_map(|(k, template)| {
                 let is_org_template = k.starts_with(&format!("{org_id}/"));
-                // Prebuilt templates live in DEFAULT_ORG and are read-only,
-                // so it is safe to surface them to every org including cloud.
-                // Custom templates in DEFAULT_ORG remain scoped to that org.
-                let is_prebuilt_from_default = k
-                    .strip_prefix(&format!("{DEFAULT_ORG}/"))
-                    .is_some_and(is_prebuilt_template_name);
-                (is_org_template || is_prebuilt_from_default).then_some(template)
+                let is_default_template = k.starts_with(&format!("{DEFAULT_ORG}/"));
+                (is_org_template || is_default_template).then_some(template)
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))
             .collect());
