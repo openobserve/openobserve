@@ -19,7 +19,7 @@ use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
     common::{
         Result,
-        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+        tree_node::{TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_plan::{
         ExecutionPlan, aggregates::AggregateExec, projection::ProjectionExec,
@@ -32,31 +32,39 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
     utils::{get_column_name, is_column},
 };
 
-#[rustfmt::skip]
 /// SimpleTopNMulti(Vec<String>, usize, bool):
 /// Supports two-field GROUP BY queries like:
-///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase ORDER BY cnt DESC LIMIT 10;
-///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase LIMIT 10;
-/// condition: select two index_fields and only have count(*) as aggregate function,
-/// group by both index_fields in select clause, order by count(*), and have limit
-pub(crate) fn is_simple_topn_multi(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
-    let mut visitor = SimpleTopnMultiVisitor::new(index_fields);
-    let _ = plan.visit(&mut visitor);
-    if let Some((fields, fetch, ascend)) = visitor.simple_topn_multi {
-        if fields.is_empty() || fields.len() < 2 {
-            return None;
-        }
-        Some(IndexOptimizeMode::SimpleTopNMulti(fields, fetch, ascend))
-    } else {
-        None
-    }
+///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase ORDER BY
+/// cnt DESC LIMIT 10;   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid,
+/// searchphrase LIMIT 10; condition: select two index_fields and only have count(*) as aggregate
+/// function, group by both index_fields in select clause, order by count(*), and have limit
+pub(crate) fn is_simple_topn_multi(
+    _plan: Arc<dyn ExecutionPlan>,
+    _index_fields: HashSet<String>,
+) -> Option<IndexOptimizeMode> {
+    // https://github.com/openobserve/openobserve/pull/12348#issuecomment-4659231020
+    // because of performance issue, we disable this optimizer for now
+    //
+    // let mut visitor = SimpleTopnMultiVisitor::new(index_fields);
+    // let _ = plan.visit(&mut visitor);
+    // if let Some((fields, fetch, ascend)) = visitor.simple_topn_multi {
+    //     if fields.is_empty() || fields.len() < 2 {
+    //         return None;
+    //     }
+    //     Some(IndexOptimizeMode::SimpleTopNMulti(fields, fetch, ascend))
+    // } else {
+    //     None
+    // }
+    None
 }
 
+#[allow(dead_code)]
 struct SimpleTopnMultiVisitor {
     pub simple_topn_multi: Option<(Vec<String>, usize, bool)>,
     index_fields: HashSet<String>,
 }
 
+#[allow(dead_code)]
 impl SimpleTopnMultiVisitor {
     pub fn new(index_fields: HashSet<String>) -> Self {
         Self {
@@ -138,92 +146,5 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnMultiVisitor {
             return Ok(TreeNodeRecursion::Stop);
         }
         Ok(TreeNodeRecursion::Continue)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use arrow::array::{Int64Array, RecordBatch, StringArray};
-    use arrow_schema::{DataType, Field, Schema};
-    use datafusion::{catalog::MemTable, prelude::SessionContext};
-
-    use super::*;
-    use crate::service::search::datafusion::udf::match_all_udf;
-
-    #[tokio::test]
-    async fn test_is_simple_topn_multi() {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("_timestamp", DataType::Int64, false),
-            Field::new("userid", DataType::Utf8, false),
-            Field::new("searchphrase", DataType::Utf8, false),
-            Field::new("status", DataType::Utf8, false),
-        ]));
-
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![1])),
-                Arc::new(StringArray::from(vec!["user1"])),
-                Arc::new(StringArray::from(vec!["hello"])),
-                Arc::new(StringArray::from(vec!["success"])),
-            ],
-        )
-        .unwrap();
-
-        let ctx = SessionContext::new();
-        let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
-        ctx.register_table("hits", Arc::new(provider)).unwrap();
-        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
-
-        let cases = vec![
-            // Valid: two-field GROUP BY with count(*) ORDER BY cnt DESC LIMIT 10
-            (
-                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopNMulti(
-                    vec!["userid".to_string(), "searchphrase".to_string()],
-                    10,
-                    false,
-                )),
-            ),
-            // Valid: two-field GROUP BY with count(*) ORDER BY cnt ASC LIMIT 5
-            (
-                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt asc limit 5",
-                Some(IndexOptimizeMode::SimpleTopNMulti(
-                    vec!["userid".to_string(), "searchphrase".to_string()],
-                    5,
-                    true,
-                )),
-            ),
-            // Invalid: one field not in index
-            (
-                "select userid, status, count(*) as cnt from hits where match_all('error') group by userid, status order by cnt desc limit 10",
-                None,
-            ),
-            // Invalid: single field GROUP BY (should be handled by is_simple_topn)
-            (
-                "select userid, count(*) as cnt from hits where match_all('error') group by userid order by cnt desc limit 10",
-                None,
-            ),
-            // Invalid: no limit
-            (
-                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc",
-                None,
-            ),
-        ];
-
-        for (sql, expected) in cases {
-            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
-            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
-
-            let index_fields = HashSet::from(["userid".to_string(), "searchphrase".to_string()]);
-            assert_eq!(
-                expected,
-                is_simple_topn_multi(physical_plan, index_fields),
-                "Failed for SQL: {}",
-                sql
-            );
-        }
     }
 }
