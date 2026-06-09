@@ -492,15 +492,14 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     return dashboardPanelData.meta.queryFields[queryIndex];
   };
 
-  const buildAliasListForQuery = (queryIndex: number): string[] => {
-    const aliasList: string[] = [];
+  const collectFieldAliasesForQuery = (queryIndex: number): string[] => {
+    const aliases: string[] = [];
     const query = dashboardPanelData.data.queries[queryIndex];
-    if (!query) return aliasList;
+    if (!query) return aliases;
 
-    // Always include axis field aliases (works for both builder and custom mode)
     ["x", "y", "z", "breakdown"].forEach((axis) => {
       query?.fields?.[axis]?.forEach((it: any) => {
-        if (!it.isDerived && it.alias) aliasList.push(it.alias);
+        if (!it.isDerived && it.alias) aliases.push(it.alias);
       });
     });
 
@@ -516,14 +515,25 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     ];
     specialFields.forEach((fieldName) => {
       const field = query?.fields?.[fieldName];
-      if (field?.alias && !field?.isDerived) aliasList.push(field.alias);
+      if (field?.alias && !field?.isDerived) aliases.push(field.alias);
     });
 
-    // Include customQueryFields from per-query cache
-    const qf = dashboardPanelData.meta.queryFields[queryIndex];
-    if (qf) {
-      qf.customQueryFields.forEach((it: any) => aliasList.push(it.name));
-    }
+    return aliases;
+  };
+
+  const buildAliasListForQuery = (queryIndex: number): string[] => {
+    const query = dashboardPanelData.data.queries[queryIndex];
+    if (!query) return [];
+
+    const aliasList: string[] = [];
+    const queries = dashboardPanelData.data.queries ?? [];
+    queries.forEach((_q: any, idx: number) => {
+      aliasList.push(...collectFieldAliasesForQuery(idx));
+      const qf = dashboardPanelData.meta.queryFields[idx];
+      if (qf) {
+        qf.customQueryFields.forEach((it: any) => aliasList.push(it.name));
+      }
+    });
 
     return aliasList;
   };

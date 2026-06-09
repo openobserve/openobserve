@@ -515,6 +515,7 @@ test.describe(
         await pm.chartTypeSelector.selectChartType("table");
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream("e2e_automate");
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField(
           "kubernetes_container_hash",
           "y"

@@ -348,7 +348,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Cross-Linking Tab -->
                       <OTab
-                        v-if="store.state.zoConfig?.enable_cross_linking"
+                        v-if="
+                          isCrossLinkingEnabledForStream(
+                            store.state.zoConfig,
+                            indexData.stream_type,
+                          )
+                        "
                         name="crossLinking"
                         icon="link"
                         :label="t('crossLinks.header')"
@@ -1041,6 +1046,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 
 const defaultValue: any = () => {
   return {
@@ -2646,6 +2652,7 @@ export default defineComponent({
       dateChangeValue,
       isCloud,
       indexData,
+      isCrossLinkingEnabledForStream,
       getSchema,
       onSubmit,
       updateSettingsForm,

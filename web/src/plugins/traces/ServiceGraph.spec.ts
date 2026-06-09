@@ -115,6 +115,21 @@ vi.mock("quasar", () => ({
   }),
 }));
 
+// fetchDatabaseEdges (called inside loadServiceGraph) hits streamService.schema
+// and searchService.search. Mock them so the call completes quickly without real
+// HTTP requests that never resolve in the test environment.
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: vi.fn().mockRejectedValue(new Error("No MSW handler for schema")),
+  },
+}));
+
+vi.mock("@/services/search", () => ({
+  default: {
+    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+  },
+}));
+
 import serviceGraphService from "@/services/service_graph";
 
 // Mock store

@@ -3208,7 +3208,10 @@
         "spans": "스팬"
       }
     },
-    "openInFullView": "전체 화면으로 열기"
+    "openInFullView": "전체 화면으로 열기",
+    "serviceMap": "서비스 맵",
+    "patternView": "패턴 뷰",
+    "spanView": "스팬 뷰"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

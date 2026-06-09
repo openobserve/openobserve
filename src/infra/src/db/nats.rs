@@ -661,6 +661,7 @@ pub(crate) struct Locker {
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
     tx: Option<mpsc::Sender<()>>,
+    keep_alive: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Locker {
@@ -670,6 +671,7 @@ impl Locker {
             lock_id: ider::uuid(),
             state: Arc::new(AtomicU8::new(0)),
             tx: None,
+            keep_alive: Mutex::new(None),
         }
     }
 
@@ -746,13 +748,15 @@ impl Locker {
         let lock_id = self.lock_id.clone();
         let lock_key = self.key.clone();
         let bucket_key = key.clone();
-        tokio::task::spawn(async move {
+        let state = self.state.clone();
+        let handle = tokio::task::spawn(async move {
             if let Err(e) =
-                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id).await
+                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id, state).await
             {
                 log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
+        *self.keep_alive.lock().await = Some(handle);
 
         Ok(())
     }
@@ -776,6 +780,18 @@ impl Locker {
         self.state.store(2, Ordering::SeqCst);
         if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
             log::error!("nats unlock sender for key: {}, error: {e}", self.key);
+        }
+
+        // Wait for the keep-alive task to fully exit before purging. Otherwise an
+        // in-flight `put` could resurrect the key right after we purge it.
+        let keep_alive = self.keep_alive.lock().await.take();
+        if let Some(handle) = keep_alive
+            && let Err(e) = handle.await
+        {
+            log::error!(
+                "nats unlock keep alive join for key: {}, error: {e}",
+                self.key
+            );
         }
         if let Err(e) = bucket.purge(&key).await {
             log::error!("nats unlock for key: {}, error: {e}", self.key);
@@ -865,16 +881,23 @@ async fn keep_alive_lock(
     key: &str,
     orig_key: &str,
     lock_id: &str,
+    state: Arc<AtomicU8>,
 ) -> Result<()> {
     let interval = std::cmp::max(1, LOCKER_WATCHER_UPDATE_TTL as u64 / 3);
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     ticker.tick().await; // first tick will be immediate
     loop {
         tokio::select! {
-            _ = ticker.tick() => {}
+            // prefer the stop signal so we never issue a `put` once unlock began
+            biased;
             _ = rx.recv() => {
                 break;
             }
+            _ = ticker.tick() => {}
+        }
+        // the lock has been released, stop keeping it alive
+        if state.load(Ordering::SeqCst) != 1 {
+            break;
         }
         // update the locker time to keep alive
         let value = Bytes::from(format!(

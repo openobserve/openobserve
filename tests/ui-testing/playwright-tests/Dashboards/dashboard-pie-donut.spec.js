@@ -155,6 +155,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.chartTypeSelector.selectChartType("pie");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("code", "y");
     await pm.dashboardPanelActions.addPanelName("Pie Aggregations");
 
@@ -214,6 +215,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
     await pm.dashboardPanelActions.addPanelName("Line To Pie");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -318,6 +320,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Add Y field, then switch to raw and enter custom SQL
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
 
     // Open Y-axis function popup and switch to raw tab
@@ -375,6 +378,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.chartTypeSelector.selectChartType("pie");
     await pm.chartTypeSelector.selectStreamType("logs");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_hash", "y");
 
     // Configure Y-axis with raw count query
@@ -408,6 +412,7 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
     await pm.chartTypeSelector.selectStream("e2e_automate");
 
     // Y-axis: kubernetes_container_name with count aggregation (cross-field)
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
     await pm.chartTypeSelector.configureYAxisRawQuery(
       "y_axis_1",

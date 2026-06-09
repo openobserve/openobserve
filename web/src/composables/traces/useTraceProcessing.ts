@@ -15,13 +15,22 @@ import {
   type TraceMetadata,
   type ServiceBreakdown,
 } from "@/ts/interfaces/traces/trace.types";
-import { getServiceColor } from "@/utils/traces/traceColors";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 /**
  * Composable for trace data processing
  * @param spans - Either flat Span[] or nested tree with spans
+ * @param spanMap - Map of spans for service detection
+ * @param serviceDetectionConfig - Configuration for span service detection
  */
-export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
+export function useTraceProcessing(
+  spans: Ref<Span[] | any[]>,
+  spanMap: Ref<{ [key: string]: Span[] | any[] }>,
+  serviceDetectionConfig: Ref<ServiceDetectionConfig | null>,
+) {
+  const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
   /**
    * Convert old tree format to EnrichedSpan format and flatten
    * Handles tree nodes with 'spans' property (children) and 'depth' or calculates depth
@@ -44,6 +53,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         ? (node.startTimeUs - traceStartTimeUs) / 1000
         : node.startTimeMs || 0;
 
+      const resolvedIdentity = resolveSpanIdentity(spanMap.value[node.spanId] as Span);
+
       // Convert old format to EnrichedSpan
       const enrichedSpan: EnrichedSpan = {
         span_id: node.spanId || node.span_id,
@@ -64,7 +75,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isExpanded: true,
         isSelected: false,
         isOnCriticalPath: false,
-        color: node.style?.color || "#9CA3AF",
+        resolvedIdentity,
+        color: getOrSetServiceColor(resolvedIdentity),
         durationMs: node.durationMs || 0,
         durationPercent: 0,
         startOffsetMs,
@@ -114,6 +126,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
 
     // First pass: convert to enriched spans
     spanList.forEach((span) => {
+      const resolvedIdentity = resolveSpanIdentity(span);
       const enriched: EnrichedSpan = {
         ...span,
         depth: 0,
@@ -122,6 +135,8 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         isExpanded: true,
         isSelected: false,
         isOnCriticalPath: false,
+        resolvedIdentity,
+        color: getOrSetServiceColor(resolvedIdentity),
         durationMs: span.duration / 1000, // Convert from microseconds to milliseconds
         durationPercent: 0,
         startOffsetMs: (span.start_time - traceStartTime) / 1000000, // Convert from nanoseconds to milliseconds
@@ -317,7 +332,7 @@ export function useTraceProcessing(spans: Ref<Span[] | any[]>) {
         span_count: spanCount,
         total_duration_ms: totalDuration,
         percentage,
-        color: getServiceColor(serviceName),
+        color: getOrSetServiceColor(serviceName),
         has_errors: hasErrors,
         error_count: hasErrors ? metadata.error_spans : 0,
       });

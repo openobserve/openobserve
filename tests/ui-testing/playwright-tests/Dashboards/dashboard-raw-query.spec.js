@@ -46,6 +46,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Open Y-axis popup and verify tabs
@@ -79,6 +80,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Open popup, switch to Raw tab, enter query
@@ -117,6 +119,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Configure raw query on Y-axis
@@ -181,6 +184,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
     await pm.chartTypeSelector.configureYAxisRawQuery(Y_AXIS_ALIAS, RAW_QUERY);
 
@@ -241,6 +245,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Open popup
@@ -297,6 +302,7 @@ test.describe("Dashboard Raw Query testcases", () => {
     panelName = pm.dashboardPanelActions.generateUniquePanelName("raw-query-test");
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.chartTypeSelector.selectStream(STREAM_NAME);
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "y");
 
     // Configure raw query
