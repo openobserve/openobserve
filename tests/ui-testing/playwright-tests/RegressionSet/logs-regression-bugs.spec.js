@@ -1349,13 +1349,8 @@ test.describe("Logs Regression Bug Fixes", () => {
   // ==========================================================================
   // Bug #10103: Query execution plan open/close shows "No results found"
   // https://github.com/openobserve/openobserve/issues/10103
-  //
-  // SKIPPED: The "Explain Query" menu item was removed in the SQL mode
-  // toggle refactor (#12483, commit 61aebff552). The openExplainDialog
-  // function still exists in SearchBar but is no longer wired to any UI
-  // element. Re-enable if the feature is restored to the UI.
   // ==========================================================================
-  test.skip("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
+  test("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify Explain Query close does not break results (Bug #10103)');
 
     await pm.logsPage.navigateToLogs();
