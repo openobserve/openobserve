@@ -282,7 +282,7 @@ export class ModelPricingPage {
         await this.saveBtn.click();
         await Promise.race([
             this.listTitle.waitFor({ state: 'visible', timeout: 15000 }),
-            this.toastMessage.waitFor({ state: 'visible', timeout: 15000 }),
+            this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 }),
         ]);
     }
 
