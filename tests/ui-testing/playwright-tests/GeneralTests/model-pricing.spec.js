@@ -4,6 +4,7 @@ const testLogger = require('../utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 const { generateHexId } = require('../utils/trace-ingestion.js');
+const fs = require('fs');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -320,16 +321,9 @@ test.describe("Model Pricing — Duplicate & Clone", () => {
 
             await navigateToBase(page);
             const pm = new PageManager(page);
-            const org = process.env['ORGNAME'] || 'default';
-
             // Duplicate → "(Copy)" suffix in editor → save → both entries in list
-            await page.goto(
-                `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${srcId}&duplicate=true`
-            );
-            await pm.modelPricingPage.verifyEditorOnPage();
-            const nameInput = pm.modelPricingPage.nameInput.locator('input').first();
-            await expect(nameInput).not.toHaveValue('', { timeout: 10000 });
-            const dupName = await nameInput.inputValue();
+            await pm.modelPricingPage.gotoEditorDuplicate(srcId);
+            const dupName = await pm.modelPricingPage.nameInput.locator('input').first().inputValue();
             expect(dupName).toMatch(/copy|Copy|\(copy\)/i);
             await pm.modelPricingPage.fillPattern(`^mp_dup_copy_${Date.now()}.*`);
             await pm.modelPricingPage.clickSave();
@@ -400,7 +394,6 @@ test.describe("Model Pricing — Bulk Actions", () => {
             ]);
             const downloadPath = await download.path();
             expect(downloadPath).toBeTruthy();
-            const fs = require('fs');
             const parsed = JSON.parse(fs.readFileSync(downloadPath, 'utf-8'));
             const list = Array.isArray(parsed) ? parsed : (parsed.list || [parsed]);
             for (const n of names) expect(list.some(m => m.name === n)).toBeTruthy();
@@ -675,9 +668,8 @@ test.describe("Model Pricing — Editor Features", () => {
             await pm.modelPricingPage.fillName(multiTierName);
             await pm.modelPricingPage.fillPattern(`^${multiTierName}.*`);
             await pm.modelPricingPage.addPriceRow('input', '0.000002');
-            const addTierBtn = page.locator('button').filter({ hasText: /add.?tier/i }).first();
-            if (await addTierBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await addTierBtn.click();
+            if (await pm.modelPricingPage.addTierBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await pm.modelPricingPage.addTierBtn.click();
                 await pm.modelPricingPage.addPriceRow('input', '0.0000015', 1);
             }
             await pm.modelPricingPage.clickSave();
@@ -691,14 +683,12 @@ test.describe("Model Pricing — Editor Features", () => {
             await pm.modelPricingPage.gotoEditorCreate();
             await pm.modelPricingPage.fillName(templateName);
             await pm.modelPricingPage.fillPattern(`^${templateName}.*`);
-            const templateBtn = page.locator('button').filter({ hasText: /openai/i }).first();
-            if (await templateBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await templateBtn.click();
-                const firstValueInput = page.getByPlaceholder('0.00').first();
-                await firstValueInput.focus();
-                await firstValueInput.selectText();
+            if (await pm.modelPricingPage.templateBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await pm.modelPricingPage.templateBtn.click();
+                await pm.modelPricingPage.priceValueInput.focus();
+                await pm.modelPricingPage.priceValueInput.selectText();
                 await page.keyboard.type('0.000002');
-                await firstValueInput.press('Tab');
+                await pm.modelPricingPage.priceValueInput.press('Tab');
             } else {
                 await pm.modelPricingPage.addPriceRow('input', '0.000002');
             }
@@ -710,9 +700,8 @@ test.describe("Model Pricing — Editor Features", () => {
 
             // ── Pattern examples ───────────────────────────────────
             await pm.modelPricingPage.gotoEditorCreate();
-            const examplesBtn = page.locator('button').filter({ hasText: /example/i }).first();
-            if (await examplesBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await examplesBtn.click();
+            if (await pm.modelPricingPage.examplesBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await pm.modelPricingPage.examplesBtn.click();
                 await expect(pm.modelPricingPage.examplesDialog).toBeVisible({ timeout: 10000 });
                 await pm.modelPricingPage.examplesDialog
                     .locator('button, [role="option"], li').first().click();
@@ -953,22 +942,16 @@ test.describe("Model Pricing — Cost Applied to Ingested LLM Span", () => {
 
         try {
             // ── Step 1: create the pricing model ──────────────────
-            const res = await fetch(`${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/llm/models`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({
-                    name:          `E2E Pricing Verifier ${ts}`,
-                    match_pattern: pattern,
-                    enabled:       true,
-                    tiers: [{
-                        name:      'Default',
-                        condition: null,
-                        prices: { input: inputPricePerToken, output: outputPricePerToken },
-                    }],
-                }),
+            const created = await apiCreateModel({
+                name:          `E2E Pricing Verifier ${ts}`,
+                match_pattern: pattern,
+                enabled:       true,
+                tiers: [{
+                    name:      'Default',
+                    condition: null,
+                    prices: { input: inputPricePerToken, output: outputPricePerToken },
+                }],
             });
-            if (!res.ok) throw new Error(`createPricingModel failed: ${res.status} ${await res.text()}`);
-            const created = await res.json();
             modelId = created?.id;
             expect(modelId, 'pricing model must be created with an ID').toBeTruthy();
             testLogger.info('Pricing model created', { modelId, pattern });
@@ -1011,11 +994,7 @@ test.describe("Model Pricing — Cost Applied to Ingested LLM Span", () => {
             });
 
         } finally {
-            if (modelId) {
-                await fetch(`${process.env.ZO_BASE_URL}/api/${getOrgIdentifier()}/llm/models/${modelId}`, {
-                    method: 'DELETE', headers: getAuthHeaders(),
-                });
-            }
+            if (modelId) await apiDeleteModel(modelId);
         }
 
         testLogger.info('Test completed successfully');

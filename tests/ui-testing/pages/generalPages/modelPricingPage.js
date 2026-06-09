@@ -65,7 +65,13 @@ export class ModelPricingPage {
         this.cancelBtn          = page.locator('[data-test="model-pricing-editor-cancel-btn"]');
         this.saveBtn            = page.locator('[data-test="model-pricing-editor-save-btn"]');
 
-        // Price row add-inputs are scoped per tier in addPriceRow() — no class-level locators.
+        // ============================================================
+        // Editor page — optional feature buttons (may not exist in all builds)
+        // ============================================================
+        this.addTierBtn     = page.locator('button').filter({ hasText: /add.?tier/i }).first();
+        this.templateBtn    = page.locator('button').filter({ hasText: /openai/i }).first();
+        this.priceValueInput = page.getByPlaceholder('0.00').first();
+        this.examplesBtn    = page.locator('button').filter({ hasText: /example/i }).first();
 
         // ============================================================
         // List page — search (OSearchInput, placeholder from i18n modelPricing.searchPlaceholder)
@@ -131,6 +137,16 @@ export class ModelPricingPage {
             `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async gotoEditorDuplicate(modelId) {
+        const org = process.env['ORGNAME'] || 'default';
+        await this.page.goto(
+            `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}&duplicate=true`
+        );
+        await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
+        const nameInput = this.nameInput.locator('input').first();
+        await expect(nameInput).not.toHaveValue('', { timeout: 10000 });
     }
 
     async gotoEditorEdit(modelId) {
