@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="ai-overview-page"
+    data-test="ai-llm-insights-page"
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:overflow-hidden"
   >
     <AppPageHeader
-      :title="t('aiObservability.nav.overview')"
+      :title="t('aiObservability.nav.llmInsights')"
       icon="dashboard"
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             endTime: datetime.endTime,
           }"
           :default-relative-time="datetime.relativeTimePeriod"
-          data-test="ai-overview-date-time"
+          data-test="ai-llm-insights-date-time"
           class="tw:h-[2rem]"
           @on:date-change="onDateChange"
         />
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm-toolbar"
           :loading="isRefreshing"
-          data-test="ai-overview-refresh-btn"
+          data-test="ai-llm-insights-refresh-btn"
           @click="refresh"
         >
           Refresh
@@ -73,7 +73,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 
-defineOptions({ name: "AIOverviewPage" });
+defineOptions({ name: "AILLMInsightsPage" });
 
 const { t } = useI18n();
 const route = useRoute();

@@ -68,7 +68,7 @@ function evalLink(tab: EvalTab) {
 // route name `aiEvaluations`; `?tab=` distinguishes them so we map it down
 // to the rail's per-item keys.
 const activeSection = computed<string>(() => {
-  if (route.name === "aiOverview") return "overview";
+  if (route.name === "aiLLMInsights") return "llmInsights";
   if (route.name === "aiSessions") return "sessions";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
@@ -81,11 +81,11 @@ const activeSection = computed<string>(() => {
 // switcher. Order here is the order shown in the rail.
 const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
   {
-    key: "overview",
-    label: t("aiObservability.nav.overview"),
+    key: "llmInsights",
+    label: t("aiObservability.nav.llmInsights"),
     icon: "dashboard",
-    to: { name: "aiOverview", query: orgQuery.value },
-    dataTest: "ai-secondary-nav-overview",
+    to: { name: "aiLLMInsights", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-llm-insights",
     group: "Monitor",
   },
   {
