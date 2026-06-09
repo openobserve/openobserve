@@ -456,7 +456,8 @@
     "language": "Dil",
     "actions": "Eylemler",
     "incidents": "Olaylar",
-    "evals": "Evalar"
+    "evals": "Evalar",
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -4669,6 +4670,21 @@
     "empty": {
       "title": "Henüz LLM Sağlayıcısı Yok",
       "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM Gözlemlenebilirlik",
+    "sections": {
+      "monitor": "Monitör",
+      "evaluate": "Değerlendirmek"
+    },
+    "nav": {
+      "overview": "Genel Bakış",
+      "sessions": "Oturumlar",
+      "quality": "KALİTE",
+      "evalJobs": "Eval İş İlanları",
+      "scorers": "Gol Sahipleri",
+      "scoreConfigs": "Puan Yapılandırmaları"
     }
   }
 }
