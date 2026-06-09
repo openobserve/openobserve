@@ -43,6 +43,7 @@ env:
   # Allow alert destinations to target localhost so the test validation stream
   # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
   ZO_SSRF_ALLOW_LOOPBACK: true
+  ZO_MODEL_PRICING_ENABLED: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -174,6 +175,7 @@ jobs:
                 "ingestionTokens.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
+                "model-pricing.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
