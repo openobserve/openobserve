@@ -19,7 +19,7 @@ use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
     common::{
         Result,
-        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+        tree_node::{TreeNodeRecursion, TreeNodeVisitor},
     },
     physical_plan::{
         ExecutionPlan, aggregates::AggregateExec, projection::ProjectionExec,
@@ -32,31 +32,39 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
     utils::{get_column_name, is_column},
 };
 
-#[rustfmt::skip]
 /// SimpleTopNMulti(Vec<String>, usize, bool):
 /// Supports two-field GROUP BY queries like:
-///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase ORDER BY cnt DESC LIMIT 10;
-///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase LIMIT 10;
-/// condition: select two index_fields and only have count(*) as aggregate function,
-/// group by both index_fields in select clause, order by count(*), and have limit
-pub(crate) fn is_simple_topn_multi(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
-    let mut visitor = SimpleTopnMultiVisitor::new(index_fields);
-    let _ = plan.visit(&mut visitor);
-    if let Some((fields, fetch, ascend)) = visitor.simple_topn_multi {
-        if fields.is_empty() || fields.len() < 2 {
-            return None;
-        }
-        Some(IndexOptimizeMode::SimpleTopNMulti(fields, fetch, ascend))
-    } else {
-        None
-    }
+///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase ORDER BY
+/// cnt DESC LIMIT 10;   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid,
+/// searchphrase LIMIT 10; condition: select two index_fields and only have count(*) as aggregate
+/// function, group by both index_fields in select clause, order by count(*), and have limit
+pub(crate) fn is_simple_topn_multi(
+    _plan: Arc<dyn ExecutionPlan>,
+    _index_fields: HashSet<String>,
+) -> Option<IndexOptimizeMode> {
+    // https://github.com/openobserve/openobserve/pull/12348#issuecomment-4659231020
+    // because of performance issue, we disable this optimizer for now
+    //
+    // let mut visitor = SimpleTopnMultiVisitor::new(index_fields);
+    // let _ = plan.visit(&mut visitor);
+    // if let Some((fields, fetch, ascend)) = visitor.simple_topn_multi {
+    //     if fields.is_empty() || fields.len() < 2 {
+    //         return None;
+    //     }
+    //     Some(IndexOptimizeMode::SimpleTopNMulti(fields, fetch, ascend))
+    // } else {
+    //     None
+    // }
+    None
 }
 
+#[allow(dead_code)]
 struct SimpleTopnMultiVisitor {
     pub simple_topn_multi: Option<(Vec<String>, usize, bool)>,
     index_fields: HashSet<String>,
 }
 
+#[allow(dead_code)]
 impl SimpleTopnMultiVisitor {
     pub fn new(index_fields: HashSet<String>) -> Self {
         Self {
