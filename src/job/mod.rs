@@ -724,8 +724,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // The scheduler and startup recovery only run on alert_manager nodes.
+    // Skip entirely when anomaly detection is disabled — no training and no detection.
     #[cfg(feature = "enterprise")]
-    if LOCAL_NODE.is_alert_manager() {
+    if LOCAL_NODE.is_alert_manager()
+        && !o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .disabled
+    {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
         crate::service::anomaly_detection::recover_detection_triggers_on_startup().await;

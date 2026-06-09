@@ -134,6 +134,18 @@ pub async fn create_config(
     Headers(user_email): Headers<UserEmail>,
     Json(mut req): Json<CreateAnomalyConfigRequest>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .anomaly_detection
+        .disabled
+    {
+        return MetaHttpResponse::error(
+            StatusCode::FORBIDDEN.as_u16(),
+            "Anomaly detection is disabled".to_string(),
+        )
+        .into_response();
+    }
+
     req.owner = resolve_owner(req.owner, &user_email.user_id);
     match anomaly_service::create_config(&org_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
