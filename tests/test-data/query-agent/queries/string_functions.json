@@ -354,27 +354,27 @@
         ],
         "results": [
           [
-            "CC-BETA",
-            "SORT-X1",
-            "manual, hybrid",
+            "CC-GAMMA",
+            "SORT-A7",
+            "auto, hybrid",
             "4"
           ],
           [
-            "CC-GAMMA",
-            "SORT-A7",
-            "hybrid, auto",
+            "CC-BETA",
+            "SORT-X1",
+            "hybrid, manual",
             "4"
           ],
           [
             "CC-DELTA",
             "SORT-M3",
-            "manual, auto",
+            "auto, manual",
             "3"
           ],
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
-            "manual, auto",
+            "auto, manual",
             "3"
           ]
         ],
@@ -902,9 +902,16 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
+            "auto",
             "SORT-ZONE-1",
-            "58",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
+            "29",
             "2"
           ],
           [
@@ -916,23 +923,23 @@
           ],
           [
             "ZONE-1",
-            "auto",
+            "manual",
             "SORT-ZONE-1",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "auto",
-            "SORT-ZONE-2",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "manual",
-            "SORT-ZONE-2",
             "58",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "manual",
+            "SORT-ZONE-3",
+            "29",
+            "1"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "SORT-ZONE-4",
+            "29",
             "1"
           ],
           [
@@ -950,17 +957,10 @@
             "1"
           ],
           [
-            "ZONE-3",
+            "ZONE-2",
             "manual",
-            "SORT-ZONE-3",
-            "29",
-            "1"
-          ],
-          [
-            "ZONE-4",
-            "hybrid",
-            "SORT-ZONE-4",
-            "29",
+            "SORT-ZONE-2",
+            "58",
             "1"
           ],
           [
@@ -999,25 +999,11 @@
             "45.0"
           ],
           [
-            "ArchiveLog",
-            "ARCHIV",
-            "False",
-            "2",
-            "1900.0"
-          ],
-          [
             "MergeBatch",
             "MERGEB",
             "False",
             "2",
             "3200.0"
-          ],
-          [
-            "UpdateBatch",
-            "UPDATE",
-            "False",
-            "2",
-            "230.0"
           ],
           [
             "RetryScan",
@@ -1027,11 +1013,18 @@
             "15.0"
           ],
           [
-            "SyncZone",
-            "SYNCZO",
+            "UpdateBatch",
+            "UPDATE",
             "False",
-            "1",
-            "12.0"
+            "2",
+            "230.0"
+          ],
+          [
+            "ArchiveLog",
+            "ARCHIV",
+            "False",
+            "2",
+            "1900.0"
           ],
           [
             "CheckThreshold",
@@ -1053,6 +1046,13 @@
             "False",
             "1",
             "567.0"
+          ],
+          [
+            "SyncZone",
+            "SYNCZO",
+            "False",
+            "1",
+            "12.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1075,6 +1075,62 @@
           "avg_items"
         ],
         "results": [
+          [
+            "US-EAST-ZONE-2-AUT",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "EU-NORTH-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "60.0"
+          ],
+          [
+            "AP-EAST-ZONE-1-AUT",
+            "1",
+            "1",
+            "0",
+            "50.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
+          ],
+          [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "US-CENTRAL-ZONE-3-HYB",
+            "1",
+            "0",
+            "0",
+            "200.0"
+          ],
           [
             "US-WEST-ZONE-1-AUT",
             "1",
@@ -1116,62 +1172,6 @@
             "1",
             "0",
             "50.0"
-          ],
-          [
-            "US-EAST-ZONE-2-AUT",
-            "1",
-            "0",
-            "0",
-            "155.0"
-          ],
-          [
-            "EU-NORTH-ZONE-3-HYB",
-            "1",
-            "0",
-            "0",
-            "60.0"
-          ],
-          [
-            "AP-EAST-ZONE-1-AUT",
-            "1",
-            "1",
-            "0",
-            "50.0"
-          ],
-          [
-            "US-CENTRAL-ZONE-3-HYB",
-            "1",
-            "0",
-            "0",
-            "200.0"
-          ],
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "88.0"
-          ],
-          [
-            "US-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "155.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,20 +1433,20 @@
         ],
         "results": [
           [
-            "checkoutPage",
-            "E006"
-          ],
-          [
-            "cartPage",
-            "E004"
+            "itemPage",
+            "E005"
           ],
           [
             "searchPage",
             "E003"
           ],
           [
-            "itemPage",
-            "E005"
+            "checkoutPage",
+            "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ]
         ],
         "results_mode": "rowsort"
@@ -1995,6 +1995,358 @@
             "Windows",
             "itemPage",
             "12"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q511",
+      "sql": "SELECT spath(request_payload, 'message.endpoint') AS endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') GROUP BY endpoint ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30599000000,
+        "end_offset": 30673000000
+      },
+      "expected": {
+        "row_count": 5,
+        "columns": [
+          "endpoint",
+          "cnt"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "column": "endpoint",
+            "values": [
+              "searchItems",
+              "updateBatch",
+              "deleteRecord",
+              "scanPallet",
+              "rerouteTrack",
+              "mergeBatch",
+              "checkThreshold",
+              "archiveLog",
+              "retryScan",
+              "syncZone"
+            ]
+          }
+        ],
+        "note": "spath() is OO-specific; DuckDB cannot replicate",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q512",
+      "sql": "SELECT spath(request_payload, 'message.status') AS msg_status, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'status') GROUP BY msg_status ORDER BY cnt DESC LIMIT 5",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30659000000,
+        "end_offset": 30733000000
+      },
+      "expected": {
+        "row_count": 2,
+        "columns": [
+          "msg_status",
+          "cnt"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "column": "msg_status",
+            "values": [
+              "ok",
+              "pending",
+              "failed",
+              "queued",
+              "warning",
+              "retrying",
+              "syncing"
+            ]
+          }
+        ],
+        "note": "spath() is OO-specific; DuckDB cannot replicate",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q513",
+      "sql": "SELECT split_part(exception_message, chr(32), 1) AS first_word, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY first_word ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30719000000,
+        "end_offset": 30793000000
+      },
+      "expected": {
+        "columns": [
+          "first_word",
+          "cnt"
+        ],
+        "results": [
+          [
+            "ResourceExhaustedException:",
+            "2"
+          ],
+          [
+            "TimeoutException:",
+            "2"
+          ],
+          [
+            "DataIntegrityException:",
+            "1"
+          ],
+          [
+            "NullPointerException",
+            "1"
+          ],
+          [
+            "SecurityException:",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q514",
+      "sql": "SELECT COALESCE(bot_flag, info_tag, passthrough_flag, CAST(auth_result AS VARCHAR)) AS fallback_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY fallback_tag ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30779000000,
+        "end_offset": 30853000000
+      },
+      "expected": {
+        "columns": [
+          "fallback_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "false",
+            "5"
+          ],
+          [
+            "verified_bot",
+            "1"
+          ],
+          [
+            "true",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q515",
+      "sql": "SELECT CONCAT(component_name, '/', COALESCE(route_key, 'no-route'), ' (', scan_category, ')') AS full_route, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY full_route ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30839000000,
+        "end_offset": 30913000000
+      },
+      "expected": {
+        "columns": [
+          "full_route",
+          "cnt"
+        ],
+        "results": [
+          [
+            "temp-regulator/rk-warehouse-006 (inbound)",
+            "2"
+          ],
+          [
+            "sorter-engine/rk-warehouse-008 (internal)",
+            "2"
+          ],
+          [
+            "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ],
+          [
+            "lane-monitor/rk-warehouse-005 (internal)",
+            "1"
+          ],
+          [
+            "conveyor-driver/rk-warehouse-009 (inbound)",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q516",
+      "sql": "SELECT CASE WHEN length(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 50 THEN 'short' WHEN length(CONCAT(COALESCE(exception_message, ''), COALESCE(log_message, ''))) < 100 THEN 'medium' ELSE 'long' END AS msg_class, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY msg_class ORDER BY cnt DESC",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30899000000,
+        "end_offset": 30973000000
+      },
+      "expected": {
+        "columns": [
+          "msg_class",
+          "cnt"
+        ],
+        "results": [
+          [
+            "long",
+            "6"
+          ],
+          [
+            "medium",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q517",
+      "sql": "SELECT CAST(tag_a AS VARCHAR) || '-' || CAST(tag_b AS VARCHAR) AS combined_tag, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY combined_tag ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 30959000000,
+        "end_offset": 31033000000
+      },
+      "expected": {
+        "columns": [
+          "combined_tag",
+          "cnt"
+        ],
+        "results": [
+          [
+            "staging-high",
+            "2"
+          ],
+          [
+            "dev-high",
+            "2"
+          ],
+          [
+            "dev-medium",
+            "1"
+          ],
+          [
+            "staging-critical",
+            "1"
+          ],
+          [
+            "prod-critical",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q518",
+      "sql": "SELECT UPPER(COALESCE(org_name, site_name, region_code, 'UNKNOWN')) AS location, LOWER(scan_category) AS scan_type, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY location, scan_type ORDER BY cnt DESC LIMIT 15",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31019000000,
+        "end_offset": 31093000000
+      },
+      "expected": {
+        "columns": [
+          "location",
+          "scan_type",
+          "cnt"
+        ],
+        "results": [
+          [
+            "WAREHOUSE-CENTRAL",
+            "outbound",
+            "2"
+          ],
+          [
+            "WAREHOUSE-NORTH",
+            "internal",
+            "2"
+          ],
+          [
+            "WAREHOUSE-SOUTH",
+            "inbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-WEST",
+            "outbound",
+            "1"
+          ],
+          [
+            "WAREHOUSE-EAST",
+            "internal",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q519",
+      "sql": "SELECT REPLACE(REPLACE(COALESCE(page_url, endpoint_path, '/'), 'https://', ''), 'http://', '') AS clean_path, COUNT(*) AS cnt FROM \"{stream}\" WHERE page_url IS NOT NULL OR endpoint_path IS NOT NULL GROUP BY clean_path ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31079000000,
+        "end_offset": 31153000000
+      },
+      "expected": {
+        "columns": [
+          "clean_path",
+          "cnt"
+        ],
+        "results": [
+          [
+            "shop.example.com/item/1001",
+            "2"
+          ],
+          [
+            "shop.example.com/item/1006",
+            "2"
+          ],
+          [
+            "shop.example.com/item/1005",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q520",
+      "sql": "SELECT TRIM(COALESCE(build_signature, build_version)) AS build_id, SUBSTRING(COALESCE(build_signature, build_version), 1, 4) AS prefix, COUNT(*) AS cnt FROM \"{stream}\" GROUP BY build_id, prefix ORDER BY cnt DESC LIMIT 10",
+      "category": "string_functions",
+      "time_offset": {
+        "start_offset": 31139000000,
+        "end_offset": 31213000000
+      },
+      "expected": {
+        "columns": [
+          "build_id",
+          "prefix",
+          "cnt"
+        ],
+        "results": [
+          [
+            "BS-2025-D4",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-C3",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-B2",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2026-A1",
+            "BS-2",
+            "1"
           ]
         ],
         "results_mode": "rowsort"

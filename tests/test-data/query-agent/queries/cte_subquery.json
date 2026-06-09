@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "2",
-            "0",
-            "1",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-4",
             "2",
             "1",
             "0",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "0",
+            "1",
             "66.66999816894531"
           ],
           [
@@ -1232,24 +1232,24 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "483.0"
-          ],
-          [
             "ZONE-1",
             "4",
             "258.0"
           ],
           [
-            "ZONE-3",
-            "3",
-            "94.0"
+            "ZONE-4",
+            "4",
+            "483.0"
           ],
           [
             "ZONE-2",
             "3",
             "620.0"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "94.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
@@ -1753,12 +1753,12 @@
         ],
         "results": [
           [
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "NetworkException: connection to batch sync failed",
             "2",
             "1"
           ],
           [
-            "NetworkException: connection to batch sync failed",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
             "2",
             "1"
           ],
@@ -1814,6 +1814,11 @@
         ],
         "results": [
           [
+            "performanceMetric",
+            "itemPage",
+            "2"
+          ],
+          [
             "navigation",
             "itemPage",
             "2"
@@ -1821,11 +1826,6 @@
           [
             "interaction",
             "searchPage",
-            "2"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
             "2"
           ],
           [
@@ -1992,22 +1992,22 @@
         "results": [
           [
             "fast",
-            "ok",
+            "unknown",
             "2"
           ],
           [
             "fast",
-            "unknown",
+            "ok",
             "2"
           ],
           [
             "degraded",
-            "unknown",
+            "ok",
             "1"
           ],
           [
             "degraded",
-            "ok",
+            "unknown",
             "1"
           ],
           [
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
@@ -2142,18 +2142,13 @@
         ],
         "results": [
           [
-            "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
-            "1"
-          ],
-          [
             "navigation",
             "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ],
           [
@@ -2163,7 +2158,12 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "1"
           ]
         ],
@@ -2193,13 +2193,13 @@
             "2"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
@@ -2896,6 +2896,160 @@
             "warehouse-west",
             "E010",
             "2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q545",
+      "sql": "WITH endpoint_stats AS (SELECT spath(request_payload, 'message.endpoint') AS endpoint, COUNT(*) AS cnt FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') GROUP BY endpoint ) SELECT endpoint, cnt FROM endpoint_stats WHERE cnt > 0 ORDER BY cnt DESC LIMIT 5",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 32639000000,
+        "end_offset": 32713000000
+      },
+      "expected": {
+        "row_count": 5,
+        "columns": [
+          "endpoint",
+          "cnt"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "column": "endpoint",
+            "values": [
+              "searchItems",
+              "updateBatch",
+              "deleteRecord",
+              "scanPallet",
+              "rerouteTrack"
+            ]
+          }
+        ],
+        "note": "spath() is OO-specific; DuckDB cannot replicate",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q546",
+      "sql": "WITH resolved AS (SELECT _timestamp, COALESCE(org_name, site_name, region_code) AS tenant, COALESCE(latency_ms, lcp_micros) AS response_time, COALESCE(response_code, 0) AS status FROM \"{stream}\" ) SELECT tenant, COUNT(*) AS reqs, AVG(CAST(response_time AS FLOAT)) AS avg_rt, SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) AS errors FROM resolved GROUP BY tenant ORDER BY reqs DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 32699000000,
+        "end_offset": 32773000000
+      },
+      "expected": {
+        "columns": [
+          "tenant",
+          "reqs",
+          "avg_rt",
+          "errors"
+        ],
+        "results": [
+          [
+            "warehouse-west",
+            "2",
+            "15.0",
+            "0"
+          ],
+          [
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
+          ],
+          [
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
+          ],
+          [
+            "warehouse-north",
+            "1",
+            "12.0",
+            "1"
+          ],
+          [
+            "warehouse-central",
+            "1",
+            "230.0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q547",
+      "sql": "WITH base AS (SELECT component_name, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" GROUP BY component_name ) SELECT component_name, avg_lat, CASE WHEN avg_lat < 500 THEN 'fast' WHEN avg_lat < 1500 THEN 'moderate' ELSE 'slow' END AS perf_tier FROM base ORDER BY avg_lat DESC",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 32759000000,
+        "end_offset": 32833000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "avg_lat",
+          "perf_tier"
+        ],
+        "results": [
+          [
+            "batch-sync",
+            "1450.0",
+            "moderate"
+          ],
+          [
+            "lane-monitor",
+            "567.0",
+            "moderate"
+          ],
+          [
+            "track-router",
+            "230.0",
+            "fast"
+          ],
+          [
+            "pallet-mapper",
+            "89.0",
+            "fast"
+          ],
+          [
+            "scan-hub",
+            "45.0",
+            "fast"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q548",
+      "sql": "SELECT component_name, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" WHERE latency_ms > (SELECT AVG(CAST(latency_ms AS FLOAT)) FROM \"{stream}\") GROUP BY component_name ORDER BY avg_lat DESC LIMIT 10",
+      "category": "cte_subquery",
+      "time_offset": {
+        "start_offset": 32819000000,
+        "end_offset": 32893000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "temp-regulator",
+            "1",
+            "3200.0"
+          ],
+          [
+            "sorter-engine",
+            "1",
+            "1900.0"
           ]
         ],
         "results_mode": "rowsort"

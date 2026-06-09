@@ -147,11 +147,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
@@ -3220,6 +3220,150 @@
         ],
         "results": [],
         "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q540",
+      "sql": "SELECT _timestamp, exception_message, log_message FROM \"{stream}\" WHERE re_match(exception_message, 'NullPointer|Timeout|Security') AND re_not_match(exception_message, 'Network') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32339000000,
+        "end_offset": 32413000000
+      },
+      "expected": {
+        "columns": [
+          "exception_message",
+          "log_message"
+        ],
+        "results": [
+          [
+            "TimeoutException: lane LANE-A did not respond within 5000ms",
+            "WARN: lane jam detected at conveyor_segment=3"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4"
+          ],
+          [
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "INFO: throughput_rate=840.0 spike at facility_zone=ZONE-4"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q541",
+      "sql": "SELECT _timestamp, request_payload FROM \"{stream}\" WHERE str_match_ignore_case(request_payload, 'endpoint') AND NOT str_match_ignore_case(request_payload, 'failed') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32399000000,
+        "end_offset": 32473000000
+      },
+      "expected": {
+        "columns": [
+          "request_payload"
+        ],
+        "results": [
+          [
+            "{\"message\":{\"endpoint\":\"updateBatch\",\"status\":\"pending\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"scanPallet\",\"status\":\"ok\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"rerouteTrack\",\"status\":\"queued\"}}"
+          ],
+          [
+            "{\"message\":{\"endpoint\":\"mergeBatch\",\"status\":\"ok\"}}"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q542",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message) AS msg FROM \"{stream}\" WHERE regexp_like(COALESCE(exception_message, log_message), '.*Exception.*') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32459000000,
+        "end_offset": 32533000000
+      },
+      "expected": {
+        "row_count": 3,
+        "columns": [
+          "_timestamp",
+          "msg"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "column": "msg",
+            "values": [
+              "Exception"
+            ]
+          }
+        ],
+        "note": "regexp_like with COALESCE argument cannot be translated to DuckDB regexp_matches",
+        "skip_sqllogictest": true
+      }
+    },
+    {
+      "id": "Q543",
+      "sql": "SELECT _timestamp, log_message FROM \"{stream}\" WHERE match_all('ACK batch') ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32519000000,
+        "end_offset": 32593000000
+      },
+      "expected": {
+        "columns": [
+          "log_message"
+        ],
+        "results": [
+          [
+            "INFO: batch sync completed, url=http://warehouse.local/sync"
+          ],
+          [
+            "DEBUG: charge_remaining below threshold 15.0"
+          ],
+          [
+            "DEBUG: charge_remaining below threshold 15.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q544",
+      "sql": "SELECT _timestamp, COALESCE(exception_message, log_message, log) AS searchable_text FROM \"{stream}\" WHERE str_match_ignore_case(COALESCE(exception_message, log_message, log), 'error') AND COALESCE(exception_message, log_message, log) IS NOT NULL ORDER BY _timestamp ASC LIMIT 10",
+      "category": "full_text_search",
+      "time_offset": {
+        "start_offset": 32579000000,
+        "end_offset": 32653000000
+      },
+      "expected": {
+        "row_count": 7,
+        "columns": [
+          "_timestamp",
+          "searchable_text"
+        ],
+        "assertions": [
+          {
+            "type": "row_contains",
+            "column": "searchable_text",
+            "values": [
+              "error",
+              "Error",
+              "ERROR"
+            ]
+          }
+        ],
+        "note": "str_match_ignore_case with COALESCE argument cannot be translated to DuckDB lower()+LIKE",
+        "skip_sqllogictest": true
       }
     }
   ],

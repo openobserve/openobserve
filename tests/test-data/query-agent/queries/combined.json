@@ -152,16 +152,16 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "277.5",
-            "SORT-A7"
-          ],
-          [
             "ZONE-1",
             "4",
             "667.5",
             "SORT-M3"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "277.5",
+            "SORT-A7"
           ],
           [
             "ZONE-3",
@@ -868,11 +868,19 @@
           ],
           [
             "2",
-            "syncZone"
+            "checkThreshold"
+          ],
+          [
+            "2",
+            "deleteRecord"
           ],
           [
             "2",
             "retryScan"
+          ],
+          [
+            "2",
+            "syncZone"
           ],
           [
             "1",
@@ -881,14 +889,6 @@
           [
             "1",
             "archiveLog"
-          ],
-          [
-            "2",
-            "checkThreshold"
-          ],
-          [
-            "2",
-            "deleteRecord"
           ]
         ],
         "results_mode": "rowsort"
@@ -1038,6 +1038,12 @@
             "78.0"
           ],
           [
+            "MergeBatch",
+            "queued",
+            "2",
+            "3200.0"
+          ],
+          [
             "RetryScan",
             "ok",
             "2",
@@ -1050,10 +1056,16 @@
             "89.0"
           ],
           [
-            "MergeBatch",
-            "queued",
-            "2",
-            "3200.0"
+            "RerouteTrack",
+            "ok",
+            "1",
+            "567.0"
+          ],
+          [
+            "ArchiveLog",
+            "warning",
+            "1",
+            "1900.0"
           ],
           [
             "SearchItems",
@@ -1066,18 +1078,6 @@
             "pending",
             "1",
             "1450.0"
-          ],
-          [
-            "RerouteTrack",
-            "ok",
-            "1",
-            "567.0"
-          ],
-          [
-            "ArchiveLog",
-            "warning",
-            "1",
-            "1900.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1114,16 +1114,6 @@
             "114.0"
           ],
           [
-            "ZONE-4",
-            "HYBRID",
-            "2",
-            "54.75",
-            "26.3",
-            "670.0",
-            "61.5",
-            "84.0"
-          ],
-          [
             "ZONE-3",
             "HYBRID",
             "2",
@@ -1131,6 +1121,16 @@
             "30.1",
             "1510.0",
             "1065.0",
+            "84.0"
+          ],
+          [
+            "ZONE-4",
+            "HYBRID",
+            "2",
+            "54.75",
+            "26.3",
+            "670.0",
+            "61.5",
             "84.0"
           ],
           [
@@ -1176,20 +1176,20 @@
         ],
         "results": [
           [
-            "HIGH_LOAD",
-            "HIGH_TPUT",
-            "4",
-            "25.45",
-            "520",
-            "3.5"
-          ],
-          [
             "MED_LOAD",
             "MED_TPUT",
             "4",
             "18.85",
             "1060",
             "2.8"
+          ],
+          [
+            "HIGH_LOAD",
+            "HIGH_TPUT",
+            "4",
+            "25.45",
+            "520",
+            "3.5"
           ],
           [
             "LOW_LOAD",
@@ -1396,18 +1396,11 @@
         ],
         "results": [
           [
-            "conveyor-driver",
-            "searchPage",
-            "2",
-            "15.0",
-            "15"
-          ],
-          [
-            "sorter-engine",
+            "zone-controller",
             "itemPage",
             "1",
-            "1900.0",
-            "1900"
+            "12.0",
+            "12"
           ],
           [
             "scan-hub",
@@ -1424,11 +1417,18 @@
             "230"
           ],
           [
-            "zone-controller",
+            "conveyor-driver",
+            "searchPage",
+            "2",
+            "15.0",
+            "15"
+          ],
+          [
+            "sorter-engine",
             "itemPage",
             "1",
-            "12.0",
-            "12"
+            "1900.0",
+            "1900"
           ]
         ],
         "results_mode": "rowsort"
@@ -1450,14 +1450,14 @@
         ],
         "results": [
           [
-            "monitoring",
-            "6",
-            "2"
-          ],
-          [
             "browse",
             "1",
             "1"
+          ],
+          [
+            "monitoring",
+            "6",
+            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -1484,13 +1484,13 @@
             "1"
           ],
           [
-            "E006",
-            "2",
+            "E005",
+            "1",
             "1"
           ],
           [
-            "E005",
-            "1",
+            "E006",
+            "2",
             "1"
           ]
         ],
@@ -1540,16 +1540,16 @@
         ],
         "results": [
           [
-            "Mobile",
-            "4",
-            "4",
-            "747.5"
-          ],
-          [
             "Computer",
             "1",
             "1",
             "230.0"
+          ],
+          [
+            "Mobile",
+            "4",
+            "4",
+            "747.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -1581,17 +1581,17 @@
             "2"
           ],
           [
-            "slow",
-            "error",
-            "1"
-          ],
-          [
             "fast",
             "success",
             "1"
           ],
           [
             "timeout",
+            "error",
+            "1"
+          ],
+          [
+            "slow",
             "error",
             "1"
           ]
@@ -1614,11 +1614,11 @@
         ],
         "results": [
           [
-            "clickEvent",
+            "vitalsInp",
             "1"
           ],
           [
-            "vitalsInp",
+            "clickEvent",
             "1"
           ]
         ],
@@ -2289,6 +2289,238 @@
             "0",
             "1",
             "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q534",
+      "sql": "SELECT CASE WHEN auth_result = 'pass' AND response_code < 400 THEN 'success' WHEN auth_result = 'pass' AND response_code >= 400 THEN 'app_error' WHEN auth_result IN ('fail', 'denied') THEN 'auth_failure' ELSE 'unknown' END AS outcome_class, COUNT(*) AS cnt, COUNT(DISTINCT COALESCE(org_name, site_name)) AS distinct_tenants FROM \"{stream}\" GROUP BY outcome_class ORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 31979000000,
+        "end_offset": 32053000000
+      },
+      "expected": {
+        "columns": [
+          "outcome_class",
+          "cnt",
+          "distinct_tenants"
+        ],
+        "results": [
+          [
+            "app_error",
+            "3",
+            "2"
+          ],
+          [
+            "auth_failure",
+            "3",
+            "2"
+          ],
+          [
+            "success",
+            "1",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q535",
+      "sql": "SELECT COALESCE(scan_category, 'none') AS scan_type, CASE WHEN CHAR_LENGTH(COALESCE(exception_message, '')) > 40 THEN 'long_error' WHEN CHAR_LENGTH(COALESCE(exception_message, '')) > 0 THEN 'short_error' ELSE 'no_error' END AS error_class, COUNT(*) AS cnt, ROUND(CAST(COUNT(*) AS FLOAT) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY COALESCE(scan_category, 'none')), 1) AS pct_within_scan FROM \"{stream}\" GROUP BY scan_type, error_class ORDER BY scan_type, cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 32039000000,
+        "end_offset": 32113000000
+      },
+      "expected": {
+        "columns": [
+          "scan_type",
+          "error_class",
+          "cnt",
+          "pct_within_scan"
+        ],
+        "results": [
+          [
+            "inbound",
+            "long_error",
+            "3",
+            "100.0"
+          ],
+          [
+            "internal",
+            "long_error",
+            "3",
+            "100.0"
+          ],
+          [
+            "outbound",
+            "long_error",
+            "1",
+            "100.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q536",
+      "sql": "SELECT device_type, page_slug, COUNT(*) AS page_views, AVG(CAST(lcp_micros AS FLOAT)) AS avg_lcp, AVG(CAST(inp_micros AS FLOAT)) AS avg_inp, AVG(CAST(cls_score AS FLOAT)) AS avg_cls FROM \"{stream}\" WHERE device_type IS NOT NULL GROUP BY device_type, page_slug ORDER BY page_views DESC LIMIT 10",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 32099000000,
+        "end_offset": 32173000000
+      },
+      "expected": {
+        "columns": [
+          "device_type",
+          "page_slug",
+          "page_views",
+          "avg_lcp",
+          "avg_inp",
+          "avg_cls"
+        ],
+        "results": [
+          [
+            "Computer",
+            "searchPage",
+            "3",
+            "1866666.6666666667",
+            "193333.33333333334",
+            "0.08666666721304257"
+          ],
+          [
+            "Mobile",
+            "itemPage",
+            "3",
+            "1566666.6666666667",
+            "166666.66666666666",
+            "0.15000000099341074"
+          ],
+          [
+            "Tablet",
+            "itemPage",
+            "1",
+            "2500000.0",
+            "70000.0",
+            "0.15000000596046448"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q537",
+      "sql": "SELECT tag_b AS severity, SUM(CASE WHEN re_match(exception_message, 'NullPointer|Timeout|Resource') THEN 1 ELSE 0 END) AS infra_errors, SUM(CASE WHEN re_match(exception_message, 'Security|Validation|Configuration') THEN 1 ELSE 0 END) AS app_errors, COUNT(*) AS total FROM \"{stream}\" GROUP BY severity ORDER BY total DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 32159000000,
+        "end_offset": 32233000000
+      },
+      "expected": {
+        "columns": [
+          "severity",
+          "infra_errors",
+          "app_errors",
+          "total"
+        ],
+        "results": [
+          [
+            "high",
+            "2",
+            "2",
+            "4"
+          ],
+          [
+            "critical",
+            "0",
+            "1",
+            "2"
+          ],
+          [
+            "medium",
+            "0",
+            "0",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q538",
+      "sql": "SELECT CAST(COALESCE(bot_flag, info_tag, 'none') AS VARCHAR) AS flag_status, CASE WHEN threat_flag = 'true' THEN 'threat' WHEN passthrough_flag = 'true' THEN 'passthrough' ELSE 'normal' END AS traffic_type, COUNT(*) AS cnt, AVG(CAST(latency_ms AS FLOAT)) AS avg_lat FROM \"{stream}\" GROUP BY flag_status, traffic_type ORDER BY cnt DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 32219000000,
+        "end_offset": 32293000000
+      },
+      "expected": {
+        "columns": [
+          "flag_status",
+          "traffic_type",
+          "cnt",
+          "avg_lat"
+        ],
+        "results": [
+          [
+            "none",
+            "normal",
+            "4",
+            "658.5"
+          ],
+          [
+            "none",
+            "passthrough",
+            "1",
+            "3200.0"
+          ],
+          [
+            "Allowlisted",
+            "threat",
+            "1",
+            "78.0"
+          ],
+          [
+            "none",
+            "threat",
+            "1",
+            "567.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q539",
+      "sql": "SELECT region_code, COUNT(*) AS total_events, COUNT(*) FILTER (WHERE auth_result = 'fail') AS auth_failures, ROUND(CAST(COUNT(*) FILTER (WHERE auth_result = 'fail') AS FLOAT) * 100.0 / NULLIF(COUNT(*), 0), 2) AS failure_pct FROM \"{stream}\" GROUP BY region_code HAVING COUNT(*) > 1 ORDER BY failure_pct DESC",
+      "category": "combined",
+      "time_offset": {
+        "start_offset": 32279000000,
+        "end_offset": 32353000000
+      },
+      "expected": {
+        "columns": [
+          "region_code",
+          "total_events",
+          "auth_failures",
+          "failure_pct"
+        ],
+        "results": [
+          [
+            "AP-CENTRAL",
+            "2",
+            "2",
+            "100.0"
+          ],
+          [
+            "US-WEST",
+            "2",
+            "0",
+            "0.0"
           ]
         ],
         "results_mode": "rowsort"

@@ -71,6 +71,11 @@
         ],
         "results": [
           [
+            "SORT-A7",
+            "auto",
+            "2"
+          ],
+          [
             "SORT-X1",
             "hybrid",
             "2"
@@ -83,11 +88,6 @@
           [
             "SORT-X1",
             "manual",
-            "2"
-          ],
-          [
-            "SORT-A7",
-            "auto",
             "2"
           ],
           [

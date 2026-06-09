@@ -125,12 +125,12 @@
           ],
           [
             "SORT-M3",
-            "manual",
+            "auto",
             "2"
           ],
           [
             "SORT-M3",
-            "auto",
+            "manual",
             "2"
           ],
           [
@@ -1271,17 +1271,17 @@
           ],
           [
             "error_bucket",
-            "E003",
-            "1"
-          ],
-          [
-            "error_bucket",
             "E001",
             "1"
           ],
           [
             "error_bucket",
             "E005",
+            "1"
+          ],
+          [
+            "error_bucket",
+            "E003",
             "1"
           ],
           [
@@ -1495,6 +1495,65 @@
             "Tablet",
             "0",
             "None"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q556",
+      "sql": "SELECT component_name AS source, latency_ms AS metric, 'latency' AS metric_type FROM \"{stream}\" WHERE latency_ms > 500 UNION ALL SELECT component_name AS source, lcp_micros AS metric, 'lcp' AS metric_type FROM \"{stream}\" WHERE lcp_micros > 1000000 ORDER BY metric_type, metric DESC LIMIT 15",
+      "category": "union",
+      "time_offset": {
+        "start_offset": 33299000000,
+        "end_offset": 33373000000
+      },
+      "expected": {
+        "columns": [
+          "source",
+          "metric",
+          "metric_type"
+        ],
+        "results": [
+          [
+            "sorter-engine",
+            "1900",
+            "latency"
+          ],
+          [
+            "track-router",
+            "3200000",
+            "lcp"
+          ],
+          [
+            "zone-controller",
+            "2500000",
+            "lcp"
+          ],
+          [
+            "scan-hub",
+            "1800000",
+            "lcp"
+          ],
+          [
+            "scan-hub",
+            "1800000",
+            "lcp"
+          ],
+          [
+            "conveyor-driver",
+            "1200000",
+            "lcp"
+          ],
+          [
+            "conveyor-driver",
+            "1200000",
+            "lcp"
+          ],
+          [
+            "sorter-engine",
+            "1100000",
+            "lcp"
           ]
         ],
         "results_mode": "rowsort"

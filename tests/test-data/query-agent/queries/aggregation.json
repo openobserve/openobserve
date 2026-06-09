@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
@@ -210,15 +210,15 @@
           ],
           [
             "ZONE-4",
-            "auto",
-            "2",
-            "385.0"
-          ],
-          [
-            "ZONE-4",
             "hybrid",
             "2",
             "437.5"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "385.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -289,14 +289,14 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "1"
-          ],
-          [
             "ZONE-2",
             "4",
             "2"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "1"
           ],
           [
             "ZONE-4",
@@ -457,16 +457,16 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "3",
-            "1",
-            "27.53"
-          ],
-          [
             "ZONE-1",
             "3",
             "0",
             "26.07"
+          ],
+          [
+            "ZONE-3",
+            "3",
+            "1",
+            "27.53"
           ],
           [
             "ZONE-2",
@@ -855,10 +855,10 @@
             "1",
             "E005",
             "@warehouse-iOS-sort-v2",
-            "None",
+            "UP-E009",
             "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-M3--E005",
-            "SORT-M3",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
             "iOS"
           ],
           [
@@ -870,10 +870,10 @@
             "1",
             "E005",
             "@warehouse-iOS-sort-v2",
-            "UP-E009",
+            "None",
             "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
+            "SORT-M3--E005",
+            "SORT-M3",
             "iOS"
           ],
           [
@@ -988,6 +988,30 @@
             "0"
           ],
           [
+            "US-WEST",
+            "1",
+            "0.0",
+            "320.0",
+            "19.2",
+            "0"
+          ],
+          [
+            "US-CENTRAL",
+            "1",
+            "0.0",
+            "555.0",
+            "22.0",
+            "1"
+          ],
+          [
+            "SA-EAST",
+            "1",
+            "290.0",
+            "0.0",
+            "18.5",
+            "0"
+          ],
+          [
             "AP-CENTRAL",
             "1",
             "0.0",
@@ -1010,30 +1034,6 @@
             "0.0",
             "None",
             "0"
-          ],
-          [
-            "US-WEST",
-            "1",
-            "0.0",
-            "320.0",
-            "19.2",
-            "0"
-          ],
-          [
-            "SA-EAST",
-            "1",
-            "290.0",
-            "0.0",
-            "18.5",
-            "0"
-          ],
-          [
-            "US-CENTRAL",
-            "1",
-            "0.0",
-            "555.0",
-            "22.0",
-            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1074,14 +1074,6 @@
             "42.42640687119285"
           ],
           [
-            "AUTO",
-            "ZONE-1-SORT-M3",
-            "2",
-            "148",
-            "2.0",
-            "205.0609665440988"
-          ],
-          [
             "HYBRID",
             "ZONE-4-SORT-A7",
             "2",
@@ -1091,11 +1083,11 @@
           ],
           [
             "AUTO",
-            "ZONE-4-SORT-A7",
-            "1",
-            "155",
-            "1.5",
-            "None"
+            "ZONE-1-SORT-M3",
+            "2",
+            "148",
+            "2.0",
+            "205.0609665440988"
           ],
           [
             "MANUAL",
@@ -1103,6 +1095,14 @@
             "1",
             "50",
             "1.2",
+            "None"
+          ],
+          [
+            "AUTO",
+            "ZONE-4-SORT-A7",
+            "1",
+            "155",
+            "1.5",
             "None"
           ]
         ],
@@ -1272,6 +1272,11 @@
         ],
         "results": [
           [
+            "batch-sync",
+            "1",
+            "1"
+          ],
+          [
             "track-router",
             "2",
             "1"
@@ -1279,11 +1284,6 @@
           [
             "pallet-mapper",
             "2",
-            "1"
-          ],
-          [
-            "batch-sync",
-            "1",
             "1"
           ],
           [
@@ -1316,12 +1316,12 @@
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -1569,19 +1569,19 @@
         ],
         "results": [
           [
-            "E003",
-            "2"
-          ],
-          [
             "E005",
             "2"
           ],
           [
-            "E004",
-            "1"
+            "E003",
+            "2"
           ],
           [
             "E006",
+            "1"
+          ],
+          [
+            "E004",
             "1"
           ]
         ],
@@ -1624,7 +1624,7 @@
         "results": [
           [
             "itemPage",
-            "E001, E009"
+            "E009, E001"
           ]
         ],
         "results_mode": "rowsort",
@@ -1783,6 +1783,11 @@
         ],
         "results": [
           [
+            "cartPage",
+            "2",
+            "2"
+          ],
+          [
             "checkoutPage",
             "2",
             "2"
@@ -1796,11 +1801,6 @@
             "itemPage",
             "2",
             "1"
-          ],
-          [
-            "cartPage",
-            "2",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2414,6 +2414,94 @@
             "site-tok-03",
             "1",
             "19.2"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q551",
+      "sql": "SELECT component_name AS val, COUNT(*) AS cnt FROM \"{stream}\" WHERE component_name IS NOT NULL AND component_name != '' GROUP BY val ORDER BY cnt DESC LIMIT 5",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 32999000000,
+        "end_offset": 33073000000
+      },
+      "expected": {
+        "columns": [
+          "val",
+          "cnt"
+        ],
+        "results": [
+          [
+            "pallet-mapper",
+            "2"
+          ],
+          [
+            "temp-regulator",
+            "2"
+          ],
+          [
+            "charge-checker",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "1"
+          ],
+          [
+            "lane-monitor",
+            "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q552",
+      "sql": "SELECT COALESCE(org_name, site_name) AS tenant, COALESCE(scan_category, 'all') AS channel, COUNT(*) AS reqs, AVG(CAST(latency_ms AS FLOAT)) AS avg_latency FROM \"{stream}\" WHERE org_name IS NOT NULL OR site_name IS NOT NULL GROUP BY tenant, channel ORDER BY reqs DESC LIMIT 15",
+      "category": "aggregation",
+      "time_offset": {
+        "start_offset": 33059000000,
+        "end_offset": 33133000000
+      },
+      "expected": {
+        "columns": [
+          "tenant",
+          "channel",
+          "reqs",
+          "avg_latency"
+        ],
+        "results": [
+          [
+            "warehouse-west",
+            "inbound",
+            "2",
+            "15.0"
+          ],
+          [
+            "warehouse-central",
+            "outbound",
+            "2",
+            "78.0"
+          ],
+          [
+            "warehouse-north",
+            "inbound",
+            "1",
+            "12.0"
+          ],
+          [
+            "warehouse-east",
+            "internal",
+            "1",
+            "1900.0"
+          ],
+          [
+            "warehouse-south",
+            "inbound",
+            "1",
+            "3200.0"
           ]
         ],
         "results_mode": "rowsort"

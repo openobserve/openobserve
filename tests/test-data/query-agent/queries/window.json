@@ -13,36 +13,6 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "900.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-X1",
-            "610.0",
-            "2",
-            "2"
-          ],
-          [
-            "SORT-X1",
-            "555.0",
-            "3",
-            "3"
-          ],
-          [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
-          ],
-          [
             "SORT-M3",
             "900.0",
             "1",
@@ -65,6 +35,36 @@
             "320.0",
             "4",
             "4"
+          ],
+          [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "900.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-X1",
+            "610.0",
+            "2",
+            "2"
+          ],
+          [
+            "SORT-X1",
+            "555.0",
+            "3",
+            "3"
           ],
           [
             "SORT-A7",
@@ -191,6 +191,42 @@
         ],
         "results": [
           [
+            "ZONE-1",
+            "99.0",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-1",
+            "94.6",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-1",
+            "33.0",
+            "3",
+            "3"
+          ],
+          [
+            "ZONE-2",
+            "88.1",
+            "1",
+            "1"
+          ],
+          [
+            "ZONE-2",
+            "55.2",
+            "2",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "12.5",
+            "3",
+            "3"
+          ],
+          [
             "ZONE-4",
             "88.1",
             "1",
@@ -213,42 +249,6 @@
             "21.4",
             "4",
             "4"
-          ],
-          [
-            "ZONE-2",
-            "88.1",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-2",
-            "55.2",
-            "2",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "12.5",
-            "3",
-            "3"
-          ],
-          [
-            "ZONE-1",
-            "99.0",
-            "1",
-            "1"
-          ],
-          [
-            "ZONE-1",
-            "94.6",
-            "2",
-            "2"
-          ],
-          [
-            "ZONE-1",
-            "33.0",
-            "3",
-            "3"
           ],
           [
             "ZONE-3",
@@ -1065,7 +1065,7 @@
           ],
           [
             "ZONE-3",
-            "manual",
+            "hybrid",
             "2",
             "4",
             "50.0",
@@ -1073,7 +1073,7 @@
           ],
           [
             "ZONE-3",
-            "hybrid",
+            "manual",
             "2",
             "4",
             "50.0",
@@ -3077,6 +3077,122 @@
             "12",
             "1",
             "1"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q549",
+      "sql": "SELECT _timestamp, component_name, latency_ms, LAG(latency_ms) OVER (PARTITION BY component_name ORDER BY _timestamp) AS prev_latency, latency_ms - LAG(latency_ms) OVER (PARTITION BY component_name ORDER BY _timestamp) AS latency_delta FROM \"{stream}\" ORDER BY component_name, _timestamp ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 32879000000,
+        "end_offset": 32953000000
+      },
+      "expected": {
+        "columns": [
+          "component_name",
+          "latency_ms",
+          "prev_latency",
+          "latency_delta"
+        ],
+        "results": [
+          [
+            "charge-checker",
+            "78",
+            "None",
+            "None"
+          ],
+          [
+            "conveyor-driver",
+            "15",
+            "None",
+            "None"
+          ],
+          [
+            "scan-hub",
+            "45",
+            "None",
+            "None"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "None",
+            "None"
+          ],
+          [
+            "sorter-engine",
+            "1900",
+            "1900",
+            "0"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "None",
+            "None"
+          ],
+          [
+            "zone-controller",
+            "12",
+            "12",
+            "0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
+    },
+    {
+      "id": "Q550",
+      "sql": "SELECT _timestamp, COALESCE(scan_category, 'unknown') AS scan_type, latency_ms, NTILE(4) OVER (PARTITION BY COALESCE(scan_category, 'unknown') ORDER BY latency_ms) AS latency_quartile FROM \"{stream}\" ORDER BY scan_type, latency_quartile ASC LIMIT 10",
+      "category": "window",
+      "time_offset": {
+        "start_offset": 32939000000,
+        "end_offset": 33013000000
+      },
+      "expected": {
+        "columns": [
+          "scan_type",
+          "latency_ms",
+          "latency_quartile"
+        ],
+        "results": [
+          [
+            "inbound",
+            "12",
+            "1"
+          ],
+          [
+            "inbound",
+            "1450",
+            "2"
+          ],
+          [
+            "inbound",
+            "1450",
+            "3"
+          ],
+          [
+            "internal",
+            "230",
+            "1"
+          ],
+          [
+            "outbound",
+            "45",
+            "1"
+          ],
+          [
+            "outbound",
+            "45",
+            "2"
+          ],
+          [
+            "outbound",
+            "89",
+            "3"
           ]
         ],
         "results_mode": "rowsort"
