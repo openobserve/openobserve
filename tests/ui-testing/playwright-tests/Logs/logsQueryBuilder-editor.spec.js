@@ -394,6 +394,10 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
+        // Wait for builder to fully initialize (makeAutoSQLQuery needs the updateGroupedFields
+        // API call to complete before it can populate the editor — CI is slower than local)
+        await pm.logsPage.expectBuilderModeActive();
+
         const editorText = await pm.logsPage.getQueryEditorText();
         expect(editorText.toLowerCase()).toContain('select');
         expect(editorText.toLowerCase()).toContain('from');
@@ -408,6 +412,10 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
 
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
+
+        // Wait for builder to fully initialize before switching to Custom mode,
+        // so queries[0].query is populated by makeAutoSQLQuery() before onBuildModeToggle reads it
+        await pm.logsPage.expectBuilderModeActive();
 
         await pm.logsPage.clickCustomQueryType();
         await pm.logsPage.expectCustomModeActive();
