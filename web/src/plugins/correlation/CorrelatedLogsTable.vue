@@ -168,12 +168,11 @@ class="tw:mr-1" />
       class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
-      <q-badge
+      <OBadge
         v-if="props.sourceEvent.severity"
         :class="severityClass(props.sourceEvent.severity)"
-        :label="props.sourceEvent.severity"
         class="tw:px-2"
-      />
+      >{{ props.sourceEvent.severity }}</OBadge>
       <span class="tw:text-xs tw:font-mono tw:opacity-80">
         {{ formatEventTimestamp(props.sourceEvent.timestamp) }}
       </span>
@@ -344,6 +343,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
