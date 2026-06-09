@@ -65,7 +65,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         next_updated_at = now;
     }
 
-    log::debug!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
+    log::info!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
 
     // Query usage stream to find which streams have recent ingestion activity
     let sql = r#"SELECT org_id, stream_name
@@ -180,6 +180,90 @@ async fn process_stream(
             )
         GROUP BY client.service_name, server.service_name"#,
     );
+    let mut hits = run_graph_search(org_id, sql, start_time, end_time).await?;
+    log::info!(
+        "[ServiceGraph] Query returned {} instrumented edges from {}/{}",
+        hits.len(),
+        org_id,
+        stream_name
+    );
+
+    // Inferred-dependency edges: CLIENT/PRODUCER spans that call an uninstrumented
+    // dependency (db/queue/external/rpc), tagged at ingestion via infer_service_*.
+    // Such a dependency has no server span, so its latency is the client span's own
+    // duration (the time spent waiting on it). The anti-join drops any inferred name
+    // that is actually an instrumented service in this window, so it is not
+    // double-represented. Schema-gated: skip entirely on streams without the field.
+    let has_infer =
+        infra::schema::get_stream_schema_from_cache(org_id, stream_name, StreamType::Traces)
+            .await
+            .map(|s| {
+                s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
+                    .is_ok()
+            })
+            .unwrap_or(false);
+    if has_infer {
+        let inferred_sql = format!(
+            r#"SELECT
+                service_name AS client,
+                infer_service_name AS server,
+                max(infer_service_type) AS connection_type,
+                COUNT(*) AS total_requests,
+                COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
+                CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+                CAST(approx_median(end_time - start_time) AS BIGINT) AS p50,
+                CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95,
+                CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99
+            FROM "{stream_name}"
+            WHERE
+                _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND CAST(span_kind AS VARCHAR) IN ('3', '4')
+                AND infer_service_name IS NOT NULL AND infer_service_name != ''
+                AND infer_service_name NOT IN (
+                    SELECT DISTINCT service_name FROM "{stream_name}"
+                    WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                        AND service_name IS NOT NULL
+                )
+            GROUP BY service_name, infer_service_name"#,
+        );
+        match run_graph_search(org_id, inferred_sql, start_time, end_time).await {
+            Ok(mut inferred_hits) => {
+                log::info!(
+                    "[ServiceGraph] Query returned {} inferred-dependency edges from {}/{}",
+                    inferred_hits.len(),
+                    org_id,
+                    stream_name
+                );
+                hits.append(&mut inferred_hits);
+            }
+            // Non-fatal: still write the instrumented edges we already have.
+            Err(e) => log::error!(
+                "[ServiceGraph] Inferred-edge query failed for {org_id}/{stream_name}: {e}"
+            ),
+        }
+    }
+
+    if hits.is_empty() {
+        return Ok(());
+    }
+
+    // SQL already aggregated everything - just write directly to _o2_service_graph stream
+    crate::service::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits)
+        .await?;
+
+    Ok(())
+}
+
+/// Run a pre-aggregated service-graph edge query against a trace stream and return
+/// the raw result hits. Shared by the instrumented self-join query and the
+/// inferred-dependency query.
+#[cfg(feature = "enterprise")]
+async fn run_graph_search(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql,
@@ -215,27 +299,7 @@ async fn process_stream(
     let trace_id = config::ider::generate();
     let resp =
         crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
-
-    log::info!(
-        "[ServiceGraph] Query returned {} pre-aggregated edges from {}/{}",
-        resp.hits.len(),
-        org_id,
-        stream_name
-    );
-
-    if resp.hits.is_empty() {
-        return Ok(());
-    }
-
-    // SQL already aggregated everything - just write directly to _o2_service_graph stream
-    crate::service::traces::service_graph::write_sql_aggregated_edges(
-        org_id,
-        stream_name,
-        resp.hits,
-    )
-    .await?;
-
-    Ok(())
+    Ok(resp.hits)
 }
 
 // Stub implementation for non-enterprise builds
