@@ -2947,7 +2947,8 @@
     "evaluationTemplateHelp": "Wählen Sie eine Bewertungsvorlage aus, die die Kriterien und Dimensionen für den LLM-Richter definiert.",
     "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
     "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert",
-    "subtitle": "Daten während des Fluges transformieren, anreichern und routen"
+    "subtitle": "Daten während des Fluges transformieren, anreichern und routen",
+    "selectStream": "Wählen Sie einen Stream aus..."
   },
   "reports": {
     "header": "Berichte",

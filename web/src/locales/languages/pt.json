@@ -2947,7 +2947,8 @@
     "evaluationTemplateHelp": "Selecione um modelo de avaliação que defina os critérios e as dimensões para o juiz do LLM.",
     "noTemplatesFound": "Nenhum modelo de avaliação encontrado. Crie um na página Modelos de avaliação.",
     "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso",
-    "subtitle": "Transforme, enriqueça e direcione dados em voo"
+    "subtitle": "Transforme, enriqueça e direcione dados em voo",
+    "selectStream": "Selecione um stream..."
   },
   "reports": {
     "header": "Relatórios",

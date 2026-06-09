@@ -2968,7 +2968,8 @@
     "evaluationTemplateHelp": "LLMジャッジの基準とディメンションを定義する評価テンプレートを選択してください。",
     "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
     "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました",
-    "subtitle": "転送中のデータの変換、強化、ルーティング"
+    "subtitle": "転送中のデータの変換、強化、ルーティング",
+    "selectStream": "ストリームを選択..."
   },
   "reports": {
     "header": "レポート",

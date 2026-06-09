@@ -2951,7 +2951,8 @@
     "evaluationTemplateHelp": "选择一个评估模板来定义 LLM 评委的标准和维度。",
     "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
     "evalTemplatesRefreshed": "评估模板已成功刷新",
-    "subtitle": "在飞行中转换、丰富和路由数据"
+    "subtitle": "在飞行中转换、丰富和路由数据",
+    "selectStream": "选择一个直播..."
   },
   "reports": {
     "header": "报表",
