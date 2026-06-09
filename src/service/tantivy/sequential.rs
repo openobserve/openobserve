@@ -18,7 +18,7 @@ use arrow::array::RecordBatch;
 use bytes::Bytes;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME,
-    utils::tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+    tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::TryStreamExt;
 use tokio::task::JoinHandle;

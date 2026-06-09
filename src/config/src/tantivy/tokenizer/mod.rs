@@ -17,9 +17,10 @@ mod o2_tokenizer;
 mod remove_short;
 
 pub use o2_tokenizer::{CollectType, O2Tokenizer};
+use remove_short::RemoveShortFilter;
 use tantivy::tokenizer::{TextAnalyzer, Token};
 
-use crate::{get_config, utils::tantivy::tokenizer::remove_short::RemoveShortFilter};
+use crate::get_config;
 
 pub const O2_TOKENIZER: &str = "o2";
 const MIN_TOKEN_LENGTH: usize = 2;

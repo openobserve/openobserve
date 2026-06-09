@@ -30,11 +30,8 @@ use config::{
         stream::{FileKey, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
-    utils::{
-        inverted_index::to_tantivy_name,
-        size::bytes_to_human_readable,
-        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
-    },
+    tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+    utils::{inverted_index::to_tantivy_name, size::bytes_to_human_readable},
 };
 use futures::{StreamExt, stream};
 use hashbrown::HashMap;
@@ -608,7 +605,7 @@ async fn search_tantivy_index(
                 ));
             }
             percent = row_ids_percent;
-            let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            let max_doc_id = row_ids.iter().copied().max().unwrap_or(0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {max_doc_id} is out of range, records {}",

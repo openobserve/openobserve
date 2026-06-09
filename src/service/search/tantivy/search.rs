@@ -18,7 +18,7 @@ use std::{collections::HashSet, fmt::Display};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
-    utils::tantivy::query::contains_query::ContainsAutomaton,
+    tantivy::query::{collector::SingleSegmentDocIdCollector, contains_query::ContainsAutomaton},
 };
 use tantivy::{
     Searcher,
@@ -38,7 +38,7 @@ use crate::service::search::index::IndexCondition;
 
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
-    RowIds(HashSet<u32>),
+    RowIds(Vec<u32>),
     /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
     RowIdsBitVec(BitVec, usize, Option<u32>),
     Count(usize),                            // simple count optimization
@@ -60,8 +60,7 @@ impl TantivyResult {
     pub fn get_memory_size(&self) -> usize {
         match self {
             Self::RowIds(row_ids) => {
-                row_ids.capacity() * std::mem::size_of::<u32>()
-                    + std::mem::size_of::<HashSet<u32>>()
+                row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
             Self::RowIdsBitVec(bitvec, ..) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
@@ -96,13 +95,8 @@ impl TantivyResult {
 
 impl TantivyResult {
     pub fn handle_matched_docs(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
-
-        let row_ids = res
-            .into_iter()
-            .map(|doc| doc.doc_id)
-            .collect::<HashSet<_>>();
-        Ok(Self::RowIds(row_ids))
+        let docs = searcher.search(&query, &SingleSegmentDocIdCollector)?;
+        Ok(Self::RowIds(docs))
     }
 
     pub fn handle_simple_select(
@@ -129,7 +123,7 @@ impl TantivyResult {
         let row_ids = res
             .into_iter()
             .map(|(_, doc)| doc.doc_id)
-            .collect::<HashSet<_>>();
+            .collect::<Vec<_>>();
         Ok(Self::RowIds(row_ids))
     }
 
@@ -516,7 +510,7 @@ mod tests {
         let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
         assert_eq!(result.percent(), 75);
 
-        let result = TantivyResult::RowIds(HashSet::new());
+        let result = TantivyResult::RowIds(Vec::new());
         assert_eq!(result.percent(), 0);
 
         let result = TantivyResult::Count(100);
@@ -525,17 +519,14 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_get_memory_size_row_ids() {
-        let mut row_ids = HashSet::new();
-        row_ids.insert(1u32);
-        row_ids.insert(2u32);
-        row_ids.insert(3u32);
+        let row_ids = vec![1u32, 2u32, 3u32];
 
         let result = TantivyResult::RowIds(row_ids);
         let memory_size = result.get_memory_size();
 
-        // Should include HashSet overhead + capacity * size_of(u32)
+        // Should include Vec overhead + capacity * size_of(u32)
         assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
+        assert!(memory_size >= std::mem::size_of::<Vec<u32>>());
     }
 
     #[test]
@@ -992,9 +983,9 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
-        let result = TantivyResult::RowIds(HashSet::new());
+        let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
+        assert!(memory_size >= std::mem::size_of::<Vec<u32>>());
 
         let result = TantivyResult::Histogram(vec![]);
         let memory_size = result.get_memory_size();
