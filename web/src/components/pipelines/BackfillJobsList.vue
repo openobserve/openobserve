@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
-         next to the "Pipelines › Backfill Jobs" breadcrumb. -->
-    <Teleport to="#o2-page-actions">
+         next to the "Pipelines › Backfill Jobs" breadcrumb.
+         `defer` (Vue 3.5+) waits for the target to be rendered in the same
+         tick — needed because #o2-page-actions is created by the parent shell
+         (Functions.vue) which may not have fully rendered when this component
+         mounts on initial page load. -->
+    <Teleport to="#o2-page-actions" defer>
       <OSelect
         v-model="filters.status"
         :options="allStatusOptions"

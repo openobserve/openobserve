@@ -125,8 +125,15 @@ function createWrapper() {
         BackfillJobDetails: { template: "<div />" },
         EditBackfillJobDialog: { template: "<div />" },
         NoData: { template: "<div />" },
-
         ConfirmDialog: { template: "<div />" },
+        OTable: { template: "<div data-test='backfill-jobs-table' />" },
+        OEmptyState: { template: "<div />" },
+        OProgressBar: { template: "<div />" },
+        OSelect: { template: "<div v-bind='$attrs'></div>", inheritAttrs: false },
+        OButton: { template: "<button v-bind='$attrs'><slot /></button>", inheritAttrs: false },
+        OTooltip: { template: "<span />" },
+        OIcon: { template: "<span />" },
+        Teleport: { template: "<div><slot /></div>" },
         ODialog: ODialogStub,
       },
     },
@@ -153,7 +160,7 @@ describe("BackfillJobsList – mount and structure", () => {
     ).toBe(true);
   });
 
-  it("renders data-test='backfill-jobs-back-btn'", async () => {
+  it.skip("renders data-test='backfill-jobs-back-btn' (removed — back button no longer exists in component)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(
@@ -322,14 +329,14 @@ describe("BackfillJobsList – goBack", () => {
     vi.mocked(backfillService.listBackfillJobs).mockResolvedValue([]);
   });
 
-  it("calls router.back() when goBack is invoked", async () => {
+  it.skip("calls router.back() when goBack is invoked (removed — goBack function no longer exists in component)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     (wrapper.vm as any).goBack();
     expect(mockRouterBack).toHaveBeenCalled();
   });
 
-  it("clicking backfill-jobs-back-btn calls router.back()", async () => {
+  it.skip("clicking backfill-jobs-back-btn calls router.back() (removed — back button no longer exists in component)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     await wrapper.find('[data-test="backfill-jobs-back-btn"]').trigger("click");

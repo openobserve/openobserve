@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="function"
                     v-model:is-expanded="expandState.functions"
                     :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
-                    class="tw-mt-1"
                   />
                   <div
                     v-show="expandState.functions"

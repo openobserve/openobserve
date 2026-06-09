@@ -5,7 +5,7 @@
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container tw:w-[100%] tw:mt-2"
+      class="test-function-query-container tw:w-[100%]"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"

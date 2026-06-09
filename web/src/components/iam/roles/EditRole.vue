@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"

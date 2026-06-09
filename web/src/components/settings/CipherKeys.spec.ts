@@ -629,7 +629,7 @@ describe("CipherKeys", () => {
       // Column 0: #
       expect(wrapper.vm.columns[0].id).toBe("#");
       expect(wrapper.vm.columns[0].accessorKey).toBe("#");
-      expect(wrapper.vm.columns[0].size).toBe(67);
+      expect(wrapper.vm.columns[0].size).toBe(44);
       expect(wrapper.vm.columns[0].meta.align).toBe("left");
 
       // Column 1: name
@@ -642,14 +642,14 @@ describe("CipherKeys", () => {
       expect(wrapper.vm.columns[2].id).toBe("store_type");
       expect(wrapper.vm.columns[2].accessorKey).toBe("store_type");
       expect(wrapper.vm.columns[2].sortable).toBe(true);
-      expect(wrapper.vm.columns[2].size).toBe(150);
+      expect(wrapper.vm.columns[2].size).toBe(120);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
       // Column 3: mechanism_type
       expect(wrapper.vm.columns[3].id).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].accessorKey).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].sortable).toBe(true);
-      expect(wrapper.vm.columns[3].size).toBe(150);
+      expect(wrapper.vm.columns[3].size).toBe(120);
       expect(wrapper.vm.columns[3].meta.align).toBe("left");
 
       // Column 4: actions

@@ -183,8 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
       <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
         <div class="tw:flex" style="height: 100%">
-          <OSplitter            
-            no-scroll
+          <OSplitter
             style="width: 100%; height: 100%"
             v-model="splitterModel"
             :disable="
@@ -197,6 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 70,
             ]"
           >
+            <template #separator>
+              <div class="tw:w-1 tw:h-full tw:bg-(--o2-border) tw:transition-colors hover:tw:bg-[orange]"></div>
+            </template>
             <template #before>
               <UnifiedQueryEditor
                 ref="queryEditorRef"
@@ -535,24 +537,11 @@ export default defineComponent({
     });
 
     const addTab = () => {
+      // addQuery() seeds the new query's default builder fields (and PromQL
+      // sample query) synchronously, so the tab is ready the moment it activates.
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
-      // For metrics page: when switching from custom to builder in PromQL, set sample query
-      if (
-        dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-      ) {
-        const streamName =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = `${streamName}{}`;
-      }
     };
 
     const updatePromQLQuery = async (value, event) => {

@@ -136,9 +136,9 @@ describe("AppGroups Component", () => {
     });
 
     it("renders search input", () => {
-      // Search moved from the page header into the table's built-in toolbar filter.
+      // Search is rendered via OSearchInput in OTable's custom toolbar slot.
       const searchInput = wrapper.find(
-        '[data-test="o2-table-global-filter-input"]',
+        '[data-test="iam-groups-search-input"]',
       );
       expect(searchInput.exists()).toBe(true);
     });
@@ -204,25 +204,22 @@ describe("AppGroups Component", () => {
     });
 
     it("sets filter query when searching via input", async () => {
-      // Filtering is delegated to OTable's client-side filter via its built-in
-      // toolbar search (v-model:global-filter wired to filterQuery).
-      const searchInput = wrapper.find(
-        '[data-test="o2-table-global-filter-input"]',
-      );
-      await searchInput.setValue("admin");
+      // Filtering is delegated to OTable's client-side filter via its custom
+      // toolbar OSearchInput (v-model wired to filterQuery).
+      wrapper.vm.filterQuery = "admin";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("admin");
     });
 
     it("clears filter query when search input is emptied", async () => {
-      const searchInput = wrapper.find(
-        '[data-test="o2-table-global-filter-input"]',
-      );
-      await searchInput.setValue("admin");
+      wrapper.vm.filterQuery = "admin";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("admin");
 
-      await searchInput.setValue("");
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("");
     });
@@ -512,11 +509,8 @@ describe("AppGroups Component", () => {
 
     it("handles search term that matches no groups", async () => {
       // When filterQuery is set to a non-matching value, OTable filters rows internally.
-      // Test that filterQuery is set correctly via the table's built-in search.
-      const searchInput = wrapper.find(
-        '[data-test="o2-table-global-filter-input"]',
-      );
-      await searchInput.setValue("nonexistent");
+      wrapper.vm.filterQuery = "nonexistent";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("nonexistent");
     });

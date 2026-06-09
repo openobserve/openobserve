@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2 tw:border-t tw:border-border-default"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2 tw:border-t tw:border-border-default"
         v-if="editTable && activeType == 'json'"
       >
         <OButton

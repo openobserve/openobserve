@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     :is-importing="isAlertImporting"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 288px)',
-      fileEditor: 'calc(100vh - 296px)',
+      urlEditor: 'calc(100vh - 285px)',
+      fileEditor: 'calc(100vh - 282px)',
       outputContainer: 'calc(100vh - 110px)',
       errorReport: 'calc(100vh - 192px)',
     }"

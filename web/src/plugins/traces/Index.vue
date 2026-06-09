@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
+        :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.125rem]!'
