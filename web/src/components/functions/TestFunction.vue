@@ -140,8 +140,8 @@
               language="sql"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
-              @focus="queryEditorPlaceholderFlag = false"
-              @blur="queryEditorPlaceholderFlag = true"
+              @focus="onQueryEditorFocus"
+              @blur="onQueryEditorBlur"
             />
             <div
               v-if="!inputQuery && queryEditorPlaceholderFlag"
@@ -309,6 +309,7 @@ import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
@@ -373,6 +374,22 @@ const originalOutputEvents = ref<any>("");
 const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
+
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef,
+    sqlMode: computed(() => true),
+    query: inputQuery,
+  });
+
+const onQueryEditorFocus = () => {
+  queryEditorPlaceholderFlag.value = false;
+  _sqlOnFocus();
+};
+const onQueryEditorBlur = async () => {
+  queryEditorPlaceholderFlag.value = true;
+  await _sqlOnBlur();
+};
 
 const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
@@ -554,8 +571,9 @@ watch(
   },
 );
 
-// Feed auto-suggest on every query change
+// Feed auto-suggest on every query change and clear stale SQL markers
 watch(inputQuery, (value) => {
+  _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
   autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;

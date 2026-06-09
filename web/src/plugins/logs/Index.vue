@@ -3010,23 +3010,6 @@ export default defineComponent({
       },
     );
 
-    // Forward pre-flight SQL syntax errors to the Monaco editor as squiggles.
-    // searchBarRef.value.queryEditorRef is auto-unwrapped by Vue's component proxy,
-    // so it gives the editor instance directly (not a Ref wrapper).
-    watch(
-      () => searchObj.data.sqlSyntaxErrorRanges,
-      (ranges) => {
-        const editorEl = searchBarRef.value?.queryEditorRef;
-        if (!editorEl) return;
-        if (ranges && ranges.length > 0) {
-          editorEl.addErrorDiagnostics?.(ranges);
-        } else {
-          editorEl.clearErrorDiagnostics?.();
-        }
-      },
-      { deep: true },
-    );
-
     // [END] cancel running queries
 
     const cancelOnGoingSearchQueries = () => {

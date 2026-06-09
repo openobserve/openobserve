@@ -439,8 +439,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
-          @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-          @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+          @focus="onQueryEditorFocus"
+          @blur="onQueryEditorBlur"
         />
         <div
           v-if="
@@ -488,6 +488,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import useTraces from "@/composables/useTraces";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { debounce } from "lodash-es";
@@ -583,6 +584,23 @@ export default defineComponent({
     const { searchObj, tracesShareURL } = useTraces();
     const queryEditorRef = ref(null);
 
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => searchObj.meta.sqlMode),
+        query: computed(() => searchObj.data.editorValue ?? ""),
+        streamName: computed(() => searchObj.data.stream.selectedStream?.value),
+      });
+
+    const onQueryEditorFocus = () => {
+      searchObj.meta.queryEditorPlaceholderFlag = false;
+      _sqlOnFocus();
+    };
+    const onQueryEditorBlur = async () => {
+      searchObj.meta.queryEditorPlaceholderFlag = true;
+      await _sqlOnBlur();
+    };
+
     let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
@@ -668,6 +686,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = async (value: string, event?: any) => {
+      _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
@@ -1020,6 +1039,8 @@ export default defineComponent({
       btnRefreshInterval,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
+      onQueryEditorFocus,
+      onQueryEditorBlur,
       updateQueryValue,
       updateDateTime,
       updateQuery,

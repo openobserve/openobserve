@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce-time="300"
               :keywords="effectiveKeywords"
               :suggestions="effectiveSuggestions"
-              @focus="editorFocused = true"
-              @blur="editorFocused = false"
+              @focus="onQueryEditorFocus"
+              @blur="onQueryEditorBlur"
               @update:query="updateAutoComplete"
             />
             <div
@@ -136,6 +136,7 @@ import {
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -175,6 +176,23 @@ const splitterModel = ref(250);
 const editorFocused = ref(false);
 const errorQueryEditorRef = ref<any>(null);
 
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef: errorQueryEditorRef,
+    sqlMode: computed(() => false),
+    query: computed(() => errorTrackingState.data.editorValue ?? ""),
+    streamName: computed(() => errorTrackingState.data.stream.errorStream),
+  });
+
+const onQueryEditorFocus = () => {
+  editorFocused.value = true;
+  _sqlOnFocus();
+};
+const onQueryEditorBlur = async () => {
+  editorFocused.value = false;
+  await _sqlOnBlur();
+};
+
 // Autosuggestions — field names, operators, filter values
 const {
   autoCompleteData,
@@ -185,6 +203,7 @@ const {
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {
+  _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;

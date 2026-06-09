@@ -859,8 +859,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai-reason="t('search.selectStreamForAI')"
                       @update:query="updateQueryValue"
                       @run-query="runQuery"
-                      @focus="queryEditorPlaceholderFlag = false"
-                      @blur="queryEditorPlaceholderFlag = true"
+                      @focus="() => { queryEditorPlaceholderFlag = false; _sqlOnFocus(); }"
+                      @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
                     />
                     <div
@@ -1102,6 +1102,7 @@ import { onBeforeUnmount } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1248,6 +1249,13 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
+
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef: pipelineEditorRef,
+    sqlMode: computed(() => tab.value === "sql"),
+    query: computed(() => query.value ?? ""),
+  });
 const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
@@ -1707,6 +1715,7 @@ const removeField = (field: any) => {
 };
 
 const updateQueryValue = (value: string) => {
+  _sqlOnQueryChange();
   query.value = value;
 
   if (tab.value === "sql") emits("update:sql", value);
@@ -1964,8 +1973,9 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = debounce(() => {
+const onBlurQueryEditor = debounce(async () => {
   queryEditorPlaceholderFlag.value = true;
+  await _sqlOnBlur();
   emits("validate-sql");
 }, 10);
 

@@ -1647,9 +1647,8 @@ import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { inject } from "vue";
+import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { computed } from "vue";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useLoading } from "@/composables/useLoading";
@@ -1661,7 +1660,7 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
-import { validateSql } from "@/utils/query/sqlDiagnostics";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -1978,39 +1977,23 @@ export default defineComponent({
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => searchObj.meta.sqlMode),
+        query: computed(() => searchObj.data.query ?? ""),
+        streamName: computed(() => searchObj.data.stream.selectedStream?.[0]),
+        externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
+      });
+
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
-      // Clear stale markers immediately when the user re-enters the editor
-      if (searchObj.data.sqlSyntaxErrorRanges?.length) {
-        searchObj.data.sqlSyntaxErrorRanges = [];
-      }
+      _sqlOnFocus();
     };
 
-    // Pre-flight SQL validation on blur — runs without firing the query.
-    // SQL mode: validate the raw query the user typed.
-    // Non-SQL mode: wrap the filter in a full SELECT and validate that.
     const handleQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
-
-      const query = searchObj.data.query?.trim();
-      if (!query) {
-        searchObj.data.sqlSyntaxErrorRanges = [];
-        return;
-      }
-
-      let range = null;
-      if (searchObj.meta.sqlMode) {
-        range = await validateSql(query);
-      } else {
-        const stream = searchObj.data.stream.selectedStream?.[0];
-        if (stream) {
-          const prefix = `select * from "${stream}" WHERE `;
-          const constructedSql = prefix + query;
-          range = await validateSql(constructedSql, 0, prefix.length);
-        }
-      }
-
-      searchObj.data.sqlSyntaxErrorRanges = range ? [range] : [];
+      await _sqlOnBlur();
     };
 
     const formData: any = ref(defaultValue());
@@ -2424,9 +2407,7 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
-      // Clear stale syntax error markers after the user pauses typing.
-      // Debounced so setModelMarkers isn't called on every keypress.
-      debouncedClearSqlErrors();
+      _sqlOnQueryChange();
 
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
@@ -2620,11 +2601,6 @@ export default defineComponent({
       emit("extractPatterns");
     }, 2500);
 
-    const debouncedClearSqlErrors = debounce(() => {
-      if (searchObj.data.sqlSyntaxErrorRanges?.length) {
-        searchObj.data.sqlSyntaxErrorRanges = [];
-      }
-    }, 500);
 
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
@@ -4758,7 +4734,6 @@ export default defineComponent({
       handleRunQueryFn,
       onQueryEditorFocus,
       handleQueryEditorBlur,
-      debouncedClearSqlErrors,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,

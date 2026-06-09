@@ -220,6 +220,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :keywords="currentEditorKeywords"
                 :suggestions="currentEditorSuggestions"
                 @update:query="handleQueryUpdate"
+                @focus="_sqlOnFocus"
+                @blur="_sqlOnBlur"
                 @language-change="handleLanguageChange"
                 @ask-ai="handleAskAI"
                 @run-query="handleRunQuery"
@@ -325,6 +327,7 @@ import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -478,6 +481,18 @@ export default defineComponent({
     } = useSqlSuggestions();
 
     const queryEditorRef = ref(null);
+
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => dashboardPanelData.data.queryType === "sql"),
+        query: computed(
+          () =>
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ]?.query ?? "",
+        ),
+      });
 
     const currentEditorKeywords = computed(() => {
       if (dashboardPanelData.data.queryType === "promql") {
@@ -794,6 +809,7 @@ export default defineComponent({
 
     // Unified Query Editor: Handle query update
     const handleQueryUpdate = (newQuery) => {
+      _sqlOnQueryChange();
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].query = newQuery;

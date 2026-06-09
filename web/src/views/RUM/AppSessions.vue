@@ -30,8 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce-time="300"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
-                @focus="editorFocused = true"
-                @blur="editorFocused = false"
+                @focus="onQueryEditorFocus"
+                @blur="onQueryEditorBlur"
                 @update:query="updateAutoComplete"
               />
               <div
@@ -177,6 +177,7 @@ import {
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -266,6 +267,23 @@ const isMounted = ref(false);
 const editorFocused = ref(false);
 const sessionQueryEditorRef = ref<any>(null);
 
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef: sessionQueryEditorRef,
+    sqlMode: computed(() => false),
+    query: computed(() => sessionState.data.editorValue ?? ""),
+    streamName: computed(() => rumSessionStreamName),
+  });
+
+const onQueryEditorFocus = () => {
+  editorFocused.value = true;
+  _sqlOnFocus();
+};
+const onQueryEditorBlur = async () => {
+  editorFocused.value = false;
+  await _sqlOnBlur();
+};
+
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 const { getStream } = useStreams();
 
@@ -279,6 +297,7 @@ const {
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {
+  _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
   autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;

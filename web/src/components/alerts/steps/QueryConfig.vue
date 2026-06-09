@@ -610,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai="!streamName"
                       :keywords="autoCompleteKeywords"
                       :suggestions="autoCompleteSuggestions"
-                      @focus="queryEditorPlaceholderFlag = false"
+                      @focus="onQueryEditorFocus"
                       @blur="onBlurInlineSqlEditor"
                       @update:query="handleInlineQueryUpdate"
                     />
@@ -906,6 +906,7 @@ import sql from "highlight.js/lib/languages/sql";
 hljs.registerLanguage("sql", sql);
 
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
@@ -1054,6 +1055,19 @@ export default defineComponent({
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef: inlineQueryEditorRef,
+        sqlMode: computed(() => localTab.value === 'sql'),
+        query: computed(() => localSqlQuery.value ?? ""),
+        streamName: computed(() => props.streamName),
+      });
+
+    const onQueryEditorFocus = () => {
+      queryEditorPlaceholderFlag.value = false;
+      _sqlOnFocus();
+    };
+
     // ── Inline editor autocomplete ──────────────────────────────────────────
     const {
       autoCompleteData,
@@ -1081,6 +1095,7 @@ export default defineComponent({
     // Called on every keystroke in the inline SQL/PromQL editor — updates
     // the query and feeds autocomplete context (same pattern as QueryEditorDialog)
     const handleInlineQueryUpdate = (newQuery: string) => {
+      _sqlOnQueryChange();
       if (localTab.value === 'sql') {
         updateSqlQuery(newQuery);
       } else {
@@ -1124,12 +1139,12 @@ export default defineComponent({
       { noStreamText: t('pipeline.queryEditorPlaceholder') },
     );
 
-    const onBlurInlineSqlEditor = () => {
+    const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value = localTab.value === 'sql'
         ? localSqlQuery.value === ''
         : localPromqlQuery.value === '';
-      // Validate SQL on blur (same chain as QueryEditorDialog)
       if (localTab.value === 'sql') {
+        await _sqlOnBlur();
         emit("validate-sql");
       }
     };
@@ -2270,6 +2285,7 @@ export default defineComponent({
       getImageURL,
       queryEditorPlaceholderFlag,
       vrlEditorPlaceholderFlag,
+      onQueryEditorFocus,
       onBlurInlineSqlEditor,
       onBlurInlineVrlEditor,
       inlineStatusState,
