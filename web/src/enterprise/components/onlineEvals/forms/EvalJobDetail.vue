@@ -245,13 +245,6 @@
               data-test="eval-job-detail-runs-refresh"
               @click="refreshRuns"
             />
-            <span class="jd__runs-meta">
-              {{ t("onlineEvals.job.detail.runs.showingPrefix") }}
-              <strong>{{ runs.length }}</strong>
-              {{ t("onlineEvals.job.detail.runs.showingOf") }}
-              <strong>{{ formatCount(kpis.totalRuns) }}</strong>
-              {{ t("onlineEvals.job.detail.runs.showingSuffix") }}
-            </span>
           </div>
 
           <OTable
@@ -1075,9 +1068,8 @@ function relativeTime(timestampMs: number): string {
 .jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
 
 .jd-kpi__title {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.01em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 

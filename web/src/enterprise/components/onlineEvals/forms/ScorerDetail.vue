@@ -213,13 +213,6 @@
               data-test="scorer-detail-runs-refresh"
               @click="refreshRuns"
             />
-            <span class="sd__runs-meta">
-              {{ t("onlineEvals.scorer.detail.runs.showingPrefix") }}
-              <strong>{{ runs.length }}</strong>
-              {{ t("onlineEvals.scorer.detail.runs.showingOf") }}
-              <strong>{{ formatCount(kpis.totalRuns) }}</strong>
-              {{ t("onlineEvals.scorer.detail.runs.showingSuffix") }}
-            </span>
           </div>
 
           <OTable
