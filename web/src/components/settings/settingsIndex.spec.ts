@@ -24,12 +24,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((url: string) => `mocked-${url}`),
 }));
 
-vi.mock("@/composables/useAppBreadcrumb", () => ({
-  useAppBreadcrumb: () => ({
-    publish: vi.fn(),
-    clear: vi.fn(),
-  }),
-}));
 
 // Mock vue-router
 const mockPush = vi.fn();

@@ -21,8 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
   <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col">
-    <!-- Breadcrumb lives in the chrome now (published below). This row exists
-         only to host page actions: the pipelines-list buttons or the detail
+    <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
     <AppPageHeader
@@ -145,10 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import type { SectionHubItem } from "@/components/common/SectionHub.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -281,39 +276,6 @@ export default defineComponent({
         : undefined,
     );
 
-    // Breadcrumb: Pipeline(link → default section) › <Section ▾>  (› detail).
-    // The root crumb makes Pipelines consistent with Settings/IAM.
-    const crumbs = computed<Crumb[]>(() => {
-      const list: Crumb[] = [
-        {
-          label: t("menu.pipeline"),
-          icon: "graph-2",
-          to: { name: "pipelines", query: { org_identifier: orgIdentifier.value } },
-          dataTest: "breadcrumb-pipeline-root",
-        },
-        {
-          dropdown: [{ label: "", items: pipelineSections.value }],
-          activeKey: activeTab.value,
-          dataTest: "breadcrumb-pipeline-section",
-        },
-      ];
-      if (isDetailView.value)
-        list.push({ label: breadcrumbLabel.value, current: true });
-      return list;
-    });
-
-    // Publish the breadcrumb to the top chrome bar (republish on change + on
-    // keep-alive re-entry; clear on leave — the chrome's route-key gate guards
-    // against stale crumbs).
-    const { publish, clear } = useAppBreadcrumb();
-    // Republish on route change too (not just when crumbs change value): the
-    // /pipeline → /pipelines redirect changes the route key without changing the
-    // crumbs, and the chrome's route-key gate would otherwise drop them.
-    watch([crumbs, routeName], () => publish(crumbs.value), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     // Header actions live on the Pipelines index page only.
     const showPipelineActions = computed(() => routeName.value === "pipelines");
 
@@ -387,7 +349,6 @@ export default defineComponent({
       isDetailView,
       breadcrumbLabel,
       detailBack,
-      crumbs,
       showPipelineActions,
       shouldCollapseActions,
       goToAddPipeline,

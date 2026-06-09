@@ -38,9 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <template #header>
-          <!-- Breadcrumb path lives in the chrome bar (published below). Row 1
-               shows the dashboard name + actions. In fullscreen/print the chrome
-               is hidden, so this title is the only heading on screen. -->
           <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
                Fullscreen/print hide the chrome, so there we keep the module icon
                as the only on-screen branding (no back affordance). -->
@@ -341,10 +338,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
@@ -1285,32 +1278,6 @@ export default defineComponent({
       return items;
     });
 
-    // Row-1 breadcrumb bar crumbs. In fullscreen/print, collapse to just the
-    // dashboard name (matches the old behavior of hiding the breadcrumb path).
-    const crumbs = computed<Crumb[]>(() => {
-      const title = currentDashboardData.data?.title || "";
-      if (isFullscreen.value || store.state.printMode === true)
-        return title
-          ? [
-              {
-                label: title,
-                icon: "dashboard",
-                current: true,
-                dataTest: "dashboard-name-title",
-              },
-            ]
-          : [];
-      // Drop crumbs whose label hasn't resolved yet (e.g. folder name before
-      // folders load) so we never render a zero-width crumb.
-      return breadcrumbItems.value
-        .filter((b) => (b.label ?? "").toString().trim() !== "")
-        .map((b, i, arr) => ({
-          ...b,
-          icon: i === 0 ? "dashboard" : undefined,
-          current: i === arr.length - 1,
-        }));
-    });
-
     //add panel
     const addPanelData = () => {
       return router.push({
@@ -1864,17 +1831,6 @@ export default defineComponent({
       }
     });
 
-    // Publish the breadcrumb path to the top chrome bar. Defined here (end of
-    // setup) because `crumbs` reads `isFullscreen`, which is declared later — an
-    // immediate watch any earlier would hit a TDZ on it. (In fullscreen/print the
-    // chrome is hidden and `crumbs` collapses to just the title — harmless, since
-    // the row-1 AppPageHeader already shows the dashboard name there.)
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       currentDashboardData,
       dashboardRemountKey,
@@ -1937,7 +1893,6 @@ export default defineComponent({
       renderDashboardChartsRef,
       folderNameFromFolderId,
       breadcrumbItems,
-      crumbs,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,

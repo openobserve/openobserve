@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full">
-    <!-- Header Section (row-1 breadcrumb bar) -->
-    <!-- Breadcrumb path lives in the chrome bar (published below). Row 1 carries
-         the editable panel-name field (as the title) + the editor actions. -->
+    <!-- Header Section -->
     <AppPageHeader
       :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
       :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
@@ -245,10 +243,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
@@ -1766,28 +1760,11 @@ export default defineComponent({
       return items;
     });
 
-    // Row-1 breadcrumb bar: Dashboards › Dashboard › <Panel> (last = current).
-    const crumbs = computed<Crumb[]>(() =>
-      breadcrumbItems.value.map((b, i, arr) => ({
-        ...b,
-        icon: i === 0 ? "dashboard" : undefined,
-        current: i === arr.length - 1,
-      })),
-    );
-
-    // Publish the breadcrumb path to the top chrome bar.
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       t,
       updateDateTime,
       goBack,
       breadcrumbItems,
-      crumbs,
       savePanelChangesToDashboard,
       runQuery,
       expandedSplitterHeight,

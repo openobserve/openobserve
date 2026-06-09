@@ -30,13 +30,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   }),
 }));
 
-// Mock useAppBreadcrumb to avoid side effects
-vi.mock("@/composables/useAppBreadcrumb", () => ({
-  useAppBreadcrumb: () => ({
-    publish: vi.fn(),
-    clear: vi.fn(),
-  }),
-}));
 
 /** Helper: collect all items from sectionGroups (flattened, excluding hidden ones) */
 function visibleItems(sectionGroups: any[]): any[] {

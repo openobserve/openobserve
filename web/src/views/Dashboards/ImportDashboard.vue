@@ -15,8 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="tw:mx-2">
-    <!-- Breadcrumb path (Dashboards › Import) lives in the chrome bar (published
-         below). Row 1 carries the title + actions. -->
     <AppPageHeader
       :title="t('dashboard.importDashboard')"
       :back="{ label: t('dashboard.header'), onClick: goBack }"
@@ -290,10 +288,6 @@ import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.v
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -738,26 +732,6 @@ export default defineComponent({
         },
       });
     };
-
-    // Publish the breadcrumb path (Dashboards › Import) to the top chrome bar.
-    const crumbs = computed<Crumb[]>(() => [
-      {
-        label: t("dashboard.header"),
-        icon: "dashboard",
-        onClick: goBack,
-        dataTest: "dashboard-import-back-btn",
-      },
-      {
-        label: t("dashboard.importDashboard"),
-        current: true,
-        dataTest: "dashboard-import-current",
-      },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
 
     const updateActiveTab = () => {
       jsonStr.value = "";

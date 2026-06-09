@@ -476,10 +476,6 @@ import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -569,22 +565,6 @@ export default defineComponent({
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
-
-    // Publish the breadcrumb path to the top chrome bar (single root crumb;
-    // the page title + description live in the row-1 AppPageHeader).
-    const crumbs = computed<Crumb[]>(() => [
-      {
-        label: t("dashboard.header"),
-        icon: "dashboard",
-        current: true,
-        dataTest: "breadcrumb-dashboards-root",
-      },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
 
     const { showPositiveNotification, showErrorNotification } =
       useNotifications();

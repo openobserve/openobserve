@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
-       always present; the chosen section renders to the right. Breadcrumb lives in
-       the top chrome bar (published from this shell). -->
+       always present; the chosen section renders to the right. -->
   <PageLayout :sidebar-width="232">
     <template #sidebar>
       <SectionRail
@@ -77,10 +76,6 @@ import {
   type SectionHubGroup,
   type SectionHubItem,
 } from "@/components/common/SectionHub.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import {
   defineComponent,
   ref,
@@ -417,59 +412,6 @@ export default defineComponent({
         .map((label) => ({ label, items: buckets.get(label)! }));
     });
 
-    // Breadcrumb (row 1). Hub: just the module name. Section: Settings(link →
-    // hub) › <Section ▾>  (› Edit on the one editor).
-    const crumbs = computed<Crumb[]>(() => {
-      if (isHub.value)
-        return [
-          {
-            label: t("settings.header"),
-            icon: "settings",
-            current: true,
-            dataTest: "breadcrumb-settings-root",
-          },
-        ];
-      const list: Crumb[] = [
-        {
-          label: t("settings.header"),
-          icon: "settings",
-          to: hubRoute.value,
-          dataTest: "breadcrumb-settings-root",
-        },
-        {
-          dropdown: sectionGroups.value,
-          activeKey: activeSection.value,
-          dataTest: "breadcrumb-settings-section",
-        },
-      ];
-      if (route.name === "modelPricingEditor")
-        list.push({ label: "Edit", current: true });
-      // Cipher keys open the add/edit form in-place via ?action=add|edit (the
-      // route name stays "cipherKeys"), so derive the trailing crumb from the
-      // query rather than a child route name.
-      if (
-        route.name === "cipherKeys" &&
-        (route.query.action === "add" || route.query.action === "edit")
-      )
-        list.push({
-          label:
-            route.query.action === "edit"
-              ? t("cipherKey.update")
-              : t("cipherKey.add"),
-          current: true,
-        });
-      return list;
-    });
-
-    // Publish the breadcrumb to the top chrome bar. Republish on change + on
-    // keep-alive re-entry; clear on leave (the chrome's route-key gate is the
-    // real safety net against stale crumbs).
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       t,
       store,
@@ -484,7 +426,6 @@ export default defineComponent({
       isHeaderedSection,
       activeSectionItem,
       sectionGroups,
-      crumbs,
       handleSettingsRouting,
     };
   },

@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, onActivated, onDeactivated, onUnmounted, watch, nextTick } from "vue";
+import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -183,10 +183,6 @@ import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -538,17 +534,6 @@ export default defineComponent({
         timeout: 1500,
       });
     };
-
-    // Publish the module breadcrumb to the top chrome bar (Incidents is a flat
-    // L1 page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
-    const crumbs = computed<Crumb[]>(() => [
-      { label: t("alerts.incidents.title"), icon: "notifications-active", current: true },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
 
     return {
       t,
