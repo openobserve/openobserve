@@ -364,7 +364,10 @@ impl TantivyResult {
                 exclude: None,
                 segment_size: Some(outer_limit),
             }),
-            sub_aggregation: Aggregations::from_iter(vec![("inner".to_string(), inner_aggregation)]),
+            sub_aggregation: Aggregations::from_iter(vec![(
+                "inner".to_string(),
+                inner_aggregation,
+            )]),
         };
 
         let aggregations = Aggregations::from_iter(vec![("outer".to_string(), outer_aggregation)]);
