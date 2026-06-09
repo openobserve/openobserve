@@ -463,6 +463,7 @@ const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
 const useInferServiceFields = ref(true);
+const isLoadingFallback = ref(false);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -859,9 +860,11 @@ ORDER BY total_requests DESC`;
       },
       error: (_payload: any, _response: any) => {
         // If the query failed because infer columns don't exist in the schema,
-        // retry with the fallback query that only uses service_name.
-        if (useInferServiceFields.value) {
+        // retry once with the fallback query that only uses service_name.
+        // Guard against re-entry: only retry if we haven't already fallen back.
+        if (useInferServiceFields.value && !isLoadingFallback.value) {
           useInferServiceFields.value = false;
+          isLoadingFallback.value = true;
           isLoading.value = false;
           loadServicesCatalog();
           return;
@@ -870,6 +873,7 @@ ORDER BY total_requests DESC`;
       },
       complete: (_payload: any, _response: any) => {
         isLoading.value = false;
+        isLoadingFallback.value = false;
       },
       reset: (_payload: any, _response: any) => {
         services.value = [];
