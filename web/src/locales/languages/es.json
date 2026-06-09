@@ -964,7 +964,8 @@
     "subscription_type": "Tipo de plan",
     "proceed_subscription": "Proceder a la suscripción",
     "subscription_plan": "Plan de suscripción",
-    "makeBilledMember": "Haga de esta organización un miembro de facturación de {org}"
+    "makeBilledMember": "Haga de esta organización un miembro de facturación de {org}",
+    "manage": "Administrar"
   },
   "template": {
     "header": "Plantillas",

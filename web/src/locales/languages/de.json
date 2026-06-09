@@ -964,7 +964,8 @@
     "subscription_type": "Art des Abonnements",
     "proceed_subscription": "Weiter zum Abonnement",
     "subscription_plan": "Abonnementplan",
-    "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen"
+    "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen",
+    "manage": "Managen"
   },
   "template": {
     "header": "Vorlagen",

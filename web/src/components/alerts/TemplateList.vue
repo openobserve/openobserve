@@ -129,7 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:ml-1"
             variant="ghost"
             size="icon-sm"
-            :title="t('alert_templates.edit')"
+            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
+            :disabled="row.isPrebuilt"
             @click="editTemplate(row)"
           >
             <OIcon name="edit" size="sm" />

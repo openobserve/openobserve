@@ -964,7 +964,8 @@
     "subscription_type": "계획 유형",
     "proceed_subscription": "구독으로 이동",
     "subscription_plan": "서브스크립션 플랜",
-    "makeBilledMember": "이 조직을 {org} 의 결제 회원으로 설정"
+    "makeBilledMember": "이 조직을 {org} 의 결제 회원으로 설정",
+    "manage": "관리"
   },
   "template": {
     "header": "템플릿",

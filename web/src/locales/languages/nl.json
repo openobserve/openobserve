@@ -964,7 +964,8 @@
     "subscription_type": "Soort abonnement",
     "proceed_subscription": "Ga verder met het abonnement",
     "subscription_plan": "Abonnementsplan",
-    "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}"
+    "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}",
+    "manage": "Beheren"
   },
   "template": {
     "header": "Sjablonen",

@@ -964,7 +964,8 @@
     "subscription_type": "Tipo di piano",
     "proceed_subscription": "Procedi alla sottoscrizione",
     "subscription_plan": "Piano di abbonamento",
-    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}"
+    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}",
+    "manage": "Gestisci"
   },
   "template": {
     "header": "Modelli",
