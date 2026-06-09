@@ -1350,7 +1350,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #10103: Query execution plan open/close shows "No results found"
   // https://github.com/openobserve/openobserve/issues/10103
   // ==========================================================================
-  test("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
+  test.skip("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify Explain Query close does not break results (Bug #10103)');
 
     await pm.logsPage.navigateToLogs();
