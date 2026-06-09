@@ -64,51 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></template>
             {{ t("traces.servicesCatalog.tabLabel") }}
           </OToggleGroupItem>
-          <!--
-            Two-gate visibility:
-              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
-                 NOT be `"false"`. Unset (default), `"true"`, or any
-                 other value keeps the UI visible — only the literal
-                 string `"false"` hides it. Prevents accidental hide
-                 on typo / missing .env file.
-              2. The org must have at least one traces stream flagged
-                 `is_llm_stream === true` (resolved by `Index.vue` and
-                 passed as `hasLLMStreams`).
-            We also keep the toggle visible when the user is already
-            on the LLM Insights tab (e.g., navigated via URL) so the
-            active selection isn't orphaned mid-session.
-          -->
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-sessions-btn"
-            value="sessions"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="forum" size="sm" class="tw:shrink-0"
-            /></template>
-            Sessions
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-llm-insights-btn"
-            value="llm-insights"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="auto-awesome" size="sm" class="tw:shrink-0"
-            /></template>
-            LLM Insights
-          </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog' &&
-            searchObj.meta.searchMode !== 'llm-insights' &&
-            searchObj.meta.searchMode !== 'sessions'
+            searchObj.meta.searchMode !== 'services-catalog'
           "
         >
           <div
@@ -403,8 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
-        searchObj.meta.searchMode !== 'llm-insights' &&
-        searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
       class="tw:flex tw:h-[calc(100%-3.1rem)]!"
@@ -520,20 +480,6 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
-    },
-    isLLMSpanPresent: {
-      type: Boolean,
-      default: false,
-    },
-    // True when the parent (`Index.vue`) has confirmed at least one
-    // traces stream is flagged `is_llm_stream === true`. Drives the
-    // LLM Insights tab visibility — we hide the toggle entirely when
-    // no org has opted in (avoids a dead button that opens an empty
-    // dashboard). Defaults to `true` so the tab doesn't flicker
-    // during the brief window before streams resolve on first mount.
-    hasLLMStreams: {
-      type: Boolean,
-      default: true,
     },
   },
   methods: {
@@ -785,9 +731,7 @@ export default defineComponent({
       // The DateTime component also fires `on:date-change` once on its own
       // mount with the current value (no actual change). The `prev`
       // comparison above filters out that mount-time replay so a tab
-      // switch that remounts the picker doesn't fire a redundant search
-      // (visible in LLM Insights as a duplicate fetchAll right after the
-      // dashboard's own initial load).
+      // switch that remounts the picker doesn't fire a redundant search.
       if (
         store.state.zoConfig?.auto_query_enabled &&
         searchObj.meta.liveMode &&

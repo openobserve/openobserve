@@ -6,7 +6,11 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="online-evals" data-test="online-evals-page">
+  <div
+    class="online-evals"
+    :class="{ 'online-evals--embedded': hideTabBar }"
+    data-test="online-evals-page"
+  >
     <!-- Full-page forms (jobs / scorers) -->
     <ScorerFormPage
       v-if="formPage?.entity === 'scorers'"
@@ -50,14 +54,14 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div class="online-evals__header card-container">
+      <div v-if="!hideTabBar" class="online-evals__header card-container">
         <div>
           <h1>{{ t("onlineEvals.title") }}</h1>
         </div>
       </div>
 
       <section class="online-evals__content card-container">
-        <div class="online-evals__tabs">
+        <div v-if="!hideTabBar" class="online-evals__tabs">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -286,6 +290,11 @@ import {
   exportScorerFileName,
   stripScorerForExport,
 } from "./onlineEvals/utils/exportScorer";
+
+// When embedded inside the AI Observability shell, the new secondary
+// sidebar provides tab navigation — the component's own header + tab
+// strip become redundant and should be suppressed.
+withDefaults(defineProps<{ hideTabBar?: boolean }>(), { hideTabBar: false });
 
 const store = useStore();
 const route = useRoute();
@@ -809,6 +818,15 @@ async function performDelete() {
   min-height: 0;
   padding: 4px 10px 10px;
   color: var(--o2-text);
+}
+
+// When rendered inside the AI Observability shell, the splitter sits to
+// the left and already provides spacing; we only need padding on the
+// right edge to mirror the PipelinesList layout pattern. Height is also
+// owned by the shell's <router-view> wrapper, so drop the viewport calc.
+.online-evals--embedded {
+  height: 100%;
+  padding: 4px 10px 10px 0;
 }
 
 .online-evals__header,
