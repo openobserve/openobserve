@@ -17,7 +17,7 @@
 
     <div class="ev-empty__desc">{{ description }}</div>
 
-    <div v-if="chips.length" class="ev-empty__chips">
+    <div v-if="chips && chips.length" class="ev-empty__chips">
       <span
         v-for="(chip, idx) in chips"
         :key="idx"
@@ -29,8 +29,12 @@
       </span>
     </div>
 
-    <div class="ev-empty__actions">
+    <!-- Actions row is rendered only when there's something to show
+         (either a primary CTA or a secondary slot). Pure informational
+         empty states (e.g. "no data in window") pass neither. -->
+    <div v-if="ctaLabel || $slots.secondary" class="ev-empty__actions">
       <OButton
+        v-if="ctaLabel"
         :data-test="ctaDataTest"
         variant="primary"
         size="md"
@@ -60,9 +64,10 @@ defineProps<{
   icon: string;
   title: string;
   description: string;
-  chips: EmptyStateChip[];
-  ctaLabel: string;
-  ctaDataTest: string;
+  chips?: EmptyStateChip[];
+  /** Omit to render an informational empty state with no CTA. */
+  ctaLabel?: string;
+  ctaDataTest?: string;
 }>();
 
 defineEmits<{ (e: "create"): void }>();
