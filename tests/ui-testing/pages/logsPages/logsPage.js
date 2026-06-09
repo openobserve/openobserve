@@ -4774,6 +4774,10 @@ export class LogsPage {
         return await this.page.locator(this.moreOptionsBtn).hover();
     }
 
+    async clickExplainQuery() {
+        return await this.page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]').click();
+    }
+
     async hoverDownloadResults() {
         // SearchBar.vue:570 — hover the data-tested wrapper to open the nested CSV/JSON
         // submenu (the icon-based `keyboard_arrow_right` text is no longer rendered

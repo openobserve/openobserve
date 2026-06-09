@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('search.resetFilters')" />
           </OButton>
           <syntax-guide
-            data-test="logs-search-bar-sql-mode-toggle-btn"
+            data-test="traces-search-bar-sql-mode-toggle-btn"
             :sqlmode="searchObj.meta.sqlMode"
             class=" tw:h-[2rem]! tw:w-[2.25rem]!"
           />
