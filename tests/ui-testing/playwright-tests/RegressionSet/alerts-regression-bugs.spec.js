@@ -383,12 +383,21 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
       'Bug #4288: "default" should be accepted in the SQL editor without error'
     ).toContain('default');
 
-    // Verify no error banner appeared
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"]')
-      .filter({ hasText: /error|invalid|unexpected/i })
-      .first().isVisible({ timeout: 2000 }).catch(() => false);
+    // Verify no app-level error (exclude Monaco's syntax squiggles, which
+    // legitimately appear for "default" as standalone-incomplete SQL)
+    const hasAppError = await page.evaluate(() => {
+      const errorEls = Array.from(
+        document.querySelectorAll('[class*="error"], [class*="negative"]')
+      );
+      return errorEls.some((el) => {
+        if (el.closest('.monaco-editor')) return false;
+        const visible = el.checkVisibility ? el.checkVisibility() : el.offsetParent !== null;
+        if (!visible) return false;
+        return /error|invalid|unexpected/i.test(el.textContent || '');
+      });
+    });
 
-    expect(errorVisible,
+    expect(hasAppError,
       'Bug #4288: "default" keyword without quotes should not cause a UI error'
     ).toBeFalsy();
 
