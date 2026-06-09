@@ -63,9 +63,7 @@ export class ModelPricingPage {
         this.cancelBtn          = page.locator('[data-test="model-pricing-editor-cancel-btn"]');
         this.saveBtn            = page.locator('[data-test="model-pricing-editor-save-btn"]');
 
-        // Price row add-inputs (no data-test — use placeholders from i18n)
-        this.addKeyInput        = page.getByPlaceholder('Usage key (e.g. input)').last();
-        this.addValueInput      = page.getByPlaceholder('0.00').last();
+        // Price row add-inputs are scoped per tier in addPriceRow() — no class-level locators.
 
         // ============================================================
         // Built-in tab
@@ -134,6 +132,9 @@ export class ModelPricingPage {
             `${process.env['ZO_BASE_URL']}/web/settings/model_pricing/edit?org_identifier=${org}&id=${modelId}`
         );
         await this.editorTitle.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the async fetch to populate the form before the caller reads any field.
+        const nameInput = this.nameInput.locator('input').first();
+        await expect(nameInput).not.toHaveValue('', { timeout: 10000 });
     }
 
     // ----------------------------------------------------------------
@@ -244,26 +245,29 @@ export class ModelPricingPage {
         await input.press('Tab'); // blur triggers patternTouched + debounce flush
     }
 
-    /** Add a single price row to the currently-visible default tier.
-     *  The add button (OButton with OIcon "add") is disabled until the key is non-empty.
-     *  Use keyboard events to trigger OInput reactivity so the button becomes enabled.
+    /** Add a single price row to the specified tier (default: tier 0 = the Default tier).
+     *  Scopes all locators to the target .tier-card so multiple tiers on the page
+     *  don't cause the wrong add-row inputs to be targeted.
+     *  @param {string} key
+     *  @param {number} valuePricePerMillion
+     *  @param {number} [tierIndex=0]
      */
-    async addPriceRow(key, valuePricePerMillion) {
-        // The add-row inputs start empty on each call (key is reset after addPrice).
-        // fill() works reliably here because there's no pre-existing text to replace.
-        const keyInput = this.addKeyInput;
+    async addPriceRow(key, valuePricePerMillion, tierIndex = 0) {
+        const tierCard = this.page.locator('.tier-card').nth(tierIndex);
+        const addRow   = tierCard.locator('.price-add-row');
+
+        const keyInput = addRow.getByPlaceholder('Usage key (e.g. input)');
         await keyInput.waitFor({ state: 'visible', timeout: 5000 });
         await keyInput.fill(key);
 
-        const valueInput = this.addValueInput;
+        const valueInput = addRow.getByPlaceholder('0.00');
         await valueInput.waitFor({ state: 'visible', timeout: 5000 });
         await valueInput.fill(String(valuePricePerMillion));
 
-        // The add button becomes enabled once key is non-empty
-        const addPriceBtn = this.page.locator('.price-add-row button').last();
+        const addPriceBtn = addRow.locator('button');
         await expect(addPriceBtn).toBeEnabled({ timeout: 5000 });
         await addPriceBtn.click();
-        // Wait for Vue to process the add and reset the add-row state
+        // Wait for Vue to process the add and reset the add-row inputs
         await this.page.waitForTimeout(200);
     }
 

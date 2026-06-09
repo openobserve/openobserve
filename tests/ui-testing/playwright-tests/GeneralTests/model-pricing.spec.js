@@ -264,7 +264,7 @@ test.describe("Model Pricing — Create Model", () => {
             const addTierBtn = page.locator('button').filter({ hasText: /add.?tier/i }).first();
             if (await addTierBtn.isVisible()) {
                 await addTierBtn.click();
-                await pm.modelPricingPage.addPriceRow('input', '0.0000015');
+                await pm.modelPricingPage.addPriceRow('input', '0.0000015', 1);
             }
 
             await pm.modelPricingPage.clickSave();
