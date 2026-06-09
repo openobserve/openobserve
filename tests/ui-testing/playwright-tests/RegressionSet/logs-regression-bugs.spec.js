@@ -1396,6 +1396,15 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("Non-SQL mode should not error when querying multiple streams @bug-8641 @P2 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify non-SQL multi-stream query works (Bug #8641)');
 
+    // Ingest data into a second stream so the multi-stream join has two streams
+    const orgId = getOrgIdentifier() || 'default';
+    const headers = getHeaders();
+    const secondStream = 'e2e_8641_stream';
+    await sendRequest(page, getIngestionUrl(orgId, secondStream), {
+      level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
+    }, headers);
+    testLogger.info(`Ingested data to stream: ${secondStream}`);
+
     await pm.logsPage.navigateToLogs();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -1409,8 +1418,8 @@ test.describe("Logs Regression Bug Fixes", () => {
       testLogger.info('Switched to non-SQL (KQL) mode');
     }
 
-    // Select multi-stream join via POM
-    await pm.logsPage.selectIndexAndStreamJoinUnion('default', 'e2e_automate');
+    // Select multi-stream join via POM (secondStream + e2e_automate)
+    await pm.logsPage.selectIndexAndStreamJoinUnion(secondStream, 'e2e_automate');
     testLogger.info('Multi-stream join selected');
 
     await page.waitForTimeout(2000);
