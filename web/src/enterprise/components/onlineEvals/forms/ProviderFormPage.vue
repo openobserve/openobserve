@@ -120,10 +120,6 @@
           </div>
         </div>
 
-        <label class="provider-checkbox">
-          <input v-model="form.isDefault" type="checkbox" class="provider-checkbox__input" />
-          <span>{{ t("onlineEvals.provider.useAsDefault") }}</span>
-        </label>
       </section>
 
       <section class="provider-section">
@@ -228,7 +224,6 @@ function initForm(row: Provider | null) {
       defaultModel: "",
       availableModels: "",
       authConfig: '{\n  "api_key": ""\n}',
-      isDefault: false,
     };
   }
   return {
@@ -238,7 +233,6 @@ function initForm(row: Provider | null) {
     defaultModel: defaultModelOf(row),
     availableModels: availableModelsOf(row).join(", "),
     authConfig: '{\n  "api_key": ""\n}',
-    isDefault: booleanOf(row, "isDefault", "is_default"),
   };
 }
 
@@ -253,7 +247,10 @@ async function save() {
       defaultModel: form.value.defaultModel,
       availableModels: splitCsv(form.value.availableModels),
       authConfig: parseJson(form.value.authConfig, t("onlineEvals.provider.authConfigLabel")),
-      isDefault: form.value.isDefault,
+      // `isDefault` is no longer surfaced in the form. Always send false;
+      // backend defaults to non-default and the user manages default-ness
+      // (if ever needed) outside this create/edit flow.
+      isDefault: false,
     };
 
     if (props.mode === "edit" && props.row) {
@@ -430,43 +427,6 @@ async function save() {
   font-size: 11.5px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
   margin-top: 4px;
-}
-
-.provider-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  cursor: pointer;
-}
-
-.provider-checkbox__input {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 3px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-}
-
-.provider-checkbox__input:checked {
-  background: var(--color-primary-600, #3F7994);
-  border-color: var(--color-primary-600, #3F7994);
-}
-
-.provider-checkbox__input:checked::after {
-  content: "";
-  width: 7px;
-  height: 4px;
-  border-left: 1.5px solid white;
-  border-bottom: 1.5px solid white;
-  transform: rotate(-45deg) translate(0, -1px);
 }
 
 .provider-callout {
