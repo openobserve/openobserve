@@ -50,6 +50,19 @@ const TraceDetailsSidebarStub = {
   template: '<div class="trace-details-sidebar-stub"></div>',
 };
 
+// Mock serviceColorRegistry so getOrSetServiceColor returns predictable colors
+vi.mock("@/utils/traces/serviceColorRegistry", () => ({
+  getOrSetServiceColor: vi.fn((name: string) => {
+    const colorMap: Record<string, string> = {
+      "service-1": "#4caf50",
+      "service-2": "#2196f3",
+      "service-3": "#ff9800",
+    };
+    return colorMap[name] || "#9CA3AF";
+  }),
+  clearServiceColorRegistry: vi.fn(),
+}));
+
 // Mock useTraces composable
 const mockSearchObj = {
   meta: {
@@ -86,6 +99,7 @@ const createMockSpan = (overrides = {}) => ({
   span_id: "span-1",
   operationName: "GET /api/users",
   serviceName: "service-1",
+  resolvedIdentity: "service-1",
   startOffsetMs: 0,
   durationMs: 100,
   depth: 0,
@@ -398,6 +412,7 @@ describe("FlameGraphView", () => {
       const unknownServiceSpan = [
         createMockSpan({
           serviceName: "unknown-service",
+          resolvedIdentity: "unknown-service",
         }),
       ];
 

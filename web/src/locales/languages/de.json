@@ -3195,7 +3195,10 @@
         "spans": "Spannweiten"
       }
     },
-    "openInFullView": "In Vollansicht öffnen"
+    "openInFullView": "In Vollansicht öffnen",
+    "serviceMap": "Karte des Service",
+    "patternView": "Musteransicht",
+    "spanView": "Span-Ansicht"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

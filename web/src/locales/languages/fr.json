@@ -3195,7 +3195,10 @@
         "spans": "S'étend"
       }
     },
-    "openInFullView": "Ouvrir en plein écran"
+    "openInFullView": "Ouvrir en plein écran",
+    "serviceMap": "Carte des services",
+    "patternView": "Affichage du motif",
+    "spanView": "Vue sur Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
