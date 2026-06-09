@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Grouped Services Table -->
-      <div class="tw:w-full tw:h-full">
+      <div class="tw:h-full tw:-mx-4">
         <div class="tw:h-[calc(100vh-21.25rem)]">
           <OTable
             :data="refreshing ? [] : filteredGroups"
