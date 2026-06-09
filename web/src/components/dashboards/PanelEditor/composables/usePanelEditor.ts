@@ -499,7 +499,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
     ["x", "y", "z", "breakdown"].forEach((axis) => {
       query?.fields?.[axis]?.forEach((it: any) => {
-        if (it.alias) aliases.push(it.alias);
+        if (!it.isDerived && it.alias) aliases.push(it.alias);
       });
     });
 
@@ -515,7 +515,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
     ];
     specialFields.forEach((fieldName) => {
       const field = query?.fields?.[fieldName];
-      if (field?.alias) aliases.push(field.alias);
+      if (field?.alias && !field?.isDerived) aliases.push(field.alias);
     });
 
     return aliases;
