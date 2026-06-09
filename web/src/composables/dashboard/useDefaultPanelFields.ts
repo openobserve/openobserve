@@ -14,18 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { buildDefaultSqlFields } from "@/utils/dashboard/defaultFields";
-
-// Chart types that drive their own builder and must not get the cartesian x/y seed.
-const SKIP_SEED_TYPES = [
-  "geomap",
-  "sankey",
-  "maps",
-  "custom_chart",
-  "html",
-  "markdown",
-  "heatmap",
-];
+import {
+  buildDefaultSqlFields,
+  SKIP_SEED_TYPES,
+} from "@/utils/dashboard/defaultFields";
 
 /**
  * Shared default-field seeding for the Add Panel and Metrics pages (both render

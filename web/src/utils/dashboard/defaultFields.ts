@@ -90,3 +90,35 @@ export const buildDefaultSqlFields = (
     y: [useValueMeasure ? DEFAULT_SQL_Y_FIELD_VALUE() : DEFAULT_SQL_Y_FIELD_COUNT()],
   };
 };
+
+// Chart types that drive their own builder and must not get the cartesian x/y seed.
+// heatmap is included because its measure lives on the Z/value axis — its Y axis is
+// a dimension that disallows aggregation, so a count(_timestamp) Y seed is invalid.
+export const SKIP_SEED_TYPES = [
+  "geomap",
+  "sankey",
+  "maps",
+  "custom_chart",
+  "html",
+  "markdown",
+  "heatmap",
+];
+
+/**
+ * Chart-type-aware default builder fields, computed synchronously from the
+ * already-loaded stream schema (no network). Mirrors applyDefaultPanelFields'
+ * axis rules: self-driven builders get nothing, metric gets a measure (y) but no
+ * x-axis, everything else gets the cartesian histogram-x + count/avg-y seed.
+ */
+export const buildDefaultBuilderFields = (
+  chartType: string,
+  streamType: string,
+  groupedFields: any[],
+  streamName?: string,
+): { x: any[]; y: any[] } => {
+  if (SKIP_SEED_TYPES.includes(chartType)) return { x: [], y: [] };
+  const { x, y } = buildDefaultSqlFields(streamType, groupedFields, streamName);
+  // metric has no x-axis — it renders a single measure.
+  if (chartType === "metric") return { x: [], y };
+  return { x, y };
+};

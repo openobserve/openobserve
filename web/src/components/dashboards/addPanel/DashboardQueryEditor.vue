@@ -316,7 +316,6 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import { inject } from "vue";
@@ -369,9 +368,6 @@ export default defineComponent({
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
-    );
-    const { applyDefaultPanelFields } = useDefaultPanelFields(
-      dashboardPanelDataPageKey,
     );
 
     const { getAllFunctions } = useFunctions();
@@ -523,15 +519,12 @@ export default defineComponent({
       return null;
     });
 
-    const addTab = async () => {
+    const addTab = () => {
+      // addQuery() seeds the new query's default builder fields (and PromQL
+      // sample query) synchronously, so the tab is ready the moment it activates.
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
-      // Seed the new query with chart-type-aware default fields, mirroring the
-      // Add Panel page: x+y (histogram/count) for cartesian charts, y-only for
-      // metric, nothing for self-driven builders (heatmap/geomap/custom/…). Also
-      // sets the `${stream}{}` sample query when in PromQL mode.
-      await applyDefaultPanelFields();
     };
 
     const updatePromQLQuery = async (value, event) => {

@@ -140,6 +140,12 @@ describe("useDashboardPanel", () => {
     panel.addQuery();
     expect(panel.dashboardPanelData.data.queries).toHaveLength(2);
     expect(panel.dashboardPanelData.data.queries[1].fields.stream).toBe("stream-a");
+    // New query is seeded synchronously with default builder fields so the tab
+    // is ready the moment it activates (no async race with stream selection).
+    expect(panel.dashboardPanelData.data.queries[1].fields.y).toHaveLength(1);
+    expect(panel.dashboardPanelData.data.queries[1].fields.y[0].functionName).toBe(
+      "count",
+    );
 
     panel.removeQuery(1);
     expect(panel.dashboardPanelData.data.queries).toHaveLength(1);

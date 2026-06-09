@@ -36,6 +36,7 @@ import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation
 import {
   DEFAULT_SQL_X_FIELD,
   DEFAULT_SQL_Y_FIELD_COUNT,
+  buildDefaultBuilderFields,
 } from "@/utils/dashboard/defaultFields";
 import {
   getDefaultDashboardPanelData,
@@ -165,6 +166,25 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         weight_fixed: 1,
       },
     };
+    // Seed the new query's default builder fields synchronously (mirrors the
+    // first query) so the tab is fully configured the moment it becomes active —
+    // an async seed would race with the user/test selecting a stream next.
+    // PromQL gets the `${stream}{}` sample query; SQL gets chart-type-aware x/y.
+    if (dashboardPanelData.data.queryType === "promql") {
+      if (newQuery.fields.stream) {
+        newQuery.query = `${newQuery.fields.stream}{}`;
+      }
+    } else {
+      const { x, y } = buildDefaultBuilderFields(
+        dashboardPanelData.data.type,
+        newQuery.fields.stream_type,
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+        newQuery.fields.stream,
+      );
+      newQuery.fields.x = x;
+      newQuery.fields.y = y;
+    }
+
     dashboardPanelData.data.queries.push(newQuery);
     // Initialize per-query field cache in meta
     getQueryFields(dashboardPanelData.data.queries.length - 1);

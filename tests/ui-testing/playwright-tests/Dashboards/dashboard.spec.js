@@ -710,8 +710,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
 
-    // Configure table chart with custom SQL using camelCase aliases
+    // Configure table chart with custom SQL using camelCase aliases.
+    // Remove both auto-seeded builder fields — this test supplies its own
+    // xAxis1/yAxis1 columns, and a stale y_axis_1 would add an empty column.
     await pm.chartTypeSelector.removeField("x_axis_1", "x");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.selectChartType("table");
 
     await pm.chartTypeSelector.setCustomSQL(

@@ -20,6 +20,8 @@ import {
   DEFAULT_SQL_Y_FIELD_VALUE,
   hasValueColumn,
   buildDefaultSqlFields,
+  buildDefaultBuilderFields,
+  SKIP_SEED_TYPES,
 } from "./defaultFields";
 
 describe("defaultFields", () => {
@@ -134,6 +136,37 @@ describe("defaultFields", () => {
       const { x, y } = buildDefaultSqlFields("logs", logsSchema, "logs");
       expect(x).toHaveLength(1);
       expect(y).toHaveLength(1);
+    });
+  });
+
+  describe("buildDefaultBuilderFields", () => {
+    const logsSchema = [{ name: "logs", schema: [{ name: "_timestamp" }] }];
+
+    it("cartesian chart (bar): seeds histogram x + count y", () => {
+      const { x, y } = buildDefaultBuilderFields("bar", "logs", logsSchema, "logs");
+      expect(x).toHaveLength(1);
+      expect(x[0].functionName).toBe("histogram");
+      expect(y).toHaveLength(1);
+      expect(y[0].functionName).toBe("count");
+    });
+
+    it("metric: seeds y only (no x-axis)", () => {
+      const { x, y } = buildDefaultBuilderFields("metric", "logs", logsSchema, "logs");
+      expect(x).toHaveLength(0);
+      expect(y).toHaveLength(1);
+      expect(y[0].functionName).toBe("count");
+    });
+
+    it.each(SKIP_SEED_TYPES)("%s: seeds nothing (self-driven builder)", (type) => {
+      const { x, y } = buildDefaultBuilderFields(type, "logs", logsSchema, "logs");
+      expect(x).toHaveLength(0);
+      expect(y).toHaveLength(0);
+    });
+
+    it("metrics stream with value column: seeds avg(value) y", () => {
+      const grouped = [{ name: "m1", schema: [{ name: "value" }] }];
+      const { y } = buildDefaultBuilderFields("bar", "metrics", grouped, "m1");
+      expect(y[0].functionName).toBe("avg");
     });
   });
 });
