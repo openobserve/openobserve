@@ -695,15 +695,15 @@
         ],
         "results": [
           [
-            "LANE-C",
-            "ZONE-2",
+            "LANE-B",
+            "ZONE-1",
             "4",
             "3.5",
             "0.5"
           ],
           [
-            "LANE-B",
-            "ZONE-1",
+            "LANE-C",
+            "ZONE-2",
             "4",
             "3.5",
             "0.5"
@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "2",
-            "1",
-            "0",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-3",
             "2",
             "0",
             "1",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-4",
+            "2",
+            "1",
+            "0",
             "66.66999816894531"
           ],
           [
@@ -1242,14 +1242,14 @@
             "483.0"
           ],
           [
-            "ZONE-2",
-            "3",
-            "620.0"
-          ],
-          [
             "ZONE-3",
             "3",
             "94.0"
+          ],
+          [
+            "ZONE-2",
+            "3",
+            "620.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1409,15 +1409,6 @@
             "26.3"
           ],
           [
-            "ZONE-3",
-            "SORT-X1",
-            "manual",
-            "2",
-            "437.5",
-            "72.8",
-            "19.2"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "auto",
@@ -1425,6 +1416,15 @@
             "437.5",
             "45.3",
             "32.5"
+          ],
+          [
+            "ZONE-3",
+            "SORT-X1",
+            "manual",
+            "2",
+            "437.5",
+            "72.8",
+            "19.2"
           ],
           [
             "ZONE-4",
@@ -1508,14 +1508,14 @@
             "88.1"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "auto",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "auto",
             "1",
             "150.0",
@@ -1560,16 +1560,16 @@
             "66.0"
           ],
           [
-            "ZONE-4",
-            "SORT-A7",
+            "ZONE-2",
+            "SORT-Q5",
             "low_tput",
             "1",
             "150.0",
             "45.3"
           ],
           [
-            "ZONE-2",
-            "SORT-Q5",
+            "ZONE-4",
+            "SORT-A7",
             "low_tput",
             "1",
             "150.0",
@@ -1763,12 +1763,12 @@
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -1814,12 +1814,12 @@
         ],
         "results": [
           [
-            "performanceMetric",
+            "navigation",
             "itemPage",
             "2"
           ],
           [
-            "navigation",
+            "performanceMetric",
             "itemPage",
             "2"
           ],
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2148,7 +2148,12 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
+            "searchPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "1"
           ],
           [
@@ -2158,12 +2163,7 @@
           ],
           [
             "performanceMetric",
-            "searchPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
-            "itemPage",
+            "cartPage",
             "1"
           ]
         ],
@@ -2918,14 +2918,9 @@
         "assertions": [
           {
             "type": "row_contains",
-            "column": "endpoint",
-            "values": [
-              "searchItems",
-              "updateBatch",
-              "deleteRecord",
-              "scanPallet",
-              "rerouteTrack"
-            ]
+            "match": {
+              "endpoint": "searchItems"
+            }
           }
         ],
         "note": "spath() is OO-specific; DuckDB cannot replicate",

@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
@@ -174,15 +174,15 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
-            "2",
-            "582.5"
-          ],
-          [
-            "ZONE-1",
             "auto",
             "2",
             "870.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "2",
+            "582.5"
           ],
           [
             "ZONE-2",
@@ -210,15 +210,15 @@
           ],
           [
             "ZONE-4",
-            "hybrid",
-            "2",
-            "437.5"
-          ],
-          [
-            "ZONE-4",
             "auto",
             "2",
             "385.0"
+          ],
+          [
+            "ZONE-4",
+            "hybrid",
+            "2",
+            "437.5"
           ]
         ],
         "results_mode": "rowsort"
@@ -289,14 +289,14 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "1"
+          ],
+          [
+            "ZONE-2",
+            "4",
+            "2"
           ],
           [
             "ZONE-4",
@@ -849,6 +849,21 @@
           [
             "0",
             "1",
+            "1",
+            "0",
+            "1",
+            "0",
+            "E004",
+            "@warehouse-Android-sort-v1",
+            "UP-E008",
+            "SecurityException: unauthorized access to control_center CC-ALPHA",
+            "SORT-Q5-UP-E008-E004",
+            "SORT-Q5",
+            "Android"
+          ],
+          [
+            "0",
+            "1",
             "0",
             "1",
             "0",
@@ -875,21 +890,6 @@
             "SORT-M3--E005",
             "SORT-M3",
             "iOS"
-          ],
-          [
-            "0",
-            "1",
-            "1",
-            "0",
-            "1",
-            "0",
-            "E004",
-            "@warehouse-Android-sort-v1",
-            "UP-E008",
-            "SecurityException: unauthorized access to control_center CC-ALPHA",
-            "SORT-Q5-UP-E008-E004",
-            "SORT-Q5",
-            "Android"
           ]
         ],
         "results_mode": "rowsort"
@@ -996,20 +996,20 @@
             "0"
           ],
           [
-            "US-CENTRAL",
-            "1",
-            "0.0",
-            "555.0",
-            "22.0",
-            "1"
-          ],
-          [
             "SA-EAST",
             "1",
             "290.0",
             "0.0",
             "18.5",
             "0"
+          ],
+          [
+            "US-CENTRAL",
+            "1",
+            "0.0",
+            "555.0",
+            "22.0",
+            "1"
           ],
           [
             "AP-CENTRAL",
@@ -1272,23 +1272,23 @@
         ],
         "results": [
           [
-            "batch-sync",
-            "1",
-            "1"
-          ],
-          [
             "track-router",
-            "2",
-            "1"
-          ],
-          [
-            "pallet-mapper",
             "2",
             "1"
           ],
           [
             "lane-monitor",
             "1",
+            "1"
+          ],
+          [
+            "batch-sync",
+            "1",
+            "1"
+          ],
+          [
+            "pallet-mapper",
+            "2",
             "1"
           ]
         ],
@@ -1316,12 +1316,12 @@
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1"
           ]
@@ -1569,11 +1569,11 @@
         ],
         "results": [
           [
-            "E005",
+            "E003",
             "2"
           ],
           [
-            "E003",
+            "E005",
             "2"
           ],
           [
@@ -1624,7 +1624,7 @@
         "results": [
           [
             "itemPage",
-            "E009, E001"
+            "E001, E009"
           ]
         ],
         "results_mode": "rowsort",
@@ -1783,12 +1783,12 @@
         ],
         "results": [
           [
-            "cartPage",
+            "checkoutPage",
             "2",
             "2"
           ],
           [
-            "checkoutPage",
+            "cartPage",
             "2",
             "2"
           ],
@@ -2446,11 +2446,11 @@
             "1"
           ],
           [
-            "batch-sync",
+            "lane-monitor",
             "1"
           ],
           [
-            "lane-monitor",
+            "batch-sync",
             "1"
           ]
         ],

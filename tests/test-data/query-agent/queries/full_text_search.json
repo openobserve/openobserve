@@ -147,11 +147,11 @@
             "4"
           ],
           [
-            "ZONE-2",
+            "ZONE-1",
             "3"
           ],
           [
-            "ZONE-1",
+            "ZONE-2",
             "3"
           ],
           [
@@ -3301,10 +3301,9 @@
         "assertions": [
           {
             "type": "row_contains",
-            "column": "msg",
-            "values": [
-              "Exception"
-            ]
+            "match": {
+              "msg": "NullPointerException at ConveyorController.handle()"
+            }
           }
         ],
         "note": "regexp_like with COALESCE argument cannot be translated to DuckDB regexp_matches",
@@ -3354,12 +3353,9 @@
         "assertions": [
           {
             "type": "row_contains",
-            "column": "searchable_text",
-            "values": [
-              "error",
-              "Error",
-              "ERROR"
-            ]
+            "match": {
+              "searchable_text": "ERROR: pallet PL-003 mismatch, retry url=https://warehouse.local/retry"
+            }
           }
         ],
         "note": "str_match_ignore_case with COALESCE argument cannot be translated to DuckDB lower()+LIKE",

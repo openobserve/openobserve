@@ -738,17 +738,17 @@
             "0.0"
           ],
           [
-            "ZONE-1",
-            "SORT-M3",
-            "581.25",
-            "68.18",
-            "0.0"
-          ],
-          [
             "ZONE-4",
             "SORT-A7",
             "498.33",
             "29.7",
+            "0.0"
+          ],
+          [
+            "ZONE-1",
+            "SORT-M3",
+            "581.25",
+            "68.18",
             "0.0"
           ],
           [
@@ -864,22 +864,6 @@
           ],
           [
             "2",
-            "updateBatch"
-          ],
-          [
-            "2",
-            "checkThreshold"
-          ],
-          [
-            "2",
-            "deleteRecord"
-          ],
-          [
-            "2",
-            "retryScan"
-          ],
-          [
-            "2",
             "syncZone"
           ],
           [
@@ -889,6 +873,22 @@
           [
             "1",
             "archiveLog"
+          ],
+          [
+            "2",
+            "updateBatch"
+          ],
+          [
+            "2",
+            "retryScan"
+          ],
+          [
+            "2",
+            "checkThreshold"
+          ],
+          [
+            "2",
+            "deleteRecord"
           ]
         ],
         "results_mode": "rowsort"
@@ -985,17 +985,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "4",
-            "653.75",
-            "0",
-            "2"
-          ],
-          [
             "ZONE-2",
             "4",
             "421.25",
             "2",
+            "2"
+          ],
+          [
+            "ZONE-3",
+            "4",
+            "653.75",
+            "0",
             "2"
           ],
           [
@@ -1056,6 +1056,18 @@
             "89.0"
           ],
           [
+            "DeleteRecord",
+            "pending",
+            "1",
+            "1450.0"
+          ],
+          [
+            "SearchItems",
+            "syncing",
+            "1",
+            "45.0"
+          ],
+          [
             "RerouteTrack",
             "ok",
             "1",
@@ -1066,18 +1078,6 @@
             "warning",
             "1",
             "1900.0"
-          ],
-          [
-            "SearchItems",
-            "syncing",
-            "1",
-            "45.0"
-          ],
-          [
-            "DeleteRecord",
-            "pending",
-            "1",
-            "1450.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1134,7 +1134,7 @@
             "84.0"
           ],
           [
-            "ZONE-2",
+            "ZONE-4",
             "AUTO",
             "1",
             "45.3",
@@ -1144,7 +1144,7 @@
             "0.0"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
             "AUTO",
             "1",
             "45.3",
@@ -1176,20 +1176,20 @@
         ],
         "results": [
           [
-            "MED_LOAD",
-            "MED_TPUT",
-            "4",
-            "18.85",
-            "1060",
-            "2.8"
-          ],
-          [
             "HIGH_LOAD",
             "HIGH_TPUT",
             "4",
             "25.45",
             "520",
             "3.5"
+          ],
+          [
+            "MED_LOAD",
+            "MED_TPUT",
+            "4",
+            "18.85",
+            "1060",
+            "2.8"
           ],
           [
             "LOW_LOAD",
@@ -1292,15 +1292,15 @@
         ],
         "results": [
           [
-            "Windows 11",
-            "performanceMetric",
-            "2",
-            "100.0"
-          ],
-          [
             "Android 14",
             "navigation",
             "1",
+            "100.0"
+          ],
+          [
+            "Windows 11",
+            "performanceMetric",
+            "2",
             "100.0"
           ]
         ],
@@ -1323,11 +1323,6 @@
         ],
         "results": [
           [
-            "https://shop.example.com/item/1003",
-            "2",
-            "1"
-          ],
-          [
             "https://shop.example.com/item/1004",
             "2",
             "1"
@@ -1336,6 +1331,11 @@
             "itemPage-fallback",
             "2",
             "2"
+          ],
+          [
+            "https://shop.example.com/item/1003",
+            "2",
+            "1"
           ],
           [
             "https://shop.example.com/search?q=test",
@@ -1403,20 +1403,6 @@
             "12"
           ],
           [
-            "scan-hub",
-            "itemPage",
-            "2",
-            "45.0",
-            "45"
-          ],
-          [
-            "track-router",
-            "searchPage",
-            "1",
-            "230.0",
-            "230"
-          ],
-          [
             "conveyor-driver",
             "searchPage",
             "2",
@@ -1429,6 +1415,20 @@
             "1",
             "1900.0",
             "1900"
+          ],
+          [
+            "scan-hub",
+            "itemPage",
+            "2",
+            "45.0",
+            "45"
+          ],
+          [
+            "track-router",
+            "searchPage",
+            "1",
+            "230.0",
+            "230"
           ]
         ],
         "results_mode": "rowsort"
@@ -1450,14 +1450,14 @@
         ],
         "results": [
           [
-            "browse",
-            "1",
-            "1"
-          ],
-          [
             "monitoring",
             "6",
             "2"
+          ],
+          [
+            "browse",
+            "1",
+            "1"
           ]
         ],
         "results_mode": "rowsort"
@@ -1479,8 +1479,8 @@
         ],
         "results": [
           [
-            "E009",
-            "1",
+            "E006",
+            "2",
             "1"
           ],
           [
@@ -1489,8 +1489,8 @@
             "1"
           ],
           [
-            "E006",
-            "2",
+            "E009",
+            "1",
             "1"
           ]
         ],
@@ -1680,13 +1680,13 @@
         ],
         "results": [
           [
-            "cartPage",
+            "checkoutPage",
             "2",
             "2",
             "100.0"
           ],
           [
-            "checkoutPage",
+            "cartPage",
             "2",
             "2",
             "100.0"
@@ -1831,13 +1831,13 @@
         ],
         "results": [
           [
-            "warehouse-east",
+            "warehouse-west",
             "1",
             "0",
             "0.0"
           ],
           [
-            "warehouse-west",
+            "warehouse-east",
             "1",
             "0",
             "0.0"
@@ -2479,16 +2479,16 @@
             "3200.0"
           ],
           [
-            "Allowlisted",
-            "threat",
-            "1",
-            "78.0"
-          ],
-          [
             "none",
             "threat",
             "1",
             "567.0"
+          ],
+          [
+            "Allowlisted",
+            "threat",
+            "1",
+            "78.0"
           ]
         ],
         "results_mode": "rowsort"

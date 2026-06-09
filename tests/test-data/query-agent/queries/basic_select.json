@@ -647,13 +647,13 @@
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-A1"
+            "BS-2026-C3"
           ],
           [
             "SORT-M3",
             "manual",
             "ZONE-1",
-            "BS-2026-C3"
+            "BS-2026-A1"
           ],
           [
             "SORT-Q5",
@@ -1581,19 +1581,19 @@
         ],
         "results": [
           [
-            "[\"scraping_pattern\",\"high_freq\"]",
-            "2"
-          ],
-          [
-            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
-            "2"
-          ],
-          [
             "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
           [
             "[\"credential_stuffing\"]",
+            "2"
+          ],
+          [
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
+            "[\"rate_limit_exceeded\",\"geo_anomaly\"]",
             "2"
           ]
         ],
