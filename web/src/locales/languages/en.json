@@ -685,7 +685,7 @@
     "search": "Logs",
     "traces": "Traces",
     "evals": "Evaluations",
-    "aiObservability": "AI Monitoring",
+    "aiObservability": "AI",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
@@ -4408,7 +4408,7 @@
     "tierConditionalName": "Conditional Tier"
   },
   "aiObservability": {
-    "title": "AI Monitoring",
+    "title": "AI Observability",
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evaluate"
