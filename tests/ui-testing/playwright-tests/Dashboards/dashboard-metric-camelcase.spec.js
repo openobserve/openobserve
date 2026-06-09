@@ -119,6 +119,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS totalcount FROM "${STREAM_NAME}"`
     );
 
+    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     // Add the lowercase alias as Y-axis field (metric chart requires Y-axis to render)
     await pm.chartTypeSelector.searchAndAddField("totalcount", "y");
     testLogger.info("Custom SQL with lowercase alias entered");
@@ -155,6 +157,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS metricValue FROM "${STREAM_NAME}" WHERE kubernetes_container_name = 'nonexistent_container_xyz_99999'`
     );
 
+    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     // Add Y-axis field (metric chart requires Y-axis to render)
     await pm.chartTypeSelector.searchAndAddField("metricValue", "y");
     testLogger.info("Custom SQL with non-existent filter entered");
@@ -215,6 +219,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
       `SELECT count(*) AS countRecords FROM "${STREAM_NAME}"`
     );
 
+    // Remove the default seeded Y (count) before adding ours — metric allows one Y.
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     // Add the camelCase alias as Y-axis field (metric chart requires Y-axis to render)
     await pm.chartTypeSelector.searchAndAddField("countRecords", "y");
     testLogger.info("Custom SQL with camelCase alias entered");
