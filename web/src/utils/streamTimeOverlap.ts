@@ -84,12 +84,13 @@ export function enrichStreamsWithOverlap(
   });
 }
 
-// Stable sort: has-data first, no-data last; preserves input order within each bucket.
+// Sort: has-data first (by doc_time_max desc — most recently active first), no-data last.
 export function sortStreamsByOverlap(
   streams: StreamWithOverlap[],
 ): StreamWithOverlap[] {
   const yes: StreamWithOverlap[] = [];
   const no: StreamWithOverlap[] = [];
   for (const s of streams) (s.overlap === "yes" ? yes : no).push(s);
+  yes.sort((a, b) => (b.doc_time_max ?? 0) - (a.doc_time_max ?? 0));
   return [...yes, ...no];
 }

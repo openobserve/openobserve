@@ -53,16 +53,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('correlation.correlatedTraces')"
           />
         </OTabs>
+      </div>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:pr-3 tw:shrink-0">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
-      </div>
-      <div
-        v-show="tab === 'table'"
-        class="col-auto tw:flex tw:justify-end align-center tw:pr-3"
-      >
         <OSwitch
+          v-show="tab === 'table'"
           data-test="log-detail-wrap-values-toggle-btn"
           v-model="shouldWrapValues"
           :label="t('common.wrap')"
@@ -78,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTabPanels
       data-test="log-detail-tab-container"
       v-model="tab"
-      animated
       keep-alive
       grow
     >

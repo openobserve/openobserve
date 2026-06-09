@@ -83,12 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="source-event-banner tw:flex tw:items-start tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
         <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
-        <q-badge
+        <OBadge
           v-if="sourceEvent.severity"
           :class="severityClass(sourceEvent.severity)"
-          :label="sourceEvent.severity"
           class="tw:px-2"
-        />
+        >{{ sourceEvent.severity }}</OBadge>
         <span class="tw:text-xs tw:font-mono tw:opacity-80">
           {{ formatEventTimestamp(sourceEvent.timestamp) }}
         </span>
@@ -127,9 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="dim-chip-eq">=</span>
           <span class="dim-chip-value">{{ chip.value }}</span>
           <OIcon v-if="activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled && !chip.active" name="swap-horiz" size="xs" class="dim-chip-filter-hint" />
-          <q-tooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled">
-            No metric streams found for this {{ chip.label.toLowerCase() }}
-          </q-tooltip>
+          <OTooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled" :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
         </div>
         <div
           v-if="hiddenChipCount > 0"
@@ -621,12 +618,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="source-event-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
       <span class="tw:text-xs tw:font-semibold tw:opacity-70">Source event</span>
-      <q-badge
+      <OBadge
         v-if="sourceEvent.severity"
         :class="severityClass(sourceEvent.severity)"
-        :label="sourceEvent.severity"
         class="tw:px-2"
-      />
+      >{{ sourceEvent.severity }}</OBadge>
       <span class="tw:text-xs tw:font-mono tw:opacity-80">
         {{ formatEventTimestamp(sourceEvent.timestamp) }}
       </span>
@@ -665,9 +661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="dim-chip-eq">=</span>
         <span class="dim-chip-value">{{ chip.value }}</span>
         <OIcon v-if="activeTab === 'metrics' && chip.kind === 'subject' && !chip.disabled && !chip.active" name="swap-horiz" size="xs" class="dim-chip-filter-hint" />
-        <q-tooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled">
-          No metric streams found for this {{ chip.label.toLowerCase() }}
-        </q-tooltip>
+        <OTooltip v-if="activeTab === 'metrics' && chip.kind === 'subject' && chip.disabled" :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
       </div>
       <div
         v-if="hiddenChipCount > 0"
@@ -1263,6 +1257,7 @@ import {
   buildSubjectButtons,
   streamMatchesPatterns,
   SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
   type SubjectButton,
 } from "@/composables/useMetricSubjectButtons";
 import {
@@ -1437,6 +1432,7 @@ const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
 let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
 const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
 let wasEmptyBeforeChange = false; // Track if we're transitioning from empty state
+let suppressNextStreamReload = false; // Set when a full reload is already scheduled (e.g. chip click)
 
 // Trace correlation state
 const tracesLoading = ref(false);
@@ -1679,16 +1675,10 @@ const titleCaseWord = (w: string): string => {
 const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
 
 const dimensionDisplayLabelCache = new Map<string, string>();
-let dimensionDisplayLabelCacheKey: any = null;
 const dimensionDisplayLabel = (key: string): string => {
-  if (dimensionDisplayLabelCacheKey !== semanticGroups.value) {
-    dimensionDisplayLabelCache.clear();
-    dimensionDisplayLabelCacheKey = semanticGroups.value;
-  }
   const cached = dimensionDisplayLabelCache.get(key);
   if (cached !== undefined) return cached;
-  const group = semanticGroups.value.find((g) => g.id === key);
-  const label = group?.display ?? titleCase(key.replace(/[-_]/g, " "));
+  const label = titleCase(key.replace(/[-_.]/g, " "));
   dimensionDisplayLabelCache.set(key, label);
   return label;
 };
@@ -1753,7 +1743,8 @@ type DimensionChip = {
 
 const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
-  const specs = SUBJECT_BUTTONS_BY_SET[props.matchedSetId];
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
   if (!specs?.length) return new Set();
   return new Set(specs.flatMap((s) => s.semanticIds));
 });
@@ -1813,7 +1804,12 @@ const unifiedChips = computed<DimensionChip[]>(() =>
         disabled: isSubject && matchCount === 0,
       };
     })
-    .filter((c) => c.value && c.value !== SELECT_ALL_VALUE),
+    .filter((c) => {
+      if (!c.value || c.value === SELECT_ALL_VALUE) return false;
+      // Subject chips (Pod, Node, Host) are only meaningful on the metrics tab
+      if (c.kind === "subject" && activeTab.value !== "metrics") return false;
+      return true;
+    }),
 );
 
 const CHIP_COLOR_PALETTE = [
@@ -1848,13 +1844,14 @@ const pinSubject = (newSubject: string | null, previousSubject: string | null) =
 };
 
 const onChipClick = (chip: DimensionChip) => {
-  if (chip.kind !== "subject") return; // only subject chips are interactive
+  if (chip.kind !== "subject") return;
   if (chip.disabled) return;
   if (activeTab.value !== "metrics") return;
   if (activeSubject.value === chip.key) return; // already active — radio, no toggle off
   const previous = activeSubject.value;
   activeSubject.value = chip.key;
   pinSubject(chip.key, previous);
+  suppressNextStreamReload = true;
   applyActivePill();
   dashboardData.value = null;
   applyDimensionChanges();
@@ -1869,7 +1866,8 @@ watch(
     } else if (!matchedSetId) {
       activeSubject.value = null;
     } else {
-      const specs = SUBJECT_BUTTONS_BY_SET[matchedSetId];
+      const canonical = resolveSetId(matchedSetId);
+      const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
       if (!specs?.length) {
         activeSubject.value = null;
       } else {
@@ -1953,9 +1951,10 @@ const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
   return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
 };
 
-const streamsForActivePill = computed<StreamInfo[]>(() =>
-  filterByIntent(applyScopeFilter(uniqueMetricStreams.value), activeIntent.value, props.matchedSetId, activeSubjectButtonId.value),
-);
+const streamsForActivePill = computed<StreamInfo[]>(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return filterByIntent(scoped, activeIntent.value, props.matchedSetId, activeSubjectButtonId.value);
+});
 
 const pillDescriptors = computed(() => {
   const scoped = applyScopeFilter(uniqueMetricStreams.value);
@@ -2339,6 +2338,7 @@ const loadDashboard = async () => {
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
       metricSchemas: metricSchemas,
+      semanticGroups: semanticGroups.value,
     };
 
     // Generate metrics dashboard JSON (if we have metrics)
@@ -2442,6 +2442,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         sourceType: props.sourceType,
         availableDimensions: props.availableDimensions,
         metricSchemas: newSchemas,
+        semanticGroups: semanticGroups.value,
       };
 
       const newDashboard = generateDashboard(
@@ -2513,6 +2514,7 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
       metricSchemas: store.state.streams.metrics || {},
+      semanticGroups: semanticGroups.value,
     };
     regenerateGroupDashboards(groupConfig);
 
@@ -2976,7 +2978,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
-              size: 50,
+              size: 10,
             },
             type: "traces",
             traceId,
@@ -3230,6 +3232,11 @@ watch(
         currentPanels.length === 0
       ) {
         wasEmptyBeforeChange = false;
+        // Skip if a full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+        if (suppressNextStreamReload) {
+          suppressNextStreamReload = false;
+          return;
+        }
         if (isOpen.value && currentStreams.length > 0) {
           dashboardData.value = null;
           loadDashboard();
@@ -3269,7 +3276,10 @@ watch(
       }
 
       if (isOpen.value && currentStreams.length > 0) {
-        if (panelsToRemove.length > 0) {
+        if (suppressNextStreamReload) {
+          // A full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+          suppressNextStreamReload = false;
+        } else if (panelsToRemove.length > 0) {
           // If panels need to be removed, do full reload
           dashboardData.value = null;
           nextTick(() => {
