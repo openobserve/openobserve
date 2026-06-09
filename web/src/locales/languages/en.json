@@ -686,6 +686,7 @@
     "search": "Logs",
     "traces": "Traces",
     "evals": "Evaluations",
+    "aiObservability": "AI Observability",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
@@ -4410,6 +4411,21 @@
     "errLoadModel": "Failed to load model",
     "tierDefaultName": "Default",
     "tierConditionalName": "Conditional Tier"
+  },
+  "aiObservability": {
+    "title": "LLM Observability",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evaluate"
+    },
+    "nav": {
+      "overview": "Overview",
+      "sessions": "Sessions",
+      "quality": "Quality",
+      "evalJobs": "Eval Jobs",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score Configs"
+    }
   },
   "onlineEvals": {
     "title": "Evaluations",

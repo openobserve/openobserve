@@ -569,12 +569,12 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the Evaluations menu entry based on the live config
+    // Insert / remove the AI Observability menu entry based on the live config
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
-    const updateOnlineEvalsMenu = () => {
+    const updateAIObservabilityMenu = () => {
       const existingIndex = linksList.value.findIndex(
-        (link: any) => link.name === "onlineEvals",
+        (link: any) => link.name === "aiObservability",
       );
 
       if (isOnlineEvalsEnabled.value) {
@@ -584,10 +584,10 @@ export default defineComponent({
         );
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
         linksList.value.splice(insertAt, 0, {
-          title: t("menu.evals"),
-          icon: "check-circle-outline",
-          link: "/online-evals",
-          name: "onlineEvals",
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
+          link: "/ai",
+          name: "aiObservability",
         });
       } else if (existingIndex !== -1) {
         linksList.value.splice(existingIndex, 1);
@@ -596,12 +596,12 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
-      updateOnlineEvalsMenu();
+      updateAIObservabilityMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus
