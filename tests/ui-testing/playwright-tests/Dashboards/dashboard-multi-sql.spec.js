@@ -749,8 +749,12 @@ test.describe("Multi-SQL Query Support", () => {
       // Q1: valid bar chart with y-field configured
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
 
-      // Add Q2 and intentionally leave it empty (no stream, no fields)
+      // Add Q2 and intentionally make it invalid. New tabs now auto-seed
+      // histogram x + count y, so strip both fields to leave Q2 unconfigured —
+      // an empty query is what surfaces the execution error under test.
       await msql.addQueryTab(1);
+      await pm.chartTypeSelector.removeField("x_axis_1", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
 
       // Switch back to Q1 — error from Q2 should surface regardless of active tab
       await msql.switchToQueryTab(0);
