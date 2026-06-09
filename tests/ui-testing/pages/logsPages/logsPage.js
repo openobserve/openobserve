@@ -9076,6 +9076,33 @@ export class LogsPage {
     }
 
     /**
+     * Wait for the search-bar query editor to contain non-empty content.
+     * Use this after switching to Build tab in SQL mode to ensure makeAutoSQLQuery()
+     * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
+     * Fails the test if the editor stays empty beyond the timeout.
+     */
+    async expectQueryEditorPopulated(timeout = 30000) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const domNode = ed.getDomNode?.();
+                    if (domNode && host.contains(domNode)) {
+                        const val = ed.getValue();
+                        return val && val.trim().length > 0;
+                    }
+                }
+                return false;
+            },
+            '[data-test="logs-search-bar-query-editor"]',
+            { timeout, polling: 500 }
+        );
+        testLogger.info('Query editor populated');
+    }
+
+    /**
      * Get the current chart type from the UI (theme-aware)
      * Checks parent element for bg-grey-3 (light) or bg-grey-5 (dark) to detect selection.
      * @returns {Promise<string|null>} The current chart type or null

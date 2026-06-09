@@ -394,9 +394,12 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
-        // Wait for builder to fully initialize (makeAutoSQLQuery needs the updateGroupedFields
-        // API call to complete before it can populate the editor — CI is slower than local)
+        // Wait for builder toggle to be active AND for the editor to actually contain SQL.
+        // expectBuilderModeActive() passes as soon as the toggle state is set (from the
+        // PanelEditor immediate watcher), but makeAutoSQLQuery() needs the updateGroupedFields
+        // API call to finish first — that takes longer in CI.
         await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.expectQueryEditorPopulated();
 
         const editorText = await pm.logsPage.getQueryEditorText();
         expect(editorText.toLowerCase()).toContain('select');
@@ -413,9 +416,11 @@ test.describe("Logs Query Builder - Search Bar Editor State", () => {
         const histogramQuery = 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
         await setupQueryAndSwitchToBuild(pm, page, histogramQuery);
 
-        // Wait for builder to fully initialize before switching to Custom mode,
-        // so queries[0].query is populated by makeAutoSQLQuery() before onBuildModeToggle reads it
+        // Wait for builder toggle AND editor content before switching to Custom mode.
+        // onBuildModeToggle reads queries[0].query to populate the editor; that value
+        // is set by makeAutoSQLQuery() which needs the updateGroupedFields API call first.
         await pm.logsPage.expectBuilderModeActive();
+        await pm.logsPage.expectQueryEditorPopulated();
 
         await pm.logsPage.clickCustomQueryType();
         await pm.logsPage.expectCustomModeActive();
