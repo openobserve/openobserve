@@ -273,10 +273,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -843,18 +839,6 @@ export default defineComponent({
       streamActiveTab.value = tab;
       onChangeStreamFilter(tab);
     };
-    // Publish the module breadcrumb to the top chrome bar (Streams is a flat L1
-    // page; the crumb is just the module name). `crumbs` reads only `t`, so the
-    // immediate watch is TDZ-safe here.
-    const crumbs = computed<Crumb[]>(() => [
-      { label: t("logStream.header"), icon: "window", current: true },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
-
     return {
       t,
       router,

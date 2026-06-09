@@ -38,12 +38,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
 
-vi.mock("@/composables/useAppBreadcrumb", () => ({
-  useAppBreadcrumb: () => ({
-    publish: vi.fn(),
-    clear: vi.fn(),
-  }),
-}));
 
 // Mock Vuex store
 const mockStore = {

@@ -678,10 +678,6 @@ import {
 } from "vue";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -2634,17 +2630,6 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
-
-    // Publish the module breadcrumb to the top chrome bar (Alerts is a flat L1
-    // page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
-    const crumbs = computed<Crumb[]>(() => [
-      { label: t("alerts.header"), icon: "shield-alert-outline", current: true },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
 
     return {
       t,

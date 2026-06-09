@@ -23,12 +23,6 @@ vi.mock("@/components/pipeline/PipelineSectionTabs.vue", () => ({
   },
 }));
 
-vi.mock("@/composables/useAppBreadcrumb", () => ({
-  useAppBreadcrumb: () => ({
-    publish: vi.fn(),
-    clear: vi.fn(),
-  }),
-}));
 
 vi.mock("@/plugins/pipelines/useDnD", () => ({
   pipelineObj: {

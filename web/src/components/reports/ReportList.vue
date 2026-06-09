@@ -303,16 +303,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 
-import { ref, onBeforeMount, onActivated, onDeactivated, onUnmounted, reactive, computed, watch, defineAsyncComponent } from "vue";
+import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -343,15 +339,6 @@ const router = useRouter();
 const { track } = useReo();
 const store = useStore();
 
-// Publish the module breadcrumb to the top chrome bar (Reports is a flat L1 page).
-const crumbs = computed<Crumb[]>(() => [
-  { label: t("reports.header"), icon: "description", current: true },
-]);
-const { publish, clear } = useAppBreadcrumb();
-watch(crumbs, (c) => publish(c), { immediate: true });
-onActivated(() => publish(crumbs.value));
-onDeactivated(clear);
-onUnmounted(clear);
 
 // ── Folder state ──────────────────────────────────────────────────────────────
 const splitterModel = ref(200);

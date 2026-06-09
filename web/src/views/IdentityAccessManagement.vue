@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Grouped left rail (prototype admin model): the rail is always present;
-       the chosen section renders its own page (header + table) to the right.
-       Breadcrumb lives in the top chrome bar (published from this shell). -->
+       the chosen section renders its own page (header + table) to the right. -->
   <PageLayout :sidebar-width="218" data-test="iam-page">
     <template #sidebar>
       <SectionRail
@@ -39,11 +38,7 @@ import {
   type SectionHubGroup,
   type SectionHubItem,
 } from "@/components/common/SectionHub.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
-import { computed, watch, onActivated, onDeactivated, onUnmounted } from "vue";
+import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -78,43 +73,6 @@ const routeToIamTab: Record<string, string> = {
 };
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
 
-// Dynamic L3 detail crumb (role/group editors).
-const trailing = computed(() => {
-  if (route.name === "editRole")
-    return (route.params.role_name as string) || "Edit role";
-  if (route.name === "editGroup")
-    return (route.params.group_name as string) || "Edit group";
-  return undefined;
-});
-
-// Breadcrumb (row 1). Hub: just the module name. Section: IAM(link → hub) ›
-// <Section ▾>  (› role/group name on editors).
-const crumbs = computed<Crumb[]>(() => {
-  if (isHub.value)
-    return [
-      {
-        label: t("menu.iam"),
-        icon: "manage-accounts",
-        current: true,
-        dataTest: "breadcrumb-iam-root",
-      },
-    ];
-  const list: Crumb[] = [
-    {
-      label: t("menu.iam"),
-      icon: "manage-accounts",
-      to: hubRoute.value,
-      dataTest: "breadcrumb-iam-root",
-    },
-    {
-      dropdown: sectionGroups.value,
-      activeKey: activeSection.value,
-      dataTest: "breadcrumb-iam-section",
-    },
-  ];
-  if (trailing.value) list.push({ label: trailing.value, current: true });
-  return list;
-});
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
@@ -212,15 +170,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   return groups;
 });
 
-// Publish the breadcrumb to the top chrome bar (republish on change + keep-alive
-// re-entry; clear on leave — the chrome's route-key gate guards against staleness).
-// Declared after `sectionGroups` because `crumbs` reads it on section routes — an
-// immediate watch any earlier would hit a TDZ on `sectionGroups`.
-const { publish, clear } = useAppBreadcrumb();
-watch(crumbs, (c) => publish(c), { immediate: true });
-onActivated(() => publish(crumbs.value));
-onDeactivated(clear);
-onUnmounted(clear);
 
 // The rail is always shown, so the IAM root has no standalone landing — send it
 // to the first section (Users, always available). Also: non-meta users can't use

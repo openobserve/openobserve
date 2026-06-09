@@ -200,9 +200,6 @@ import {
   defineComponent,
   ref,
   onBeforeMount,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
   watch,
   defineAsyncComponent,
   computed,
@@ -210,10 +207,6 @@ import {
 import type { Ref } from "vue";
 import PageLayout from "@/components/common/PageLayout.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import {
-  useAppBreadcrumb,
-  type Crumb,
-} from "@/composables/useAppBreadcrumb";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -769,17 +762,6 @@ export default defineComponent({
       },
       { immediate: true },
     );
-
-    // Publish the module breadcrumb to the top chrome bar (Actions is a flat L1
-    // page). `crumbs` reads only `t`, so the immediate watch is TDZ-safe.
-    const crumbs = computed<Crumb[]>(() => [
-      { label: t("actions.header"), icon: "code", current: true },
-    ]);
-    const { publish, clear } = useAppBreadcrumb();
-    watch(crumbs, (c) => publish(c), { immediate: true });
-    onActivated(() => publish(crumbs.value));
-    onDeactivated(clear);
-    onUnmounted(clear);
 
     return {
       t,
