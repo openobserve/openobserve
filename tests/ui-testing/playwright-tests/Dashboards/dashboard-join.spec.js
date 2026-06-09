@@ -235,6 +235,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.APP_USERS);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
 
@@ -262,6 +263,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.APP_USERS);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
 
@@ -289,6 +291,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.APP_USERS);
 
       await pm.chartTypeSelector.searchAndAddField("name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("email", "y");
       await pm.chartTypeSelector.searchAndAddField("plan", "y");
 
@@ -346,6 +349,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.SESSIONS);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("device", "y");
       await pm.chartTypeSelector.searchAndAddField("browser", "y");
 
@@ -380,6 +384,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.SESSIONS, 1);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("status", "y");
 
@@ -407,6 +412,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       await verifyJoinChipIsVisible(page, STREAMS.SESSIONS);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("device", "y");
       await pm.chartTypeSelector.searchAndAddField("browser", "y");
       await pm.chartTypeSelector.searchAndAddField("os", "y");
@@ -464,6 +470,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
       await pm.chartTypeSelector.searchAndAddField("plan", "y");
@@ -491,6 +498,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("plan", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("bytes", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -516,6 +524,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("plan", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("response_time_ms", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -541,6 +550,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("response_time_ms", "y");
       await pm.chartTypeSelector.searchAndAddField("bytes", "y");
 
@@ -597,6 +607,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("response_time_ms", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
 
@@ -620,6 +631,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("country", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
 
@@ -643,6 +655,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("bytes", "y");
       await pm.chartTypeSelector.searchAndAddField("plan", "y");
 
@@ -666,6 +679,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
       await pm.chartTypeSelector.searchAndAddField("email", "y");
 
@@ -722,6 +736,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
       await pm.chartTypeSelector.searchAndAddField("plan", "y");
@@ -750,6 +765,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
       await pm.chartTypeSelector.searchAndAddField("name", "y");
       await pm.chartTypeSelector.searchAndAddField("email", "y");
@@ -778,6 +794,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("duration_mins", "y");
       await pm.chartTypeSelector.searchAndAddField("device", "y");
 
@@ -804,6 +821,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -829,6 +847,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("status", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -854,6 +873,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1002,6 +1022,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
       ]);
 
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -1103,6 +1124,7 @@ test.describe("Dashboard Joins Feature Tests (Consolidated)", () => {
 
       // Add fields and apply - should work without any joins
       await pm.chartTypeSelector.searchAndAddField("request_id", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("path", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();

@@ -876,7 +876,7 @@ import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -929,6 +929,12 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1003,6 +1009,8 @@ export default defineComponent({
     "update:activeTab",
   ],
   setup(props, { emit }) {
+    const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
@@ -1984,7 +1992,9 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         store.state.theme === "dark",
-        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        props.span
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          : "#9e9e9e",
       ),
     );
 

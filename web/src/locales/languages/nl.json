@@ -3208,7 +3208,10 @@
         "spans": "Overspant"
       }
     },
-    "openInFullView": "In volledige weergave openen"
+    "openInFullView": "In volledige weergave openen",
+    "serviceMap": "Servicekaart",
+    "patternView": "Patroonweergave",
+    "spanView": "Spanweergave"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

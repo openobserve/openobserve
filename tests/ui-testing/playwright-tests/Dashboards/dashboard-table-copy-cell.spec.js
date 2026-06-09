@@ -65,6 +65,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -103,6 +104,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -153,6 +155,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -201,6 +204,7 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       await pm.chartTypeSelector.selectStream("e2e_automate");
 
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("code", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -256,7 +260,6 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
       // X: row field, P: pivot/breakdown field, Y: value field
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);
@@ -293,7 +296,6 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);
@@ -339,7 +341,6 @@ test.describe("Dashboard Table Chart - Copy Cell Timestamp Formatting", () => {
 
       await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);

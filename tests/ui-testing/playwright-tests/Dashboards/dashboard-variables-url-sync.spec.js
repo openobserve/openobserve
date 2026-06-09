@@ -158,6 +158,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
 
@@ -527,6 +528,7 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     // This would typically be in panel settings
     // For now, verify the concept
 
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
