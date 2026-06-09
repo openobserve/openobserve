@@ -140,7 +140,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
 
       // Add Y field (Value field) with count aggregation
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       // Apply and wait for render
@@ -203,7 +202,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "kubernetes_container_name",
         "x"
       );
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -273,7 +271,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "kubernetes_container_name",
         "x"
       );
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -357,7 +354,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "kubernetes_container_name",
         "x"
       );
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       // Check for "First Column" label (non-pivot mode)
@@ -419,7 +415,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "x"
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);
@@ -533,7 +528,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "x"
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -679,7 +673,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "x"
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -767,7 +760,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "x"
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -841,7 +833,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
         "x"
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -928,7 +919,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
 
       // Add only Pivot (breakdown) + Y fields (no X)
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -987,6 +977,9 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       );
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
 
+      // Remove the default seeded Y field (count) so this truly tests the no-Y case
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
+
       await pm.dashboardPanelActions.applyDashboardBtn();
       await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -1040,7 +1033,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
       
       // Multiple Y fields to create hierarchy
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       await pm.chartTypeSelector.searchAndAddField("log", "y");
@@ -1098,7 +1090,6 @@ test.describe("Dashboard Table Chart - Pivot Table Feature", () => {
       await pm.chartTypeSelector.searchAndAddField("kubernetes_host", "p");
       
       // Y field
-      await pm.chartTypeSelector.searchAndAddField("_timestamp", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
       const streamPromise = waitForStreamComplete(page);

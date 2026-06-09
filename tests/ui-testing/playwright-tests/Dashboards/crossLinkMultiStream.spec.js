@@ -336,6 +336,9 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType("table");
         await pm.chartTypeSelector.selectStream(STREAM_A);
+        // Add Panel auto-seeds y_axis_1 = count(_timestamp); remove it to keep
+        // the original single-column table shape (x-axis only).
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
         await pm.dashboardPanelActions.addPanelName("CrossLink Single Stream Panel");
         await pm.dashboardPanelActions.applyDashboardBtn();

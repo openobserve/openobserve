@@ -69,6 +69,8 @@ async function buildPanel(page, pm, dashboardName, {
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
+  // remove the auto-seeded default y-axis before adding this panel's measure
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
   if (breakdownField) {
     await pm.chartTypeSelector.searchAndAddField(breakdownField, "b");
