@@ -22,12 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="tw:flex-1 tw:min-w-0 tw:relative">
             <query-editor
+              ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
               :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
               @focus="editorFocused = true"
               @blur="editorFocused = false"
+              @update:query="updateAutoComplete"
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
@@ -131,6 +135,7 @@ import {
   defineAsyncComponent,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import useSqlSuggestions from "@/composables/useSuggestions";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
@@ -168,6 +173,26 @@ const dateTime = ref({
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
 const editorFocused = ref(false);
+const errorQueryEditorRef = ref<any>(null);
+
+// Autosuggestions — field names, operators, filter values
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+} = useSqlSuggestions();
+
+const updateAutoComplete = (value: string) => {
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+  getSuggestions();
+};
 
 // Dynamic placeholder based on actual error stream fields
 const _sqlMode = computed(() => false);
@@ -324,6 +349,9 @@ const getStreamFields = () => {
             });
           }
         });
+
+        // Feed all schema fields (not just userDataSet) into autosuggestion engine
+        updateFieldKeywords(stream.schema);
       })
       .finally(() => {
         resolve(true);

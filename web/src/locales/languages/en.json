@@ -1473,7 +1473,8 @@
     "errorGettingResults": "Error while getting results",
     "save": "Save",
     "evalTemplates": "Evaluation Templates",
-    "selectStream": "Select a stream ..."
+    "selectStream": "Select a stream ...",
+    "queryEditorPlaceholder": "Select a stream or write SQL query here..."
   },
   "evalTemplate": {
     "header": "Evaluation Templates",

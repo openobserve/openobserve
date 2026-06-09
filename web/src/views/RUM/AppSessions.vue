@@ -23,12 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Query editor (flex-grow to fill available space) -->
             <div class="tw:flex-1 tw:min-w-0 tw:relative">
               <query-editor
+                ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
                 :class="['monaco-editor', 'tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
                 v-model:query="sessionState.data.editorValue"
                 :debounce-time="300"
+                :keywords="effectiveKeywords"
+                :suggestions="effectiveSuggestions"
                 @focus="editorFocused = true"
                 @blur="editorFocused = false"
+                @update:query="updateAutoComplete"
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
@@ -172,6 +176,7 @@ import {
   computed,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import useSqlSuggestions from "@/composables/useSuggestions";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -259,9 +264,29 @@ const queryEditorHeight = computed(() => {
 
 const isMounted = ref(false);
 const editorFocused = ref(false);
+const sessionQueryEditorRef = ref<any>(null);
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
 const { getStream } = useStreams();
+
+// Autosuggestions — field names, operators, filter values
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+} = useSqlSuggestions();
+
+const updateAutoComplete = (value: string) => {
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = rumSessionStreamName;
+  getSuggestions();
+};
 
 // Dynamic placeholder based on actual stream fields
 const _sqlMode = computed(() => false);
@@ -432,6 +457,9 @@ const getStreamFields = () => {
           // Otherwise, sort alphabetically
           return a.name.localeCompare(b.name);
         });
+
+        // Feed full schema into autosuggestion (all fields, not just userDataSet subset)
+        updateFieldKeywords(stream.schema);
       })
       .finally(() => {
         isLoading.value.pop();

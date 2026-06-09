@@ -25,6 +25,8 @@ interface Options {
   eraseSpeedMs?: number;
   holdMs?: number;
   initialDelayMs?: number;
+  /** Override the text shown when no stream is selected. Default: "Select a stream first". */
+  noStreamText?: string;
 }
 
 const SYSTEM_FIELDS = new Set([
@@ -94,7 +96,7 @@ export function useQueryPlaceholder(
 
   // Build example query strings from available field+value data
   const examples = computed((): string[] => {
-    if (noStream.value) return ["Select a stream first"];
+    if (noStream.value) return [options.noStreamText ?? "Select a stream first"];
 
     const f = fields.value;
     if (!f || f.length === 0) return [];
