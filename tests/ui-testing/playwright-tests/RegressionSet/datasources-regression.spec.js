@@ -30,15 +30,11 @@ test.describe("Data Sources Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Verify AI integration content persists on re-click (Bug #11682)');
 
-    // Navigate to Data Sources → AI Integrations via sidebar menu
-    await pm.dataPage.gotoDataPage();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    testLogger.info('Navigated to Data Sources page');
-
-    // Click the AI Integrations nav item in the sidebar
-    const aiNavItem = page.locator('[data-test="menu-link-\\/ai-integrations-item"]');
-    await expect(aiNavItem, 'AI Integrations nav item should be visible').toBeVisible({ timeout: 5000 });
-    await aiNavItem.click();
+    // Navigate to Data Sources → AI Integrations
+    // AI Integrations is an ORouteTab inside the Ingestion page (not a sidebar MenuLink),
+    // so we navigate directly to its URL instead of clicking a tab selector.
+    const aiUrl = `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/web/ingestion/ai-integrations?org_identifier=${process.env.ORGNAME || 'default'}`;
+    await page.goto(aiUrl, { timeout: 15000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to AI Integrations');
 
