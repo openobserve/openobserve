@@ -86,11 +86,10 @@ pub async fn get_org_usage(
 
     usage_results.append(&mut data_retention_results);
 
-    let mut data = Vec::with_capacity(usage_results.len());
-    for result in usage_results {
-        let entry = OrgUserData::from_query_result(result, &pricing_map);
-        data.push(entry)
-    }
+    let data = usage_results
+        .into_iter()
+        .map(|v| OrgUserData::from_query_result(v, &pricing_map))
+        .collect();
 
     let mut body = GetOrgUsageResponseBody {
         data,

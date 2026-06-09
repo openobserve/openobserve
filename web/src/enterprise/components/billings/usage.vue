@@ -337,6 +337,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         )
           .then((res) => {
             dataLoading.value = false;
+            // reset the data
+            for(const key of Object.keys(usageData.value)){
+                usageData.value[key] = "0.00";
+                usageCost.value[key] = null;
+            }
             res.data.data.forEach((item: any) => {
               const numericValue = parseFloat(item.value);
               // Map API event names to usageData keys
@@ -357,8 +362,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
                 }else{
                     usageCost.value[key] = null;
                 }
-              }else{
-                usageData.value[key] = "0.00";
               }
             });
             startTime.value = res.data.start_time;
@@ -1071,4 +1074,3 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     color: var(--o2-text-heading);
   }
   </style>
-  
