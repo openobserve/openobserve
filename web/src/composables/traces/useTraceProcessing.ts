@@ -53,10 +53,8 @@ export function useTraceProcessing(
         ? (node.startTimeUs - traceStartTimeUs) / 1000
         : node.startTimeMs || 0;
 
-      console.log(spanMap, node)
       const resolvedIdentity = resolveSpanIdentity(spanMap.value[node.spanId] as Span);
 
-      console.log("called", resolvedIdentity);
       // Convert old format to EnrichedSpan
       const enrichedSpan: EnrichedSpan = {
         span_id: node.spanId || node.span_id,
@@ -120,7 +118,6 @@ export function useTraceProcessing(
   const buildSpanTree = (spanList: Span[]): EnrichedSpan[] => {
     if (!spanList || spanList.length === 0) return [];
 
-    console.log("build span tree");
     const spanMap = new Map<string, EnrichedSpan>();
     const rootSpans: EnrichedSpan[] = [];
 
@@ -233,7 +230,6 @@ export function useTraceProcessing(
     traceId: string,
     spanTree: EnrichedSpan[],
   ): TraceMetadata => {
-    console.log(spanTree);
     const allSpans = flattenSpanTree(spanTree);
 
     if (allSpans.length === 0) {
@@ -431,12 +427,10 @@ export function useTraceProcessing(
     if (!spans.value || spans.value.length === 0) return [];
 
     // Check if it's the old tree format (from TraceDetails.vue)
-    console.log(spans.value);
     if (isOldTreeFormat(spans.value)) {
       return flattenOldTreeFormat(spans.value);
     }
 
-    console.log(spanTree.value);
     // Flatten the built span tree
     return flattenSpanTree(spanTree.value);
   });
