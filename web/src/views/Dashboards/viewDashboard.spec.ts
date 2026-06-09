@@ -544,6 +544,7 @@ describe("ViewDashboard", () => {
         path: "/dashboards",
         query: {
           folder: "default",
+          org_identifier: "test-org",
         },
       });
     });
@@ -577,6 +578,7 @@ describe("ViewDashboard", () => {
         path: "/dashboards",
         query: {
           folder: "default",
+          org_identifier: "test-org",
         },
       });
     });

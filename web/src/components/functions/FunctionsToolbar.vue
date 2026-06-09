@@ -1,31 +1,18 @@
 <template>
-  <div
-    class="tw:w-full tw:flex tw:justify-between tw:items-center"
+  <!-- Standard app header: back tile + "Add Function" title, with the name/
+       transform-type fields inline (#tabs) and the action buttons (#actions). -->
+  <AppPageHeader
+    :title="t('function.addFunction')"
+    :back="{ label: t('function.header'), onClick: redirectToFunctions, dataTest: 'add-function-back-btn' }"
   >
-    <div class="tw:flex tw:items-center">
-      <div class="add-function-back-btn">
-        <div
-          data-test="add-function-back-btn"
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow-back-ios-new"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          title="Go Back"
-          @click="redirectToFunctions"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-      </div>
-      <div class="tw:text-lg tw:w-full add-function-title tw:mr-2">
-        {{ t('function.addFunction') }}
-      </div>
-      <div class="o2-input tw:flex tw:items-end tw:gap-6">
+    <template #tabs>
+      <div class="o2-input tw:flex tw:items-center tw:gap-6">
         <div class="tw:flex tw:items-center">
           <OInput
             data-test="add-function-name-input"
             v-model.trim="functionName"
             :label="t('function.name')"
+            label-position="inside"
             class="tw:p-0 tw:w-full"
             v-bind:readonly="disableName"
             v-bind:disabled="disableName"
@@ -80,22 +67,22 @@
           </OIcon>
         </div>
       </div>
-    </div>
-    <div class="add-function-actions tw:flex tw:justify-center tw:gap-2">
+    </template>
+    <template #actions>
       <OButton
-            v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
-            variant="ghost"
-            size="icon-sm"
-            @click="emit('open:chat',!store.state.isAiChatEnabled)"
-            data-test="menu-link-ai-item"
-            class="ai-hover-btn"
-            :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
-            style="border-radius: 6px;"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-          >
-            <img :src="getBtnLogo" class="header-icon ai-icon" />
-          </OButton>
+        v-if="config.isEnterprise == 'true' && !isAddFunctionComponent && store.state.zoConfig.ai_enabled"
+        variant="ghost"
+        size="icon-sm"
+        @click="emit('open:chat',!store.state.isAiChatEnabled)"
+        data-test="menu-link-ai-item"
+        class="ai-hover-btn"
+        :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
+        style="border-radius: 6px;"
+        @mouseenter="isHovered = true"
+        @mouseleave="isHovered = false"
+      >
+        <img :src="getBtnLogo" class="header-icon ai-icon" />
+      </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
         v-close-popup="true"
@@ -132,8 +119,8 @@
       >
         {{ t('function.save') }}
       </OButton>
-    </div>
-  </div>
+    </template>
+  </AppPageHeader>
 </template>
 <script setup lang="ts">
 import {
@@ -151,6 +138,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 const { t } = useI18n();
 

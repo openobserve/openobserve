@@ -27,77 +27,77 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-button-primary tw:text-button-primary-foreground",
     "tw:enabled:hover:bg-button-primary-hover",
     "tw:enabled:active:bg-button-primary-active",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-primary-hover",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-primary-hover",
     "tw:disabled:bg-button-primary-disabled tw:disabled:text-button-primary-foreground",
   ].join(" "),
   secondary: [
     "tw:bg-button-secondary tw:text-button-secondary-foreground",
     "tw:enabled:hover:bg-button-secondary-hover",
     "tw:enabled:active:bg-button-secondary-active",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-secondary-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-secondary-focus-ring",
     "tw:disabled:bg-button-secondary-disabled tw:disabled:text-text-disabled",
   ].join(" "),
   outline: [
     "tw:bg-transparent tw:text-button-outline-text tw:border tw:border-button-outline-border",
     "tw:enabled:hover:bg-button-outline-hover-bg tw:enabled:hover:border-button-outline-hover-border",
     "tw:enabled:active:bg-button-outline-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-outline-hover-border",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-outline-hover-border",
     "tw:disabled:opacity-50",
   ].join(" "),
   ghost: [
     "tw:bg-transparent tw:text-button-ghost-text tw:border-0",
     "tw:enabled:hover:bg-button-ghost-hover-bg",
     "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
     "tw:disabled:text-text-disabled",
   ].join(" "),
   "ghost-primary": [
     "tw:bg-transparent tw:text-button-ghost-primary-text tw:border-0",
     "tw:enabled:hover:bg-button-ghost-primary-hover-bg",
     "tw:enabled:active:bg-button-ghost-primary-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-primary-focus-ring",
     "tw:disabled:text-text-disabled",
   ].join(" "),
   "ghost-muted": [
     "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
     "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
     "tw:enabled:active:bg-button-ghost-muted-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-muted-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-muted-focus-ring",
     "tw:disabled:text-text-disabled",
   ].join(" "),
   "ghost-subtle": [
     "tw:bg-transparent tw:text-button-ghost-subtle-text tw:border-0 tw:opacity-60",
     "tw:enabled:hover:opacity-100 tw:enabled:hover:bg-button-ghost-subtle-hover-bg",
     "tw:enabled:active:bg-button-ghost-subtle-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-subtle-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-subtle-focus-ring",
     "tw:disabled:text-text-disabled tw:disabled:opacity-30",
   ].join(" "),
   "ghost-destructive": [
     "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border-0",
     "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
     "tw:enabled:active:bg-button-ghost-destructive-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-destructive-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-destructive-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
   destructive: [
     "tw:bg-button-destructive tw:text-button-destructive-foreground",
     "tw:enabled:hover:bg-button-destructive-hover",
     "tw:enabled:active:bg-button-destructive-hover",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-destructive-hover",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-destructive-hover",
     "tw:disabled:opacity-60",
   ].join(" "),
   "ghost-warning": [
     "tw:bg-transparent tw:text-button-ghost-warning-text tw:border-0",
     "tw:enabled:hover:bg-button-ghost-warning-hover-bg",
     "tw:enabled:active:bg-button-ghost-warning-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-warning-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
   warning: [
     "tw:bg-button-warning tw:text-button-warning-foreground tw:border tw:border-button-warning-border",
     "tw:enabled:hover:bg-button-warning-hover",
     "tw:enabled:active:bg-button-warning-active",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-warning-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-warning-focus-ring",
     "tw:disabled:opacity-60",
   ].join(" "),
   // Neutral ghost: inherits parent text color — used for compact tw:inline action buttons
@@ -106,7 +106,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-transparent tw:text-inherit tw:border-0",
     "tw:enabled:hover:bg-button-ghost-hover-bg",
     "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
   // Outline destructive: transparent bg + red border + red text — use for destructive actions
@@ -115,7 +115,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border tw:border-button-ghost-destructive-text",
     "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
     "tw:enabled:active:bg-button-ghost-destructive-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-destructive-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-destructive-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
   // Panel collapse: ghost muted — for sidebar panel header collapse/expand.
@@ -124,7 +124,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
     "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
     "tw:enabled:active:bg-button-ghost-muted-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-muted-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-muted-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
@@ -132,7 +132,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-button-primary tw:text-button-primary-foreground",
     "tw:enabled:hover:bg-button-primary-hover",
     "tw:enabled:active:bg-button-primary-active",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-primary-hover",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-primary-hover",
     "tw:disabled:bg-button-primary-disabled tw:disabled:text-button-primary-foreground",
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
@@ -140,7 +140,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-surface-panel tw:text-button-ghost-text tw:border tw:border-border-default tw:shadow-sm",
     "tw:enabled:hover:bg-button-ghost-hover-bg tw:enabled:hover:border-button-border-hover",
     "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
@@ -148,7 +148,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] tw:text-white tw:border-0",
     "tw:enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
     "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-[#8B5CF6]",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-[#8B5CF6]",
     "tw:disabled:opacity-40",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
@@ -156,7 +156,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-white tw:text-primary-600 tw:font-bold tw:border-0 tw:shadow-md",
     "tw:enabled:hover:shadow-xl",
     "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-white/50",
     "tw:disabled:opacity-50",
   ].join(" "),
   // On-dark ghost — transparent with white border/text, for use on dark gradient panels
@@ -164,7 +164,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-transparent tw:text-white tw:border-2 tw:border-white/30",
     "tw:enabled:hover:bg-white/10 tw:enabled:hover:border-white/50",
     "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-white/50",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-white/50",
     "tw:disabled:opacity-50",
   ].join(" "),
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
@@ -205,7 +205,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "tw:bg-button-ghost-primary-active-bg tw:text-button-ghost-primary-text tw:border tw:border-button-outline-hover-border",
     "tw:enabled:hover:bg-button-ghost-primary-active-bg tw:enabled:hover:border-button-outline-hover-border",
     "tw:enabled:active:bg-button-ghost-primary-active-bg",
-    "tw:focus-visible:ring-2 tw:focus-visible:ring-button-ghost-primary-focus-ring",
+    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-primary-focus-ring",
     "tw:disabled:opacity-50",
   ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
@@ -220,7 +220,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
-  sm: "tw:h-8 tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-md",
+  // 34px control height per HANDOFF §11 — the workhorse compact button that
+  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
+  sm: "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-lg",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
     "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
@@ -231,7 +233,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "tw:h-6 tw:ps-2 tw:pe-1.5 tw:!text-[12px] tw:gap-1 tw:rounded tw:leading-none",
   "sm-action":
-    "tw:h-8 tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-md",
+    "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-lg",
   md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
   lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
   icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
@@ -267,11 +269,19 @@ const classes = computed<string[]>(() => [
   props.block
     ? "tw:flex tw:w-full tw:items-center tw:justify-center"
     : "tw:inline-flex tw:items-center tw:justify-center",
-  "tw:relative",
+  // box-border so a variant's 1px border is drawn INSIDE the fixed size box
+  // (outline/secondary/etc.) — otherwise a bordered icon button renders 2px
+  // taller than a borderless ghost one of the same size.
+  "tw:relative tw:box-border",
   "tw:whitespace-nowrap",
+  // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
   "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
   "tw:outline-none",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
+  /* Unified focus glow — identical to OInput/OSelect: a 2px translucent primary
+     halo hugging the control (no ring-offset gap). The trailing `!` overrides
+     each variant's own ring width/color below, so every button focuses with the
+     exact same soft glow regardless of variant. */
+  "tw:focus-visible:ring-[0.125rem]! tw:focus-visible:ring-primary-500/25!",
   "tw:disabled:cursor-not-allowed tw:enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],

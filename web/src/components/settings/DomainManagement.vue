@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="domain_management tw:flex tw:flex-col tw:h-full">
+  <!-- Section header is provided full-width by the Settings shell. -->
   <div class="tw:px-3 tw:py-3 tw:flex-1 tw:overflow-y-auto tw:pb-4">
     <!-- Claim Parser Function Selection -->
     <div class="tw:mb-6">

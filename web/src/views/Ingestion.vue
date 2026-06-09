@@ -18,198 +18,157 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="tw:rounded-md ingestionPage tw:h-full tw:flex tw:flex-col" data-test="ingestion-page">
-    <div class="tw:w-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1">
-      <div class="card-container">
-        <div class="tw:px-3 tw:pt-3 tw:w-full tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-xl tw:font-semibold tw:mr-auto"> {{ t("ingestion.header") }}</span>
-          <span
-            class="text-subtitle tw:bg-amber-500 tw:p-2 tw:font-bold"
-            v-if="
-              store.state.zoConfig.hasOwnProperty(
-                'restricted_routes_on_empty_data',
-              ) &&
-              store.state.zoConfig.restricted_routes_on_empty_data == true &&
-              store.state.organizationData.isDataIngested == false
-            "
-          >
-            {{ t("ingestion.redirectionIngestionMsg") }}
-          </span>
-          <div class="tw:w-50 tw:flex-none">
-            <OSearchInput
-              v-model="globalSearchQuery"
-              :placeholder="t('common.search')"
-              clearable
-              class="tw:w-full indexlist-search-input"
-              data-test="recommended-list-search-input"
-            />
-          </div>
-          <!-- Token selector dropdown -->
-          <OSelect
-            v-if="!isRUMPage"
-            v-model="selectedTokenName"
-            :options="tokenOptions"
-            label-key="label"
-            value-key="value"
-            class="tw:max-w-xs"
-            style="min-width: 220px"
-            @update:model-value="onTokenSelected"
-          />
-          <!-- Org token management button (non-RUM pages) -->
-          <span
-            v-if="!isRUMPage"
-          >
-            <OButton variant="primary" size="sm" icon-left="key" @click="navigateToIngestionTokens">
-              {{ t('ingestion.manageTokensBtnLabel') }}
-            </OButton>
-          </span>
-          <span
-            v-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-              store.state.organizationData.rumToken.rum_token != ''
-            "
-          >
-            <OButton variant="primary" size="sm" data-test="ingestion-reset-token-btn" @click="showRUMUpdateDialogFn">
-              {{ t(`ingestion.resetRUMTokenLabel`) }}
-            </OButton>
-          </span>
-          <span
-            v-else-if="
-              rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
-              store.state.organizationData.rumToken.rum_token == ''
-            "
-          >
-            <OButton variant="primary" size="sm" data-test="ingestion-reset-token-btn" @click="generateRUMToken">
-              {{ t(`ingestion.generateRUMTokenLabel`) }}
-            </OButton>
-          </span>
-          <ConfirmDialog
-            title="Reset RUM Token"
-            message="Are you sure you want to update rum token for this organization?"
-            @update:ok="updateRUMToken"
-            @update:cancel="confirmRUMUpdate = false"
-            v-model="confirmRUMUpdate"
+    <!-- Standard page header: title + icon. Search / token controls live in the
+         toolbar row below. -->
+    <!-- Standard page header: title + icon, with search / token controls and the
+         Manage-Tokens action on the SAME header line. -->
+    <AppPageHeader
+      :title="t('ingestion.header')"
+      icon="data-plus-line"
+      tabs-below
+      class="tw:shrink-0 tw:px-4"
+    >
+      <template #actions>
+        <div class="tw:w-50 tw:flex-none">
+          <OSearchInput
+            v-model="globalSearchQuery"
+            :placeholder="t('common.search')"
+            clearable
+            class="tw:w-full indexlist-search-input"
+            data-test="recommended-list-search-input"
           />
         </div>
-        <div class="tw:ml-3">
-          <OTabs v-model="ingestTabType" horizontal align="left">
-            <ORouteTab
-              name="recommended"
-              :to="{
-                name: 'recommended',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.recommendedLabel')"
-            />
-            <ORouteTab
-              name="custom"
-              :to="{
-                name: 'custom',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.customLabel')"
-            />
-            <ORouteTab
-              name="server"
-              :to="{
-                name: 'servers',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.serverLabel')"
-            />
-            <ORouteTab
-              name="database"
-              :to="{
-                name: 'databases',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.databaseLabel')"
-            />
-
-            <ORouteTab
-              name="security"
-              :to="{
-                name: 'security',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.securityLabel')"
-            />
-
-            <ORouteTab
-              name="devops"
-              :to="{
-                name: 'devops',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.devopsLabel')"
-            />
-
-            <ORouteTab
-              name="networking"
-              :to="{
-                name: 'networking',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.networkingLabel')"
-            />
-            <ORouteTab
-              name="message-queues"
-              :to="{
-                name: 'message-queues',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.messageQueuesLabel')"
-            />
-            <ORouteTab
-              name="languages"
-              :to="{
-                name: 'languages',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.languagesLabel')"
-            />
-            <ORouteTab
-              name="ai-integrations"
-              :to="{
-                name: 'ai-integrations',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.aiLabel')"
-            />
-            <ORouteTab
-              name="others"
-              :to="{
-                name: 'others',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.otherLabel')"
-            />
-          </OTabs>
+        <!-- Token selector: only meaningful when there's more than one token to
+             choose between. With 0/1 tokens the curl examples auto-use the only
+             token (see the tokenOptions watcher), so the dropdown is hidden to
+             avoid a pointless single-option control in the header. -->
+        <OSelect
+          v-if="!isRUMPage && tokenOptions.length > 1"
+          v-model="selectedTokenName"
+          :options="tokenOptions"
+          label-key="label"
+          value-key="value"
+          class="tw:max-w-xs"
+          style="min-width: 220px"
+          @update:model-value="onTokenSelected"
+        />
+        <OButton
+          v-if="!isRUMPage"
+          variant="primary"
+          size="sm"
+          icon-left="key"
+          @click="navigateToIngestionTokens"
+        >
+          {{ t('ingestion.manageTokensBtnLabel') }}
+        </OButton>
+        <OButton
+          v-if="
+            rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+            store.state.organizationData.rumToken.rum_token != ''
+          "
+          variant="primary"
+          size="sm"
+          data-test="ingestion-reset-token-btn"
+          @click="showRUMUpdateDialogFn"
+        >
+          {{ t(`ingestion.resetRUMTokenLabel`) }}
+        </OButton>
+        <OButton
+          v-else-if="
+            rumRoutes.indexOf(router.currentRoute.value.name) > -1 &&
+            store.state.organizationData.rumToken.rum_token == ''
+          "
+          variant="primary"
+          size="sm"
+          data-test="ingestion-reset-token-btn"
+          @click="generateRUMToken"
+        >
+          {{ t(`ingestion.generateRUMTokenLabel`) }}
+        </OButton>
+      </template>
+      <template #tabs>
+        <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
+             up with the vertical sub-nav (Kubernetes/…) in the section below. -->
+        <div class="tw:-ml-3 tw:w-full">
+        <OTabs v-model="ingestTabType" align="left">
+          <ORouteTab
+            name="recommended"
+            :to="{ name: 'recommended', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.recommendedLabel')"
+          />
+          <ORouteTab
+            name="custom"
+            :to="{ name: 'custom', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.customLabel')"
+          />
+          <ORouteTab
+            name="server"
+            :to="{ name: 'servers', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.serverLabel')"
+          />
+          <ORouteTab
+            name="database"
+            :to="{ name: 'databases', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.databaseLabel')"
+          />
+          <ORouteTab
+            name="security"
+            :to="{ name: 'security', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.securityLabel')"
+          />
+          <ORouteTab
+            name="devops"
+            :to="{ name: 'devops', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.devopsLabel')"
+          />
+          <ORouteTab
+            name="networking"
+            :to="{ name: 'networking', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.networkingLabel')"
+          />
+          <ORouteTab
+            name="message-queues"
+            :to="{ name: 'message-queues', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.messageQueuesLabel')"
+          />
+          <ORouteTab
+            name="languages"
+            :to="{ name: 'languages', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.languagesLabel')"
+          />
+          <ORouteTab
+            name="ai-integrations"
+            :to="{ name: 'ai-integrations', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.aiLabel')"
+          />
+          <ORouteTab
+            name="others"
+            :to="{ name: 'others', query: { org_identifier: store.state.selectedOrganization.identifier } }"
+            :label="t('ingestion.otherLabel')"
+          />
+        </OTabs>
         </div>
-      </div>
+      </template>
+    </AppPageHeader>
+    <ConfirmDialog
+      title="Reset RUM Token"
+      message="Are you sure you want to update rum token for this organization?"
+      @update:ok="updateRUMToken"
+      @update:cancel="confirmRUMUpdate = false"
+      v-model="confirmRUMUpdate"
+    />
+    <!-- Empty-data warning banner -->
+    <div
+      v-if="
+        store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
+        store.state.zoConfig.restricted_routes_on_empty_data == true &&
+        store.state.organizationData.isDataIngested == false
+      "
+      class="text-subtitle tw:bg-amber-500 tw:p-2 tw:font-bold tw:mx-2.5 tw:mt-1 tw:rounded-md"
+    >
+      {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <div class="tw:flex-1 tw:min-h-0 tw:px-2.5 tw:pb-2.5">
+    <div class="tw:flex-1 tw:min-h-0">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
@@ -226,6 +185,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -252,7 +212,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
+  components: { AppPageHeader, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
     OSelect,
 },
   setup() {

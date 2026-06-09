@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div data-test="llm-providers-settings" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
     <ProviderFormPage
       v-if="formPage"
@@ -10,19 +10,18 @@
     />
 
     <template v-else>
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-4 tw:border-b-[1px] tw:border-[var(--color-dialog-header-border,var(--o2-border))]"
+      <AppPageHeader
+        icon="smart-toy"
+        :subtitle="'LLM providers for online evaluations'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="llm-providers-settings-title"
-        >
-          {{ t("llmProviders.title") }}
-        </div>
-        <div class="tw:flex tw:items-center">
+        <template #title>
+          <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+        </template>
+        <template #actions>
           <OInput
             v-model="searchQuery"
-            class="tw:mr-2 tw:w-[200px]"
+            class="tw:w-50"
             :placeholder="t('llmProviders.searchPlaceholder')"
             data-test="llm-providers-search-input"
           >
@@ -34,12 +33,12 @@
             data-test="llm-providers-add-btn"
             variant="primary"
             size="sm"
-                  @click="openCreate"
+            @click="openCreate"
           >
             {{ t("llmProviders.newButton") }}
           </OButton>
-        </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <div v-if="isLoading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
         <OSpinner size="md" />
@@ -82,6 +81,15 @@
           class="tw:w-full tw:h-full"
           @row-click="(row: any) => openEdit(row)"
         >
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-llm-providers"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
           <template #cell-type="{ row }">
             <span class="llmp-type-chip">{{ providerTypeOf(row) || "—" }}</span>
           </template>
@@ -160,7 +168,10 @@ import {
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -183,7 +194,7 @@ const columns = computed(() => [
     header: "#",
     accessorKey: "#",
     sortable: false,
-    size: 56,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" },
   },
   {
@@ -191,7 +202,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
+    size: COL.name,
     meta: { align: "left" },
   },
   {
@@ -199,7 +210,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.type"),
     accessorFn: (row: Provider) => providerTypeOf(row),
     sortable: true,
-    size: 140,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -207,7 +218,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.endpoint"),
     accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
     sortable: false,
-    size: 240,
+    size: COL.url,
     meta: { align: "left" },
   },
   {
@@ -223,7 +234,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.default"),
     accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
     sortable: true,
-    size: 110,
+    size: COL.toggle,
     meta: { align: "left" },
   },
   {

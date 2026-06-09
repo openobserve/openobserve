@@ -1,6 +1,9 @@
 <template>
+  <!-- No card-container: the loaded UsageTab content has no outer border, so the
+       skeleton must not add one (otherwise a top/outer border flashes only while
+       loading and disappears once data arrives). -->
   <div
-    class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem] card-container"
+    class="tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
     style="display: flex; flex-direction: column; height: calc(100vh - 52px)"
   >
     <!-- 1st section - Streams container -->

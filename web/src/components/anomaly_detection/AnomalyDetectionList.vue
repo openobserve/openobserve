@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
+          <OBadge :variant="statusColor(row)" dot data-test="anomaly-detection-status-badge">
             {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"
@@ -144,9 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty state -->
       <template #empty>
-        <div class="tw:w-full tw:text-center tw:py-12 tw:text-gray-400">
-          {{ t("alerts.noDestinations") }}
-        </div>
+        <OEmptyState size="hero" preset="no-anomaly-configs" hide-action />
       </template>
     </OTable>
 
@@ -243,13 +241,15 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
+  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {
@@ -278,7 +278,7 @@ export default defineComponent({
     const cancellingId = ref<string | null>(null);
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
       { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, meta: { align: "left" } },
       { id: "status", header: "Status", accessorKey: "status", sortable: true, meta: { align: "left" } },

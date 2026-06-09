@@ -132,9 +132,11 @@ describe("CorrelationSettings", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should display the title", () => {
+    it("should render the section (title is provided by the Settings shell)", () => {
       wrapper = mountComponent();
-      expect(wrapper.text()).toContain("Correlation Settings");
+      expect(
+        wrapper.find('[data-test="correlation-settings-tabs"]').exists(),
+      ).toBe(true);
     });
 
     it("should default to services tab", () => {

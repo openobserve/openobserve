@@ -35,6 +35,7 @@ const variantClasses: Record<
       'tw:relative tw:flex tw:items-center tw:gap-2',
       'tw:w-full tw:px-3 tw:py-1.5 tw:rounded-md',
       'tw:cursor-pointer tw:select-none tw:outline-none',
+      'tw:transition-colors tw:duration-150',
       variantClasses[variant],
       'tw:data-[disabled]:text-dropdown-item-disabled tw:data-[disabled]:cursor-not-allowed',
     ]"

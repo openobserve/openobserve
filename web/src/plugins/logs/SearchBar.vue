@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem]! tw:items-center! tw:w-full tw:overflow-hidden tw:border-b tw:solid tw:border-b-[var(--o2-border-color)]">
       <div
         ref="toolbarLeftRef"
         class="tw:flex tw:items-center tw:gap-1 tw:flex-nowrap tw:flex-1 tw:min-w-0 tw:overflow-hidden"
@@ -260,6 +260,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("search.createSavedView") }}
             </ODropdownItem>
           </ODropdownGroup>
+
+          <ODropdownSeparator />
+
+          <!-- SYNTAX GUIDE -->
+          <SyntaxGuide
+            :sqlmode="searchObj.meta.sqlMode"
+            :menuItem="true"
+            ref="syntaxGuideRef"
+            data-test="logs-search-bar-syntax-guide-btn"
+          />
         </ODropdown>
       </div>
 
@@ -962,6 +972,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
+         the right (4px wrapper + 6px), aligning with the results panel below. -->
     <div
       ref="editorContainerRef"
       class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
@@ -991,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full tw:relative"
+              class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:relative"
               :class="{
                 'tw:border-r-0 tw:rounded-r-none': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor
@@ -1020,6 +1032,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('search.selectStreamForAI')
                     : t('search.nlpModeDisabledForVisualization')
                 "
+                :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
                 editor-height="100%"
@@ -1033,9 +1046,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
                 @run-query="handleRunQueryFn"
                 @keydown="handleKeyDown"
-                @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+                @focus="onQueryEditorFocus"
+                @blur="handleQueryEditorBlur"
               />
+              <!-- Query editor placeholder overlay — shown when editor is empty and unfocused -->
+              <div
+                v-if="
+                  searchObj.data.editorValue == '' &&
+                  searchObj.meta.queryEditorPlaceholderFlag &&
+                  !searchObj.meta.nlpMode
+                "
+                class="query-editor-placeholder-overlay"
+              >
+                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+              </div>
             </div>
           </template>
           <template #after>
@@ -1047,7 +1071,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="showFunctionEditor">
                 <div class="tw:relative tw:h-full tw:w-full">
                   <div
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:rounded-[0.375rem] tw:rounded-l-none tw:border-l-0 tw:relative tw:h-full"
+                    class="tw:relative tw:h-full"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -1081,6 +1105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.functionEditorPlaceholderFlag = true
                       "
                     />
+                    <div
+                      v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
@@ -1584,6 +1614,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
+import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
@@ -1622,9 +1653,10 @@ import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { inject } from "vue";
+import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
-import { computed } from "vue";
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
@@ -1634,6 +1666,8 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import {
   logsUtils,
   removeFieldFromWhereAST,
@@ -1950,6 +1984,25 @@ export default defineComponent({
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => searchObj.meta.sqlMode),
+        query: computed(() => searchObj.data.query ?? ""),
+        streamName: computed(() => searchObj.data.stream.selectedStream?.[0]),
+        externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
+      });
+
+    const onQueryEditorFocus = () => {
+      searchObj.meta.queryEditorPlaceholderFlag = false;
+      _sqlOnFocus();
+    };
+
+    const handleQueryEditorBlur = async () => {
+      searchObj.meta.queryEditorPlaceholderFlag = true;
+      await _sqlOnBlur();
+    };
+
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
@@ -2113,21 +2166,8 @@ export default defineComponent({
     // Responsive breakpoint: share button moves into overflow menu at narrow widths
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
 
-    // Track window width for responsive toolbar layout (share button breakpoint)
-    // Measure the ACTUAL available width for the left section:
-    //   availableLeftWidth = bar container width − right section width − bar padding (14px)
-    // Both sides are observed via ResizeObserver so any layout shift (window resize,
-    // panel open/close, sidebar toggle) is handled automatically.
-    const toolbarLeftRef  = ref<HTMLElement | null>(null);
-    const toolbarRightRef = ref<HTMLElement | null>(null);
-    const toolbarBarWidth   = ref(window.innerWidth);
-    const toolbarRightWidth = ref(0);
-    let toolbarResizeObserver: ResizeObserver | null = null;
-    let toolbarRightObserver:  ResizeObserver | null = null;
-
-    const availableLeftWidth = computed(() =>
-      Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14),
-    );
+    // Responsive toolbar — width tracking via shared composable
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
 
     // Approximate rendered widths of left-section content at each collapse state:
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
@@ -2374,6 +2414,8 @@ export default defineComponent({
       searchObj.data.editorValue = value;
       searchObj.data.query = value;
 
+      _sqlOnQueryChange();
+
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
@@ -2565,6 +2607,7 @@ export default defineComponent({
     const debouncedAutoRunPatterns = debounce(() => {
       emit("extractPatterns");
     }, 2500);
+
 
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
@@ -2792,23 +2835,6 @@ export default defineComponent({
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
 
-      // Observe the bar container (parent of left section) for total width.
-      const barEl = toolbarLeftRef.value?.parentElement;
-      if (barEl) {
-        toolbarBarWidth.value = barEl.getBoundingClientRect().width;
-        toolbarResizeObserver = new ResizeObserver((entries) => {
-          toolbarBarWidth.value = entries[0]?.contentRect.width ?? 0;
-        });
-        toolbarResizeObserver.observe(barEl);
-      }
-      // Observe the right section so its actual rendered width is always known.
-      if (toolbarRightRef.value) {
-        toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
-        toolbarRightObserver = new ResizeObserver((entries) => {
-          toolbarRightWidth.value = entries[0]?.contentRect.width ?? 0;
-        });
-        toolbarRightObserver.observe(toolbarRightRef.value);
-      }
     });
 
     onUnmounted(() => {
@@ -2817,8 +2843,6 @@ export default defineComponent({
       });
       window.removeEventListener("keydown", handleEscKey);
       window.removeEventListener("resize", onWindowResize);
-      toolbarResizeObserver?.disconnect();
-      toolbarRightObserver?.disconnect();
     });
 
     onActivated(() => {
@@ -4656,6 +4680,35 @@ export default defineComponent({
     };
     // [END] explain query functionality
 
+    // [START] query editor placeholder overlay
+    const _streamFields = computed(
+      () => searchObj.data.stream.selectedStreamFields ?? [],
+    );
+    const _fieldValues = computed(() => props.fieldValues ?? {});
+    const _sqlMode = computed(() => searchObj.meta.sqlMode);
+    const _noStream = computed(() => !searchObj.data.stream.selectedStream.length);
+    const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+      _streamFields,
+      _fieldValues,
+      _sqlMode,
+      _noStream,
+    );
+    // [END] query editor placeholder overlay
+
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
+
+    // [START] typewriter placeholder for AI query input
+    const aiQueryPlaceholderPrompts = computed(() => [
+      t("search.askAIPlaceholderRotation.one"),
+      t("search.askAIPlaceholderRotation.two"),
+      t("search.askAIPlaceholderRotation.three"),
+      t("search.askAIPlaceholderRotation.four"),
+    ]);
+    const { placeholder: aiQueryPlaceholder } = useTypewriterPlaceholder(
+      aiQueryPlaceholderPrompts,
+    );
+    // [END] typewriter placeholder for AI query input
+
     return {
       t,
       store,
@@ -4688,6 +4741,8 @@ export default defineComponent({
       refreshData,
       handleRunQuery,
       handleRunQueryFn,
+      onQueryEditorFocus,
+      handleQueryEditorBlur,
       autoCompleteKeywords,
       autoCompleteSuggestions,
       effectiveKeywords,
@@ -4839,6 +4894,9 @@ export default defineComponent({
       toggleViewOptions,
       currentToggleOption,
       toggleLiveMode,
+      aiQueryPlaceholder,
+      editorPlaceholder,
+      vrlPlaceholder,
       patternsState,
       cancelPatterns,
     };
@@ -5312,23 +5370,21 @@ html.dark .file-type label,
 }
 
 .syntax-guide-menu-item {
-  :deep(.q-btn) {
-    padding: 0 !important;
-    min-height: unset !important;
-    border: none !important;
-    margin: 0 !important;
-    font-size: inherit !important;
-    font-weight: inherit !important;
-.q-btn__content {
-      gap: 0.5rem; // match tw:gap-2
-    }
+  :deep(button) {
+    width: 100%;
+    justify-content: flex-start;
+    height: auto;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.375rem;
+    border: none;
+    margin: 0;
+    gap: 0.5rem;
+    color: var(--color-dropdown-item-text);
+    background: transparent;
+    font-size: var(--text-sm);
 
     &:hover {
-      background-color: transparent !important;
-    }
-
-    &::before {
-      display: none !important;
+      background-color: var(--color-dropdown-item-hover-bg);
     }
   }
 }
@@ -5368,8 +5424,11 @@ html.dark .file-type label,
   font-size: var(--text-xs);
   font-weight: var(--font-medium) !important;
   line-height: 1rem !important;
-  padding: 0 0.5rem !important;
-  min-width: 5.875rem;
+  padding: 0 0.25rem !important;
+  width: 5.875rem !important;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -5499,5 +5558,44 @@ html.dark .file-type label,
 
 .body--dark .vrl-disabled-warning {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  /* Must line up with where Monaco actually starts rendering text in
+     CodeQueryEditor: host padding-left (0.5rem) + the line-number gutter
+     (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) + lineDecorationsWidth (10px ≈
+     0.625rem) ≈ 2.15rem. Keep this in sync if those editor options change.
+     top 0.1875rem matches the editor's padding.top (3px) so the placeholder sits
+     on line 1 next to the "1" gutter number. */
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    /* Mirror Monaco's rendered text so the placeholder reads as the future
+       typed query, not a different (proportional) font on a different baseline:
+       same monospace family and same ~21px (1.5 × 14px) line height. */
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
 }
 </style>

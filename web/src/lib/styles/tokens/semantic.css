@@ -11,11 +11,21 @@
 
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
-  /* Text */
-  --color-text-primary:   var(--color-grey-900);
-  --color-text-secondary: var(--color-grey-500);
-  --color-text-disabled:  var(--color-grey-400);
-  --color-text-inverse:   var(--color-white);
+  /* Text — grey-based semantic hierarchy (Datadog/Grafana pattern) */
+  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
+  --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
+  --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
+  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
+  --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
+  --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
+  --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
+  --color-text-disabled:    var(--color-grey-400);
+  --color-text-placeholder: var(--color-grey-400);
+  --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% — readable but not harsh */
+  --color-text-link:        var(--color-primary-600);  /* clickable links */
+  --color-text-link-hover:  var(--color-primary-700);  /* link hover state */
+  --color-text-code:        var(--color-grey-700);     /* inline code, monospace */
+  --color-text-inverse:     var(--color-white);        /* text on dark/colored bg */
 
   /* Surfaces */
   --color-surface-base:    var(--color-white);
@@ -23,10 +33,22 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* App chrome (top bar + side rail + the gutter behind the content card) — a
+     BARELY-tinted near-white (prototype --g-100 ≈ #F5F6F9), just a whisper of
+     brand hue so the white content card floats on a calm backdrop. A strong
+     tint reads as "too bright". (Must live here in the .scss set the app loads —
+     the parallel .css set is NOT imported by the app, so a value defined only
+     there leaves the token undefined and the chrome falls through to the body
+     tint.) */
+  --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
+  --color-surface-chrome-deeper: var(--color-primary-100);
 
   /* Borders */
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
+  /* Soft divider — lighter than the structural border. Use for in-list row
+     dividers and intra-card section splits (HANDOFF.md §1.3 --border-soft). */
+  --color-border-subtle:  var(--color-grey-150);
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
@@ -35,10 +57,19 @@
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
 @theme inline {
   /* Text */
-  --color-text-primary:   var(--color-text-primary);
-  --color-text-secondary: var(--color-text-secondary);
-  --color-text-disabled:  var(--color-text-disabled);
-  --color-text-inverse:   var(--color-text-inverse);
+  --color-text-heading:     var(--color-text-heading);
+  --color-text-primary:     var(--color-text-primary);
+  --color-text-body:        var(--color-text-body);
+  --color-text-secondary:   var(--color-text-secondary);
+  --color-text-caption:     var(--color-text-caption);
+  --color-text-label:       var(--color-text-label);
+  --color-text-muted:       var(--color-text-muted);
+  --color-text-disabled:    var(--color-text-disabled);
+  --color-text-placeholder: var(--color-text-placeholder);
+  --color-text-link:        var(--color-text-link);
+  --color-text-link-hover:  var(--color-text-link-hover);
+  --color-text-code:        var(--color-text-code);
+  --color-text-inverse:     var(--color-text-inverse);
 
   /* Surfaces */
   --color-surface-base:    var(--color-surface-base);
@@ -46,10 +77,13 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle:       var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+  --color-surface-chrome:        var(--color-surface-chrome);
+  --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
   /* Borders */
   --color-border-default: var(--color-border-default);
   --color-border-strong:  var(--color-border-strong);
+  --color-border-subtle:  var(--color-border-subtle);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);

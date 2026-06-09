@@ -415,7 +415,7 @@ export class ReportsPage {
           const t = document.querySelector('[data-test="report-list-table"]');
           if (!t) return false;
           const text = t.textContent || '';
-          return /Showing \d+ - \d+/.test(text) || text.includes('No data available');
+          return /Showing \d+ - \d+/.test(text) || !!document.querySelector('[data-test="o2-empty-state"]');
         }, { timeout: 10000 });
         await this.reportSearchInputField.fill(reportName);
         return await btn.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
@@ -486,7 +486,7 @@ export class ReportsPage {
   async notAvailableReport(reportName) {
     await this.reportSearchInputField.fill(reportName);
     await this.reportListTable.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(this.reportListTable).toContainText('No data available');
+    await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
   }
 
 }

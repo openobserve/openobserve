@@ -147,7 +147,8 @@ describe("OButton", () => {
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:h-8");
+    // 34px control height per the design system (HANDOFF §11).
+    expect(wrapper.classes().join(" ")).toContain("tw:h-[2.125rem]");
   });
 
   it("applies lg size classes", () => {
@@ -263,18 +264,17 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("tw:transition-colors");
   });
 
-  it("applies ring-offset utilities so the focus ring renders with a surface-base gap", () => {
+  it("applies unified focus glow (ring-[0.125rem]! ring-primary-500/25!) as base", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:ring-offset-1");
-    expect(classes).toContain("tw:ring-offset-surface-base");
+    expect(classes).toContain("tw:focus-visible:ring-[0.125rem]!");
+    expect(classes).toContain("tw:focus-visible:ring-primary-500/25!");
   });
 
-  it("retains outline-none alongside the ring-offset utilities", () => {
+  it("retains outline-none as part of base classes", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("tw:outline-none");
-    expect(classes).toContain("tw:ring-offset-1");
   });
 
   it("applies a focus-visible ring on the default primary variant", () => {
@@ -291,9 +291,9 @@ describe("OButton", () => {
     );
   });
 
-  it("applies tw:focus-visible:ring-2 on every styled variant", () => {
+  it("applies tw:focus-visible:ring-[3px] on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:focus-visible:ring-2");
+    expect(wrapper.classes().join(" ")).toContain("tw:focus-visible:ring-[3px]");
   });
 
   // --- data attributes ---

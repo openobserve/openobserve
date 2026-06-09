@@ -138,17 +138,18 @@ describe('DynamoDB.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation link', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('text-blue-500');
-      expect(docLink.classes()).toContain('hover:text-blue-600');
-      expect(docLink.attributes('style')).toContain('text-decoration: underline');
+      expect(docLink.classes()).toContain('tw:text-text-link');
+      expect(docLink.classes()).toContain('hover:tw:text-text-link-hover');
+      expect(docLink.classes()).toContain('tw:underline');
+      expect(docLink.classes()).toContain('tw:font-medium');
     });
 
     it('should render documentation text correctly', () => {
       wrapper = createWrapper();
-      const docText = wrapper.find('.tw\\:font-bold');
-      expect(docText.text()).toContain('Click');
-      expect(docText.text()).toContain('here');
-      expect(docText.text()).toContain('to check further documentation.');
+      expect(wrapper.find('a').exists()).toBe(true);
+      expect(wrapper.text()).toContain('Click');
+      expect(wrapper.text()).toContain('here');
+      expect(wrapper.text()).toContain('to check further documentation.');
     });
   });
 
@@ -372,8 +373,8 @@ describe('DynamoDB.vue Comprehensive Coverage', () => {
       wrapper = createWrapper();
       const link = wrapper.find('a');
       expect(link.attributes('target')).toBe('_blank');
-      expect(link.classes()).toContain('text-blue-500');
-      expect(link.classes()).toContain('hover:text-blue-600');
+      expect(link.classes()).toContain('tw:text-text-link');
+      expect(link.classes()).toContain('hover:tw:text-text-link-hover');
     });
   });
 

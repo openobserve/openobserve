@@ -96,7 +96,7 @@ import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 export const defaultAlertValue: any = () => {
   return {
     name: "",
-    stream_type: "",
+    stream_type: "logs",
     stream_name: "",
     is_real_time: "false",
     query_condition: {
@@ -625,8 +625,54 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     originalStreamFields.value = [...streamCols];
     filteredColumns.value = [...streamCols];
 
+    // In SQL mode, generate a starter query when the editor is still empty
+    if (
+      formData.value.query_condition.type === "sql" &&
+      !formData.value.query_condition.sql?.trim()
+    ) {
+      formData.value.query_condition.sql = `SELECT * FROM "${stream_name}"`;
+    }
+
     onInputUpdate("stream_name", stream_name);
   };
+
+  // ── SQL → stream-name sync ──────────────────────────────────────────────
+  // When the user edits the SQL query and changes the stream name inside the
+  // FROM clause, update the stream-name dropdown to match.
+  // Guard flag prevents the auto-SQL-generation inside updateStreamFields from
+  // firing while we are already syncing (SQL is not empty at that point, so
+  // the guard in updateStreamFields would already prevent it, but this is an
+  // extra safety layer).
+  const isSyncingStreamFromSql = ref(false);
+
+  const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
+    if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    try {
+      const parsed = parser.parse(sql);
+      const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+      if (fromStream && fromStream !== formData.value.stream_name) {
+        isSyncingStreamFromSql.value = true;
+        formData.value.stream_name = fromStream;
+        streamNameError.value = false;
+        await updateStreamFields(fromStream);
+        isSyncingStreamFromSql.value = false;
+      }
+    } catch {
+      // ignore parse errors while user is mid-typing
+    }
+  }, 600);
+
+  watch(
+    () => formData.value.query_condition.sql,
+    (sql) => {
+      if (
+        formData.value.query_condition.type === "sql" &&
+        !isSyncingStreamFromSql.value
+      ) {
+        debouncedSyncStreamFromSql(sql || "");
+      }
+    },
+  );
 
   const updateStreams = (resetStream = true) => {
     if (resetStream) formData.value.stream_name = "";

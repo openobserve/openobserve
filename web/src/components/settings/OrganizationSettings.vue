@@ -1,5 +1,6 @@
 <template>
   <div>
+    <!-- Section header is provided full-width by the Settings shell. -->
     <div class="tw:px-3 tw:pt-3 tw:pb-3">
       <div class="tw:text-base tw:font-bold">
         {{ t("settings.logDetails") }}
@@ -67,12 +68,12 @@
     </template>
 
     <div class="tw:flex tw:gap-2 tw:mt-3">
-      <OButton
+      <!-- <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"
         size="sm-action"
         @click="$emit('cancel:hideform')"
-      >{{ t('alerts.cancel') }}</OButton>
+      >{{ t('alerts.cancel') }}</OButton> -->
       <OButton
         data-test="add-alert-submit-btn"
         variant="primary"

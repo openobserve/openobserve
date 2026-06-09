@@ -21,7 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @submit="createDestination"
       class="tw:w-full pipeline-add-remote-destination-form"
     >
-      <!-- Stepper for Create New Destination -->
+      <!-- Stepper for Create New Destination.
+           Width-constrained to 50vw for readable field/card widths, while the
+           footer below stays full-width so its top border lines up with the
+           full-width page header (matching the other destination forms). -->
+      <div class="tw:w-[50vw]">
       <OStepper
         v-model="step"
         ref="stepper"
@@ -410,9 +414,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
         </OStep>
       </OStepper>
+      </div>
 
       <!-- Form buttons -->
-      <div class="tw:flex tw:justify-start tw:mb-3">
+      <div class="tw:flex tw:justify-start tw:mb-3 tw:pt-4 tw:border-t tw:border-border-default">
         <div v-if="step === 1" class="tw:flex tw:gap-2">
           <OButton
             data-test="step1-cancel-btn"

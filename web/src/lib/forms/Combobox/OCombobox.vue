@@ -240,11 +240,13 @@ const hasInsideLabel = computed(
             'tw:rounded-md tw:border tw:shadow-lg',
             'tw:bg-select-content-bg tw:border-select-content-border',
             'tw:p-1',
-            'tw:data-[state=open]:animate-in tw:data-[state=closed]:animate-out',
-            'tw:data-[state=closed]:fade-out-0 tw:data-[state=open]:fade-in-0',
-            'tw:data-[state=closed]:zoom-out-95 tw:data-[state=open]:zoom-in-95',
-            'tw:data-[side=bottom]:slide-in-from-top-2',
-            'tw:data-[side=top]:slide-in-from-bottom-2',
+            // Clip-path reveal: unveiled at full size from its trigger edge (no
+            // scale/squish). Wipes down by default; top-placed wipes up. Soft
+            // ease-out-expo in (200ms), quick wipe out (140ms).
+            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
         >
           <ComboboxViewport class="tw:max-h-56 tw:overflow-y-auto">

@@ -110,6 +110,7 @@ function mountComponent() {
           template: '<div data-test="pipeline-destination-editor-stub" />',
         },
         NoData: { template: '<div data-test="no-data-stub" />' },
+        OEmptyState: { template: '<div data-test="o-empty-state-stub" />' },
         OBadge: { template: '<span data-test="o-badge-stub"><slot /></span>' },
         OIcon: { template: '<span data-test="o-icon-stub" />' },
         OButton: {
@@ -163,9 +164,7 @@ describe("PipelinesDestinationList", () => {
     it("renders the list title", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-title"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 
     it("renders the table when no editor is open", async () => {
@@ -495,7 +494,7 @@ describe("PipelinesDestinationList", () => {
       (destinationService.list as any).mockResolvedValue({ data: [] });
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find('[data-test="no-data-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-empty-state-stub"]').exists()).toBe(true);
     });
   });
 

@@ -20,28 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
-    <div
-      class="tw:flex tw:items-center tw:px-3 tw:h-[68px] tw:border-b-[1px] tw:gap-3 tw:flex-shrink-0"
+    <AppPageHeader
+      :back="{
+        label: t('modelPricing.header'),
+        onClick: goBack,
+        dataTest: 'model-pricing-editor-back-btn',
+      }"
+      :title="headerTitle"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <div
-        data-test="model-pricing-editor-back-btn"
-        class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius"
-        :title="t('modelPricing.goBack')"
-        @click="goBack"
-      >
-        <OIcon name="arrow-back-ios-new" size="xs" />
-      </div>
-      <div class="tw:flex tw:flex-col tw:justify-center">
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:leading-tight"
-          data-test="model-pricing-editor-title"
-        >
-          {{
-            isEdit ? t("modelPricing.editTitle") : t("modelPricing.newTitle")
-          }}
-        </div>
-      </div>
-    </div>
+      <template #title>
+        <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Form Body -->
     <div
@@ -526,6 +517,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -602,6 +594,9 @@ const regexError = computed(() => {
 
 const isEdit = computed(
   () => !!route.query.id && route.query.duplicate !== "true",
+);
+const headerTitle = computed(() =>
+  isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
 );
 
 const model = ref<any>(createEmptyModel());

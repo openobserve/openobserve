@@ -20,37 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
-      >
-
-        <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:w-full tw:font-[600]"
-            data-test="service-accounts-title-text"
-          >
-            {{ t("serviceAccounts.header") }}
-          </div>
-          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <OSearchInput
-                v-model="filterQuery"
-                class="tw:w-[12.5rem]"
-                :placeholder="t('serviceAccounts.search')"
-              />
-              <OButton
-                data-test="service-accounts-add-btn"
-                variant="primary"
-                size="sm"
-                class="tw:!h-8"
-                @click="addRoutePush({})"
-              >
-                {{ t('serviceAccounts.add') }}
-              </OButton>
-          </div>
-      </div>
-      </div>
+    <!-- Standard page header: title + actions only. Search moved into the
+         table's own toolbar (built-in global filter). -->
+    <AppPageHeader
+      :title="t('serviceAccounts.header')"
+      icon="manage-accounts"
+      :subtitle="'Programmatic access tokens for APIs'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          data-test="service-accounts-add-btn"
+          variant="primary"
+          size="sm"
+          @click="addRoutePush({})"
+        >
+          {{ t('serviceAccounts.add') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
       <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <div class="card-container tw:h-full">
           <OTable
+            :frame="false"
             :data="serviceAccountsState.service_accounts_users"
             :columns="columns"
             row-key="email"
@@ -62,14 +54,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             selection="multiple"
             :selected-ids="selectedAccountEmails"
-            :global-filter="filterQuery"
+            v-model:global-filter="filterQuery"
+            :show-global-filter="false"
             filter-mode="client"
             :default-columns="false"
-            :show-global-filter="false"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
+            <template #toolbar>
+              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <OSearchInput
+                  v-model="filterQuery"
+                  :placeholder="t('serviceAccounts.search')"
+                  class="tw:flex-1"
+                />
+              </div>
+            </template>
             <template #empty>
-              <NoData />
+              <OEmptyState
+                size="hero"
+                preset="no-service-accounts"
+                :filtered="!!filterQuery"
+                @action="
+                  (id) =>
+                    id === 'clear-filters'
+                      ? (filterQuery = '')
+                      : addRoutePush({})
+                "
+              />
             </template>
 
             <template #cell-email="{ row }">
@@ -236,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onBeforeMount, onMounted, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { useStore } from "vuex";
@@ -247,7 +258,7 @@ import AddServiceAccount from "./AddServiceAccount.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import usersService from "@/services/users";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import {
@@ -256,7 +267,9 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -267,7 +280,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { NoData, AddServiceAccount, OButton, ODialog, OIcon, OSearchInput, OTooltip, OTable, OBadge },
+  components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -319,7 +332,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 36,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 32,
         maxSize: 40,
         meta: { align: "left", compactPadding: true },
@@ -329,7 +342,7 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "email",
         sortable: true,
-        size: 550,
+        size: COL.email,
         meta: { align: "left" },
       },
       {
@@ -337,6 +350,7 @@ export default defineComponent({
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
+        size: COL.description,
         meta: { align: "left", autoWidth: true },
       },
       {
@@ -344,7 +358,7 @@ export default defineComponent({
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
-        size: 200,
+        size: COL.token,
         meta: { align: "left" },
       },
       {

@@ -118,16 +118,17 @@ describe('Kafka.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation link', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('text-blue-500');
-      expect(docLink.attributes('style')).toContain('text-decoration: underline');
+      expect(docLink.classes()).toContain('tw:text-text-link');
+      expect(docLink.classes()).toContain('tw:underline');
     });
 
     it('should render documentation text correctly', () => {
       wrapper = createWrapper();
-      const docSection = wrapper.find('.tw\\:font-bold');
-      expect(docSection.text()).toContain('Click');
-      expect(docSection.text()).toContain('here');
-      expect(docSection.text()).toContain('to check further documentation');
+      expect(wrapper.find('a').exists()).toBe(true);
+      const text = wrapper.text();
+      expect(text).toContain('Click');
+      expect(text).toContain('here');
+      expect(text).toContain('to check further documentation');
     });
   });
 
