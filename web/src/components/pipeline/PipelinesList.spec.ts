@@ -587,42 +587,8 @@ describe("PipelinesList", () => {
     });
   });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  describe("Navigation Methods", () => {
-    it("routeToAddPipeline navigates to createPipeline with org_identifier", () => {
-      wrapper.vm.routeToAddPipeline();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "createPipeline",
-        query: { org_identifier: "test-org" },
-      });
-    });
-
-    it("routeToImportPipeline navigates to importPipeline with org_identifier", () => {
-      wrapper.vm.routeToImportPipeline();
-
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "importPipeline",
-        query: { org_identifier: "test-org" },
-      });
-    });
-
-    it("goToPipelineHistory navigates to pipelineHistory", () => {
-      wrapper.vm.goToPipelineHistory();
-
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "pipelineHistory" })
-      );
-    });
-
-    it("goToBackfillJobs navigates to backfillJobs", () => {
-      wrapper.vm.goToBackfillJobs();
-
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "pipelineBackfill" })
-      );
-    });
-  });
+  // Navigation actions (Add / Import / History / Backfill) live in the Functions
+  // shell header now, not in PipelinesList — their tests moved with them.
 
   // ─────────────────────────────────────────────────────────────────────────────
   describe("Export Methods", () => {
@@ -1026,17 +992,13 @@ describe("PipelinesList", () => {
         "savePipeline",
         "deletePipeline",
         "resetConfirmDialog",
-        "routeToAddPipeline",
         "exportPipeline",
-        "routeToImportPipeline",
         "exportBulkPipelines",
         "handleResumePipeline",
         "handleCancelResumePipeline",
         "updateActiveTab",
         "showErrorDialog",
         "closeErrorDialog",
-        "goToPipelineHistory",
-        "goToBackfillJobs",
         "bulkTogglePipelines",
         "openBulkDeleteDialog",
         "bulkDeletePipelines",

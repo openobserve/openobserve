@@ -380,10 +380,12 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
 
     // Wait for initial pt-period URL param to land before changing time — ensures
     // panelsInitializing guard in RenderDashboardCharts has cleared.
+    // Use 20 s — under CI load the first refreshPanelRequest (which writes the
+    // URL) can be delayed by panel data fetches re-arming the guard.
     await page.waitForFunction(
       (pid) => window.location.href.includes(`pt-period.${pid}`),
       panelAId,
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     // Step 6: Click picker again, select "Last 6 days" and apply

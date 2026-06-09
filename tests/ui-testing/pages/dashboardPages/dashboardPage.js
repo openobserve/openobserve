@@ -29,6 +29,10 @@ export class DashboardPage {
     this.firstTableRow = page.locator('[data-test="o2-table-row-0"]');
     // Delete button scoped to the first row.
     this.firstRowDeleteButton = this.firstTableRow.locator('[data-test="dashboard-delete"]');
+    // Factory: returns the name-cell for a specific dashboard (Dashboards.vue line 202:
+    // :data-test="`dashboard-name-cell-${value}`"). Used to confirm the correct row
+    // is visible after search filtering completes before clicking delete.
+    this.getDashboardNameCell = (name) => page.locator(`[data-test="dashboard-name-cell-${name}"]`);
     // Toast surface (deletion confirmation, etc.).
     this.toastMessage = page.locator('[data-test="o-toast-message"]');
     this.confirmButton = page.locator('[data-test="dashboard-confirm-dialog"] [data-test="o-dialog-primary-btn"]');
@@ -291,10 +295,18 @@ export class DashboardPage {
     // Search the dashboard by name. All locators are class members.
     await this.dashboardSearchInput.click();
     await this.dashboardSearchInput.fill(dashboardName);
-    await this.page.waitForTimeout(1000);
 
-    // Click the delete action on the first filtered row.
-    await this.firstTableRow.waitFor({ state: "visible", timeout: 10000 });
+    // Wait for the name cell of the target dashboard to be visible.
+    // Dashboards.vue renders each row's title cell as
+    // data-test="dashboard-name-cell-${value}" — this is a precise,
+    // data-test-only selector that only resolves once the search filter
+    // has re-rendered the table with the correct row. It avoids the race
+    // where a stale row-0 from before the filter is applied passes a plain
+    // waitFor({ state: 'visible' }) immediately, causing a delete on the
+    // wrong row.
+    await this.getDashboardNameCell(dashboardName).waitFor({ state: 'visible', timeout: 20000 });
+
+    // Click the delete action on the confirmed filtered first row.
     await this.firstRowDeleteButton.click();
 
     // Confirm and verify the toast surface appears.

@@ -52,12 +52,13 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
     "tw:leading-tight",
   ].join(" "),
 
-  // Section group label: uppercase, wide tracking, secondary color.
-  // Like Datadog's "LOGS", "MONITORS" subsection headers — they recede visually.
+  // Section group label (gray eyebrow). HANDOFF §2.3 / §0 locked decision:
+  // 11.5px / 600 / 0 tracking, SENTENCE CASE — never ALL-CAPS, never tracked.
+  // ("Cipher keys", not "CIPHER KEYS".) They recede via color + size, not caps.
   "section": [
-    "tw:text-xs tw:font-semibold",
+    "tw:text-[11.5px] tw:font-semibold",
     "tw:text-typography-section",
-    "tw:uppercase tw:tracking-wide tw:leading-none",
+    "tw:leading-none",
   ].join(" "),
 
   // Panel / card title: mixed-case, slightly heavier than body, primary color.
@@ -100,6 +101,8 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
     "tw:text-xs tw:[font-family:var(--font-mono)]",
+    // HANDOFF §2.1: tabular figures + tight tracking for IDs/counts/timestamps.
+    "tw:[font-feature-settings:'tnum'] tw:tracking-[-0.2px]",
     "tw:text-typography-mono",
     "tw:leading-none",
   ].join(" "),

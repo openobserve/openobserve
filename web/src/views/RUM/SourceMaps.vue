@@ -143,13 +143,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <div class="tw:p-6 tw:text-center tw:text-gray-400">
-              <OIcon name="code" size="xl" class="tw:mb-3" />
-              <div class="tw:text-xl tw:font-semibold tw:mb-2">No Source Maps Found</div>
-              <div class="tw:text-sm">
-                Upload source maps to enable stack trace translation
-              </div>
-            </div>
+            <OEmptyState
+              size="hero"
+              preset="no-source-maps"
+              :filtered="!!(filters.version || filters.service || filters.environment)"
+              :hide-action="!(filters.version || filters.service || filters.environment)"
+              @action="(id) => id === 'upload' && navigateToUpload()"
+            />
           </template>
         </OTable>
     </div>
@@ -182,6 +182,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

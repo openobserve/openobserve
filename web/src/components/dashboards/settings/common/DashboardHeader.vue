@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           data-test="dashboard-header-title"
-          class="tw:text-xl tw:font-semibold"
+          class="tw:text-base tw:font-semibold"
         >
           {{ title }}
         </div>

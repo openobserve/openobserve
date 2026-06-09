@@ -79,7 +79,7 @@ const info = computed(() => {
   height: 1rem;
   border-radius: 0.2rem;
   font-size: 0.6rem;
-  font-weight: 800;
+  font-weight: 700;
   margin-right: 0.3rem;
   flex-shrink: 0;
   vertical-align: middle;

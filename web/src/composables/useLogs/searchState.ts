@@ -81,6 +81,7 @@ export interface SearchObjectData {
   highlightQuery: string;
   crossLinks: { stream_links: any[]; org_links: any[] };
   crossLinkQuery: string;
+  sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
 }
 
 export interface SearchObject {
@@ -330,6 +331,7 @@ export const searchState = () => {
     searchObj.data.errorDetail = "";
     searchObj.data.countErrorMsg = "";
     searchObj.data.errorCode = 0;
+    searchObj.data.sqlSyntaxErrorRanges = [];
   };
 
   /**

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
-import { createI18n } from 'vue-i18n';
+import i18n from '@/locales';
 import ImportPipeline from '@/components/pipeline/ImportPipeline.vue';
 import store from '@/test/unit/helpers/store';
 
@@ -51,6 +51,29 @@ vi.mock('@/utils/zincutils', () => ({
   useLocalTimezone: vi.fn(() => null)
 }));
 
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: vi.fn(),
+}));
+
+vi.mock('@/lib/forms/Input/OInput.vue', () => ({
+  default: { name: 'OInput', template: '<div />' }
+}));
+
+vi.mock('@/lib/forms/Select/OSelect.vue', () => ({
+  default: { name: 'OSelect', template: '<div />' }
+}));
+
+vi.mock('@/components/CodeQueryEditor.vue', () => ({
+  default: { name: 'QueryEditor', template: '<div />' }
+}));
+
+vi.mock('@/utils/alerts/alertDataTransforms', () => ({
+  detectConditionsVersion: vi.fn(() => 2),
+  convertV0ToV2: vi.fn((c: any) => c),
+  convertV1ToV2: vi.fn((c: any) => c),
+  convertV1BEToV2: vi.fn((c: any) => c),
+}));
+
 const mockRouter = {
   push: vi.fn(),
   back: vi.fn(),
@@ -66,28 +89,14 @@ vi.mock('vue-router', () => ({
   useRoute: () => mockRouter.currentRoute.value
 }));
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'en',
-  messages: {
-    en: {
-      'pipeline.import': 'Import Pipeline',
-      'pipeline.name': 'Pipeline Name'
-    }
-  }
-});
-
-
 describe('ImportPipeline.vue - OR Operator Tests', () => {
   let wrapper: VueWrapper<any>;
-  let mockQuasar: any;
 
   const createWrapper = (props = {}) => {
-    mockQuasar = {
-      notify: vi.fn()
-    };
-
+    const div = document.createElement('div');
+    document.body.appendChild(div);
     return mount(ImportPipeline, {
+      attachTo: div,
       props: {
         destinations: [],
         templates: [],
@@ -96,16 +105,24 @@ describe('ImportPipeline.vue - OR Operator Tests', () => {
       },
       global: {
         plugins: [i18n, store],
-        provide: {
-          $q: mockQuasar
-        },
         stubs: {
-          AppTabs: {
-            template: '<div data-test="app-tabs"><slot /></div>'
+          BaseImport: {
+            name: 'BaseImport',
+            template: '<div data-test="base-import"><slot name="output-content" /></div>',
+            props: ['title', 'testPrefix', 'isImporting', 'editorHeights', 'hideHeader'],
+            data() { return { isImporting: false, jsonArrayOfObj: [] }; },
+            methods: { updateJsonArray: vi.fn() },
           },
           QueryEditor: {
-            template: '<div data-test="query-editor"><slot /></div>'
-          }
+            name: 'QueryEditor',
+            template: '<div data-test="query-editor" />',
+            props: ['modelValue', 'label', 'debounceTime', 'language'],
+            emits: ['update:query'],
+          },
+          OSeparator: true,
+          OButton: true,
+          OInput: true,
+          OSelect: true,
         }
       }
     });
@@ -117,6 +134,12 @@ describe('ImportPipeline.vue - OR Operator Tests', () => {
       identifier: 'test-org',
       label: 'Test Organization'
     };
+    // Teleport target required by ImportPipeline.vue
+    if (!document.getElementById('o2-page-actions')) {
+      const el = document.createElement('div');
+      el.id = 'o2-page-actions';
+      document.body.appendChild(el);
+    }
   });
 
   afterEach(() => {

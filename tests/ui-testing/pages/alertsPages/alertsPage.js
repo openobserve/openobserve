@@ -909,16 +909,16 @@ export class AlertsPage {
         try {
             await Promise.race([
                 this.page.locator(this.locators.alertListTable).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
-            testLogger.error('Neither table nor no data message found after clicking folder', { folderName, error: error.message });
-            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor "No data available" message appeared`);
+            testLogger.error('Neither table nor empty state found after clicking folder', { folderName, error: error.message });
+            throw new Error(`Failed to load folder content for "${folderName}": Neither table nor empty state appeared`);
         }
     }
 
     async verifyNoDataAvailable() {
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     async verifyFolderExistsError() {
@@ -1218,7 +1218,7 @@ export class AlertsPage {
 
     async verifyTabContents() {
         await this.page.locator('[data-test="tab-scheduled"]').click();
-        await expect(this.page.getByText('No data available')).toBeVisible();
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
         await this.page.locator('[data-test="tab-realTime"]').click();
         await expect(this.page.getByText('Showing 1 - 1 of')).toBeVisible();
         await this.page.locator('[data-test="tab-all"]').click();

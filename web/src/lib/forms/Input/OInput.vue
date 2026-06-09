@@ -205,9 +205,10 @@ watch(
 // md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
 // Height applied to the wrapper (so border is included in the box, matching OSelect).
 // The inner input fills the wrapper via h-full.
+// 34px control height per the design system (HANDOFF §11: input height 34px).
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
-  sm: "tw:h-8",
-  md: "tw:h-8",
+  sm: "tw:h-[2.125rem]",
+  md: "tw:h-[2.125rem]",
 };
 const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "tw:text-sm",
@@ -216,17 +217,16 @@ const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
 
 const wrapperClasses = computed(() => [
   "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
   "tw:bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
   hasError.value
     ? "tw:border-input-border-error"
     : "tw:border-input-border tw:hover:border-input-border-hover",
-  /* Single-border focus: just change the border color, no outer ring.
-     Previously both `focus-within:border-input-border-focus` AND
-     `focus-within:ring-2 ring-input-focus-ring` were applied — that produced
-     the "two borders" look. The colored border alone is enough affordance. */
+  /* Focus affordance = soft glow: a 4px translucent primary halo hugging the
+     border (no offset gap), plus the focus border color. Reads as a glow while
+     staying a clearly visible focus indicator. */
   "tw:focus-within:border-input-border-focus",
+  "tw:focus-within:ring-[0.125rem] tw:focus-within:ring-primary-500/25",
   /* Disabled inputs were almost indistinguishable from enabled ones — same
      near-white bg, same border. Added opacity-60 + dashed border so they
      read as obviously inactive at a glance. */
@@ -264,7 +264,7 @@ const wrapperClasses = computed(() => [
       <!-- Inside label: floating mini-label at the top of the input border -->
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
-        class="tw:absolute tw:top-0.75 tw:start-3 tw:end-7 tw:text-[0.625rem] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+        class="tw:absolute tw:top-1 tw:start-3 tw:end-7 tw:text-[0.6875rem] tw:font-medium tw:leading-none tw:text-text-secondary tw:select-none tw:pointer-events-none tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
       >{{ label }}</span>
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
@@ -338,7 +338,7 @@ const wrapperClasses = computed(() => [
           'tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
           'tw:h-full',
           // Inside-label: push text down to leave room for the floating mini-label
-          labelPosition === 'inside' && label ? 'tw:pt-3.5 tw:pb-0.5 tw:text-xs' : textSizeClasses[size ?? 'md'],
+          labelPosition === 'inside' && label ? 'tw:pt-3 tw:pb-0.5 tw:text-xs tw:font-semibold' : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'tw:ps-2' : 'tw:ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'tw:pe-2' : 'tw:pe-3',
         ]"

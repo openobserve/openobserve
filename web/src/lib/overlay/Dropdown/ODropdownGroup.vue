@@ -12,7 +12,7 @@ defineSlots<DropdownGroupSlots>();
     <DropdownMenuLabel
       v-if="props.label"
       :class="[
-        'tw:px-3 tw:py-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide',
+        'tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
         'tw:text-dropdown-label tw:select-none',
       ]"
     >

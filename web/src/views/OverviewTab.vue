@@ -219,9 +219,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="ov-empty-desc">{{ t('overview.allClearDesc') }}</div>
     </div>
 
-    <!-- Loading skeleton -->
+    <!-- Loading skeleton (standard O2 wave shimmer) -->
     <div v-if="isLoading" class="ov-skeleton-wrap">
-      <div v-for="i in 3" :key="i" class="ov-skeleton-row"></div>
+      <OSkeleton v-for="i in 3" :key="i" class="ov-skeleton-row" />
     </div>
   </div>
 </template>
@@ -247,6 +247,7 @@ import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 
 const { t } = useI18n();
@@ -1265,28 +1266,16 @@ body.body--dark {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 0;
+  /* The app's default skeleton base is grey-200 (#e5e5e5), but the Usage tab's
+     skeleton renders on the lighter grey-100 (#f5f5f5). Override the token here
+     so the Overview skeleton reads the same shade as Usage. OSkeleton picks this
+     up via its bg-skeleton-base (= var(--color-skeleton-base)). */
+  --color-skeleton-base: var(--color-grey-100);
 }
 
+/* Height only — OSkeleton provides the surface, rounding and wave shimmer. */
 .ov-skeleton-row {
   height: 3.25em;
-  border-radius: 0.375rem;
-  background: linear-gradient(
-    90deg,
-    var(--o2-card-bg-solid) 0%,
-    var(--o2-bg-gray) 50%,
-    var(--o2-card-bg-solid) 100%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
 }
 
 /* ── Scrollbar ── */

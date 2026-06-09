@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:p-3">
+  <div class="tw:p-3 tw:pt-1">
     <ContentCopy :content="getCommand"></ContentCopy>
     <br />
     <hr />

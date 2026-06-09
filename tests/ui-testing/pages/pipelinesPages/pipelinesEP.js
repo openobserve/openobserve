@@ -7,7 +7,7 @@ export class PipelinesEP {
         this.page = page;
 
         this.pipelinesMenu = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        this.functionStreamTab = 'button[data-test="function-stream-tab"]';
+        this.functionStreamTab = '[data-test="pipeline-section-tab-functions"]';
         this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
         this.createFunctionButton = this.page.locator('[data-test="function-list-add-function-btn"]');
         // OInput: outer wrapper has data-test="foo"; inner native <input> has data-test="foo-field".
@@ -16,7 +16,7 @@ export class PipelinesEP {
         this.saveFunctionButton = '[data-test="add-function-save-btn"]';
         this.logsSearchField = '[data-test="logs-vrl-function-editor"]';
         this.logsSearchFieldCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
-        this.streamPipelinesTab = 'button[data-test="stream-pipelines-tab"]';
+        this.streamPipelinesTab = '[data-test="pipeline-section-tab-streamPipelines"]';
         this.importPipelineButton = '[data-test="pipeline-list-import-pipeline-btn"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';

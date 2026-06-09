@@ -40,7 +40,7 @@ class EnrichmentPage {
         // Use the data-test prefix (no `.o-tab__label` suffix — that Quasar
         // class no longer renders under the Reka tabs implementation).
         this.pipelineMenuItem = page.locator('[data-test="menu-link-\\/pipeline-item"]');
-        this.enrichmentTableTab = page.locator('button[data-test="function-enrichment-table-tab"]');
+        this.enrichmentTableTab = page.locator('[data-test="pipeline-section-tab-enrichmentTables"]');
 
         // ────────────────────────────────────────────────────────────────────
         // Confirm delete dialog (ConfirmDialog) — shared OOConfirmDialog
@@ -119,7 +119,7 @@ class EnrichmentPage {
         this.nameLabel = 'Name';
         this.warningQueryExecution = 'text=warning Query execution';
         this.startTimeCell = 'Start time';
-        this.showingText = 'Showing 1 to 2 out of 2';
+        this.showingText = '1 to 2 out of 2';
         this.csvRequiredError = 'CSV File is required!';
         this.enrichmentTablesButton = 'Enrichment Tables';
         this.appendDataToggle = 'Append data to existing';

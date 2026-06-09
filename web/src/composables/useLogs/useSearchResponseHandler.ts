@@ -31,6 +31,7 @@ import { getFunctionErrorMessage } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { rangesFromSqlParserDetail, rangesFromServerMessage } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
   const { showErrorNotification, showCancelSearchNotification } =
@@ -597,7 +598,7 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
+  const handleSearchError = async (request: any, err: WebSocketErrorResponse) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -634,6 +635,32 @@ export const useSearchResponseHandler = () => {
       searchObj.data.errorDetail = error_detail || "";
       searchObj.data.errorMsg = errorMsg;
       notificationMsg.value = errorMsg;
+
+      // Surface SQL parse errors as Monaco squiggles.
+      // SQL mode (code 20001): sqlparser gives "at Line: N, Column: N" in error_detail —
+      //   re-run client parser on the full SQL query for a contextual message.
+      // Non-SQL mode (both code 20001 and DataFusion message errors): reconstruct the
+      //   full SQL from the filter text and stream name, then re-run client parser so
+      //   the column points into the user's filter text, not the constructed SQL prefix.
+      if (searchObj.meta.sqlMode && code === 20001 && error_detail) {
+        const ranges = await rangesFromSqlParserDetail(
+          error_detail,
+          searchObj.data.query,
+        );
+        if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
+      } else if (!searchObj.meta.sqlMode) {
+        const stream = searchObj.data.stream.selectedStream?.[0];
+        if (stream && searchObj.data.query) {
+          const prefix = `select * from "${stream}" WHERE `;
+          const constructedSql = prefix + searchObj.data.query;
+          const ranges = await rangesFromServerMessage(
+            message || error_detail || "",
+            constructedSql,
+            prefix.length,
+          );
+          if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
+        }
+      }
     }
   };
 

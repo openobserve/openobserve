@@ -53,7 +53,7 @@ const pageSizeSelectOptions = computed(() =>
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-3 tw:border-t tw:border-border-default tw:h-[3.1rem] tw:min-h-[2.5rem]"
+    class="tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-3 tw:border-t tw:border-border-default tw:h-10 tw:min-h-10"
   >
     <!-- Left: bulk actions slot or row count -->
     <div class="tw:flex tw:items-center tw:gap-2">

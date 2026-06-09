@@ -109,9 +109,7 @@ describe("Others Component", () => {
     });
 
     expect(wrapper.vm.tabs).toBe("");
-    expect(wrapper.vm.tabsFilter).toBe("");
     expect(wrapper.vm.ingestTabType).toBe("airflow");
-    expect(wrapper.vm.splitterModel).toBe(270);
   });
 
   it("should set currentOrgIdentifier from store", () => {
@@ -233,55 +231,6 @@ describe("Others Component", () => {
     expect(othersTabs[3].name).toBe("heroku");
   });
 
-  it("should filter tabs correctly with filteredList computed property", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
-
-    // Initially, filteredList should contain all tabs
-    expect(wrapper.vm.filteredList).toHaveLength(4);
-
-    // Filter by "air"
-    wrapper.vm.tabsFilter = "air";
-    await nextTick();
-    
-    const airflowFiltered = wrapper.vm.filteredList.filter(tab => 
-      tab.label.toLowerCase().includes("air")
-    );
-    expect(airflowFiltered.length).toBeGreaterThan(0);
-  });
-
-  it("should filter tabs case-insensitively", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
-
-    wrapper.vm.tabsFilter = "CRIBL";
-    await nextTick();
-
-    const filtered = wrapper.vm.filteredList.filter(tab => 
-      tab.label.toLowerCase().includes("cribl")
-    );
-    expect(filtered.length).toBeGreaterThan(0);
-  });
-
-  it("should return empty array when no tabs match filter", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
-
-    wrapper.vm.tabsFilter = "nonexistent";
-    await nextTick();
-
-    expect(wrapper.vm.filteredList).toHaveLength(0);
-  });
-
   it("should expose all required properties in return statement", () => {
     wrapper = mount(Others, {
       global: {
@@ -293,15 +242,13 @@ describe("Others Component", () => {
     expect(wrapper.vm.store).toBeDefined();
     expect(wrapper.vm.router).toBeDefined();
     expect(wrapper.vm.config).toBeDefined();
-    expect(wrapper.vm.splitterModel).toBe(270);
     expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
     expect(wrapper.vm.currentOrgIdentifier).toBe("default");
     expect(wrapper.vm.getImageURL).toBeDefined();
     expect(wrapper.vm.verifyOrganizationStatus).toBeDefined();
     expect(wrapper.vm.tabs).toBe("");
     expect(wrapper.vm.ingestTabType).toBe("airflow");
-    expect(wrapper.vm.tabsFilter).toBe("");
-    expect(wrapper.vm.filteredList).toBeDefined();
+    expect(wrapper.vm.othersTabs).toBeDefined();
   });
 
   it("should handle onUpdated hook correctly when route is 'others'", async () => {
@@ -349,27 +296,6 @@ describe("Others Component", () => {
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  it("should maintain tabs filter reactivity", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
-
-    const initialLength = wrapper.vm.filteredList.length;
-    
-    wrapper.vm.tabsFilter = "airflow";
-    await nextTick();
-    
-    const filteredLength = wrapper.vm.filteredList.length;
-    expect(filteredLength).toBeLessThanOrEqual(initialLength);
-
-    wrapper.vm.tabsFilter = "";
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList.length).toBe(initialLength);
-  });
-
   it("should have correct tab icons with image URLs", async () => {
     wrapper = mount(Others, {
       global: {
@@ -387,7 +313,7 @@ describe("Others Component", () => {
       "img:mock-images/ingestion/heroku.svg"
     ];
     
-    wrapper.vm.filteredList.forEach((tab, index) => {
+    wrapper.vm.othersTabs.forEach((tab, index) => {
       expect(tab.icon).toBe(expectedIcons[index]);
     });
   });
@@ -428,7 +354,7 @@ describe("Others Component", () => {
       }
     });
 
-    wrapper.vm.filteredList.forEach(tab => {
+    wrapper.vm.othersTabs.forEach(tab => {
       expect(tab.contentClass).toBe("tab_content");
     });
   });
@@ -463,21 +389,6 @@ describe("Others Component", () => {
     expect(wrapper.vm.tabs).toBe("test-tab");
   });
 
-  it("should update splitterModel ref", async () => {
-    wrapper = mount(Others, {
-      global: {
-        plugins: [i18n, store]
-      }
-    });
-
-    expect(wrapper.vm.splitterModel).toBe(270);
-
-    wrapper.vm.splitterModel = 300;
-    await nextTick();
-
-    expect(wrapper.vm.splitterModel).toBe(300);
-  });
-
   it("should have correct query parameters in tab routes", () => {
     wrapper = mount(Others, {
       global: {
@@ -485,7 +396,7 @@ describe("Others Component", () => {
       }
     });
 
-    wrapper.vm.filteredList.forEach(tab => {
+    wrapper.vm.othersTabs.forEach(tab => {
       expect(tab.to.query.org_identifier).toBe("default");
     });
   });

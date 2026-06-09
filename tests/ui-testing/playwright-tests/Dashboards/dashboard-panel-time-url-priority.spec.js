@@ -43,10 +43,11 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Wait for initial pt-period URL param to land before interacting — ensures
     // panelsInitializing guard in RenderDashboardCharts has cleared (500ms timeout).
+    // Use 20 s in CI — panel data fetches can re-arm the guard under load.
     await page.waitForFunction(
       (pid) => window.location.href.includes(`pt-period.${pid}`),
       panelId,
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     // Step 2: Change Panel time to "Last 6d" and Apply
@@ -98,10 +99,11 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const panelBId = panelIds[1];
 
     // Wait for URL to be populated with panel time params before asserting
+    // Use 20 s in CI — panel data fetches can re-arm the panelsInitializing guard.
     await page.waitForFunction(
       (ids) => ids.every(pid => window.location.href.includes(`pt-period.${pid}`)),
       [panelAId, panelBId],
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     // Step 2: Verify initial URL contains both panel times

@@ -477,7 +477,7 @@ export default defineComponent({
   display: grid;
   grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px;
   padding: 8px 0;
-  font-weight: 900;
+  font-weight: 700;
   border-bottom: 1px solid var(--o2-border-color);
   background-color: var(--o2-table-header-bg);
 

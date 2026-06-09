@@ -23,32 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flex-direction: column;
     "
   >
-    <div
-      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
+    <AppPageHeader
+      :back="{
+        label: t('alert_destinations.header'),
+        onClick: () => emit('cancel:hideform'),
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
       style="flex-shrink: 0"
     >
-      <div class="tw:flex tw:items-center tw:h-[60px]">
-        <div
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow-back-ios-new"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          title="Go Back"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col" data-test="add-destination-title">
-          <div v-if="destination" class="tw:text-xl tw:font-semibold">
-            {{ t("alert_destinations.updateTitle") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold">
-            {{ t("alert_destinations.addTitle") }}
-          </div>
-        </div>
-      </div>
-    </div>
+      <template #title>
+        <span data-test="add-destination-title">
+          {{
+            destination
+              ? t("alert_destinations.updateTitle")
+              : t("alert_destinations.addTitle")
+          }}
+        </span>
+      </template>
+    </AppPageHeader>
     <div
       class="card-container tw:py-2"
       style="flex: 1; overflow-y: auto; overflow-x: hidden"
@@ -480,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
+      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full tw:border-t tw:border-border-default">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
@@ -562,6 +554,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type {
   Template,
   DestinationData,

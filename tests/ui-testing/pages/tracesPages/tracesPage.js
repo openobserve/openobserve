@@ -30,7 +30,7 @@ export class TracesPage {
     // Main Components
     this.searchBar = '[data-test="logs-search-bar"]';
     this.indexList = '[data-test="traces-search-index-list"]';
-    this.fieldListCollapseButton = '[data-test="logs-search-field-list-collapse-btn"]';
+    this.fieldListCollapseButton = '[data-test="traces-search-field-list-collapse-btn"]';
     this.searchResult = '[data-test="logs-search-search-result"]';
 
     // Search Results
@@ -136,7 +136,7 @@ export class TracesPage {
     this.traceTreeSpanServiceNamePrefix = '[data-test^="trace-tree-span-service-name-"]';
 
     // Field List Toggle
-    this.fieldListToggleButton = '[data-test="logs-search-field-list-collapse-btn"]';
+    this.fieldListToggleButton = '[data-test="traces-search-field-list-collapse-btn"]';
 
     // Legacy/Common
     this.dateTimeButton = dateTimeButtonLocator;
@@ -1827,17 +1827,25 @@ export class TracesPage {
    * @returns {Promise<boolean>}
    */
   async isDimensionSidebarVisible() {
-    return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+    return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
   }
 
   /**
    * Toggle dimension selector sidebar via collapse button
    */
   async toggleDimensionSidebar() {
-    const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-    if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const sidebar = this.page.locator(this.dimensionSelectorSidebar);
+    const sidebarVisible = await sidebar.isVisible().catch(() => false);
+    if (sidebarVisible) {
+      // Sidebar is open — click the collapse btn inside it
+      const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
       await btn.click();
-      await this.page.waitForTimeout(500);
+      await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    } else {
+      // Sidebar is collapsed — click the collapsed bar to expand
+      const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
+      await collapsedBar.click();
+      await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
 

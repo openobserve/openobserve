@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="tw:rounded-md quota-page tw:text-left card-container tw:h-full"
+  <div class="tw:rounded-md quota-page tw:text-left tw:h-full tw:py-2.5"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -141,7 +141,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-columns="false"
         :show-global-filter="false"
       >
-        <template #empty><NoData /></template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-api-limits"
+            :filtered="!!searchQuery"
+            :hide-action="!searchQuery"
+            @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+          />
+        </template>
         <template #bottom />
         <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
           <div v-if="editTable" :style="{ backgroundColor: editTable ? (store.state.theme === 'dark' ? '#212121' : '#f1f1ee') : 'transparent' }">
@@ -201,7 +209,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
-          <template #empty><NoData /></template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-role-limits"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
           <template #bottom />
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
@@ -284,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:py-2 tw:gap-2 tw:border-t tw:border-border-default"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -304,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2"
+        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:pr-3 tw:mt-3 tw:gap-2 tw:border-t tw:border-border-default"
         v-if="editTable && activeType == 'json'"
       >
         <OButton
@@ -379,7 +395,7 @@ import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
@@ -394,7 +410,7 @@ export default defineComponent({
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
-    NoData,
+    OEmptyState,
     OSpinner,
     OIcon,
     OTable,
@@ -492,7 +508,7 @@ export default defineComponent({
           header: t("quota.moduleName"),
           accessorKey: "module_name",
           sortable: true,
-          meta: { align: "left" },
+          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",

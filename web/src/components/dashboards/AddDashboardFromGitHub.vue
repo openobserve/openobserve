@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="searchQuery"
             placeholder="Search dashboards..."
             clearable
-            class="tw:mb-4"
+            class="tw:mb-3"
             data-test="add-dashboard-github-search"
           />
 

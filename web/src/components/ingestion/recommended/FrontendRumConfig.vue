@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3" :key="rumToken">
+  <div class="tw:m-3 tw:mt-1" :key="rumToken">
     <div v-if="rumToken">
       <div class="tw:text-xl tw:font-semibold tw:mt-1" data-test="rumweb-title-text">
         {{ t("ingestion.npmStepTitle") }}

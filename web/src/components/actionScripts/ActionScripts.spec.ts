@@ -125,6 +125,7 @@ describe("ActionScripts", () => {
             inheritAttrs: false,
             template: `
               <div data-test="action-scripts-table">
+                <slot name="toolbar" />
                 <table>
                   <tbody>
                     <tr v-for="(row, i) in data" :key="i">
@@ -210,7 +211,8 @@ describe("ActionScripts", () => {
 
   describe("Header section", () => {
     it("should display page title", () => {
-      const title = wrapper.find('[data-test="alerts-list-title"]');
+      // Title now lives in the standard AppPageHeader (row 1).
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
 

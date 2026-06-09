@@ -18,8 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="card-container"
-    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
+    class="tw:bg-surface-base"
+    :class="[
+      frame ? 'tw:border tw:border-border-default tw:rounded-xl' : '',
+      store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto',
+    ]"
   >
     <div class="tw:px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
@@ -392,6 +395,13 @@ export default defineComponent({
     simplifiedPanelView: {
       type: Boolean,
       default: false,
+    },
+    /** Draws the component's own bordered card. Set false when embedded inside
+     *  an already-bordered container (e.g. the dashboard view page card) to
+     *  avoid a double border. */
+    frame: {
+      type: Boolean,
+      default: true,
     },
   },
 

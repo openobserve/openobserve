@@ -5,9 +5,14 @@
  * Only active when both `enabled` is true and a `tableId` is provided.
  *
  * Storage key schema:
- *   o2-table-{tableId}-column-sizes       → Record<string, number>
- *   o2-table-{tableId}-column-visibility  → Record<string, boolean>
+ *   o2-table-{tableId}-column-sizes-v2     → Record<string, number>
+ *   o2-table-{tableId}-column-visibility   → Record<string, boolean>
+ *
+ * The sizes key is versioned (-v2): the Excel-style resize model changed what a
+ * persisted width means (a frozen fixed width, not a hint), so pre-existing
+ * sizes are intentionally discarded on upgrade.
  */
+const COLUMN_SIZES_KEY = "column-sizes-v2";
 export function useTableColumnPersistence(options: {
   tableId: string | undefined;
   enabled: boolean;
@@ -23,7 +28,7 @@ export function useTableColumnPersistence(options: {
   function loadColumnSizes(): Record<string, number> | null {
     if (!isActive) return null;
     try {
-      const raw = localStorage.getItem(storageKey("column-sizes"));
+      const raw = localStorage.getItem(storageKey(COLUMN_SIZES_KEY));
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (typeof parsed !== "object" || parsed === null) return null;
@@ -36,7 +41,7 @@ export function useTableColumnPersistence(options: {
   function saveColumnSizes(sizes: Record<string, number>): void {
     if (!isActive) return;
     try {
-      localStorage.setItem(storageKey("column-sizes"), JSON.stringify(sizes));
+      localStorage.setItem(storageKey(COLUMN_SIZES_KEY), JSON.stringify(sizes));
     } catch {
       // localStorage may be unavailable (private mode, quota exceeded)
     }
@@ -70,7 +75,7 @@ export function useTableColumnPersistence(options: {
   function clearPersistedState(): void {
     if (!tableId) return;
     try {
-      localStorage.removeItem(storageKey("column-sizes"));
+      localStorage.removeItem(storageKey(COLUMN_SIZES_KEY));
       localStorage.removeItem(storageKey("column-visibility"));
     } catch {
       // no-op

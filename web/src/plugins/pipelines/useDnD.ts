@@ -77,10 +77,13 @@ const defaultObject = {
   previousNodeOptions:<any>[],
   userSelectedNode:<any>{},
   userClickedNode : <any>{},
+  pipelineNameError: false,
+  pipelineNameErrorMessage: "",
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
+export { pipelineObj };
 export default function useDragAndDrop() {
 
   const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
