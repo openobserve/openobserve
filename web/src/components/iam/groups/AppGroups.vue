@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filterQuery"
                 :placeholder="t('iam.searchGroup')"
                 class="tw:flex-1"
+                data-test="iam-groups-search-input"
               />
             </div>
           </template>

@@ -20,9 +20,8 @@ import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-import { nextTick, ref, computed } from "vue";
+import { nextTick } from "vue";
 import config from "@/aws-exports";
-
 
 // Mock the useIsMetaOrg composable
 vi.mock("@/composables/useIsMetaOrg", () => ({
@@ -31,11 +30,40 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   }),
 }));
 
+// Mock useAppBreadcrumb to avoid side effects
+vi.mock("@/composables/useAppBreadcrumb", () => ({
+  useAppBreadcrumb: () => ({
+    publish: vi.fn(),
+    clear: vi.fn(),
+  }),
+}));
+
+/** Helper: collect all items from sectionGroups (flattened, excluding hidden ones) */
+function visibleItems(sectionGroups: any[]): any[] {
+  return sectionGroups.flatMap((g: any) =>
+    (g.items ?? []).filter((item: any) => item.visible !== false),
+  );
+}
+
+/** Helper: collect ALL items regardless of visible flag */
+function allItems(sectionGroups: any[]): any[] {
+  return sectionGroups.flatMap((g: any) => g.items ?? []);
+}
+
+const defaultStubs = {
+  RouterView: { template: "<div>Router View</div>" },
+  RouteTabs: true,
+  PageLayout: {
+    template:
+      '<div><slot name="sidebar" /><slot /></div>',
+  },
+  SectionRail: true,
+};
+
 describe("IdentityAccessManagement.vue Component", () => {
   let wrapper: VueWrapper<any>;
 
   beforeEach(async () => {
-    // Reset store state
     store.state.zoConfig = {
       rbac_enabled: false,
       service_account_enabled: true,
@@ -46,17 +74,9 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     wrapper = mount(IdentityAccessManagement, {
       global: {
-        provide: {
-          store: store,
-        },
+        provide: { store: store },
         plugins: [i18n, router],
-        stubs: {
-          RouterView: {
-            template: "<div>Router View</div>",
-          },
-          RouteTabs: true,
-                    OButton: true,
-        },
+        stubs: defaultStubs,
       },
     });
     await flushPromises();
@@ -64,6 +84,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
   afterEach(() => {
     wrapper.unmount();
+    vi.restoreAllMocks();
   });
 
   describe("Component Definition Tests", () => {
@@ -80,7 +101,6 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("should have RouteTabs component available", () => {
-      // RouteTabs is imported and used in the template
       expect(RouteTabs).toBeDefined();
     });
   });
@@ -90,32 +110,17 @@ describe("IdentityAccessManagement.vue Component", () => {
       expect(typeof wrapper.vm.$options.setup).toBe("function");
     });
 
-    it("should return activeTab from setup", () => {
-      expect(wrapper.vm.activeTab).toBeDefined();
+    it("should expose sectionGroups from setup", () => {
+      expect(wrapper.vm.sectionGroups).toBeDefined();
     });
 
-    it("should return tabs from setup", () => {
-      expect(wrapper.vm.tabs).toBeDefined();
-    });
-
-    it("should return splitterModel from setup", () => {
-      expect(wrapper.vm.splitterModel).toBeDefined();
-    });
-
-    it("should return showSidebar from setup", () => {
-      expect(wrapper.vm.showSidebar).toBeDefined();
+    it("should expose activeSection from setup", () => {
+      expect(wrapper.vm.activeSection).toBeDefined();
     });
 
     it("should have all required setup return properties", () => {
-      const setupProperties = [
-        "activeTab",
-        "tabs",
-        "splitterModel",
-        "showSidebar",
-        "collapseSidebar",
-        "updateActiveTab",
-      ];
-      setupProperties.forEach((prop) => {
+      const props = ["sectionGroups", "activeSection"];
+      props.forEach((prop) => {
         expect(wrapper.vm[prop]).toBeDefined();
       });
     });
@@ -139,349 +144,181 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
   });
 
-  describe("Reactive References Tests", () => {
-    it("should initialize activeTab as 'users'", () => {
-      expect(wrapper.vm.activeTab).toBe("users");
+  describe("Section Groups Tests", () => {
+    it("should initialize sectionGroups as an array", () => {
+      expect(Array.isArray(wrapper.vm.sectionGroups)).toBe(true);
     });
 
-    it("should initialize splitterModel as 220", () => {
-      expect(wrapper.vm.splitterModel).toBe(220);
+    it("should have at least one section group", () => {
+      expect(wrapper.vm.sectionGroups.length).toBeGreaterThan(0);
     });
 
-    it("should initialize showSidebar as true", () => {
-      expect(wrapper.vm.showSidebar).toBe(true);
+    it("should always include users item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const hasUsers = items.some((item: any) => item.key === "users");
+      expect(hasUsers).toBe(true);
     });
 
-    it("should initialize tabs as array", () => {
-      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
+    it("should always include organizations item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const hasOrgs = items.some((item: any) => item.key === "organizations");
+      expect(hasOrgs).toBe(true);
     });
 
-    it("should allow activeTab to be modified", async () => {
-      wrapper.vm.activeTab = "groups";
-      await nextTick();
-      expect(wrapper.vm.activeTab).toBe("groups");
+    it("should always include ingestionTokens item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const hasTokens = items.some(
+        (item: any) => item.key === "ingestionTokens",
+      );
+      expect(hasTokens).toBe(true);
     });
 
-    it("should allow splitterModel to be modified", async () => {
-      wrapper.vm.splitterModel = 300;
-      await nextTick();
-      expect(wrapper.vm.splitterModel).toBe(300);
-    });
-
-    it("should allow showSidebar to be modified", async () => {
-      wrapper.vm.showSidebar = false;
-      await nextTick();
-      expect(wrapper.vm.showSidebar).toBe(false);
+    it("each item should have required properties", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      items.forEach((item: any) => {
+        expect(item).toHaveProperty("key");
+        expect(item).toHaveProperty("label");
+        expect(item).toHaveProperty("to");
+        expect(item).toHaveProperty("dataTest");
+      });
     });
   });
 
   describe("Tab Filtering Tests - Service Accounts", () => {
-    it("should include service accounts tab when service_account_enabled is true", async () => {
+    it("should show serviceAccounts when service_account_enabled is true", async () => {
       store.state.zoConfig.service_account_enabled = true;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
-
       await flushPromises();
 
-      // In open source mode, should have users, serviceAccounts, organizations
-      const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
-      );
-      expect(hasServiceAccounts).toBe(true);
-
-      newWrapper.unmount();
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "serviceAccounts")).toBe(true);
+      w.unmount();
     });
 
-    it("should exclude service accounts tab when service_account_enabled is false", async () => {
+    it("should hide serviceAccounts when service_account_enabled is false", async () => {
       store.state.zoConfig.service_account_enabled = false;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
-
       await flushPromises();
 
-      const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
-      );
-      expect(hasServiceAccounts).toBe(false);
-
-      newWrapper.unmount();
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "serviceAccounts")).toBe(false);
+      w.unmount();
     });
 
-    it("should default to including service accounts when config is undefined", async () => {
+    it("should default to showing serviceAccounts when config is undefined", async () => {
       store.state.zoConfig.service_account_enabled = undefined;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
-
       await flushPromises();
 
-      const hasServiceAccounts = newWrapper.vm.tabs.some(
-        (tab: any) => tab.name === "serviceAccounts"
-      );
-      // Default should be true (service_account_enabled ?? true)
-      expect(hasServiceAccounts).toBe(true);
-
-      newWrapper.unmount();
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "serviceAccounts")).toBe(true);
+      w.unmount();
     });
   });
 
   describe("Tab Filtering Tests - RBAC", () => {
-    it("should include RBAC tabs when rbac_enabled is true", async () => {
+    it("should show groups and roles when enterprise and rbac_enabled", async () => {
       vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
       vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
       store.state.zoConfig.rbac_enabled = true;
-      store.state.zoConfig.service_account_enabled = true;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
-
       await flushPromises();
 
-      const hasGroups = newWrapper.vm.tabs.some((tab: any) => tab.name === "groups");
-      const hasRoles = newWrapper.vm.tabs.some((tab: any) => tab.name === "roles");
-
-      expect(hasGroups).toBe(true);
-      expect(hasRoles).toBe(true);
-
-      newWrapper.unmount();
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "groups")).toBe(true);
+      expect(items.some((i: any) => i.key === "roles")).toBe(true);
+      w.unmount();
     });
 
-    it("should exclude RBAC tabs when rbac_enabled is false", async () => {
+    it("should hide groups and roles when rbac_enabled is false", async () => {
       store.state.zoConfig.rbac_enabled = false;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
-
       await flushPromises();
 
-      const hasGroups = newWrapper.vm.tabs.some((tab: any) => tab.name === "groups");
-      const hasRoles = newWrapper.vm.tabs.some((tab: any) => tab.name === "roles");
-
-      expect(hasGroups).toBe(false);
-      expect(hasRoles).toBe(false);
-
-      newWrapper.unmount();
+      const items = visibleItems(w.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "groups")).toBe(false);
+      expect(items.some((i: any) => i.key === "roles")).toBe(false);
+      w.unmount();
     });
   });
 
   describe("Tab Configuration Tests - Enterprise vs Open Source", () => {
-    it("should have correct tabs structure for open source", () => {
-      expect(wrapper.vm.tabs).toBeDefined();
-      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
-      expect(wrapper.vm.tabs.length).toBeGreaterThan(0);
+    it("should have correct sectionGroups structure for open source", () => {
+      expect(wrapper.vm.sectionGroups).toBeDefined();
+      expect(Array.isArray(wrapper.vm.sectionGroups)).toBe(true);
+      expect(wrapper.vm.sectionGroups.length).toBeGreaterThan(0);
     });
 
-    it("should have required tab properties", () => {
-      const firstTab = wrapper.vm.tabs[0];
-      expect(firstTab).toHaveProperty("name");
-      expect(firstTab).toHaveProperty("to");
-      expect(firstTab).toHaveProperty("label");
-      expect(firstTab).toHaveProperty("class");
-      expect(firstTab).toHaveProperty("dataTest");
+    it("should have group labels", () => {
+      wrapper.vm.sectionGroups.forEach((group: any) => {
+        expect(group).toHaveProperty("label");
+        expect(group).toHaveProperty("items");
+      });
     });
 
-    it("should always include users tab", () => {
-      const hasUsers = wrapper.vm.tabs.some((tab: any) => tab.name === "users");
-      expect(hasUsers).toBe(true);
+    it("should always include users item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "users")).toBe(true);
     });
 
-    it("should always include organizations tab", () => {
-      const hasOrganizations = wrapper.vm.tabs.some(
-        (tab: any) => tab.name === "organizations"
-      );
-      expect(hasOrganizations).toBe(true);
+    it("should always include organizations item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      expect(items.some((i: any) => i.key === "organizations")).toBe(true);
     });
   });
 
-  describe("Sidebar Collapse/Expand Tests", () => {
-    it("should have collapseSidebar function", () => {
-      expect(typeof wrapper.vm.collapseSidebar).toBe("function");
+  describe("Route and Navigation Tests", () => {
+    it("should have activeSection as a computed string", () => {
+      expect(typeof wrapper.vm.activeSection).toBe("string");
     });
 
-    it("should toggle showSidebar when collapseSidebar is called", async () => {
-      const initialState = wrapper.vm.showSidebar;
-      wrapper.vm.collapseSidebar();
-      await nextTick();
-      expect(wrapper.vm.showSidebar).toBe(!initialState);
-    });
-
-    it("should set splitterModel to 0 when collapsing", async () => {
-      wrapper.vm.showSidebar = true;
-      wrapper.vm.splitterModel = 220;
-      wrapper.vm.collapseSidebar();
-      await nextTick();
-      expect(wrapper.vm.splitterModel).toBe(0);
-    });
-
-    it("should restore splitterModel when expanding", async () => {
-      wrapper.vm.showSidebar = true;
-      wrapper.vm.splitterModel = 250;
-      wrapper.vm.collapseSidebar(); // Collapse
-      await nextTick();
-      wrapper.vm.collapseSidebar(); // Expand
-      await nextTick();
-      expect(wrapper.vm.splitterModel).toBe(250);
-    });
-
-    it("should save last splitter position before collapsing", async () => {
-      wrapper.vm.showSidebar = true;
-      wrapper.vm.splitterModel = 300;
-      const lastPosition = wrapper.vm.lastSplitterPosition;
-      wrapper.vm.collapseSidebar();
-      await nextTick();
-      expect(wrapper.vm.lastSplitterPosition).toBe(300);
-    });
-  });
-
-  describe("Update Active Tab Tests", () => {
-    it("should have updateActiveTab function", () => {
-      expect(typeof wrapper.vm.updateActiveTab).toBe("function");
-    });
-
-    it("should update activeTab when called with a tab name", async () => {
-      wrapper.vm.updateActiveTab("groups");
-      await nextTick();
-      expect(wrapper.vm.activeTab).toBe("groups");
-    });
-
-    it("should handle undefined tab parameter", async () => {
-      wrapper.vm.activeTab = "users";
-      wrapper.vm.updateActiveTab(undefined);
-      await nextTick();
-      // Should not change when undefined
-      expect(wrapper.vm.activeTab).toBeDefined();
-    });
-
-    it("should handle empty string tab parameter", async () => {
-      wrapper.vm.activeTab = "users";
-      wrapper.vm.updateActiveTab("");
-      await nextTick();
-      // Empty string is falsy, so should not update
-      expect(wrapper.vm.activeTab).toBeDefined();
-    });
-  });
-
-  describe("Route Watcher Tests", () => {
     it.skip("should redirect to users when accessing quota as non-meta org", async () => {
-      // Create a reactive current route
-      const currentRoute = ref({
-        name: "users",
-        query: { org_identifier: "test-org" },
-        params: {},
-        path: "/users",
-        fullPath: "/users?org_identifier=test-org",
-        matched: [],
-        meta: {},
-        redirectedFrom: undefined,
-        hash: "",
-      });
-
-      // Create mock push function
-      const mockPush = vi.fn().mockResolvedValue(undefined);
-
-      // Create test router with reactive route
-      const testRouter: any = {
-        ...router,
-        currentRoute,
-        push: mockPush,
-        options: router.options,
-        install: router.install,
-      };
-
-      // Mock useRouter to return our test router
-      const vueRouter = await import("vue-router");
-      const useRouterSpy = vi.spyOn(vueRouter, "useRouter").mockReturnValue(testRouter);
-
-      // Mount component
-      const testWrapper = mount(IdentityAccessManagement, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
-        },
-      });
-
-      await flushPromises();
-      await nextTick();
-
-      // Clear calls from initial mount (watcher has immediate: true)
-      mockPush.mockClear();
-
-      // Update the entire route object to trigger watcher
-      currentRoute.value = {
-        name: "quota",
-        query: { org_identifier: "test-org" },
-        params: {},
-        path: "/quota",
-        fullPath: "/quota?org_identifier=test-org",
-        matched: [],
-        meta: {},
-        redirectedFrom: undefined,
-        hash: "",
-      };
-
-      // Wait for watcher to trigger
-      await nextTick();
-      await flushPromises();
-      await nextTick();
-
-      // Verify redirect was called
-      expect(mockPush).toHaveBeenCalledWith({
-        name: "users",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
-
-      testWrapper.unmount();
-      useRouterSpy.mockRestore();
+      // Requires deep router mocking — covered by e2e tests
     });
   });
 
   describe("Template Rendering Tests", () => {
-    it("should render page div", () => {
+    it("should render page div with data-test=iam-page", () => {
       expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
     });
 
     it("should render page content", () => {
       expect(wrapper.find('[data-test="iam-page"]').exists()).toBe(true);
-    });
-
-    it("should conditionally render sidebar based on showSidebar", async () => {
-      wrapper.vm.showSidebar = true;
-      await nextTick();
-      expect(wrapper.vm.showSidebar).toBe(true);
-
-      wrapper.vm.showSidebar = false;
-      await nextTick();
-      expect(wrapper.vm.showSidebar).toBe(false);
     });
   });
 
@@ -501,95 +338,85 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
   });
 
-  describe("All Tabs Structure Tests", () => {
-    it("should have all expected tabs in allTabs array", () => {
-      // Access internal allTabs through the component
-      const expectedTabs = [
-        "users",
-        "serviceAccounts",
-        "groups",
-        "roles",
-        "quota",
-        "organizations",
-        "invitations",
-      ];
-
-      // The tabs array should be a subset of allTabs based on config
-      expect(wrapper.vm.tabs).toBeDefined();
-      expect(wrapper.vm.tabs.length).toBeGreaterThan(0);
+  describe("All Items Structure Tests", () => {
+    it("should have expected item keys in sectionGroups", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const keys = items.map((i: any) => i.key);
+      // At minimum these are always defined (visibility aside)
+      expect(keys).toContain("users");
+      expect(keys).toContain("organizations");
+      expect(keys).toContain("ingestionTokens");
     });
 
-    it("should have correct translation keys for tab labels", () => {
-      const tab = wrapper.vm.tabs[0];
-      expect(tab.label).toBeDefined();
-      expect(typeof tab.label).toBe("string");
+    it("should have correct translation keys for item labels", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const first = items[0];
+      expect(first.label).toBeDefined();
+      expect(typeof first.label).toBe("string");
     });
 
-    it("should have correct route configuration for each tab", () => {
-      wrapper.vm.tabs.forEach((tab: any) => {
-        expect(tab.to).toBeDefined();
-        expect(tab.to.name).toBeDefined();
-        expect(tab.to.query).toBeDefined();
-        expect(tab.to.query.org_identifier).toBe("test-org");
+    it("should have correct route configuration for each item", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      items.forEach((item: any) => {
+        expect(item.to).toBeDefined();
+        expect(item.to.name).toBeDefined();
+        expect(item.to.query).toBeDefined();
+        expect(item.to.query.org_identifier).toBe("test-org");
       });
     });
   });
 
-  describe("setTabs() Function Tests", () => {
-    it("should be called on component mount", () => {
-      // setTabs is called via watcher on mount
-      expect(wrapper.vm.tabs).toBeDefined();
-      expect(wrapper.vm.tabs.length).toBeGreaterThan(0);
+  describe("setTabs() / sectionGroups Computation Tests", () => {
+    it("should have non-empty sectionGroups on mount", () => {
+      expect(wrapper.vm.sectionGroups).toBeDefined();
+      expect(wrapper.vm.sectionGroups.length).toBeGreaterThan(0);
     });
 
     describe("Enterprise Mode Tests", () => {
-      it("should include service accounts in enterprise (not cloud) when enabled", async () => {
-        // Mock enterprise mode
+      it("should show serviceAccounts in enterprise (not cloud) when enabled", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.service_account_enabled = true;
         store.state.zoConfig.rbac_enabled = false;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("users");
-        expect(tabNames).toContain("organizations");
-        expect(tabNames).toContain("serviceAccounts");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        const keys = items.map((i: any) => i.key);
+        expect(keys).toContain("users");
+        expect(keys).toContain("organizations");
+        expect(keys).toContain("serviceAccounts");
+        w.unmount();
       });
 
-      it("should exclude service accounts in enterprise when disabled", async () => {
+      it("should exclude serviceAccounts in enterprise when disabled", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.service_account_enabled = false;
         store.state.zoConfig.rbac_enabled = false;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("users");
-        expect(tabNames).toContain("organizations");
-        expect(tabNames).not.toContain("serviceAccounts");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        const keys = items.map((i: any) => i.key);
+        expect(keys).toContain("users");
+        expect(keys).toContain("organizations");
+        expect(keys).not.toContain("serviceAccounts");
+        w.unmount();
       });
 
       it("should include invitations in cloud mode", async () => {
@@ -597,207 +424,184 @@ describe("IdentityAccessManagement.vue Component", () => {
         vi.spyOn(config, "isCloud", "get").mockReturnValue("true");
         store.state.zoConfig.rbac_enabled = false;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("invitations");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "invitations")).toBe(true);
+        w.unmount();
       });
 
-      it("should include RBAC tabs when rbac_enabled is true in enterprise", async () => {
+      it("should include groups and roles when rbac_enabled in enterprise", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.rbac_enabled = true;
         store.state.zoConfig.service_account_enabled = true;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("groups");
-        expect(tabNames).toContain("roles");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        const keys = items.map((i: any) => i.key);
+        expect(keys).toContain("groups");
+        expect(keys).toContain("roles");
+        w.unmount();
       });
 
-      it("should include quota tab when isMetaOrg and rbac_enabled", async () => {
-        // Mock isMetaOrg to return true
-        vi.mock("@/composables/useIsMetaOrg", () => ({
-          default: () => ({
-            isMetaOrg: { value: true },
-          }),
-        }));
-
+      it("should have quota defined in sectionGroups (visibility depends on isMetaOrg)", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("true");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.rbac_enabled = true;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        // Quota might be included if isMetaOrg is true
-        expect(tabNames).toBeDefined();
-
-        newWrapper.unmount();
+        // quota exists in allItems regardless of visibility
+        const items = allItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "quota")).toBe(true);
+        w.unmount();
       });
     });
 
     describe("Open Source Mode Tests", () => {
-      it("should include users, organizations in open source", async () => {
+      it("should include users and organizations in open source", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.service_account_enabled = true;
         store.state.zoConfig.rbac_enabled = false;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("users");
-        expect(tabNames).toContain("organizations");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        const keys = items.map((i: any) => i.key);
+        expect(keys).toContain("users");
+        expect(keys).toContain("organizations");
+        w.unmount();
       });
 
-      it("should include service accounts in open source when enabled", async () => {
+      it("should include serviceAccounts in open source when enabled", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.service_account_enabled = true;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).toContain("serviceAccounts");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "serviceAccounts")).toBe(true);
+        w.unmount();
       });
 
-      it("should exclude service accounts in open source when disabled", async () => {
+      it("should exclude serviceAccounts in open source when disabled", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
         store.state.zoConfig.service_account_enabled = false;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).not.toContain("serviceAccounts");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "serviceAccounts")).toBe(false);
+        w.unmount();
       });
 
-      it("should not include RBAC tabs in open source", async () => {
+      it("should not include groups/roles in open source (non-enterprise)", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
-        store.state.zoConfig.rbac_enabled = true; // Even if enabled, should not show in OS
+        store.state.zoConfig.rbac_enabled = true;
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).not.toContain("groups");
-        expect(tabNames).not.toContain("roles");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        const keys = items.map((i: any) => i.key);
+        expect(keys).not.toContain("groups");
+        expect(keys).not.toContain("roles");
+        w.unmount();
       });
 
       it("should not include invitations in open source", async () => {
         vi.spyOn(config, "isEnterprise", "get").mockReturnValue("false");
         vi.spyOn(config, "isCloud", "get").mockReturnValue("false");
 
-        const newWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-
         await flushPromises();
 
-        const tabNames = newWrapper.vm.tabs.map((t: any) => t.name);
-        expect(tabNames).not.toContain("invitations");
-
-        newWrapper.unmount();
+        const items = visibleItems(w.vm.sectionGroups);
+        expect(items.some((i: any) => i.key === "invitations")).toBe(false);
+        w.unmount();
       });
     });
 
     describe("Config Change Tests", () => {
-      it("should recalculate tabs when service_account_enabled changes", async () => {
+      it("should recalculate sectionGroups when service_account_enabled changes", async () => {
         store.state.zoConfig.service_account_enabled = true;
         await nextTick();
         await flushPromises();
 
-        const hasServiceAccountsBefore = wrapper.vm.tabs.some(
-          (t: any) => t.name === "serviceAccounts"
+        const hasBefore = visibleItems(wrapper.vm.sectionGroups).some(
+          (i: any) => i.key === "serviceAccounts",
         );
+        expect(hasBefore).toBe(true);
 
         store.state.zoConfig.service_account_enabled = false;
         await nextTick();
         await flushPromises();
 
-        const hasServiceAccountsAfter = wrapper.vm.tabs.some(
-          (t: any) => t.name === "serviceAccounts"
-        );
-
-        // Should be different based on config change
-        expect(wrapper.vm.tabs).toBeDefined();
+        // sectionGroups is a computed — it recalculates
+        expect(wrapper.vm.sectionGroups).toBeDefined();
       });
 
-      it("should recalculate tabs when rbac_enabled changes", async () => {
+      it("should recalculate sectionGroups when rbac_enabled changes", async () => {
         store.state.zoConfig.rbac_enabled = false;
         await nextTick();
         await flushPromises();
@@ -806,23 +610,18 @@ describe("IdentityAccessManagement.vue Component", () => {
         await nextTick();
         await flushPromises();
 
-        // Tabs should be recalculated
-        expect(wrapper.vm.tabs).toBeDefined();
+        expect(wrapper.vm.sectionGroups).toBeDefined();
       });
     });
   });
 
   describe("Watchers Tests", () => {
-    it("should watch zoConfig changes", async () => {
-      const originalTabsLength = wrapper.vm.tabs.length;
-
-      // Change config
+    it("should reflect config change in sectionGroups", async () => {
       store.state.zoConfig.rbac_enabled = true;
       await nextTick();
       await flushPromises();
 
-      // Tabs should be recalculated
-      expect(wrapper.vm.tabs).toBeDefined();
+      expect(wrapper.vm.sectionGroups).toBeDefined();
     });
   });
 
@@ -835,159 +634,121 @@ describe("IdentityAccessManagement.vue Component", () => {
         },
       };
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
           provide: { store: testStore },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
 
-      expect(newWrapper.vm.tabs).toBeDefined();
-      newWrapper.unmount();
+      expect(w.vm.sectionGroups).toBeDefined();
+      w.unmount();
     });
 
     it("should handle null zoConfig values", async () => {
       store.state.zoConfig.rbac_enabled = null;
       store.state.zoConfig.service_account_enabled = null;
 
-      const newWrapper = mount(IdentityAccessManagement, {
+      const w = mount(IdentityAccessManagement, {
         global: {
-          provide: { store: store },
+          provide: { store },
           plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
+          stubs: defaultStubs,
         },
       });
 
-      expect(newWrapper.vm.tabs).toBeDefined();
-      expect(newWrapper.vm.tabs.length).toBeGreaterThan(0);
-      newWrapper.unmount();
+      expect(w.vm.sectionGroups).toBeDefined();
+      expect(w.vm.sectionGroups.length).toBeGreaterThan(0);
+      w.unmount();
     });
 
-    it("should handle rapid sidebar toggle", async () => {
+    it("should handle multiple activeSection reads", async () => {
       for (let i = 0; i < 10; i++) {
-        wrapper.vm.collapseSidebar();
+        expect(typeof wrapper.vm.activeSection).toBe("string");
         await nextTick();
       }
-      // Should still be in valid state
-      expect(typeof wrapper.vm.showSidebar).toBe("boolean");
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
-    });
-
-    it("should handle multiple active tab changes", async () => {
-      const tabs = ["users", "groups", "roles", "organizations"];
-      for (const tab of tabs) {
-        wrapper.vm.updateActiveTab(tab);
-        await nextTick();
-      }
-      expect(wrapper.vm.activeTab).toBeDefined();
     });
   });
 
   describe("Performance and Memory Tests", () => {
     it("should not create memory leaks on mount/unmount", () => {
       for (let i = 0; i < 5; i++) {
-        const testWrapper = mount(IdentityAccessManagement, {
+        const w = mount(IdentityAccessManagement, {
           global: {
-            provide: { store: store },
+            provide: { store },
             plugins: [i18n, router],
-            stubs: { RouterView: true, RouteTabs: true },
+            stubs: defaultStubs,
           },
         });
-        testWrapper.unmount();
+        w.unmount();
       }
       expect(true).toBe(true);
     });
 
     it("should handle multiple instances", () => {
-      const wrappers = [];
+      const wrappers: VueWrapper<any>[] = [];
       for (let i = 0; i < 3; i++) {
         wrappers.push(
           mount(IdentityAccessManagement, {
             global: {
-              provide: { store: store },
+              provide: { store },
               plugins: [i18n, router],
-              stubs: { RouterView: true, RouteTabs: true },
+              stubs: defaultStubs,
             },
-          })
+          }),
         );
       }
 
       expect(wrappers.length).toBe(3);
       wrappers.forEach((w) => {
-        expect(w.vm.activeTab).toBe("users");
-        expect(w.vm.tabs).toBeDefined();
+        expect(Array.isArray(w.vm.sectionGroups)).toBe(true);
         w.unmount();
       });
     });
   });
 
   describe("Integration with Vue Composition API", () => {
-    it("should use ref correctly for activeTab", () => {
-      expect(wrapper.vm.activeTab).toBeDefined();
+    it("should use computed correctly for sectionGroups", () => {
+      expect(Array.isArray(wrapper.vm.sectionGroups)).toBe(true);
     });
 
-    it("should use ref correctly for tabs", () => {
-      expect(wrapper.vm.tabs).toBeDefined();
-      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
+    it("should use computed correctly for activeSection", () => {
+      expect(typeof wrapper.vm.activeSection).toBe("string");
     });
 
-    it("should use ref correctly for splitterModel", () => {
-      expect(typeof wrapper.vm.splitterModel).toBe("number");
-    });
-
-    it("should use ref correctly for showSidebar", () => {
-      expect(typeof wrapper.vm.showSidebar).toBe("boolean");
-    });
-
-    it("should use watch correctly", () => {
+    it("should use watch correctly (setup is defined)", () => {
       expect(wrapper.vm.$options.setup).toBeDefined();
     });
   });
 
-  describe("Bug Fix Regression Tests", () => {
-    it("should properly filter tabs when tabs is a ref (bug fix test)", async () => {
-      // This test ensures the bug where tabs.value couldn't be reassigned is fixed
-      store.state.zoConfig.rbac_enabled = true;
-      store.state.zoConfig.service_account_enabled = true;
-
-      const newWrapper = mount(IdentityAccessManagement, {
-        global: {
-          provide: { store: store },
-          plugins: [i18n, router],
-          stubs: { RouterView: true, RouteTabs: true },
-        },
+  describe("Section Group Item Key Tests", () => {
+    it("should have items with key, label, icon, to, dataTest", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      items.forEach((item: any) => {
+        expect(item.key).toBeDefined();
+        expect(item.label).toBeDefined();
+        expect(item.to).toBeDefined();
+        expect(item.dataTest).toBeDefined();
       });
-
-      await flushPromises();
-
-      // Tabs should be filtered correctly
-      expect(newWrapper.vm.tabs).toBeDefined();
-      expect(Array.isArray(newWrapper.vm.tabs)).toBe(true);
-      expect(newWrapper.vm.tabs.length).toBeGreaterThan(0);
-
-      newWrapper.unmount();
     });
 
-    it("should allow tabs.value reassignment (not a computed property)", async () => {
-      const originalLength = wrapper.vm.tabs.length;
-
-      // Try to directly assign tabs
-      wrapper.vm.tabs = [
-        {
-          name: "test",
-          to: { name: "test", query: {} },
-          label: "Test",
-          class: "test",
-          dataTest: "test",
-        },
+    it("should include all expected item keys in allItems", () => {
+      const items = allItems(wrapper.vm.sectionGroups);
+      const keys = items.map((i: any) => i.key);
+      const expectedKeys = [
+        "users",
+        "serviceAccounts",
+        "ingestionTokens",
+        "invitations",
+        "groups",
+        "roles",
+        "quota",
+        "organizations",
       ];
-
-      await nextTick();
-
-      // Should allow reassignment (proving it's not a computed)
-      expect(wrapper.vm.tabs.length).not.toBe(originalLength);
-      expect(wrapper.vm.tabs[0].name).toBe("test");
+      expectedKeys.forEach((key) => {
+        expect(keys).toContain(key);
+      });
     });
   });
 });

@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount, shallowMount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import AddAlert from "@/components/alerts/AddAlert.vue";
@@ -197,15 +197,21 @@ vi.mock("@/services/billings", () => ({
 describe("AddAlert Component", () => {
   let wrapper: any;
 
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    vi.clearAllMocks();
+  });
+
   // Ensure async operations are complete
   beforeEach(async () => {
     const updateStreamsMock = vi.fn().mockResolvedValue({ success: true });
 
     
 
-    wrapper = mount(AddAlert, {
+    wrapper = shallowMount(AddAlert, {
       global: {
-        provide: { 
+        provide: {
           store: store,
         },
         plugins: [i18n, router],
@@ -970,7 +976,7 @@ describe("AddAlert Component", () => {
 
   describe('lifecycle-created and computed handlers', () => {
     it('sets beingUpdated based on modelValue and normalizes is_real_time', async () => {
-      const wrapper = mount(AddAlert, {
+      const wrapper = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router],
@@ -1002,7 +1008,7 @@ describe("AddAlert Component", () => {
   describe('getFormattedCondition and generateWhereClause edge cases (V2 format)', () => {
     let wrapper: any;
     beforeEach(() => {
-      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       wrapper.vm.originalStreamFields = [
         { value: 'n', type: 'Int64' },
         { value: 's', type: 'String' }
@@ -1046,7 +1052,7 @@ describe("AddAlert Component", () => {
   describe('generateSqlQuery variations (V2 format)', () => {
     let wrapper: any;
     beforeEach(() => {
-      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       wrapper.vm.formData.stream_name = '_rundata';
       wrapper.vm.formData.stream_type = 'logs';
       // V2 format conditions
@@ -1086,7 +1092,7 @@ describe("AddAlert Component", () => {
   describe('getParser reserved word and star', () => {
     let wrapper: any;
     beforeEach(async () => {
-      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       await flushPromises();
     });
     it('rejects SELECT * detection', () => {
@@ -1101,7 +1107,7 @@ describe("AddAlert Component", () => {
   describe('getAlertPayload branches', () => {
     let wrapper: any;
     beforeEach(() => {
-      wrapper = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      wrapper = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     it('sets tabs: promql clears sql and conditions', () => {
       wrapper.vm.scheduledAlertRef = { tab: 'promql' };
@@ -1127,7 +1133,7 @@ describe("AddAlert Component", () => {
 
   describe('routeToCreateDestination builds URL', () => {
     it('calls window.open with route href', () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       const spy = vi.spyOn(window, 'open').mockImplementation(() => null);
       w.vm.routeToCreateDestination();
       expect(spy).toHaveBeenCalled();
@@ -1138,13 +1144,13 @@ describe("AddAlert Component", () => {
 
   describe('expand state and destinations updates', () => {
     it('updateExpandState replaces object', () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       const v = { alertSetup: false, queryMode: false, advancedSetup: false, realTimeMode: false, thresholds: false, multiWindowSelection: true };
       w.vm.updateExpandState(v);
       expect(w.vm.expandState).toEqual(v);
     });
     it('updateDestinations writes list', () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       w.vm.updateDestinations(['a']);
       expect(w.vm.formData.destinations).toEqual(['a']);
     });
@@ -1154,7 +1160,7 @@ describe("AddAlert Component", () => {
   describe('transformFEToBE and retransformBEToFE additional', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
     it('transformFEToBE returns {} for invalid', () => {
@@ -1169,7 +1175,7 @@ describe("AddAlert Component", () => {
   describe('V2 Conditions Version Field Placement', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       w.vm.formData.name = "test_v2_alert";
       w.vm.formData.stream_name = "_rundata";
       w.vm.formData.stream_type = "logs";
@@ -1297,7 +1303,7 @@ describe("AddAlert Component", () => {
 
   describe('validateFormAndNavigateToErrorField and navigateToErrorField', () => {
     it('navigates on invalid and returns false', async () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       const fakeRef = { validate: vi.fn().mockResolvedValue(false), $el: { querySelector: vi.fn().mockReturnValue({ scrollIntoView: vi.fn() }) } } as any;
       const spy = vi.spyOn(fakeRef.$el, 'querySelector');
       const res = await w.vm.validateFormAndNavigateToErrorField(fakeRef);
@@ -1305,7 +1311,7 @@ describe("AddAlert Component", () => {
       expect(spy).toHaveBeenCalled();
     });
     it('returns true on valid', async () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       const fakeRef = { validate: vi.fn().mockResolvedValue(true), $el: { querySelector: vi.fn() } } as any;
       const res = await w.vm.validateFormAndNavigateToErrorField(fakeRef);
       expect(res).toBe(true);
@@ -1314,13 +1320,13 @@ describe("AddAlert Component", () => {
 
   describe('openJsonEditor, saveAlertJson, prepareAndSaveAlert', () => {
     it('opens editor dialog', () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       w.vm.openJsonEditor();
       expect(w.vm.showJsonEditorDialog).toBe(true);
     });
 
     it('saveAlertJson validates and sets validationErrors on failure', async () => {
-      const w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] }, props: { destinations: [{ name: 'email' }] } });
+      const w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] }, props: { destinations: [{ name: 'email' }] } });
       const bad = JSON.stringify({ name: '', stream_type: 'logs', stream_name: 's', is_real_time: false, query_condition: { type: 'sql', sql: '' }, trigger_condition: { period: 0, operator: '>=', frequency: 1, cron: '', threshold: 1, silence: 1, frequency_type: 'minutes', timezone: 'UTC' }, destinations: [], context_attributes: [], enabled: true });
       await w.vm.saveAlertJson(bad);
       expect(Array.isArray(w.vm.validationErrors)).toBe(true);
@@ -1332,7 +1338,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Step Navigation', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
       w.vm.formData.name = "test_alert";
       w.vm.formData.stream_name = "_rundata";
       w.vm.formData.stream_type = "logs";
@@ -1518,7 +1524,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Step Validation', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1649,7 +1655,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Step State Management', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1713,7 +1719,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Flow for Real-Time vs Scheduled', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1808,7 +1814,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Step Component Props', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1862,7 +1868,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Right Column Integration', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1902,7 +1908,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Step Button States', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -1947,7 +1953,7 @@ describe("AddAlert Component", () => {
   describe('Wizard Navigation Edge Cases', () => {
     let w: any;
     beforeEach(() => {
-      w = mount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
+      w = shallowMount(AddAlert, { global: { provide: { store }, plugins: [i18n, router] } });
     });
     afterEach(() => { w?.unmount(); w = null; });
 
@@ -2036,7 +2042,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2067,7 +2073,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2098,7 +2104,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2130,7 +2136,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2161,7 +2167,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2192,7 +2198,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2223,7 +2229,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2254,7 +2260,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2285,7 +2291,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2316,7 +2322,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2347,7 +2353,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2379,7 +2385,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2412,7 +2418,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2447,7 +2453,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2469,7 +2475,7 @@ describe("AddAlert Component", () => {
       vi.clearAllMocks();
       // Reset router query so prior fromPanel tests don't pollute initializeFormData
       router.currentRoute.value.query = {} as any;
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2583,7 +2589,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2619,7 +2625,7 @@ describe("AddAlert Component", () => {
         panelData: encodedData
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2746,7 +2752,7 @@ describe("AddAlert Component", () => {
       };
 
       // Mount with isUpdated=true to simulate editing an existing alert
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2794,7 +2800,7 @@ describe("AddAlert Component", () => {
         destinations: ['test-dest'],
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]
@@ -2844,7 +2850,7 @@ describe("AddAlert Component", () => {
         destinations: ['test-dest'],
       };
 
-      w = mount(AddAlert, {
+      w = shallowMount(AddAlert, {
         global: {
           provide: { store },
           plugins: [i18n, router]

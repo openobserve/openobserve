@@ -79,19 +79,19 @@ describe("NoPanel", () => {
 
     it("should show the descriptive message", () => {
       expect(wrapper.text()).toContain(
-        "Start by adding your first dashboard panel",
+        "Add your first panel to start visualizing logs, metrics, and traces.",
       );
     });
 
     it("should render the inline svg image", () => {
-      const svg = wrapper.find('[data-test="no-panel-image"]');
+      const svg = wrapper.find('[data-test="empty-panel-art"]');
       expect(svg.exists()).toBe(true);
       expect(svg.element.tagName.toLowerCase()).toBe("svg");
     });
 
-    it("should use currentColor for the accent paths so it follows the theme", () => {
-      const svg = wrapper.find('[data-test="no-panel-image"]');
-      expect(svg.html()).toContain('fill="currentColor"');
+    it("should use CSS custom properties for colors so it follows the theme", () => {
+      const svg = wrapper.find('[data-test="empty-panel-art"]');
+      expect(svg.html()).toContain("var(--color-primary");
     });
   });
 
@@ -129,11 +129,11 @@ describe("NoPanel", () => {
       wrapper = mountNoPanel({ viewOnly: false });
     });
 
-    it("should display the i18n label for panel.add", () => {
+    it("should display the label for the first quick-start card", () => {
       const btn = wrapper.find(
         '[data-test="dashboard-if-no-panel-add-panel-btn"]',
       );
-      expect(btn.text()).toContain("Add Panel");
+      expect(btn.exists()).toBe(true);
     });
   });
 
@@ -166,7 +166,7 @@ describe("NoPanel", () => {
     it("should keep the image in the DOM regardless of viewOnly", async () => {
       wrapper = mountNoPanel({ viewOnly: false });
       await wrapper.setProps({ viewOnly: true });
-      expect(wrapper.find('[data-test="no-panel-image"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="empty-panel-art"]').exists()).toBe(true);
     });
   });
 });

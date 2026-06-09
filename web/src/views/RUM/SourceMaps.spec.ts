@@ -346,9 +346,11 @@ describe("SourceMaps.vue", () => {
 
       wrapper = await mountComponent();
 
-      // OTable is always rendered in v-else; when data is empty it renders #empty slot
-      expect(wrapper.text()).toContain("No Source Maps Found");
+      // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
+      // The i18n keys are not translated in the test environment, so we verify the
+      // empty state component is rendered rather than checking for translated text.
       expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="q-table"]').text()).toContain("emptyState");
     });
 
     it("shows OTable when grouped source maps exist", async () => {

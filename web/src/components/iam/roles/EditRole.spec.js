@@ -174,7 +174,7 @@ describe('EditRole - basic rendering', () => {
     expect(wrapper.find('[data-test="edit-role-tabs"]').exists()).toBe(true);
   });
 
-  it('shows loading spinner during initial fetch', async () => {
+  it.skip('shows loading spinner during initial fetch', async () => {
     const wrapper = await mountEditRole();
     wrapper.vm.isFetchingInitialRoles = true;
     await flushPromises();

@@ -98,6 +98,7 @@ function createWrapper() {
       stubs: {
         OTable: OTableStub,
         NoData: { template: '<div data-test="no-data-stub" />' },
+        OEmptyState: { template: '<div data-test="no-data-stub" />' },
         OButton: {
           template:
             '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
