@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="tw:flex-1 tw:min-h-0">
+                    <div class="tw:flex-1 tw:min-h-0 tw:relative">
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -157,6 +157,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :keywords="autoCompleteKeywords"
                         :suggestions="autoCompleteSuggestions"
                       />
+                      <div
+                        v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
+                        class="query-editor-placeholder-overlay"
+                      >
+                        <span class="query-editor-placeholder-typewriter">{{ fullEditorPlaceholder }}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -438,6 +444,7 @@ import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -591,6 +598,23 @@ const restoreVrlEditor = () => {
 // Editor state
 const queryEditorPlaceholderFlag = ref(true);
 const functionEditorPlaceholderFlag = ref(true);
+
+// ─── Typewriter placeholder for the full query editor ────────────────
+const streamFieldsForPlaceholder = computed(() =>
+  (props.columns as any[]).map((c: any) => ({
+    name: typeof c === 'string' ? c : (c.value ?? c.label ?? ''),
+    dataType: typeof c === 'string' ? '' : (c.type ?? ''),
+  }))
+);
+const noStreamForPlaceholder = computed(() => !props.streamName);
+const isSqlModeForPlaceholder = computed(() => localTab.value === 'sql');
+const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
+  streamFieldsForPlaceholder,
+  ref({}),
+  isSqlModeForPlaceholder,
+  noStreamForPlaceholder,
+  { noStreamText: t('pipeline.queryEditorPlaceholder') },
+);
 
 // Field selection
 const selectedFunction = ref<any>(null);
@@ -1090,6 +1114,33 @@ const getBtnLogo = computed(() => {
 </script>
 
 <style scoped lang="scss">
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
+}
+
 // ── Dialog topbar ──────────────────────────────────────────────────────────
 .dialog-topbar {
   display: flex;
