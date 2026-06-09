@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
+            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2 tw:border-t tw:border-border-default"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton

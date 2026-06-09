@@ -472,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
+      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full tw:border-t tw:border-border-default">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="

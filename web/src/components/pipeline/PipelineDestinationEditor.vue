@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <div class="card-container tw:py-2 tw:px-3 tw:overflow-auto">
-      <div class="tw:w-[50vw]">
+      <div class="tw:w-full">
         <CreateDestinationForm
           :destination="destination"
           @created="handleDestinationCreated"

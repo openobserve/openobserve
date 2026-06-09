@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer -->
     <div
-      class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
+      class="card-container tw:flex tw:items-center tw:justify-end tw:-mx-2.5 tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
     >
       <OButton
         data-test="add-enrichment-table-cancel-btn"
