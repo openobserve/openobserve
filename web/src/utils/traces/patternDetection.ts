@@ -77,16 +77,16 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
   })
 
   /**
-   * Extract services and their relationships from trace tree
-   * Handles both standalone services and service-to-service relationships
+   * Extract services and their relationships from trace tree.
+   * Single-pass: mutates collectors passed by reference rather than creating
+   * intermediate per-level collections that get merged upward with spread.
    */
-  const extractServicesAndRelationships = (spans: any[], parentService: string = ''): {
-    relationships: CallPath[],
-    services: Map<string, { spans: any[], totalDuration: number, errorCount: number }>
-  } => {
-    const relationships: CallPath[] = []
-    const services = new Map<string, { spans: any[], totalDuration: number, errorCount: number }>()
-
+  const extractServicesAndRelationships = (
+    spans: any[],
+    parentService: string = '',
+    relationships: CallPath[] = [],
+    services: Map<string, { spans: any[], totalDuration: number, errorCount: number }> = new Map()
+  ): void => {
     spans.forEach(span => {
       const serviceName = span.resolvedIdentity || span.serviceName || 'unknown'
       const duration = span.durationMs || 0
@@ -113,32 +113,17 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
         })
       }
 
-      // Recursively process child spans
+      // Recursively process child spans — mutates the same collectors in place
       if (span.spans && span.spans.length > 0) {
-        const childResult = extractServicesAndRelationships(span.spans, serviceName)
-        relationships.push(...childResult.relationships)
-
-        // Merge child services
-        childResult.services.forEach((childInfo, childServiceName) => {
-          if (services.has(childServiceName)) {
-            const existing = services.get(childServiceName)!
-            existing.spans.push(...childInfo.spans)
-            existing.totalDuration += childInfo.totalDuration
-            existing.errorCount += childInfo.errorCount
-          } else {
-            services.set(childServiceName, childInfo)
-          }
-        })
+        extractServicesAndRelationships(span.spans, serviceName, relationships, services)
       }
     })
-
-    return { relationships, services }
   }
 
-  // Extract services and relationships from all root spans
-  const extractionResult = extractServicesAndRelationships(traceTree)
-  const allPaths = extractionResult.relationships
-  const allServices = extractionResult.services
+  // Extract services and relationships from all root spans (single pass)
+  const allPaths: CallPath[] = []
+  const allServices = new Map<string, { spans: any[], totalDuration: number, errorCount: number }>()
+  extractServicesAndRelationships(traceTree, '', allPaths, allServices)
 
   // Group paths by signature and aggregate metrics
   allPaths.forEach(path => {

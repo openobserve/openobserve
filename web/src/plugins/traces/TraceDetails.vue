@@ -1053,7 +1053,6 @@ export default defineComponent({
     const traceServiceMap: any = ref({});
 
     // Pattern View - new functionality
-    const mapViewMode = ref<'pattern' | 'span'>('pattern'); // Default to pattern view
     const consolidatedPatterns = ref(new Map());
     const isDarkMode = computed(() => store.state.theme === 'dark');
 
@@ -1068,7 +1067,6 @@ export default defineComponent({
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
-      if (mapViewMode.value === 'pattern') {
         // Pattern view - use new pattern-based visualization
         const chartOptions = generateEChartsOptions(
           {
@@ -1086,21 +1084,12 @@ export default defineComponent({
           }
         );
 
-        console.log("chartOptions ", chartOptions);
         // Wrap in the format expected by ChartRenderer
         return {
           options: chartOptions,
           notMerge: true,
           lazyUpdate: true
         };
-      } else {
-        // Span view - use existing service tree logic (unchanged)
-        return {
-          options: traceServiceMap.value,
-          notMerge: true,
-          lazyUpdate: true
-        };
-      }
     });
 
     const spanDimensions = {
@@ -1556,8 +1545,6 @@ export default defineComponent({
         clearTimeout(pendingTooltipSetup);
         pendingTooltipSetup = null;
       }
-      // Only setup tooltips for Pattern View
-      if (mapViewMode.value !== 'pattern') return;
 
       await nextTick();
       // 300ms delay matches Service Graph tooltip setup timing
@@ -2826,7 +2813,6 @@ export default defineComponent({
       traceServiceMap,
       traceServiceMapChartOptions,
       chartRendererRef,
-      mapViewMode,
       activeVisual,
       traceVisuals,
       getImageURL,
