@@ -41,6 +41,7 @@ async function buildPanelWithWideRange(page, pm, panelName, chartType = "area") 
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream(MAX_QUERY_STREAM);
+  await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
   await pm.chartTypeSelector.searchAndAddField("kubernetes_labels_name", "b");
 
@@ -203,6 +204,7 @@ test.describe("Dashboard Max Query Range", () => {
 
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream(MAX_QUERY_STREAM);
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
       await pm.dashboardPanelActions.applyDashboardBtn();
@@ -252,6 +254,7 @@ test.describe("Dashboard Max Query Range", () => {
         await pm.chartTypeSelector.selectChartType(chartType);
         await pm.chartTypeSelector.selectStreamType("logs");
         await pm.chartTypeSelector.selectStream(MAX_QUERY_STREAM);
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
         await waitForDateTimeButtonToBeEnabled(page);
@@ -392,6 +395,7 @@ test.describe("Dashboard Max Query Range", () => {
       // First query tab
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream(MAX_QUERY_STREAM);
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "y");
 
       // Second query tab

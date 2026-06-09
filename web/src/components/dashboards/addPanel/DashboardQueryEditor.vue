@@ -520,24 +520,11 @@ export default defineComponent({
     });
 
     const addTab = () => {
+      // addQuery() seeds the new query's default builder fields (and PromQL
+      // sample query) synchronously, so the tab is ready the moment it activates.
       addQuery();
       dashboardPanelData.layout.currentQueryIndex =
         dashboardPanelData.data.queries.length - 1;
-      // For metrics page: when switching from custom to builder in PromQL, set sample query
-      if (
-        dashboardPanelData.data.queryType === "promql" &&
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream
-      ) {
-        const streamName =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream;
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].query = `${streamName}{}`;
-      }
     };
 
     const updatePromQLQuery = async (value, event) => {

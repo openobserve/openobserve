@@ -199,6 +199,7 @@ test.describe("Dashboard Functions", () => {
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("user_name", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
@@ -221,6 +222,7 @@ test.describe("Dashboard Functions", () => {
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("user_name", "y");
 
       // UI shows "Distinct" for COUNT-DISTINCT function; label displays as "count"
@@ -242,6 +244,7 @@ test.describe("Dashboard Functions", () => {
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "avg");
@@ -262,6 +265,7 @@ test.describe("Dashboard Functions", () => {
 
       await selectStreamAndChartType(page, pm, STREAM_NAME, "table");
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
 
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "sum");
@@ -314,6 +318,7 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
 
       // Add first Y-axis with COUNT
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("user_name", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
 
@@ -345,6 +350,7 @@ test.describe("Dashboard Functions", () => {
       await pm.chartTypeSelector.searchAndAddField("_timestamp", "x");
 
       // Add Y-axis with MIN
+      await pm.chartTypeSelector.removeField("y_axis_1", "y");
       await pm.chartTypeSelector.searchAndAddField("score", "y");
       await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "min");
 
