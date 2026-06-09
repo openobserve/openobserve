@@ -14,1000 +14,1393 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod result_cache;
+pub mod search;
 
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, ops::Bound, sync::Arc};
 
 use config::{
-    TIMESTAMP_COL_NAME,
-    meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
-    utils::tantivy::query::contains_query::ContainsAutomaton,
-};
-use tantivy::{
-    Searcher,
-    aggregation::{
-        AggregationCollector, Key,
-        agg_req::{Aggregation, AggregationVariants, Aggregations},
-        agg_result::{AggregationResult, BucketEntries, BucketResult},
-        bucket::{
-            CustomOrder, HistogramAggregation, HistogramBounds, Order, OrderTarget,
-            TermsAggregation,
-        },
+    INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode, search::ScanStats, stream::FileKey},
+    metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
+    utils::{
+        inverted_index::to_tantivy_name,
+        size::bytes_to_human_readable,
+        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
     },
-    query::Query,
+};
+use futures::{StreamExt, stream};
+use hashbrown::HashMap;
+use infra::{cache::file_data, errors::Error};
+use itertools::Itertools;
+use roaring::RoaringBitmap;
+pub use search::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult};
+use tantivy::{
+    Directory, Term,
+    query::{BooleanQuery, Occur, Query, RangeQuery},
+};
+use tantivy_utils::puffin_directory::{
+    PROP_ROW_GROUP_SIZE,
+    caching_directory::CachingDirectory,
+    footer_cache::FooterCache,
+    reader::{PuffinDirReader, warm_up_terms},
+};
+use tokio::sync::Semaphore;
+use tokio_stream::StreamExt as _;
+
+use self::result_cache::{self as tantivy_result_cache, CacheEntry};
+use crate::service::search::{
+    grpc::{QueryParams, storage::cache_files},
+    index::IndexCondition,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
-use crate::service::search::index::IndexCondition;
+/// Filter file list using tantivy index
+#[tracing::instrument(name = "service:search:grpc:storage:tantivy_search", skip_all)]
+pub async fn tantivy_search(
+    query: Arc<QueryParams>,
+    file_list: &mut Vec<FileKey>,
+    index_condition: Option<IndexCondition>,
+    idx_optimize_mode: Option<IndexOptimizeMode>,
+) -> Result<(usize, bool, TantivyMultiResult), Error> {
+    let start = std::time::Instant::now();
+    let cfg = get_config();
+    let trace_id = &query.trace_id;
 
-#[derive(Debug, Clone)]
-pub enum TantivyResult {
-    RowIds(HashSet<u32>),
-    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
-    RowIdsBitVec(BitVec, usize, Option<u32>),
-    Count(usize),                            // simple count optimization
-    Histogram(Vec<u64>),                     // simple histogram optimization
-    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
-    TopN(Vec<(String, u64)>),                // simple top n optimization
-    Distinct(HashSet<String>),               // simple distinct optimization
-}
+    // Cache the corresponding Index files
+    let mut scan_stats = ScanStats::new();
+    let mut file_list_map = file_list
+        .drain(..)
+        .map(|f| (f.key.clone(), f))
+        .collect::<HashMap<_, _>>();
+    let index_file_names = file_list_map
+        .iter()
+        .filter_map(|(_, f)| {
+            scan_stats.compressed_size += f.meta.index_size;
+            if f.meta.index_size > 0 {
+                to_tantivy_name(&f.key).map(|ttv_file| (ttv_file, f.clone()))
+            } else {
+                None
+            }
+        })
+        .collect_vec();
+    scan_stats.querier_files = index_file_names.len() as i64;
+    let (cache_type, cache_hits, cache_misses) = cache_files(
+        &query.trace_id,
+        &index_file_names
+            .iter()
+            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
+            .collect_vec(),
+        &mut scan_stats,
+        "index",
+    )
+    .await;
 
-impl TantivyResult {
-    // used for skip tantivy search
-    pub fn percent(&self) -> usize {
-        match self {
-            Self::RowIdsBitVec(_, percent, _) => *percent,
-            _ => 0,
+    // report cache hit and miss metrics
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[query.org_id.as_str(), query.stream_type.as_str(), "index"])
+        .inc_by(cache_misses);
+
+    let cached_ratio = (scan_stats.querier_memory_cached_files
+        + scan_stats.querier_disk_cached_files) as f64
+        / scan_stats.querier_files as f64;
+
+    let download_msg = if cache_type == file_data::CacheType::None {
+        "".to_string()
+    } else {
+        format!(" downloading others into {cache_type:?} in background,")
+    };
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] search->tantivy: stream {}/{}/{}, load tantivy index files {}, index size: {}, memory cached {}, disk cached {}, cached ratio {}%,{download_msg} took: {} ms",
+                query.org_id,
+                query.stream_type,
+                query.stream_name,
+                scan_stats.querier_files,
+                bytes_to_human_readable(scan_stats.compressed_size as f64),
+                scan_stats.querier_memory_cached_files,
+                scan_stats.querier_disk_cached_files,
+                (cached_ratio * 100.0) as usize,
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("tantivy load files".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "load tantivy index files {}, memory cached {}, disk cached {}",
+                    scan_stats.querier_files,
+                    scan_stats.querier_memory_cached_files,
+                    scan_stats.querier_disk_cached_files,
+                ))
+                .build()
+        )
+    );
+
+    if scan_stats.querier_files > 0 {
+        QUERY_PARQUET_CACHE_RATIO_NODE
+            .with_label_values(&[&query.org_id, &query.stream_type.to_string()])
+            .observe(cached_ratio);
+    }
+
+    let target_partitions =
+        calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
+
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: session target_partitions: {target_partitions}",
+    );
+
+    let search_start = std::time::Instant::now();
+    let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
+    let time_range = query.time_range;
+    let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
+    let (index_parquet_files, query_limit) =
+        partition_tantivy_files(index_parquet_files, &idx_optimize_mode, target_partitions);
+
+    let mut no_more_files = false;
+    let mut tantivy_result_builder = TantivyMultiResultBuilder::new(&idx_optimize_mode);
+    let group_num = index_parquet_files.first().unwrap_or(&vec![]).len();
+    let max_group_len = index_parquet_files.len();
+
+    log::info!(
+        "[trace_id {trace_id}] search->tantivy: target_partitions: {target_partitions}, group_num: {group_num}, max_group_len: {max_group_len}",
+    );
+
+    for file_group in index_parquet_files {
+        if no_more_files {
+            // delete the rest of the files
+            for file in file_group {
+                file_list_map.remove(&file.key);
+            }
+            continue;
         }
-    }
 
-    pub fn get_memory_size(&self) -> usize {
-        match self {
-            Self::RowIds(row_ids) => {
-                row_ids.capacity() * std::mem::size_of::<u32>()
-                    + std::mem::size_of::<HashSet<u32>>()
-            }
-            Self::RowIdsBitVec(bitvec, ..) => {
-                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
-            }
-            Self::Count(_) => std::mem::size_of::<usize>(),
-            Self::Histogram(histogram) => {
-                histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
-            }
-            Self::MultiHistogram(multi_histogram) => {
-                multi_histogram
-                    .iter()
-                    .map(|(_, s, _)| {
-                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
-                    })
-                    .sum::<usize>()
-                    + std::mem::size_of::<Vec<(i64, String, u64)>>()
-            }
-            Self::TopN(top_n) => {
-                top_n
-                    .iter()
-                    .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
-                    .sum::<usize>()
-                    + std::mem::size_of::<Vec<(String, u64)>>()
-            }
-            Self::Distinct(distinct) => {
-                distinct.iter().map(|s| s.capacity()).sum::<usize>()
-                    + std::mem::size_of::<HashSet<String>>()
-            }
+        // Spawn a task for each group of files get row_id from index
+        let mut tasks = Vec::new();
+        let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
+        for file in file_group {
+            let trace_id = query.trace_id.to_string();
+            let index_condition_clone = index_condition.clone();
+            let idx_optimize_rule_clone = idx_optimize_mode.clone();
+            let semaphore_clone = semaphore.clone();
+            let task = tokio::task::spawn(async move {
+                let permit = semaphore_clone.acquire_owned().await.unwrap();
+                let ret = search_tantivy_index(
+                    &trace_id,
+                    time_range,
+                    index_condition_clone,
+                    idx_optimize_rule_clone,
+                    &file,
+                )
+                .await;
+                drop(permit);
+                match ret {
+                    Ok(ret) => Ok(ret),
+                    Err(e) => {
+                        log::error!(
+                            "[trace_id {trace_id}] search->tantivy: error filtering via index: {}, index_size: {}, error: {e:?}",
+                            file.key,
+                            file.meta.index_size,
+                        );
+                        Err(e)
+                    }
+                }
+            });
+            tasks.push(task)
         }
-    }
-}
 
-impl TantivyResult {
-    pub fn handle_matched_docs(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
-
-        let row_ids = res
-            .into_iter()
-            .map(|doc| doc.doc_id)
-            .collect::<HashSet<_>>();
-        Ok(Self::RowIds(row_ids))
-    }
-
-    pub fn handle_simple_select(
-        searcher: &Searcher,
-        query: Box<dyn Query>,
-        limit: usize,
-        ascend: bool,
-    ) -> anyhow::Result<Self> {
-        let res = searcher.search(
-            &query,
-            &tantivy::collector::TopDocs::with_limit(limit).tweak_score(
-                move |_segment_reader: &tantivy::SegmentReader| {
-                    move |doc_id: tantivy::DocId, _original_score: tantivy::Score| {
-                        if ascend {
-                            doc_id as i64
-                        } else {
-                            -(doc_id as i64)
+        // if more than cpu_num's file returned many row_ids, we skip tantivy search
+        let mut threshold_num = cfg.limit.cpu_num;
+        let mut total_row_ids_percent = 0;
+        let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
+        while let Some(result) = match tasks.try_next().await {
+            Err(e) => {
+                let took = start.elapsed().as_millis() as usize;
+                log::error!(
+                    "[trace_id {trace_id}] search->tantivy: error filtering via index, error: {e:?}, took: {took} ms",
+                );
+                // search error, need add filter back
+                return Ok((took, true, TantivyMultiResult::RowNums(0)));
+            }
+            Ok(result) => result,
+        } {
+            // Each result corresponds to a file in the file list
+            match result {
+                Ok((file_name, result, has_skipped_conditions)) => {
+                    // when has_skipped_conditions is true, we should add filter back to datafusion,
+                    // because the index result is not accurate
+                    if has_skipped_conditions {
+                        is_add_filter_back = true;
+                    }
+                    if file_name.is_empty() {
+                        // no need inverted index for this file, need add filter back
+                        let took = start.elapsed().as_millis() as usize;
+                        threshold_num -= 1;
+                        total_row_ids_percent += result.percent();
+                        if threshold_num == 0 {
+                            log::warn!(
+                                "[trace_id {trace_id}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
+                                total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
+                            );
+                            file_list.extend(file_list_map.into_values());
+                            return Ok((took, true, TantivyMultiResult::RowNums(0)));
+                        }
+                        is_add_filter_back = true;
+                        continue;
+                    }
+                    match result {
+                        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
+                            if num_rows == 0 {
+                                // if the bitmap is empty then we remove the file from the list
+                                file_list_map.remove(&file_name);
+                            } else {
+                                // Replace the segment IDs in the existing `FileKey` with the found
+                                tantivy_result_builder.add_row_nums(num_rows as u64);
+                                let file = file_list_map.get_mut(&file_name).unwrap();
+                                file.with_segment_ids(bitvec, row_group_size);
+                            }
+                        }
+                        TantivyResult::Count(count) => {
+                            tantivy_result_builder.add_row_nums(count as u64);
+                            file_list_map.remove(&file_name); // maybe we do not need to remove it?
+                        }
+                        TantivyResult::Histogram(histogram) => {
+                            tantivy_result_builder.add_histogram(histogram);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::MultiHistogram(multi_histogram) => {
+                            tantivy_result_builder.add_multi_histogram(multi_histogram);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::TopN(top_n) => {
+                            tantivy_result_builder.add_top_n(top_n);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::Distinct(distinct) => {
+                            tantivy_result_builder.add_distinct(distinct);
+                            file_list_map.remove(&file_name);
+                        }
+                        TantivyResult::RowIds(_) => {
+                            unreachable!("RowIds should not be returned");
                         }
                     }
-                },
+                }
+                Err(e) => {
+                    log::error!(
+                        "[trace_id {trace_id}] search->tantivy: error filtering via index. Keep file to search, error: {e}"
+                    );
+                    is_add_filter_back = true;
+                    continue;
+                }
+            }
+        }
+        // if limit is set and total hits exceed the limit, we stop searching
+        if query_limit > 0 && tantivy_result_builder.num_rows() > query_limit {
+            no_more_files = true;
+        }
+    }
+
+    // get the result
+    let tantivy_result = tantivy_result_builder.build();
+
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] search->tantivy: total hits for index_condition: {index_condition:?} found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}, took: {} ms",
+                file_list_map.len(),
+                search_start.elapsed().as_millis()
             ),
-        )?;
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(query.trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("tantivy search".to_string())
+                .search_role("follower".to_string())
+                .duration(search_start.elapsed().as_millis() as usize)
+                .desc(format!(
+                    "found {tantivy_result}, is_add_filter_back: {is_add_filter_back}, file_num: {}",
+                    file_list_map.len(),
+                ))
+                .build()
+        )
+    );
 
-        let row_ids = res
-            .into_iter()
-            .map(|(_, doc)| doc.doc_id)
-            .collect::<HashSet<_>>();
-        Ok(Self::RowIds(row_ids))
+    file_list.extend(file_list_map.into_values());
+    Ok((
+        start.elapsed().as_millis() as usize,
+        is_add_filter_back,
+        tantivy_result,
+    ))
+}
+
+pub async fn get_tantivy_directory(
+    _trace_id: &str,
+    file_account: &str,
+    file_name: &str,
+    file_size: i64,
+) -> anyhow::Result<PuffinDirReader> {
+    let file_account = file_account.to_string();
+    let source = object_store::ObjectMeta {
+        location: file_name.into(),
+        last_modified: *config::utils::time::BASE_TIME,
+        size: file_size as u64,
+        e_tag: None,
+        version: None,
+    };
+    Ok(PuffinDirReader::from_path(file_account, source).await?)
+}
+
+/// Returns (file_key, result, has_skipped_conditions).
+/// when has_skipped_conditions is true, we should all filter back to datafusion.
+async fn search_tantivy_index(
+    trace_id: &str,
+    time_range: (i64, i64),
+    index_condition: Option<IndexCondition>,
+    idx_optimize_rule: Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> anyhow::Result<(String, TantivyResult, bool)> {
+    let file_account = parquet_file.account.clone();
+    let Some(ttv_file_name) = to_tantivy_name(&parquet_file.key) else {
+        return Err(anyhow::anyhow!(
+            "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
+            parquet_file.key.clone()
+        ));
+    };
+
+    let cfg = get_config();
+    let mut cache_key = String::new();
+    if cfg.common.inverted_index_result_cache_enabled {
+        metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
+            .with_label_values::<&str>(&[])
+            .inc();
+        cache_key = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        if let Some(result) = tantivy_result_cache::GLOBAL_CACHE.get(&cache_key) {
+            metrics::TANTIVY_RESULT_CACHE_HITS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+            return Ok((parquet_file.key.to_string(), result, false));
+        }
     }
 
-    pub fn handle_simple_count(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::Count)?;
-        Ok(Self::Count(res))
+    // open the tantivy index
+    log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
+
+    let puffin_dir = Arc::new(
+        get_tantivy_directory(
+            trace_id,
+            &file_account,
+            &ttv_file_name,
+            parquet_file.meta.index_size,
+        )
+        .await?,
+    );
+    // Read the row group size that the writer used when this tantivy index was
+    // built. Old .ttv files predate this property — None falls back to the
+    // legacy assumption in the access-plan code.
+    let row_group_size = puffin_dir
+        .get_property(PROP_ROW_GROUP_SIZE)
+        .and_then(|s| s.parse::<u32>().ok());
+    let footer_cache = FooterCache::from_directory(puffin_dir.clone(), &ttv_file_name).await?;
+    let cache_dir = CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
+    let reader_directory: Box<dyn Directory> = Box::new(cache_dir);
+
+    let index = tantivy::Index::open(reader_directory)?;
+    index
+        .tokenizers()
+        .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
+    let reader = index
+        .reader_builder()
+        .reload_policy(tantivy::ReloadPolicy::Manual)
+        .num_warming_threads(0)
+        .try_into()?;
+    let tantivy_index = Arc::new(index);
+    let tantivy_reader = Arc::new(reader);
+
+    let searcher = tantivy_reader.searcher();
+    let tantivy_schema = tantivy_index.schema();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
+
+    // check if the index has multiple segments
+    if tantivy_index.searchable_segment_metas()?.len() > 1 {
+        return Err(anyhow::anyhow!(
+            "one tantivy file should only have one segment"
+        ));
     }
 
-    pub fn handle_simple_histogram(
-        searcher: &Searcher,
-        query: Box<dyn Query>,
-        min_value: i64,
-        bucket_width: u64,
-        num_buckets: usize,
-    ) -> anyhow::Result<Self> {
-        let res = searcher.search(
-            &query,
-            &tantivy::collector::HistogramCollector::new::<i64>(
-                TIMESTAMP_COL_NAME.to_string(),
+    // generate the tantivy query
+    let condition: IndexCondition =
+        index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
+    let (mut query, has_skipped_conditions) =
+        condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
+
+    // when the file is not fully within the time range, add a timestamp filter
+    let (start_time, end_time) = time_range;
+    let file_in_range =
+        parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
+    if !file_in_range && let Ok(ts_field) = tantivy_schema.get_field(TIMESTAMP_COL_NAME) {
+        let ts_range = RangeQuery::new(
+            Bound::Included(Term::from_field_i64(ts_field, start_time)),
+            Bound::Excluded(Term::from_field_i64(ts_field, end_time)),
+        );
+        query = Box::new(BooleanQuery::new(vec![
+            (Occur::Must, query),
+            (Occur::Must, Box::new(ts_range)),
+        ]));
+    }
+
+    let need_all_term_fields = condition
+        .need_all_term_fields()
+        .into_iter()
+        .chain(get_simple_distinct_field(&idx_optimize_rule))
+        .filter_map(|filed| tantivy_schema.get_field(&filed).ok())
+        .collect::<HashSet<_>>();
+
+    // warm up the terms in the query
+    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+        HashMap::new();
+    query.query_terms(&mut |term, need_position| {
+        let field = term.field();
+        let entry = warm_terms.entry(field).or_default();
+        entry.insert(term.clone(), need_position);
+    });
+
+    let mut need_fast_field = HashSet::new();
+    if let Some(rule) = &idx_optimize_rule {
+        match rule {
+            IndexOptimizeMode::SimpleHistogram(..) => {
+                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+            }
+            IndexOptimizeMode::SimpleMultiHistogram(.., name) => {
+                need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+                need_fast_field.insert(name.clone());
+            }
+            IndexOptimizeMode::SimpleTopN(field, ..) => {
+                need_fast_field.insert(field.clone());
+            }
+            _ => {}
+        }
+    }
+    if !file_in_range {
+        need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
+    }
+
+    warm_up_terms(
+        &searcher,
+        &warm_terms,
+        need_all_term_fields,
+        need_fast_field,
+    )
+    .await?;
+
+    // search the index
+    let trace_id_clone = trace_id.to_string();
+    let res = tokio::task::spawn_blocking(move || match idx_optimize_rule {
+        None => TantivyResult::handle_matched_docs(&searcher, query),
+        Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) => {
+            TantivyResult::handle_simple_select(&searcher, query, limit, ascend)
+        }
+        Some(IndexOptimizeMode::SimpleCount) => {
+            TantivyResult::handle_simple_count(&searcher, query)
+        }
+        Some(IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets)) => {
+            // fail the function if field not in tantivy schema
+            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::Histogram(vec![]));
+            }
+            TantivyResult::handle_simple_histogram(
+                &searcher,
+                query,
                 min_value,
                 bucket_width,
                 num_buckets,
-            ),
-        )?;
-
-        Ok(Self::Histogram(res))
-    }
-
-    pub fn handle_simple_multi_histogram(
-        searcher: &Searcher,
-        query: Box<dyn Query>,
-        min_value: i64,
-        max_value: i64,
-        bucket_width: u64,
-        breakdown_field: &str,
-    ) -> anyhow::Result<Self> {
-        let limit = config::get_config().limit.query_default_limit;
-        // this value should be zero
-        let offset = (min_value % bucket_width as i64) as f64;
-        let histogram_agg = Aggregation {
-            agg: AggregationVariants::Histogram(HistogramAggregation {
-                field: TIMESTAMP_COL_NAME.to_string(),
-                interval: bucket_width as f64,
-                offset: Some(offset),
-                min_doc_count: Some(1),
-                hard_bounds: Some(HistogramBounds {
-                    min: min_value as f64,
-                    max: max_value as f64,
-                }),
-                extended_bounds: None,
-                keyed: false,
-                is_normalized_to_ns: false,
-            }),
-            sub_aggregation: Aggregations::from_iter(vec![(
-                "breakdown".to_string(),
-                Aggregation {
-                    agg: AggregationVariants::Terms(TermsAggregation {
-                        field: breakdown_field.to_string(),
-                        size: Some(limit as u32),
-                        order: None,
-                        missing: None,
-                        min_doc_count: Some(1),
-                        show_term_doc_count_error: Some(false),
-                        segment_size: None,
-                        include: None,
-                        exclude: None,
-                    }),
-                    sub_aggregation: Default::default(),
-                },
-            )]),
-        };
-        let aggregations = Aggregations::from_iter(vec![("histogram".to_string(), histogram_agg)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
-
-        let mut res = searcher.search(&query, &collector)?;
-
-        let mut results = Vec::new();
-        if let AggregationResult::BucketResult(BucketResult::Histogram { buckets }) =
-            res.0.remove("histogram").unwrap()
-        {
-            let hist_buckets = match buckets {
-                BucketEntries::Vec(vec) => vec,
-                BucketEntries::HashMap(map) => map.into_values().collect(),
-            };
-            for mut bucket_entry in hist_buckets {
-                let timestamp = match bucket_entry.key {
-                    Key::F64(k) => k as i64,
-                    _ => continue,
-                };
-                if let AggregationResult::BucketResult(BucketResult::Terms {
-                    buckets: term_entries,
-                    ..
-                }) = bucket_entry.sub_aggregation.0.remove("breakdown").unwrap()
-                {
-                    for term_bucket in term_entries {
-                        let breakdown_value = match term_bucket.key {
-                            Key::Str(s) => s,
-                            Key::F64(f) => f.to_string(),
-                            Key::I64(i) => i.to_string(),
-                            Key::U64(u) => u.to_string(),
-                        };
-                        results.push((timestamp, breakdown_value, term_bucket.doc_count));
-                    }
-                }
+            )
+        }
+        Some(IndexOptimizeMode::SimpleMultiHistogram(
+            min_value,
+            max_value,
+            bucket_width,
+            breakdown_field,
+        )) => {
+            if tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: _timestamp not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::MultiHistogram(vec![]));
+            }
+            if tantivy_schema.get_field(&breakdown_field).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {breakdown_field} not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::MultiHistogram(vec![]));
+            }
+            TantivyResult::handle_simple_multi_histogram(
+                &searcher,
+                query,
+                min_value,
+                max_value,
+                bucket_width,
+                &breakdown_field,
+            )
+        }
+        Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend)) => {
+            TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
+        }
+        Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {
+            if tantivy_schema.get_field(&field).is_err() {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                Ok(TantivyResult::Distinct(HashSet::new()))
+            } else {
+                TantivyResult::handle_simple_distinct(&searcher, &condition, &field, limit, ascend)
             }
         }
+    })
+    .await??;
 
-        Ok(Self::MultiHistogram(results))
+    let key = parquet_file.key.to_string();
+    let mut percent = 0.0;
+    let result = match res {
+        TantivyResult::Count(count) => TantivyResult::Count(count),
+        TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
+        TantivyResult::MultiHistogram(multi_histogram) => {
+            TantivyResult::MultiHistogram(multi_histogram)
+        }
+        TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
+        TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
+        TantivyResult::RowIds(row_ids) => {
+            if row_ids.is_empty() || parquet_file.meta.records == 0 {
+                return Ok((
+                    key,
+                    TantivyResult::RowIdsBitVec(BitVec::EMPTY, 0, row_group_size),
+                    false,
+                ));
+            }
+            // return early if the number of matched docs is too large
+            let skip_threshold = cfg.limit.inverted_index_skip_threshold;
+            let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+            if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
+                // return empty file name means we need to add filter back and skip tantivy search
+                log::info!(
+                    "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+                    parquet_file.key
+                );
+                return Ok((
+                    "".to_string(),
+                    TantivyResult::RowIdsBitVec(
+                        BitVec::EMPTY,
+                        row_ids_percent as usize,
+                        row_group_size,
+                    ),
+                    true,
+                ));
+            }
+            percent = row_ids_percent;
+            let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            if max_doc_id >= parquet_file.meta.records {
+                return Err(anyhow::anyhow!(
+                    "doc_id {max_doc_id} is out of range, records {}",
+                    parquet_file.meta.records,
+                ));
+            }
+            // NOTE: the BitVec's length should equal to the number of records in the parquet file
+            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
+            let num_rows = row_ids.len();
+            for id in row_ids {
+                res.set(id as usize, true);
+            }
+            TantivyResult::RowIdsBitVec(res, num_rows, row_group_size)
+        }
+        TantivyResult::RowIdsBitVec(..) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
+        }
+    };
+
+    // cache the result if the memory size is less than the limit
+    // Do not cache when conditions were skipped — the result is incomplete.
+    if cfg.common.inverted_index_result_cache_enabled
+        && !cache_key.is_empty()
+        && !has_skipped_conditions
+        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+            || percent < 1.0)
+    {
+        let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
+        tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
+    }
+    Ok((key, result, has_skipped_conditions))
+}
+
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ratio: f64) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
+}
+
+/// if simple distinct without filter, we need to warm up the field
+fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> Vec<String> {
+    if let Some(IndexOptimizeMode::SimpleDistinct(field, ..)) = idx_optimize_rule {
+        vec![field.to_string()]
+    } else {
+        vec![]
+    }
+}
+
+// partition the tantivy files by time range
+// the return file groups should execte one by one
+fn partition_tantivy_files(
+    index_parquet_files: Vec<FileKey>,
+    idx_optimize_mode: &Option<IndexOptimizeMode>,
+    target_partitions: usize,
+) -> (Vec<Vec<FileKey>>, usize) {
+    let (file_groups, limit, ascend) = if let Some(IndexOptimizeMode::SimpleSelect(limit, ascend)) =
+        idx_optimize_mode
+        && *limit > 0
+    {
+        let file_groups = group_files_by_time_range(index_parquet_files, target_partitions);
+        (file_groups, *limit, *ascend)
+    } else {
+        // splite the filter groups by target partitions
+        let file_groups = into_chunks(index_parquet_files, target_partitions);
+        (file_groups, 0, false)
+    };
+
+    if limit == 0 {
+        (file_groups, limit)
+    } else {
+        (regroup_tantivy_files(file_groups, ascend), limit)
+    }
+}
+
+// regroup the tantivy for better performance
+// after [`partition_tantivy_files`] we get multiple groups that order by time range desc and each
+// group's time range not overlap, when execute the tantivy search, we get the last file in each
+// group and do the tantivy search.
+// so in this function, we recursive collect the last file in each group
+fn regroup_tantivy_files(file_groups: Vec<Vec<FileKey>>, ascend: bool) -> Vec<Vec<FileKey>> {
+    let group_num = file_groups.len();
+    let max_group_len = file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
+    let mut new_file_groups: Vec<Vec<FileKey>> = vec![Vec::new(); max_group_len];
+
+    let mut file_groups: Vec<_> = file_groups
+        .into_iter()
+        .map(|mut group| {
+            if !ascend {
+                group.reverse();
+            }
+            group.into_iter()
+        })
+        .collect();
+
+    for new_group in new_file_groups.iter_mut().take(max_group_len) {
+        for file_group in file_groups.iter_mut().take(group_num) {
+            if let Some(file) = file_group.next() {
+                new_group.push(file)
+            }
+        }
     }
 
-    pub fn handle_simple_top_n(
-        searcher: &Searcher,
-        query: Box<dyn Query>,
-        field: &str,
-        limit: usize,
-        ascend: bool,
-    ) -> anyhow::Result<Self> {
-        let order = if ascend {
-            Some(CustomOrder {
-                target: OrderTarget::Count,
-                order: Order::Asc,
+    new_file_groups
+}
+
+fn into_chunks<T>(mut v: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
+    let mut chunks = Vec::new();
+    while !v.is_empty() {
+        let take = if v.len() >= chunk_size {
+            chunk_size
+        } else {
+            v.len()
+        };
+        let chunk: Vec<T> = v.drain(..take).collect();
+        chunks.push(chunk);
+    }
+    chunks
+}
+
+// Group files by time range.
+// Use file.meta min_ts/max_ts to keep each group's files sorted and non-overlapping.
+fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
+    if files.is_empty() {
+        return vec![];
+    }
+
+    let partition_num = partition_num.max(1);
+
+    // Sort files by min_ts in ascending order, matching DataFusion's
+    // split_groups_by_statistics_with_target_partitions strategy.
+    files.sort_unstable_by(|a, b| {
+        a.meta
+            .min_ts
+            .cmp(&b.meta.min_ts)
+            .then_with(|| a.meta.max_ts.cmp(&b.meta.max_ts))
+    });
+
+    let mut file_groups_indices: Vec<Vec<FileKey>> = vec![vec![]; partition_num];
+    for file in files {
+        if let Some(group) = file_groups_indices
+            .iter_mut()
+            .filter(|group| {
+                group.is_empty()
+                    || file.meta.min_ts
+                        > group
+                            .last()
+                            .expect("groups should not be empty after is_empty check")
+                            .meta
+                            .max_ts
             })
-        } else {
-            None
-        };
-        let limit = (limit * 4).max(1000) as u32;
-        let aggregation = Aggregation {
-            agg: AggregationVariants::Terms(TermsAggregation {
-                field: field.to_string(),
-                size: Some(limit),
-                order,
-                missing: None,
-                min_doc_count: Some(1),
-                show_term_doc_count_error: Some(false),
-                segment_size: Some(limit),
-                include: None,
-                exclude: None,
-            }),
-            sub_aggregation: Default::default(),
-        };
-        let aggregations = Aggregations::from_iter(vec![("termagg".to_string(), aggregation)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
-
-        let mut res = searcher.search(&query, &collector)?;
-
-        if let AggregationResult::BucketResult(BucketResult::Terms { buckets, .. }) =
-            res.0.remove("termagg").unwrap()
+            .min_by_key(|group| group.len())
         {
-            let top_n = buckets
-                .into_iter()
-                .map(|bucket| {
-                    let count = bucket.doc_count;
-                    match bucket.key {
-                        Key::Str(s) => (s, count),
-                        Key::F64(f) => (f.to_string(), count),
-                        Key::I64(i) => (i.to_string(), count),
-                        Key::U64(u) => (u.to_string(), count),
-                    }
-                })
-                .collect::<Vec<_>>();
-            Ok(Self::TopN(top_n))
+            group.push(file);
         } else {
-            anyhow::bail!("Failed to get top n results from tantivy");
+            file_groups_indices.push(vec![file]);
         }
     }
 
-    pub fn handle_simple_distinct(
-        searcher: &Searcher,
-        index_condition: &IndexCondition,
-        field: &str,
-        limit: usize,
-        ascend: bool,
-    ) -> anyhow::Result<Self> {
-        let mut distinct_values: Vec<String> = Vec::with_capacity(limit * 4);
-        let field = searcher.schema().get_field(field).unwrap();
-        if let Some((value, case_sensitive)) = index_condition.get_str_match_condition() {
-            for seg in searcher.segment_readers() {
-                let index = seg.inverted_index(field).unwrap();
-                let mut terms = index
-                    .terms()
-                    .search(ContainsAutomaton::new(&value, case_sensitive))
-                    .into_stream()
-                    .unwrap();
-                while let Some((term, _)) = terms.next() {
-                    if ascend && distinct_values.len() >= limit {
-                        break;
+    file_groups_indices.retain(|group| !group.is_empty());
+    file_groups_indices
+}
+
+fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
+    match tantivy_result {
+        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
+            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
+            // otherwise, we use bitvec to store the row ids.
+            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
+            // efficient for large percent.
+            if percent < 1.0 {
+                let mut roaring = RoaringBitmap::new();
+                for (i, bit) in bitvec.into_iter().enumerate() {
+                    if bit {
+                        roaring.insert(i as u32);
                     }
-                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
-            }
-        } else {
-            for seg in searcher.segment_readers() {
-                let index = seg.inverted_index(field).unwrap();
-                let mut terms = index.terms().stream().unwrap();
-                while let Some((term, _)) = terms.next() {
-                    if ascend && distinct_values.len() >= limit {
-                        break;
-                    }
-                    distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
-                }
+                CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size)
+            } else {
+                CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size)
             }
         }
-        if !ascend {
-            distinct_values.reverse();
-            distinct_values.truncate(limit);
+        TantivyResult::Count(count) => CacheEntry::Count(count),
+        TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
+        TantivyResult::MultiHistogram(multi_histogram) => {
+            CacheEntry::MultiHistogram(multi_histogram)
         }
-        Ok(Self::Distinct(distinct_values.into_iter().collect()))
-    }
-}
-
-// TantivyMultiResultBuilder is used to build a TantivyMultiResult from multiple TantivyResult
-pub enum TantivyMultiResultBuilder {
-    RowNums(u64),
-    Histogram(Vec<Vec<u64>>),
-    MultiHistogram(Vec<Vec<(i64, String, u64)>>),
-    TopN(Vec<(String, u64)>),
-    Distinct(HashSet<String>),
-}
-
-impl TantivyMultiResultBuilder {
-    pub fn new(optimize_rule: &Option<IndexOptimizeMode>) -> Self {
-        match optimize_rule {
-            Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
-            Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
-            Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
-            Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
-            Some(IndexOptimizeMode::SimpleSelect(..))
-            | Some(IndexOptimizeMode::SimpleCount)
-            | None => Self::RowNums(0),
-        }
-    }
-
-    pub fn add_row_nums(&mut self, row_nums: u64) {
-        match self {
-            Self::RowNums(a) => *a += row_nums,
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_histogram(&mut self, histogram: Vec<u64>) {
-        match self {
-            Self::Histogram(a) => {
-                if !histogram.is_empty() {
-                    a.push(histogram);
-                }
-            }
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_multi_histogram(&mut self, multi_histogram: Vec<(i64, String, u64)>) {
-        match self {
-            Self::MultiHistogram(a) => {
-                if !multi_histogram.is_empty() {
-                    a.push(multi_histogram);
-                }
-            }
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_top_n(&mut self, top_n: Vec<(String, u64)>) {
-        match self {
-            Self::TopN(a) => a.extend(top_n),
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_distinct(&mut self, distinct: HashSet<String>) {
-        match self {
-            Self::Distinct(a) => a.extend(distinct),
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn num_rows(&self) -> usize {
-        match self {
-            Self::RowNums(a) => *a as usize,
-            _ => 0,
-        }
-    }
-
-    pub fn build(self) -> TantivyMultiResult {
-        match self {
-            Self::RowNums(a) => TantivyMultiResult::RowNums(a),
-            Self::Histogram(histograms_hits) => {
-                if histograms_hits.is_empty() {
-                    return TantivyMultiResult::Histogram(vec![]);
-                }
-                let len = histograms_hits[0].len();
-                let histogram = (0..len)
-                    .map(|i| {
-                        histograms_hits
-                            .iter()
-                            .map(|v| v.get(i).unwrap_or(&0))
-                            .sum::<u64>()
-                    })
-                    .collect();
-                TantivyMultiResult::Histogram(histogram)
-            }
-            Self::MultiHistogram(results) => {
-                // Merge: flatten all per-file results into a single Vec
-                let merged: Vec<(i64, String, u64)> = results.into_iter().flatten().collect();
-                TantivyMultiResult::MultiHistogram(merged)
-            }
-            Self::TopN(a) => TantivyMultiResult::TopN(a),
-            Self::Distinct(a) => TantivyMultiResult::Distinct(a),
+        TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
+        TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
+        TantivyResult::RowIds(_) => {
+            unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
 }
 
-pub enum TantivyMultiResult {
-    RowNums(u64),
-    Histogram(Vec<u64>),
-    MultiHistogram(Vec<(i64, String, u64)>),
-    TopN(Vec<(String, u64)>),
-    Distinct(HashSet<String>),
-}
-
-impl Display for TantivyMultiResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::RowNums(num) => write!(f, "row_nums: {num}"),
-            Self::Histogram(histogram) => {
-                write!(f, "histogram hits: {}", histogram.iter().sum::<u64>())
-            }
-            Self::MultiHistogram(multi_histogram) => {
-                write!(f, "multi_histogram hits: {}", multi_histogram.len())
-            }
-            Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
-            Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
-        }
-    }
-}
-
-impl TantivyMultiResult {
-    pub fn num_rows(&self) -> usize {
-        match self {
-            Self::RowNums(a) => *a as usize,
-            _ => 0,
-        }
-    }
-
-    pub fn histogram(self) -> Vec<u64> {
-        match self {
-            Self::Histogram(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn multi_histogram(self) -> Vec<(i64, String, u64)> {
-        match self {
-            Self::MultiHistogram(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn top_n(self) -> Vec<(String, u64)> {
-        match self {
-            Self::TopN(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn distinct(self) -> HashSet<String> {
-        match self {
-            Self::Distinct(a) => a,
-            _ => HashSet::new(),
-        }
-    }
+fn generate_cache_key(
+    index_condition: &Option<IndexCondition>,
+    idx_optimize_rule: &Option<IndexOptimizeMode>,
+    parquet_file: &FileKey,
+) -> String {
+    let condition = match index_condition {
+        Some(condition) => condition.to_query(),
+        None => return String::new(),
+    };
+    let rule = match idx_optimize_rule {
+        Some(rule) => rule.to_rule_string(),
+        None => return String::new(),
+    };
+    format!("{condition}_{rule}_{}", parquet_file.key)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
-
-    use arrow_schema::{DataType, Field, Schema};
-    use config::meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode};
+    use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta};
 
     use super::*;
+    use crate::service::search::index::{Condition, IndexCondition};
 
-    #[test]
-    fn test_tantivy_result_percent() {
-        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
-        assert_eq!(result.percent(), 75);
-
-        let result = TantivyResult::RowIds(HashSet::new());
-        assert_eq!(result.percent(), 0);
-
-        let result = TantivyResult::Count(100);
-        assert_eq!(result.percent(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_row_ids() {
-        let mut row_ids = HashSet::new();
-        row_ids.insert(1u32);
-        row_ids.insert(2u32);
-        row_ids.insert(3u32);
-
-        let result = TantivyResult::RowIds(row_ids);
-        let memory_size = result.get_memory_size();
-
-        // Should include HashSet overhead + capacity * size_of(u32)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_bitvec() {
-        let bitvec = BitVec::repeat(false, 1000);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 50, None);
-        let memory_size = result.get_memory_size();
-
-        // Should include BitVec overhead + bit capacity / 8
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<BitVec>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_count() {
-        let result = TantivyResult::Count(12345);
-        let memory_size = result.get_memory_size();
-
-        assert_eq!(memory_size, std::mem::size_of::<usize>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_histogram() {
-        let histogram = vec![10u64, 20u64, 30u64, 40u64];
-        let result = TantivyResult::Histogram(histogram);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + capacity * size_of(u64)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<u64>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_top_n() {
-        let top_n = vec![
-            ("term1".to_string(), 100u64),
-            ("term2".to_string(), 200u64),
-            ("term3".to_string(), 150u64),
-        ];
-        let result = TantivyResult::TopN(top_n);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + string capacities + u64 sizes
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<(String, u64)>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_distinct() {
-        let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
-        distinct.insert("value2".to_string());
-        distinct.insert("value3".to_string());
-
-        let result = TantivyResult::Distinct(distinct);
-        let memory_size = result.get_memory_size();
-
-        // Should include HashSet overhead + string capacities
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_new() {
-        // Test with SimpleHistogram
-        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::Histogram(_)));
-
-        // Test with SimpleTopN
-        let optimize_rule = Some(IndexOptimizeMode::SimpleTopN("field".to_string(), 10, true));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::TopN(_)));
-
-        // Test with SimpleDistinct
-        let optimize_rule = Some(IndexOptimizeMode::SimpleDistinct(
-            "field".to_string(),
-            10,
-            true,
-        ));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::Distinct(_)));
-
-        // Test with SimpleSelect
-        let optimize_rule = Some(IndexOptimizeMode::SimpleSelect(10, true));
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-
-        // Test with SimpleCount
-        let optimize_rule = Some(IndexOptimizeMode::SimpleCount);
-        let builder = TantivyMultiResultBuilder::new(&optimize_rule);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-
-        // Test with None
-        let builder = TantivyMultiResultBuilder::new(&None);
-        assert!(matches!(builder, TantivyMultiResultBuilder::RowNums(_)));
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_row_nums() {
-        let mut builder = TantivyMultiResultBuilder::RowNums(10);
-        builder.add_row_nums(5);
-
-        match builder {
-            TantivyMultiResultBuilder::RowNums(count) => assert_eq!(count, 15),
-            _ => panic!("Expected RowNums variant"),
+    fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
+        FileKey {
+            key: format!("file_{min_ts}_{max_ts}"),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                ..Default::default()
+            },
+            ..Default::default()
         }
     }
 
-    #[test]
-    fn test_tantivy_multi_result_builder_add_histogram() {
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-
-        builder.add_histogram(vec![10, 20, 30]);
-        builder.add_histogram(vec![5, 15, 25]);
-
-        match &builder {
-            TantivyMultiResultBuilder::Histogram(histograms) => {
-                assert_eq!(histograms.len(), 2);
-                assert_eq!(histograms[0], vec![10, 20, 30]);
-                assert_eq!(histograms[1], vec![5, 15, 25]);
+    fn assert_groups_are_sorted_and_non_overlapping(groups: &[Vec<FileKey>]) {
+        for group in groups {
+            for files in group.windows(2) {
+                assert!(
+                    files[0].meta.min_ts <= files[1].meta.min_ts,
+                    "files should be sorted by min_ts within each group"
+                );
+                assert!(
+                    files[0].meta.max_ts < files[1].meta.min_ts,
+                    "files should not overlap within each group"
+                );
             }
-            _ => panic!("Expected Histogram variant"),
-        }
-
-        // Test empty histogram is not added
-        builder.add_histogram(vec![]);
-        match &builder {
-            TantivyMultiResultBuilder::Histogram(histograms) => {
-                assert_eq!(histograms.len(), 2); // Should still be 2
-            }
-            _ => panic!("Expected Histogram variant"),
         }
     }
 
-    #[test]
-    fn test_tantivy_multi_result_builder_add_top_n() {
-        let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-
-        let top_n1 = vec![("term1".to_string(), 100), ("term2".to_string(), 50)];
-        let top_n2 = vec![("term3".to_string(), 75)];
-
-        builder.add_top_n(top_n1);
-        builder.add_top_n(top_n2);
-
-        match &builder {
-            TantivyMultiResultBuilder::TopN(results) => {
-                assert_eq!(results.len(), 3);
-                assert_eq!(results[0].0, "term1");
-                assert_eq!(results[0].1, 100);
-                assert_eq!(results[2].0, "term3");
-                assert_eq!(results[2].1, 75);
-            }
-            _ => panic!("Expected TopN variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_add_distinct() {
-        let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-
-        let mut distinct1 = HashSet::new();
-        distinct1.insert("value1".to_string());
-        distinct1.insert("value2".to_string());
-
-        let mut distinct2 = HashSet::new();
-        distinct2.insert("value2".to_string()); // Duplicate
-        distinct2.insert("value3".to_string());
-
-        builder.add_distinct(distinct1);
-        builder.add_distinct(distinct2);
-
-        match &builder {
-            TantivyMultiResultBuilder::Distinct(results) => {
-                assert_eq!(results.len(), 3); // Should deduplicate
-                assert!(results.contains("value1"));
-                assert!(results.contains("value2"));
-                assert!(results.contains("value3"));
-            }
-            _ => panic!("Expected Distinct variant"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_num_rows() {
-        let builder = TantivyMultiResultBuilder::RowNums(42);
-        assert_eq!(builder.num_rows(), 42);
-
-        let builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        assert_eq!(builder.num_rows(), 0);
-
-        let builder = TantivyMultiResultBuilder::TopN(vec![]);
-        assert_eq!(builder.num_rows(), 0);
-
-        let builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-        assert_eq!(builder.num_rows(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_builder_build() {
-        // Test RowNums build
-        let builder = TantivyMultiResultBuilder::RowNums(100);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::RowNums(count) => assert_eq!(count, 100),
-            _ => panic!("Expected RowNums result"),
-        }
-
-        // Test empty Histogram build
-        let builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => assert!(hist.is_empty()),
-            _ => panic!("Expected Histogram result"),
-        }
-
-        // Test Histogram build with data
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        builder.add_histogram(vec![10, 20, 30]);
-        builder.add_histogram(vec![5, 15, 25]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => {
-                assert_eq!(hist.len(), 3);
-                assert_eq!(hist[0], 15); // 10 + 5
-                assert_eq!(hist[1], 35); // 20 + 15
-                assert_eq!(hist[2], 55); // 30 + 25
-            }
-            _ => panic!("Expected Histogram result"),
-        }
-
-        // Test TopN build
-        let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-        builder.add_top_n(vec![("term1".to_string(), 100)]);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::TopN(top_n) => {
-                assert_eq!(top_n.len(), 1);
-                assert_eq!(top_n[0].0, "term1");
-                assert_eq!(top_n[0].1, 100);
-            }
-            _ => panic!("Expected TopN result"),
-        }
-
-        // Test Distinct build
-        let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
-        let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
-        builder.add_distinct(distinct);
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Distinct(dist) => {
-                assert_eq!(dist.len(), 1);
-                assert!(dist.contains("value1"));
-            }
-            _ => panic!("Expected Distinct result"),
-        }
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_num_rows() {
-        let result = TantivyMultiResult::RowNums(123);
-        assert_eq!(result.num_rows(), 123);
-
-        let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
-        assert_eq!(result.num_rows(), 0);
-
-        let result = TantivyMultiResult::TopN(vec![("term".to_string(), 50)]);
-        assert_eq!(result.num_rows(), 0);
-
-        let mut distinct = HashSet::new();
-        distinct.insert("value".to_string());
-        let result = TantivyMultiResult::Distinct(distinct);
-        assert_eq!(result.num_rows(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_histogram() {
-        let histogram_data = vec![10, 20, 30, 40];
-        let result = TantivyMultiResult::Histogram(histogram_data.clone());
-
-        let extracted = result.histogram();
-        assert_eq!(extracted, histogram_data);
-
-        // Test non-histogram returns empty vec
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.histogram();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_top_n() {
-        let top_n_data = vec![("term1".to_string(), 100), ("term2".to_string(), 50)];
-        let result = TantivyMultiResult::TopN(top_n_data.clone());
-
-        let extracted = result.top_n();
-        assert_eq!(extracted, top_n_data);
-
-        // Test non-top-n returns empty vec
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.top_n();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_distinct() {
-        let mut distinct_data = HashSet::new();
-        distinct_data.insert("value1".to_string());
-        distinct_data.insert("value2".to_string());
-        let result = TantivyMultiResult::Distinct(distinct_data.clone());
-
-        let extracted = result.distinct();
-        assert_eq!(extracted, distinct_data);
-
-        // Test non-distinct returns empty set
-        let result = TantivyMultiResult::RowNums(100);
-        let extracted = result.distinct();
-        assert!(extracted.is_empty());
-    }
-
-    #[test]
-    fn test_tantivy_multi_result_display() {
-        // Test RowNums display
-        let result = TantivyMultiResult::RowNums(12345);
-        assert_eq!(format!("{result}"), "row_nums: 12345");
-
-        // Test Histogram display
-        let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
-        assert_eq!(format!("{result}"), "histogram hits: 60");
-
-        // Test TopN display
-        let result = TantivyMultiResult::TopN(vec![("a".to_string(), 1), ("b".to_string(), 2)]);
-        assert_eq!(format!("{result}"), "top_n hits: 2");
-
-        // Test Distinct display
-        let mut distinct = HashSet::new();
-        distinct.insert("val1".to_string());
-        distinct.insert("val2".to_string());
-        distinct.insert("val3".to_string());
-        let result = TantivyMultiResult::Distinct(distinct);
-        assert_eq!(format!("{result}"), "distinct hits: 3");
-    }
-
-    #[test]
-    fn test_change_schema_to_utf8_view_enabled() {
-        // Mock the config to enable utf8_view
-        // Since we can't easily mock get_config(), we'll test the logic indirectly
-        let fields = vec![
-            Arc::new(Field::new("string_field", DataType::Utf8, false)),
-            Arc::new(Field::new("large_string_field", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("int_field", DataType::Int64, false)),
-            Arc::new(Field::new("bool_field", DataType::Boolean, true)),
-        ];
-        let original_schema = Schema::new(fields);
-
-        // Test the schema transformation logic
-        let transformed_fields = original_schema
-            .fields()
+    fn group_keys(groups: &[Vec<FileKey>]) -> Vec<Vec<String>> {
+        groups
             .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        // Verify transformations
-        assert_eq!(transformed_schema.field(0).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(1).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(2).data_type(), &DataType::Int64);
-        assert_eq!(transformed_schema.field(3).data_type(), &DataType::Boolean);
-
-        // Verify nullability is preserved
-        assert!(!transformed_schema.field(0).is_nullable());
-        assert!(transformed_schema.field(1).is_nullable());
-        assert!(!transformed_schema.field(2).is_nullable());
-        assert!(transformed_schema.field(3).is_nullable());
+            .map(|group| group.iter().map(|file| file.key.clone()).collect())
+            .collect()
     }
 
     #[test]
-    fn test_change_schema_to_utf8_view_field_names_preserved() {
-        let fields = vec![
-            Arc::new(Field::new("field_name_1", DataType::Utf8, false)),
-            Arc::new(Field::new("field_name_2", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("field_name_3", DataType::Int32, false)),
+    fn test_group_files_by_time_range() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
         ];
-        let original_schema = Schema::new(fields);
-
-        // Test field name preservation in transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.field(0).name(), "field_name_1");
-        assert_eq!(transformed_schema.field(1).name(), "field_name_2");
-        assert_eq!(transformed_schema.field(2).name(), "field_name_3");
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert_eq!(groups.len(), 3);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
-    fn test_change_schema_to_utf8_view_empty_schema() {
-        let original_schema = Schema::empty();
-
-        // Test empty schema transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.fields().len(), 0);
+    fn test_group_files_by_time_range_with_overlap() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(5, 15),
+            create_file_key(11, 20),
+            create_file_key(18, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
+        ];
+        let partition_num = 2;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert!(groups.len() >= 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
     }
 
     #[test]
-    fn test_histogram_builder_edge_cases() {
-        // Test with histograms of different lengths
-        let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
-        builder.add_histogram(vec![10, 20]);
-        builder.add_histogram(vec![5, 15, 25]); // Different length
+    fn test_group_files_by_time_range_with_less_partitions() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert_eq!(groups.len(), 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
 
-        let result = builder.build();
-        match result {
-            TantivyMultiResult::Histogram(hist) => {
-                // Should use the length of the first histogram (2)
-                assert_eq!(hist.len(), 2);
-                assert_eq!(hist[0], 15); // 10 + 5
-                assert_eq!(hist[1], 35); // 20 + 15 (25 is ignored due to index bounds)
+    #[test]
+    fn test_group_files_by_time_range_sorts_unsorted_input_by_min_ts() {
+        let files = vec![
+            create_file_key(31, 40),
+            create_file_key(1, 10),
+            create_file_key(21, 30),
+            create_file_key(11, 20),
+        ];
+
+        let groups = group_files_by_time_range(files, 2);
+
+        assert_eq!(
+            group_keys(&groups),
+            vec![
+                vec!["file_1_10".to_string(), "file_21_30".to_string()],
+                vec!["file_11_20".to_string(), "file_31_40".to_string()],
+            ]
+        );
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_balances_smallest_eligible_group() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
+            create_file_key(51, 60),
+            create_file_key(61, 70),
+        ];
+
+        let groups = group_files_by_time_range(files, 3);
+        let group_sizes = groups.iter().map(Vec::len).collect::<Vec<_>>();
+
+        assert_eq!(group_sizes, vec![3, 2, 2]);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_adds_groups_when_all_targets_overlap() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(2, 11),
+            create_file_key(3, 12),
+        ];
+
+        let groups = group_files_by_time_range(files, 2);
+
+        assert_eq!(groups.len(), 3);
+        assert!(groups.iter().all(|group| group.len() == 1));
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_requires_strictly_non_overlapping_ranges() {
+        let files = vec![create_file_key(1, 10), create_file_key(10, 20)];
+
+        let groups = group_files_by_time_range(files, 1);
+
+        assert_eq!(groups.len(), 2);
+        assert!(groups.iter().all(|group| group.len() == 1));
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_histogram_i64() {
+        const MARGIN_IN_BYTES: usize = 1_000_000;
+        const MEMORY_BUDGET_NUM_BYTES_MIN: usize = ((MARGIN_IN_BYTES as u32) * 15u32) as usize;
+
+        let mut schema_builder = tantivy::schema::SchemaBuilder::new();
+        let val_field = schema_builder.add_i64_field(TIMESTAMP_COL_NAME, tantivy::schema::FAST);
+        let schema = schema_builder.build();
+        let index = tantivy::index::Index::create_in_ram(schema);
+        let mut writer = index
+            .writer_with_num_threads(1, MEMORY_BUDGET_NUM_BYTES_MIN)
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>12i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-30i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-12i64))
+            .unwrap();
+        writer
+            .add_document(tantivy::doc!(val_field=>-10i64))
+            .unwrap();
+        writer.commit().unwrap();
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        let all_query = tantivy::query::AllQuery;
+        let histogram_collector = tantivy::collector::HistogramCollector::new(
+            TIMESTAMP_COL_NAME.to_string(),
+            -20i64,
+            10u64,
+            4,
+        );
+        let histogram = searcher.search(&all_query, &histogram_collector).unwrap();
+        assert_eq!(histogram, vec![1, 1, 0, 1]);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_basic() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups, false);
+
+        // Should have 2 groups (max length of input groups)
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_11_20"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the first file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_1_10"); // First file from first group
+        assert_eq!(result[1][1].key, "file_21_30"); // First file from second group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_uneven_groups() {
+        let file_groups = vec![
+            vec![
+                create_file_key(1, 10),
+                create_file_key(11, 20),
+                create_file_key(21, 30),
+            ],
+            vec![create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups, false);
+
+        // Should have 3 groups (max length of input groups)
+        assert_eq!(result.len(), 3);
+
+        // First group should contain the last file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file from first group
+        assert_eq!(result[0][1].key, "file_31_40"); // Last file from second group
+
+        // Second group should contain the middle file from first group, none from second
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file from first group
+
+        // Third group should contain the first file from first group, none from second
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file from first group
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_empty_groups() {
+        let file_groups: Vec<Vec<FileKey>> = vec![];
+        let result = regroup_tantivy_files(file_groups, false);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_single_group() {
+        let file_groups = vec![vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ]];
+        let result = regroup_tantivy_files(file_groups, false);
+
+        // Should have 3 groups (length of the single input group)
+        assert_eq!(result.len(), 3);
+
+        // Each group should contain one file
+        assert_eq!(result[0].len(), 1);
+        assert_eq!(result[0][0].key, "file_21_30"); // Last file
+
+        assert_eq!(result[1].len(), 1);
+        assert_eq!(result[1][0].key, "file_11_20"); // Middle file
+
+        assert_eq!(result[2].len(), 1);
+        assert_eq!(result[2][0].key, "file_1_10"); // First file
+    }
+
+    #[test]
+    fn test_into_chunks_basic() {
+        let v = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2, 3]);
+        assert_eq!(chunks[1], vec![4, 5, 6]);
+        assert_eq!(chunks[2], vec![7, 8]);
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_none() {
+        let idx_optimize_rule = None;
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_simple_distinct() {
+        let idx_optimize_rule = Some(
+            config::meta::inverted_index::IndexOptimizeMode::SimpleDistinct(
+                "test_field".to_string(),
+                100,
+                false,
+            ),
+        );
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, vec!["test_field".to_string()]);
+    }
+
+    #[test]
+    fn test_get_simple_distinct_field_other_mode() {
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let result = get_simple_distinct_field(&idx_optimize_rule);
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_simple_select_with_limit() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+        ];
+        let idx_optimize_mode =
+            Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(100, false));
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 100);
+        assert!(!file_groups.is_empty());
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_simple_select_no_limit() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let idx_optimize_mode =
+            Some(config::meta::inverted_index::IndexOptimizeMode::SimpleSelect(0, false));
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 0);
+        assert_eq!(file_groups.len(), 1);
+    }
+
+    #[test]
+    fn test_partition_tantivy_files_other_mode() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+        ];
+        let idx_optimize_mode = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let target_partitions = 2;
+
+        let (file_groups, limit) =
+            partition_tantivy_files(files, &idx_optimize_mode, target_partitions);
+        assert_eq!(limit, 0);
+        assert!(file_groups.len() <= 2);
+    }
+
+    #[test]
+    fn test_generate_cache_key_none_condition() {
+        let index_condition = None;
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&index_condition, &idx_optimize_rule, parquet_file);
+        assert_eq!(result, String::new());
+    }
+
+    #[test]
+    fn test_generate_cache_key_none_rule() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let idx_optimize_rule = None;
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
+        assert_eq!(result, String::new());
+    }
+
+    #[test]
+    fn test_generate_cache_key_valid() {
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
+        let idx_optimize_rule = Some(config::meta::inverted_index::IndexOptimizeMode::SimpleCount);
+        let parquet_file = &create_file_key(1, 10);
+
+        let result = generate_cache_key(&Some(index_condition), &idx_optimize_rule, parquet_file);
+        assert!(!result.is_empty());
+        assert!(result.contains("file_1_10"));
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(2, true);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 2, None);
+        let percent = 0.5; // Less than 1.0, should use roaring bitmap
+        let parquet_rows = 4;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            CacheEntry::RowIdsRoaring(roaring, num_rows, rows, _) => {
+                assert_eq!(num_rows, 2);
+                assert_eq!(rows, 4);
+                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
+                assert!(roaring.contains(0));
+                assert!(roaring.contains(2));
             }
-            _ => panic!("Expected Histogram result"),
+            _ => panic!("Expected RowIdsRoaring cache entry"),
         }
     }
 
     #[test]
-    fn test_memory_size_edge_cases() {
-        // Test with empty collections
-        let result = TantivyResult::RowIds(HashSet::new());
-        let memory_size = result.get_memory_size();
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
+    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
+        let mut bitvec = BitVec::repeat(false, 4);
+        bitvec.set(0, true);
+        bitvec.set(1, true);
+        bitvec.set(3, true);
+        let result = TantivyResult::RowIdsBitVec(bitvec, 3, None);
+        let percent = 2.0; // Greater than 1.0, should use bitvec
+        let parquet_rows = 4;
 
-        let result = TantivyResult::Histogram(vec![]);
-        let memory_size = result.get_memory_size();
-        assert!(memory_size >= std::mem::size_of::<Vec<u64>>());
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            CacheEntry::RowIdsBitVec(returned_bitvec, num_rows, _) => {
+                assert_eq!(num_rows, 3);
+                assert_eq!(returned_bitvec.len(), 4);
+                assert_eq!(returned_bitvec.get(0).unwrap(), true);
+                assert_eq!(returned_bitvec.get(1).unwrap(), true);
+                assert_eq!(returned_bitvec.get(2).unwrap(), false);
+                assert_eq!(returned_bitvec.get(3).unwrap(), true);
+            }
+            _ => panic!("Expected RowIdsBitVec cache entry"),
+        }
+    }
 
-        let result = TantivyResult::TopN(vec![]);
-        let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<Vec<(String, u64)>>());
+    #[test]
+    fn test_get_cache_entry_count() {
+        let result = TantivyResult::Count(42);
+        let percent = 1.0;
+        let parquet_rows = 100;
 
-        let result = TantivyResult::Distinct(HashSet::new());
-        let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<HashSet<String>>());
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            CacheEntry::Count(count) => {
+                assert_eq!(count, 42);
+            }
+            _ => panic!("Expected Count cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_histogram() {
+        let histogram_data = vec![1, 2, 3, 4];
+        let result = TantivyResult::Histogram(histogram_data.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            CacheEntry::Histogram(histogram) => {
+                assert_eq!(histogram, histogram_data);
+            }
+            _ => panic!("Expected Histogram cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_distinct() {
+        let mut distinct_values = HashSet::new();
+        distinct_values.insert("value1".to_string());
+        distinct_values.insert("value2".to_string());
+        let result = TantivyResult::Distinct(distinct_values.clone());
+        let percent = 1.0;
+        let parquet_rows = 100;
+
+        let entry = get_cache_entry(result, percent, parquet_rows);
+        match entry {
+            CacheEntry::Distinct(distinct) => {
+                assert_eq!(distinct, distinct_values);
+            }
+            _ => panic!("Expected Distinct cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_into_chunks_exact_divisible() {
+        let v = vec![1, 2, 3, 4, 5, 6];
+        let chunks = into_chunks(v, 2);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0], vec![1, 2]);
+        assert_eq!(chunks[1], vec![3, 4]);
+        assert_eq!(chunks[2], vec![5, 6]);
+    }
+
+    #[test]
+    fn test_into_chunks_empty_vector() {
+        let v: Vec<i32> = vec![];
+        let chunks = into_chunks(v, 3);
+
+        assert_eq!(chunks.len(), 0);
+    }
+
+    #[test]
+    fn test_into_chunks_chunk_size_larger_than_vector() {
+        let v = vec![1, 2];
+        let chunks = into_chunks(v, 5);
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], vec![1, 2]);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_single_file() {
+        let files = vec![create_file_key(1, 10)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 1);
+        assert_eq!(groups[0][0].key, "file_1_10");
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_empty() {
+        let groups = group_files_by_time_range(vec![], 3);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_zero_partitions() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let groups = group_files_by_time_range(files, 0);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 2);
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_no_overlap_many_partitions() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+        ];
+        let partition_num = 10; // More partitions than files
+        let groups = group_files_by_time_range(files, partition_num);
+
+        // Should only keep non-empty target partitions.
+        assert_eq!(groups.len(), 3);
+        for group in &groups {
+            assert_eq!(group.len(), 1); // Each file should be in its own group
+        }
+        assert_groups_are_sorted_and_non_overlapping(&groups);
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_many_single_element_groups() {
+        let file_groups = vec![
+            vec![create_file_key(1, 10)],
+            vec![create_file_key(11, 20)],
+            vec![create_file_key(21, 30)],
+        ];
+        let result = regroup_tantivy_files(file_groups, false);
+
+        assert_eq!(result.len(), 1); // Max group length is 1
+        assert_eq!(result[0].len(), 3); // Should contain all files
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_11_20");
+        assert_eq!(result[0][2].key, "file_21_30");
+    }
+
+    #[test]
+    fn test_regroup_tantivy_files_ascend() {
+        // Same input as test_regroup_tantivy_files_basic, but with ascend=true.
+        // Without the reverse, each group stays in ascending order, so the
+        // interleaved output groups contain oldest files first.
+        let file_groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let result = regroup_tantivy_files(file_groups, true);
+
+        assert_eq!(result.len(), 2);
+
+        // First group should contain the first (oldest) file from each input group
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[0][0].key, "file_1_10");
+        assert_eq!(result[0][1].key, "file_21_30");
+
+        // Second group should contain the last (newest) file from each input group
+        assert_eq!(result[1].len(), 2);
+        assert_eq!(result[1][0].key, "file_11_20");
+        assert_eq!(result[1][1].key, "file_31_40");
     }
 }
