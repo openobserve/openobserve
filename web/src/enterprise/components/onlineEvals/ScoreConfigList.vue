@@ -22,7 +22,82 @@
         :cta-label="t('onlineEvals.scoreConfig.newButton')"
         cta-data-test="score-config-empty-create-btn"
         @create="$emit('create')"
-      />
+      >
+        <template #secondary>
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="md"
+                data-test="score-config-empty-import"
+                icon-right="expand-more"
+              >
+                {{ t("onlineEvals.scoreConfig.import.button") }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              @select="$emit('import-custom')"
+              data-test="score-config-empty-import-custom"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+            <ODropdownItem
+              @select="$emit('open-library')"
+              data-test="score-config-empty-import-library"
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
+                </span>
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+        </template>
+      </EvalEmptyState>
+    </template>
+
+    <template #actions>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            class="tw:ml-2"
+            data-test="score-config-import"
+            icon-right="expand-more"
+          >
+            {{ t("onlineEvals.scoreConfig.import.button") }}
+          </OButton>
+        </template>
+        <ODropdownItem
+          @select="$emit('import-custom')"
+          data-test="score-config-import-custom"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+        <ODropdownItem
+          @select="$emit('open-library')"
+          data-test="score-config-import-library"
+        >
+          <div class="tw:flex tw:flex-col">
+            <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
+            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+              {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
+            </span>
+          </div>
+        </ODropdownItem>
+      </ODropdown>
     </template>
 
     <template #filter>
@@ -38,6 +113,8 @@
 
     <template #table>
       <OTable
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="score-config-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -81,6 +158,23 @@
           {{ formatDateShort(rowCreated(row)) }}
         </template>
 
+        <template #bottom="{ totalRows }">
+          <span class="o2-table-footer-title tw:text-primary">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline"
+            size="sm"
+            class="tw:ml-3"
+            icon-left="download"
+            data-test="score-config-bulk-export-btn"
+            @click="handleBulkExport"
+          >
+            {{ t("onlineEvals.scoreConfig.export.bulkButton") }} ({{ selectedIds.length }})
+          </OButton>
+        </template>
+
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -90,6 +184,14 @@
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
               @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`score-config-list-${row.name}-export-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.export')"
+              icon-left="download"
+              @click.stop="$emit('export', row)"
             />
             <OButton
               :data-test="`score-config-list-${row.name}-delete-btn`"
@@ -112,6 +214,8 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
@@ -123,21 +227,36 @@ type DataType = "numeric" | "categorical" | "boolean";
 
 const props = defineProps<{
   rows: ScoreConfig[];
+  allScoreConfigs: ScoreConfig[];
   scorers: Scorer[];
   search: string;
   loading?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: ScoreConfig): void;
   (e: "view", row: ScoreConfig): void;
   (e: "delete", row: ScoreConfig): void;
+  (e: "imported"): void;
+  (e: "import-custom"): void;
+  (e: "open-library"): void;
+  (e: "export", row: ScoreConfig): void;
+  (e: "export-bulk", ids: string[]): void;
 }>();
 
 const { t } = useI18n();
 const typeFilter = ref<DataType | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkExport() {
+  // Snapshot the ids before clearing so the parent receives a stable array
+  // and the table immediately reflects deselection.
+  const ids = [...selectedIds.value];
+  selectedIds.value = [];
+  emit("export-bulk", ids);
+}
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
@@ -215,8 +334,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.actions"),
     sortable: false,
     isAction: true,
-    size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    size: 140,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 
@@ -231,7 +350,7 @@ const numberedRows = useNumberedRows(filteredRows);
 const showEmptyState = computed(
   () =>
     !props.loading &&
-    props.rows.length === 0 &&
+    props.allScoreConfigs.length === 0 &&
     !props.search &&
     !typeFilter.value,
 );

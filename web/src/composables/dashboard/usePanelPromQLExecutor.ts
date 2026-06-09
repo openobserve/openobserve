@@ -117,6 +117,7 @@ export const usePanelPromQLExecutor = (ctx: {
             endTime: endISOTimestamp,
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
+            tabName: it.tabName,
           };
 
           queryMetadata[queryIndex] = metadata;

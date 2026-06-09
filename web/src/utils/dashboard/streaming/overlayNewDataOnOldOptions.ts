@@ -276,9 +276,31 @@ export function overlayNewDataOnOldOptions(
   // Keep them visible with reduced opacity so user knows they're stale.
   // Filter their data to the new time range so they don't stretch the x-axis
   // (e.g. old 1-week series shouldn't expand a 1-day chart).
+  //
+  // Skip old series whose axis indices exceed the new options' axis count.
+  // This happens when transitioning from trellis (multiple grids/axes) to
+  // non-trellis (single grid/axis) — carrying over those series would cause
+  // ECharts "xAxis N not found" errors.
+  const newXAxisCount = Array.isArray(newOptions.xAxis)
+    ? newOptions.xAxis.length
+    : newOptions.xAxis
+      ? 1
+      : 0;
+  const newYAxisCount = Array.isArray(newOptions.yAxis)
+    ? newOptions.yAxis.length
+    : newOptions.yAxis
+      ? 1
+      : 0;
   const hasValidQueryRange = queryStartMs > 0 && queryEndMs > 0;
   for (const oldSeries of oldOptions.series) {
     if (oldSeries?.name == null) continue;
+    // Skip old series with axis indices that don't exist in the new layout
+    if (
+      (oldSeries.xAxisIndex ?? 0) >= newXAxisCount ||
+      (oldSeries.yAxisIndex ?? 0) >= newYAxisCount
+    ) {
+      continue;
+    }
     const existsInNew = merged.series.some(
       (s: any) => s?.name === oldSeries.name,
     );

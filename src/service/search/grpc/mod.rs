@@ -30,9 +30,8 @@ use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 
 pub mod flight;
 pub mod storage;
-pub(crate) mod tantivy;
-pub(crate) mod tantivy_result_cache;
 pub mod wal;
+pub(crate) use super::tantivy::cache as tantivy_result_cache;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 
@@ -46,6 +45,13 @@ pub struct QueryParams {
     pub time_range: (i64, i64),
     pub work_group: Option<String>,
     pub use_inverted_index: bool,
+}
+
+/// Linear interpolation: cached_ratio=0 -> query_thread_num, cached_ratio=1 -> cpu_num.
+pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ratio: f64) -> usize {
+    (cpu_num as i64
+        + ((query_thread_num as i64 - cpu_num as i64) as f64 * (1.0 - cached_ratio)) as i64)
+        as usize
 }
 
 /// Create tables from files, automatically splitting them based on time range overlap:

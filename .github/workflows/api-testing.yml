@@ -131,7 +131,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 

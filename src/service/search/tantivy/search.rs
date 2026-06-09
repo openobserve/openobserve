@@ -45,6 +45,7 @@ pub enum TantivyResult {
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
     TopN(Vec<(String, u64)>),                // simple top n optimization
+    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -85,6 +86,17 @@ impl TantivyResult {
                     .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
                     .sum::<usize>()
                     + std::mem::size_of::<Vec<(String, u64)>>()
+            }
+            Self::TopNMulti(top_n) => {
+                top_n
+                    .iter()
+                    .map(|(keys, _)| {
+                        keys.iter().map(|s| s.capacity()).sum::<usize>()
+                            + std::mem::size_of::<Vec<String>>()
+                            + std::mem::size_of::<u64>()
+                    })
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
             }
             Self::Distinct(distinct) => {
                 distinct.iter().map(|s| s.capacity()).sum::<usize>()
@@ -296,6 +308,113 @@ impl TantivyResult {
         }
     }
 
+    /// Handle two-field GROUP BY with count(*) using nested TermsAggregation
+    pub fn handle_simple_top_n_multi(
+        searcher: &Searcher,
+        query: Box<dyn Query>,
+        fields: &[String],
+        limit: usize,
+        ascend: bool,
+    ) -> anyhow::Result<Self> {
+        if fields.len() != 2 {
+            anyhow::bail!("handle_simple_top_n_multi requires exactly 2 fields");
+        }
+
+        let order = if ascend {
+            Some(CustomOrder {
+                target: OrderTarget::Count,
+                order: Order::Asc,
+            })
+        } else {
+            None
+        };
+
+        // Smarter over-fetch: outer needs enough distinct values of field[0],
+        // inner only needs enough per-bucket combinations.
+        // Use sqrt-based scaling to avoid O(N^2) bucket explosion.
+        let effective_limit = limit.max(10);
+        let outer_limit = (effective_limit * 2).max(100) as u32;
+        let inner_limit = (effective_limit * 2).max(100) as u32;
+
+        // Build nested aggregation: outer terms on field[0], inner terms on field[1]
+        let inner_aggregation = Aggregation {
+            agg: AggregationVariants::Terms(TermsAggregation {
+                field: fields[1].to_string(),
+                size: Some(inner_limit),
+                order: order.clone(),
+                missing: None,
+                min_doc_count: Some(1),
+                show_term_doc_count_error: Some(false),
+                segment_size: Some(inner_limit),
+                include: None,
+                exclude: None,
+            }),
+            sub_aggregation: Default::default(),
+        };
+
+        let outer_aggregation = Aggregation {
+            agg: AggregationVariants::Terms(TermsAggregation {
+                field: fields[0].to_string(),
+                size: Some(outer_limit),
+                order,
+                missing: None,
+                min_doc_count: Some(1),
+                show_term_doc_count_error: Some(false),
+                include: None,
+                exclude: None,
+                segment_size: Some(outer_limit),
+            }),
+            sub_aggregation: Aggregations::from_iter(vec![(
+                "inner".to_string(),
+                inner_aggregation,
+            )]),
+        };
+
+        let aggregations = Aggregations::from_iter(vec![("outer".to_string(), outer_aggregation)]);
+        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
+
+        let mut res = searcher.search(&query, &collector)?;
+
+        // Pre-allocate with a reasonable estimate
+        let estimated_results = (outer_limit as usize) * 4;
+        let mut results: Vec<(Vec<String>, u64)> = Vec::with_capacity(estimated_results);
+
+        if let AggregationResult::BucketResult(BucketResult::Terms {
+            buckets: outer_buckets,
+            ..
+        }) = res.0.remove("outer").unwrap()
+        {
+            for mut outer_bucket in outer_buckets {
+                let outer_key = match &outer_bucket.key {
+                    Key::Str(s) => s.clone(),
+                    Key::F64(f) => f.to_string(),
+                    Key::I64(i) => i.to_string(),
+                    Key::U64(u) => u.to_string(),
+                };
+
+                if let Some(AggregationResult::BucketResult(BucketResult::Terms {
+                    buckets: inner_buckets,
+                    ..
+                })) = outer_bucket.sub_aggregation.0.remove("inner")
+                {
+                    for inner_bucket in inner_buckets {
+                        let inner_key = match inner_bucket.key {
+                            Key::Str(s) => s,
+                            Key::F64(f) => f.to_string(),
+                            Key::I64(i) => i.to_string(),
+                            Key::U64(u) => u.to_string(),
+                        };
+                        results.push((vec![outer_key.clone(), inner_key], inner_bucket.doc_count));
+                    }
+                }
+            }
+        } else {
+            anyhow::bail!("Failed to get top n multi results from tantivy");
+        }
+
+        Ok(Self::TopNMulti(results))
+    }
+
     pub fn handle_simple_distinct(
         searcher: &Searcher,
         index_condition: &IndexCondition,
@@ -346,6 +465,7 @@ pub enum TantivyMultiResultBuilder {
     Histogram(Vec<Vec<u64>>),
     MultiHistogram(Vec<Vec<(i64, String, u64)>>),
     TopN(Vec<(String, u64)>),
+    TopNMulti(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -355,6 +475,7 @@ impl TantivyMultiResultBuilder {
             Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
             Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
             Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
+            Some(IndexOptimizeMode::SimpleTopNMulti(..)) => Self::TopNMulti(vec![]),
             Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
             Some(IndexOptimizeMode::SimpleSelect(..))
             | Some(IndexOptimizeMode::SimpleCount)
@@ -398,6 +519,13 @@ impl TantivyMultiResultBuilder {
         }
     }
 
+    pub fn add_top_n_multi(&mut self, top_n: Vec<(Vec<String>, u64)>) {
+        match self {
+            Self::TopNMulti(a) => a.extend(top_n),
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
     pub fn add_distinct(&mut self, distinct: HashSet<String>) {
         match self {
             Self::Distinct(a) => a.extend(distinct),
@@ -436,6 +564,7 @@ impl TantivyMultiResultBuilder {
                 TantivyMultiResult::MultiHistogram(merged)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
+            Self::TopNMulti(a) => TantivyMultiResult::TopNMulti(a),
             Self::Distinct(a) => TantivyMultiResult::Distinct(a),
         }
     }
@@ -446,6 +575,7 @@ pub enum TantivyMultiResult {
     Histogram(Vec<u64>),
     MultiHistogram(Vec<(i64, String, u64)>),
     TopN(Vec<(String, u64)>),
+    TopNMulti(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -460,6 +590,7 @@ impl Display for TantivyMultiResult {
                 write!(f, "multi_histogram hits: {}", multi_histogram.len())
             }
             Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
+            Self::TopNMulti(top_n) => write!(f, "top_n_multi hits: {}", top_n.len()),
             Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
         }
     }
@@ -490,6 +621,13 @@ impl TantivyMultiResult {
     pub fn top_n(self) -> Vec<(String, u64)> {
         match self {
             Self::TopN(a) => a,
+            _ => vec![],
+        }
+    }
+
+    pub fn top_n_multi(self) -> Vec<(Vec<String>, u64)> {
+        match self {
+            Self::TopNMulti(a) => a,
             _ => vec![],
         }
     }

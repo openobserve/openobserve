@@ -45,6 +45,17 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+// Mock useServiceCorrelation — onMounted now calls loadKeyFields() to
+// populate serviceDetectionConfig, so we provide a no-op that returns
+// an empty config immediately to keep existing tests working.
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: () => ({
+    loadKeyFields: vi.fn().mockResolvedValue({}),
+  }),
+  TRACE_SERVICE_DETECTION_KEY: Symbol("traceServiceDetection"),
+  initServiceCorrelationProviders: vi.fn(),
+}));
+
 
 // ---------------------------------------------------------------------------
 // ODrawer stub — replaces the migrated trace filters drawer

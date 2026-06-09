@@ -389,6 +389,9 @@ export default defineComponent({
     watch(
       () => histogramInterval.value,
       async () => {
+        // Capture the flag BEFORE any await — it may change while we're paused
+        const wasInitialSetup = isInitialHistogramSetup;
+
         // import sql parser if not imported
         if (!parser) {
           await importSqlParser();
@@ -409,7 +412,7 @@ export default defineComponent({
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
         // Note: false means changes need to be applied (flag logic is inverted)
-        if (!isInitialHistogramSetup) {
+        if (!wasInitialSetup) {
           isVariablesChanged.value = false;
         }
       },
@@ -561,7 +564,18 @@ export default defineComponent({
     );
     const refreshData = () => {
       if (!disable.value) {
-        // Apply any pending histogram interval changes
+        // Apply histogram interval to ALL queries before copying to chartData
+        dashboardPanelData.data.queries?.forEach((query: any) => {
+          const originalQuery = query.query;
+          const updatedQuery = replaceHistogramInterval(
+            originalQuery,
+            histogramInterval.value,
+          );
+          if (updatedQuery !== originalQuery) {
+            query.query = updatedQuery;
+          }
+        });
+
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(

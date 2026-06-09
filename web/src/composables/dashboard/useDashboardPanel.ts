@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed, watch, onBeforeMount, onUnmounted } from "vue";
+import { reactive, computed, watch, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
+import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
 import useValuesWebSocket from "./useValuesWebSocket";
 import queryService from "@/services/search";
@@ -32,6 +33,11 @@ import {
 } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { usePanelFields } from "@/composables/dashboard/usePanelFields";
 import { usePanelAggregation } from "@/composables/dashboard/usePanelAggregation";
+import {
+  DEFAULT_SQL_X_FIELD,
+  DEFAULT_SQL_Y_FIELD_COUNT,
+  buildDefaultBuilderFields,
+} from "@/utils/dashboard/defaultFields";
 import {
   getDefaultDashboardPanelData,
   getDefaultCustomChartText,
@@ -117,10 +123,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     const newQuery: any = {
       query: "",
       vrlFunctionQuery: "",
-      customQuery:
-        dashboardPanelData?.data?.queries?.[
-          dashboardPanelData?.layout?.currentQueryIndex
-        ]?.customQuery ?? false,
+      vrlFunctionFieldList: [],
+      // Custom-query chart types always use a hand-written query, so a query
+      // added for such a panel starts in custom mode — otherwise its query
+      // editor would be read-only (read-only is bound to !customQuery).
+      customQuery: CUSTOM_QUERY_CHART_TYPES.includes(
+        dashboardPanelData.data.type,
+      ),
       fields: {
         stream:
           dashboardPanelData.data.queries[
@@ -152,15 +161,55 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       },
       config: {
         promql_legend: "",
+        query_label: "",
         layer_type: "scatter",
         weight_fixed: 1,
       },
     };
+    // Seed the new query's default builder fields synchronously (mirrors the
+    // first query) so the tab is fully configured the moment it becomes active —
+    // an async seed would race with the user/test selecting a stream next.
+    // PromQL gets the `${stream}{}` sample query; SQL gets chart-type-aware x/y.
+    if (dashboardPanelData.data.queryType === "promql") {
+      if (newQuery.fields.stream) {
+        newQuery.query = `${newQuery.fields.stream}{}`;
+      }
+    } else {
+      const { x, y } = buildDefaultBuilderFields(
+        dashboardPanelData.data.type,
+        newQuery.fields.stream_type,
+        dashboardPanelData.meta?.streamFields?.groupedFields ?? [],
+        newQuery.fields.stream,
+      );
+      newQuery.fields.x = x;
+      newQuery.fields.y = y;
+    }
+
     dashboardPanelData.data.queries.push(newQuery);
+    // Initialize per-query field cache in meta
+    getQueryFields(dashboardPanelData.data.queries.length - 1);
   };
 
   const removeQuery = (index: number) => {
     dashboardPanelData.data.queries.splice(index, 1);
+
+    // Rebuild queryFields map with shifted indices
+    const newQueryFields: Record<number, any> = {};
+    Object.keys(dashboardPanelData.meta.queryFields).forEach((key) => {
+      const i = Number(key);
+      if (i < index)
+        newQueryFields[i] = dashboardPanelData.meta.queryFields[i];
+      else if (i > index)
+        newQueryFields[i - 1] = dashboardPanelData.meta.queryFields[i];
+    });
+    dashboardPanelData.meta.queryFields = newQueryFields;
+
+    // Fix hiddenQueries indices after removal. Old saved dashboards may not
+    // have this property — initialize to an empty array if missing.
+    const hidden = dashboardPanelData.layout.hiddenQueries || [];
+    dashboardPanelData.layout.hiddenQueries = hidden
+      .filter((i: number) => i !== index)
+      .map((i: number) => (i > index ? i - 1 : i));
   };
 
   const resetDashboardPanelData = () => {
@@ -170,10 +219,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const resetDashboardPanelDataAndAddTimeField = () => {
     resetDashboardPanelData();
 
-    // add _timestamp field in x axis as default
-    addXAxisItem({
-      name: store.state.zoConfig.timestamp_column ?? "_timestamp",
-    });
+    // Seed default x (histogram(_timestamp)) and y (count(_timestamp)) from the
+    // shared default-fields builder so a bar chart renders on open — the same
+    // fields applyDefaultPanelFields seeds on stream/builder changes.
+    const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex;
+    dashboardPanelData.data.queries[currentQueryIndex].fields.x = [
+      DEFAULT_SQL_X_FIELD(),
+    ];
+    dashboardPanelData.data.queries[currentQueryIndex].fields.y = [
+      DEFAULT_SQL_Y_FIELD_COUNT(),
+    ];
   };
 
   // Watch queryType and toggle off VRL functions when switching to PromQL
@@ -948,14 +1003,17 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     await importSqlParser();
   });
 
-  onUnmounted(async () => {
-    parser = null;
-  });
 
-  const importSqlParser = async () => {
+  const ensureParser = async () => {
+    if (parser) return parser;
     const useSqlParser: any = await import("@/composables/useParser");
     const { sqlParser }: any = useSqlParser.default();
     parser = await sqlParser();
+    return parser;
+  };
+
+  const importSqlParser = async () => {
+    await ensureParser();
 
     // do not allow to modify custom query fields for logs page
     updateQueryValue(pageKey == "logs" ? true : false);
@@ -1156,7 +1214,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         const oldCustomQueryFields = JSON.parse(
           JSON.stringify(dashboardPanelData.meta.stream.customQueryFields),
         );
-        dashboardPanelData.meta.stream.customQueryFields = [];
+        const newCustomQueryFields: any[] = [];
 
         const fields = extractFields(
           dashboardPanelData.meta.parsedQuery,
@@ -1167,17 +1225,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           fields.forEach((field: any) => {
             const fieldAlias = field.alias ?? field.column;
             if (
-              !dashboardPanelData.meta.stream.customQueryFields.find(
+              !newCustomQueryFields.find(
                 (it: any) => it.name == fieldAlias,
               )
             ) {
-              dashboardPanelData.meta.stream.customQueryFields.push({
+              newCustomQueryFields.push({
                 name: fieldAlias,
                 type: "",
               });
             }
           });
         }
+
+        syncCustomQueryFields(newCustomQueryFields);
 
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
@@ -1208,6 +1268,49 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   };
 
+  // Get or initialize per-query field cache in meta (never in data)
+  const getQueryFields = (queryIndex: number) => {
+    if (!dashboardPanelData.meta.queryFields[queryIndex]) {
+      dashboardPanelData.meta.queryFields[queryIndex] = {
+        customQueryFields: [],
+        vrlFunctionFieldList: [],
+      };
+    }
+    return dashboardPanelData.meta.queryFields[queryIndex];
+  };
+
+  // Write customQueryFields to both per-query cache and shared meta view
+  const syncCustomQueryFields = (fields: any[]) => {
+    const currentIdx = dashboardPanelData.layout.currentQueryIndex;
+    getQueryFields(currentIdx).customQueryFields = fields;
+    dashboardPanelData.meta.stream.customQueryFields = fields;
+  };
+
+  // On tab switch, restore the incoming query's cached fields to shared meta.
+  // If the incoming query is custom + has SQL but no cached fields yet (e.g. first
+  // load of a saved panel), trigger SQL parsing to populate the cache.
+  watch(
+    () => dashboardPanelData.layout.currentQueryIndex,
+    async (newIdx) => {
+      const qf = getQueryFields(newIdx);
+      dashboardPanelData.meta.stream.customQueryFields = qf.customQueryFields;
+      dashboardPanelData.meta.stream.vrlFunctionFieldList =
+        qf.vrlFunctionFieldList;
+
+      // Parse SQL for custom queries that haven't been parsed yet
+      const incomingQuery = dashboardPanelData.data.queries[newIdx];
+      if (
+        incomingQuery?.customQuery &&
+        incomingQuery?.query &&
+        dashboardPanelData.data.queryType == "sql" &&
+        qf.customQueryFields.length === 0
+      ) {
+        await ensureParser();
+        if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
+      }
+    },
+  );
+
   watch(
     () => [
       dashboardPanelData.data.queries[
@@ -1217,15 +1320,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
+      dashboardPanelData.layout.currentQueryIndex,
     ],
     async (newVal, oldVal) => {
-      // if pageKey is logs, then return
-      // because custom query fields will be extracted from the query using the result schema api
-      // NOW: we need to only skip custom query fields for logs page
-      // not stream selection, so commented below code and in updateQueryValue function will skip custom query fields extraction
-      // if (pageKey == "logs") {
-      //   return;
-      // }
+      // Skip if this firing is from a tab switch — the tab switch watcher handles it
+      const currentIdx = newVal[3] as number;
+      const prevIdx = oldVal[3] as number;
+      if (currentIdx !== prevIdx) return;
 
       // Check if customQuery mode has changed
       const customQueryChanged = newVal[1] !== oldVal[1];
@@ -1239,17 +1340,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         // will skip custom query fields extraction for logs page
+        await ensureParser();
         if (parser) await updateQueryValue(pageKey == "logs" ? true : false);
       } else if (customQueryChanged) {
-        // Only clear lists when switching modes
-        // auto query mode selected
-        // remove the custom fields from the list
-        dashboardPanelData.meta.stream.customQueryFields = [];
-        dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
+        // Only clear lists when switching modes within the same query
+        syncCustomQueryFields([]);
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
+        getQueryFields(
+          dashboardPanelData.layout.currentQueryIndex,
+        ).vrlFunctionFieldList = [];
       }
-      // if (dashboardPanelData.data.queryType == "promql") {
-      //     updatePromQLQuery()
-      // }
     },
     { deep: true },
   );
@@ -1411,16 +1511,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       },
       autoSelectChartType: boolean = true,
     ) => {
-      // remove all fields from custom query fields
-      dashboardPanelData.meta.stream.customQueryFields = [];
-
-      // add all fields to custom query fields
-      extractedFields.projections.forEach((field: any) => {
-        dashboardPanelData.meta.stream.customQueryFields.push({
-          name: field,
-          type: "",
-        });
-      });
+      // build and sync custom query fields from projections
+      const newFields = extractedFields.projections.map((field: any) => ({
+        name: field,
+        type: "",
+      }));
+      syncCustomQueryFields(newFields);
 
       // Determine chart type
       const chartType = autoSelectChartType
