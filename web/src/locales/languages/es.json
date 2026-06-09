@@ -2945,7 +2945,8 @@
     "evaluationTemplateHelp": "Seleccione una plantilla de evaluación que defina los criterios y las dimensiones del juez del LLM.",
     "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación. Cree una en la página de plantillas de evaluación.",
     "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente",
-    "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo"
+    "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo",
+    "selectStream": "Selecciona una transmisión..."
   },
   "reports": {
     "header": "Informes",

@@ -2960,7 +2960,8 @@
     "evaluationTemplateHelp": "LLM hakimi için kriterleri ve boyutları tanımlayan bir değerlendirme şablonu seçin.",
     "noTemplatesFound": "Değerlendirme şablonu bulunamadı. Değerlendirme Şablonları sayfasında bir tane oluşturun.",
     "evalTemplatesRefreshed": "Değerlendirme şablonları başarıyla yenilendi",
-    "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin"
+    "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin",
+    "selectStream": "Bir akış seçin..."
   },
   "reports": {
     "header": "Raporlar",

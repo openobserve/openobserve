@@ -2960,7 +2960,8 @@
     "evaluationTemplateHelp": "Selecteer een evaluatiesjabloon dat de criteria en dimensies voor de LLM-jurylid definieert.",
     "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
     "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd",
-    "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht"
+    "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
+    "selectStream": "Selecteer een stream..."
   },
   "reports": {
     "header": "Rapporten",

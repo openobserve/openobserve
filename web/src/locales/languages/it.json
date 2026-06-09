@@ -2958,7 +2958,8 @@
     "evaluationTemplateHelp": "Seleziona un modello di valutazione che definisca i criteri e le dimensioni per il giudice LLM.",
     "noTemplatesFound": "Nessun modello di valutazione trovato. Creane uno nella pagina Modelli di valutazione.",
     "evalTemplatesRefreshed": "Modelli di valutazione aggiornati con successo",
-    "subtitle": "Trasforma, arricchisci e instrada i dati in volo"
+    "subtitle": "Trasforma, arricchisci e instrada i dati in volo",
+    "selectStream": "Seleziona uno stream..."
   },
   "reports": {
     "header": "Rapporti",
