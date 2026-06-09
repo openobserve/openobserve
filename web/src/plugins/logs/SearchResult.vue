@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="tw:ml-1.5 tw:shrink-0 tw:rotate-90"
+          class="tw:ml-1.5 tw:shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
           <OIcon
-            :name="searchObj.meta.showFields ? 'unfold-less' : 'unfold-more'"
+            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
             size="sm"
           />
           <OTooltip

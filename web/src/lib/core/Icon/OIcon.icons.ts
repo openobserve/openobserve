@@ -114,6 +114,8 @@ import Warning from "~icons/material-symbols/warning-outline";
 import Workspaces from "~icons/material-symbols/workspaces-outline";
 import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline";
 import UnfoldLess from "~icons/material-symbols/unfold-less";
+import LeftPanelClose from "~icons/material-symbols/left-panel-close";
+import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -427,6 +429,8 @@ export const iconRegistry = {
   "workspaces": Workspaces,
   "workspace-premium": WorkspacePremium,
   "unfold-less": UnfoldLess,
+  "left-panel-close": LeftPanelClose,
+  "left-panel-open": LeftPanelOpen,
   "reorder": Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
