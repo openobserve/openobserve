@@ -194,7 +194,11 @@ const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
-const HIDDEN_KPI_IDS = new Set(["evaluationCost"]);
+// Now that `gen_ai_usage_cost` on `_evaluator` is populated, the
+// Evaluation Cost card is sourced live (see useQualityData) — no longer
+// hidden. Keep the set in place so future placeholder KPIs can be
+// hidden the same way without touching the render loop.
+const HIDDEN_KPI_IDS = new Set<string>();
 const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");

@@ -53,6 +53,7 @@ interface EvaluatorAggRow {
   success_runs?: number | string;
   failure_runs?: number | string;
   latency_p95_ms?: number | string | null;
+  total_cost_usd?: number | string | null;
 }
 
 interface ScoresBucketRow {
@@ -66,6 +67,7 @@ interface EvaluatorBucketRow {
   success?: number | string;
   failures?: number | string;
   latency_p95_ms?: number | string | null;
+  cost_usd?: number | string | null;
 }
 
 
@@ -104,13 +106,18 @@ function scoresSql(): string {
 // strings). `approx_percentile_cont` requires a numeric input, so we
 // TRY_CAST to Double — TRY_CAST returns NULL on unparseable values and
 // the percentile aggregator skips NULLs, keeping the query robust.
+//
+// Cost lives at the top level as `gen_ai_usage_cost` (OTel GenAI semantic
+// convention) — not under `attributes_`. Already a Float64 in the schema,
+// so no cast needed; SUM() naturally skips NULLs if any sneak in.
 function evaluatorSql(): string {
   return [
     "SELECT",
     "  COUNT(*) AS total_runs,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success_runs,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failure_runs,",
-    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms",
+    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
+    "  SUM(gen_ai_usage_cost) AS total_cost_usd",
     'FROM "_evaluator"',
   ].join("\n");
 }
@@ -134,7 +141,8 @@ function evaluatorSparklineSql(interval: string): string {
     "  COUNT(*) AS total,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failures,",
-    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms",
+    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
+    "  SUM(gen_ai_usage_cost) AS cost_usd",
     'FROM "_evaluator"',
     "GROUP BY bucket",
     "ORDER BY bucket",
@@ -210,6 +218,7 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
         const ms = toNumber(r.latency_p95_ms);
         return ms != null ? ms / 1000 : 0;
       });
+      const costSpark = evalSeries.map((r) => toNumber(r.cost_usd) ?? 0);
 
       const evaluatedNow = toNumber(scoresNow?.evaluated_count);
       const evaluatedPrev = toNumber(scoresPrev?.evaluated_count);
@@ -227,6 +236,9 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
       const latencyP95SecNow = toNumber(evalNow?.latency_p95_ms);
       const latencyP95SecPrev = toNumber(evalPrev?.latency_p95_ms);
 
+      const costNow = toNumber(evalNow?.total_cost_usd);
+      const costPrev = toNumber(evalPrev?.total_cost_usd);
+
       kpis.value = [
         {
           id: "evaluated",
@@ -237,13 +249,16 @@ export function useQualityData(dateWindow: import("vue").Ref<DateWindow>) {
           format: "count",
         },
         {
-          // EVALUATION COST is not yet captured in `_evaluator` attributes.
-          // Leave null until the backend exposes a cost field.
+          // Total USD spent by the evaluator (LLM-judge scorer calls) over
+          // the window. Sourced from `gen_ai_usage_cost` on `_evaluator` —
+          // top-level OTel GenAI semantic-convention column. Healthy
+          // direction is "down" (lower spend = better) so the delta arrow
+          // turns red when cost grows.
           id: "evaluationCost",
-          value: null,
-          prevValue: null,
-          sparkline: [],
-          healthyDirection: "neutral",
+          value: costNow,
+          prevValue: costPrev,
+          sparkline: costSpark,
+          healthyDirection: "down",
           format: "currency",
         },
         {
