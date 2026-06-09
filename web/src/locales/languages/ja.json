@@ -3216,7 +3216,10 @@
         "spans": "スパン"
       }
     },
-    "openInFullView": "フルビューで開く"
+    "openInFullView": "フルビューで開く",
+    "serviceMap": "サービスマップ",
+    "patternView": "パターンビュー",
+    "spanView": "スパンビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",
