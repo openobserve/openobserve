@@ -94,6 +94,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         if (v && v !== SELECT_ALL_VALUE && !k.startsWith('_')) merged[k] = v;
       }
     }
+    // matchedDimensions and additionalDimensions take priority over stream filters
+    Object.assign(merged, props.matchedDimensions, props.additionalDimensions ?? {});
     return merged;
   };
   const currentFilters = ref<Record<string, string>>(buildInitialFilters());
@@ -354,7 +356,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
    * Reset filters to the initial per-stream filter values from _correlate
    */
   const resetFilters = () => {
-    currentFilters.value = buildInitialFilters();
+    currentFilters.value = { ...props.matchedDimensions };
     currentPage.value = 1;
     fetchCorrelatedLogs();
   };
