@@ -4408,7 +4408,7 @@
     "tierConditionalName": "Conditional Tier"
   },
   "aiObservability": {
-    "title": "LLM Observability",
+    "title": "AI Observability",
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evaluate"
