@@ -370,7 +370,7 @@ export default defineComponent({
 
     // Computed styles
     const contentStyle = computed(() => {
-      return props.showSplitter ? "width: calc(100vw - 100px);" : "width: 100%;";
+      return "width: 100%;";
     });
 
     const splitterStyle = computed(() => {

@@ -57,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="(activeSectionItem?.icon as any)"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
       />
-      <section class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+      <section class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
         <router-view title="" />
       </section>
     </div>
     <!-- Table/list sections render their own AppPageHeader inside. -->
-    <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+    <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
       <router-view title="" />
     </section>
   </PageLayout>
