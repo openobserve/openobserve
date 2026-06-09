@@ -8,7 +8,7 @@
 import type { ScoreDataType, ScorerType } from "@/services/online-evals.service";
 
 export const ONLINE_EVALS_CATALOG_URL =
-  "https://raw.githubusercontent.com/openobserve/sdr_patterns/refs/heads/main/score_configs_and_scorers.json";
+  "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/score_configs_and_scorers.json";
 
 export interface CatalogScoreConfig {
   displayName: string;
