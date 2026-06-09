@@ -1287,7 +1287,8 @@
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
-    "subscription_plan": "Subscription Plan"
+    "subscription_plan": "Subscription Plan",
+    "manage": "Manage"
   },
   "template": {
     "header": "Templates",
