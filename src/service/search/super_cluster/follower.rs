@@ -291,6 +291,7 @@ pub async fn search(
     // we only want to get the scan stats from the remote scan exec
     let scan_stats = ScanStats {
         file_list_took: file_id_list_took as i64,
+        wait_in_queue: took_wait as i64,
         ..Default::default()
     };
 
