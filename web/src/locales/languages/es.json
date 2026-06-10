@@ -3225,7 +3225,8 @@
     "confirmRejectMsg": "¿Estás seguro de que quieres rechazar la invitación para unirte a {org}?",
     "expired": "Expirado",
     "expiresToday": "Caduca hoy",
-    "daysLeft": "Quedan {días} días"
+    "daysLeft": "Quedan {días} días",
+    "search": "Buscar invitaciones"
   },
   "serviceAccounts": {
     "header": "Cuentas de servicio",

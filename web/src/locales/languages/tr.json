@@ -3240,7 +3240,8 @@
     "confirmRejectMsg": "{org} katılma davetini reddetmek istediğinizden emin misiniz?",
     "expired": "Süresi doldu",
     "expiresToday": "Bugün Sona Eriyor",
-    "daysLeft": "{gün} gün kaldı"
+    "daysLeft": "{gün} gün kaldı",
+    "search": "Davetiyeleri Ara"
   },
   "serviceAccounts": {
     "header": "Hizmet Hesapları",

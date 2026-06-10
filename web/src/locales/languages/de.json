@@ -3227,7 +3227,8 @@
     "confirmRejectMsg": "Bist du sicher, dass du die Einladung zum Beitritt zu {org} ablehnen möchtest?",
     "expired": "Abgelaufen",
     "expiresToday": "Läuft heute ab",
-    "daysLeft": "{Tage} verbleibende Tage"
+    "daysLeft": "{Tage} verbleibende Tage",
+    "search": "Einladungen suchen"
   },
   "serviceAccounts": {
     "header": "Dienstkonten",

@@ -3231,7 +3231,8 @@
     "confirmRejectMsg": "您确定要拒绝加入 {org} 的邀请吗？",
     "expired": "已过期",
     "expiresToday": "今天到期",
-    "daysLeft": "还剩 {天} 天"
+    "daysLeft": "还剩 {天} 天",
+    "search": "搜索邀请"
   },
   "serviceAccounts": {
     "header": "服务账号",

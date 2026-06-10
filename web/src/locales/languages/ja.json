@@ -3336,7 +3336,8 @@
     "confirmRejectMsg": "{org} への招待を拒否してもよろしいですか？",
     "expired": "期限切れ",
     "expiresToday": "本日期限切れ",
-    "daysLeft": "残り {日} 日"
+    "daysLeft": "残り {日} 日",
+    "search": "招待状を検索"
   },
   "regex_patterns": {
     "title": "機密データの編集",

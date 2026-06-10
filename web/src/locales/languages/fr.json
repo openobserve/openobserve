@@ -3227,7 +3227,8 @@
     "confirmRejectMsg": "Êtes-vous sûr de vouloir rejeter l'invitation à rejoindre {org} ?",
     "expired": "Expiré",
     "expiresToday": "Expire aujourd'hui",
-    "daysLeft": "Il reste {jours} jours"
+    "daysLeft": "Il reste {jours} jours",
+    "search": "Rechercher des invitations"
   },
   "serviceAccounts": {
     "header": "Comptes de service",
