@@ -4340,6 +4340,24 @@
       "description": "Oturumlar gen_ai_conversation_id olarak gruplandırılır. Hizmetlerinizi düzenleyin, böylece her konuşma izlerini etiketler ve oturumlar burada görünür.",
       "action": "OpenTelemetry ile Enstrüman",
       "actionDesc": "gen_ai_conversation_id ile gen_ai_conversation_id ile etiketleme alanları"
+    },
+    "noScorers": {
+      "title": "Henüz golcü yok",
+      "description": "Puanlar, LLM yanıtlarını puan yapılandırmalarınıza göre derecelendirir - bir LLM jüri ile başlayın veya kütüphaneden bir tane içe aktarın.",
+      "action": "Golcü oluştur",
+      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın"
+    },
+    "noEvalJobs": {
+      "title": "Henüz değerlendirme işi yok",
+      "description": "Bir LLM akışına karşı işler skorları programlar. Bir kadans üzerinde konuşmalara not vermeye başlamak için bir tane oluşturun.",
+      "action": "Eval işi oluştur",
+      "actionDesc": "Bir akış seçin + puanlar + kadans"
+    },
+    "noScoreConfigs": {
+      "title": "Henüz puan yapılandırması yok",
+      "description": "Puan yapılandırmaları, şema puanlarının ürettiklerini tanımlar - sayısal, boole veya kategorik. Puanlamaya başlamak için bir tane ekleyin.",
+      "action": "Puan yapılandırması oluştur",
+      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın"
     }
   },
   "onlineEvals": {

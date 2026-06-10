@@ -4338,6 +4338,24 @@
       "description": "Le sessioni sono raggruppate per gen_ai_conversation_id. Imposta i tuoi servizi in modo che ogni conversazione tagghi le proprie tracce e le sessioni vengano visualizzate qui.",
       "action": "Strumento con OpenTelemetry",
       "actionDesc": "I tag si estendono con gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ancora nessun marcatore",
+      "description": "I valutatori valutano le risposte LLM in base alle tue configurazioni di punteggio: inizia con un giudice LLM o importane uno dalla libreria.",
+      "action": "Crea segnapunti",
+      "actionDesc": "Definire un giudice LLM o un marcatore remoto"
+    },
+    "noEvalJobs": {
+      "title": "Non ci sono ancora lavori di valutazione",
+      "description": "I punteggi dei job pianificano i punteggi in base a uno stream LLM. Creane uno per iniziare a valutare le conversazioni in base a una cadenza.",
+      "action": "Crea un job di valutazione",
+      "actionDesc": "Scegli uno stream + marcatori + cadenza"
+    },
+    "noScoreConfigs": {
+      "title": "Nessuna configurazione del punteggio ancora",
+      "description": "Le configurazioni dei punteggi definiscono lo schema prodotto dai puntatori: numerico, booleano o categorico. Aggiungine uno per iniziare a segnare.",
+      "action": "Crea configurazione della partitura",
+      "actionDesc": "Definisci la forma del punteggio + un intervallo sano"
     }
   },
   "onlineEvals": {

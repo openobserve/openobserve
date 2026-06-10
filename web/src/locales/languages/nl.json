@@ -4340,6 +4340,24 @@
       "description": "Sessies worden gegroepeerd op gen_ai_conversation_id. Instrumenteer uw services zodat elk gesprek zijn sporen tagt, en sessies worden hier weergegeven.",
       "action": "Instrument met OpenTelemetrie",
       "actionDesc": "Tag omspant met gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Nog geen scorers",
+      "description": "Scorers beoordelen LLM-reacties op basis van je scoreconfiguraties — begin met een LLM-jurylid of importeer er een uit de bibliotheek.",
+      "action": "Maak een scorer",
+      "actionDesc": "Definieer een LLM-jurylid of externe scorer"
+    },
+    "noEvalJobs": {
+      "title": "Nog geen evaluatieopdrachten",
+      "description": "Jobs rangschik scorers tegen een LLM-stream. Maak er een om te beginnen met het beoordelen van gesprekken op basis van een cadans.",
+      "action": "Een evaluatietaak aanmaken",
+      "actionDesc": "Kies een stream + scorers + cadans"
+    },
+    "noScoreConfigs": {
+      "title": "Nog geen scoreconfiguraties",
+      "description": "Scoreconfiguraties definiëren het schema dat scorers produceren: numeriek, booleaans of categorisch. Voeg er een toe om te beginnen met scoren.",
+      "action": "Scoreconfiguratie aanmaken",
+      "actionDesc": "Definieer de scorevorm + gezond bereik"
     }
   },
   "onlineEvals": {

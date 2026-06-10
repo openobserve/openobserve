@@ -4327,6 +4327,24 @@
       "description": "Sitzungen werden nach gen_ai_conversation_id gruppiert. Instrumentieren Sie Ihre Dienste so, dass jede Konversation ihre Spuren markiert und die Sitzungen hier angezeigt werden.",
       "action": "Instrument mit OpenTelemetrie",
       "actionDesc": "Tag-Spans mit gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Noch keine Torschützen",
+      "description": "Scorer bewerten LLM-Antworten anhand Ihrer Score-Konfigurationen — beginnen Sie mit einem LLM-Judge oder importieren Sie einen aus der Bibliothek.",
+      "action": "Torschütze erstellen",
+      "actionDesc": "Definieren Sie einen LLM-Richter oder Remote-Scorer"
+    },
+    "noEvalJobs": {
+      "title": "Noch keine Bewertungsjobs",
+      "description": "Jobs plant Torschützen gegen einen LLM-Stream. Erstellen Sie einen, um mit der Bewertung von Konversationen in einer bestimmten Reihenfolge zu beginnen.",
+      "action": "Evaluationsjob erstellen",
+      "actionDesc": "Wähle einen Stream + Torschützen + Trittfrequenz"
+    },
+    "noScoreConfigs": {
+      "title": "Noch keine Score-Konfigurationen",
+      "description": "Score-Konfigurationen definieren das Schema, das Scorer erzeugen — numerisch, boolesch oder kategorial. Fügen Sie eine hinzu, um mit der Bewertung zu beginnen.",
+      "action": "Score-Konfiguration erstellen",
+      "actionDesc": "Definieren Sie die Punkteform + den gesunden Bereich"
     }
   },
   "onlineEvals": {

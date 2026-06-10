@@ -4340,6 +4340,24 @@
       "description": "세션은 gen_ai_conversation_id별로 그룹화됩니다. 각 대화에 트레이스에 태그를 지정하도록 서비스를 계측하면 세션이 여기에 표시됩니다.",
       "action": "오픈 텔레메트리 기능이 있는 기기",
       "actionDesc": "gen_ai_conversation_id가 포함된 태그 범위"
+    },
+    "noScorers": {
+      "title": "아직 득점자 없음",
+      "description": "채점자는 점수 구성을 기준으로 LLM 응답을 채점합니다. LLM 심사위원으로 시작하거나 라이브러리에서 가져올 수 있습니다.",
+      "action": "채점자 생성",
+      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의"
+    },
+    "noEvalJobs": {
+      "title": "아직 평가 작업이 없습니다",
+      "description": "작업은 LLM 스트림을 기준으로 채점자를 스케줄링합니다.하나씩 생성하여 단계별로 대화를 채점할 수 있습니다.",
+      "action": "평가 작업 생성",
+      "actionDesc": "스트림 선택+득점자+케이던스"
+    },
+    "noScoreConfigs": {
+      "title": "점수 구성이 아직 없습니다",
+      "description": "점수 구성은 채점자가 생성하는 스키마 (숫자, 불리언 또는 범주형) 를 정의합니다.하나를 추가하여 채점을 시작하세요.",
+      "action": "점수 구성 생성",
+      "actionDesc": "점수 모양+정상 범위 정의"
     }
   },
   "onlineEvals": {

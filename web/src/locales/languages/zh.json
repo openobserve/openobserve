@@ -4331,6 +4331,24 @@
       "description": "会话按 gen_ai_conversation_id 分组。对您的服务进行检测，以便每个对话都标记其痕迹，会话将显示在此处。",
       "action": "带有 OpenTelemetry",
       "actionDesc": "使用 gen_ai_conversation_id 标记跨度"
+    },
+    "noScorers": {
+      "title": "还没有得分手",
+      "description": "评分员根据你的分数配置对 LLM 回复进行评分——从 LLM 评委开始，或者从库中导入一个。",
+      "action": "创建记分员",
+      "actionDesc": "定义 LLM 评委或远程记分员"
+    },
+    "noEvalJobs": {
+      "title": "尚无评估职位",
+      "description": "在 LLM 直播中安排记分员。创建一个，开始按节奏对对话进行评分。",
+      "action": "创建评估任务",
+      "actionDesc": "选择直播 + 得分手 + 节奏"
+    },
+    "noScoreConfigs": {
+      "title": "还没有分数配置",
+      "description": "分数配置定义评分器生成的架构——数字、布尔值或分类。添加一个即可开始得分。",
+      "action": "创建分数配置",
+      "actionDesc": "定义分数形状 + 健康范围"
     }
   },
   "onlineEvals": {

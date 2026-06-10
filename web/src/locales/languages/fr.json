@@ -4327,6 +4327,24 @@
       "description": "Les sessions sont regroupées par gen_ai_conversation_id. Instrumentez vos services de manière à ce que chaque conversation marque ses traces, et les sessions apparaîtront ici.",
       "action": "Instrument avec OpenTelemetry",
       "actionDesc": "Les tags s'étendent avec gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Aucun buteur pour l'instant",
+      "description": "Les évaluateurs évaluent les réponses LLM en fonction de vos configurations de score : commencez par un juge LLM ou importez-en un depuis la bibliothèque.",
+      "action": "Créer un buteur",
+      "actionDesc": "Définissez un juge LLM ou un marqueur à distance"
+    },
+    "noEvalJobs": {
+      "title": "Aucun poste d'évaluation pour le moment",
+      "description": "Les jobs planifient les buteurs par rapport à un stream LLM. Créez-en un pour commencer à évaluer les conversations selon une cadence.",
+      "action": "Créer une tâche d'évaluation",
+      "actionDesc": "Choisissez un stream + des buteurs + une cadence"
+    },
+    "noScoreConfigs": {
+      "title": "Aucune configuration de score pour le moment",
+      "description": "Les configurations de score définissent le schéma produit par les évaluateurs : numérique, booléen ou catégorique. Ajoutez-en un pour commencer à marquer.",
+      "action": "Créer une configuration de score",
+      "actionDesc": "Définissez la forme du score + la plage saine"
     }
   },
   "onlineEvals": {

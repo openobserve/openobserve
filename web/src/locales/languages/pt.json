@@ -4327,6 +4327,24 @@
       "description": "As sessões são agrupadas por gen_ai_conversation_id. Instrumente seus serviços para que cada conversa marque seus rastros, e as sessões apareçam aqui.",
       "action": "Instrumento com OpenTelemetry",
       "actionDesc": "Expansões de tags com gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ainda não há marcadores",
+      "description": "Os pontuadores classificam as respostas do LLM de acordo com suas configurações de pontuação — comece com um juiz do LLM ou importe uma da biblioteca.",
+      "action": "Criar marcador",
+      "actionDesc": "Defina um juiz de LLM ou pontuador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Ainda não há trabalhos de avaliação",
+      "description": "Pontuadores do cronograma de trabalhos em relação a um stream do LLM. Crie um para começar a avaliar as conversas em uma cadência.",
+      "action": "Crie um trabalho de avaliação",
+      "actionDesc": "Escolha uma transmissão, marcadores e cadência"
+    },
+    "noScoreConfigs": {
+      "title": "Ainda não há configurações de pontuação",
+      "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
+      "action": "Criar configuração de pontuação",
+      "actionDesc": "Defina a forma da pontuação+faixa saudável"
     }
   },
   "onlineEvals": {
