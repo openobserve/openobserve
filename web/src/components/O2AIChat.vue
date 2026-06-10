@@ -2176,7 +2176,7 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage = data.message || 'An error occurred';
+                    const rawErrorMessage = data.message || data.error || 'An error occurred';
                     const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: 'error',
