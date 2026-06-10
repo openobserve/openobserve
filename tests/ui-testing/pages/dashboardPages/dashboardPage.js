@@ -512,6 +512,9 @@ export class DashboardPage {
       code,
       { timeout: 10000 }
     );
+    // CodeQueryEditor debounces its update:query emit by 500ms — wait past the
+    // window so the panel schema receives the value before subsequent steps.
+    await this.page.waitForTimeout(600);
   }
 
   // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
@@ -536,6 +539,11 @@ export class DashboardPage {
       sql,
       { timeout: 10000 }
     );
+    // CodeQueryEditor.vue:107 / 726 debounces its onDidChangeModelContent->
+    // emit('update:query') by 500ms. Without this wait, panelSchema.queries[i].query
+    // stays empty when Apply fires and the panel shows "Please enter query for
+    // custom chart" — even though the Monaco model already shows the SQL.
+    await this.page.waitForTimeout(600);
   }
 
 }
