@@ -61,9 +61,13 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const currentURL = page.url();
     const newPage = await page.context().newPage();
     await newPage.goto(currentURL);
-    await newPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await newPage.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Step 5: Verify Panel shows "Last 6d" in new tab
+    // Wait explicitly for the picker to be visible before reading its text —
+    // networkidle alone is not enough on a loaded server; the panel may still
+    // be rendering its time picker element when networkidle fires.
+    await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).waitFor({ state: "visible", timeout: 20000 });
     const pickerText = await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).textContent();
     expect(pickerText).toContain("6");
 
