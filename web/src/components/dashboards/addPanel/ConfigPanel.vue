@@ -2012,7 +2012,7 @@ export default defineComponent({
       }
 
       // by default, tableFiltering is disabled
-      if (dashboardPanelData.data.config.table_filtering === undefined) {
+      if (!dashboardPanelData.data.config.table_filtering) {
         dashboardPanelData.data.config.table_filtering = false;
       }
 
