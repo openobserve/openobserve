@@ -17,6 +17,7 @@ import { ref } from "vue";
 import useAiChat from "@/composables/useAiChat";
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
+import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 /**
  * Composable for Natural Language to SQL Query transformation
@@ -507,7 +508,10 @@ export function useNLQuery() {
                 // Error event
                 console.error('[NL2Q] Error event:', data.error || data.message);
                 hasError = true;
-                errorMessage = data.error || data.message || 'Unknown error';
+                const rawErr = data.error || data.message || 'Unknown error';
+                errorMessage = isAuthError(rawErr, data.error_type)
+                  ? UNAUTHORIZED_MESSAGE
+                  : rawErr;
                 streamingResponse.value = errorMessage;
               } else if (data.type === 'complete') {
                 // Completion event - may contain full response in history
