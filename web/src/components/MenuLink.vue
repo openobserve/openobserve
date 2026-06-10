@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'nav-menu-item',
       'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0.5 tw:py-1 tw:min-h-0 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      'tw:text-tabs-inactive-text',
+      'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent',
       { 'menu-link-function': title === 'Functions' }
     ]"
     :aria-current="isActive ? 'page' : undefined"
@@ -93,8 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'nav-menu-item',
       'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0.5 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       isActive
-        ? 'tw:text-primary-700 tw:bg-surface-base tw:shadow-sm'
-        : 'tw:text-tabs-inactive-text tw:hover:bg-primary-200',
+        ? 'tw:text-primary-700 tw:bg-surface-base tw:shadow-sm tw:border-l-2 tw:border-primary-600'
+        : 'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:hover:bg-primary-200',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"
