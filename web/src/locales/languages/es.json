@@ -4312,6 +4312,16 @@
       "description": "Destinos externos para la salida de canalización: puntos finales HTTP y destinos de escritura remota.",
       "action": "Nuevo destino",
       "actionDesc": "Conectar un destino de canalización"
+    },
+    "noEvalTemplates": {
+      "title": "Aún no hay plantillas de evaluación",
+      "description": "Las plantillas de evaluación definen criterios de puntuación reutilizables para las evaluaciones de LLM.",
+      "action": "Nueva plantilla",
+      "actionDesc": "Crear una plantilla de evaluación"
+    },
+    "noPipelineHistory": {
+      "title": "Aún no hay historial de oleoductos",
+      "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
     }
   },
   "onlineEvals": {

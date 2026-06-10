@@ -4314,6 +4314,16 @@
       "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
       "action": "新しい目的地",
       "actionDesc": "パイプラインデスティネーションの接続"
+    },
+    "noEvalTemplates": {
+      "title": "評価テンプレートはまだありません",
+      "description": "評価テンプレートは、LLM評価のための再利用可能な採点基準を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "評価テンプレートを作成する"
+    },
+    "noPipelineHistory": {
+      "title": "パイプライン履歴はまだありません",
+      "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
     }
   },
   "onlineEvals": {

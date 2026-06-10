@@ -4327,6 +4327,16 @@
       "description": "Boru hattı çıktısı için harici hedefler - HTTP uç noktaları ve uzaktan yazma hedefleri.",
       "action": "Yeni hedef",
       "actionDesc": "Bir boru hattı hedefini bağlama"
+    },
+    "noEvalTemplates": {
+      "title": "Henüz değerlendirme şablonu yok",
+      "description": "Değerlendirme şablonları, LLM değerlendirmeleri için yeniden kullanılabilir puanlama kriterlerini tanımlar.",
+      "action": "Yeni şablon",
+      "actionDesc": "Değerlendirme şablonu oluşturma"
+    },
+    "noPipelineHistory": {
+      "title": "Henüz boru hattı geçmişi yok",
+      "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
     }
   },
   "onlineEvals": {

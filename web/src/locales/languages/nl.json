@@ -4327,6 +4327,16 @@
       "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
       "action": "Nieuwe bestemming",
       "actionDesc": "Een pijplijnbestemming aansluiten"
+    },
+    "noEvalTemplates": {
+      "title": "Nog geen evaluatiesjablonen",
+      "description": "Evaluatiesjablonen definiëren herbruikbare scorecriteria voor LLM-evaluaties.",
+      "action": "Nieuw sjabloon",
+      "actionDesc": "Maak een evaluatiesjabloon"
+    },
+    "noPipelineHistory": {
+      "title": "Nog geen geschiedenis van de pijplijn",
+      "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
     }
   },
   "onlineEvals": {
