@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
       data-test="trace-details-sidebar-header"
-      :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"

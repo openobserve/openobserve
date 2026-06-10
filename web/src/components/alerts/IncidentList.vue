@@ -668,14 +668,9 @@ body.body--dark {
 }
 
 .badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--color-surface-panel);
+  color: var(--o2-text-secondary);
   font-weight: 500;
-}
-
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
 }
 
 /* Color scheme matching schema.scss type badges */
