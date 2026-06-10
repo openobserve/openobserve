@@ -80,6 +80,7 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import { isAuthError } from "@/utils/authErrors";
 
 export default defineComponent({
   inheritAttrs: false,
@@ -480,7 +481,10 @@ export default defineComponent({
           console.log(
             "[NL2Q-UI] Showing error notification - query generation failed or empty",
           );
-          showErrorNotification(t("search.nlQueryGenerationFailed"));
+          const errorMsg = isAuthError(streamingResponse.value)
+            ? streamingResponse.value
+            : t("search.nlQueryGenerationFailed");
+          showErrorNotification(errorMsg);
           throw new Error("Query generation failed");
         }
 

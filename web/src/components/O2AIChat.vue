@@ -992,6 +992,7 @@ import useAiChat from '@/composables/useAiChat';
 import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
 import { matThumbUpAlt, matThumbDownAlt } from '@quasar/extras/material-icons';
 import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
+import { UNAUTHORIZED_MESSAGE, isAuthError } from '@/utils/authErrors';
 import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock, ImageAttachment, MAX_IMAGE_SIZE_BYTES, ALLOWED_IMAGE_TYPES } from '@/ts/interfaces/chat';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RichTextInput, { ReferenceChip } from '@/components/RichTextInput.vue';
@@ -1916,8 +1917,9 @@ export default defineComponent({
                     const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
                     const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
-                    let errorMessage = `Error: ${errorText}`;
-                    if (data.suggestion) {
+                    const authErr = isAuthError(errorText, data.error_type);
+                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                    if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
 
@@ -2174,12 +2176,14 @@ export default defineComponent({
                     }
 
                     // Add inline error block
+                    const rawErrorMessage = data.message || 'An error occurred';
+                    const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: 'error',
-                      message: data.message || 'An error occurred',
+                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
                       errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                      recoverable: data.recoverable ?? undefined,
+                      suggestion: authErr ? undefined : data.suggestion || undefined,
+                      recoverable: authErr ? false : data.recoverable ?? undefined,
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2370,8 +2374,9 @@ export default defineComponent({
                   const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
                   const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
-                  let errorMessage = `Error: ${errorText}`;
-                  if (data.suggestion) {
+                  const authErr = isAuthError(errorText, data.error_type);
+                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                  if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
 
@@ -3472,7 +3477,7 @@ export default defineComponent({
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage = 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.';
+          errorMessage = UNAUTHORIZED_MESSAGE;
         } else if (error.message && error.message !== 'No response body') {
           errorMessage = error.message;
         } else {
