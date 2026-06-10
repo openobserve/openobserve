@@ -804,7 +804,7 @@ export class HomePage {
      * Validate Settings - Cipher Keys page UI elements
      */
     async validateSettingsCipherKeysPageElements() {
-        await expect(this.page.locator('[data-test="cipher-keys-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="cipher-keys-add-btn"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
@@ -825,7 +825,7 @@ export class HomePage {
      * Validate Settings - Sensitive Data Redaction page UI elements
      */
     async validateSettingsSensitiveDataRedactionPageElements() {
-        await expect(this.page.locator('[data-test="regex-pattern-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="regex-pattern-list-table"]')).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator('[data-test="regex-pattern-list-add-pattern-btn"]')).toBeVisible({ timeout: 5000 });
     }
 

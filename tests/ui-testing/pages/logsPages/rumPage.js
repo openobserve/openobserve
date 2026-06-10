@@ -9,7 +9,7 @@ export class RumPage {
 
         // Error Tracking selectors
         this.dateTimeDropdown = '[data-test="logs-search-bar-date-time-dropdown"]';
-        this.runQueryButton = '[data-test="metrics-explorer-run-query-button"]';
+        this.runQueryButton = '[data-test="errors-run-query-button"]';
         this.errorTrackingTab = 'text=Error Tracking';
         this.errorsTab = 'text=Errors';
         this.appTableContainer = '[data-test="rum-app-errors-table"]';

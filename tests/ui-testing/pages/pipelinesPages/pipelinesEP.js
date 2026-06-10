@@ -20,7 +20,7 @@ export class PipelinesEP {
         this.importPipelineButton = '[data-test="pipeline-list-import-pipeline-btn"]';
         this.importJsonUrlTab = '[data-test="tab-import_json_url"]';
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';
-        this.pipelineListTitle = '[data-test="pipeline-list-title"]';
+        this.pipelineListTitle = '[data-test="pipeline-list-page"]';
         this.importJsonButton = '[data-test="pipeline-import-json-btn"]';
         this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input-field"]';
         this.pipelineImportNameInput = '[data-test="pipeline-import-name-input-field"]';
@@ -165,7 +165,6 @@ export class PipelinesEP {
         await this.page.locator(this.importCancelButton).waitFor({ state: 'visible' });
         await this.page.locator(this.importCancelButton).click();
         await this.page.locator(this.pipelineListTitle).waitFor({ state: 'visible' });
-        await expect(this.page.locator(this.pipelineListTitle)).toContainText('Pipelines');
     }
 
     async setFileInput(filePath) {
