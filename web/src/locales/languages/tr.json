@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Çizelge",
     "menuGroupInspect": "İnceleyin",
     "validSql": "Geçerli SQL",
-    "invalidSql": "Geçersiz sorgu"
+    "invalidSql": "Geçersiz sorgu",
+    "menuGroupExplain": "Açıklamak"
   },
   "menu": {
     "home": "Ana Sayfa",
