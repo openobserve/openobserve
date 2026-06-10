@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Cronograma",
     "menuGroupInspect": "Inspecionar",
     "validSql": "SQL válido",
-    "invalidSql": "Consulta inválida"
+    "invalidSql": "Consulta inválida",
+    "menuGroupExplain": "Explique"
   },
   "menu": {
     "home": "Início",

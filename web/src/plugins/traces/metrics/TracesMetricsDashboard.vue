@@ -763,9 +763,13 @@ defineExpose({
 
 // Charts wrapper
 .charts-wrapper {
-  padding: 0.25rem;
   overflow: hidden;
   will-change: transform, opacity;
+
+  :deep(.render-dashboard-charts-container){
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+  }
 }
 
 // Dark mode support
