@@ -1208,7 +1208,8 @@
     "tokenRotateError": "Ruotazione del token non riuscita.",
     "tokenDeleteError": "Eliminazione del token non riuscita.",
     "noTokensFound": "Nessun token di ingestione trovato.",
-    "createdBy": "Creato da"
+    "createdBy": "Creato da",
+    "orgLevelSummary": "Token a livello di organizzazione per gli endpoint di inserimento."
   },
   "dashboard": {
     "selectField": "Campo",

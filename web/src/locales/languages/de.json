@@ -1208,7 +1208,8 @@
     "tokenRotateError": "Das Token konnte nicht gedreht werden.",
     "tokenDeleteError": "Das Token konnte nicht gelöscht werden.",
     "noTokensFound": "Es wurden keine Aufnahme-Token gefunden.",
-    "createdBy": "Erstellt von"
+    "createdBy": "Erstellt von",
+    "orgLevelSummary": "Token auf Organisationsebene für Aufnahmeendpunkte."
   },
   "dashboard": {
     "selectField": "Feld",

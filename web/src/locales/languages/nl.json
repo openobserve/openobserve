@@ -1208,7 +1208,8 @@
     "tokenRotateError": "Het roteren van het token is mislukt.",
     "tokenDeleteError": "Het verwijderen van het token is mislukt.",
     "noTokensFound": "Geen innametokens gevonden.",
-    "createdBy": "Gemaakt door"
+    "createdBy": "Gemaakt door",
+    "orgLevelSummary": "Tokens op organisatieniveau voor eindpunten voor opname."
   },
   "dashboard": {
     "selectField": "Veld",
