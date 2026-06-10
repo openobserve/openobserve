@@ -1900,7 +1900,7 @@ pub struct Limit {
     pub histogram_enabled: bool,
     #[env_config(
         name = "ZO_TIMECHART_ENABLED",
-        help = "Show timechart (visualize) tab on logs page",
+        help = "Show timechart tab on logs page",
         default = false
     )]
     pub timechart_enabled: bool,
