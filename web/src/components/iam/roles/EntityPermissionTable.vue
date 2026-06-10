@@ -53,7 +53,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   resource: {
@@ -100,6 +100,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("iam.entityName"),
     accessorKey: "name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {

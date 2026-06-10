@@ -102,6 +102,7 @@
                 row-key="name"
                 :global-filter="filterField"
                 :show-global-filter="false"
+                :default-columns="false"
                 :page-size-options="[5, 10, 20, 50]"
               />
             </div>
@@ -138,6 +139,7 @@
     import AppTabs from "@/components/common/AppTabs.vue";
 
     import OTable from "@/lib/core/Table/OTable.vue";
+    import { COL } from "@/lib/core/Table/OTable.types";
         import DateTime from "@/components/DateTime.vue";
     import OButton from "@/lib/core/Button/OButton.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -188,13 +190,15 @@
                 header: t("logStream.propertyName"),
                 accessorKey: "name",
                 sortable: true,
-                meta: { align: "left" },
+                size: COL.name,
+                meta: { align: "left", autoWidth: true },
             },
             {
                 id: "type",
                 header: t("logStream.propertyType"),
                 accessorKey: "type",
                 sortable: true,
+                size: COL.type,
                 meta: { align: "left" },
             },
         ];

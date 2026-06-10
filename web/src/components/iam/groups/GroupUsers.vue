@@ -153,7 +153,7 @@ import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -241,6 +241,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
+      size: COL.email,
       meta: { align: "left" , autoWidth: true},
     },
   ];
@@ -252,6 +253,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "Organizations",
       accessorKey: "org",
       sortable: true,
+      size: COL.owner,
       meta: { align: "left" },
     });
   }

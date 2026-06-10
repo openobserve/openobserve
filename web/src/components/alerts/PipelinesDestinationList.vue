@@ -176,7 +176,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -220,7 +220,8 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "destination_type",
@@ -234,6 +235,7 @@ export default defineComponent({
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
+        size: COL.url,
         meta: { align: "left" },
       },
       {

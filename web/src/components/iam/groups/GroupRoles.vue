@@ -114,7 +114,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -189,6 +189,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.roleName"),
     accessorKey: "role_name",
     sortable: true,
+    size: COL.role,
     meta: { align: "left", autoWidth: true },
   },
 ];

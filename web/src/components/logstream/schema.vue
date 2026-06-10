@@ -518,6 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :page-size="selectedPerPage"
                       :page-size-options="perPageOptionsList"
                       :show-global-filter="false"
+                      :default-columns="false"
                       dense
                       class="o2-schema-table"
                       :style="{ height: '100%', width: '100%' }"
@@ -526,12 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
-                            <OTooltip
-                              v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </OTooltip>
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -764,6 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :page-size="selectedPerPage"
                         :page-size-options="perPageOptionsList"
                         :show-global-filter="false"
+                        :default-columns="false"
                         dense
                         :class="
                           store.state.theme == 'dark'
@@ -1026,6 +1022,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -2010,12 +2007,14 @@ export default defineComponent({
         header: t("logStream.propertyName"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "settings",
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
+        size: COL.method,
         meta: { align: "left" },
       },
       {
@@ -2023,6 +2022,7 @@ export default defineComponent({
         header: t("logStream.propertyType"),
         accessorKey: "type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -2030,6 +2030,7 @@ export default defineComponent({
         header: t("logStream.indexType"),
         accessorKey: "index_type",
         sortable: false,
+        size: 220,
         meta: { align: "left" },
       },
       // Only show patterns column for enterprise builds
@@ -2040,6 +2041,7 @@ export default defineComponent({
               header: t("logStream.regexPatterns"),
               accessorKey: "patterns",
               sortable: false,
+              size: COL.template,
               meta: { align: "left" },
             },
           ]
@@ -2052,13 +2054,15 @@ export default defineComponent({
         header: t("logStream.extendedStartDate"),
         accessorKey: "start",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.date,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "end",
         header: t("logStream.extendedEndDate"),
         accessorKey: "end",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
     ];

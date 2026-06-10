@@ -254,10 +254,7 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span
-                class="sd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+              <span class="sd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="sd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>

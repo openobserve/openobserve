@@ -385,6 +385,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -508,7 +509,8 @@ export default defineComponent({
           header: t("quota.moduleName"),
           accessorKey: "module_name",
           sortable: true,
-          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+          size: COL.name,
+          meta: { align: "left", autoWidth: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",
@@ -561,7 +563,8 @@ export default defineComponent({
           accessorKey: "role_name",
           sortable: true,
           cell: (info: any) => info.getValue(),
-          meta: { align: "left" },
+          size: COL.role,
+          meta: { align: "left", autoWidth: true },
         },
         {
           id: "list",

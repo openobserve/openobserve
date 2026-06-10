@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :data="rows"
           :columns="columns"
+          :default-columns="false"
           row-key="id"
           width="100%"
           class="tw:w-full tw:h-full"
@@ -478,7 +479,7 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -539,7 +540,8 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
-    meta: { align: "left" as const },
+    size: COL.name,
+    meta: { align: "left" as const, autoWidth: true },
   },
   {
     id: "is_realtime",

@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
           v-model:selected-ids="selectedIds"
+          :default-columns="false"
           width="100%"
           class="tw:w-full tw:h-full"
         >
@@ -168,6 +169,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -209,6 +211,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {
@@ -216,6 +219,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("evalTemplate.responseType"),
     accessorKey: "response_type",
     sortable: true,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -223,6 +227,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    size: COL.version,
     meta: { align: "center" },
   },
   {
@@ -230,6 +235,7 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.updated_at"),
     accessorKey: "updated_at",
     sortable: true,
+    size: COL.updatedAt,
     meta: {
       align: "left",
       format: (val: number) =>

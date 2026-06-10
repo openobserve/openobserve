@@ -109,7 +109,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "InvitationList",
@@ -149,13 +149,15 @@ export default defineComponent({
         header: t("invitation.organizationName"),
         accessorKey: "org_name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "role",
         header: t("invitation.role"),
         accessorKey: "role",
         sortable: true,
+        size: COL.role,
         meta: { align: "left" },
       },
       {
@@ -163,6 +165,7 @@ export default defineComponent({
         header: t("invitation.invitedBy"),
         accessorKey: "inviter_id",
         sortable: true,
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
@@ -170,6 +173,7 @@ export default defineComponent({
         header: t("invitation.expiry"),
         accessorKey: "expiry",
         sortable: true,
+        size: COL.duration,
         meta: { align: "left" },
       },
       {

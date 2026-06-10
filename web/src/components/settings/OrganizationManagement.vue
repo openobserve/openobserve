@@ -208,6 +208,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -274,12 +275,14 @@ export default defineComponent({
         header: t("settings.org_name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "identifier",
         header: t("settings.org_identifier"),
         accessorKey: "identifier",
+        size: COL.name,
         meta: { align: "left" },
       },
       {
@@ -287,6 +290,7 @@ export default defineComponent({
         header: t("settings.subscription_status"),
         accessorKey: "plan",
         sortable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {
@@ -294,6 +298,7 @@ export default defineComponent({
         header: "Provider",
         accessorKey: "billing_provider",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -301,6 +306,7 @@ export default defineComponent({
         header: t("settings.created_on"),
         accessorKey: "created_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -308,6 +314,7 @@ export default defineComponent({
         header: t("settings.trial_expiry"),
         accessorKey: "trial_expires_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -315,6 +322,7 @@ export default defineComponent({
         header: "Contract End",
         accessorKey: "contract_end_date_display",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {

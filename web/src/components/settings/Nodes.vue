@@ -461,12 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            {{
-              row.name.length > 40
-                ? row.name.substring(0, 40) + "..."
-                : row.name
-            }}
-            <OTooltip :content="row.name" />
+            {{ row.name }}
           </template>
 
           <template

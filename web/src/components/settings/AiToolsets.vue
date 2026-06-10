@@ -166,7 +166,7 @@ export default defineComponent({
 
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left" } },
+      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
       { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, size: COL.type, meta: { align: "left" } },
       { id: "description", header: t("aiToolset.description"), accessorKey: "description", size: COL.description, meta: { align: "left" } },
       {

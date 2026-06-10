@@ -139,6 +139,7 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -223,6 +224,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type {
   EvalJob,
   Provider,
@@ -289,6 +291,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.name"),
     accessorKey: "name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {
@@ -296,7 +299,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.type"),
     accessorFn: (row: Scorer) => scorerTypeOf(row),
     sortable: true,
-    size: 160,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -304,7 +307,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.produces"),
     accessorFn: (row: Scorer) => producesLabel(row),
     sortable: true,
-    size: 180,
+    size: COL.template,
     meta: { align: "left" },
   },
   {
@@ -312,7 +315,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.version"),
     accessorKey: "version",
     sortable: true,
-    size: 100,
+    size: COL.version,
     meta: { align: "left" },
   },
   {
@@ -320,14 +323,14 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.usedBy"),
     accessorFn: (row: Scorer) => usedByCount(row),
     sortable: true,
-    size: 130,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
     id: "lastRun",
     header: t("onlineEvals.scorer.columns.lastRun"),
     sortable: false,
-    size: 120,
+    size: COL.date,
     meta: { align: "left" },
   },
   {

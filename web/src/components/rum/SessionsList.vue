@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :data="tableRows"
           :columns="tableColumns"
+          :default-columns="false"
           row-key="id"
           pagination="none"
           virtual-scroll
@@ -54,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onMounted, ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { formatDuration } from "@/utils/zincutils";
@@ -96,6 +98,7 @@ const tableColumns = [
     header: t("rum.timestamp"),
     accessorKey: "timestamp",
     sortable: true,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -103,6 +106,7 @@ const tableColumns = [
     header: t("rum.sessionType"),
     accessorKey: "type",
     sortable: true,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -110,6 +114,7 @@ const tableColumns = [
     header: t("rum.timeSpent"),
     accessorFn: (row: any) => formatDuration(row["time_spent"] / 1000000),
     sortable: true,
+    size: COL.duration,
     meta: { align: "left" },
   },
   {
@@ -117,6 +122,7 @@ const tableColumns = [
     header: t("rum.errorCount"),
     accessorKey: "error_count",
     sortable: true,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -124,7 +130,8 @@ const tableColumns = [
     header: t("rum.initialViewName"),
     accessorKey: "initial_view_name",
     sortable: true,
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
 ];
 

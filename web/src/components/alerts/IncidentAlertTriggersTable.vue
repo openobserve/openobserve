@@ -71,6 +71,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 interface IncidentAlert {
   incident_id: string;
@@ -108,14 +109,15 @@ export default defineComponent({
         header: "Alert Name",
         accessorKey: "alert_name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "alert_fired_at",
         header: "Fired At",
         accessorKey: "alert_fired_at",
         sortable: true,
-        size: 200,
+        size: COL.date,
         meta: { align: "left" },
       },
       {

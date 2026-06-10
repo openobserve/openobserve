@@ -286,10 +286,7 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+              <span class="jd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -406,10 +403,7 @@
                 </div>
               </template>
               <template #cell-scoreDisplay="{ row }">
-                <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+                <span class="jd-mono">{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
                 <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>

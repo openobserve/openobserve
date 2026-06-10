@@ -75,6 +75,7 @@
           :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
+          :default-columns="false"
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
@@ -203,7 +204,7 @@ const columns = computed(() => [
     accessorKey: "name",
     sortable: true,
     size: COL.name,
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "type",
@@ -226,7 +227,7 @@ const columns = computed(() => [
     header: t("llmProviders.columns.defaultModel"),
     accessorFn: (row: Provider) => defaultModelOf(row),
     sortable: false,
-    size: 180,
+    size: COL.defaultModel,
     meta: { align: "left" },
   },
   {

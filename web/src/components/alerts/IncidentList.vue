@@ -192,7 +192,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
@@ -231,7 +231,9 @@ export default defineComponent({
         id: "title",
         header: t("alerts.incidents.title_field"),
         accessorKey: "title",
-        meta: { align: "left" },
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "severity",
