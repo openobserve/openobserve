@@ -203,17 +203,11 @@ size="xs" class="warning" />{{
         @select="handleOrgSelection"
       />
 
-      <!-- Visual separator between org context and utility icons. Parent's
-           gap-1 (4px) provides equal spacing on both sides via flex gap, so
-           no per-element margin needed here. -->
-      <!-- <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" /> -->
-
       <div class="header-utility-icons tw:flex tw:items-center tw:gap-x-2">
       <!-- AI CHAT TOGGLE: Enterprise feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group. -->
       <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled">
-        <div class="tw:w-separator tw:h-5 tw:bg-separator tw:shrink-0" aria-hidden="true" />
         <OButton
           variant="ghost"
           size="icon-toolbar"
