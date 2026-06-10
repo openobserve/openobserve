@@ -464,7 +464,16 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
-// null = not yet checked; boolean = whether infer_service_name column exists in the stream schema
+/**
+ * Tri-state cache for whether the current stream's schema contains the `infer_service_name` column.
+ *
+ * - `null`  — not yet checked for the current stream; triggers a schema API call on next load.
+ * - `true`  — column exists; queries will use `infer_service_name` for service grouping.
+ * - `false` — column absent; queries will fall back to `service_name` only.
+ *
+ * The value is reset to `null` whenever the stream filter changes so that the next
+ * `loadServicesCatalog()` call re-validates against the new stream's schema.
+ */
 const hasInferColumns = ref<boolean | null>(null);
 
 const totalPages = computed(() =>

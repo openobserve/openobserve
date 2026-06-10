@@ -677,13 +677,58 @@ export interface ResourceTabConfig {
 // chains that generate COALESCE expressions for both SELECT/GROUP BY and
 // the downstream filter clause.
 // ---------------------------------------------------------------------------
+/**
+ * Describes a resource tab rendered for an inferred service in the node detail panel.
+ *
+ * Each tab exposes a group of related span attributes (e.g. host info, database names)
+ * organised as a table. Because OTel semantic conventions have evolved across
+ * generations, a single conceptual attribute may map to several field names
+ * (e.g. host → `server_address`, `net_peer_name`, `net_peer_ip`, `network_peer_address`).
+ *
+ * The `fields` array defines a **fallback chain** — the first field found in the
+ * stream schema is used as both the GROUP BY column and the link target for View
+ * Traces drill-down. If multiple fields exist, they are assembled into a
+ * `COALESCE(NULLIF(f1, ''), NULLIF(f2, ''), ...)` expression so that rows with
+ * different generations of the same attribute still aggregate together.
+ */
 export interface InferredServiceTab {
-  id: string;        // unique tab name, e.g. "hosts", "databases"
-  label: string;     // display label, e.g. "Hosts", "Databases"
-  colLabel: string;  // table column header, e.g. "Host", "Database"
-  fields: string[];  // fallback order for COALESCE, e.g. ["server_address", "net_peer_name"]
+  /** Unique tab identifier, e.g. "hosts", "databases", "queries" */
+  id: string;
+  /** User-facing tab label, e.g. "Hosts", "Databases", "Queries" */
+  label: string;
+  /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
+  colLabel: string;
+  /**
+   * Fallback-ordered field names for the attribute column, evaluated against the
+   * stream schema at runtime. The first field present in the schema wins as the
+   * primary GROUP BY column; additional matching fields contribute to a COALESCE
+   * expression for unified aggregation.
+   */
+  fields: string[];
 }
 
+/**
+ * Registry of inferred-service resource tabs, keyed by `service_type`.
+ *
+ * Each entry defines the resource breakdowns available for that service type.
+ * At runtime, tabs are filtered against the target stream's schema so that
+ * only tabs whose `fields` intersect the schema are shown to the user.
+ *
+ * OTel semantic convention coverage:
+ * | Service Type | Tabs          | Attribute Generations                                     |
+ * |-------------|---------------|-----------------------------------------------------------|
+ * | database    | Hosts         | server_address, net_peer_*, network_peer_address          |
+ * |             | Databases     | db_namespace, db_name (stabilised OTel DB)                |
+ * |             | Queries       | db_operations (OTel DB operations)                        |
+ * | queue       | Hosts         | server_address, net_peer_*, network_peer_address          |
+ * |             | Destinations  | messaging_destination_name, messaging_destination         |
+ * | rpc         | Hosts         | server_address, net_peer_*, network_peer_address          |
+ * |             | RPC Services  | rpc_service, rpc_method                                   |
+ * | http        | Hosts         | server_address, net_peer_*, network_peer_address          |
+ *
+ * When adding a new dependency type, add its entry here — the panel will
+ * automatically render the appropriate resource tabs.
+ */
 const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   database: [
     {
@@ -907,7 +952,16 @@ export default defineComponent({
       return escapeSingleQuotes(name);
     };
 
-    // Returns the correct SQL field name based on whether the node is an inferred service
+    /**
+     * Returns the correct SQL field name for the service name column in WHERE clauses.
+     *
+     * Inferred services (those discovered from span attributes rather than instrumented
+     * SDKs) use `infer_service_name`, while regular instrumented services use `service_name`.
+     * The distinction is driven by `props.selectedNode.service_type`:
+     * - When `service_type` is set (e.g. "database", "queue", "rpc", "http"), the node
+     *   represents an inferred service → `infer_service_name`.
+     * - When `service_type` is absent, the node represents an instrumented service → `service_name`.
+     */
     const serviceNameField = computed(() =>
       props.selectedNode?.service_type ? "infer_service_name" : "service_name",
     );

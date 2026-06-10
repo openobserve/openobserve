@@ -2269,7 +2269,20 @@ const handleServiceGraphViewTraces = (data: any) => {
   });
 };
 
-// Handler for services catalog row click — switches to traces mode filtered by service
+/**
+ * Handler for the services catalog `view-traces` event.
+ *
+ * Normalizes the payload (which may be a plain service name string for backward
+ * compatibility, or a full object with `serviceName`, `serviceType`,
+ * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
+ * to populate the search bar and run the filtered traces query.
+ *
+ * @param data - Service name string (legacy) or structured filter object.
+ *               Structured objects may include `serviceName`, `serviceType`,
+ *               `operationName`, `nodeName`, `podName`, `callerService`,
+ *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
+ *               `maxDurationMicros`, `mode`, and `stream`.
+ */
 const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
   // Normalize plain string to object then delegate to the full handler
   const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
