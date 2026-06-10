@@ -1229,7 +1229,7 @@ export default defineComponent({
           org_identifier: org,
           query: {
             query: {
-              sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${escapeSingleQuotes(serviceName)}' ORDER BY _timestamp DESC`,
+              sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY _timestamp DESC`,
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
@@ -2212,7 +2212,7 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
 
       let streamName: string | undefined;
-      let filterQuery = `${serviceNameField.value}='${escapeSingleQuotes(serviceName)}'`;
+      let filterQuery = `${serviceNameField.value}='${serviceName}'`;
 
       try {
         const correlateResponse = await correlateStreams(org, {
