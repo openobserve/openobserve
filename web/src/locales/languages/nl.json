@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Schema",
     "menuGroupInspect": "Inspecteer",
     "validSql": "Geldige SQL",
-    "invalidSql": "Ongeldige vraag"
+    "invalidSql": "Ongeldige vraag",
+    "menuGroupExplain": "Leg uit"
   },
   "menu": {
     "home": "Home",
