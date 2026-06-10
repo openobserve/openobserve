@@ -14,3 +14,4 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod contains_query;
+pub mod ids_collector;
