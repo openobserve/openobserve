@@ -39,6 +39,8 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  # Timechart (visualize) tab is hidden by default; enable it so visualize E2E tests can reach it.
+  ZO_TIMECHART_ENABLED: true
   ZO_SSRF_ALLOW_LOOPBACK: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 

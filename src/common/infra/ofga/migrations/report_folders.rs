@@ -113,7 +113,7 @@ pub async fn migrate_report_folders<C: ConnectionTrait>(db: &C) -> Result<(), an
                     &mut tuples,
                 );
                 authorizer::authz::get_parent_tuple(
-                    &report.folder_id,
+                    "default",
                     report_folders_ofga_type,
                     &object,
                     &mut tuples,

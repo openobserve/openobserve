@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
 
           <OToggleGroupItem
+            v-if="store.state.zoConfig.timechart_enabled"
             data-test="logs-visualize-toggle"
             :disabled="isVisualizeDisabled"
             :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
@@ -2205,8 +2206,10 @@ export default defineComponent({
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
       { value: 'logs',      icon: 'search',   label: t('common.search'),          disabled: false },
-      { value: 'visualize', icon: 'timeline', label: t('search.visualize'),
-        disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 },
+      ...(store.state.zoConfig.timechart_enabled
+        ? [{ value: 'visualize', icon: 'timeline', label: t('search.visualize'),
+            disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 }]
+        : []),
       { value: 'build',     icon: 'build',    label: t('search.buildQuery'),      disabled: false },
       ...(config.isEnterprise === 'true'
         ? [{ value: 'patterns', icon: 'layers', label: t('search.showPatternsLabel'), disabled: false }]
