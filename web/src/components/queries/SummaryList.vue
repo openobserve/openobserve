@@ -53,10 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #bottom>
       <OButton
+        v-if="selectedRow.length"
         data-test="qm-multiple-cancel-query-btn"
         variant="outline-destructive"
         size="sm-action"
-        :disabled="selectedRow.length === 0"
         @click="handleMultiQueryCancel"
       >
         {{ t('queries.cancelQuery') }}
