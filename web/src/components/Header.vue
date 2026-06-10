@@ -162,21 +162,6 @@ size="xs" class="warning" />{{
 
     <!-- HEADER MENU: Contains all header navigation and user controls -->
     <div class="header-menu tw:flex tw:items-center tw:gap-x-2">
-      <!-- EDITION BADGE / UPGRADE BUTTON -->
-      <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
-      <!-- Open Source: primary CTA to drive upgrades -->
-      <OButton
-        :variant="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'outline-primary' : 'primary'"
-        size="xs"
-        data-test="upgrade-to-enterprise-btn"
-        @click="openEnterpriseDialog"
-      >
-        <template #icon-left>
-          <OIcon :name="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'verified' : 'card-giftcard'" size="sm" />
-        </template>
-        {{ enterpriseButtonText }}
-      </OButton>
-
       <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
       <OButton
         v-if="
@@ -194,6 +179,21 @@ size="xs" class="warning" />{{
           :style="{ color: ingestionQuotaColor }"
         />
         <OTooltip side="top" align="center" :content="`Warning: ${ingestionQuotaPercentage}% of ingestion limit used`" />
+      </OButton>
+
+      <!-- EDITION BADGE / UPGRADE BUTTON -->
+      <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
+      <!-- Open Source: primary CTA to drive upgrades -->
+      <OButton
+        :variant="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'outline-primary' : 'primary'"
+        size="xs"
+        data-test="upgrade-to-enterprise-btn"
+        @click="openEnterpriseDialog"
+      >
+        <template #icon-left>
+          <OIcon :name="config.isEnterprise === 'true' || config.isCloud === 'true' ? 'verified' : 'card-giftcard'" size="sm" />
+        </template>
+        {{ enterpriseButtonText }}
       </OButton>
 
       <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
