@@ -112,14 +112,24 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-/* Slim, unobtrusive scrollbar that floats in the reserved gutter
-   (scrollbar-gutter: stable) so it never steals width from the labels. */
+/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
+   it never reserves layout width, so there is no empty strip beside the labels.
+
+   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
+   what previously pushed the labels inward and clipped "Management"). The only
+   way a native scrollbar floats *over* content instead of reserving space is
+   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
+   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
+   nothing. Either way the rail keeps its full width and still scrolls via
+   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
 .o2-navbar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-width: none; /* Firefox: hidden, reserves nothing */
+  -ms-overflow-style: none; /* legacy Edge/IE */
 }
-.o2-navbar-scroll:hover {
-  scrollbar-color: var(--color-border-soft, rgba(148, 163, 184, 0.5)) transparent;
+@supports (overflow: overlay) {
+  .o2-navbar-scroll {
+    overflow-y: overlay; /* Blink/WebKit: scrollbar floats over content */
+  }
 }
 .o2-navbar-scroll::-webkit-scrollbar {
   width: 6px;
@@ -130,7 +140,9 @@ function handleKeydown(event: KeyboardEvent) {
 .o2-navbar-scroll::-webkit-scrollbar-thumb {
   background-color: transparent;
   border-radius: 9999px;
+  transition: background-color 150ms ease;
 }
+/* Reveal the thumb only while the rail is hovered. */
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
   background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
 }
