@@ -1015,12 +1015,35 @@ jobs:
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
-          # Filter report to only include failed tests for TestDino upload
+          # Filter report to only include failed tests for TestDino upload.
+          # Retries with identical status+error are stripped to the final attempt only,
+          # reducing quota usage. Retries with differing status or error are kept in full.
           node -e "
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
+          let strippedRetries = 0;
+          function getErrorFingerprint(r) {
+            return r.error?.message?.split('\n')[0]?.trim() || r.status;
+          }
           function filterSuite(s) {
-            const specs = (s.specs||[]).filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'));
+            const specs = (s.specs||[])
+              .filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'))
+              .map(sp=>({
+                ...sp,
+                tests: sp.tests.map(t=>{
+                  const results = t.results||[];
+                  const first = results[0];
+                  const allIdentical = results.length <= 1 || results.every(r=>
+                    r.status === first.status &&
+                    getErrorFingerprint(r) === getErrorFingerprint(first)
+                  );
+                  if (allIdentical && results.length > 1) strippedRetries += results.length - 1;
+                  return {
+                    ...t,
+                    results: allIdentical ? [results[results.length-1]] : results
+                  };
+                })
+              }));
             const suites = (s.suites||[]).map(filterSuite).filter(sub=>(sub.specs&&sub.specs.length)||(sub.suites&&sub.suites.length));
             return {...s,specs,suites};
           }
@@ -1031,7 +1054,7 @@ jobs:
           };
           fs.writeFileSync('playwright-results/report-failures-only.json',JSON.stringify(filtered));
           const total=(report.stats.expected||0)+(report.stats.unexpected||0)+(report.stats.skipped||0)+(report.stats.flaky||0);
-          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino');
+          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino (stripped '+strippedRetries+' identical retry results)');
           "
           echo "::notice::Report filtered to failures only"
 
