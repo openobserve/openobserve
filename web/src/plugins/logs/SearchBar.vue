@@ -2059,7 +2059,7 @@ export default defineComponent({
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
-        height: `${Math.round(window.innerHeight * 0.6)}px`,
+        height: `${Math.round(window.innerHeight * 0.75)}px !important`,
         zIndex: 50,
       };
     });
@@ -2719,7 +2719,8 @@ export default defineComponent({
       if (
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0
       ) {
         searchObj.loading = true;
         searchObj.runQuery = true;

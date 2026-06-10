@@ -1473,7 +1473,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
             componentInstance.searchObj.data.datetime.queryRangeRestrictionInHour || 0,
         };
         
-        if (componentInstance.searchObj.loading === false) {
+        if (
+          componentInstance.searchObj.loading === false &&
+          componentInstance.searchObj.data.stream.selectedStream.length > 0
+        ) {
           componentInstance.searchObj.loading = true;
           componentInstance.searchObj.runQuery = true;
         }
@@ -3000,17 +3003,36 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 178: updateDateTime with loading state management
   it("should manage loading state during datetime update", async () => {
     componentInstance.searchObj.loading = false;
+    componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
     const dateTime = {
       startTime: 123456789,
       endTime: 987654321,
       relativeTimePeriod: "2h",
       valueType: "relative",
     };
-    
+
     await componentInstance.updateDateTime(dateTime);
-    
+
     expect(componentInstance.searchObj.loading).toBe(true);
     expect(componentInstance.searchObj.runQuery).toBe(true);
+  });
+
+  // Test 178b: updateDateTime with no stream selected — should not trigger loading
+  it("should not set loading state when no stream is selected", async () => {
+    componentInstance.searchObj.loading = false;
+    componentInstance.searchObj.runQuery = false;
+    componentInstance.searchObj.data.stream.selectedStream = [];
+    const dateTime = {
+      startTime: 123456789,
+      endTime: 987654321,
+      relativeTimePeriod: "1h",
+      valueType: "relative",
+    };
+
+    await componentInstance.updateDateTime(dateTime);
+
+    expect(componentInstance.searchObj.loading).toBe(false);
+    expect(componentInstance.searchObj.runQuery).toBe(false);
   });
 
   // Test 179: updateDateTime without loading state change
