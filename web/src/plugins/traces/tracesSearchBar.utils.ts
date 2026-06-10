@@ -71,5 +71,5 @@ export function isDatetimeChanged(
   if (isRelative) {
     return prev.relativeTimePeriod !== value.relativeTimePeriod;
   }
-  return prev.startTime.toString() !== value.startTime.toString() || prev.endTime.toString() !== value.endTime.toString();
+  return prev.startTime !== value.startTime || prev.endTime !== value.endTime;
 }
