@@ -2059,7 +2059,7 @@ export default defineComponent({
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
-        height: `${Math.round(window.innerHeight * 0.6)}px`,
+        height: `${Math.round(window.innerHeight * 0.75)}px !important`,
         zIndex: 50,
       };
     });
