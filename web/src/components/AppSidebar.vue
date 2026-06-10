@@ -124,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-hidden="true"
               />
             </span>
-            <span class="app-sidebar__org-copy" :aria-hidden="collapsed">
+            <span v-if="!collapsed" class="app-sidebar__org-copy">
               <span class="app-sidebar__org-name">{{ orgName }}</span>
-              <span class="app-sidebar__org-id">{{ orgIdentifier }}</span>
             </span>
             <OIcon
+              v-if="!collapsed"
               name="chevron-right"
               size="sm"
               class="app-sidebar__org-chevron"
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="toggleAIChat"
       >
         <img :src="sidebarAiLogo" class="app-sidebar__ai-icon ai-icon" alt="" />
-        <span class="app-sidebar__ai-label" :aria-hidden="collapsed">
+        <span v-if="!collapsed" class="app-sidebar__ai-label">
           Ask O2 AI
         </span>
         <span
@@ -1134,7 +1134,7 @@ function toggleTheme() {
   );
 
   display: flex;
-  width: 15.5rem;
+  width: 13.75rem;
   height: 100%;
   min-height: 0;
   flex: 0 0 auto;
@@ -1158,11 +1158,13 @@ function toggleTheme() {
 .app-sidebar__brand {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "brand toggle";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "brand";
   align-items: center;
-  gap: 0.5rem;
-  min-height: 3.5rem;
+  gap: 0;
+  height: 3.75rem;
+  min-height: 3.75rem;
+  flex: 0 0 3.75rem;
   overflow: visible;
   padding: 0.625rem 0.625rem 0.5rem 0.75rem;
   border-bottom: 1px solid var(--app-sidebar-border);
@@ -1170,22 +1172,23 @@ function toggleTheme() {
 
 .app-sidebar--collapsed .app-sidebar__brand {
   grid-template-columns: 1fr;
-  grid-template-areas:
-    "brand"
-    "toggle";
-  gap: 0.375rem;
+  grid-template-areas: "brand";
+  gap: 0;
   justify-items: center;
-  min-height: 5.25rem;
+  height: 3.75rem;
+  min-height: 3.75rem;
   padding: 0.625rem 0.5rem 0.5rem;
 }
 
 .app-sidebar__collapse-button {
-  grid-area: toggle;
+  position: absolute;
+  bottom: -0.625rem;
+  right: 0.75rem;
   z-index: 6;
-  width: 1.375rem !important;
-  height: 1.375rem !important;
-  min-width: 1.375rem !important;
-  min-height: 1.375rem !important;
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+  min-width: 1.25rem !important;
+  min-height: 1.25rem !important;
   border: 1px solid var(--app-sidebar-border);
   border-radius: 0.375rem !important;
   background: var(--app-sidebar-panel);
@@ -1200,6 +1203,9 @@ function toggleTheme() {
 }
 
 .app-sidebar--collapsed .app-sidebar__collapse-button {
+  right: auto;
+  left: calc(2rem - 1px);
+  transform: translateX(-50%);
   width: 1.25rem !important;
   height: 1.25rem !important;
   min-width: 1.25rem !important;
@@ -1296,8 +1302,9 @@ function toggleTheme() {
 
 .app-sidebar__brand-edition--collapsed {
   position: absolute;
-  right: -0.5rem;
-  bottom: -0.4rem;
+  top: -0.35rem;
+  right: -0.45rem;
+  bottom: auto;
   min-width: 1.35rem;
   height: 0.825rem;
   padding: 0 0.1875rem;
@@ -1326,19 +1333,21 @@ function toggleTheme() {
   display: grid;
   box-sizing: border-box;
   width: 100%;
-  min-height: 3.625rem;
+  min-height: 2.75rem;
   grid-template-columns: 2.25rem minmax(0, 1fr) 1rem;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.5rem;
-  border: 1px solid var(--app-sidebar-border);
+  padding: 0.1875rem 0.125rem;
+  border: 1px solid
+    color-mix(in srgb, var(--app-sidebar-border) 65%, transparent);
   border-radius: 0.5rem;
-  background: transparent;
+  background: color-mix(in srgb, var(--app-sidebar-muted) 38%, transparent);
   color: inherit;
   cursor: pointer;
   text-align: left;
   transition:
     width 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 240ms cubic-bezier(0.16, 1, 0.3, 1),
     min-height 240ms cubic-bezier(0.16, 1, 0.3, 1),
     padding 240ms cubic-bezier(0.16, 1, 0.3, 1),
     border-color 180ms ease,
@@ -1359,14 +1368,16 @@ function toggleTheme() {
 }
 
 .app-sidebar__org--collapsed {
-  width: 2.625rem;
-  height: 2.625rem;
-  min-height: 2.625rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
   grid-template-columns: 1fr;
+  gap: 0;
   justify-items: center;
   border-color: color-mix(in srgb, var(--app-sidebar-border) 65%, transparent);
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--app-sidebar-muted) 38%, transparent);
+  overflow: hidden;
   padding: 0;
   box-shadow: none;
 }
@@ -1410,8 +1421,7 @@ function toggleTheme() {
 .app-sidebar__org-copy {
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: center;
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
@@ -1458,6 +1468,7 @@ function toggleTheme() {
 .app-sidebar__org-name {
   font-size: 0.875rem;
   font-weight: 700;
+  line-height: 1.25rem;
 }
 
 .app-sidebar__org-id,
@@ -1523,12 +1534,13 @@ function toggleTheme() {
     var(--app-sidebar-panel);
   color: var(--app-sidebar-text);
   cursor: pointer;
-  padding: 0.5rem 0.625rem;
+  padding: 0.5rem;
   text-align: left;
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   transition:
     width 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 240ms cubic-bezier(0.16, 1, 0.3, 1),
     min-height 240ms cubic-bezier(0.16, 1, 0.3, 1),
     padding 240ms cubic-bezier(0.16, 1, 0.3, 1),
     border-color 180ms ease,
@@ -1551,10 +1563,13 @@ function toggleTheme() {
 }
 
 .app-sidebar__ai--collapsed {
-  width: 2.5rem;
-  min-height: 2.25rem;
+  width: 2.625rem;
+  height: 2.625rem;
+  min-height: 2.625rem;
+  gap: 0;
   justify-content: center;
-  padding-inline: 0;
+  overflow: hidden;
+  padding: 0;
 }
 
 .app-sidebar__ai--active {
@@ -1660,7 +1675,7 @@ function toggleTheme() {
   gap: 0.75rem;
   border-radius: 0.5rem;
   color: var(--app-sidebar-text-muted);
-  padding: 0.5rem 0.625rem 0.5rem 0.875rem;
+  padding: 0.5rem 0.625rem 0.5rem 0.5625rem;
   text-decoration: none;
   transition:
     background-color 150ms ease,
@@ -1748,7 +1763,7 @@ function toggleTheme() {
   background: transparent;
   color: var(--app-sidebar-text-muted);
   cursor: pointer;
-  padding: 0.375rem 0.625rem;
+  padding: 0.375rem 0.5625rem;
   text-align: left;
 }
 
@@ -1803,6 +1818,11 @@ function toggleTheme() {
 .app-sidebar__account {
   margin-top: 0.25rem;
   min-height: 3rem;
+  padding-left: 0.1875rem;
+}
+
+.app-sidebar__account--collapsed {
+  padding-left: 0;
 }
 
 .app-sidebar__account-copy {

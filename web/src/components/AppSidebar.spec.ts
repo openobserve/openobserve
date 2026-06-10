@@ -238,6 +238,35 @@ describe("AppSidebar", () => {
     expect(navLinks[0].attributes("aria-label")).toBe("Logs - Current page");
   });
 
+  it("keeps collapsed context controls icon-only while preserving accessible labels", () => {
+    const wrapper = createWrapper({ collapsed: true });
+    const orgButton = wrapper.find(
+      '[data-test="navbar-organizations-select-trigger"]',
+    );
+    const aiButton = wrapper.find('[data-test="menu-link-ai-item"]');
+
+    expect(orgButton.find(".app-sidebar__org-copy").exists()).toBe(false);
+    expect(orgButton.find(".app-sidebar__org-chevron").exists()).toBe(false);
+    expect(orgButton.attributes("aria-label")).toBe(
+      "Organization: default, default",
+    );
+    expect(aiButton.find(".app-sidebar__ai-label").exists()).toBe(false);
+    expect(aiButton.attributes("aria-label")).toBe("Ask O2 AI");
+  });
+
+  it("shows only the organization name in the expanded selector", () => {
+    const wrapper = createWrapper();
+    const orgButton = wrapper.find(
+      '[data-test="navbar-organizations-select-trigger"]',
+    );
+
+    expect(orgButton.find(".app-sidebar__org-name").text()).toBe("default");
+    expect(orgButton.find(".app-sidebar__org-id").exists()).toBe(false);
+    expect(orgButton.attributes("aria-label")).toBe(
+      "Organization: default, default",
+    );
+  });
+
   it("keeps the collapse control inside the brand block without a separate row", () => {
     const wrapper = createWrapper();
     const brand = wrapper.find(".app-sidebar__brand");
