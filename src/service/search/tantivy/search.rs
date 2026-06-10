@@ -17,7 +17,10 @@ use std::{collections::HashSet, fmt::Display};
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
+    meta::{
+        bitvec::BitVec,
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_MULTI_FIELDS},
+    },
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
     },
@@ -37,6 +40,7 @@ use tantivy::{
     query::Query,
 };
 
+use super::topn_multi::TopNMultiCollector;
 use crate::service::search::index::IndexCondition;
 
 #[derive(Debug, Clone)]
@@ -48,7 +52,7 @@ pub enum TantivyResult {
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
     TopN(Vec<(String, u64)>),                // simple top n optimization
-    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
+    TopNMulti(Vec<(Vec<String>, u64)>),      // multi-field top n optimization
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -305,7 +309,18 @@ impl TantivyResult {
         }
     }
 
-    /// Handle two-field GROUP BY with count(*) using nested TermsAggregation
+    /// Handle multi-field (2..=4) GROUP BY with count(*) using a flat custom collector.
+    ///
+    /// Tantivy's nested `TermsAggregation` keeps a separate inner term collector per outer
+    /// bucket, materializes a string per group, and over-fetches the product of the per-level
+    /// segment sizes (exponential in the field count). Instead, this aggregates directly over
+    /// the columnar fast fields:
+    ///   - read each field's term ordinal for each matching doc,
+    ///   - count into a single flat `packed ordinals -> count` map (bounded by the file's rows),
+    ///   - keep only the per-file top-K, resolving ordinals to strings for survivors only.
+    ///
+    /// DataFusion's `AggregateExec` re-aggregates the per-file partials and applies the final
+    /// ORDER BY + LIMIT, so correctness is preserved.
     pub fn handle_simple_top_n_multi(
         searcher: &Searcher,
         query: Box<dyn Query>,
@@ -313,101 +328,28 @@ impl TantivyResult {
         limit: usize,
         ascend: bool,
     ) -> anyhow::Result<Self> {
-        if fields.len() != 2 {
-            anyhow::bail!("handle_simple_top_n_multi requires exactly 2 fields");
+        if fields.len() < 2 || fields.len() > MAX_SIMPLE_TOPN_MULTI_FIELDS {
+            anyhow::bail!(
+                "handle_simple_top_n_multi requires 2..={MAX_SIMPLE_TOPN_MULTI_FIELDS} fields, got {}",
+                fields.len()
+            );
         }
 
-        let order = if ascend {
-            Some(CustomOrder {
-                target: OrderTarget::Count,
-                order: Order::Asc,
-            })
+        // Over-fetch per file so the final cross-file top-N is contained in the union of the
+        // per-file partials, while keeping the payload (and the number of term-dictionary
+        // resolutions per file) linear in `limit`. `limit * 2` matches the fan-out of the old
+        // nested path (per-level segment_size); the old path was quadratic in the bucket
+        // count, this is not.
+        let k = (limit * 2).max(1000);
+
+        // two ordinals pack into a u64 key; three or four need a u128
+        let results = if fields.len() == 2 {
+            let collector = TopNMultiCollector::<u64>::new(fields.to_vec(), k, ascend);
+            searcher.search(&query, &collector)?
         } else {
-            None
+            let collector = TopNMultiCollector::<u128>::new(fields.to_vec(), k, ascend);
+            searcher.search(&query, &collector)?
         };
-
-        // Smarter over-fetch: outer needs enough distinct values of field[0],
-        // inner only needs enough per-bucket combinations.
-        // Use sqrt-based scaling to avoid O(N^2) bucket explosion.
-        let effective_limit = limit.max(10);
-        let outer_limit = (effective_limit * 2).max(100) as u32;
-        let inner_limit = (effective_limit * 2).max(100) as u32;
-
-        // Build nested aggregation: outer terms on field[0], inner terms on field[1]
-        let inner_aggregation = Aggregation {
-            agg: AggregationVariants::Terms(TermsAggregation {
-                field: fields[1].to_string(),
-                size: Some(inner_limit),
-                order: order.clone(),
-                missing: None,
-                min_doc_count: Some(1),
-                show_term_doc_count_error: Some(false),
-                segment_size: Some(inner_limit),
-                include: None,
-                exclude: None,
-            }),
-            sub_aggregation: Default::default(),
-        };
-
-        let outer_aggregation = Aggregation {
-            agg: AggregationVariants::Terms(TermsAggregation {
-                field: fields[0].to_string(),
-                size: Some(outer_limit),
-                order,
-                missing: None,
-                min_doc_count: Some(1),
-                show_term_doc_count_error: Some(false),
-                include: None,
-                exclude: None,
-                segment_size: Some(outer_limit),
-            }),
-            sub_aggregation: Aggregations::from_iter(vec![(
-                "inner".to_string(),
-                inner_aggregation,
-            )]),
-        };
-
-        let aggregations = Aggregations::from_iter(vec![("outer".to_string(), outer_aggregation)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
-
-        let mut res = searcher.search(&query, &collector)?;
-
-        // Pre-allocate with a reasonable estimate
-        let estimated_results = (outer_limit as usize) * 4;
-        let mut results: Vec<(Vec<String>, u64)> = Vec::with_capacity(estimated_results);
-
-        if let AggregationResult::BucketResult(BucketResult::Terms {
-            buckets: outer_buckets,
-            ..
-        }) = res.0.remove("outer").unwrap()
-        {
-            for mut outer_bucket in outer_buckets {
-                let outer_key = match &outer_bucket.key {
-                    Key::Str(s) => s.clone(),
-                    Key::F64(f) => f.to_string(),
-                    Key::I64(i) => i.to_string(),
-                    Key::U64(u) => u.to_string(),
-                };
-
-                if let Some(AggregationResult::BucketResult(BucketResult::Terms {
-                    buckets: inner_buckets,
-                    ..
-                })) = outer_bucket.sub_aggregation.0.remove("inner")
-                {
-                    for inner_bucket in inner_buckets {
-                        let inner_key = match inner_bucket.key {
-                            Key::Str(s) => s,
-                            Key::F64(f) => f.to_string(),
-                            Key::I64(i) => i.to_string(),
-                            Key::U64(u) => u.to_string(),
-                        };
-                        results.push((vec![outer_key.clone(), inner_key], inner_bucket.doc_count));
-                    }
-                }
-            }
-        } else {
-            anyhow::bail!("Failed to get top n multi results from tantivy");
-        }
 
         Ok(Self::TopNMulti(results))
     }

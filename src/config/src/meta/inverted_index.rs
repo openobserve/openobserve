@@ -17,6 +17,10 @@ use proto::cluster_rpc;
 
 pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
 
+/// Maximum number of GROUP BY fields supported by [`IndexOptimizeMode::SimpleTopNMulti`].
+/// Four 32-bit term ordinals pack into one u128 key in the tantivy collector.
+pub const MAX_SIMPLE_TOPN_MULTI_FIELDS: usize = 4;
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),
@@ -24,7 +28,8 @@ pub enum IndexOptimizeMode {
     SimpleHistogram(i64, u64, usize),
     SimpleMultiHistogram(i64, i64, u64, String),
     SimpleTopN(String, usize, bool),
-    /// Two-field GROUP BY with count(*): (field1, field2, limit, ascend)
+    /// Multi-field (2..=MAX_SIMPLE_TOPN_MULTI_FIELDS) GROUP BY with count(*):
+    /// (fields, limit, ascend)
     SimpleTopNMulti(Vec<String>, usize, bool),
     SimpleDistinct(String, usize, bool),
 }

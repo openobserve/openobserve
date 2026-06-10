@@ -16,6 +16,7 @@
 pub mod cache;
 mod partition;
 pub mod search;
+mod topn_multi;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
 
@@ -158,8 +159,29 @@ pub async fn tantivy_search(
             .observe(cached_ratio);
     }
 
+    // The aggregation optimize modes (Count/Histogram/TopN/TopNMulti/Distinct) read only the
+    // columnar fast fields and emit a tiny per-file result, so they are CPU-bound. Never drop
+    // below full CPU parallelism for them — with `query_thread_num < cpu_num` (e.g. 1),
+    // `calc_target_partitions` would serialize every file onto a single core on a cold index.
+    // Keep the calculated value when it is higher (HA defaults to cpu_num * 4 for cold-cache
+    // I/O concurrency).
     let target_partitions =
         calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
+    let target_partitions = if matches!(
+        idx_optimize_mode,
+        Some(
+            IndexOptimizeMode::SimpleCount
+                | IndexOptimizeMode::SimpleHistogram(..)
+                | IndexOptimizeMode::SimpleMultiHistogram(..)
+                | IndexOptimizeMode::SimpleTopN(..)
+                | IndexOptimizeMode::SimpleTopNMulti(..)
+                | IndexOptimizeMode::SimpleDistinct(..)
+        )
+    ) {
+        target_partitions.max(cfg.limit.cpu_num)
+    } else {
+        target_partitions
+    };
 
     log::info!(
         "[trace_id {trace_id}] search->tantivy: session target_partitions: {target_partitions}",
@@ -559,6 +581,15 @@ async fn search_tantivy_index(
             TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
         }
         Some(IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend)) => {
+            // files indexed before a field was added to index_fields lack its column; they
+            // cannot contribute to the group by, same convention as the histogram handlers
+            if let Some(field) = fields
+                .iter()
+                .find(|f| tantivy_schema.get_field(f).is_err())
+            {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                return Ok(TantivyResult::TopNMulti(vec![]));
+            }
             TantivyResult::handle_simple_top_n_multi(&searcher, query, &fields, limit, ascend)
         }
         Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {

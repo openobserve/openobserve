@@ -506,17 +506,18 @@ fn create_top_n_multi_arrow_array(
     _fields: &[String],
     _limit: usize,
 ) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
-    // Validate: schema should have 3 fields (field1, field2, count)
-    if schema.fields().len() != 3 {
+    // Validate: schema should have N group fields (2..=MAX) plus a count field
+    let schema_fields = schema.fields().len();
+    if !(3..=config::meta::inverted_index::MAX_SIMPLE_TOPN_MULTI_FIELDS + 1)
+        .contains(&schema_fields)
+    {
         return Err(DataFusionError::Internal(format!(
-            "Expected schema with 3 fields for TopNMulti, got {}",
-            schema.fields().len()
+            "Expected schema with 3..={} fields for TopNMulti, got {schema_fields}",
+            config::meta::inverted_index::MAX_SIMPLE_TOPN_MULTI_FIELDS + 1
         )));
     }
-
-    let field1_field = &schema.fields()[0];
-    let field2_field = &schema.fields()[1];
-    let count_field = &schema.fields()[2];
+    let num_group_fields = schema_fields - 1;
+    let count_field = &schema.fields()[num_group_fields];
 
     let total_rows = top_n.len();
     if total_rows == 0 {
@@ -524,19 +525,19 @@ fn create_top_n_multi_arrow_array(
     }
 
     // Unzip the composite keys and counts
-    let mut field1_values = Vec::with_capacity(total_rows);
-    let mut field2_values = Vec::with_capacity(total_rows);
+    let mut group_values: Vec<Vec<String>> = vec![Vec::with_capacity(total_rows); num_group_fields];
     let mut count_values = Vec::with_capacity(total_rows);
 
     for (keys, count) in top_n {
-        if keys.len() >= 2 {
-            field1_values.push(keys[0].clone());
-            field2_values.push(keys[1].clone());
+        if keys.len() == num_group_fields {
+            for (values, key) in group_values.iter_mut().zip(keys) {
+                values.push(key);
+            }
             count_values.push(count);
         }
     }
 
-    let total_rows = field1_values.len();
+    let total_rows = count_values.len();
     if total_rows == 0 {
         return Ok(vec![]);
     }
@@ -547,15 +548,15 @@ fn create_top_n_multi_arrow_array(
     for chunk_start in (0..total_rows).step_by(batch_size) {
         let chunk_end = std::cmp::min(chunk_start + batch_size, total_rows);
 
-        let field1_chunk = field1_values[chunk_start..chunk_end].to_vec();
-        let field2_chunk = field2_values[chunk_start..chunk_end].to_vec();
+        let mut arrays = Vec::with_capacity(schema_fields);
+        for (i, values) in group_values.iter().enumerate() {
+            let chunk = values[chunk_start..chunk_end].to_vec();
+            arrays.push(create_field_array(&schema.fields()[i], chunk)?);
+        }
         let count_chunk = count_values[chunk_start..chunk_end].to_vec();
+        arrays.push(create_count_array(count_field, count_chunk)?);
 
-        let field1_array = create_field_array(field1_field, field1_chunk)?;
-        let field2_array = create_field_array(field2_field, field2_chunk)?;
-        let count_array = create_count_array(count_field, count_chunk)?;
-
-        batches.push(vec![field1_array, field2_array, count_array]);
+        batches.push(arrays);
     }
 
     Ok(batches)

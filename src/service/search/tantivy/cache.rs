@@ -37,7 +37,7 @@ pub enum CacheEntry {
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
     TopN(Vec<(String, u64)>),                // simple top n optimization
-    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
+    TopNMulti(Vec<(Vec<String>, u64)>),      // multi-field top n optimization
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
