@@ -25,10 +25,10 @@ export const COL = {
   description:  300,
   status:       100,
   toggle:        80,
-  date:         160,
+  date:         200,
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
-  createdAt:    180,
-  updatedAt:    180,
+  createdAt:    200,
+  updatedAt:    200,
   duration:     120,
   frequency:    130,
   type:         180,

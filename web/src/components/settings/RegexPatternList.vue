@@ -236,7 +236,7 @@ export default defineComponent({
         accessorKey: "created_at",
         resizable: true,
         hideable: true,
-        size: 180,
+        size: COL.createdAt,
         meta: { align: "left" },
       },
       {
@@ -246,7 +246,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: 180,
+        size: COL.updatedAt,
         meta: { align: "left" },
       },
       {
