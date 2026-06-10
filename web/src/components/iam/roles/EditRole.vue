@@ -168,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @updated:permission="handlePermissionChange"
                 @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
+                @update:filter="onClearFilter"
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
@@ -1348,6 +1349,12 @@ const filterRowsByResourceName = (
 const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
+};
+
+const onClearFilter = () => {
+  filter.value.value = "";
+  filter.value.resource = "";
+  onResourceChange();
 };
 
 function filterResources(rows: any, terms: any) {
