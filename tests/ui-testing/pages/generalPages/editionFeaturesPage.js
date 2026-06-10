@@ -2,6 +2,7 @@
 // Covers the header edition button (data-test="upgrade-to-enterprise-btn") and the
 // EnterpriseUpgradeDialog feature list with o2.ws documentation short links.
 import { expect } from '@playwright/test';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 // Enterprise features rendered in the dialog for OSS and ENT builds (non-cloud layout).
 // Source of truth: web/src/components/EnterpriseUpgradeDialog.vue (FEATURE_LINKS + enterpriseFeatures).
@@ -87,7 +88,7 @@ export class EditionFeaturesPage {
     if (trimmed.includes('Edition: Enterprise')) return 'enterprise';
     if (trimmed.includes('Get OpenObserve Enterprise')) return 'opensource';
     if (trimmed.includes('OpenObserve Features')) return 'cloud';
-    throw new Error(`Unrecognized edition button label: "${trimmed}"`);
+    throw new Error(`Unrecognized edition button label: "${trimmed}" (raw: ${JSON.stringify(label)})`);
   }
 
   async openDialog() {
@@ -136,6 +137,10 @@ export class EditionFeaturesPage {
       await popup.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       return popup.url();
     } catch (e) {
+      testLogger.error('Popup never reached openobserve.ai — returning current URL', {
+        currentUrl: popup.url(),
+        error: e.message,
+      });
       return popup.url();
     } finally {
       await popup.close().catch(() => {});
