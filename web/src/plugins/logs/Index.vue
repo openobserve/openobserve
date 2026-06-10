@@ -975,7 +975,11 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
-      if (!searchObj.data.stream.selectedStream.length) return;
+      if (!searchObj.data.stream.selectedStream.length) {
+        searchObj.loading = false;
+        searchObj.runQuery = false;
+        return;
+      }
       try {
         searchObj.loading = true;
         searchObj.meta.refreshHistogram = true;
