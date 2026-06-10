@@ -18,8 +18,7 @@ export const UNAUTHORIZED_MESSAGE =
 
 /**
  * Check whether an error message or error_type indicates an authorization failure.
- * Prefers the structured `errorType` field (e.g. from SSE events) over fuzzy
- * text matching on the message body.
+ * Checks both fields independently — auth if either indicates it.
  */
 export const isAuthError = (message?: string, errorType?: string): boolean => {
   if (errorType && /unauthorized|forbidden|permission_denied/i.test(errorType)) {
