@@ -1021,9 +1021,13 @@ jobs:
           node -e "
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
-          let strippedRetries = 0;
+          let strippedRetries = 0; // accumulated once per test via single-visit tree traversal
           function getErrorFingerprint(r) {
-            return r.error?.message?.split('\n')[0]?.trim() || r.status;
+            // First line of error.message is stable across retries (stack/timing in later lines varies).
+            // Distinguish no-error-object (safe to strip on status alone) from error-without-message
+            // (unknown content — treat as unique so we never falsely deduplicate).
+            if (r.error?.message) return r.error.message.split('\n')[0].trim();
+            return r.status + ':' + (r.error ? 'error-no-msg' : 'no-error');
           }
           function filterSuite(s) {
             const specs = (s.specs||[])
@@ -1032,8 +1036,9 @@ jobs:
                 ...sp,
                 tests: sp.tests.map(t=>{
                   const results = t.results||[];
+                  if (!results.length) return {...t};
                   const first = results[0];
-                  const allIdentical = results.length <= 1 || results.every(r=>
+                  const allIdentical = results.length === 1 || results.every(r=>
                     r.status === first.status &&
                     getErrorFingerprint(r) === getErrorFingerprint(first)
                   );
