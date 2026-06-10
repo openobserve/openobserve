@@ -18,11 +18,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
     <!-- Standard section header: title + description + Create action. -->
     <AppPageHeader
-      :subtitle="t('ingestion.orgLevelExplanation')"
       icon="key"
       class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <template #title><span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span></template>
+      <template #title>
+        <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+          <span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span>
+          <!-- Full explanation lives in this info tooltip; the subtitle below is a
+               truncated preview so neither overruns the Create action button. -->
+          
+            <OIcon
+              name="info-outline"
+              size="sm"
+              class="tw:text-text-secondary tw:cursor-help"
+              data-test="ingestion-tokens-info-icon"
+            />
+            <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px"/>
+        
+        </span>
+      </template>
+      <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
+      <template #subtitle>
+        <span class="tw:truncate tw:min-w-0 tw:leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
+      </template>
       <template #actions>
         <OButton
           variant="primary"

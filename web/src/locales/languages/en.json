@@ -1734,6 +1734,7 @@
     "aiLabel": "AI Integrations",
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
+    "orgLevelSummary": "Organization-level tokens for ingestion endpoints.",
     "resetDefaultTokenLabel": "Reset Token",
     "tokenManagementTitle": "Manage Ingestion Tokens",
     "defaultTokenBadge": "DEFAULT",
