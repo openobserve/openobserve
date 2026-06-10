@@ -176,6 +176,7 @@ jobs:
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
                 "model-pricing.spec.js",
+                "edition-features.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
