@@ -97,6 +97,74 @@ describe("useVariablesManager", () => {
       expect(manager.variablesData.panels["panel-2"][0].panelId).toBe("panel-2");
     });
 
+    it("should use the option marked as default (selected) for single-select custom variables", () => {
+      // Regression: previously the first option was always used as the default,
+      // ignoring the per-option "Default" checkbox (option.selected).
+      const manager = useVariablesManager();
+      const config: VariableConfig[] = [
+        {
+          name: "custom_stream",
+          type: "custom",
+          scope: "panels",
+          panels: ["panel-1"],
+          multiSelect: false,
+          value: "",
+          options: [
+            { label: "e2e_automate", value: "e2e_automate", selected: false },
+            { label: "default", value: "default", selected: true },
+          ],
+        },
+      ];
+
+      manager.initialize(config, {});
+
+      // Should resolve to the default-marked option ("default"), not the first option
+      expect(manager.variablesData.panels["panel-1"][0].value).toBe("default");
+    });
+
+    it("should use options marked as default (selected) for multiSelect custom variables", () => {
+      const manager = useVariablesManager();
+      const config: VariableConfig[] = [
+        {
+          name: "custom_multi",
+          type: "custom",
+          scope: "global",
+          multiSelect: true,
+          value: "",
+          options: [
+            { label: "one", value: "one", selected: false },
+            { label: "two", value: "two", selected: true },
+            { label: "three", value: "three", selected: true },
+          ],
+        },
+      ];
+
+      manager.initialize(config, {});
+
+      expect(manager.variablesData.global[0].value).toEqual(["two", "three"]);
+    });
+
+    it("should fall back to the first option when no custom option is marked default", () => {
+      const manager = useVariablesManager();
+      const config: VariableConfig[] = [
+        {
+          name: "custom_no_default",
+          type: "custom",
+          scope: "global",
+          multiSelect: false,
+          value: "",
+          options: [
+            { label: "alpha", value: "alpha", selected: false },
+            { label: "beta", value: "beta", selected: false },
+          ],
+        },
+      ];
+
+      manager.initialize(config, {});
+
+      expect(manager.variablesData.global[0].value).toBe("alpha");
+    });
+
     it("should migrate legacy variables to global scope", () => {
       const manager = useVariablesManager();
       const config: any[] = [

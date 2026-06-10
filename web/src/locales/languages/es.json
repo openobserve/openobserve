@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Programar",
     "menuGroupInspect": "Inspeccionar",
     "validSql": "SQL válido",
-    "invalidSql": "Consulta no válida"
+    "invalidSql": "Consulta no válida",
+    "menuGroupExplain": "Explique"
   },
   "menu": {
     "home": "Inicio",

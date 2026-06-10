@@ -232,6 +232,68 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
   return MSG.generic(found, loc.line, loc.column);
 }
 
+// ─── Parser-limitation guards ─────────────────────────────────────────────────
+
+/**
+ * Check if a PEG SyntaxError is a parser limitation rather than a real
+ * user mistake.  The client parser doesn't support every construct the
+ * OpenObserve backend accepts (e.g. PERCENT_RANK() OVER, CUME_DIST() OVER,
+ * POSITION(str IN str), or complex window function clauses).
+ *
+ * When this returns true the caller should treat the SQL as valid — the
+ * backend will parse it correctly.
+ *
+ * This is a pure function of the error object — no async imports needed,
+ * so it can be used in both sync and async validation paths.
+ */
+export function isParserLimitation(err: any): boolean {
+  // Guard 1: found is a whitespace character (never a real user error)
+  if (err?.found != null && /^\s$/.test(err.found)) return true;
+
+  const expLits = new Set(
+    (err?.expected ?? [])
+      .filter((e: any) => e.type === "literal")
+      .map((e: any) => e.text?.toUpperCase()),
+  );
+  const expSize: number = err?.expected?.length ?? 0;
+
+  // Guard 2: found is a letter AND expected contains both ")" and "AND"/"OR"
+  // with a very large candidate set (parser gave up inside a complex expression)
+  if (
+    err?.found != null &&
+    /^[a-zA-Z]$/.test(err.found) &&
+    expLits.has(")") &&
+    (expLits.has("AND") || expLits.has("OR")) &&
+    expSize > 150
+  )
+    return true;
+
+  // Guard 3: POSITION(str IN str) syntax — parser doesn't support it,
+  // found=")" with small expected set
+  if (
+    err?.found === ")" &&
+    !expLits.has(")") &&
+    !expLits.has("AND") &&
+    !expLits.has("OR") &&
+    expSize < 50
+  )
+    return true;
+
+  // Guard 4: found "(" inside a window function clause where ORDER/ROWS
+  // are expected. The parser cannot handle complex window function arguments
+  // like SUM(COUNT(*)) OVER (...) or NTILE(N) OVER (PARTITION BY COALESCE(...) ...).
+  if (
+    err?.found === "(" &&
+    expLits.has("ORDER") &&
+    expLits.has("ROWS") &&
+    !expLits.has("AND") &&
+    !expLits.has("OR")
+  )
+    return true;
+
+  return false;
+}
+
 // ─── Async validator ──────────────────────────────────────────────────────────
 
 let _parserInstance: any = null;
@@ -262,19 +324,9 @@ export async function validateSql(
     parser.astify(sql);
     return null;
   } catch (err: any) {
-    // Parser-limitation guard: the client parser doesn't support every construct
-    // the OpenObserve backend accepts (e.g. PERCENT_RANK() OVER, CUME_DIST() OVER,
-    // or complex window function clauses). Two signatures indicate a parser gap
-    // rather than a user mistake — suppress to avoid false positives:
-    //   1. found is a whitespace character (never a real user error)
-    //   2. found is a letter AND expected contains both ")" and "AND"/"OR" with a
-    //      very large candidate set (parser gave up inside a complex expression)
-    if (err?.found != null && /^\s$/.test(err.found)) return null;
-    const _expLits = new Set((err?.expected ?? []).filter((e: any) => e.type === "literal").map((e: any) => e.text?.toUpperCase()));
-    const _expSize = err?.expected?.length ?? 0;
-    if (err?.found != null && /^[a-zA-Z]$/.test(err.found) && _expLits.has(")") && (_expLits.has("AND") || _expLits.has("OR")) && _expSize > 150) return null;
-    // POSITION(str IN str) syntax — parser doesn't support it, found=")" with small expected set
-    if (err?.found === ")" && !_expLits.has(")") && !_expLits.has("AND") && !_expLits.has("OR") && _expSize < 50) return null;
+    // Suppress parser limitations — these are known gaps in the PEG parser
+    // that the DataFusion backend handles correctly.
+    if (isParserLimitation(err)) return null;
 
     const loc = err?.location?.start;
     const line = Math.max(1, (loc?.line ?? 1));

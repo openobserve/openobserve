@@ -190,6 +190,8 @@ describe("FrontendRumConfig Component", () => {
       expect(config).toContain("trackResources");
       expect(config).toContain("trackLongTasks");
       expect(config).toContain("trackUserInteractions");
+      expect(config).toContain("allowedTracingUrls");
+      expect(config).toContain("propagatorTypes");
       expect(config).toContain("defaultPrivacyLevel");
     });
 
