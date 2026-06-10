@@ -280,47 +280,88 @@ export default class DashboardPanelTime {
     // Wait for the DateTime dialog to open
     await this.dateTimeMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Use page-level locators for both the time option and the Apply button.
-    // ODropdown portals content to document.body; after the time option is clicked,
-    // Vue re-renders the dropdown, briefly detaching #date-time-menu-scoped element
-    // references. Page-level locators re-resolve from the document root each retry
-    // attempt, so they survive the churn. Only one dropdown can be open at a time
-    // (Reka UI unmounts the portal when closed), so page-level locators are safe
-    // and unambiguous — this is exactly how the passing test 4 works.
-    // force: true bypasses stability (the element can be mid-animation due to
-    // background panel re-renders from the initializePanelTimes watch). The element
-    // IS present and visible — it just fails Playwright's stability check in a tight
-    // re-render loop. force fires pointer events immediately once the locator resolves.
-    // page-level locator re-resolves fresh if the element momentarily detaches.
+    // Wait for all panel data API responses to complete BEFORE clicking the time
+    // option. This lets the panelsInitializing guard (500 ms timer) expire and
+    // reduces re-render churn around the Reka UI portal.
+    await this._waitForAllPanelsIdle();
+
+    // Page-level locators survive portal re-mounts; only one datetime menu can be
+    // open at a time (Reka UI unmounts when closed), so these are unambiguous.
     const timeOptionLocator = this.page.locator(`[data-test="date-time-relative-${timeRange}-btn"]`).first();
+    // force: true is required here. Reka UI's data-reka-popper-content-wrapper can
+    // transiently intercept pointer events mid-re-render even after the idle wait,
+    // and the element can briefly detach while Vue re-mounts the portal. force
+    // fires the pointer event as soon as the locator resolves without waiting for
+    // the wrapper to clear — the button itself IS the intended target.
     await timeOptionLocator.click({ force: true, timeout: 15000 });
 
     if (clickApply) {
+      // The time option selection itself may trigger a live-preview re-render or a
+      // new panel data request. Wait for those to settle so the Apply button is
+      // stable and the panelsInitializing guard (500 ms timer in
+      // RenderDashboardCharts) has had time to expire before we commit the change.
+      await this._waitForAllPanelsIdle();
+
+      // If the menu closed unexpectedly during the wait (a background re-render
+      // unmounted the portal), retry rather than hanging waiting for Apply.
+      const menuVisible = await this.dateTimeMenu.isVisible().catch(() => false);
+      if (!menuVisible) {
+        if (_attempt < 4) {
+          await this._waitForAllPanelsIdle();
+          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
+        }
+        return;
+      }
+
       const applyBtn = this.page.locator('[data-test="date-time-apply-btn"]').first();
-      await applyBtn.waitFor({ state: "visible", timeout: 5000 });
+      await applyBtn.waitFor({ state: "visible", timeout: 10000 });
 
       const urlBefore = this.page.url();
-      // force: true for the same reason as the time option — continuous background
-      // panel re-renders can keep this button "not stable" in the stability check.
-      await applyBtn.click({ force: true });
 
-      // Wait for dialog to close and network to settle
-      await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
-      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      try {
+        // No force:true — panels are idle so the button is stable and actionable.
+        // Explicit 10 s timeout: fail fast if the button detaches mid-click (another
+        // re-render) rather than hanging until the 45 s CI action-timeout.
+        await applyBtn.click({ timeout: 10000 });
 
-      // Detect whether onPanelTimeApply was blocked by the panelsInitializing guard.
-      // The guard is a 500ms timer in RenderDashboardCharts that re-arms whenever
-      // initializePanelTimes() runs (e.g. when currentTimeObj updates from a panel
-      // refresh). Under parallel-test server load this guard can be active when Apply
-      // is clicked, causing onPanelTimeApply to return early without writing the URL.
-      // Detection: if the URL hasn't changed, the apply was a no-op — retry once.
-      const urlAfter = this.page.url();
-      if (urlAfter === urlBefore && _attempt < 2) {
-        // Wait for network to drain fully (lets any in-flight panel refreshes complete
-        // and allows the 500ms panelsInitializing guard to expire).
-        await this.page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-        await this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
+        // Wait for the dialog to close, then for the resulting panel data request
+        // (triggered by the new time range) to complete.
+        await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
+        await this._waitForAllPanelsIdle();
+
+        // Detect whether onPanelTimeApply was blocked by the panelsInitializing guard.
+        // The guard is a 500 ms timer that re-arms whenever initializePanelTimes()
+        // runs. If the URL hasn't changed the apply was a no-op — retry.
+        const urlAfter = this.page.url();
+        if (urlAfter === urlBefore && _attempt < 4) {
+          await this._waitForAllPanelsIdle();
+          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
+        }
+      } catch (_err) {
+        // Apply click or menu-close timed out. Retry if attempts remain.
+        if (_attempt < 4) {
+          await this._waitForAllPanelsIdle();
+          return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
+        }
+        throw _err;
       }
+    }
+  }
+
+  /**
+   * Wait for all panel data API requests to complete and all loading indicators to
+   * clear. This is the correct signal that the panelsInitializing guard in
+   * RenderDashboardCharts (a 500 ms timer that re-arms on every panel refresh) has
+   * had time to expire, making the UI stable for clicks without force:true.
+   */
+  async _waitForAllPanelsIdle() {
+    // Network idle = no pending /_search or /query responses
+    await this.page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    // Loading indicators confirm each panel has finished rendering its response
+    const loadingIndicators = this.page.locator('[data-test$="-loading"]');
+    const count = await loadingIndicators.count();
+    for (let i = 0; i < count; i++) {
+      await loadingIndicators.nth(i).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
     }
   }
 
