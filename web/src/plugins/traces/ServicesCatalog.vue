@@ -402,6 +402,7 @@ import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import streamService from "@/services/stream";
 import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import {
   b64EncodeUnicode,
@@ -427,7 +428,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
   useHttpStreaming();
 
 const emit = defineEmits<{
-  "view-traces": [serviceName: string];
+  "view-traces": [data: string | Record<string, any>];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -452,6 +453,7 @@ interface ServiceRow {
   p99_latency_ns: number;
   infer_service_name?: string;
   infer_service_system?: string;
+  infer_service_type?: string;
 }
 
 const isLoading = ref(false);
@@ -462,8 +464,17 @@ const rowsPerPage = ref(25);
 const rowsPerPageOptions = [10, 25, 50, 100];
 const sortBy = ref<string>("status");
 const sortOrder = ref<"asc" | "desc">("desc");
-const useInferServiceFields = ref(true);
-const isLoadingFallback = ref(false);
+/**
+ * Tri-state cache for whether the current stream's schema contains the `infer_service_name` column.
+ *
+ * - `null`  — not yet checked for the current stream; triggers a schema API call on next load.
+ * - `true`  — column exists; queries will use `infer_service_name` for service grouping.
+ * - `false` — column absent; queries will fall back to `service_name` only.
+ *
+ * The value is reset to `null` whenever the stream filter changes so that the next
+ * `loadServicesCatalog()` call re-validates against the new stream's schema.
+ */
+const hasInferColumns = ref<boolean | null>(null);
 
 const totalPages = computed(() =>
   filteredServices.value.length && rowsPerPage.value
@@ -501,6 +512,7 @@ const selectedServiceNode = computed(() =>
     ? {
         id: selectedServiceRow.value.service_name,
         name: selectedServiceRow.value.service_name,
+        service_type: selectedServiceRow.value.infer_service_type,
       }
     : null,
 );
@@ -712,9 +724,7 @@ function handleCloseSidePanel() {
 }
 
 function viewTraces(data: string | Record<string, any>) {
-  const serviceName =
-    typeof data === "string" ? data : (data?.serviceName ?? "");
-  emit("view-traces", serviceName);
+  emit("view-traces", data);
 }
 
 function getTimeRange(): { start_time: number; end_time: number } {
@@ -749,6 +759,7 @@ const loadAvailableStreams = async () => {
 const onStreamFilterChange = (stream: string) => {
   streamFilter.value = stream;
   localStorage.setItem("servicesCatalog_streamFilter", stream);
+  hasInferColumns.value = null; // re-check schema for new stream
   loadServicesCatalog();
 };
 
@@ -775,14 +786,34 @@ async function loadServicesCatalog() {
 
   const { start_time, end_time } = getTimeRange();
 
-  // Build SQL: try to group by infer_service_name first (with COALESCE fallback to service_name).
-  // If the infer columns don't exist in the schema, the error callback retries without them.
-  const useInfer = useInferServiceFields.value;
+  // Check stream schema for infer_service_name column (cache result per stream)
+  if (hasInferColumns.value === null) {
+    try {
+      const org = searchObj.organizationIdentifier;
+      const schemaResponse = await streamService.schema(
+        org,
+        streamName,
+        "traces",
+      );
+      const schemaFields =
+        schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      hasInferColumns.value = schemaFields.some(
+        (f: any) => f.name === "infer_service_name",
+      );
+    } catch {
+      // If schema check fails, default to false (use service_name only)
+      hasInferColumns.value = false;
+    }
+  }
+
+  // Build SQL: use infer_service_name when the column exists in the schema
+  const useInfer = hasInferColumns.value;
   const sql = useInfer
     ? `SELECT
   COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
-  MAX(infer_service_name) AS infer_service_name,
-  MAX(infer_service_system) AS infer_service_system,
+  MAX(infer_service_name) AS _infer_service_name,
+  MAX(infer_service_system) AS _infer_service_system,
+  MAX(infer_service_type) AS _infer_service_type,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
   CAST(SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS DOUBLE) / CAST(COUNT(*) AS DOUBLE) * 100 AS error_rate,
@@ -851,29 +882,19 @@ ORDER BY total_requests DESC`;
               p95_latency_ns: hit.p95_latency_ns ?? 0,
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
-              infer_service_name: hit.infer_service_name ?? undefined,
-              infer_service_system: hit.infer_service_system ?? undefined,
+              infer_service_name: hit._infer_service_name ?? undefined,
+              infer_service_system: hit._infer_service_system ?? undefined,
+              infer_service_type: hit._infer_service_type ?? undefined,
             });
           }
           services.value = Array.from(serviceMap.values());
         }
       },
       error: (_payload: any, _response: any) => {
-        // If the query failed because infer columns don't exist in the schema,
-        // retry once with the fallback query that only uses service_name.
-        // Guard against re-entry: only retry if we haven't already fallen back.
-        if (useInferServiceFields.value && !isLoadingFallback.value) {
-          useInferServiceFields.value = false;
-          isLoadingFallback.value = true;
-          isLoading.value = false;
-          loadServicesCatalog();
-          return;
-        }
         isLoading.value = false;
       },
       complete: (_payload: any, _response: any) => {
         isLoading.value = false;
-        isLoadingFallback.value = false;
       },
       reset: (_payload: any, _response: any) => {
         services.value = [];
