@@ -15,7 +15,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use config::meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_MULTI_FIELDS};
+use config::meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS};
 use datafusion::{
     common::{
         Result,
@@ -32,7 +32,7 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
     utils::{get_column_name, is_column},
 };
 
-/// SimpleTopNMulti(Vec<String>, usize, bool):
+/// SimpleTopN(Vec<String>, usize, bool) for multi-field group by:
 /// Supports multi-field (2..=4) GROUP BY queries like:
 ///   SELECT userid, searchphrase, COUNT(*) as cnt FROM hits GROUP BY userid, searchphrase ORDER BY
 /// cnt DESC LIMIT 10;
@@ -45,10 +45,10 @@ pub(crate) fn is_simple_topn_multi(
     let mut visitor = SimpleTopnMultiVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
     if let Some((fields, fetch, ascend)) = visitor.simple_topn_multi {
-        if fields.len() < 2 || fields.len() > MAX_SIMPLE_TOPN_MULTI_FIELDS {
+        if fields.len() < 2 || fields.len() > MAX_SIMPLE_TOPN_FIELDS {
             return None;
         }
-        Some(IndexOptimizeMode::SimpleTopNMulti(fields, fetch, ascend))
+        Some(IndexOptimizeMode::SimpleTopN(fields, fetch, ascend))
     } else {
         None
     }
@@ -77,7 +77,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnMultiVisitor {
             if let Some(fetch) = sort_merge.fetch()
                 && fetch > 0
                 && !sort_merge.expr().is_empty()
-                && sort_merge.expr().len() <= MAX_SIMPLE_TOPN_MULTI_FIELDS + 1
+                && sort_merge.expr().len() <= MAX_SIMPLE_TOPN_FIELDS + 1
             // primary sort + up to one secondary sort per group field
             {
                 // the first sort should be on the count(*) result, not directly on an index field
@@ -100,7 +100,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnMultiVisitor {
         } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [field1, .., fieldN, count(*)]
             let exprs = projection.expr();
-            if exprs.len() >= 3 && exprs.len() <= MAX_SIMPLE_TOPN_MULTI_FIELDS + 1 {
+            if exprs.len() >= 3 && exprs.len() <= MAX_SIMPLE_TOPN_FIELDS + 1 {
                 return Ok(TreeNodeRecursion::Continue);
             }
             self.simple_topn_multi = None;
@@ -108,8 +108,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnMultiVisitor {
         } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches multi-field TopN pattern
             let group_len = aggregate.group_expr().expr().len();
-            if (2..=MAX_SIMPLE_TOPN_MULTI_FIELDS).contains(&group_len)
-                && aggregate.aggr_expr().len() == 1
+            if (2..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len) && aggregate.aggr_expr().len() == 1
             {
                 let mut fields = Vec::with_capacity(group_len);
 
@@ -185,7 +184,7 @@ mod tests {
             // Valid: two-field GROUP BY with count(*) ORDER BY cnt DESC LIMIT 10
             (
                 "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopNMulti(
+                Some(IndexOptimizeMode::SimpleTopN(
                     vec!["userid".to_string(), "searchphrase".to_string()],
                     10,
                     false,
@@ -194,7 +193,7 @@ mod tests {
             // Valid: two-field GROUP BY with count(*) ORDER BY cnt ASC LIMIT 5
             (
                 "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt asc limit 5",
-                Some(IndexOptimizeMode::SimpleTopNMulti(
+                Some(IndexOptimizeMode::SimpleTopN(
                     vec!["userid".to_string(), "searchphrase".to_string()],
                     5,
                     true,
@@ -203,7 +202,7 @@ mod tests {
             // Valid: three-field GROUP BY with count(*) (status is in index_fields below)
             (
                 "select userid, searchphrase, status, count(*) as cnt from hits where match_all('error') group by userid, searchphrase, status order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopNMulti(
+                Some(IndexOptimizeMode::SimpleTopN(
                     vec![
                         "userid".to_string(),
                         "searchphrase".to_string(),

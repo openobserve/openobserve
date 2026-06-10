@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::inverted_index::MAX_SIMPLE_TOPN_MULTI_FIELDS;
 use hashbrown::HashMap;
 use tantivy::{
     DocId, Score, SegmentOrdinal, SegmentReader,
@@ -21,13 +20,15 @@ use tantivy::{
     columnar::StrColumn,
 };
 
+use crate::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS;
+
 /// Packed multi-field term-ordinal key.
 ///
 /// Ordinals always fit in 32 bits: a segment holds at most u32::MAX docs (DocId is u32) and a
 /// dictionary cannot have more terms than docs. Field `i`'s ordinal occupies bits
 /// `32*i..32*(i+1)`. A single integer key hashes faster (and uses less memory bandwidth) than
 /// a tuple or Vec on the 100M+ insert hot path.
-pub(super) trait OrdKey: Copy + Eq + Ord + std::hash::Hash + Send + Sync + 'static {
+pub trait OrdKey: Copy + Eq + Ord + std::hash::Hash + Send + Sync + 'static {
     /// max number of ordinals this key can hold
     const CAPACITY: usize;
 
@@ -65,15 +66,20 @@ impl OrdKey for u128 {
     }
 }
 
-/// Flat collector for multi-field `GROUP BY field0, .., fieldN COUNT(*)` (N in 2..=4).
+/// Flat collector for `GROUP BY field0[, .., fieldN] COUNT(*)` (N in 1..=4).
 ///
 /// Aggregates over the fields' columnar (fast field) term ordinals into a single flat
-/// map and returns the per-file top-K `(fields, count)` pairs. See
-/// [`super::search::TantivyResult::handle_simple_top_n_multi`] for why this replaces the
-/// nested aggregation.
+/// map and returns the per-file top-K `(fields, count)` groups:
+///   - read each field's term ordinal for each matching doc,
+///   - count into a single flat `packed ordinals -> count` map (bounded by the file's rows),
+///   - keep only the per-file top-K, resolving ordinals to strings for survivors only.
 ///
-/// `K` selects the packed key width: `u64` for 2 fields, `u128` for 3..=4 fields.
-pub(super) struct TopNMultiCollector<K: OrdKey> {
+/// This replaces tantivy's `TermsAggregation`, which keeps a separate sub-collector per
+/// bucket level, materializes a string per group, and over-fetches the product of the
+/// per-level segment sizes (exponential in the field count).
+///
+/// `K` selects the packed key width: `u64` for 1..=2 fields, `u128` for 3..=4 fields.
+pub struct TopNCollector<K: OrdKey> {
     fields: Vec<String>,
     /// number of groups to keep per file (over-fetch for cross-file accuracy)
     k: usize,
@@ -82,9 +88,9 @@ pub(super) struct TopNMultiCollector<K: OrdKey> {
     _key: std::marker::PhantomData<K>,
 }
 
-impl<K: OrdKey> TopNMultiCollector<K> {
-    pub(super) fn new(fields: Vec<String>, k: usize, ascend: bool) -> Self {
-        debug_assert!(fields.len() >= 2 && fields.len() <= K::CAPACITY);
+impl<K: OrdKey> TopNCollector<K> {
+    pub fn new(fields: Vec<String>, k: usize, ascend: bool) -> Self {
+        debug_assert!(!fields.is_empty() && fields.len() <= K::CAPACITY);
         Self {
             fields,
             k,
@@ -94,7 +100,7 @@ impl<K: OrdKey> TopNMultiCollector<K> {
     }
 }
 
-pub(super) struct TopNMultiSegmentCollector<K: OrdKey> {
+pub struct TopNSegmentCollector<K: OrdKey> {
     /// None when any field's column is missing from this segment (legacy index file)
     cols: Option<Vec<StrColumn>>,
     k: usize,
@@ -103,9 +109,9 @@ pub(super) struct TopNMultiSegmentCollector<K: OrdKey> {
     counts: HashMap<K, u64>,
 }
 
-impl<K: OrdKey> Collector for TopNMultiCollector<K> {
+impl<K: OrdKey> Collector for TopNCollector<K> {
     type Fruit = Vec<(Vec<String>, u64)>;
-    type Child = TopNMultiSegmentCollector<K>;
+    type Child = TopNSegmentCollector<K>;
 
     fn for_segment(
         &self,
@@ -118,7 +124,7 @@ impl<K: OrdKey> Collector for TopNMultiCollector<K> {
             .iter()
             .map(|field| fast_fields.str(field))
             .collect::<tantivy::Result<Option<Vec<_>>>>()?;
-        Ok(TopNMultiSegmentCollector {
+        Ok(TopNSegmentCollector {
             cols,
             k: self.k,
             ascend: self.ascend,
@@ -153,7 +159,7 @@ impl<K: OrdKey> Collector for TopNMultiCollector<K> {
     }
 }
 
-impl<K: OrdKey> SegmentCollector for TopNMultiSegmentCollector<K> {
+impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
     type Fruit = Vec<(Vec<String>, u64)>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
@@ -162,7 +168,7 @@ impl<K: OrdKey> SegmentCollector for TopNMultiSegmentCollector<K> {
         };
         // index_fields are single-valued raw columns: take the first ordinal if present.
         // Docs missing any field do not form a group (matches `missing: None` before).
-        let mut ords = [0u64; MAX_SIMPLE_TOPN_MULTI_FIELDS];
+        let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
         for (ord, col) in ords.iter_mut().zip(cols.iter()) {
             match col.ords().first(doc) {
                 Some(o) => *ord = o,
@@ -174,7 +180,7 @@ impl<K: OrdKey> SegmentCollector for TopNMultiSegmentCollector<K> {
     }
 
     fn harvest(self) -> Self::Fruit {
-        let TopNMultiSegmentCollector {
+        let TopNSegmentCollector {
             cols,
             k,
             ascend,
@@ -235,7 +241,7 @@ fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
         })
     {
         log::warn!(
-            "search->tantivy: topn_multi failed to resolve {} of {} term ordinals: {e}",
+            "search->tantivy: topn failed to resolve {} of {} term ordinals: {e}",
             ords.len() - strings.len(),
             ords.len()
         );
@@ -275,6 +281,9 @@ mod tests {
 
     #[test]
     fn test_ord_key_pack_unpack() {
+        let key = u64::pack(&[7]);
+        assert_eq!(key.unpack(0), 7);
+
         let key = u64::pack(&[7, 9]);
         assert_eq!((key.unpack(0), key.unpack(1)), (7, 9));
 
@@ -290,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_topn_multi_collector() {
+    fn test_topn_collector() {
         let mut schema_builder = SchemaBuilder::new();
         let opts = TextOptions::default().set_fast(None);
         let f0 = schema_builder.add_text_field("f0", opts.clone());
@@ -319,24 +328,42 @@ mod tests {
         writer
             .add_document(doc!(f0 => "b", f1 => "x", f2 => "1"))
             .unwrap();
-        // missing f1 -> does not form a group
+        // missing f1 -> does not form a group for queries that include f1
         writer.add_document(doc!(f0 => "c", f2 => "1")).unwrap();
         writer.commit().unwrap();
 
         let searcher = index.reader().unwrap().searcher();
         let row = |strs: &[&str], count: u64| (strs.iter().map(|s| s.to_string()).collect(), count);
-
-        // 2 fields via the u64 key
-        let search2 = |k: usize, ascend: bool| {
-            let collector =
-                TopNMultiCollector::<u64>::new(vec!["f0".to_string(), "f1".to_string()], k, ascend);
-            let mut res = searcher.search(&AllQuery, &collector).unwrap();
-            res.sort_by(|a, b| if ascend { a.1.cmp(&b.1) } else { b.1.cmp(&a.1) });
+        let search = |fields: &[&str], k: usize, ascend: bool| {
+            let fields: Vec<String> = fields.iter().map(|s| s.to_string()).collect();
+            let mut res = if fields.len() <= 2 {
+                searcher
+                    .search(&AllQuery, &TopNCollector::<u64>::new(fields, k, ascend))
+                    .unwrap()
+            } else {
+                searcher
+                    .search(&AllQuery, &TopNCollector::<u128>::new(fields, k, ascend))
+                    .unwrap()
+            };
+            res.sort_by(|a, b| {
+                if ascend {
+                    a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0))
+                } else {
+                    b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0))
+                }
+            });
             res
         };
-        // all groups, counts merged across segments, missing-field doc excluded
+
+        // single field via the u64 key (doc with missing f1 still counts for f0)
         assert_eq!(
-            search2(10, false),
+            search(&["f0"], 10, false),
+            vec![row(&["a"], 5), row(&["b"], 1), row(&["c"], 1)]
+        );
+
+        // two fields, counts merged across segments, missing-field doc excluded
+        assert_eq!(
+            search(&["f0", "f1"], 10, false),
             vec![
                 row(&["a", "x"], 3),
                 row(&["a", "y"], 2),
@@ -344,20 +371,13 @@ mod tests {
             ]
         );
         // ascend keeps the smallest counts
-        assert_eq!(search2(10, true)[0], row(&["b", "x"], 1));
+        assert_eq!(search(&["f0", "f1"], 10, true)[0], row(&["b", "x"], 1));
         // k truncates per merge result
-        assert_eq!(search2(1, false), vec![row(&["a", "x"], 3)]);
+        assert_eq!(search(&["f0", "f1"], 1, false), vec![row(&["a", "x"], 3)]);
 
-        // 3 fields via the u128 key
-        let collector = TopNMultiCollector::<u128>::new(
-            vec!["f0".to_string(), "f1".to_string(), "f2".to_string()],
-            10,
-            false,
-        );
-        let mut res = searcher.search(&AllQuery, &collector).unwrap();
-        res.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        // three fields via the u128 key
         assert_eq!(
-            res,
+            search(&["f0", "f1", "f2"], 10, false),
             vec![
                 row(&["a", "x", "1"], 3),
                 row(&["a", "y", "1"], 1),

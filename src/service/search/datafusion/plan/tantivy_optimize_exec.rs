@@ -216,12 +216,7 @@ async fn adapt_tantivy_result(
                 &result.multi_histogram(),
             )?]
         }
-        IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
-            create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
-        }
-        IndexOptimizeMode::SimpleTopNMulti(ref fields, limit, _ascend) => {
-            create_top_n_multi_arrow_array(&schema, result.top_n_multi(), fields, limit)?
-        }
+        IndexOptimizeMode::SimpleTopN(..) => create_top_n_arrow_array(&schema, result.top_n())?,
         IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
             vec![create_distinct_arrow_array(&schema, result.distinct())?]
         }
@@ -453,67 +448,14 @@ fn create_multi_histogram_arrow_array(
 
 fn create_top_n_arrow_array(
     schema: &SchemaRef,
-    top_n: Vec<(String, u64)>,
-    _field: &str,
-    _limit: usize,
-) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
-    // Validate inputs
-    if schema.fields().len() != 2 {
-        return Err(DataFusionError::Internal(format!(
-            "Expected schema with 2 fields for TopN, got {}",
-            schema.fields().len()
-        )));
-    }
-
-    // Extract field values and counts
-    let (field_values, count_values): (Vec<String>, Vec<u64>) = top_n.into_iter().unzip();
-
-    // Get field data types from schema to ensure we create the right array types
-    let field_field = &schema.fields()[0];
-    let count_field = &schema.fields()[1];
-
-    let total_rows = field_values.len();
-
-    if total_rows == 0 {
-        return Ok(vec![]);
-    }
-
-    let mut batches = Vec::new();
-
-    // Process data in batches of BATCH_SIZE
-    let batch_size = get_batch_size();
-    for chunk_start in (0..total_rows).step_by(batch_size) {
-        let chunk_end = std::cmp::min(chunk_start + batch_size, total_rows);
-
-        let field_chunk = field_values[chunk_start..chunk_end].to_vec();
-        let count_chunk = count_values[chunk_start..chunk_end].to_vec();
-
-        // Create field value array with proper type based on schema
-        let field_array = create_field_array(field_field, field_chunk)?;
-
-        // Create count array with proper type based on schema
-        let count_array = create_count_array(count_field, count_chunk)?;
-
-        batches.push(vec![field_array, count_array]);
-    }
-
-    Ok(batches)
-}
-
-fn create_top_n_multi_arrow_array(
-    schema: &SchemaRef,
     top_n: Vec<(Vec<String>, u64)>,
-    _fields: &[String],
-    _limit: usize,
 ) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
-    // Validate: schema should have N group fields (2..=MAX) plus a count field
+    // Validate: schema should have N group fields (1..=MAX) plus a count field
     let schema_fields = schema.fields().len();
-    if !(3..=config::meta::inverted_index::MAX_SIMPLE_TOPN_MULTI_FIELDS + 1)
-        .contains(&schema_fields)
-    {
+    if !(2..=config::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS + 1).contains(&schema_fields) {
         return Err(DataFusionError::Internal(format!(
-            "Expected schema with 3..={} fields for TopNMulti, got {schema_fields}",
-            config::meta::inverted_index::MAX_SIMPLE_TOPN_MULTI_FIELDS + 1
+            "Expected schema with 2..={} fields for TopN, got {schema_fields}",
+            config::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS + 1
         )));
     }
     let num_group_fields = schema_fields - 1;
@@ -1039,12 +981,13 @@ mod tests {
 
     #[test]
     fn test_create_top_n_arrow_array() {
+        // single group field
         let schema = Arc::new(Schema::new(vec![
             Field::new("field", DataType::Utf8, false),
             Field::new("count", DataType::Int64, false),
         ]));
-        let top_n = vec![("a".to_string(), 10), ("b".to_string(), 20)];
-        let result = create_top_n_arrow_array(&schema, top_n, "field", 2).unwrap();
+        let top_n = vec![(vec!["a".to_string()], 10), (vec!["b".to_string()], 20)];
+        let result = create_top_n_arrow_array(&schema, top_n).unwrap();
 
         assert_eq!(result.len(), 1); // One batch
         let batch = &result[0];
@@ -1059,6 +1002,28 @@ mod tests {
         assert_eq!(field_array.value(1), "b");
         assert_eq!(count_array.value(0), 10);
         assert_eq!(count_array.value(1), 20);
+
+        // two group fields
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field1", DataType::Utf8, false),
+            Field::new("field2", DataType::Utf8, false),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let top_n = vec![
+            (vec!["a".to_string(), "x".to_string()], 10),
+            (vec!["b".to_string(), "y".to_string()], 20),
+        ];
+        let result = create_top_n_arrow_array(&schema, top_n).unwrap();
+
+        assert_eq!(result.len(), 1);
+        let batch = &result[0];
+        assert_eq!(batch.len(), 3);
+
+        let field2_array = batch[1].as_any().downcast_ref::<StringArray>().unwrap();
+        let count_array = batch[2].as_any().downcast_ref::<Int64Array>().unwrap();
+        assert_eq!(field2_array.value(0), "x");
+        assert_eq!(field2_array.value(1), "y");
+        assert_eq!(count_array.value(1), 20);
     }
 
     #[test]
@@ -1067,7 +1032,7 @@ mod tests {
             Field::new("field", DataType::Utf8, false),
             Field::new("count", DataType::Int64, false),
         ]));
-        let result = create_top_n_arrow_array(&schema, vec![], "field", 2).unwrap();
+        let result = create_top_n_arrow_array(&schema, vec![]).unwrap();
         assert!(result.is_empty());
     }
 
@@ -1078,8 +1043,8 @@ mod tests {
             DataType::Utf8,
             false,
         )]));
-        let top_n = vec![("a".to_string(), 10)];
-        let result = create_top_n_arrow_array(&schema, top_n, "field", 1);
+        let top_n = vec![(vec!["a".to_string()], 10)];
+        let result = create_top_n_arrow_array(&schema, top_n);
         assert!(result.is_err());
     }
 

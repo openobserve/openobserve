@@ -59,7 +59,7 @@ pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet
             return None;
         }
         Some(IndexOptimizeMode::SimpleTopN(
-            field,
+            vec![field],
             fetch,
             ascend,
         ))
@@ -220,19 +220,35 @@ mod tests {
         let cases = vec![
             (
                 "select name, count(*) as cnt from t where match_all('error') group by name order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string()],
+                    10,
+                    false,
+                )),
             ),
             (
                 "select name, count(*) as cnt from t where match_all('error') group by name order by cnt asc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, true)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string()],
+                    10,
+                    true,
+                )),
             ),
             (
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string()],
+                    10,
+                    false,
+                )),
             ),
             (
                 "select name as key, count(*) as cnt from t where match_all('error') group by key order by cnt desc, key asc limit 10",
-                Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string()],
+                    10,
+                    false,
+                )),
             ),
             // Invalid case: secondary sort with DESC should not optimize
             (
@@ -247,12 +263,20 @@ mod tests {
             // Valid case: different index field (id instead of name)
             (
                 "select id, count(*) as cnt from t where match_all('error') group by id order by cnt desc limit 5",
-                Some(IndexOptimizeMode::SimpleTopN("id".to_string(), 5, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["id".to_string()],
+                    5,
+                    false,
+                )),
             ),
             // Valid case: with alias and secondary sort
             (
                 "select id as identifier, count(*) as total from t where match_all('error') group by identifier order by total desc, identifier asc limit 20",
-                Some(IndexOptimizeMode::SimpleTopN("id".to_string(), 20, false)),
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["id".to_string()],
+                    20,
+                    false,
+                )),
             ),
             // Invalid case: no limit
             (
@@ -317,7 +341,7 @@ mod tests {
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "hostname".to_string(),
+                    vec!["hostname".to_string()],
                     1,
                     false,
                 )),
@@ -325,7 +349,7 @@ mod tests {
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 100",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "hostname".to_string(),
+                    vec!["hostname".to_string()],
                     100,
                     false,
                 )),
@@ -333,7 +357,7 @@ mod tests {
             (
                 "select hostname, count(*) as cnt from logs where match_all('error') group by hostname order by cnt desc limit 1000",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "hostname".to_string(),
+                    vec!["hostname".to_string()],
                     1000,
                     false,
                 )),
@@ -380,7 +404,7 @@ mod tests {
             (
                 "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc limit 10",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "category".to_string(),
+                    vec!["category".to_string()],
                     10,
                     true,
                 )),
@@ -388,7 +412,7 @@ mod tests {
             (
                 "select category as cat, count(*) as cnt from events where match_all('error') group by cat order by cnt asc, cat asc limit 15",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "category".to_string(),
+                    vec!["category".to_string()],
                     15,
                     true,
                 )),
@@ -397,7 +421,7 @@ mod tests {
             (
                 "select category, count(*) as cnt from events where match_all('error') group by category order by cnt asc, category asc limit 10",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "category".to_string(),
+                    vec!["category".to_string()],
                     10,
                     true,
                 )),
@@ -451,7 +475,7 @@ mod tests {
             (
                 "select service, count(*) as cnt from metrics where match_all('error') group by service order by cnt desc limit 10",
                 Some(IndexOptimizeMode::SimpleTopN(
-                    "service".to_string(),
+                    vec!["service".to_string()],
                     10,
                     false,
                 )),

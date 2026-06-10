@@ -279,7 +279,7 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
             } else if let Some(index_optimize_mode) =
                 is_simple_topn_multi(Arc::clone(&plan), index_fields.clone())
             {
-                // Check for SimpleTopNMulti (two-field GROUP BY)
+                // Check for multi-field GROUP BY top-n
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
@@ -417,7 +417,7 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(remote);
 
         // Apply rewrite with a concrete mode and assert it reports transformed=true
-        let mode = IndexOptimizeMode::SimpleTopN("field".to_string(), 10, true);
+        let mode = IndexOptimizeMode::SimpleTopN(vec!["field".to_string()], 10, true);
         let mut rewriter = IndexOptimizerRewrite::new(mode.clone());
         let result = plan.rewrite(&mut rewriter).unwrap();
         assert!(result.transformed, "plan should be marked as transformed");
@@ -529,7 +529,11 @@ mod tests {
         let remote_scan = get_remote_scan(plan);
         assert_eq!(
             remote_scan[0].index_optimize_mode(),
-            Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false))
+            Some(IndexOptimizeMode::SimpleTopN(
+                vec!["name".to_string()],
+                10,
+                false
+            ))
         )
     }
 

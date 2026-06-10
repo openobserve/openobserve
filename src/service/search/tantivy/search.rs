@@ -19,10 +19,11 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         bitvec::BitVec,
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_MULTI_FIELDS},
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     },
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
+        topn_collector::TopNCollector,
     },
 };
 use tantivy::{
@@ -31,16 +32,12 @@ use tantivy::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants, Aggregations},
         agg_result::{AggregationResult, BucketEntries, BucketResult},
-        bucket::{
-            CustomOrder, HistogramAggregation, HistogramBounds, Order, OrderTarget,
-            TermsAggregation,
-        },
+        bucket::{HistogramAggregation, HistogramBounds, TermsAggregation},
     },
     collector::{Count, TopDocs},
     query::Query,
 };
 
-use super::topn_multi::TopNMultiCollector;
 use crate::service::search::index::IndexCondition;
 
 #[derive(Debug, Clone)]
@@ -51,8 +48,7 @@ pub enum TantivyResult {
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
-    TopN(Vec<(String, u64)>),                // simple top n optimization
-    TopNMulti(Vec<(Vec<String>, u64)>),      // multi-field top n optimization
+    TopN(Vec<(Vec<String>, u64)>),           // group by top n optimization (1..=4 fields)
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -87,13 +83,6 @@ impl TantivyResult {
                     + std::mem::size_of::<Vec<(i64, String, u64)>>()
             }
             Self::TopN(top_n) => {
-                top_n
-                    .iter()
-                    .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
-                    .sum::<usize>()
-                    + std::mem::size_of::<Vec<(String, u64)>>()
-            }
-            Self::TopNMulti(top_n) => {
                 top_n
                     .iter()
                     .map(|(keys, _)| {
@@ -253,105 +242,46 @@ impl TantivyResult {
         Ok(Self::MultiHistogram(results))
     }
 
-    pub fn handle_simple_top_n(
-        searcher: &Searcher,
-        query: Box<dyn Query>,
-        field: &str,
-        limit: usize,
-        ascend: bool,
-    ) -> anyhow::Result<Self> {
-        let order = if ascend {
-            Some(CustomOrder {
-                target: OrderTarget::Count,
-                order: Order::Asc,
-            })
-        } else {
-            None
-        };
-        let limit = (limit * 4).max(1000) as u32;
-        let aggregation = Aggregation {
-            agg: AggregationVariants::Terms(TermsAggregation {
-                field: field.to_string(),
-                size: Some(limit),
-                order,
-                missing: None,
-                min_doc_count: Some(1),
-                show_term_doc_count_error: Some(false),
-                segment_size: Some(limit),
-                include: None,
-                exclude: None,
-            }),
-            sub_aggregation: Default::default(),
-        };
-        let aggregations = Aggregations::from_iter(vec![("termagg".to_string(), aggregation)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
-
-        let mut res = searcher.search(&query, &collector)?;
-
-        if let AggregationResult::BucketResult(BucketResult::Terms { buckets, .. }) =
-            res.0.remove("termagg").unwrap()
-        {
-            let top_n = buckets
-                .into_iter()
-                .map(|bucket| {
-                    let count = bucket.doc_count;
-                    match bucket.key {
-                        Key::Str(s) => (s, count),
-                        Key::F64(f) => (f.to_string(), count),
-                        Key::I64(i) => (i.to_string(), count),
-                        Key::U64(u) => (u.to_string(), count),
-                    }
-                })
-                .collect::<Vec<_>>();
-            Ok(Self::TopN(top_n))
-        } else {
-            anyhow::bail!("Failed to get top n results from tantivy");
-        }
-    }
-
-    /// Handle multi-field (2..=4) GROUP BY with count(*) using a flat custom collector.
-    ///
-    /// Tantivy's nested `TermsAggregation` keeps a separate inner term collector per outer
-    /// bucket, materializes a string per group, and over-fetches the product of the per-level
-    /// segment sizes (exponential in the field count). Instead, this aggregates directly over
-    /// the columnar fast fields:
-    ///   - read each field's term ordinal for each matching doc,
-    ///   - count into a single flat `packed ordinals -> count` map (bounded by the file's rows),
-    ///   - keep only the per-file top-K, resolving ordinals to strings for survivors only.
+    /// Handle GROUP BY with count(*) over 1..=4 indexed fields using the flat
+    /// [`TopNCollector`]: count packed fast-field term ordinals into a single flat map, keep
+    /// only the per-file top-K, and resolve ordinals to strings for the survivors only.
     ///
     /// DataFusion's `AggregateExec` re-aggregates the per-file partials and applies the final
     /// ORDER BY + LIMIT, so correctness is preserved.
-    pub fn handle_simple_top_n_multi(
+    pub fn handle_simple_top_n(
         searcher: &Searcher,
         query: Box<dyn Query>,
         fields: &[String],
         limit: usize,
         ascend: bool,
     ) -> anyhow::Result<Self> {
-        if fields.len() < 2 || fields.len() > MAX_SIMPLE_TOPN_MULTI_FIELDS {
+        if fields.is_empty() || fields.len() > MAX_SIMPLE_TOPN_FIELDS {
             anyhow::bail!(
-                "handle_simple_top_n_multi requires 2..={MAX_SIMPLE_TOPN_MULTI_FIELDS} fields, got {}",
+                "handle_simple_top_n requires 1..={MAX_SIMPLE_TOPN_FIELDS} fields, got {}",
                 fields.len()
             );
         }
 
         // Over-fetch per file so the final cross-file top-N is contained in the union of the
         // per-file partials, while keeping the payload (and the number of term-dictionary
-        // resolutions per file) linear in `limit`. `limit * 2` matches the fan-out of the old
-        // nested path (per-level segment_size); the old path was quadratic in the bucket
-        // count, this is not.
-        let k = (limit * 2).max(1000);
+        // resolutions per file) linear in `limit`. The multipliers preserve each path's
+        // historical fan-out: `limit * 4` for single field, `limit * 2` per level for multi.
+        let k = if fields.len() == 1 {
+            (limit * 4).max(1000)
+        } else {
+            (limit * 2).max(1000)
+        };
 
-        // two ordinals pack into a u64 key; three or four need a u128
-        let results = if fields.len() == 2 {
-            let collector = TopNMultiCollector::<u64>::new(fields.to_vec(), k, ascend);
+        // one or two ordinals pack into a u64 key; three or four need a u128
+        let results = if fields.len() <= 2 {
+            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, ascend);
             searcher.search(&query, &collector)?
         } else {
-            let collector = TopNMultiCollector::<u128>::new(fields.to_vec(), k, ascend);
+            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, ascend);
             searcher.search(&query, &collector)?
         };
 
-        Ok(Self::TopNMulti(results))
+        Ok(Self::TopN(results))
     }
 
     pub fn handle_simple_distinct(
@@ -403,8 +333,7 @@ pub enum TantivyMultiResultBuilder {
     RowNums(u64),
     Histogram(Vec<Vec<u64>>),
     MultiHistogram(Vec<Vec<(i64, String, u64)>>),
-    TopN(Vec<(String, u64)>),
-    TopNMulti(Vec<(Vec<String>, u64)>),
+    TopN(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -414,7 +343,6 @@ impl TantivyMultiResultBuilder {
             Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
             Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
             Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
-            Some(IndexOptimizeMode::SimpleTopNMulti(..)) => Self::TopNMulti(vec![]),
             Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
             Some(IndexOptimizeMode::SimpleSelect(..))
             | Some(IndexOptimizeMode::SimpleCount)
@@ -451,16 +379,9 @@ impl TantivyMultiResultBuilder {
         }
     }
 
-    pub fn add_top_n(&mut self, top_n: Vec<(String, u64)>) {
+    pub fn add_top_n(&mut self, top_n: Vec<(Vec<String>, u64)>) {
         match self {
             Self::TopN(a) => a.extend(top_n),
-            _ => unreachable!("unsupported tantivy multi result"),
-        }
-    }
-
-    pub fn add_top_n_multi(&mut self, top_n: Vec<(Vec<String>, u64)>) {
-        match self {
-            Self::TopNMulti(a) => a.extend(top_n),
             _ => unreachable!("unsupported tantivy multi result"),
         }
     }
@@ -503,7 +424,6 @@ impl TantivyMultiResultBuilder {
                 TantivyMultiResult::MultiHistogram(merged)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
-            Self::TopNMulti(a) => TantivyMultiResult::TopNMulti(a),
             Self::Distinct(a) => TantivyMultiResult::Distinct(a),
         }
     }
@@ -513,8 +433,7 @@ pub enum TantivyMultiResult {
     RowNums(u64),
     Histogram(Vec<u64>),
     MultiHistogram(Vec<(i64, String, u64)>),
-    TopN(Vec<(String, u64)>),
-    TopNMulti(Vec<(Vec<String>, u64)>),
+    TopN(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -529,7 +448,6 @@ impl Display for TantivyMultiResult {
                 write!(f, "multi_histogram hits: {}", multi_histogram.len())
             }
             Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
-            Self::TopNMulti(top_n) => write!(f, "top_n_multi hits: {}", top_n.len()),
             Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
         }
     }
@@ -557,16 +475,9 @@ impl TantivyMultiResult {
         }
     }
 
-    pub fn top_n(self) -> Vec<(String, u64)> {
+    pub fn top_n(self) -> Vec<(Vec<String>, u64)> {
         match self {
             Self::TopN(a) => a,
-            _ => vec![],
-        }
-    }
-
-    pub fn top_n_multi(self) -> Vec<(Vec<String>, u64)> {
-        match self {
-            Self::TopNMulti(a) => a,
             _ => vec![],
         }
     }
@@ -608,6 +519,47 @@ mod tests {
     }
 
     #[test]
+    fn test_tantivy_result_get_memory_size_histogram() {
+        let histogram = vec![10u64, 20u64, 30u64, 40u64];
+        let result = TantivyResult::Histogram(histogram);
+        let memory_size = result.get_memory_size();
+
+        // Should include Vec overhead + capacity * size_of(u64)
+        assert!(memory_size > 0);
+        assert!(memory_size >= std::mem::size_of::<Vec<u64>>());
+    }
+
+    #[test]
+    fn test_tantivy_result_get_memory_size_top_n() {
+        let top_n = vec![
+            (vec!["term1".to_string()], 100u64),
+            (vec!["term2".to_string(), "sub1".to_string()], 200u64),
+            (vec!["term3".to_string(), "sub2".to_string()], 150u64),
+        ];
+        let result = TantivyResult::TopN(top_n);
+        let memory_size = result.get_memory_size();
+
+        // Should include Vec overhead + string capacities + u64 sizes
+        assert!(memory_size > 0);
+        assert!(memory_size >= std::mem::size_of::<Vec<(Vec<String>, u64)>>());
+    }
+
+    #[test]
+    fn test_tantivy_result_get_memory_size_distinct() {
+        let mut distinct = HashSet::new();
+        distinct.insert("value1".to_string());
+        distinct.insert("value2".to_string());
+        distinct.insert("value3".to_string());
+
+        let result = TantivyResult::Distinct(distinct);
+        let memory_size = result.get_memory_size();
+
+        // Should include HashSet overhead + string capacities
+        assert!(memory_size > 0);
+        assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
+    }
+
+    #[test]
     fn test_tantivy_multi_result_builder_new() {
         // Test with SimpleHistogram
         let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10));
@@ -615,7 +567,11 @@ mod tests {
         assert!(matches!(builder, TantivyMultiResultBuilder::Histogram(_)));
 
         // Test with SimpleTopN
-        let optimize_rule = Some(IndexOptimizeMode::SimpleTopN("field".to_string(), 10, true));
+        let optimize_rule = Some(IndexOptimizeMode::SimpleTopN(
+            vec!["field".to_string()],
+            10,
+            true,
+        ));
         let builder = TantivyMultiResultBuilder::new(&optimize_rule);
         assert!(matches!(builder, TantivyMultiResultBuilder::TopN(_)));
 
@@ -684,8 +640,11 @@ mod tests {
     fn test_tantivy_multi_result_builder_add_top_n() {
         let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
 
-        let top_n1 = vec![("term1".to_string(), 100), ("term2".to_string(), 50)];
-        let top_n2 = vec![("term3".to_string(), 75)];
+        let top_n1 = vec![
+            (vec!["term1".to_string()], 100),
+            (vec!["term2".to_string()], 50),
+        ];
+        let top_n2 = vec![(vec!["term3".to_string(), "sub1".to_string()], 75)];
 
         builder.add_top_n(top_n1);
         builder.add_top_n(top_n2);
@@ -693,9 +652,9 @@ mod tests {
         match &builder {
             TantivyMultiResultBuilder::TopN(results) => {
                 assert_eq!(results.len(), 3);
-                assert_eq!(results[0].0, "term1");
+                assert_eq!(results[0].0, vec!["term1".to_string()]);
                 assert_eq!(results[0].1, 100);
-                assert_eq!(results[2].0, "term3");
+                assert_eq!(results[2].0, vec!["term3".to_string(), "sub1".to_string()]);
                 assert_eq!(results[2].1, 75);
             }
             _ => panic!("Expected TopN variant"),
@@ -778,12 +737,12 @@ mod tests {
 
         // Test TopN build
         let mut builder = TantivyMultiResultBuilder::TopN(vec![]);
-        builder.add_top_n(vec![("term1".to_string(), 100)]);
+        builder.add_top_n(vec![(vec!["term1".to_string()], 100)]);
         let result = builder.build();
         match result {
             TantivyMultiResult::TopN(top_n) => {
                 assert_eq!(top_n.len(), 1);
-                assert_eq!(top_n[0].0, "term1");
+                assert_eq!(top_n[0].0, vec!["term1".to_string()]);
                 assert_eq!(top_n[0].1, 100);
             }
             _ => panic!("Expected TopN result"),
@@ -812,7 +771,7 @@ mod tests {
         let result = TantivyMultiResult::Histogram(vec![10, 20, 30]);
         assert_eq!(result.num_rows(), 0);
 
-        let result = TantivyMultiResult::TopN(vec![("term".to_string(), 50)]);
+        let result = TantivyMultiResult::TopN(vec![(vec!["term".to_string()], 50)]);
         assert_eq!(result.num_rows(), 0);
 
         let mut distinct = HashSet::new();
@@ -837,7 +796,10 @@ mod tests {
 
     #[test]
     fn test_tantivy_multi_result_top_n() {
-        let top_n_data = vec![("term1".to_string(), 100), ("term2".to_string(), 50)];
+        let top_n_data = vec![
+            (vec!["term1".to_string()], 100),
+            (vec!["term2".to_string(), "sub1".to_string()], 50),
+        ];
         let result = TantivyMultiResult::TopN(top_n_data.clone());
 
         let extracted = result.top_n();
@@ -876,7 +838,8 @@ mod tests {
         assert_eq!(format!("{result}"), "histogram hits: 60");
 
         // Test TopN display
-        let result = TantivyMultiResult::TopN(vec![("a".to_string(), 1), ("b".to_string(), 2)]);
+        let result =
+            TantivyMultiResult::TopN(vec![(vec!["a".to_string()], 1), (vec!["b".to_string()], 2)]);
         assert_eq!(format!("{result}"), "top_n hits: 2");
 
         // Test Distinct display

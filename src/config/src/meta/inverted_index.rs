@@ -17,9 +17,9 @@ use proto::cluster_rpc;
 
 pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
 
-/// Maximum number of GROUP BY fields supported by [`IndexOptimizeMode::SimpleTopNMulti`].
+/// Maximum number of GROUP BY fields supported by [`IndexOptimizeMode::SimpleTopN`].
 /// Four 32-bit term ordinals pack into one u128 key in the tantivy collector.
-pub const MAX_SIMPLE_TOPN_MULTI_FIELDS: usize = 4;
+pub const MAX_SIMPLE_TOPN_FIELDS: usize = 4;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
@@ -27,10 +27,8 @@ pub enum IndexOptimizeMode {
     SimpleCount,
     SimpleHistogram(i64, u64, usize),
     SimpleMultiHistogram(i64, i64, u64, String),
-    SimpleTopN(String, usize, bool),
-    /// Multi-field (2..=MAX_SIMPLE_TOPN_MULTI_FIELDS) GROUP BY with count(*):
-    /// (fields, limit, ascend)
-    SimpleTopNMulti(Vec<String>, usize, bool),
+    /// GROUP BY (1..=MAX_SIMPLE_TOPN_FIELDS fields) with count(*): (fields, limit, ascend)
+    SimpleTopN(Vec<String>, usize, bool),
     SimpleDistinct(String, usize, bool),
 }
 
@@ -45,12 +43,9 @@ impl IndexOptimizeMode {
             IndexOptimizeMode::SimpleMultiHistogram(min_value, max_value, bucket_width, field) => {
                 format!("mh(m:{min_value},x:{max_value},b:{bucket_width},f:{field})")
             }
-            IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
-                format!("t(f{field},l:{limit},a:{ascend})")
-            }
-            IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend) => {
+            IndexOptimizeMode::SimpleTopN(fields, limit, ascend) => {
                 let fields_str = fields.join(",");
-                format!("tm(f:{fields_str},l:{limit},a:{ascend})")
+                format!("t(f:{fields_str},l:{limit},a:{ascend})")
             }
             IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
                 format!("d(f:{field},l:{limit},a:{ascend})")
@@ -78,14 +73,11 @@ impl std::fmt::Display for IndexOptimizeMode {
                     "multi_histogram(min_value: {min_value}, max_value: {max_value}, bucket_width: {bucket_width}, field: {field})"
                 )
             }
-            IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
-                write!(f, "topn(field: {field}, limit: {limit}, ascend: {ascend})")
-            }
-            IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend) => {
+            IndexOptimizeMode::SimpleTopN(fields, limit, ascend) => {
                 let fields_str = fields.join(", ");
                 write!(
                     f,
-                    "topn_multi(fields: [{fields_str}], limit: {limit}, ascend: {ascend})"
+                    "topn(fields: [{fields_str}], limit: {limit}, ascend: {ascend})"
                 )
             }
             IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
@@ -101,14 +93,16 @@ impl std::fmt::Display for IndexOptimizeMode {
 impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
     fn from(cluster_rpc_mode: cluster_rpc::IdxOptimizeMode) -> Self {
         match cluster_rpc_mode.mode {
+            // the wire keeps separate single-field/multi-field messages for compatibility
+            // with older nodes during rolling upgrades; internally both are SimpleTopN
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(select)) => {
-                IndexOptimizeMode::SimpleTopN(select.field, select.limit as usize, select.asc)
+                IndexOptimizeMode::SimpleTopN(vec![select.field], select.limit as usize, select.asc)
+            }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(select)) => {
+                IndexOptimizeMode::SimpleTopN(select.fields, select.limit as usize, select.asc)
             }
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleDistinct(select)) => {
                 IndexOptimizeMode::SimpleDistinct(select.field, select.limit as usize, select.asc)
-            }
-            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(select)) => {
-                IndexOptimizeMode::SimpleTopNMulti(select.fields, select.limit as usize, select.asc)
             }
             None => panic!("Invalid IndexOptimizeMode"),
         }
@@ -118,24 +112,29 @@ impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
 impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
     fn from(mode: IndexOptimizeMode) -> Self {
         match mode {
-            IndexOptimizeMode::SimpleTopN(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
-                mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
-                    cluster_rpc::SimpleTopN {
-                        field,
-                        limit: limit as u32,
-                        asc,
-                    },
-                )),
-            },
-            IndexOptimizeMode::SimpleTopNMulti(fields, limit, asc) => {
-                cluster_rpc::IdxOptimizeMode {
-                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(
-                        cluster_rpc::SimpleTopNMulti {
-                            fields,
-                            limit: limit as u32,
-                            asc,
-                        },
-                    )),
+            // the wire keeps separate single-field/multi-field messages for compatibility
+            // with older nodes during rolling upgrades
+            IndexOptimizeMode::SimpleTopN(mut fields, limit, asc) => {
+                if fields.len() <= 1 {
+                    cluster_rpc::IdxOptimizeMode {
+                        mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopn(
+                            cluster_rpc::SimpleTopN {
+                                field: fields.pop().unwrap_or_default(),
+                                limit: limit as u32,
+                                asc,
+                            },
+                        )),
+                    }
+                } else {
+                    cluster_rpc::IdxOptimizeMode {
+                        mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(
+                            cluster_rpc::SimpleTopNMulti {
+                                fields,
+                                limit: limit as u32,
+                                asc,
+                            },
+                        )),
+                    }
                 }
             }
             IndexOptimizeMode::SimpleDistinct(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
@@ -181,12 +180,12 @@ mod tests {
             "mh(m:0,x:1000,b:10,f:level)"
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleTopN("cpu".to_string(), 10, true).to_rule_string(),
-            "t(fcpu,l:10,a:true)"
+            IndexOptimizeMode::SimpleTopN(vec!["cpu".to_string()], 10, true).to_rule_string(),
+            "t(f:cpu,l:10,a:true)"
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleTopN("mem".to_string(), 5, false).to_rule_string(),
-            "t(fmem,l:5,a:false)"
+            IndexOptimizeMode::SimpleTopN(vec!["mem".to_string()], 5, false).to_rule_string(),
+            "t(f:mem,l:5,a:false)"
         );
         assert_eq!(
             IndexOptimizeMode::SimpleDistinct("uid".to_string(), 100, true).to_rule_string(),
@@ -242,12 +241,12 @@ mod tests {
                 "multi_histogram(min_value: 0, max_value: 1000, bucket_width: 10, field: level)",
             ),
             (
-                IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
-                "topn(field: cpu_usage, limit: 10, ascend: true)",
+                IndexOptimizeMode::SimpleTopN(vec!["cpu_usage".to_string()], 10, true),
+                "topn(fields: [cpu_usage], limit: 10, ascend: true)",
             ),
             (
-                IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
-                "topn(field: memory_usage, limit: 5, ascend: false)",
+                IndexOptimizeMode::SimpleTopN(vec!["memory_usage".to_string()], 5, false),
+                "topn(fields: [memory_usage], limit: 5, ascend: false)",
             ),
             (
                 IndexOptimizeMode::SimpleDistinct("user_id".to_string(), 100, true),
@@ -278,7 +277,7 @@ mod tests {
                         asc: true,
                     })),
                 },
-                IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
+                IndexOptimizeMode::SimpleTopN(vec!["cpu_usage".to_string()], 10, true),
             ),
             (
                 IdxOptimizeMode {
@@ -288,7 +287,7 @@ mod tests {
                         asc: false,
                     })),
                 },
-                IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
+                IndexOptimizeMode::SimpleTopN(vec!["memory_usage".to_string()], 5, false),
             ),
             (
                 IdxOptimizeMode {
@@ -325,7 +324,7 @@ mod tests {
 
         let test_cases = [
             (
-                IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
+                IndexOptimizeMode::SimpleTopN(vec!["cpu_usage".to_string()], 10, true),
                 IdxOptimizeMode {
                     mode: Some(Mode::SimpleTopn(SimpleTopN {
                         field: "cpu_usage".to_string(),
@@ -335,7 +334,7 @@ mod tests {
                 },
             ),
             (
-                IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
+                IndexOptimizeMode::SimpleTopN(vec!["memory_usage".to_string()], 5, false),
                 IdxOptimizeMode {
                     mode: Some(Mode::SimpleTopn(SimpleTopN {
                         field: "memory_usage".to_string(),
@@ -377,8 +376,14 @@ mod tests {
         // Test that converting from IndexOptimizeMode to cluster_rpc and back preserves the
         // original
         let test_modes = [
-            IndexOptimizeMode::SimpleTopN("cpu_usage".to_string(), 10, true),
-            IndexOptimizeMode::SimpleTopN("memory_usage".to_string(), 5, false),
+            IndexOptimizeMode::SimpleTopN(vec!["cpu_usage".to_string()], 10, true),
+            IndexOptimizeMode::SimpleTopN(vec!["memory_usage".to_string()], 5, false),
+            // multi-field goes through the SimpleTopNMulti wire message and back
+            IndexOptimizeMode::SimpleTopN(
+                vec!["cpu_usage".to_string(), "memory_usage".to_string()],
+                10,
+                false,
+            ),
             IndexOptimizeMode::SimpleDistinct("user_id".to_string(), 100, true),
             IndexOptimizeMode::SimpleDistinct("session_id".to_string(), 25, false),
         ];
@@ -403,11 +408,11 @@ mod tests {
         // Test edge cases and boundary values
         let edge_cases = [
             // Zero values
-            IndexOptimizeMode::SimpleTopN("".to_string(), 0, false),
+            IndexOptimizeMode::SimpleTopN(vec!["".to_string()], 0, false),
             IndexOptimizeMode::SimpleDistinct("".to_string(), 0, true),
             // Large values (using u32::MAX to avoid overflow in conversion)
             IndexOptimizeMode::SimpleTopN(
-                "very_long_field_name_that_might_exceed_normal_lengths".to_string(),
+                vec!["very_long_field_name_that_might_exceed_normal_lengths".to_string()],
                 u32::MAX as usize,
                 true,
             ),
