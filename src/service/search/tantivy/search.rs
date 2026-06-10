@@ -18,10 +18,12 @@ use std::{collections::HashSet, fmt::Display};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
-    tantivy::query::{collector::SingleSegmentDocIdCollector, contains_query::ContainsAutomaton},
+    tantivy::query::{
+        contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
+    },
 };
 use tantivy::{
-    Searcher,
+    DocId, Score, Searcher,
     aggregation::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants, Aggregations},
@@ -31,6 +33,7 @@ use tantivy::{
             TermsAggregation,
         },
     },
+    collector::{Count, TopDocs},
     query::Query,
 };
 
@@ -119,9 +122,9 @@ impl TantivyResult {
     ) -> anyhow::Result<Self> {
         let res = searcher.search(
             &query,
-            &tantivy::collector::TopDocs::with_limit(limit).tweak_score(
+            &TopDocs::with_limit(limit).tweak_score(
                 move |_segment_reader: &tantivy::SegmentReader| {
-                    move |doc_id: tantivy::DocId, _original_score: tantivy::Score| {
+                    move |doc_id: DocId, _original_score: Score| {
                         if ascend {
                             doc_id as i64
                         } else {
@@ -140,7 +143,7 @@ impl TantivyResult {
     }
 
     pub fn handle_simple_count(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::Count)?;
+        let res = searcher.search(&query, &Count)?;
         Ok(Self::Count(res))
     }
 
