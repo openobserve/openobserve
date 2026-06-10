@@ -296,24 +296,26 @@ export class DashboardPage {
     await this.dashboardSearchInput.click();
     await this.dashboardSearchInput.fill(dashboardName);
 
-    // Wait for the name cell of the target dashboard to be visible.
-    // Dashboards.vue renders each row's title cell as
-    // data-test="dashboard-name-cell-${value}" — this is a precise,
-    // data-test-only selector that only resolves once the search filter
-    // has re-rendered the table with the correct row. It avoids the race
-    // where a stale row-0 from before the filter is applied passes a plain
-    // waitFor({ state: 'visible' }) immediately, causing a delete on the
-    // wrong row.
-    await this.getDashboardNameCell(dashboardName).waitFor({ state: 'visible', timeout: 20000 });
+    // Wait for the specific name cell to confirm the search result is rendered.
+    // Dashboards.vue stamps each title cell with
+    // data-test="dashboard-name-cell-${value}" — this resolves only once the
+    // search filter has re-rendered the table with the correct row.
+    const nameCell = this.getDashboardNameCell(dashboardName);
+    await nameCell.waitFor({ state: 'visible', timeout: 20000 });
 
-    // Row action buttons (delete, edit, …) are CSS-hidden by default and only
-    // revealed when the row is hovered. Without this hover step the delete
-    // button locator never resolves and times out at the CI action-timeout
-    // (45 s). Hover first, then wait for the button to be visible before
-    // clicking — same pattern used in dashboard-import.js:272.
-    await this.firstTableRow.hover();
-    await this.firstRowDeleteButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.firstRowDeleteButton.click();
+    // Walk up from the confirmed name cell to its containing table row via
+    // XPath ancestor. This avoids the CI race where the row's o2-table-row-N
+    // data-test attribute hasn't been stamped yet when we try to hover
+    // [data-test="o2-table-row-0"] directly — same approach as dashboard-import.js:260.
+    const dashboardRow = nameCell.locator(
+      'xpath=ancestor::*[starts-with(@data-test, "o2-table-row-")][1]'
+    );
+    const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
+
+    // Row action buttons are CSS-hidden until hover — reveal before clicking.
+    await dashboardRow.hover();
+    await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
+    await deleteButton.click();
 
     // Confirm and verify the toast surface appears.
     await this.confirmButton.click();
