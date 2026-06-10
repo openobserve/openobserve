@@ -144,6 +144,7 @@ jobs:
 
       # ── Issue: add to project ──
       - name: Add issue to project
+        id: add_issue_to_project
         if: github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
@@ -157,9 +158,43 @@ jobs:
 
           [ -n "$PROJECT_ID" ] || { echo "::warning::Project not found — check PROJECT_NUMBER and token scope"; exit 0; }
 
-          gh api graphql \
+          ITEM_ID=$(gh api graphql \
             -f query='mutation($project:ID!,$content:ID!){addProjectV2ItemById(input:{projectId:$project,contentId:$content}){item{id}}}' \
             -f project="$PROJECT_ID" \
             -f content="$NODE_ID" \
-            && echo "Added issue to project" \
-            || echo "::warning::Could not add issue to project"
+            --jq '.data.addProjectV2ItemById.item.id')
+
+          if [ -n "$ITEM_ID" ]; then
+            echo "Added issue to project (item: $ITEM_ID)"
+            echo "item_id=$ITEM_ID" >> "$GITHUB_OUTPUT"
+            echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not add issue to project"
+          fi
+
+      # ── Issue: set start date ──
+      - name: Set start date on issue
+        if: github.event_name == 'issues' && steps.add_issue_to_project.outputs.item_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          ITEM_ID: ${{ steps.add_issue_to_project.outputs.item_id }}
+          PROJECT_ID: ${{ steps.add_issue_to_project.outputs.project_id }}
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+
+          FIELD_ID=$(gh api graphql \
+            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){fields(first:30){nodes{... on ProjectV2Field{id name}}}}}}' \
+            -F org="$ORG" -F num="$PROJECT_NUMBER" \
+            --jq '[.data.organization.projectV2.fields.nodes[] | select(.name | ascii_downcase == "start date")] | .[0].id // empty')
+
+          [ -n "$FIELD_ID" ] || { echo "::warning::Start date field not found in project"; exit 0; }
+
+          gh api graphql \
+            -f query='mutation($project:ID!,$item:ID!,$field:ID!,$date:Date!){updateProjectV2ItemFieldValue(input:{projectId:$project,itemId:$item,fieldId:$field,value:{date:$date}}){projectV2Item{id}}}' \
+            -f project="$PROJECT_ID" \
+            -f item="$ITEM_ID" \
+            -f field="$FIELD_ID" \
+            -f date="$TODAY" \
+            && echo "Set start date to $TODAY" \
+            || echo "::warning::Could not set start date"
