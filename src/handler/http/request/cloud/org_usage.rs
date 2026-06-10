@@ -79,7 +79,7 @@ pub async fn get_org_usage(
         &org_id
     };
 
-    match org_usage::get_org_usage(&query_org, &usage_range, unit).await {
+    match org_usage::get_org_usage(&org_id, &query_org, &usage_range, unit).await {
         Err(e) => e.into_http_response(),
         Ok(body) => MetaHttpResponse::json(body),
     }

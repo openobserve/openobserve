@@ -16,7 +16,15 @@
 //! These models define the schemas of HTTP request and response JSON bodies in
 //! billings API endpoints.
 
-use o2_enterprise::enterprise::cloud::billings as cloud_billings;
+use std::collections::HashMap;
+
+use o2_enterprise::enterprise::{
+    cloud::billings::{
+        self as cloud_billings,
+        org_usage::{OrgUsageEvent, UsageResultUnit},
+    },
+    metering::MeteringEventName,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -90,15 +98,32 @@ impl GetOrgUsageResponseBody {
 pub struct OrgUserData {
     pub event: String,
     pub value: f64,
+    pub cost: Option<f64>,
     pub unit: String,
 }
 
-impl From<cloud_billings::org_usage::OrgUsageQueryResult> for OrgUserData {
-    fn from(value: cloud_billings::org_usage::OrgUsageQueryResult) -> Self {
+impl OrgUserData {
+    pub fn from_query_result(
+        value: cloud_billings::org_usage::OrgUsageQueryResult,
+        price_map: &HashMap<String, f64>,
+    ) -> Self {
+        let ev = match value.event {
+            OrgUsageEvent::UsageEvent(ev) => ev.into(),
+            OrgUsageEvent::DataRetentionUsageEvent(_) => MeteringEventName::DataRetention,
+        };
+        let name = ev.to_string();
+        let cost = price_map.get(&name);
+
+        let amt = match value.unit {
+            UsageResultUnit::MB => value.size / 1024.0,
+            UsageResultUnit::GB | UsageResultUnit::Count => value.size,
+        };
+        let cost = cost.map(|v| v * amt);
         Self {
             event: value.event.to_string(),
             value: value.size,
             unit: value.unit.to_string(),
+            cost,
         }
     }
 }
@@ -111,6 +136,8 @@ pub struct NewUserAttribution {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use cloud_billings::{
         CustomerBilling, MeteringProvider, SubscriptionType, org_usage::OrgUsageQueryResult,
     };
@@ -173,6 +200,7 @@ mod tests {
                 event: "ingestion".to_string(),
                 value: 2.0,
                 unit: "GB".to_string(),
+                cost: None,
             }],
             range: "30d".to_string(),
             start_time: 0,
@@ -192,6 +220,7 @@ mod tests {
                 event: "ingestion".to_string(),
                 value: 1024.0,
                 unit: "MB".to_string(),
+                cost: None,
             }],
             range: "30d".to_string(),
             start_time: 0,
@@ -211,6 +240,7 @@ mod tests {
                 event: "ingestion".to_string(),
                 value: 1.0,
                 unit: "gb".to_string(),
+                cost: None,
             }],
             range: "30d".to_string(),
             start_time: 0,
@@ -230,6 +260,7 @@ mod tests {
                 event: "ingestion".to_string(),
                 value: 5.5,
                 unit: "GB".to_string(),
+                cost: None,
             }],
             range: "7d".to_string(),
             start_time: 0,
@@ -249,6 +280,7 @@ mod tests {
                 event: "ingestion".to_string(),
                 value: 100.0,
                 unit: "Bytes".to_string(),
+                cost: None,
             }],
             range: "1d".to_string(),
             start_time: 0,
@@ -275,10 +307,11 @@ mod tests {
         });
         let q: OrgUsageQueryResult = serde_json::from_value(json).unwrap();
 
-        let data: OrgUserData = q.into();
+        let data: OrgUserData = OrgUserData::from_query_result(q, &HashMap::new());
 
         assert!((data.value - 12.5).abs() < f64::EPSILON);
         assert_eq!(data.unit, "GB");
         assert_eq!(data.event, "Ingestion");
+        assert_eq!(data.cost, None);
     }
 }

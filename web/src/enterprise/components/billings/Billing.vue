@@ -247,6 +247,7 @@ export default defineComponent({
     const options = computed(()=>{
       return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value ?
         [
+          {label: "Previous Cycle", value: "-1cycle"},
           {label: "Current Cycle", value: "1cycle"},
           {label: "30 Days", value: "30days"},
           {label: "60 Days", value: "60days"},
