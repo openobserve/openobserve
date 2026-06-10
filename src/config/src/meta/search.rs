@@ -2341,6 +2341,7 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
 
         let stats2 = ScanStats {
@@ -2356,6 +2357,7 @@ mod tests {
             file_list_took: 40,
             aggs_cache_ratio: 90,
             peak_memory_usage: 2048000,
+            wait_in_queue: 0,
         };
 
         stats1.add(&stats2);
@@ -2534,6 +2536,7 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
 
         // Test conversion to cluster_rpc::ScanStats
