@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2"
+            class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-1"
           >
             <div
               class="tw:flex tw:items-center tw:text-sm tw:mr-4"
