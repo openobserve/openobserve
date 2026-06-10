@@ -465,6 +465,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span data-test="search-inspect-label">Search Inspect</span>
             </ODropdownItem>
           </ODropdownGroup>
+
+          <ODropdownSeparator />
+
+          <ODropdownGroup
+            v-if="searchObj.meta.sqlMode"
+            :label="t('search.menuGroupExplain')"
+          >
+            <ODropdownItem
+              data-test="logs-search-bar-explain-query-menu-btn"
+              :disabled="
+                !searchObj.data.query || searchObj.data.query.trim() === ''
+              "
+              @select="openExplainDialog"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="lightbulb" size="sm" />
+                </span>
+              </template>
+              {{ t('search.explainQuery') }}
+            </ODropdownItem>
+          </ODropdownGroup>
         </ODropdown>
         <share-button
           v-if="!shouldMoveShareToMenu"

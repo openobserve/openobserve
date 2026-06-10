@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:flex-col qp-2 tw:h-full">
-    <div class="tw:w-full tw:flex tw:items-end tw:pb-[0.625rem]">
+    <div class="tw:w-full tw:flex tw:items-end tw:border-b tw:border-border-default">
       <div class="tw:w-full tw:flex card-container tw:px-[0.625rem] tw:py-[0.625rem]">
         <div
           class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer hover:tw:text-[var(--o2-primary-btn-bg)] tw:border-[1.5px] tw:border-solid tw:rounded-full tw:w-[1.375rem] tw:h-[1.375rem]"

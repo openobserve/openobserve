@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Zeitplan",
     "menuGroupInspect": "Inspizieren",
     "validSql": "Gültiges SQL",
-    "invalidSql": "Ungültige Abfrage"
+    "invalidSql": "Ungültige Abfrage",
+    "menuGroupExplain": "Erkläre"
   },
   "menu": {
     "home": "Startseite",
