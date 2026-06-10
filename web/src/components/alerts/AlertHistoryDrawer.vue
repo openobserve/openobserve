@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-44 tw:truncate tw:inline-block',
+                'tw:font-semibold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
