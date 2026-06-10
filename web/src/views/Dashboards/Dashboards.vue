@@ -474,7 +474,7 @@ import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -609,7 +609,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          meta: { align: "left" },
+          size: COL.name,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         // {
         //   id: "identifier",
@@ -627,6 +629,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.description,
           meta: { align: "left" },
         },
         {
@@ -636,6 +639,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.owner,
           meta: { align: "left" },
         },
         {
@@ -645,6 +649,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.date,
           meta: { align: "left" },
         },
         {
@@ -665,6 +670,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.folder,
           meta: { align: "left" },
         });
       }

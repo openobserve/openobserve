@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selection="multiple"
         :enable-column-resize="true"
         :persist-columns="true"
+        :default-columns="false"
         table-id="pipelines-pipeline-list"
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
@@ -569,8 +570,9 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
-    size: 'auto',
-    meta: { align: "left" },
+    size: COL.name,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   };
   const streamNameColumn = {
     id: "stream_name",
@@ -625,6 +627,7 @@ const getColumnsForActiveTab = (tab: any) => {
     header: t("pipeline_list.stream_type"),
     accessorKey: "stream_type",
     sortable: true,
+    size: COL.streamType,
     meta: { align: "left" },
   };
   const actionsColumn = {

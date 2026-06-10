@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               sorting="client"
               filter-mode="client"
               :show-global-filter="false"
+              :default-columns="false"
               selection="multiple"
               :selected-ids="selectedEnrichmentTableIds"
               @update:selected-ids="handleSelectedIdsUpdate"
@@ -417,7 +418,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
-      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
+      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: COL.type },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: COL.count },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
       { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },

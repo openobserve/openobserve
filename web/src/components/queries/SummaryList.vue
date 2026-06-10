@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="getAllUserQueries"
     style="width: 100%"
     :show-global-filter="false"
+    :default-columns="false"
   >
     <template #empty>
       <OEmptyState size="hero" preset="no-queries" hide-action />
@@ -120,9 +121,9 @@ export default defineComponent({
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
       { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: COL.type, sortable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: COL.count, sortable: true, meta: { align: "left" } },
       { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 

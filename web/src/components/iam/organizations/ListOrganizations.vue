@@ -122,7 +122,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -192,6 +192,7 @@ export default defineComponent({
         header: t("organization.subscription_plan"),
         accessorKey: "plan",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       });
     }

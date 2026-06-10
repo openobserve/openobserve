@@ -145,6 +145,7 @@ export default defineComponent({
         header: t("organization.id"),
         accessorKey: "org_id",
         sortable: true,
+        size: COL.owner,
         meta: { align: "left" },
       },
       {

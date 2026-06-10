@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
+          :default-columns="false"
           filter-mode="client"
         >
           <template #toolbar>
@@ -174,7 +175,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
@@ -212,20 +213,22 @@ export default defineComponent({
         header: t("ingestion.tokenNameLabel"),
         accessorKey: "name",
         sortable: true,
-        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+        size: COL.name,
+        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', autoWidth: true },
       },
       {
         id: "token",
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
+        size: COL.token,
       },
       {
         id: "created_by",
         header: t("ingestion.createdBy"),
         accessorKey: "created_by",
         sortable: true,
-        size: 200,
+        size: COL.owner,
       },
       {
         id: "actions",

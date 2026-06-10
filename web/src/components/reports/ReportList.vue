@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-global-filter="false"
                 :enable-column-resize="true"
                 :persist-columns="true"
+                :default-columns="false"
                 table-id="reports-report-list"
               >
                 <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
@@ -395,9 +396,9 @@ const confirmBulkDelete = ref<boolean>(false);
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
     { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
-    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, meta: { align: "left" } },
-    { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: 150, meta: { align: "center" } },
-    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: 300, meta: { align: "center" } },
+    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
+    { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner, meta: { align: "center" } },
+    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "center" } },
     { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.date, meta: { align: "left" } },
     { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
   ];
