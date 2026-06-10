@@ -306,7 +306,13 @@ export class DashboardPage {
     // wrong row.
     await this.getDashboardNameCell(dashboardName).waitFor({ state: 'visible', timeout: 20000 });
 
-    // Click the delete action on the confirmed filtered first row.
+    // Row action buttons (delete, edit, …) are CSS-hidden by default and only
+    // revealed when the row is hovered. Without this hover step the delete
+    // button locator never resolves and times out at the CI action-timeout
+    // (45 s). Hover first, then wait for the button to be visible before
+    // clicking — same pattern used in dashboard-import.js:272.
+    await this.firstTableRow.hover();
+    await this.firstRowDeleteButton.waitFor({ state: 'visible', timeout: 10000 });
     await this.firstRowDeleteButton.click();
 
     // Confirm and verify the toast surface appears.
