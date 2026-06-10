@@ -804,7 +804,7 @@ export class HomePage {
      * Validate Settings - Cipher Keys page UI elements
      */
     async validateSettingsCipherKeysPageElements() {
-        await expect(this.page.locator('[data-test="cipher-keys-list-title"]')).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator('[data-test="cipher-keys-add-btn"]')).toBeVisible({ timeout: 10000 });
     }
 
     /**
