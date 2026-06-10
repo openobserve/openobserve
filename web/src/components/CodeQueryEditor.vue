@@ -477,7 +477,7 @@ export default defineComponent({
         });
 
         if (!generatedSQL || generatedSQL.trim() === "") {
-          // Show error notification
+          // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
           console.log(
             "[NL2Q-UI] Showing error notification - query generation failed or empty",
           );
