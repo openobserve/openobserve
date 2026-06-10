@@ -71,3 +71,4 @@ tests/ui-testing/.env.old
 /tests/ui-testing/test-output/
 **/debug-login-page.png
 /.opencode
+/tests/ux-audit/*
