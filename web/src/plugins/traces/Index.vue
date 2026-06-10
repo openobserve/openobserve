@@ -1579,8 +1579,8 @@ function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
   const date = {
-    startTime: queryParams.from,
-    endTime: queryParams.to,
+    startTime: typeof queryParams.from === "string" ? Number(queryParams.from) : queryParams.from,
+    endTime: typeof queryParams.from === "string" ? Number(queryParams.to) : queryParams.to,
     relativeTimePeriod: queryParams.period || null,
     type: queryParams.period ? "relative" : "absolute",
   };
