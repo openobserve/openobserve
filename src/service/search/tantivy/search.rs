@@ -19,7 +19,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         bitvec::BitVec,
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS, simple_topn_over_fetch_size},
     },
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
@@ -247,7 +247,9 @@ impl TantivyResult {
     /// only the per-file top-K, and resolve ordinals to strings for the survivors only.
     ///
     /// DataFusion's `AggregateExec` re-aggregates the per-file partials and applies the final
-    /// ORDER BY + LIMIT, so correctness is preserved.
+    /// ORDER BY + LIMIT. The merged result is exact when every file's distinct group count
+    /// fits within the per-file keep size, and approximate beyond that (see
+    /// `ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM`).
     pub fn handle_simple_top_n(
         searcher: &Searcher,
         query: Box<dyn Query>,
@@ -262,22 +264,21 @@ impl TantivyResult {
             );
         }
 
-        // Over-fetch per file so the final cross-file top-N is contained in the union of the
-        // per-file partials, while keeping the payload (and the number of term-dictionary
-        // resolutions per file) linear in `limit`. The multipliers preserve each path's
-        // historical fan-out: `limit * 4` for single field, `limit * 2` per level for multi.
-        let k = if fields.len() == 1 {
-            (limit * 4).max(1000)
-        } else {
-            (limit * 2).max(1000)
-        };
+        // A file with up to `max_groups` distinct groups returns all of them, so its
+        // contribution to the merged result is exact. Beyond that no practical keep size
+        // helps (a group's total is spread thin across files), so keep only the small
+        // limit-derived top-K per file: the result is approximate — acceptable for the skewed
+        // distributions that top-n queries target — and stays fast. The env raises the exact
+        // threshold for deployments that prefer accuracy over speed.
+        let k = simple_topn_over_fetch_size(fields.len(), limit);
+        let max_groups = k.max(config::get_config().limit.inverted_index_topn_max_group_num);
 
         // one or two ordinals pack into a u64 key; three or four need a u128
         let results = if fields.len() <= 2 {
-            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, ascend);
+            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, max_groups, ascend);
             searcher.search(&query, &collector)?
         } else {
-            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, ascend);
+            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, max_groups, ascend);
             searcher.search(&query, &collector)?
         };
 
