@@ -43,22 +43,17 @@ test.describe("Custom Charts Tests", () => {
 
     await pm.dashboardPage.addCustomChart();
 
-    // Set chart code directly via Monaco API — keyboard.insertText races against
-    // the .inputarea fill below (focus shifts before Monaco commits)
+    // Set both editors via Monaco API — .inputarea.fill() stopped overriding the
+    // panel's auto-generated query, leaving panelSchema.query empty so Apply
+    // shows "Please enter query for custom chart" instead of running JS validation.
     await pm.dashboardPage.setCustomChartCode(pictorialJSON);
-    // await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill('select * from "e2e_automate"');
-    await page.waitForTimeout(2000);
+    await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForTimeout(3000);
     await expect(
       page.getByText(
         "Unsafe code detected: Access to 'document' is not allowed"
       )
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30000 });
   });
 
   test("Add line JSON in Monaco Editor", async ({ page }) => {
@@ -71,13 +66,9 @@ test.describe("Custom Charts Tests", () => {
 
     await pm.dashboardPage.addCustomChart();
 
-    // Set chart code directly via Monaco API (see Pictorial test above)
+    // Set both editors via Monaco API (see Pictorial test above)
     await pm.dashboardPage.setCustomChartCode(lineJSON);
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill('select * from "e2e_automate"');
-    await page.waitForTimeout(3000);
+    await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
     await page.waitForTimeout(3000);
   });

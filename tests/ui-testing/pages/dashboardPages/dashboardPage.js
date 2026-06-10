@@ -514,6 +514,30 @@ export class DashboardPage {
     );
   }
 
+  // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
+  // locator(".inputarea").fill() stopped overriding the model on main — the panel
+  // auto-generates a histogram query from the default-selected stream and the
+  // .fill() input is silently ignored, so panelSchema.queries[0].query stays
+  // whatever the auto-gen produced (or empty). Drive Monaco's model directly and
+  // poll to confirm the value lands before Apply.
+  async setDashboardPanelQuery(sql) {
+    await this.page.waitForFunction(
+      (query) => {
+        const host = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+        if (!host || !window.monaco?.editor?.getEditors) return false;
+        const editor = window.monaco.editor.getEditors().find((ed) => {
+          const dom = ed.getDomNode?.();
+          return dom && host.contains(dom);
+        });
+        if (!editor) return false;
+        if (editor.getValue() !== query) editor.setValue(query);
+        return editor.getValue() === query;
+      },
+      sql,
+      { timeout: 10000 }
+    );
+  }
+
 }
 
 
