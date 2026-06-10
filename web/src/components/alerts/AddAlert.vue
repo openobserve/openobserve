@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
       <div class="tw:flex tw:flex-col" style="height: calc(100vh - var(--navbar-height) - 5px);">
       <AppPageHeader
-        class="alert-v3-topbar tw:mb-2 tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="alert-v3-topbar tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
           onClick: goBackToAlertsList,
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
 
-      <div class="tw:flex tw:flex-1 tw:min-h-0 tw:mx-[0.625rem] tw:gap-2 tw:mb-2">
+      <div class="tw:flex tw:flex-1 tw:min-h-0">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
-      <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px;">
+      <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
 
       <!-- Stream Name & Stream Type -->
       <div class="card-container tw:shrink-0 stream-config-card">
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
         <!-- Tab Headers -->
         <OToggleGroup
           :model-value="activeTab"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
+        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
       >
         <OButton
           data-test="add-alert-cancel-btn"
@@ -335,11 +335,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div><!-- end LEFT column wrapper -->
 
       <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
-      <div class="tw:flex tw:flex-col tw:gap-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
+      <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
+      <div class="tw:flex tw:flex-col tw:gap-2 tw:border-l tw:border-border-default tw:pt-2 tw:pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
         <!-- Preview Card -->
         <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0 tw:gap-2"
+            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:shrink-0 tw:gap-2"
             :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
           >
             <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
@@ -382,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Summary Card -->
         <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:h-[40px] tw:select-none tw:border-b tw:shrink-0"
+            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:shrink-0"
             :class="store.state.theme === 'dark' ? 'tw:border-gray-700' : 'tw:border-gray-200'"
           >
             <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
