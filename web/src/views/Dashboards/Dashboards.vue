@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ ownerInitials(value) }}</span
                 >
                 <span
-                  class="tw:text-text-primary text-truncate"
+                  class="tw:text-text-primary tw:truncate tw:flex-1 tw:min-w-0"
                   :title="value"
                   >{{ value }}</span
                 >
