@@ -206,20 +206,20 @@ jobs:
           TODAY=$(date -u +%Y-%m-%d)
 
           FIELD_ID=$(gh api graphql \
-            -f query='query($org:String!,$num:Int!){organization(login:$org){projectV2(number:$num){fields(first:30){nodes{... on ProjectV2Field{id name}}}}}}' \
-            -F org="$ORG" -F num="$PROJECT_NUMBER" \
-            --jq '[.data.organization.projectV2.fields.nodes[] | select(.name | ascii_downcase == "start date")] | .[0].id // empty')
+            -f query='query($project:ID!){node(id:$project){... on ProjectV2{fields(first:30){nodes{... on ProjectV2Field{id name}}}}}}' \
+            -f project="$PROJECT_ID" \
+            --jq '[.data.node.fields.nodes[] | select(.name | ascii_downcase == "start date")] | .[0].id // empty')
 
           [ -n "$FIELD_ID" ] || { echo "::warning::Start date field not found in project"; exit 0; }
 
-          gh api graphql \
+          MUTATION_OUT=$(gh api graphql \
             -f query='mutation($project:ID!,$item:ID!,$field:ID!,$date:Date!){updateProjectV2ItemFieldValue(input:{projectId:$project,itemId:$item,fieldId:$field,value:{date:$date}}){projectV2Item{id}}}' \
             -f project="$PROJECT_ID" \
             -f item="$ITEM_ID" \
             -f field="$FIELD_ID" \
-            -f date="$TODAY" \
+            -f date="$TODAY" 2>&1) \
             && echo "Set start date to $TODAY" \
-            || echo "::warning::Could not set start date"
+            || echo "::warning::Could not set start date: $MUTATION_OUT"
 
       # ── Stranger: assign issue to Shrinath + Manas ──
       - name: Assign stranger issue
