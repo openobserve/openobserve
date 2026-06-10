@@ -300,8 +300,6 @@ export const useSearchQuery = () => {
             searchObj.data.sqlSyntaxErrorRanges = [
               { startLine: line, endLine: line, column: col, error: msg },
             ];
-            searchObj.loading = false;
-            return null;
           }
         }
       }
