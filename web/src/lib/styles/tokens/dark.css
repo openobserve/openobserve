@@ -69,6 +69,7 @@
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
     --color-text-primary:     var(--d-text);   /* alias for heading */
+    --color-text-soft:        var(--d-text);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--d-text-2) */
     --color-text-body:        var(--d-text-2); /* paragraphs, default body */
     --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
     --color-text-caption:     var(--d-text-3); /* captions, footnotes, timestamps */

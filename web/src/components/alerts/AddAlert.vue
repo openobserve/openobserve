@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full">
+  <div class="tw:w-full tw:h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col" style="height: calc(100vh - var(--navbar-height) - 5px);">
+      <div class="tw:flex tw:flex-col tw:h-full">
       <AppPageHeader
         class="alert-v3-topbar tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
         :back="{
