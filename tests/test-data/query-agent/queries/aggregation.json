@@ -15,11 +15,11 @@
             "4"
           ],
           [
-            "ZONE-1",
+            "ZONE-3",
             "3"
           ],
           [
-            "ZONE-3",
+            "ZONE-1",
             "3"
           ],
           [
@@ -174,15 +174,15 @@
         "results": [
           [
             "ZONE-1",
-            "manual",
-            "2",
-            "582.5"
-          ],
-          [
-            "ZONE-1",
             "auto",
             "2",
             "870.0"
+          ],
+          [
+            "ZONE-1",
+            "manual",
+            "2",
+            "582.5"
           ],
           [
             "ZONE-2",
@@ -210,15 +210,15 @@
           ],
           [
             "ZONE-4",
-            "auto",
-            "2",
-            "385.0"
-          ],
-          [
-            "ZONE-4",
             "hybrid",
             "2",
             "437.5"
+          ],
+          [
+            "ZONE-4",
+            "auto",
+            "2",
+            "385.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -289,22 +289,22 @@
         ],
         "results": [
           [
-            "ZONE-2",
-            "4",
-            "2"
-          ],
-          [
             "ZONE-3",
             "4",
             "1"
           ],
           [
-            "ZONE-4",
+            "ZONE-2",
+            "4",
+            "2"
+          ],
+          [
+            "ZONE-1",
             "3",
             "1"
           ],
           [
-            "ZONE-1",
+            "ZONE-4",
             "3",
             "1"
           ]
@@ -639,7 +639,7 @@
           [
             "ZONE-2",
             "2",
-            "manual"
+            "auto"
           ],
           [
             "ZONE-3",
@@ -849,21 +849,6 @@
           [
             "0",
             "1",
-            "0",
-            "1",
-            "0",
-            "1",
-            "E005",
-            "@warehouse-iOS-sort-v2",
-            "UP-E009",
-            "ConfigurationException: missing facility_zone ZONE-3 override",
-            "SORT-X1-UP-E009-E005",
-            "SORT-X1",
-            "iOS"
-          ],
-          [
-            "0",
-            "1",
             "1",
             "0",
             "1",
@@ -889,6 +874,21 @@
             "ConfigurationException: missing facility_zone ZONE-3 override",
             "SORT-M3--E005",
             "SORT-M3",
+            "iOS"
+          ],
+          [
+            "0",
+            "1",
+            "0",
+            "1",
+            "0",
+            "1",
+            "E005",
+            "@warehouse-iOS-sort-v2",
+            "UP-E009",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "SORT-X1-UP-E009-E005",
+            "SORT-X1",
             "iOS"
           ]
         ],
@@ -972,14 +972,6 @@
         ],
         "results": [
           [
-            "EU-NORTH",
-            "2",
-            "610.0",
-            "610.0",
-            "28.9",
-            "0"
-          ],
-          [
             "AP-EAST",
             "2",
             "0.0",
@@ -988,11 +980,11 @@
             "0"
           ],
           [
-            "US-WEST",
-            "1",
-            "0.0",
-            "320.0",
-            "19.2",
+            "EU-NORTH",
+            "2",
+            "610.0",
+            "610.0",
+            "28.9",
             "0"
           ],
           [
@@ -1026,6 +1018,14 @@
             "555.0",
             "22.0",
             "1"
+          ],
+          [
+            "US-WEST",
+            "1",
+            "0.0",
+            "320.0",
+            "19.2",
+            "0"
           ],
           [
             "SA-EAST",
@@ -1090,19 +1090,19 @@
             "205.0609665440988"
           ],
           [
-            "MANUAL",
-            "ZONE-1-SORT-M3",
-            "1",
-            "50",
-            "1.2",
-            "None"
-          ],
-          [
             "AUTO",
             "ZONE-4-SORT-A7",
             "1",
             "155",
             "1.5",
+            "None"
+          ],
+          [
+            "MANUAL",
+            "ZONE-1-SORT-M3",
+            "1",
+            "50",
+            "1.2",
             "None"
           ]
         ],
@@ -1316,12 +1316,12 @@
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ]
@@ -1577,11 +1577,11 @@
             "2"
           ],
           [
-            "E006",
+            "E004",
             "1"
           ],
           [
-            "E004",
+            "E006",
             "1"
           ]
         ],
@@ -1624,7 +1624,7 @@
         "results": [
           [
             "itemPage",
-            "E001, E009"
+            "E009, E001"
           ]
         ],
         "results_mode": "rowsort",
@@ -1652,7 +1652,7 @@
             "1"
           ],
           [
-            "vitalsInp",
+            "pageView",
             "1",
             "1"
           ],
@@ -1662,7 +1662,7 @@
             "1"
           ],
           [
-            "pageView",
+            "vitalsInp",
             "1",
             "1"
           ]
@@ -1783,6 +1783,11 @@
         ],
         "results": [
           [
+            "checkoutPage",
+            "2",
+            "2"
+          ],
+          [
             "cartPage",
             "2",
             "2"
@@ -1796,11 +1801,6 @@
             "itemPage",
             "2",
             "1"
-          ],
-          [
-            "checkoutPage",
-            "2",
-            "2"
           ]
         ],
         "results_mode": "rowsort"
@@ -2492,16 +2492,16 @@
             "1900.0"
           ],
           [
-            "warehouse-south",
-            "inbound",
-            "1",
-            "3200.0"
-          ],
-          [
             "warehouse-north",
             "inbound",
             "1",
             "12.0"
+          ],
+          [
+            "warehouse-south",
+            "inbound",
+            "1",
+            "3200.0"
           ]
         ],
         "results_mode": "rowsort"

@@ -1581,6 +1581,10 @@
         ],
         "results": [
           [
+            "[\"scraping_pattern\",\"high_freq\"]",
+            "2"
+          ],
+          [
             "[\"torbot_ua_mismatch\",\"cookie_reuse\"]",
             "2"
           ],
@@ -1590,10 +1594,6 @@
           ],
           [
             "[\"credential_stuffing\"]",
-            "2"
-          ],
-          [
-            "[\"scraping_pattern\",\"high_freq\"]",
             "2"
           ]
         ],
