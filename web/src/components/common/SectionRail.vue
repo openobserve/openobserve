@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:px-2 tw:pt-2 tw:pb-1 tw:text-[0.72rem] tw:font-semibold tw:text-text-secondary"
         >
-          {{ sentence(group.label) }}
+          {{ group.label }}
         </div>
         <button
           v-for="item in group.items"
@@ -104,9 +104,4 @@ const visibleGroups = computed(() =>
 );
 
 // Group labels in the data are sometimes ALL-CAPS ("ACCESS"); the design system
-// uses sentence case for section labels — never shouty eyebrows.
-function sentence(label: string): string {
-  if (!label) return label;
-  return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
-}
 </script>

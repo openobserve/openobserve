@@ -17,6 +17,7 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -140,6 +141,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
@@ -202,15 +204,15 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "type",
     header: t("onlineEvals.scoreConfig.columns.type"),
     accessorFn: (row: ScoreConfig) => dataTypeOf(row),
     sortable: true,
-    size: 120,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -218,6 +220,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.rangeValues"),
     accessorFn: (row: ScoreConfig) => rangeOrValues(row),
     sortable: false,
+    size: COL.description,
     meta: { align: "left" },
   },
   {
@@ -233,7 +236,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.activeVersion"),
     accessorKey: "version",
     sortable: true,
-    size: 140,
+    size: COL.version,
     meta: { align: "left" },
   },
   {
@@ -241,7 +244,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.usedBy"),
     accessorFn: (row: ScoreConfig) => usedByCount(row),
     sortable: true,
-    size: 160,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -249,7 +252,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.created"),
     accessorFn: (row: ScoreConfig) => rowCreated(row),
     sortable: true,
-    size: 180,
+    size: COL.createdAt,
     meta: { align: "left" },
   },
   {

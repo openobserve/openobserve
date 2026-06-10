@@ -22,10 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:w-full pipeline-add-remote-destination-form"
     >
       <!-- Stepper for Create New Destination.
-           Width-constrained to 50vw for readable field/card widths, while the
+           Capped at 50vw (not fixed) so it reads as a readable column on the
+           full-width page editor, yet shrinks to fill narrower containers like
+           the External Destination drawer without overflowing/clipping. The
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
-      <div class="tw:w-[50vw]">
+      <div class="tw:w-full tw:max-w-[50vw]">
       <OStepper
         v-model="step"
         ref="stepper"

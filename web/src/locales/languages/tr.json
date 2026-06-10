@@ -3242,7 +3242,8 @@
     "confirmRejectMsg": "{org} katılma davetini reddetmek istediğinizden emin misiniz?",
     "expired": "Süresi doldu",
     "expiresToday": "Bugün Sona Eriyor",
-    "daysLeft": "{gün} gün kaldı"
+    "daysLeft": "{gün} gün kaldı",
+    "search": "Davetiyeleri Ara"
   },
   "serviceAccounts": {
     "header": "Hizmet Hesapları",
@@ -4358,6 +4359,16 @@
       "description": "Puan yapılandırmaları, şema puanlarının ürettiklerini tanımlar - sayısal, boole veya kategorik. Puanlamaya başlamak için bir tane ekleyin.",
       "action": "Puan yapılandırması oluştur",
       "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın"
+    },
+    "noEvalTemplates": {
+      "title": "Henüz değerlendirme şablonu yok",
+      "description": "Değerlendirme şablonları, LLM değerlendirmeleri için yeniden kullanılabilir puanlama kriterlerini tanımlar.",
+      "action": "Yeni şablon",
+      "actionDesc": "Değerlendirme şablonu oluşturma"
+    },
+    "noPipelineHistory": {
+      "title": "Henüz boru hattı geçmişi yok",
+      "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
     }
   },
   "onlineEvals": {

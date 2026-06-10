@@ -143,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-details-sidebar-exceptions-table"
       :data="exceptionData"
       :columns="exceptionEventColumns"
+      :default-columns="false"
       row-key="_index"
       pagination="none"
       :show-global-filter="false"
@@ -233,6 +234,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps<{
@@ -291,9 +293,9 @@ const exceptionEventColumns: OTableColumnDef[] = [
     id: "type",
     header: t("traces.typeLabel"),
     accessorKey: "exception.type",
-    meta: { align: "left" },
+    meta: { align: "left", autoWidth: true },
     sortable: true,
-    size: undefined,
+    size: COL.type,
     minSize: 100,
   },
 ];

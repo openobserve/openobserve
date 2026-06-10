@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="dashboard-import-file-rejected"
                         >
                           <code
-                            style="background-color: #f2f1f1; padding: 3px"
+                            style="background-color: var(--color-surface-panel); padding: 3px"
                             >{{ importResult?.reason?.file }}</code
                           >
                           : {{ importResult?.reason?.error }}

@@ -2089,7 +2089,8 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    let filterQuery = `service_name = '${escapedServiceName}'`;
+    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
+    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
     if (data.operationName) {
       const escapedOpName = escapeSingleQuotes(data.operationName);
       filterQuery += ` AND operation_name = '${escapedOpName}'`;
@@ -2102,9 +2103,21 @@ const handleServiceGraphViewTraces = (data: any) => {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
     }
-    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+    if (data.callerService) {
+      const escapedCaller = escapeSingleQuotes(data.callerService);
+      filterQuery += ` AND service_name = '${escapedCaller}'`;
+    }
+    if (data.resourceFilter?.value) {
       const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      if (data.resourceFilter.fields?.length) {
+        // Fallback chain: (field1 = 'val' OR field2 = 'val')
+        const clauses = data.resourceFilter.fields
+          .map((f: string) => `${f} = '${escapedValue}'`)
+          .join(" OR ");
+        filterQuery += ` AND (${clauses})`;
+      } else if (data.resourceFilter.field) {
+        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      }
     }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;
@@ -2136,16 +2149,24 @@ const handleServiceGraphViewTraces = (data: any) => {
   });
 };
 
-// Handler for services catalog row click — switches to traces mode filtered by service
-const handleServicesCatalogViewTraces = (serviceName: string) => {
-  const escapedName = escapeSingleQuotes(serviceName);
-  searchObj.data.editorValue = `service_name = '${escapedName}'`;
-  searchObj.data.query = searchObj.data.editorValue;
-  searchObj.meta.sqlMode = false;
-  searchObj.meta.searchMode = "traces";
-  nextTick(() => {
-    runQueryFn();
-  });
+/**
+ * Handler for the services catalog `view-traces` event.
+ *
+ * Normalizes the payload (which may be a plain service name string for backward
+ * compatibility, or a full object with `serviceName`, `serviceType`,
+ * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
+ * to populate the search bar and run the filtered traces query.
+ *
+ * @param data - Service name string (legacy) or structured filter object.
+ *               Structured objects may include `serviceName`, `serviceType`,
+ *               `operationName`, `nodeName`, `podName`, `callerService`,
+ *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
+ *               `maxDurationMicros`, `mode`, and `stream`.
+ */
+const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
+  // Normalize plain string to object then delegate to the full handler
+  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
+  handleServiceGraphViewTraces(payload);
 };
 
 // watch(updateSelectedColumns, () => {

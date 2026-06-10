@@ -212,7 +212,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageLogStream",
@@ -245,13 +245,15 @@ export default defineComponent({
         accessorKey: "name",
         header: t("logStream.name"),
         sortable: true,
-        meta: { align: "left" },
+        size: COL.streamName,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "stream_type",
         accessorKey: "stream_type",
         header: t("logStream.type"),
         sortable: true,
+        size: COL.streamType,
         meta: { align: "left" },
       },
       {
@@ -259,6 +261,7 @@ export default defineComponent({
         accessorKey: "doc_num",
         header: t("logStream.docNum"),
         sortable: true,
+        size: COL.count,
         meta: { align: "left" },
       },
       {
@@ -266,6 +269,7 @@ export default defineComponent({
         accessorKey: "storage_size",
         header: t("logStream.storageSize"),
         sortable: true,
+        size: COL.sizeBytes,
         meta: { align: "left" },
       },
       {
@@ -273,6 +277,7 @@ export default defineComponent({
         accessorKey: "compressed_size",
         header: t("logStream.compressedSize"),
         sortable: true,
+        size: COL.sizeBytes,
         meta: { align: "left" },
       },
     ];
@@ -347,7 +352,8 @@ export default defineComponent({
           header: t("logStream.name"),
           cell: " ",
           sortable: true,
-          meta: { align: "left" },
+          size: COL.name,
+          meta: { align: "left", autoWidth: true },
         },
         {
           id: "order",
@@ -355,6 +361,7 @@ export default defineComponent({
           header: "Order",
           cell: " ",
           sortable: true,
+          size: COL.count,
           meta: { align: "left" },
         },
         {
@@ -363,6 +370,7 @@ export default defineComponent({
           header: "Apply Before Flattening",
           cell: " ",
           sortable: true,
+          size: 180,
           meta: { align: "left" },
         },
         {

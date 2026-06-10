@@ -53,7 +53,7 @@ const pageSizeSelectOptions = computed(() =>
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="tw:flex tw:items-center tw:justify-between tw:py-1 tw:px-3 tw:border-t tw:border-border-default tw:h-10 tw:min-h-10"
+    class="tw:flex tw:items-center tw:flex-wrap tw:justify-between tw:gap-x-3 tw:gap-y-1 tw:py-1 tw:px-3 tw:border-t tw:border-border-default tw:min-h-10"
   >
     <!-- Left: bulk actions slot or row count -->
     <div class="tw:flex tw:items-center tw:gap-2">
@@ -83,7 +83,7 @@ const pageSizeSelectOptions = computed(() =>
       />
       <span
         v-else
-        class="tw:text-primary tw:text-xs"
+        class="tw:text-primary tw:text-xs tw:whitespace-nowrap"
         data-test="o2-table-pagination-info"
       >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}

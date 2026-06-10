@@ -738,7 +738,8 @@ body.body--dark [data-destructive-icon="true"]:hover {
 }
 
 .dashboard-chart-border {
-  border: 0.03rem solid var(--o2-border-color);
+  border-right: 0.03rem solid var(--o2-border-color);
+  border-bottom: 0.03rem solid var(--o2-border-color);
 }
 
 // ═══════════════════════════════════════════════════════════════

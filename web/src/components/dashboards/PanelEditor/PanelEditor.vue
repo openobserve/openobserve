@@ -71,6 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
+          separatorClass="field-list-separator"
+          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List (before slot) -->
           <template #before>
@@ -85,11 +87,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </template>
-
-          <!-- Splitter separator -->
-          <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
           </template>
 
           <!-- Main content area (after slot) -->
@@ -413,6 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 50px)',
             height: '100%',
           }"
+          separatorClass="field-list-separator"
+          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List for custom chart -->
           <template #before>
@@ -432,11 +431,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-          </template>
-
-          <!-- Custom chart splitter separator -->
-          <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
           </template>
 
           <!-- Custom chart content area -->
@@ -1241,6 +1235,22 @@ defineExpose({
 }
 
 .splitter-enabled:hover {
+  background-color: orange;
+}
+
+:deep(.field-list-separator::after) {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+:deep(.field-list-separator:hover::after) {
   background-color: orange;
 }
 

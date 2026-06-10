@@ -3240,7 +3240,8 @@
     "confirmRejectMsg": "Sei sicuro di voler rifiutare l'invito a partecipare a {org}?",
     "expired": "Scaduto",
     "expiresToday": "Scade oggi",
-    "daysLeft": "{giorni} giorni rimanenti"
+    "daysLeft": "{giorni} giorni rimanenti",
+    "search": "Cerca inviti"
   },
   "serviceAccounts": {
     "header": "Account di servizio",
@@ -4356,6 +4357,16 @@
       "description": "Le configurazioni dei punteggi definiscono lo schema prodotto dai puntatori: numerico, booleano o categorico. Aggiungine uno per iniziare a segnare.",
       "action": "Crea configurazione della partitura",
       "actionDesc": "Definisci la forma del punteggio + un intervallo sano"
+    },
+    "noEvalTemplates": {
+      "title": "Non sono ancora disponibili modelli di valutazione",
+      "description": "I modelli di valutazione definiscono criteri di punteggio riutilizzabili per le valutazioni LLM.",
+      "action": "Nuovo modello",
+      "actionDesc": "Crea un modello di valutazione"
+    },
+    "noPipelineHistory": {
+      "title": "Ancora nessuna cronologia delle pipeline",
+      "description": "La cronologia delle esecuzioni delle pipeline verrà visualizzata qui una volta eseguite le pipeline."
     }
   },
   "onlineEvals": {

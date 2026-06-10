@@ -3229,7 +3229,8 @@
     "confirmRejectMsg": "Tem certeza de que deseja rejeitar o convite para entrar em {org}?",
     "expired": "Expirado",
     "expiresToday": "Expira hoje",
-    "daysLeft": "{dias} dias restantes"
+    "daysLeft": "{dias} dias restantes",
+    "search": "Pesquisar convites"
   },
   "serviceAccounts": {
     "header": "Contas de serviço",
@@ -4345,6 +4346,16 @@
       "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
       "action": "Criar configuração de pontuação",
       "actionDesc": "Defina a forma da pontuação+faixa saudável"
+    },
+    "noEvalTemplates": {
+      "title": "Ainda não há modelos de avaliação",
+      "description": "Os modelos de avaliação definem critérios de pontuação reutilizáveis para avaliações de LLM.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de avaliação"
+    },
+    "noPipelineHistory": {
+      "title": "Ainda não há histórico de oleodutos",
+      "description": "O histórico de execução do pipeline aparecerá aqui quando seus pipelines forem executados."
     }
   },
   "onlineEvals": {

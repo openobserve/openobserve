@@ -6,6 +6,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "../OTable.types";
 
 const props = defineProps<{
@@ -56,24 +57,29 @@ function resetToDefault(): void {
 <template>
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
-      <OButton
-        variant="outline"
-        size="sm"
-        :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
-        data-test="o2-table-column-toggle-btn"
-      >
-        <template #icon-left>
-          <OIcon name="view-column" size="sm" />
-        </template>
-        Columns
+      <div class="tw:relative tw:inline-flex">
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
+          data-test="o2-table-column-toggle-btn"
+        >
+          <template #icon-left>
+            <OIcon name="view-column" size="sm" />
+          </template>
+          <OTooltip
+            :content="hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'"
+            side="bottom"
+          />
+        </OButton>
         <span
           v-if="hiddenCount > 0"
-          class="tw:ml-1 tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[var(--color-primary-100)] tw:text-[var(--color-primary-700)] tw:text-xs tw:font-medium tw:w-4 tw:h-4"
+          class="tw:absolute tw:-top-1 tw:-right-1 tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[var(--color-primary-600)] tw:text-white tw:text-[10px] tw:font-medium tw:w-4 tw:h-4 tw:leading-none tw:pointer-events-none"
           data-test="o2-table-column-toggle-hidden-badge"
         >
           {{ hiddenCount }}
         </span>
-      </OButton>
+      </div>
     </template>
 
     <!-- Column list panel -->

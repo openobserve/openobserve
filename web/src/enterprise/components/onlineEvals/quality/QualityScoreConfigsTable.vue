@@ -57,6 +57,7 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('select', row)"
@@ -122,6 +123,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
 
@@ -184,15 +186,15 @@ const columns = computed(() => [
     header: t("onlineEvals.quality.overview.columns.scoreConfig"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "type",
     header: t("onlineEvals.quality.overview.columns.type"),
     accessorKey: "dataType",
     sortable: true,
-    size: 110,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -200,7 +202,7 @@ const columns = computed(() => [
     header: t("onlineEvals.quality.overview.columns.totalScores"),
     accessorKey: "totalScores",
     sortable: true,
-    size: 120,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -223,7 +225,7 @@ const columns = computed(() => [
     header: t("onlineEvals.quality.overview.columns.updated"),
     accessorKey: "lastUpdatedMs",
     sortable: true,
-    size: 110,
+    size: COL.date,
     meta: { align: "left" },
   },
 ]);

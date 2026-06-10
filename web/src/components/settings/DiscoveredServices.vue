@@ -170,6 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-discovered-services"
             :show-global-filter="false"
             expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
@@ -636,12 +639,17 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.serviceName"),
     accessorKey: "service_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    resizable: true,
+    hideable: true,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "telemetry",
     header: t("settings.correlation.telemetryCoverage"),
     accessorKey: "telemetry",
+    resizable: true,
+    hideable: true,
     size: 260,
     meta: { align: "left" },
   },
@@ -650,6 +658,8 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.lastSeen"),
     accessorKey: "lastSeen",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: 120,
     meta: { align: "left" },
   },

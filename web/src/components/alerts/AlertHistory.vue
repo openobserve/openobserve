@@ -550,7 +550,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.alertName") || "Alert Name",
     accessorKey: "alert_name",
     sortable: true,
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "is_realtime",

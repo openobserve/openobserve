@@ -30,6 +30,10 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "false" },
+}));
+
 // Mock organizations service
 vi.mock("@/services/organizations", () => ({
   default: {

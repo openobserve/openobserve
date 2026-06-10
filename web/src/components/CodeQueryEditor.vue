@@ -76,6 +76,7 @@ import { useNLQuery } from "@/composables/useNLQuery";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
+import { isAuthError } from "@/utils/authErrors";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -483,11 +484,14 @@ export default defineComponent({
         });
 
         if (!generatedSQL || generatedSQL.trim() === "") {
-          // Show error notification
+          // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
           console.log(
             "[NL2Q-UI] Showing error notification - query generation failed or empty",
           );
-          showErrorNotification(t("search.nlQueryGenerationFailed"));
+          const errorMsg = isAuthError(streamingResponse.value)
+            ? streamingResponse.value
+            : t("search.nlQueryGenerationFailed");
+          showErrorNotification(errorMsg);
           throw new Error("Query generation failed");
         }
 

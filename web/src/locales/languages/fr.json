@@ -3229,7 +3229,8 @@
     "confirmRejectMsg": "Êtes-vous sûr de vouloir rejeter l'invitation à rejoindre {org} ?",
     "expired": "Expiré",
     "expiresToday": "Expire aujourd'hui",
-    "daysLeft": "Il reste {jours} jours"
+    "daysLeft": "Il reste {jours} jours",
+    "search": "Rechercher des invitations"
   },
   "serviceAccounts": {
     "header": "Comptes de service",
@@ -4345,6 +4346,16 @@
       "description": "Les configurations de score définissent le schéma produit par les évaluateurs : numérique, booléen ou catégorique. Ajoutez-en un pour commencer à marquer.",
       "action": "Créer une configuration de score",
       "actionDesc": "Définissez la forme du score + la plage saine"
+    },
+    "noEvalTemplates": {
+      "title": "Aucun modèle d'évaluation pour le moment",
+      "description": "Les modèles d'évaluation définissent des critères de notation réutilisables pour les évaluations LLM.",
+      "action": "Nouveau modèle",
+      "actionDesc": "Création d'un modèle d'évaluation"
+    },
+    "noPipelineHistory": {
+      "title": "Pas encore d'historique du pipeline",
+      "description": "L'historique d'exécution des pipelines apparaîtra ici une fois que vos pipelines seront exécutés."
     }
   },
   "onlineEvals": {

@@ -58,6 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             filter-mode="client"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="iam-service-accounts-list"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -342,6 +345,8 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "email",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.email,
         meta: { align: "left" },
       },
@@ -350,14 +355,19 @@ export default defineComponent({
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.description,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "token",
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
+        resizable: true,
+        hideable: true,
         size: COL.token,
         meta: { align: "left" },
       },

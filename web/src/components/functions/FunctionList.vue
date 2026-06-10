@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
             :show-global-filter="false"
+            :default-columns="false"
             width="100%"
             class="tw:w-full tw:h-full"
           >

@@ -29,9 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @row-click="getAllUserQueries"
     style="width: 100%"
     :show-global-filter="false"
+    :default-columns="false"
   >
     <template #empty>
-      <OEmptyState size="hero" preset="no-queries" hide-action />
+      <OEmptyState
+        size="hero"
+        preset="no-queries"
+        :filtered="filtered"
+        :hide-action="!filtered"
+        @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+      />
     </template>
     <template #cell-actions="{ row }">
       <OButton
@@ -52,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #bottom>
       <OButton
+        v-if="selectedRow.length"
         data-test="qm-multiple-cancel-query-btn"
         variant="outline-destructive"
         size="sm-action"
-        :disabled="selectedRow.length === 0"
         @click="handleMultiQueryCancel"
       >
         {{ t('queries.cancelQuery') }}
@@ -90,12 +97,17 @@ export default defineComponent({
       type: Array,
       required: true,
     },
+    filtered: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "cancel:hideform",
     "filter:queries",
     "update:selectedRows",
     "delete:queries",
+    "clear:filters",
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();
@@ -119,10 +131,10 @@ export default defineComponent({
     const columns = ref<OTableColumnDef[]>([
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: COL.type, sortable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
-      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, meta: { align: "left"  } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, meta: { align: "left" } },
+      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 

@@ -70,6 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
           v-model:selected-ids="selectedIds"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="pipelines-evaluation-templates"
           width="100%"
           class="tw:w-full tw:h-full"
         >
@@ -112,7 +116,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Empty state -->
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-eval-templates"
+              :filtered="!!filterQuery"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : goToCreate())
+              "
+            />
           </template>
 
           <!-- Pagination footer -->
@@ -168,7 +179,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
@@ -209,13 +221,20 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    resizable: true,
+    hideable: true,
+    size: COL.name,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "response_type",
     header: t("evalTemplate.responseType"),
     accessorKey: "response_type",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -223,6 +242,9 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.version,
     meta: { align: "center" },
   },
   {
@@ -230,6 +252,9 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.updated_at"),
     accessorKey: "updated_at",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.updatedAt,
     meta: {
       align: "left",
       format: (val: number) =>

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("correlation.logs.timeRange.sourceTime") }}
       </div>
       <div
-        class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50 tw:flex tw:items-center tw:gap-2"
+        class="tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-surface-panel tw:flex tw:items-center tw:gap-2"
       >
         <OIcon name="schedule" size="sm" />
         <span class="tw:font-mono tw:text-sm">{{

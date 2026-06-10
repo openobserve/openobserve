@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :frame="false"
             :data="filteredJobs"
             :columns="columns"
+            :default-columns="false"
             row-key="job_id"
             :loading="loading"
             pagination="client"
@@ -305,6 +306,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -346,11 +348,11 @@ const selectedPerPage = ref(10);
 const perPageOptionsList = [10, 20, 50, 100];
 
 const columns: OTableColumnDef[] = [
-  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, meta: { align: "left" } },
-  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, meta: { align: "left" } },
-  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, meta: { align: "left" } },
+  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
+  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: COL.description, meta: { align: "left" } },
+  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 

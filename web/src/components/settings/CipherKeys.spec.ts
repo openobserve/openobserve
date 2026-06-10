@@ -642,14 +642,14 @@ describe("CipherKeys", () => {
       expect(wrapper.vm.columns[2].id).toBe("store_type");
       expect(wrapper.vm.columns[2].accessorKey).toBe("store_type");
       expect(wrapper.vm.columns[2].sortable).toBe(true);
-      expect(wrapper.vm.columns[2].size).toBe(120);
+      expect(wrapper.vm.columns[2].size).toBe(180);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
       // Column 3: mechanism_type
       expect(wrapper.vm.columns[3].id).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].accessorKey).toBe("mechanism_type");
       expect(wrapper.vm.columns[3].sortable).toBe(true);
-      expect(wrapper.vm.columns[3].size).toBe(120);
+      expect(wrapper.vm.columns[3].size).toBe(180);
       expect(wrapper.vm.columns[3].meta.align).toBe("left");
 
       // Column 4: actions

@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @cancel="cancelAddFunction"
       @open:chat="openChat"
       :is-add-function-component="isAddFunctionComponent"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="tw:shrink-0 tw:px-2 tw:border-b tw:border-border-default"
     />
 
     <div class="tw:flex tw:flex-1 tw:min-h-0">
