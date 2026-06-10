@@ -30,7 +30,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
-import { buildContextualSqlMessage } from "@/utils/query/sqlDiagnostics";
+import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -286,16 +286,23 @@ export const useSearchQuery = () => {
           const _sqlParser = new SqlParser();
           _sqlParser.astify(query);
         } catch (syntaxErr: any) {
-          const loc = syntaxErr?.location?.start;
-          const line = loc?.line ?? 1;
-          const col = loc?.column ?? 1;
-          const msg = buildContextualSqlMessage(query, syntaxErr);
-          searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
-          searchObj.data.sqlSyntaxErrorRanges = [
-            { startLine: line, endLine: line, column: col, error: msg },
-          ];
-          searchObj.loading = false;
-          return null;
+          // Suppress parser-limitation false positives — these are valid SQL
+          // constructs the PEG parser can't handle (e.g. SUM(COUNT(*)) OVER,
+          // COALESCE in PARTITION BY) but the DataFusion backend accepts.
+          if (isParserLimitation(syntaxErr)) {
+            // continue past the error — don't block the query
+          } else {
+            const loc = syntaxErr?.location?.start;
+            const line = loc?.line ?? 1;
+            const col = loc?.column ?? 1;
+            const msg = buildContextualSqlMessage(query, syntaxErr);
+            searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
+            searchObj.data.sqlSyntaxErrorRanges = [
+              { startLine: line, endLine: line, column: col, error: msg },
+            ];
+            searchObj.loading = false;
+            return null;
+          }
         }
       }
 
