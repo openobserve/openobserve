@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'nav-menu-item',
       'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       isActive
-        ? 'tw:text-tabs-active-text tw:bg-tabs-active-bg tw:shadow-sm tw:border-l-2 tw:border-primary-400'
+        ? activePillClass
         : 'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:hover:bg-tabs-hover-bg',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="isActive
-          ? 'tw:text-tabs-active-text!'
+          ? activeIconClass
           : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >
         <OIcon
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
         :class="isActive
-          ? 'tw:font-semibold tw:text-tabs-active-text!'
+          ? activeLabelClass
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="[
-          isActive ? 'tw:text-tabs-active-text!' : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'
+          isActive ? activeIconClass : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'
         ]"
       >
         <component
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
         :class="isActive
-          ? 'tw:font-semibold tw:text-tabs-active-text!'
+          ? activeLabelClass
           : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
@@ -235,6 +235,25 @@ export default defineComponent({
       return route.path.indexOf(props.link) === 0;
     });
 
+    // Active-state styling is theme-aware: LIGHT keeps the classic white pill
+    // with primary-coloured text/icon; DARK uses the tinted "selected" pill
+    // (matching the dashboard-folder selection) with white text/icon — because
+    // surface-base is black in dark mode, a white pill there would vanish.
+    const isDark = computed(() => store.state.theme === "dark");
+    const activePillClass = computed(() =>
+      isDark.value
+        ? "tw:text-tabs-active-text tw:bg-tabs-active-bg tw:shadow-sm tw:border-l-2 tw:border-primary-400"
+        : "tw:text-primary-700 tw:bg-surface-base tw:shadow-sm tw:border-l-2 tw:border-primary-600"
+    );
+    const activeIconClass = computed(() =>
+      isDark.value ? "tw:text-tabs-active-text!" : "tw:text-primary-700!"
+    );
+    const activeLabelClass = computed(() =>
+      isDark.value
+        ? "tw:font-semibold tw:text-tabs-active-text!"
+        : "tw:font-semibold tw:text-primary-600!"
+    );
+
     // Phase 5: Accessibility - compute ARIA label with fallback
     const ariaLabel = computed(() => {
       let label = props.title || 'Navigation link';
@@ -253,6 +272,9 @@ export default defineComponent({
       openWebPage,
       isActive,
       ariaLabel,
+      activePillClass,
+      activeIconClass,
+      activeLabelClass,
     };
   },
 });
