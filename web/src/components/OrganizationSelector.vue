@@ -30,8 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -58,21 +56,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const router = useRouter();
-const store = useStore();
 
 const open = ref(false);
 const searchQuery = ref("");
-
-const navigateToOrganizations = () => {
-  open.value = false;
-  router.push({
-    name: "organizations",
-    query: {
-      org_identifier: store.state.selectedOrganization?.identifier,
-    },
-  });
-};
 
 // Matches both the display name and the identifier.
 const filtered = computed<OrgOption[]>(() => {
@@ -253,39 +239,23 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         data-test="organization-menu-list"
         class="tw:flex tw:flex-col tw:w-80 tw:max-w-[92vw]"
       >
-        <!-- Header: title + count (inline) + manage button -->
+        <!-- Header: title + count -->
         <div
           class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-1.5"
         >
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <span
-              class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wider tw:text-text-secondary"
-            >
-              {{ t("organization.header") }}
-            </span>
-            <span
-              data-test="organization-menu-count"
-              class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:leading-none tw:px-2 tw:py-1 tw:rounded-full tw:bg-select-item-hover-bg tw:text-text-secondary"
-            >
-              {{
-                searchQuery
-                  ? `${filtered.length} of ${organizations.length}`
-                  : organizations.length
-              }}
-            </span>
-          </div>
-          <OButton
-            variant="outline"
-            size="xs"
-            data-test="organization-menu-manage-btn"
-            class="tw:text-text-secondary tw:border-text-secondary/30"
-            @click="navigateToOrganizations"
+          <span class="tw:text-[13px] tw:font-semibold tw:text-text-primary">
+            {{ t("organization.header") }}
+          </span>
+          <span
+            data-test="organization-menu-count"
+            class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:leading-none tw:px-2 tw:py-1 tw:rounded-full tw:bg-select-item-hover-bg tw:text-text-secondary"
           >
-            <template #icon-left>
-              <OIcon name="settings" size="xs" />
-            </template>
-            {{ t("organization.manage") }}
-          </OButton>
+            {{
+              searchQuery
+                ? `${filtered.length} of ${organizations.length}`
+                : organizations.length
+            }}
+          </span>
         </div>
 
         <!-- Search: ↑/↓ move highlight, Enter selects, Esc closes -->
