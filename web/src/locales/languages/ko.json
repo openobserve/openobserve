@@ -1208,7 +1208,8 @@
     "tokenRotateError": "토큰 회전에 실패했습니다.",
     "tokenDeleteError": "토큰을 삭제하지 못했습니다.",
     "noTokensFound": "통합 토큰을 찾을 수 없습니다.",
-    "createdBy": "만든 사람"
+    "createdBy": "만든 사람",
+    "orgLevelSummary": "통합 엔드포인트를 위한 조직 수준 토큰."
   },
   "dashboard": {
     "selectField": "필드",

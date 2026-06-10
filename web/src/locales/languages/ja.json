@@ -1225,7 +1225,8 @@
     "tokenRotateError": "トークンをローテーションできませんでした。",
     "tokenDeleteError": "トークンを削除できませんでした。",
     "noTokensFound": "取り込みトークンが見つかりません。",
-    "createdBy": "作成者"
+    "createdBy": "作成者",
+    "orgLevelSummary": "インジェストエンドポイント用の組織レベルのトークン。"
   },
   "dashboard": {
     "selectField": "フィールド",

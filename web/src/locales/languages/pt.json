@@ -1208,7 +1208,8 @@
     "tokenRotateError": "Falha ao girar o token.",
     "tokenDeleteError": "Falha ao excluir o token.",
     "noTokensFound": "Nenhum token de ingestão foi encontrado.",
-    "createdBy": "Criado por"
+    "createdBy": "Criado por",
+    "orgLevelSummary": "Tokens de nível organizacional para endpoints de ingestão."
   },
   "dashboard": {
     "selectField": "Campo",
