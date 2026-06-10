@@ -71,6 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           v-model:selected-ids="selectedIds"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="pipelines-evaluation-templates"
           width="100%"
           class="tw:w-full tw:h-full"
         >
@@ -218,14 +221,19 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.name,
-    meta: { align: "left", autoWidth: true },
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "response_type",
     header: t("evalTemplate.responseType"),
     accessorKey: "response_type",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.type,
     meta: { align: "left" },
   },
@@ -234,6 +242,8 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.version,
     meta: { align: "center" },
   },
@@ -242,6 +252,8 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.updated_at"),
     accessorKey: "updated_at",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.updatedAt,
     meta: {
       align: "left",
