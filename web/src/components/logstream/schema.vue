@@ -512,6 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row-key="name"
                       selection="multiple"
                       :selected-ids="selectedSchemaIds"
+                      :is-row-selectable="isSchemaRowSelectable"
                       @update:selected-ids="handleSchemaSelectedIdsUpdate"
                       @selection-change="handleSchemaSelectionChange"
                       pagination="client"
@@ -1222,6 +1223,15 @@ export default defineComponent({
         );
       },
     });
+
+    // The _timestamp and allFields rows are never part of the selection (they
+    // are filtered out below). Tell the table they are non-selectable so the
+    // header "Select All" toggle only considers real rows — otherwise it can
+    // never reach a fully-selected state and stays stuck in select-only mode,
+    // breaking deselect-all.
+    const isSchemaRowSelectable = (row: any) =>
+      row.name !== store.state.zoConfig.timestamp_column &&
+      row.name !== allFieldsName.value;
 
     const handleSchemaSelectedIdsUpdate = (ids: string[]) => {
       selectedSchemaIds.value = ids;
@@ -2712,6 +2722,7 @@ export default defineComponent({
       perPageOptionsList,
       filteredSchemaData,
       selectedSchemaIds,
+      isSchemaRowSelectable,
       handleSchemaSelectedIdsUpdate,
       handleSchemaSelectionChange,
       selectedDateIds,
