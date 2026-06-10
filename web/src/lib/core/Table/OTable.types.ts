@@ -39,7 +39,7 @@ export const COL = {
   sizeBytes:    130,
   url:          220,
   template:     180,
-  owner:        150,
+  owner:        220,
   folder:       150,
   role:         160,
   authType:     100,
