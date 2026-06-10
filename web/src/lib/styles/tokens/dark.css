@@ -16,38 +16,86 @@
      */
     color-scheme: dark;
 
-    /* --- Text --- */
-    --color-text-heading:     var(--color-grey-50);   /* h1-h6, modal titles */
-    --color-text-primary:     var(--color-grey-50);   /* alias for heading */
-    --color-text-body:        var(--color-grey-200);  /* paragraphs, default body */
-    --color-text-secondary:   var(--color-grey-400);  /* supporting text, descriptions */
-    --color-text-caption:     var(--color-grey-400);  /* captions, footnotes, timestamps */
-    --color-text-label:       var(--color-grey-500);  /* form labels, metadata */
-    --color-text-muted:       var(--color-grey-600);  /* disabled, de-emphasized */
-    --color-text-disabled:    var(--color-grey-500);
-    --color-text-placeholder: var(--color-grey-600);  /* input placeholders */
-    --color-text-link:        var(--color-primary-400);  /* clickable links */
-    --color-text-link-hover:  var(--color-primary-300);  /* link hover state */
-    --color-text-code:        var(--color-grey-300);     /* inline code, monospace */
-    --color-text-inverse:     var(--color-grey-900);     /* text on dark/colored bg */
+    /* ═══════════════════════════════════════════════════════════
+       DARK MODE FOUNDATION — tune these ~16 values to taste.
+       Everything below (surfaces, borders, text, and the per-component
+       overrides further down) references ONLY these vars, so the whole
+       dark theme is tuned from here without touching components.
 
-    /* --- Surfaces --- */
-    --color-surface-base: var(--color-grey-950);
-    --color-surface-panel: var(--color-grey-900);
-    --color-surface-overlay: var(--color-grey-800);
-    --color-surface-subtle: var(--color-grey-800);
-    --color-surface-subtle-hover: var(--color-grey-700);
-    /* App chrome — a quiet dark backdrop, just slightly lifted from the content
-       card (grey-950) so the card still reads as a distinct floating surface. */
-    --color-surface-chrome: color-mix(in srgb, var(--color-primary-500) 8%, var(--color-grey-900));
-    --color-surface-chrome-deeper: color-mix(in srgb, var(--color-primary-500) 20%, var(--color-grey-950));
+       Elevation order (deepest → lightest), preserving the light-mode
+       relationship (subtle < panel < base < overlay) so cards LIFT and
+       sub-rails RECEDE — that's what creates visible "sections":
 
-    /* --- Borders --- */
-    --color-border-default: var(--color-grey-700);
-    --color-border-strong: var(--color-grey-500);
-    /* Soft divider on the dark card — one step quieter than border-default so
-       row/section splits don't read as hard structural lines. */
-    --color-border-subtle: var(--color-grey-800);
+         chrome   top bar / left rail / gutter behind the card  (deepest)
+         well     recessed fills, segmented-control track
+         panel    folder & sub rails, cards, table-header base
+         base     THE content card + table canvas               (main, lifted)
+         overlay  menus, dialogs, inputs, table-header, tooltips (highest)
+
+       Two rules that must survive any tuning:
+        1. BASE (the content card) is clearly LIGHTER than the chrome behind
+           it, so the card visibly floats off the frame.
+        2. Borders read clearly ABOVE the surface they outline — a border
+           close to its background is invisible (the bug this fixes).
+
+       Accents stay on the teal brand palette (--color-primary-*), which is
+       theme-driven at runtime (utils/theme.ts) — no accent is hardcoded here.
+       Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
+       ═══════════════════════════════════════════════════════════ */
+
+    /* Surfaces — deepest (recessed) → lightest (raised) */
+    --d-chrome:    #0E1014;  /* top bar + left rail + gutter behind the card   */
+    --d-well:      #16191F;  /* recessed wells, segmented-control track         */
+    --d-panel:     #1C212A;  /* folder/sub rails, cards, table-header base      */
+    --d-base:      #252B35;  /* MAIN: content card + table canvas (lifted)      */
+    --d-overlay:   #2F3640;  /* menus, dialogs, inputs, table-header, tooltips  */
+
+    /* Borders & dividers — MUST read clearly against every surface above */
+    --d-divider:       #3D4550;  /* subtle: row & section separators            */
+    --d-border:        #58616F;  /* default: card / input / table / rail edges  */
+    --d-border-strong: #727C8B;  /* strong: checkbox / radio / file outlines    */
+
+    /* Text — never pure white */
+    --d-text:      #ECEEF1;  /* primary text, headings, record names            */
+    --d-text-2:    #BFC6CF;  /* secondary: body, nav, labels                    */
+    --d-text-3:    #9BA3AE;  /* metadata, captions, column heads, IDs           */
+
+    /* Row / item states on the content surface */
+    --d-hover:     #2C333D;  /* neutral row & list-item hover (above base)      */
+    --d-selected:  color-mix(in srgb, var(--color-primary-500) 26%, var(--d-base));
+                             /* selected row — teal-tinted (brand signal)       */
+    --d-zebra:     #20262F;  /* striped-row bg — one step below base            */
+
+    /* --- Text (mapped to the foundation) --- */
+    --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
+    --color-text-primary:     var(--d-text);   /* alias for heading */
+    --color-text-body:        var(--d-text-2); /* paragraphs, default body */
+    --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
+    --color-text-caption:     var(--d-text-3); /* captions, footnotes, timestamps */
+    --color-text-label:       var(--d-text-3); /* form labels, metadata */
+    --color-text-muted:       var(--d-text-3); /* disabled, de-emphasized */
+    --color-text-disabled:    var(--d-text-3);
+    --color-text-placeholder: var(--d-text-3); /* input placeholders */
+    --color-text-link:        var(--color-primary-400);  /* clickable links (teal) */
+    --color-text-link-hover:  var(--color-primary-300);  /* link hover state (teal) */
+    --color-text-code:        var(--d-text-2);           /* inline code, monospace */
+    --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
+
+    /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
+    --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */
+    --color-surface-panel:        var(--d-panel);   /* folder rails, cards, table-header base */
+    --color-surface-overlay:      var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
+    --color-surface-subtle:       var(--d-well);    /* recessed fills, segmented track */
+    --color-surface-subtle-hover: var(--d-panel);   /* hover on a recessed fill (one step up) */
+    --color-surface-chrome:        var(--d-chrome);  /* top bar + left rail */
+    --color-surface-chrome-deeper: var(--d-chrome);  /* gutter behind card (same frame) */
+
+    /* --- Borders (mapped — solid, clearly visible) --- */
+    --color-border-default: var(--d-border);
+    --color-border-strong:  var(--d-border-strong);
+    /* Soft divider — one step quieter than border-default so row/section
+       splits don't read as hard structural lines (but still visible). */
+    --color-border-subtle:  var(--d-divider);
 
     /* ---- Button overrides ---- */
 
@@ -101,10 +149,10 @@
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* Tooltip */
-    --color-tooltip-bg: var(--color-grey-800);
-    --color-tooltip-text: var(--color-grey-50);
-    --color-tooltip-border: var(--color-grey-600);
-    --color-tooltip-arrow: var(--color-grey-800);
+    --color-tooltip-bg: var(--d-overlay);
+    --color-tooltip-text: var(--d-text);
+    --color-tooltip-border: var(--d-border);
+    --color-tooltip-arrow: var(--d-overlay);
 
     /* ToggleGroup */
     --color-toggle-item-hover-bg: var(--color-primary-950);
@@ -176,20 +224,19 @@
     --color-refresh-dot-critical: var(--color-error-400);
 
     /* Input (OInput, OTextarea) — disabled-bg uses grey-700 (#404040) which
-       sits noticeably brighter than the enabled `surface-panel` grey-900
-       (#171717) so disabled fields are visually obvious in dark mode. */
-    --color-input-bg: var(--color-surface-panel);
+       enabled field (--d-overlay) so disabled fields read as flat/inert. */
+    --color-input-bg: var(--d-overlay);
     --color-input-border: var(--color-border-default);
-    --color-input-disabled-bg: var(--color-grey-700);
+    --color-input-disabled-bg: var(--d-well);
     --color-input-disabled-text: var(--color-text-secondary);
     --color-input-placeholder: var(--color-text-disabled);
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
     /* Select (OSelect) — same disabled-bg strategy as input. */
-    --color-select-bg: var(--color-surface-panel);
+    --color-select-bg: var(--d-overlay);
     --color-select-border: var(--color-border-default);
-    --color-select-disabled-bg: var(--color-grey-700);
+    --color-select-disabled-bg: var(--d-well);
     --color-select-disabled-text: var(--color-text-secondary);
     --color-select-placeholder: var(--color-text-disabled);
     --color-select-error-text: var(--color-error-400);
@@ -282,18 +329,18 @@
     --color-colorpicker-popup-border: var(--color-border-default);
 
     /* Dialog */
-    --color-dialog-overlay: color-mix(in srgb, var(--color-grey-950) 70%, transparent);
-    --color-dialog-bg: var(--color-grey-900);
-    --color-dialog-border: var(--color-grey-700);
-    --color-dialog-header-bg: var(--color-grey-800);
-    --color-dialog-header-text: var(--color-grey-50);
-    --color-dialog-header-border: var(--color-grey-700);
-    --color-dialog-content-text: var(--color-grey-50);
-    --color-dialog-footer-bg: var(--color-grey-800);
-    --color-dialog-footer-border: var(--color-grey-700);
-    --color-dialog-close-text: var(--color-grey-400);
-    --color-dialog-close-hover-bg: var(--color-grey-700);
-    --color-dialog-close-active-bg: var(--color-grey-600);
+    --color-dialog-overlay: color-mix(in srgb, var(--d-chrome) 80%, transparent);
+    --color-dialog-bg: var(--d-base);
+    --color-dialog-border: var(--d-border);
+    --color-dialog-header-bg: var(--d-overlay);
+    --color-dialog-header-text: var(--d-text);
+    --color-dialog-header-border: var(--d-border);
+    --color-dialog-content-text: var(--d-text);
+    --color-dialog-footer-bg: var(--d-overlay);
+    --color-dialog-footer-border: var(--d-border);
+    --color-dialog-close-text: var(--d-text-3);
+    --color-dialog-close-hover-bg: var(--d-divider);
+    --color-dialog-close-active-bg: var(--d-border);
 
     /* Pagination */
     --color-pagination-item-active-bg: var(--color-primary-500);
@@ -387,14 +434,14 @@
     --color-toast-action-text:    var(--color-primary-400);
     --color-toast-action-hover:   var(--color-primary-300);
 
-    /* ── OTable (dark) ─────────────────────────────────── */
-    --color-table-header-bg: var(--color-grey-800);
-    --color-table-row-hover-bg: var(--color-primary-900);
-    --color-table-row-selected-bg: color-mix(in srgb, var(--color-primary-800) 50%, var(--color-grey-900));
-    --color-table-row-striped-bg: var(--color-grey-800);
-    --color-table-row-divider: var(--color-grey-700);
+    /* ── OTable (dark) — pulled onto the elevation ladder ─── */
+    --color-table-header-bg: var(--d-overlay);          /* header band lifts off rows */
+    --color-table-row-hover-bg: var(--d-hover);        /* neutral hover (not teal-washed) */
+    --color-table-row-selected-bg: var(--d-selected);  /* teal-tinted selection */
+    --color-table-row-striped-bg: var(--d-zebra);      /* panel +1 step zebra */
+    --color-table-row-divider: var(--d-divider);       /* solid, visible row separators */
     --color-table-highlight-bg: color-mix(in srgb, var(--color-warning-700) 40%, transparent);
     --color-table-sort-icon-active: var(--color-primary-400);
     --color-table-streaming-bar: var(--color-primary-400);
-    --color-table-row-expanded-bg: var(--color-grey-850);
+    --color-table-row-expanded-bg: var(--d-overlay);
 }
