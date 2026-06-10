@@ -271,7 +271,7 @@ export default class DashboardPanelTime {
    * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
    * @param {boolean} clickApply - Whether to click Apply button (default: true)
-   * @param {number} _attempt - Internal retry counter (do not pass from call sites)
+   * @param {number} [_attempt=1] - Internal recursion counter. Do NOT pass from call sites.
    */
   async changePanelTimeInView(panelId, timeRange, clickApply = true, _attempt = 1) {
     // Click the panel time picker button
@@ -310,7 +310,9 @@ export default class DashboardPanelTime {
           await this._waitForAllPanelsIdle();
           return this.changePanelTimeInView(panelId, timeRange, clickApply, _attempt + 1);
         }
-        return;
+        throw new Error(
+          `changePanelTimeInView: date-time menu did not stay open for panel "${panelId}" after ${_attempt} attempts`
+        );
       }
 
       const applyBtn = this.page.locator('[data-test="date-time-apply-btn"]').first();
@@ -353,16 +355,29 @@ export default class DashboardPanelTime {
    * clear. This is the correct signal that the panelsInitializing guard in
    * RenderDashboardCharts (a 500 ms timer that re-arms on every panel refresh) has
    * had time to expire, making the UI stable for clicks without force:true.
+   *
+   * Both waits intentionally swallow timeouts (.catch(() => {})):
+   * - networkidle may never fire under continuous background refreshes in CI;
+   *   timing out and continuing is correct — the loading-indicator check below
+   *   provides the authoritative signal.
+   * - Individual loading indicators may never appear (panel already loaded) or
+   *   may time out on a very slow server; either way we proceed and let the
+   *   caller's retry logic handle persistent instability.
    */
   async _waitForAllPanelsIdle() {
     // Network idle = no pending /_search or /query responses
     await this.page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    // Loading indicators confirm each panel has finished rendering its response
+    // Wait for all visible loading indicators in parallel — avoids the O(n) sequential
+    // worst case (N panels × 8 s timeout) that blocking await inside a loop creates.
     const loadingIndicators = this.page.locator('[data-test$="-loading"]');
     const count = await loadingIndicators.count();
+    const waits = [];
     for (let i = 0; i < count; i++) {
-      await loadingIndicators.nth(i).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {});
+      waits.push(
+        loadingIndicators.nth(i).waitFor({ state: "hidden", timeout: 8000 }).catch(() => {})
+      );
     }
+    await Promise.allSettled(waits);
   }
 
   /**
