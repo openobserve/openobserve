@@ -4315,6 +4315,18 @@
       "description": "Externe Ziele für die Pipeline-Ausgabe — HTTP-Endpunkte und Remote-Schreibziele.",
       "action": "Neues Reiseziel",
       "actionDesc": "Pipeline-Ziel verbinden"
+    },
+    "noLLMInsights": {
+      "title": "Noch keine LLM-Aktivität",
+      "description": "Instrumentieren Sie Ihre Dienste mit den semantischen Konventionen der OpenTelemetry Gen-AI und nehmen Sie mindestens einen Trace auf, um dieses Dashboard zu füllen.",
+      "action": "Instrument mit OpenTelemetrie",
+      "actionDesc": "Erfasse gen_ai_*-Attribute auf deinen Spuren"
+    },
+    "noLLMSessions": {
+      "title": "Noch keine LLM-Sitzungen",
+      "description": "Sitzungen werden nach gen_ai_conversation_id gruppiert. Instrumentieren Sie Ihre Dienste so, dass jede Konversation ihre Spuren markiert und die Sitzungen hier angezeigt werden.",
+      "action": "Instrument mit OpenTelemetrie",
+      "actionDesc": "Tag-Spans mit gen_ai_conversation_id"
     }
   },
   "onlineEvals": {

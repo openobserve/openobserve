@@ -4328,6 +4328,18 @@
       "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
       "action": "Nieuwe bestemming",
       "actionDesc": "Een pijplijnbestemming aansluiten"
+    },
+    "noLLMInsights": {
+      "title": "Nog geen LLM-activiteit",
+      "description": "Instrument uw services met de OpenTelemetry Gen-AI semantische conventies en gebruik ten minste één spoor om dit dashboard te vullen.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Leg gen_ai_* attributen vast op je sporen"
+    },
+    "noLLMSessions": {
+      "title": "Nog geen LLM-sessies",
+      "description": "Sessies worden gegroepeerd op gen_ai_conversation_id. Instrumenteer uw services zodat elk gesprek zijn sporen tagt, en sessies worden hier weergegeven.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Tag omspant met gen_ai_conversation_id"
     }
   },
   "onlineEvals": {

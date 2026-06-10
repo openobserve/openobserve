@@ -4328,6 +4328,18 @@
       "description": "Boru hattı çıktısı için harici hedefler - HTTP uç noktaları ve uzaktan yazma hedefleri.",
       "action": "Yeni hedef",
       "actionDesc": "Bir boru hattı hedefini bağlama"
+    },
+    "noLLMInsights": {
+      "title": "Henüz LLM etkinliği yok",
+      "description": "Hizmetlerinizi OpenTelemetry Gen-AI semantik kurallarıyla düzenleyin ve bu gösterge tablosunu doldurmak için en az bir iz alın.",
+      "action": "OpenTelemetry ile Enstrüman",
+      "actionDesc": "İzlerinizdeki gen_ai_* özelliklerini yakalayın"
+    },
+    "noLLMSessions": {
+      "title": "Henüz LLM oturumu yok",
+      "description": "Oturumlar gen_ai_conversation_id olarak gruplandırılır. Hizmetlerinizi düzenleyin, böylece her konuşma izlerini etiketler ve oturumlar burada görünür.",
+      "action": "OpenTelemetry ile Enstrüman",
+      "actionDesc": "gen_ai_conversation_id ile gen_ai_conversation_id ile etiketleme alanları"
     }
   },
   "onlineEvals": {

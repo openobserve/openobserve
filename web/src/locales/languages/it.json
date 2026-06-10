@@ -4326,6 +4326,18 @@
       "description": "Destinazioni esterne per l'output della pipeline: endpoint HTTP e destinazioni di scrittura remota.",
       "action": "Nuova destinazione",
       "actionDesc": "Connetti una destinazione della pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Nessuna attività LLM ancora",
+      "description": "Strumenta i tuoi servizi con le convenzioni semantiche OpenTelemetry Gen-AI e inserisci almeno una traccia per popolare questa dashboard.",
+      "action": "Strumento con OpenTelemetry",
+      "actionDesc": "Acquisisci gli attributi gen_ai_* sulle tue tracce"
+    },
+    "noLLMSessions": {
+      "title": "Ancora nessuna sessione LLM",
+      "description": "Le sessioni sono raggruppate per gen_ai_conversation_id. Imposta i tuoi servizi in modo che ogni conversazione tagghi le proprie tracce e le sessioni vengano visualizzate qui.",
+      "action": "Strumento con OpenTelemetry",
+      "actionDesc": "I tag si estendono con gen_ai_conversation_id"
     }
   },
   "onlineEvals": {

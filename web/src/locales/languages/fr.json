@@ -4315,6 +4315,18 @@
       "description": "Cibles externes pour la sortie du pipeline : points de terminaison HTTP et cibles d'écriture distantes.",
       "action": "Nouvelle destination",
       "actionDesc": "Connecter une destination de pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Aucune activité LLM pour le moment",
+      "description": "Instrumentez vos services à l'aide des conventions sémantiques OpenTelemetry Gen-AI et ingérez au moins une trace pour alimenter ce tableau de bord.",
+      "action": "Instrument avec OpenTelemetry",
+      "actionDesc": "Capturez les attributs gen_ai_* sur vos traces"
+    },
+    "noLLMSessions": {
+      "title": "Pas encore de sessions de LLM",
+      "description": "Les sessions sont regroupées par gen_ai_conversation_id. Instrumentez vos services de manière à ce que chaque conversation marque ses traces, et les sessions apparaîtront ici.",
+      "action": "Instrument avec OpenTelemetry",
+      "actionDesc": "Les tags s'étendent avec gen_ai_conversation_id"
     }
   },
   "onlineEvals": {

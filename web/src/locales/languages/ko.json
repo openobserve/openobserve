@@ -4328,6 +4328,18 @@
       "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
       "action": "새 목적지",
       "actionDesc": "파이프라인 대상 연결"
+    },
+    "noLLMInsights": {
+      "title": "LLM 활동이 아직 없습니다",
+      "description": "OpenTelemetry Gen-AI 시맨틱 규칙으로 서비스를 계측하고 최소 하나의 트레이스를 수집하여 이 대시보드를 채웁니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "트레이스에서 gen_ai_* 어트리뷰트를 캡처하세요"
+    },
+    "noLLMSessions": {
+      "title": "LLM 세션이 아직 없습니다",
+      "description": "세션은 gen_ai_conversation_id별로 그룹화됩니다. 각 대화에 트레이스에 태그를 지정하도록 서비스를 계측하면 세션이 여기에 표시됩니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "gen_ai_conversation_id가 포함된 태그 범위"
     }
   },
   "onlineEvals": {

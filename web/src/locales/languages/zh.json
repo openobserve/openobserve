@@ -4319,6 +4319,18 @@
       "description": "管道输出的外部目标 — HTTP 端点和远程写入目标。",
       "action": "新目的地",
       "actionDesc": "连接管道目的地"
+    },
+    "noLLMInsights": {
+      "title": "还没有 LLM 活动",
+      "description": "使用 OpenTelemetry Gen-AI 语义约定来检测您的服务，并提取至少一条轨迹以填充此仪表板。",
+      "action": "带有 OpenTelemetry",
+      "actionDesc": "捕获痕迹上的 gen_ai_* 属性"
+    },
+    "noLLMSessions": {
+      "title": "还没有 LLM 课程",
+      "description": "会话按 gen_ai_conversation_id 分组。对您的服务进行检测，以便每个对话都标记其痕迹，会话将显示在此处。",
+      "action": "带有 OpenTelemetry",
+      "actionDesc": "使用 gen_ai_conversation_id 标记跨度"
     }
   },
   "onlineEvals": {

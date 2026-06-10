@@ -4315,6 +4315,18 @@
       "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
       "action": "新しい目的地",
       "actionDesc": "パイプラインデスティネーションの接続"
+    },
+    "noLLMInsights": {
+      "title": "LLM アクティビティはまだありません",
+      "description": "OpenTelemetry Gen-AI セマンティック規約を使用してサービスをインストルメントし、少なくとも 1 つのトレースを取り込んでこのダッシュボードに入力してください。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "トレースの gen_ai_* 属性をキャプチャ"
+    },
+    "noLLMSessions": {
+      "title": "LLM セッションはまだありません",
+      "description": "セッションは gen_ai_conversation_id でグループ化されます。各会話がトレースにタグ付けされるようにサービスをインストルメントすると、セッションがここに表示されます。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "gen_ai_conversation_id でスパンにタグを付ける"
     }
   },
   "onlineEvals": {

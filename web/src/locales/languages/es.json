@@ -4313,6 +4313,18 @@
       "description": "Destinos externos para la salida de canalización: puntos finales HTTP y destinos de escritura remota.",
       "action": "Nuevo destino",
       "actionDesc": "Conectar un destino de canalización"
+    },
+    "noLLMInsights": {
+      "title": "Aún no hay actividad de LLM",
+      "description": "Instrumente sus servicios con las convenciones semánticas de la generación AI de OpenTelemetry e ingiera al menos un rastro para rellenar este panel.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Captura los atributos gen_ai_* en tus rastros"
+    },
+    "noLLMSessions": {
+      "title": "Aún no hay sesiones de LLM",
+      "description": "Las sesiones se agrupan por gen_ai_conversation_id. Instrumente sus servicios para que cada conversación etiquete sus rastros y las sesiones aparezcan aquí.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Etiquete intervalos con gen_ai_conversation_id"
     }
   },
   "onlineEvals": {
