@@ -426,6 +426,9 @@ export function useNLQuery() {
 
       if (!(response as Response).ok) {
         console.error('[NL2Q] AI assistant returned error:', (response as Response).status);
+        if ((response as Response).status === 403) {
+          streamingResponse.value = UNAUTHORIZED_MESSAGE;
+        }
         return null;
       }
 
