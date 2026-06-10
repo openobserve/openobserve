@@ -15,7 +15,7 @@
 
 use std::{collections::HashSet, sync::Arc};
 
-use config::meta::inverted_index::IndexOptimizeMode;
+use config::meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS};
 use datafusion::{
     common::{
         Result,
@@ -33,12 +33,13 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 };
 
 #[rustfmt::skip]
-/// SimpleTopN(String, usize, bool):
+/// SimpleTopN(Vec<String>, usize, bool):
 /// the sql can like: select name, count(*) as cnt from table where match_all() group by name order by cnt desc limit 10;
-///                   or select name as key, count(*) as cnt from table where match_all() group by key order by cnt desc limit 10;
 ///                   or select name as key, count(*) as cnt from table where match_all() group by key order by cnt desc, key asc limit 10;
-/// condition: only select a index_field, and only have count(*) as aggregate function, group by the index_field in select clause,
-/// order by count(*) [, key asc], and have limit (secondary sort on key is optional and must be ASC if present)
+///                   or select userid, searchphrase, count(*) as cnt from table where match_all() group by userid, searchphrase order by cnt desc limit 10;
+/// condition: only select 1..=MAX_SIMPLE_TOPN_FIELDS index_fields, and only have count(*) as aggregate function,
+/// group by those index_fields in select clause, order by count(*) [, field asc...], and have limit
+/// (secondary sorts are optional, must be ASC and reference the group by fields)
 /// example plan:
 ///   SortPreservingMergeExec: [cnt@1 DESC], fetch=10
 ///     SortExec: TopK(fetch=10), expr=[cnt@1 DESC], preserve_partitioning=[true]
@@ -54,24 +55,21 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet<String>) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleTopnVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
-    if let Some((field, fetch, ascend)) = visitor.simple_topn {
-        if field.is_empty() {
-            return None;
+    match visitor.simple_topn {
+        Some((fields, fetch, ascend))
+            if !fields.is_empty() && fields.len() <= MAX_SIMPLE_TOPN_FIELDS =>
+        {
+            Some(IndexOptimizeMode::SimpleTopN(fields, fetch, ascend))
         }
-        Some(IndexOptimizeMode::SimpleTopN(
-            vec![field],
-            fetch,
-            ascend,
-        ))
-    } else {
-        None
+        _ => None,
     }
 }
 
 struct SimpleTopnVisitor {
-    pub simple_topn: Option<(String, usize, bool)>,
+    pub simple_topn: Option<(Vec<String>, usize, bool)>,
     index_fields: HashSet<String>,
-    secondary_sort_column: Option<String>,
+    secondary_sort_columns: Vec<String>,
+    projection_len: Option<usize>,
 }
 
 impl SimpleTopnVisitor {
@@ -79,7 +77,8 @@ impl SimpleTopnVisitor {
         Self {
             simple_topn: None,
             index_fields,
-            secondary_sort_column: None,
+            secondary_sort_columns: Vec::new(),
+            projection_len: None,
         }
     }
 }
@@ -93,7 +92,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             if let Some(fetch) = sort_merge.fetch()
                 && fetch > 0
                 && !sort_merge.expr().is_empty()
-                && sort_merge.expr().len() <= 2
+                && sort_merge.expr().len() <= MAX_SIMPLE_TOPN_FIELDS + 1
+            // primary sort on count(*) + up to one secondary sort per group field
             {
                 // the first sort should be on the count(*) result, not directly on an index field
                 // should not sort by index field as primary sort
@@ -104,21 +104,19 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
                     return Ok(TreeNodeRecursion::Stop);
                 }
 
-                // If there's a secondary sort, it should be ASC (not descending)
-                if sort_merge.expr().len() == 2 {
-                    let secondary_sort = &sort_merge.expr()[1];
-                    // Secondary sort must be ASC (not descending) and should be a column
+                // Secondary sorts must be ASC (not descending) columns; their names are
+                // validated against the group by fields when visiting the ProjectionExec
+                for secondary_sort in sort_merge.expr().iter().skip(1) {
                     if secondary_sort.options.descending || !is_column(&secondary_sort.expr) {
                         self.simple_topn = None;
                         return Ok(TreeNodeRecursion::Stop);
                     }
-                    // Store the secondary sort column name to validate later in AggregateExec
-                    self.secondary_sort_column =
-                        Some(get_column_name(&secondary_sort.expr).to_string());
+                    self.secondary_sort_columns
+                        .push(get_column_name(&secondary_sort.expr).to_string());
                 }
 
                 self.simple_topn = Some((
-                    "".to_string(), // Will be set when we find the group by field
+                    vec![], // Will be set when we find the group by fields
                     fetch,
                     !sort_merge.expr().first().options.descending,
                 ));
@@ -128,44 +126,60 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             self.simple_topn = None;
             return Ok(TreeNodeRecursion::Stop);
         } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
-            // Check ProjectionExec for the structure: [index_field, count(*)]
+            // Check ProjectionExec for the structure: [field1, .., fieldN, count(*)]
             let exprs = projection.expr();
-            if exprs.len() == 2 {
-                // First expression should be the index field, second should be count(*)
-                // If we have a secondary sort column, validate it matches the first projection
-                // column alias
-                if let Some(secondary_col) = &self.secondary_sort_column {
-                    let first_alias = &exprs[0].alias;
-                    if secondary_col != first_alias {
-                        // Secondary sort doesn't match the grouped field
-                        self.simple_topn = None;
-                        return Ok(TreeNodeRecursion::Stop);
-                    }
+            if exprs.len() >= 2 && exprs.len() <= MAX_SIMPLE_TOPN_FIELDS + 1 {
+                self.projection_len = Some(exprs.len());
+                // Secondary sort columns must reference the group by fields, i.e. the
+                // aliases of the leading projection columns
+                let group_aliases: HashSet<&str> = exprs[..exprs.len() - 1]
+                    .iter()
+                    .map(|expr| expr.alias.as_str())
+                    .collect();
+                if self
+                    .secondary_sort_columns
+                    .iter()
+                    .any(|col| !group_aliases.contains(col.as_str()))
+                {
+                    // Secondary sort doesn't match the grouped fields
+                    self.simple_topn = None;
+                    return Ok(TreeNodeRecursion::Stop);
                 }
                 return Ok(TreeNodeRecursion::Continue);
             }
-            // If projection doesn't have exactly 2 expressions, stop visiting
+            // If projection doesn't have 2..=MAX_SIMPLE_TOPN_FIELDS+1 expressions, stop visiting
             self.simple_topn = None;
             return Ok(TreeNodeRecursion::Stop);
         } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches SimpleTopN pattern
-            if aggregate.group_expr().expr().len() == 1 && aggregate.aggr_expr().len() == 1 {
-                // Check group by field
-                if let Some((group_expr, _)) = aggregate.group_expr().expr().first() {
+            let group_len = aggregate.group_expr().expr().len();
+            if (1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
+                && aggregate.aggr_expr().len() == 1
+                // the projection (if any) should be exactly the group by fields + count(*)
+                && self.projection_len.is_none_or(|len| len == group_len + 1)
+            {
+                let mut fields = Vec::with_capacity(group_len);
+
+                // Check all group by fields are in index_fields
+                for (group_expr, _) in aggregate.group_expr().expr().iter() {
                     let column_name = get_column_name(group_expr);
                     if is_column(group_expr) && self.index_fields.contains(column_name) {
-                        // Check aggregate function is count(*)
-                        let aggr_expr = &aggregate.aggr_expr()[0];
-                        if aggr_expr.name() == "count(Int64(1))" {
-                            // Update the simple_topn with the correct field name
-                            if let Some(simple_topn) = &mut self.simple_topn {
-                                self.simple_topn =
-                                    Some((column_name.to_string(), simple_topn.1, simple_topn.2));
-                            }
-
-                            return Ok(TreeNodeRecursion::Continue);
-                        }
+                        fields.push(column_name.to_string());
+                    } else {
+                        // One of the group by fields is not an index field
+                        self.simple_topn = None;
+                        return Ok(TreeNodeRecursion::Stop);
                     }
+                }
+
+                // Check aggregate function is count(*)
+                let aggr_expr = &aggregate.aggr_expr()[0];
+                if aggr_expr.name() == "count(Int64(1))" {
+                    // Update the simple_topn with the correct field names
+                    if let Some(simple_topn) = &mut self.simple_topn {
+                        simple_topn.0 = fields;
+                    }
+                    return Ok(TreeNodeRecursion::Continue);
                 }
             }
             // If AggregateExec doesn't match SimpleTopN pattern, stop visiting
@@ -283,15 +297,19 @@ mod tests {
                 "select name, count(*) as cnt from t where match_all('error') group by name order by cnt desc",
                 None,
             ),
-            // Invalid case: multiple aggregations (selecting more than 2 columns)
+            // Invalid case: multiple aggregations (selecting more than group fields + count)
             (
                 "select name, count(*) as cnt, count(*) as cnt2 from t where match_all('error') group by name order by cnt desc limit 10",
                 None,
             ),
-            // Invalid case: group by multiple fields
+            // Valid case: group by multiple index fields
             (
                 "select name, id, count(*) as cnt from t where match_all('error') group by name, id order by cnt desc limit 10",
-                None,
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["name".to_string(), "id".to_string()],
+                    10,
+                    false,
+                )),
             ),
             // Invalid case: wrong aggregate function (not count)
             (
@@ -306,6 +324,132 @@ mod tests {
             let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
 
             let index_fields = HashSet::from(["name".to_string(), "id".to_string()]);
+            assert_eq!(
+                expected,
+                is_simple_topn(physical_plan, index_fields),
+                "Failed for SQL: {}",
+                sql
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_is_simple_topn_multi_fields() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("userid", DataType::Utf8, false),
+            Field::new("searchphrase", DataType::Utf8, false),
+            Field::new("status", DataType::Utf8, false),
+            Field::new("region", DataType::Utf8, false),
+            Field::new("zone", DataType::Utf8, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["user1"])),
+                Arc::new(StringArray::from(vec!["hello"])),
+                Arc::new(StringArray::from(vec!["success"])),
+                Arc::new(StringArray::from(vec!["us-west"])),
+                Arc::new(StringArray::from(vec!["a"])),
+            ],
+        )
+        .unwrap();
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch.clone()], vec![batch]]).unwrap();
+        ctx.register_table("hits", Arc::new(provider)).unwrap();
+        ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
+
+        let cases = vec![
+            // Valid: two-field GROUP BY with count(*) ORDER BY cnt DESC LIMIT 10
+            (
+                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["userid".to_string(), "searchphrase".to_string()],
+                    10,
+                    false,
+                )),
+            ),
+            // Valid: two-field GROUP BY with count(*) ORDER BY cnt ASC LIMIT 5
+            (
+                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt asc limit 5",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["userid".to_string(), "searchphrase".to_string()],
+                    5,
+                    true,
+                )),
+            ),
+            // Valid: three-field GROUP BY with count(*)
+            (
+                "select userid, searchphrase, status, count(*) as cnt from hits where match_all('error') group by userid, searchphrase, status order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec![
+                        "userid".to_string(),
+                        "searchphrase".to_string(),
+                        "status".to_string(),
+                    ],
+                    10,
+                    false,
+                )),
+            ),
+            // Valid: four-field GROUP BY with count(*)
+            (
+                "select userid, searchphrase, status, region, count(*) as cnt from hits where match_all('error') group by userid, searchphrase, status, region order by cnt desc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec![
+                        "userid".to_string(),
+                        "searchphrase".to_string(),
+                        "status".to_string(),
+                        "region".to_string(),
+                    ],
+                    10,
+                    false,
+                )),
+            ),
+            // Invalid: five-field GROUP BY exceeds MAX_SIMPLE_TOPN_FIELDS
+            (
+                "select userid, searchphrase, status, region, zone, count(*) as cnt from hits where match_all('error') group by userid, searchphrase, status, region, zone order by cnt desc limit 10",
+                None,
+            ),
+            // Valid: secondary sorts on group by fields (ASC)
+            (
+                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc, userid asc, searchphrase asc limit 10",
+                Some(IndexOptimizeMode::SimpleTopN(
+                    vec!["userid".to_string(), "searchphrase".to_string()],
+                    10,
+                    false,
+                )),
+            ),
+            // Invalid: secondary sort with DESC should not optimize
+            (
+                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc, userid desc limit 10",
+                None,
+            ),
+            // Invalid: one field not in index
+            (
+                "select userid, _timestamp, count(*) as cnt from hits where match_all('error') group by userid, _timestamp order by cnt desc limit 10",
+                None,
+            ),
+            // Invalid: no limit
+            (
+                "select userid, searchphrase, count(*) as cnt from hits where match_all('error') group by userid, searchphrase order by cnt desc",
+                None,
+            ),
+        ];
+
+        for (sql, expected) in cases {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+            let index_fields = HashSet::from([
+                "userid".to_string(),
+                "searchphrase".to_string(),
+                "status".to_string(),
+                "region".to_string(),
+                "zone".to_string(),
+            ]);
             assert_eq!(
                 expected,
                 is_simple_topn(physical_plan, index_fields),
@@ -505,7 +649,8 @@ mod tests {
         let fields = HashSet::from(["service".to_string()]);
         let visitor = SimpleTopnVisitor::new(fields.clone());
         assert!(visitor.simple_topn.is_none());
-        assert!(visitor.secondary_sort_column.is_none());
+        assert!(visitor.secondary_sort_columns.is_empty());
+        assert!(visitor.projection_len.is_none());
         assert_eq!(visitor.index_fields, fields);
     }
 
@@ -514,7 +659,7 @@ mod tests {
         let fields: HashSet<String> = HashSet::new();
         let visitor = SimpleTopnVisitor::new(fields.clone());
         assert!(visitor.simple_topn.is_none());
-        assert!(visitor.secondary_sort_column.is_none());
+        assert!(visitor.secondary_sort_columns.is_empty());
         assert!(visitor.index_fields.is_empty());
     }
 
