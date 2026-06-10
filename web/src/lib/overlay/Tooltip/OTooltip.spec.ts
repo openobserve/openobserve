@@ -68,6 +68,16 @@ describe("OTooltip", () => {
     expect(wrapper.find(".my-custom-class").exists()).toBe(true);
   });
 
+  it("keeps tooltip portals from intercepting clicks", () => {
+    const wrapper = mountTooltip(
+      { content: "Safe hover", open: true },
+      { default: () => h("button", "Hover") },
+    );
+    expect(wrapper.find('[data-test="o-tooltip-content"]').classes()).toContain(
+      "tw:pointer-events-none",
+    );
+  });
+
   it("accepts side and align props without errors", () => {
     const wrapper = mountTooltip(
       { content: "Positioned", open: true, side: "right", align: "end" },

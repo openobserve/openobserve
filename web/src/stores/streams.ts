@@ -9,6 +9,7 @@ export default {
       metadata: null,
       streamsIndexMapping: {},
       areAllStreamsFetched: false,
+      streamsOrgIdentifier: "",
       evalTemplatesByOrg: {} as Record<string, any[]>,
     }),
     getters: {
@@ -30,6 +31,9 @@ export default {
       },
       areAllStreamsFetched(state: any) {
         return state.areAllStreamsFetched;
+      },
+      streamsOrgIdentifier(state: any) {
+        return state.streamsOrgIdentifier;
       },
     },
     mutations: {
@@ -59,6 +63,9 @@ export default {
       },
       updateStreamsFetched(state: any, areAllStreamsFetched: any) {
         state.areAllStreamsFetched = areAllStreamsFetched;
+      },
+      updateStreamsOrgIdentifier(state: any, orgIdentifier: string) {
+        state.streamsOrgIdentifier = orgIdentifier;
       },
       updateEvalTemplates(state: any, { orgId, templates }: { orgId: string; templates: any[] }) {
         state.evalTemplatesByOrg = { ...state.evalTemplatesByOrg, [orgId]: templates };
@@ -104,9 +111,11 @@ export default {
       setStreamsFetched(context: any, areAllStreamsFetched: any) {
         context.commit('updateStreamsFetched', areAllStreamsFetched);
       },
+      setStreamsOrgIdentifier(context: any, orgIdentifier: string) {
+        context.commit('updateStreamsOrgIdentifier', orgIdentifier);
+      },
       setEvalTemplates(context: any, payload: { orgId: string; templates: any[] }) {
         context.commit('updateEvalTemplates', payload);
       },
     },
   };
-  

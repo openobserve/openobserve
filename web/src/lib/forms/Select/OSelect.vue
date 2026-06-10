@@ -1088,6 +1088,7 @@ const fieldWidthClass = computed(() => {
               'tw:overflow-hidden tw:flex tw:flex-col',
               'tw:rounded-md tw:shadow-lg',
               'tw:bg-select-content-bg',
+              'tw:data-[state=closed]:pointer-events-none tw:data-[state=closed]:opacity-0',
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
@@ -1567,6 +1568,7 @@ const fieldWidthClass = computed(() => {
             'tw:overflow-hidden',
             'tw:rounded-md tw:border tw:shadow-md',
             'tw:bg-select-content-bg tw:border-select-content-border',
+            'tw:data-[state=closed]:pointer-events-none tw:data-[state=closed]:opacity-0',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).

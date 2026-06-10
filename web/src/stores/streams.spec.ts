@@ -63,6 +63,10 @@ describe("streams store", () => {
     it("should initialise areAllStreamsFetched as false", () => {
       expect(store.state.streams.areAllStreamsFetched).toBe(false);
     });
+
+    it("should initialise streamsOrgIdentifier as empty", () => {
+      expect(store.state.streams.streamsOrgIdentifier).toBe("");
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -164,6 +168,13 @@ describe("streams store", () => {
         store.commit("streams/updateStreamsFetched", true);
         store.commit("streams/updateStreamsFetched", false);
         expect(store.state.streams.areAllStreamsFetched).toBe(false);
+      });
+    });
+
+    describe("updateStreamsOrgIdentifier", () => {
+      it("should set the org identifier that owns cached streams", () => {
+        store.commit("streams/updateStreamsOrgIdentifier", "_meta");
+        expect(store.state.streams.streamsOrgIdentifier).toBe("_meta");
       });
     });
   });
@@ -389,6 +400,13 @@ describe("streams store", () => {
         await store.dispatch("streams/setStreamsFetched", true);
         await store.dispatch("streams/setStreamsFetched", false);
         expect(store.state.streams.areAllStreamsFetched).toBe(false);
+      });
+    });
+
+    describe("setStreamsOrgIdentifier", () => {
+      it("should commit updateStreamsOrgIdentifier", async () => {
+        await store.dispatch("streams/setStreamsOrgIdentifier", "team1");
+        expect(store.state.streams.streamsOrgIdentifier).toBe("team1");
       });
     });
   });

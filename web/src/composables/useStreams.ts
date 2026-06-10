@@ -37,6 +37,10 @@ const useStreams = () => {
     store.commit("streams/updateStreamsFetched", areAllStreamsFetched);
   };
 
+  const updateStreamsOrgIdentifierInStore = (orgIdentifier: string) => {
+    store.commit("streams/updateStreamsOrgIdentifier", orgIdentifier);
+  };
+
   const streamsCache: { [key: string]: ComputedRef<any> } = {
     logs: computed(() => store.state.streams.logs),
     metrics: computed(() => store.state.streams.metrics),
@@ -44,6 +48,31 @@ const useStreams = () => {
     enrichment_tables: computed(() => store.state.streams.enrichment_tables),
     index: computed(() => store.state.streams.index),
     metadata: computed(() => store.state.streams.metadata),
+  };
+
+  const getSelectedOrgIdentifier = () =>
+    store.state.selectedOrganization?.identifier || "";
+
+  const isStreamsOrgCurrent = (orgIdentifier: string) =>
+    !!orgIdentifier &&
+    getSelectedOrgIdentifier() === orgIdentifier &&
+    store.state.streams.streamsOrgIdentifier === orgIdentifier;
+
+  const syncStreamsOrgIdentifier = () => {
+    const selectedOrgIdentifier = getSelectedOrgIdentifier();
+    if (!selectedOrgIdentifier) return selectedOrgIdentifier;
+
+    const streamsOrgIdentifier = store.state.streams.streamsOrgIdentifier;
+    if (!streamsOrgIdentifier) {
+      updateStreamsOrgIdentifierInStore(selectedOrgIdentifier);
+      return selectedOrgIdentifier;
+    }
+
+    if (streamsOrgIdentifier !== selectedOrgIdentifier) {
+      resetStreams(selectedOrgIdentifier);
+    }
+
+    return selectedOrgIdentifier;
   };
 
 
@@ -59,9 +88,11 @@ const useStreams = () => {
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
+      syncStreamsOrgIdentifier();
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
+      const requestOrgIdentifier = syncStreamsOrgIdentifier();
       try {
         if (!isStreamFetched(streamName || "all") || force) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -89,18 +120,28 @@ const useStreams = () => {
               (_streamType) => !streamsCache[_streamType]?.value,
             );
 
-            getStreamsPromise.value = Promise.allSettled(
+            const streamsRequest = Promise.allSettled(
               [...streamsToFetch].map((streamType) =>
                 StreamService.nameList(
-                  store.state.selectedOrganization.identifier,
+                  requestOrgIdentifier,
                   streamType,
                   schema,
                 ),
               ),
             );
+            getStreamsPromise.value = streamsRequest;
 
-            getStreamsPromise.value
+            streamsRequest
               .then((results: any) => {
+                if (!isStreamsOrgCurrent(requestOrgIdentifier)) {
+                  if (getStreamsPromise.value === streamsRequest) {
+                    getStreamsPromise.value = null;
+                  }
+                  dismiss();
+                  resolve(getAllStreamsPayload());
+                  return;
+                }
+
                 results.forEach((result: any, index: number) => {
                   if (
                     result.status === "fulfilled" &&
@@ -118,36 +159,54 @@ const useStreams = () => {
                   streamList.every((stream) => !!streamsCache[stream].value),
                 );
 
-                getStreamsPromise.value = null;
+                if (getStreamsPromise.value === streamsRequest) {
+                  getStreamsPromise.value = null;
+                }
 
                 dismiss();
                 resolve(getAllStreamsPayload());
               })
               .catch((e: any) => {
-                getStreamsPromise.value = null;
+                if (getStreamsPromise.value === streamsRequest) {
+                  getStreamsPromise.value = null;
+                }
                 dismiss();
                 reject(new Error(e.message));
               });
           } else {
-            getStreamsPromise.value = StreamService.nameList(
-              store.state.selectedOrganization.identifier,
+            const streamsRequest = StreamService.nameList(
+              requestOrgIdentifier,
               _streamName,
               schema,
             );
-            getStreamsPromise.value
+            getStreamsPromise.value = streamsRequest;
+            streamsRequest
               .then((res: any) => {
+                if (!isStreamsOrgCurrent(requestOrgIdentifier)) {
+                  if (getStreamsPromise.value === streamsRequest) {
+                    getStreamsPromise.value = null;
+                  }
+                  dismiss();
+                  resolve({ name: streamName, list: [], schema: false });
+                  return;
+                }
+
                 setStreams(streamName, res.data.list);
                 const streamData = {
                   name: streamName,
                   list: res.data.list,
                   schema: false,
                 };
-                getStreamsPromise.value = null;
+                if (getStreamsPromise.value === streamsRequest) {
+                  getStreamsPromise.value = null;
+                }
                 dismiss();
                 resolve(streamData);
               })
               .catch((e: any) => {
-                getStreamsPromise.value = null;
+                if (getStreamsPromise.value === streamsRequest) {
+                  getStreamsPromise.value = null;
+                }
                 dismiss();
                 reject(new Error(e.message));
               });
@@ -181,9 +240,11 @@ const useStreams = () => {
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
+      syncStreamsOrgIdentifier();
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
+      const requestOrgIdentifier = syncStreamsOrgIdentifier();
       try {
         // Added adddtional check to fetch all streamstype separately if streamName is all
         const dismiss = notify
@@ -194,8 +255,8 @@ const useStreams = () => {
             })
           : () => {};
 
-        getStreamsPromise.value = StreamService.nameList(
-          store.state.selectedOrganization.identifier,
+        const streamsRequest = StreamService.nameList(
+          requestOrgIdentifier,
           _streamType,
           schema,
           offset,
@@ -204,20 +265,39 @@ const useStreams = () => {
           sort,
           asc,
         );
-        getStreamsPromise.value
+        getStreamsPromise.value = streamsRequest;
+        streamsRequest
           .then((res: any) => {
+            if (!isStreamsOrgCurrent(requestOrgIdentifier)) {
+              if (getStreamsPromise.value === streamsRequest) {
+                getStreamsPromise.value = null;
+              }
+              dismiss();
+              resolve({
+                name: streamType,
+                list: [],
+                schema: false,
+                total: 0,
+              });
+              return;
+            }
+
             const streamData = {
               name: streamType,
               list: res.data.list,
               schema: false,
               total: res.data.total,
             };
-            getStreamsPromise.value = null;
+            if (getStreamsPromise.value === streamsRequest) {
+              getStreamsPromise.value = null;
+            }
             dismiss();
             resolve(streamData);
           })
           .catch((e: any) => {
-            getStreamsPromise.value = null;
+            if (getStreamsPromise.value === streamsRequest) {
+              getStreamsPromise.value = null;
+            }
             dismiss();
             reject(new Error(e.message));
           });
@@ -250,10 +330,12 @@ const useStreams = () => {
         resolve(null);
       }
 
+      syncStreamsOrgIdentifier();
       // Wait for the streams to be fetched if they are being fetched
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
+      const requestOrgIdentifier = syncStreamsOrgIdentifier();
 
       // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams
       if (!isStreamFetched(streamType)) {
@@ -281,10 +363,13 @@ const useStreams = () => {
           if ((schema && !hasSchema) || force) {
             try {
               const _stream: any = await StreamService.schema(
-                store.state.selectedOrganization.identifier,
+                requestOrgIdentifier,
                 streamName,
                 streamType,
               );
+              if (!isStreamsOrgCurrent(requestOrgIdentifier)) {
+                return resolve(null);
+              }
               const streamList = deepCopy(streamsCache[streamType].value || {});
               streamList.list[streamIndex] = removeSchemaFields(_stream.data);
               updateStreamsInStore(streamType, streamList);
@@ -323,6 +408,8 @@ const useStreams = () => {
       schema: boolean;
     }>,
   ): Promise<any[]> => {
+    const requestOrgIdentifier = syncStreamsOrgIdentifier();
+
     return Promise.all(
       _streams.map(async ({ streamName, streamType, schema }) => {
         // Return null immediately if either streamName or streamType is not provided.
@@ -348,10 +435,13 @@ const useStreams = () => {
             // If schema is requested but not present, fetch and update it.
             if (schema && !hasSchema) {
               const fetchedStream = await StreamService.schema(
-                store.state.selectedOrganization.identifier,
+                requestOrgIdentifier,
                 streamName,
                 streamType,
               );
+              if (!isStreamsOrgCurrent(requestOrgIdentifier)) {
+                return null;
+              }
 
               const streamList = deepCopy(streamsCache[streamType].value || {});
               streamList.list[streamIndex] = removeSchemaFields(
@@ -552,12 +642,13 @@ const useStreams = () => {
     }
   };
 
-  const resetStreams = () => {
+  const resetStreams = (orgIdentifier: string = getSelectedOrgIdentifier()) => {
     Object.keys(streamsCache).forEach((key) => {
       updateStreamsInStore(key, null);
     });
     updateStreamIndexMappingInStore({});
     updateStreamsFetchedInStore(false);
+    updateStreamsOrgIdentifierInStore(orgIdentifier);
     getStreamsPromise.value = null;
     store.dispatch("setIsDataIngested", false);
   };

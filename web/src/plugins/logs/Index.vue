@@ -843,6 +843,25 @@ export default defineComponent({
       if (isLogsMounted.value) handleActivation();
     });
 
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      async (orgIdentifier, previousOrgIdentifier) => {
+        if (
+          !isLogsMounted.value ||
+          router.currentRoute.value.name !== "logs" ||
+          !orgIdentifier ||
+          orgIdentifier === previousOrgIdentifier
+        ) {
+          return;
+        }
+
+        searchObj.organizationIdentifier = orgIdentifier;
+        searchObj.loading = true;
+        resetStreamData();
+        await loadLogsData();
+      },
+    );
+
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
      * This watcher is used to check if the user has changed the stream type from stream explorer to logs.

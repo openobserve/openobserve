@@ -60,7 +60,9 @@ const createMockStore = () => ({
         index: {},
         metadata: {}
       },
-      areStreamsFetched: false
+      areStreamsFetched: false,
+      areAllStreamsFetched: false,
+      streamsOrgIdentifier: "test-org"
     },
     organizationData: {
       isDataIngested: false
@@ -202,6 +204,39 @@ describe("useStreams Composable", () => {
       
       expect(result).toEqual({ list: [{ name: "cached" }] });
       expect(StreamService.nameList).not.toHaveBeenCalled();
+    });
+
+    it("should reset cached streams when selected organization changes", async () => {
+      mockStore.state.selectedOrganization.identifier = "_meta";
+      mockStore.state.streams.streamsOrgIdentifier = "default";
+      mockStore.state.streams.logs = { list: [{ name: "default-stream" }] };
+      mockStore.dispatch.mockImplementation((type: string, payload: any) => {
+        if (type === "streams/setStreams") {
+          mockStore.state.streams[payload.streamType] = payload.streams;
+        }
+      });
+      mockStore.commit.mockImplementation((type: string, payload: any) => {
+        if (type === "streams/updateStreamIndexMapping") {
+          mockStore.state.streams.streamsIndexMapping = payload;
+        } else if (type === "streams/updateStreamsFetched") {
+          mockStore.state.streams.areAllStreamsFetched = payload;
+        } else if (type === "streams/updateStreamsOrgIdentifier") {
+          mockStore.state.streams.streamsOrgIdentifier = payload;
+        }
+      });
+
+      const result = await streamsInstance.getStreams("logs", false, false);
+
+      expect(StreamService.nameList).toHaveBeenCalledWith("_meta", "logs", false);
+      expect(result).toEqual({
+        name: "logs",
+        list: [{ name: "test-stream", stream_type: "logs" }],
+        schema: false,
+      });
+      expect(mockStore.dispatch).toHaveBeenCalledWith("streams/setStreams", {
+        streamType: "logs",
+        streams: null,
+      });
     });
 
     it("should force fetch streams when force parameter is true", async () => {

@@ -136,4 +136,23 @@ describe("OSelect", () => {
     await flushPromises();
     expect(wrapper.emitted("create")).toBeFalsy();
   });
+
+  it("keeps searchable popover portals transparent when closing", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: {
+        parentDataTest: "searchable-select",
+        searchable: true,
+        options: [{ label: "Existing", value: "ex" }],
+      },
+    });
+
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+
+    expect(document.body.innerHTML).toContain(
+      "tw:data-[state=closed]:pointer-events-none",
+    );
+  });
+
 });

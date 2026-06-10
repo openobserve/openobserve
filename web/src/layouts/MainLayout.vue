@@ -16,19 +16,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
+    :class="[
+      store.state.printMode === true ? 'printMode' : '',
+      'o2-app-root',
+      'tw:min-h-screen',
+      'tw:h-screen',
+      'tw:flex',
+      'tw:flex-col',
+    ]"
   >
-    <header class="o2-app-header tw:shrink-0">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        v-if="config.isCloud === 'true'"
-        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
-      >
-        <WebinarBanner variant="header" />
-      </div>
+    <!-- Webinar announcement bar: the only global top offset after header removal. -->
+    <div
+      v-if="config.isCloud === 'true'"
+      class="o2-app-banner tw:shrink-0 tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+    >
+      <WebinarBanner variant="header" />
+    </div>
 
-      <!-- Header component containing logo, navigation, and user controls -->
-      <Header
+    <div class="o2-auth-shell tw:flex-1 tw:flex tw:min-h-0">
+      <AppSidebar
+        v-if="store.state.printMode !== true"
         :store="store"
         :router="router"
         :config="config"
@@ -40,8 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
         :organizations="orgOptions"
+        :links-list="linksList"
         :is-hovered="isHovered"
         :get-btn-logo="getBtnLogo"
+        v-model:collapsed="isSidebarCollapsed"
         @update:selected-org="selectedOrg = $event"
         @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
@@ -52,25 +61,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @navigateToOpenAPI="navigateToOpenAPI"
         @navigate-to-docs="navigateToDocs"
         @change-language="changeLanguage"
-        @open-predefined-themes="openPredefinedThemes"
         @signout="signout"
-      />
-    </header>
-
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
-      <ONavbar
-        v-if="store.state.printMode !== true"
-        :links-list="linksList"
-        :mini-mode="miniMode"
-        :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
       />
 
-      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
+      <div
+        class="o2-auth-shell__body tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full"
+      >
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
+          class="o2-auth-shell__main tw:flex tw:flex-col tw:min-h-0 tw:flex-1 tw:min-w-0"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -89,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
             >
               <router-view v-slot="{ Component }">
-                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+                <component
+                  :is="Component"
+                  class="tw:h-full"
+                  @sendToAiChat="sendToAiChat"
+                />
               </router-view>
             </div>
           </div>
@@ -98,34 +103,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
+          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:shrink-0"
           :class="[
             store.state.theme == 'dark'
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
-            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-          ]"
-          :style="[
             {
-              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+              'o2-sidebar--expanded': store.state.isAiChatExpanded,
+              'o2-sidebar--inline': isAiChatInline,
+              'o2-sidebar--overlay': isAiChatOverlay,
             },
-            store.state.isAiChatExpanded
-              ? {
-                  position: 'fixed',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  maxWidth: '100%',
-                  minWidth: '18.75rem',
-                  height: '100vh',
-                  zIndex: 200,
-                }
-              : {
-                  width: '25%',
-                  maxWidth: '100%',
-                  minWidth: '4.688rem',
-                },
           ]"
+          :style="aiChatPanelStyle"
         >
           <O2AIChat
             :header-height="42.5"
@@ -136,10 +125,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-    </div>
+      </div>
     </div>
 
-    <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
+    <ODialog
+      data-test="main-layout-get-started-dialog"
+      v-model:open="showGetStarted"
+      size="full"
+      :show-close="false"
+    >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
     <PredefinedThemes />
@@ -147,8 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
-import Header from "../components/Header.vue";
+import AppSidebar from "@/components/AppSidebar.vue";
 import { useI18n } from "vue-i18n";
 import {
   useLocalCurrentUser,
@@ -163,9 +156,9 @@ import {
 import {
   ref,
   defineComponent,
-  KeepAlive,
   computed,
   onMounted,
+  onBeforeUnmount,
   watch,
   markRaw,
   nextTick,
@@ -182,13 +175,11 @@ import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
 import configService from "@/services/config";
-import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
-import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -197,7 +188,6 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -210,14 +200,10 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
-    Header,
+    AppSidebar,
     WebinarBanner,
-    "keep-alive": KeepAlive,
-    ONavbar,
     "router-view": RouterView,
     SlackIcon,
-    ManagementIcon,
-    ThemeSwitcher,
     PredefinedThemes,
     O2AIChat,
     GetStarted,
@@ -285,7 +271,6 @@ export default defineComponent({
     const store: any = useStore();
     const router: any = useRouter();
     const { t } = useI18n();
-    const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -307,6 +292,75 @@ export default defineComponent({
       autoSend: boolean;
       id: number;
     } | null>(null);
+    const isSidebarCollapsed = ref(
+      localStorage.getItem("o2-app-sidebar-collapsed") === "true",
+    );
+    const viewportWidth = ref(window.innerWidth);
+    const syncViewportWidth = () => {
+      viewportWidth.value = window.innerWidth;
+    };
+    const sidebarWidthPx = computed(() =>
+      store.state.printMode === true ? 0 : isSidebarCollapsed.value ? 64 : 248,
+    );
+    const aiAsideWidthPx = computed(() =>
+      Math.min(Math.max(viewportWidth.value * 0.25, 320), 480),
+    );
+    const isAiChatInline = computed(() => {
+      if (!store.state.isAiChatEnabled || store.state.isAiChatExpanded) {
+        return false;
+      }
+
+      const remainingMainWidth =
+        viewportWidth.value - sidebarWidthPx.value - aiAsideWidthPx.value;
+
+      return viewportWidth.value >= 900 && remainingMainWidth >= 720;
+    });
+    const isAiChatOverlay = computed(
+      () => store.state.isAiChatEnabled && !isAiChatInline.value,
+    );
+    const aiChatPanelStyle = computed(() => {
+      const bannerOffset = "var(--navbar-height, 0rem)";
+      const baseStyle = {
+        height: `calc(100vh - ${bannerOffset})`,
+      };
+
+      if (!isAiChatOverlay.value) {
+        return {
+          ...baseStyle,
+          width: "clamp(20rem, 25vw, 30rem)",
+        };
+      }
+
+      const maxWidth = `calc(100vw - ${sidebarWidthPx.value}px)`;
+      const overlayWidth = store.state.isAiChatExpanded
+        ? `min(50vw, ${maxWidth})`
+        : `min(30rem, ${maxWidth})`;
+
+      return {
+        ...baseStyle,
+        position: "fixed",
+        top: bannerOffset,
+        right: 0,
+        width: overlayWidth,
+        maxWidth,
+        minWidth: `min(20rem, ${maxWidth})`,
+        zIndex: 200,
+      };
+    });
+
+    watch(isSidebarCollapsed, (collapsed) => {
+      localStorage.setItem("o2-app-sidebar-collapsed", String(collapsed));
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    onMounted(() => {
+      syncViewportWidth();
+      window.addEventListener("resize", syncViewportWidth);
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener("resize", syncViewportWidth);
+    });
     let customOrganization = router.currentRoute.value.query.hasOwnProperty(
       "org_identifier",
     )
@@ -494,7 +548,7 @@ export default defineComponent({
     watch(
       () => store.state.isWebinarBannerVisible,
       (visible) => {
-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
+        const navbarHeight = visible ? "1.688rem" : "0rem";
         document.documentElement.style.setProperty(
           "--navbar-height",
           navbarHeight,
@@ -585,7 +639,8 @@ export default defineComponent({
         const tracesIndex = linksList.value.findIndex(
           (link: any) => link.name === "traces",
         );
-        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        const insertAt =
+          tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
         linksList.value.splice(insertAt, 0, {
           title: t("menu.evals"),
           icon: "check-circle-outline",
@@ -599,7 +654,9 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), {
+      immediate: false,
+    });
 
     const filterMenus = () => {
       updateIncidentsMenu();
@@ -1036,7 +1093,6 @@ export default defineComponent({
     };
 
     const expandMenu = () => {
-      // miniMode.value = false;
       if (!isMonacoEditorLoaded.value) prefetch();
     };
 
@@ -1155,8 +1211,10 @@ export default defineComponent({
       linksList,
       selectedOrg,
       orgOptions,
-      leftDrawerOpen: true,
-      miniMode,
+      isSidebarCollapsed,
+      isAiChatInline,
+      isAiChatOverlay,
+      aiChatPanelStyle,
       user,
       zoBackendUrl,
       isLoading,
@@ -1169,7 +1227,7 @@ export default defineComponent({
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
-      "settings": "settings",
+      settings: "settings",
       closeSocket,
       splitterModel,
       toggleAIChat,
@@ -1252,13 +1310,56 @@ export default defineComponent({
 </style>
 
 <style lang="scss" scoped>
-// Print mode — hide header + sidebar, show body overflow
+.o2-auth-shell {
+  height: calc(100vh - var(--navbar-height, 0rem));
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: var(--color-surface-chrome-deeper, var(--o2-body-primary-bg));
+}
+
+.o2-auth-shell__body {
+  position: relative;
+  gap: 0.5rem;
+}
+
+.o2-auth-shell__main {
+  width: auto;
+}
+
+.o2-sidebar-right {
+  border: 1px solid var(--o2-border-color);
+  border-radius: 0.75rem;
+  background: var(--o2-card-bg-solid, #ffffff);
+  box-shadow:
+    0 1px 3px rgba(16, 40, 55, 0.06),
+    0 6px 20px rgba(16, 40, 55, 0.08);
+}
+
+.o2-sidebar--inline {
+  position: relative;
+  align-self: stretch;
+}
+
+.o2-sidebar--overlay {
+  box-shadow:
+    0 1px 3px rgba(16, 40, 55, 0.08),
+    0 0.75rem 2rem rgba(15, 23, 42, 0.12);
+}
+
+body.body--dark .o2-sidebar-right {
+  background: var(--o2-card-background, #181a20);
+}
+
+// Print mode — hide banner + sidebar, show body overflow
 .printMode {
   :global(body) {
     overflow: auto !important;
   }
 
-  .o2-app-header {
+  .o2-app-banner,
+  :deep(.app-sidebar),
+  .o2-sidebar,
+  .o2-sidebar-right {
     display: none;
   }
 }

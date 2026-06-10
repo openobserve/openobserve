@@ -65,7 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="tw:cursor-pointer">
-                  <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
+                  <OTooltip
+                    side="top"
+                    :content="t('settings.maxSeriesPerQueryTooltip')"
+                  />
                 </OIcon>
               </template>
             </OInput>
@@ -79,10 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="individual-setting-title">
               {{ t("settings.manageTheme") }}
             </span>
-            <div
-              class="tw:flex tw:gap-2 tw:items-center"
-              style="margin-left: -60px"
-            >
+            <div class="theme-chip-group">
               <!-- Light Mode Theme -->
               <div
                 class="theme-color-chip"
@@ -93,11 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customLightColor }"
                 >
-                  <OIcon
-                    name="palette"
-                    size="xs"
-                    class="palette-icon"
-                  />
+                  <OIcon name="palette" size="xs" class="palette-icon" />
                 </div>
                 <span class="chip-label">{{ t("settings.light") }}</span>
                 <span class="chip-value">{{ customLightColor }}</span>
@@ -113,11 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="color-circle"
                   :style="{ backgroundColor: customDarkColor }"
                 >
-                  <OIcon
-                    name="palette"
-                    size="xs"
-                    class="palette-icon"
-                  />
+                  <OIcon name="palette" size="xs" class="palette-icon" />
                 </div>
                 <span class="chip-label">{{ t("settings.dark") }}</span>
                 <span class="chip-value">{{ customDarkColor }}</span>
@@ -130,7 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="reset-theme-colors-btn"
               >
                 <OIcon name="refresh" size="sm" />
-                <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
+                <OTooltip
+                  :content="t('settings.resetToDefaultColors')"
+                  side="top"
+                />
               </div>
             </div>
             <span class="individual-setting-description tw:self-start">
@@ -296,9 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <span class="individual-setting-description tw:-translate-y-[5px]">
-              {{ t("settings.customLogoLightDescription") }}
-            </span>
-          </div>
+            {{ t("settings.customLogoLightDescription") }}
+          </span>
+        </div>
 
         <!-- Dark Mode Logo -->
         <div class="settings-grid-item">
@@ -367,9 +362,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <span class="individual-setting-description tw:-translate-y-[5px]">
-              {{ t("settings.customLogoDarkDescription") }}
-            </span>
-          </div>
+            {{ t("settings.customLogoDarkDescription") }}
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -379,7 +374,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
     data-test="general-settings-loading-indicator"
   />
-  <ODialog data-test="general-delete-image-dialog"
+  <ODialog
+    data-test="general-delete-image-dialog"
     v-model:open="confirmDeleteImage"
     size="sm"
     :title="t('settings.deleteLogoTitle')"
@@ -388,10 +384,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="cancelConfirmDialog"
     @click:primary="confirmDialogOK"
   >
-    <p>{{ t('settings.deleteLogoMessage') }}</p>
+    <p>{{ t("settings.deleteLogoMessage") }}</p>
   </ODialog>
 
-  <ODialog data-test="general-color-picker-dialog"
+  <ODialog
+    data-test="general-color-picker-dialog"
     v-model:open="showColorPicker"
     @update:open="(v) => !v && onColorPickerClose()"
     size="xs"
@@ -405,7 +402,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  defineComponent,
+  onActivated,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -455,7 +459,7 @@ export default defineComponent({
     OFile,
     OForm,
     OColor,
-},
+  },
   setup() {
     const { t } = useI18n();
 
@@ -588,11 +592,14 @@ export default defineComponent({
     const onSubmit = useLoading(async () => {
       // Validate scrape interval
       if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
+        scrapeIntervalError.value =
+          t("settings.scrapeIntervalRequired") || "Scrape interval is required";
         return;
       }
       if (scrapeIntereval.value < 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
+        scrapeIntervalError.value =
+          t("settings.scrapeIntervalPositive") ||
+          "Scrape interval must be a positive number";
         return;
       }
       // Validate max series per query (optional field — only validate when provided)
@@ -602,11 +609,13 @@ export default defineComponent({
         maxSeriesPerQuery.value !== ""
       ) {
         if (maxSeriesPerQuery.value < 1000) {
-          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
+          maxSeriesError.value =
+            t("settings.maxSeriesMinError") || "Minimum value is 1000";
           return;
         }
         if (maxSeriesPerQuery.value > 1000000) {
-          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
+          maxSeriesError.value =
+            t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
           return;
         }
       }
@@ -1109,6 +1118,14 @@ export default defineComponent({
 }
 
 // Theme management styles - Compact chip design
+.theme-chip-group {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .theme-color-chip {
   display: inline-flex;
   align-items: center;
@@ -1213,5 +1230,25 @@ body.body--dark .theme-reset-chip:hover {
 
 body.body--dark .theme-reset-chip:hover .OIcon {
   color: rgb(248, 113, 113);
+}
+
+@media (max-width: 1100px) {
+  .settings-grid-item {
+    grid-template-columns: minmax(7.5rem, 0.75fr) minmax(0, 1.25fr);
+  }
+
+  .settings-grid-item .individual-setting-description {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-grid-item {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-grid-item .individual-setting-description {
+    grid-column: auto;
+  }
 }
 </style>

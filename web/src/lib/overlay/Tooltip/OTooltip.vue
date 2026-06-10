@@ -83,12 +83,12 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "tw:z-[10100] tw:px-2.5 tw:py-1.5",
+  "tw:z-[10100] tw:pointer-events-none tw:px-2.5 tw:py-1.5",
   "tw:bg-[var(--color-surface-overlay)] tw:rounded-md",
   "tw:text-xs tw:text-[var(--color-text-primary)] tw:font-medium tw:leading-relaxed",
   "tw:data-[state=delayed-open]:animate-in tw:data-[state=delayed-open]:fade-in-0 tw:data-[state=delayed-open]:zoom-in-95",
   "tw:data-[state=instant-open]:animate-in tw:data-[state=instant-open]:fade-in-0",
-  "tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95",
+  "tw:data-[state=closed]:opacity-0 tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95",
   "tw:data-[side=top]:slide-in-from-bottom-1",
   "tw:data-[side=bottom]:slide-in-from-top-1",
   "tw:data-[side=left]:slide-in-from-right-1",

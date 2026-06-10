@@ -192,7 +192,7 @@ if (sidebarScrollTick) {
       <slot name="trigger" />
     </DropdownMenuTrigger>
 
-    <DropdownMenuPortal>
+    <DropdownMenuPortal v-if="internalOpen">
       <DropdownMenuContent
         :side="side"
         :align="align"
@@ -211,9 +211,10 @@ if (sidebarScrollTick) {
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in (200ms), quick wipe out (140ms).
           'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'tw:data-[state=closed]:pointer-events-none tw:data-[state=closed]:opacity-0',
+          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)_forwards]',
           'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)_forwards]',
         ]"
       >
         <slot />
