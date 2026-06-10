@@ -43,10 +43,9 @@ test.describe("Custom Charts Tests", () => {
 
     await pm.dashboardPage.addCustomChart();
 
-    // Type the content with raw modifier to bypass autocomplete
-    await page.keyboard.insertText(pictorialJSON);
-
-    await page.waitForTimeout(1000);
+    // Set chart code directly via Monaco API — keyboard.insertText races against
+    // the .inputarea fill below (focus shifts before Monaco commits)
+    await pm.dashboardPage.setCustomChartCode(pictorialJSON);
     // await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
@@ -72,10 +71,8 @@ test.describe("Custom Charts Tests", () => {
 
     await pm.dashboardPage.addCustomChart();
 
-    // Type the content with raw modifier to bypass autocomplete
-    await page.keyboard.insertText(lineJSON);
-
-    await page.waitForTimeout(1000);
+    // Set chart code directly via Monaco API (see Pictorial test above)
+    await pm.dashboardPage.setCustomChartCode(lineJSON);
     await page
       .locator('[data-test="dashboard-panel-query-editor"]')
       .locator(".inputarea")

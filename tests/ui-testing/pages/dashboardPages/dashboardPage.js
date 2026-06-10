@@ -490,6 +490,29 @@ export class DashboardPage {
     await this.page.keyboard.press('Delete');
   }
 
+  // Custom chart Monaco editor (data-test="dashboard-markdown-editor-query-editor")
+  // shares the page with the SQL query Monaco editor. Setting content via
+  // keyboard.insertText races against the subsequent .inputarea fill on the query
+  // editor — focus shifts before Monaco commits the chart code, leaving the chart
+  // empty when Apply runs (CI flake on custom-charts.spec.js). Set the model
+  // directly via Monaco's API and poll until the value sticks.
+  async setCustomChartCode(code) {
+    await this.page.waitForFunction(
+      (chartCode) => {
+        const host = document.querySelector('[data-test="dashboard-markdown-editor-query-editor"]');
+        if (!host || !window.monaco?.editor?.getEditors) return false;
+        const editor = window.monaco.editor.getEditors().find((ed) => {
+          const dom = ed.getDomNode?.();
+          return dom && host.contains(dom);
+        });
+        if (!editor) return false;
+        if (editor.getValue() !== chartCode) editor.setValue(chartCode);
+        return editor.getValue() === chartCode;
+      },
+      code,
+      { timeout: 10000 }
+    );
+  }
 
 }
 
