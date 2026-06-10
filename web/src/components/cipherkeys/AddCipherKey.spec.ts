@@ -150,7 +150,7 @@ describe('AddCipherKey.vue', () => {
 
     it('renders back button correctly', () => {
       wrapper = createWrapper();
-      const backButton = wrapper.find('[title="Go Back"]');
+      const backButton = wrapper.find('[data-test="app-page-header-back"]');
       expect(backButton.exists()).toBe(true);
     });
 
@@ -324,7 +324,7 @@ describe('AddCipherKey.vue', () => {
   describe('Event Handling', () => {
     it('emits cancel event when back button is clicked', async () => {
       wrapper = createWrapper();
-      const backButton = wrapper.find('[title="Go Back"]');
+      const backButton = wrapper.find('[data-test="app-page-header-back"]');
 
       await backButton.trigger('click');
 

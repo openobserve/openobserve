@@ -684,16 +684,24 @@ export default defineComponent({
         wordWrap: "on",
         automaticLayout: true,
         lineNumbers: props.showLineNumbers ? "on" : "off",
-        lineNumbersMinChars: 0,
+        // Reserve a couple of gutter chars so the right-aligned line numbers get
+        // left breathing room instead of sitting flush against the editor edge
+        // (and so the gutter width doesn't visibly jump as digit count grows).
+        lineNumbersMinChars: 2,
         overviewRulerLanes: 0,
         fixedOverflowWidgets: true,
         overviewRulerBorder: false,
-        lineDecorationsWidth: 3,
+        // Gap between the (right-aligned) line numbers and the code text. 3px was
+        // too tight and made the digit visually collide with the first character.
+        lineDecorationsWidth: 10,
         hideCursorInOverviewRuler: true,
         renderLineHighlight: "none",
         glyphMargin: false,
         scrollBeyondLastColumn: 0,
         scrollBeyondLastLine: false,
+        // Small top/bottom breathing room so line 1 (and the cursor) doesn't
+        // hug the top edge of the editor.
+        padding: { top: 3, bottom: 3 },
         smoothScrolling: true,
         mouseWheelScrollSensitivity: 1,
         fastScrollSensitivity: 1,
@@ -1088,15 +1096,24 @@ export default defineComponent({
 
       // Set markers to the model
       // monaco.editor.setModelMarkers(getModel(), "owner", markers);
-      const markers = ranges.map((range: any) => ({
-        severity: monaco.MarkerSeverity.Error, // Mark as error
-        startLineNumber: range.startLine,
-        startColumn: 1, // Start of the line
-        endLineNumber: range.endLine,
-        endColumn: 1, // End of the line
-        message: range.error, // The error message
-        code: "", // Optional error code
-      }));
+      const model = getModel();
+      const markers = ranges.map((range: any) => {
+        const startLine = range.startLine;
+        const endLine = range.endLine;
+        const startCol = range.column ?? 1;
+        // Highlight to end-of-line so the squiggle is visible
+        const lineContent = model?.getLineContent?.(endLine) ?? "";
+        const endCol = lineContent.length + 1 || startCol + 1;
+        return {
+          severity: monaco.MarkerSeverity.Error,
+          startLineNumber: startLine,
+          startColumn: startCol,
+          endLineNumber: endLine,
+          endColumn: endCol,
+          message: range.error,
+          code: "",
+        };
+      });
 
       monaco.editor.setModelMarkers(getModel(), "owner", []);
       monaco.editor.setModelMarkers(getModel(), "owner", markers);
@@ -1456,6 +1473,13 @@ export default defineComponent({
 .logs-query-editor {
   flex: 1;
   min-height: 0;
+  /* Fixed left breathing room for the whole editor. Monaco mounts as a child of
+     this host, so padding here insets the line-number gutter (and code) by a
+     constant amount regardless of the line-number digit count — unlike
+     lineNumbersMinChars, which only pads while digits stay below the reserved
+     width and goes flush again at 2+ digits. automaticLayout measures the
+     content box, so the editor adapts to the reduced width. */
+  padding-left: 0.5rem;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;

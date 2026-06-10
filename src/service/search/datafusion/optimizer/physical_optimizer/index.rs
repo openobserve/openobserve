@@ -21,7 +21,7 @@ use std::{
     },
 };
 
-use config::utils::tantivy::tokenizer::o2_collect_search_tokens;
+use config::tantivy::tokenizer::o2_collect_search_tokens;
 use datafusion::{
     common::{
         Result,

@@ -113,7 +113,7 @@ describe("PipelineDestinationEditor - back arrow click emits cancel", () => {
 
   it("emits 'cancel' when back arrow container is clicked", async () => {
     wrapper = await mountComp();
-    const backDiv = wrapper.find('[title="Go Back"]');
+    const backDiv = wrapper.find('[data-test="app-page-header-back"]');
     expect(backDiv.exists()).toBe(true);
     await backDiv.trigger("click");
     expect(wrapper.emitted("cancel")).toBeTruthy();

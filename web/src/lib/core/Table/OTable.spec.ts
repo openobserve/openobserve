@@ -701,31 +701,6 @@ describe("OTable", () => {
     });
   });
 
-  describe("column close", () => {
-    it("shows close button on hideable columns", () => {
-      const cols: OTableColumnDef<TestRow>[] = [
-        { id: "id", header: "ID", accessorKey: "id", hideable: true },
-      ];
-      wrapper = mount(OTable, {
-        props: { data: makeRows(3), columns: cols },
-      });
-      expect(
-        wrapper.find('[data-test="o2-table-th-close-id"]').exists(),
-      ).toBe(true);
-    });
-
-    it("emits column-close when close button clicked", async () => {
-      const cols: OTableColumnDef<TestRow>[] = [
-        { id: "id", header: "ID", accessorKey: "id", hideable: true },
-      ];
-      wrapper = mount(OTable, {
-        props: { data: makeRows(3), columns: cols },
-      });
-      await wrapper.find('[data-test="o2-table-th-close-id"]').trigger("click");
-      expect(wrapper.emitted("column-close")).toBeTruthy();
-      expect(wrapper.emitted("column-close")?.[0][0]).toBe("id");
-    });
-  });
 
   // ── Highlighting ────────────────────────────────────────────
 

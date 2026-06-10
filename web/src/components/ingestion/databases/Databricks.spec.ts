@@ -105,7 +105,7 @@ describe('Databricks.vue', () => {
       plugins: [store, i18n, ],
       stubs: {
         CopyContent: {
-          template: '<div class="copy-content-stub copy-content-container-cls"><slot /></div>',
+          template: '<div class="copy-content-stub" data-test="copy-content"><slot /></div>',
           props: ['content']
         }
       }
@@ -141,7 +141,7 @@ describe('Databricks.vue', () => {
   // Test 5: Template renders main container
   it('should render main container with correct class', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.tw\\:p-2');
+    const container = wrapper.find('.tw\\:p-3');
     expect(container.exists()).toBe(true);
   });
 
@@ -191,8 +191,10 @@ describe('Databricks.vue', () => {
       ...getGlobalConfig()
     });
     const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('text-blue-500');
-    expect(link.classes()).toContain('hover:text-blue-600');
+    expect(link.classes()).toContain('tw:text-text-link');
+    expect(link.classes()).toContain('hover:tw:text-text-link-hover');
+    expect(link.classes()).toContain('tw:underline');
+    expect(link.classes()).toContain('tw:font-medium');
   });
 
   // Test 12: Setup function returns correct values
@@ -250,32 +252,30 @@ describe('Databricks.vue', () => {
   // Test 19: Component structure matches expected layout
   it('should have correct component structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
-    const container = wrapper.find('.tw\\:p-2');
-    const textDiv = container.find('div[class*="tw:text-"]');
-    const boldDiv = wrapper.find('div[class*="tw:font-bold"]');
-    
+    const container = wrapper.find('.tw\\:p-3');
+    const copyContent = wrapper.find('.copy-content-stub');
+    const link = wrapper.find('a[target="_blank"]');
+
     expect(container.exists()).toBe(true);
-    expect(textDiv.exists()).toBe(true);
-    expect(boldDiv.exists()).toBe(true);
+    expect(copyContent.exists()).toBe(true);
+    expect(link.exists()).toBe(true);
   });
 
-  // Test 20: CopyContent has correct classes
-  it('should apply correct classes to CopyContent', () => {
+  // Test 20: CopyContent component renders
+  it('should render CopyContent component within structure', () => {
     wrapper = mount(Databricks, getGlobalConfig());
     const copyContent = wrapper.find('.copy-content-stub');
-    expect(copyContent.classes()).toContain('copy-content-container-cls');
+    expect(copyContent.exists()).toBe(true);
   });
 
-  // Test 21: Documentation section styling
-  it('should apply correct styling to documentation section', () => {
+  // Test 21: Documentation section renders link
+  it('should render the documentation section with link', () => {
     wrapper = mount(Databricks, {
       ...getGlobalConfig()
     });
-    const docSection = wrapper.find('.tw\\:font-bold.tw\\:pt-6.tw\\:pb-2');
-    expect(docSection.exists()).toBe(true);
-    expect(docSection.classes()).toContain('tw:font-bold');
-    expect(docSection.classes()).toContain('tw:pt-6');
-    expect(docSection.classes()).toContain('tw:pb-2');
+    const link = wrapper.find('a[target="_blank"]');
+    expect(link.exists()).toBe(true);
+    expect(wrapper.text()).toContain('to check further documentation');
   });
 
   // Test 22: Template text content
@@ -289,12 +289,12 @@ describe('Databricks.vue', () => {
   });
 
   // Test 23: Link styling attributes
-  it('should have correct inline styling for documentation link', () => {
+  it('should have underline styling for documentation link', () => {
     wrapper = mount(Databricks, {
       ...getGlobalConfig()
     });
     const link = wrapper.find('a[target="_blank"]');
-    expect(link.attributes('style')).toContain('text-decoration: underline');
+    expect(link.classes()).toContain('tw:underline');
   });
 
   // Test 24: Component reactive data

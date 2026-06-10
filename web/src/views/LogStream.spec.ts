@@ -245,7 +245,8 @@ describe("LogStream Component", () => {
     });
 
     it("should display correct title", () => {
-      const title = wrapper.find('[data-test="log-stream-title-text"]');
+      // Title now lives in the standard AppPageHeader (row 1).
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
       expect(title.text()).toBe("Streams");
     });

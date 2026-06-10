@@ -3,8 +3,8 @@
     <template #trigger>
       <OButton
         data-cy="metric-legends-button"
-        variant="ghost"
-        size="sm-action"
+        variant="outline"
+        size="sm-toolbar"
         class="metric-legends-button"
       >
         <OIcon name="category" size="sm" />
@@ -74,13 +74,5 @@ export default defineComponent({
 
 .q-btn:before {
   border: 0px solid #d5d5d5;
-}
-.metric-legends-button {
-  cursor: pointer;
-  text-transform: capitalize;
-  padding: 5px 5px;
-  height: 30px;
-  font-weight: 600;
-  border: 1px solid rgba(89, 96, 178, 0.3);
 }
 </style>

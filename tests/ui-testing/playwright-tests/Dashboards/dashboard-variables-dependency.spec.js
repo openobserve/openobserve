@@ -991,6 +991,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "filter");
 

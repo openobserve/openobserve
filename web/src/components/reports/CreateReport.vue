@@ -15,38 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1 tw:pb-[0.625rem]">
+  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
     <div data-test="add-report-section" class="tw:w-full create-report-page">
-      <div
-        class="tw:flex tw:items-center tw:flex-nowrap card-container tw:py-[0.675rem] tw:h-[64px] tw:px-[0.675rem] tw:mb-[0.675rem]"
+      <AppPageHeader
+        :title="isEditingReport ? t('reports.update') : t('reports.add')"
+        :back="{
+          label: t('reports.header'),
+          onClick: () => router.back(),
+          dataTest: 'add-report-back-btn',
+        }"
+        class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.675rem]"
       >
-        <div class="tw:flex tw:items-center">
-          <div
-            data-test="add-report-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
-            title="Go Back"
-            @click="router.back()"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-          </div>
-          <div
-            v-if="isEditingReport"
-            class="tw:text-xl tw:font-semibold"
-            data-test="add-report-title"
-          >
-            {{ t("reports.update") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold" data-test="add-report-title">
-            {{ t("reports.add") }}
-          </div>
-        </div>
-      </div>
+        <template #title>
+          <span data-test="add-report-title">{{
+            isEditingReport ? t("reports.update") : t("reports.add")
+          }}</span>
+        </template>
+      </AppPageHeader>
       <div
         class="tw:flex card-container tw:mb-[0.675rem] tw:h-[calc(100vh-12.5rem)] tw:overflow-auto"
       >
@@ -792,6 +777,7 @@ import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";

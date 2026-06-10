@@ -30,6 +30,7 @@ async function handleCopy(event: MouseEvent) {
 const props = defineProps<{
   cell: Cell<any, any>;
   row: Row<any>;
+  rowSelected?: boolean;
   highlightText?: string;
   shouldHighlight?: boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
@@ -53,19 +54,29 @@ const emit = defineEmits<{
 const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
+// Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
+// Only the default-rendered text path uses this; custom cells style their own.
+const defaultTextClass = computed(() => [
+  "tw:text-text-primary",
+]);
+
 const alignClass = computed(() => {
   if (align.value === "center") return "tw:text-center";
   if (align.value === "right") return "tw:text-right";
   return "tw:text-left";
 });
 
-const slotAlignClass = computed(() => {
-  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full";
-  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full";
-  return "tw:flex tw:items-center tw:w-full";
-});
-
 const isAction = computed(() => meta.value?.isAction ?? false);
+
+const slotAlignClass = computed(() => {
+  // Action cells shrink to their content (inline-flex, no w-full) so the
+  // column can be measured and sized to the buttons with no dead space.
+  if (isAction.value) return "tw:inline-flex tw:items-center";
+  // `min-w-0` lets the inner truncation wrapper actually shrink.
+  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full tw:min-w-0";
+  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full tw:min-w-0";
+  return "tw:flex tw:items-center tw:w-full tw:min-w-0";
+});
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
@@ -89,19 +100,29 @@ const displayValue = computed(() => {
   return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
 });
 
-const isAutoWidth = computed(() => meta.value?.autoWidth === true);
-
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",
   null,
 );
 
+const isAutoWidth = computed(() => meta.value?.autoWidth === true);
+
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
-  if (!isAutoWidth.value) {
+  if (isAutoWidth.value) {
+    // Elastic column: no width (absorbs the table's leftover space), but honour
+    // minSize so it can't collapse — it pushes the table to scroll instead.
+    const min = props.cell.column.columnDef.minSize;
+    if (min) base.minWidth = `${min}px`;
+  } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
-    if (!horizontalScroll?.value) {
+    // Rigid columns (index, actions) pin min+max to the size var so their width
+    // never depends on — or is squeezed by — the sibling data columns.
+    if (meta.value?.fixedWidth) {
+      base.minWidth = sizeVar;
+      base.maxWidth = sizeVar;
+    } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
     }
   }
@@ -178,17 +199,21 @@ function handleClick() {
   <td
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
-      meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle',
+      meta?.spacer ? 'tw:px-0 tw:align-middle' : (meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle'),
       bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
       alignClass,
       isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
-      isPinned ? 'tw:bg-[var(--color-table-cell-bg)]' : '',
+       isPinned
+        ? (rowSelected
+            ? 'tw:bg-[var(--color-table-row-selected-bg)] tw:group-hover/row:bg-table-row-hover-bg tw:transition-colors tw:duration-150'
+            : 'tw:bg-[var(--color-table-cell-bg)] tw:group-hover/row:bg-[var(--color-table-row-hover-bg)] tw:transition-colors tw:duration-150')
+        : '',
       wrap
         ? 'tw:break-words tw:whitespace-normal'
         : horizontalScroll?.value
           ? 'tw:whitespace-nowrap'
           : isAction
-            ? 'tw:whitespace-nowrap'
+            ? 'tw:whitespace-nowrap tw:overflow-hidden'
             : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
       meta?.cellClass ?? '',
       isTreeColumn ? 'o2-tree-cell' : '',
@@ -238,7 +263,10 @@ function handleClick() {
         />
       </span>
       <div class="tw:flex-1 tw:min-w-0">
-        <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+        <div v-if="$slots.default" :class="slotAlignClass">
+          <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+          <slot v-else />
+        </div>
         <FlexRender
           v-else-if="cell.column.columnDef.cell"
           :render="cell.column.columnDef.cell"
@@ -246,17 +274,21 @@ function handleClick() {
         />
         <span
           v-else-if="highlightedHtml"
-          class="tw:text-primary tw:text-sm"
+          :class="defaultTextClass"
           v-html="highlightedHtml"
         />
-        <span v-else class="tw:text-primary tw:text-sm">
+        <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
       </div>
     </div>
 
     <template v-else>
-      <div v-if="$slots.default" :class="slotAlignClass"><slot /></div>
+      <div v-if="$slots.default" :class="slotAlignClass">
+        <!-- Non-action slot content truncates with an ellipsis by default. -->
+        <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+        <slot v-else />
+      </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
         v-else-if="cell.column.columnDef.cell"
@@ -266,11 +298,11 @@ function handleClick() {
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
       <span
         v-else-if="highlightedHtml"
-        class="tw:text-primary tw:text-sm"
+        :class="defaultTextClass"
         v-html="highlightedHtml"
       />
       <!-- Default: plain text -->
-      <span v-else class="tw:text-primary tw:text-sm">
+      <span v-else :class="defaultTextClass">
         {{ displayValue }}
       </span>
     </template>
@@ -280,7 +312,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-default)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
+      class="tw:absolute tw:right-1 tw:opacity-0 group-hover:tw:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

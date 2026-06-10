@@ -1,10 +1,49 @@
 /* ============================================================
-   BASE TOKENS — raw palette, spacing, radius, shadows
+   BASE TOKENS — raw palette, spacing, radius, shadows, fonts
    These are NEVER referenced directly in components.
    Components use semantic or component tokens only.
    ============================================================ */
 
 :root {
+  /* --- Font family tokens --- */
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Ubuntu Mono', 'Liberation Mono', 'Courier New', monospace;
+
+  /* --- Font size scale --- */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.8125rem; /* 13px */
+  --text-base: 0.875rem; /* 16px */
+  --text-md:   1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+
+  /* --- Line-height scale --- */
+  --leading-xs:    1rem;      /* 16px */
+  --leading-sm:    1.125rem;  /* 18px */
+  --leading-base:  1.25rem;   /* 20px */
+  --leading-md:    1.375rem;  /* 22px */
+  --leading-lg:    1.5rem;    /* 24px */
+  --leading-xl:    1.75rem;   /* 28px */
+  --leading-2xl:   2rem;      /* 32px */
+  --leading-3xl:   2.25rem;   /* 36px */
+  --leading-4xl:   2.5rem;    /* 40px */
+
+  /* --- Letter-spacing scale --- */
+  --tracking-tighter: -0.05em;
+  --tracking-tight:   -0.025em;
+  --tracking-normal:   0;
+  --tracking-wide:     0.025em;
+
+  /* --- Font weight scale --- */
+  --font-normal: normal;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-black: 900;
   /* --- Primary palette — brand color #3F7994 (HSL 199°, 40%, 41%) --- */
   --color-primary-50:  #f5f8f9;
   --color-primary-100: #e4edf1;
@@ -16,15 +55,17 @@
   --color-primary-700: #316177;
   --color-primary-800: #224758;
   --color-primary-900: #16303c;
+  --color-primary-950: #0e1f27;   /* darkest — referenced by dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
-  --color-grey-0:   #ffffff;
-  --color-grey-50:  #fafafa;
   /* Tailwind "neutral" palette — true greys with no blue undertone.
      Previously used "gray" (#1f2937, #111827, …) which has a cool/blue tint,
      causing inputs / selects / dropdowns / dialogs to read as dark blue in
      dark mode. Neutral matches user expectation of "dark grey, not blue". */
+  --color-grey-0:   #ffffff;
+  --color-grey-50:  #fafafa;
   --color-grey-100: #f5f5f5;
+  --color-grey-150: #ededed;   /* soft divider step (between 100 and 200) */
   --color-grey-200: #e5e5e5;
   --color-grey-300: #d4d4d4;
   --color-grey-400: #a3a3a3;
@@ -39,6 +80,7 @@
   /* --- Error palette --- */
   --color-error-50:  #fef2f2;
   --color-error-100: #fee2e2;
+  --color-error-300: #fca5a5;   /* referenced by destructive-disabled / focus-ring */
   --color-error-400: #f87171;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
@@ -48,6 +90,7 @@
   --color-success-50:  #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
+  --color-success-400: #4ade80;   /* referenced by EmptyState check illustration */
   --color-success-500: #22c55e;
   --color-success-700: #15803d;
   --color-success-900: #14532d;
@@ -62,8 +105,7 @@
   --color-warning-700: #a16207;
   --color-warning-900: #78350f;
 
-  /* --- Info palette (blue, used by OBanner info variant) --- */
-  /* Purple palette (used by OBadge purple-outline for metrics stream type) */
+  /* --- Purple palette (used by OBadge purple-outline for metrics stream type) --- */
   --color-purple-50:  #faf5ff;
   --color-purple-100: #f3e8ff;
   --color-purple-400: #c084fc;
@@ -72,6 +114,7 @@
   --color-purple-700: #7e22ce;
   --color-purple-900: #581c87;
 
+  /* --- Info palette (blue, used by OBanner info variant) --- */
   --color-info-50:  #eff6ff;
   --color-info-100: #dbeafe;
   --color-info-200: #bfdbfe;

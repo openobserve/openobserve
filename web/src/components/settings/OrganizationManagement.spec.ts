@@ -191,6 +191,7 @@ const OTableStub = {
   props: ["data", "columns", "loading", "rowKey"],
   template: `
     <div data-test="org-management-list-table">
+      <slot name="toolbar" />
       <div v-for="(row, idx) in (data || [])" :key="idx" :data-test="'otable-row-' + idx">
         <slot name="cell-actions" :row="row" />
       </div>
@@ -1085,7 +1086,8 @@ describe("OrganizationManagement.vue", () => {
 
     it("should render the title", () => {
       wrapper = createWrapper();
-      const title = wrapper.find('[data-test="org-management-list-title"]');
+      // Title now lives in the standard AppPageHeader (row 1).
+      const title = wrapper.find(".app-page-header h1");
       expect(title.text()).toBe("Organization Management");
     });
 

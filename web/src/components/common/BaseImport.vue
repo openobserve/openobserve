@@ -15,48 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
-    <!-- Header Section -->
-    <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="tw:flex tw:px-4 tw:items-center tw:justify-between tw:flex-nowrap tw:h-[68px]" :class="headerClass">
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex">
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="handleBack"
-              :data-test="`${testPrefix}-import-back-btn`"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
-            <div :class="titleClass" class="tw:ml-3">{{ title }}</div>
-          </div>
-        </div>
-
+  <div
+    class="tw:w-full"
+    :class="[containerClass]"
+    :style="containerStyle"
+  >
+    <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
+         used across the app. Hidden when the host page provides its own page
+         header, e.g. the pipeline shell's AppPageHeader (avoids a duplicate). -->
+    <AppPageHeader
+      v-if="!hideHeader"
+      :title="title"
+      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default"
+      :class="headerContainerClass"
+    >
+      <template #actions>
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="tw:flex tw:ml-auto tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm"
-            :class="cancelButtonClass"
-            @click="handleCancel"
-            :data-test="`${testPrefix}-import-cancel-btn`"
-          >{{ t('function.cancel') }}</OButton>
-          <OButton
-            variant="primary"
-            size="sm"
-            type="submit"
-            :class="importButtonClass"
-            @click="handleImport"
-            :loading="isImporting || $props.isImporting"
-            :disabled="isImporting || $props.isImporting"
-            :data-test="`${testPrefix}-import-json-btn`"
-          >{{ t('dashboard.import') }}</OButton>
-        </div>
-      </div>
-    </div>
+        <OButton
+          variant="outline"
+          size="sm"
+          :class="cancelButtonClass"
+          @click="handleCancel"
+          :data-test="`${testPrefix}-import-cancel-btn`"
+        >{{ t('function.cancel') }}</OButton>
+        <OButton
+          variant="primary"
+          size="sm"
+          type="submit"
+          :class="importButtonClass"
+          @click="handleImport"
+          :loading="isImporting || $props.isImporting"
+          :disabled="isImporting || $props.isImporting"
+          :data-test="`${testPrefix}-import-json-btn`"
+        >{{ t('dashboard.import') }}</OButton>
+      </template>
+    </AppPageHeader>
 
     <div class="tw:flex" :class="contentWrapperClass">
       <div class="tw:flex" :style="contentStyle">
@@ -180,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:mb-[0.625rem] tw:w-full"
+              class="card-container tw:w-full"
               :style="outputContainerStyle"
             >
               <!-- Slot for complete output section customization -->
@@ -188,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-                  <OSeparator class="tw:mx-4 tw:mt-4" />
+                  <OSeparator class="tw:mr-4 tw:mt-4" />
                   <div class="error-report-container">
                     <div class="tw:text-center tw:p-3 tw:text-gray-400">
                       No messages to display
@@ -220,6 +216,7 @@ import {
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
+import AppPageHeader from "./AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -237,6 +234,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
+    AppPageHeader,
     OButton,
     OInput,
     OIcon,
@@ -283,6 +281,12 @@ export default defineComponent({
     showSplitter: {
       type: Boolean,
       default: true,
+    },
+    // Hide the built-in header (title + back + cancel/import buttons) when the
+    // host page already renders its own page header and teleports the actions.
+    hideHeader: {
+      type: Boolean,
+      default: false,
     },
     // Custom heights for different editor sections
     editorHeights: {
@@ -366,7 +370,7 @@ export default defineComponent({
 
     // Computed styles
     const contentStyle = computed(() => {
-      return props.showSplitter ? "width: calc(100vw - 100px);" : "width: 100%;";
+      return "width: 100%;";
     });
 
     const splitterStyle = computed(() => {

@@ -30,6 +30,7 @@ import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
+import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 
 export function usePanelDrilldown({
   panelSchema,
@@ -1166,8 +1167,16 @@ export function usePanelDrilldown({
       metadata.value?.queries?.[0]?.query ||
       panelSchema.value?.queries?.[0]?.query,
     async (newQuery: string) => {
+      // Cross-linking is only supported for logs streams; skip the result_schema
+      // call for panels backed by other stream types (metrics, traces,
+      // enrichment_tables) to avoid failing requests.
+      const crossLinkStreamType =
+        panelSchema.value?.queries?.[0]?.fields?.stream_type;
       if (
-        !store.state.zoConfig?.enable_cross_linking ||
+        !isCrossLinkingEnabledForStream(
+          store.state.zoConfig,
+          crossLinkStreamType,
+        ) ||
         !newQuery ||
         panelSchema.value?.queryType === "promql"
       ) {

@@ -99,6 +99,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     inheritAttrs: true,
     template: `
       <div v-bind="$attrs">
+        <slot name="toolbar" />
         <div v-if="loading" data-test="o-table-stub-loading">Loading...</div>
         <template v-else>
           <div
@@ -264,9 +265,8 @@ describe("ReportList", () => {
     });
 
     it("should render the title", () => {
-      expect(
-        wrapper.find('[data-test="report-list-title"]').exists(),
-      ).toBe(true);
+      // Title now lives in the standard AppPageHeader (row 1).
+      expect(wrapper.find(".app-page-header h1").text()).toContain("Report");
     });
 
     it("should render the search input", () => {

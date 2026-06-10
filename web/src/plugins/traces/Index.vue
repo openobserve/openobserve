@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -33,6 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
         "
         :horizontal="true"
+        unit="px"
+        :limits="[85, 400]"
+        :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
           activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
             ? 'tw:max-h-[3.125rem]!'
@@ -41,8 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
+          <!-- px-1 (4px): the search bar's own 6px internal inset (toolbar p-1.5)
+               + 4px = 10px, aligning the bar with the 10px field-list & results
+               panels below (matches the Logs page). -->
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -53,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :activeTab="activeTab"
               :isLLMSpanPresent="isLLMSpanPresent"
               :hasLLMStreams="hasLLMStreams"
-              class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"
@@ -69,12 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
+          <div class="tw:h-full tw:overflow-hidden">
           <!-- Service Graph Tab Content -->
           <div
             v-if="
               activeTab === 'service-graph' && config.isEnterprise == 'true'
             "
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <service-graph
               ref="serviceGraphRef"
@@ -86,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Services Catalog Tab Content -->
           <div
             v-if="activeTab === 'services-catalog'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <services-catalog
               ref="servicesCatalogRef"
@@ -98,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- LLM Insights Tab Content -->
           <div
             v-if="activeTab === 'llm-insights'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <LLMInsightsDashboard
               :key="'llm-' + store.state.selectedOrganization.identifier"
@@ -113,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Sessions Tab Content -->
           <div
             v-if="activeTab === 'sessions'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <SessionsList
               :key="'sessions-' + store.state.selectedOrganization.identifier"
@@ -136,11 +142,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
+              separatorClass="tw:w-px"
               @update:model-value="onSplitterUpdate"
               class="tw:h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"
@@ -154,32 +161,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:selectedFields="updateFieldVisibility"
                   />
                 </div>
-              </template>
-              <template #separator>
-                <OButton
-                  data-test="logs-search-field-list-collapse-btn"
-                  variant="sidebar-button"
-                  size="sidebar-button"
-                  :title="
-                    searchObj.meta.showFields
-                      ? t('traces.collapseFields')
-                      : t('traces.openFields')
-                  "
-                  :class="
-                    searchObj.meta.showFields
-                      ? 'splitter-icon-collapse'
-                      : 'splitter-icon-expand'
-                  "
-                  @click="collapseFieldList"
-                  ><template #icon-left>
-                    <OIcon
-                      :name="
-                        searchObj.meta.showFields
-                          ? 'chevron-left'
-                          : 'chevron-right'
-                      " size="sm"
-                    /> </template
-                ></OButton>
               </template>
               <template #after>
                 <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
@@ -307,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
             </OSplitter>
+          </div>
           </div>
         </template>
       </OSplitter>
@@ -444,7 +426,7 @@ const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const llmInsightsRef = ref<any>(null);
 const sessionsListRef = ref<any>(null);
-const splitterModel = ref(15);
+const splitterModel = ref(90);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();

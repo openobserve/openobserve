@@ -17,34 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
-    <div
-      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
+    <AppPageHeader
+      :back="{
+        label: t('alert_templates.header'),
+        onClick: () => emit('cancel:hideform'),
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
     >
-      <div class="tw:flex tw:items-center tw:h-[60px]">
-        <div
-          no-caps
-            padding="xs"
-            outline
-            icon="arrow-back-ios-new"
-            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          title="Go Back"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col" data-test="add-template-title">
-          <div v-if="isUpdatingTemplate" class="tw:text-xl tw:font-semibold">
-            {{ t("alert_templates.updateTitle") }}
-          </div>
-          <div v-else-if="isClone" class="tw:text-xl tw:font-semibold">
-            {{ t("alert_templates.cloneTitle") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold">
-            {{ t("alert_templates.addTitle") }}
-          </div>
-        </div>
-      </div>
-    </div>
+      <template #title>
+        <span data-test="add-template-title">
+          <template v-if="isUpdatingTemplate">{{
+            t("alert_templates.updateTitle")
+          }}</template>
+          <template v-else-if="isClone">{{
+            t("alert_templates.cloneTitle")
+          }}</template>
+          <template v-else>{{ t("alert_templates.addTitle") }}</template>
+        </span>
+      </template>
+    </AppPageHeader>
 
     <OSplitter
       v-model="splitterModel"
@@ -118,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)]"
+            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)] tw:border-t tw:border-border-default"
           >
             <OButton
               v-close-popup
@@ -138,12 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container"
+          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container tw:border-l tw:border-border-default"
         >
           <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <OSeparator class="tw:w-full" />
+          <OSeparator class="tw:-ml-2 tw:mr-2" />
           <div class="tw:py-3 tw:px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
@@ -214,6 +205,7 @@ import type { TemplateData, Template } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,

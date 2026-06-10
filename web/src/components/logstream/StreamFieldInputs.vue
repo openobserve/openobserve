@@ -19,7 +19,7 @@
       <div
         v-for="(field, index) in fields as any"
         :key="field.uuid"
-        class="tw:flex tw:flex-wrap tw:items-end tw:gap-2 tw:mt-2"
+        class="tw:flex tw:flex-wrap tw:items-start tw:gap-2 tw:mt-2"
         :data-test="`add-stream-field-row-${index}`"
       >
         <div data-test="add-stream-field-name-input" class="tw:flex-1 tw:min-w-[160px]">
@@ -28,7 +28,8 @@
             :placeholder="t('logStream.fieldName') + ' *'"
             :error="!!fieldNameErrors[index]"
             :error-message="fieldNameErrors[index] || ''"
-            @update:model-value="fieldNameErrors[index] = ''"
+            :help-text="!fieldNameErrors[index] ? fieldNameHelpText : undefined"
+            @update:model-value="validateFieldName(Number(index))"
             tabindex="0"
           />
         </div>
@@ -164,6 +165,20 @@ const { t } = useI18n();
 const fieldNameErrors = ref<string[]>([]);
 const fieldDataTypeErrors = ref<string[]>([]);
 
+// Allowed characters mirror the backend `format_stream_name` regex
+// (src/config/src/utils/schema.rs): alphanumeric, underscore and colon only.
+const fieldNameRegex = /^[a-zA-Z0-9_:]+$/;
+const fieldNameHelpText = "Use alphanumeric characters, underscore and colon only.";
+
+const validateFieldName = (index: number) => {
+  const field = (props.fields as any[])[index];
+  if (field?.name && !fieldNameRegex.test(field.name)) {
+    fieldNameErrors.value[index] = fieldNameHelpText;
+  } else {
+    fieldNameErrors.value[index] = "";
+  }
+};
+
 const isFocused = ref(false);
 //repetitive need to refactor
 const isDataTypeFocused = ref(false);
@@ -245,6 +260,8 @@ const validate = () => {
   fields.forEach((field, index) => {
     if (!field.name.trim()) {
       fieldNameErrors.value[index] = t("logStream.fieldRequired");
+    } else if (!fieldNameRegex.test(field.name)) {
+      fieldNameErrors.value[index] = fieldNameHelpText;
     }
     if (props.visibleInputs.data_type && !field.type) {
       fieldDataTypeErrors.value[index] = t("logStream.dataTypeRequired");
@@ -252,13 +269,16 @@ const validate = () => {
   });
   return fields.every(
     (field) =>
-      field.name.trim() && (!props.visibleInputs.data_type || field.type),
+      field.name.trim() &&
+      fieldNameRegex.test(field.name) &&
+      (!props.visibleInputs.data_type || field.type),
   );
 };
 
 // Expose methods and data for testing
 defineExpose({
   validate,
+  validateFieldName,
   deleteApiHeader,
   addApiHeader,
   disableOptions,

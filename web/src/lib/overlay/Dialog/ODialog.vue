@@ -298,7 +298,7 @@ watch(internalOpen, (open) => {
           'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-          'tw:duration-200',
+          'tw:data-[state=open]:duration-110 tw:data-[state=closed]:duration-90',
         ]"
       />
 
@@ -308,8 +308,12 @@ watch(internalOpen, (open) => {
         :data-test="parentDataTest || 'o-dialog-panel'"
         :style="[contentStyle, { zIndex: contentZIndex }]"
         :class="[
-          // Positioning — centered in viewport
-          'tw:fixed tw:left-1/2 tw:top-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2',
+          // Positioning — centered in viewport.
+          // Centering uses the standalone `translate` CSS property (not the
+          // `transform`-based -translate utilities) so the zoom animation —
+          // which drives `transform` — composes cleanly and the panel scales
+          // from true center instead of sliding diagonally.
+          'tw:fixed tw:left-1/2 tw:top-1/2 tw:[translate:-50%_-50%]',
           // Layout — flex-col so header/footer stick and only body scrolls
           'tw:flex tw:flex-col tw:overflow-hidden',
           // Size
@@ -324,10 +328,13 @@ watch(internalOpen, (open) => {
           'tw:text-dialog-content-text',
           // Focus ring
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
-          // Animation
-          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:zoom-in-95',
-          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:zoom-out-95',
-          'tw:duration-200',
+          // Animation — single-direction rise: slides up from ~24px below while
+          // fading in, soft ease-out-expo settle (150ms); fades + drops back out
+          // (100ms). No scale, so nothing squishes — it just glides into place.
+          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-6',
+          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-2',
+          'tw:data-[state=open]:duration-150 tw:data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'tw:data-[state=closed]:duration-100 tw:data-[state=closed]:ease-in',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
@@ -369,7 +376,7 @@ watch(internalOpen, (open) => {
             <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
-                class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
               >
                 {{ title }}
               </span>

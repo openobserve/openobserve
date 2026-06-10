@@ -19,11 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="baseImportRef"
     title="Import Pipeline"
     test-prefix="pipeline"
+    hide-header
     :is-importing="isPipelineImporting"
     :editor-heights="{
       urlEditor: 'calc(100vh - 285px)',
       fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 132px)',
+      outputContainer: 'calc(100vh - 112px)',
       errorReport: 'calc(100vh - 132px)',
     }"
     @back="router.back()"
@@ -32,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
           class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
@@ -40,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Error Validations
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="tw:mr-4 tw:mt-4" />
         <div class="error-report-container" style="height: calc(100vh - 128px) !important; overflow: auto; resize: none;">
           <!-- Pipeline Errors Section -->
           <div
@@ -340,6 +341,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
   </base-import>
+
+  <!-- Actions live in the pipeline shell's AppPageHeader (Functions.vue), next
+       to the "Pipelines › Import" breadcrumb — the shell owns the single header
+       so BaseImport's built-in header is hidden (hide-header). -->
+  <Teleport to="#o2-page-actions">
+    <OButton
+      variant="outline"
+      size="sm-action"
+      data-test="pipeline-import-cancel-btn"
+      @click="baseImportRef?.handleCancel()"
+    >
+      {{ t("function.cancel") }}
+    </OButton>
+    <OButton
+      variant="primary"
+      size="sm-action"
+      type="submit"
+      data-test="pipeline-import-json-btn"
+      :loading="isPipelineImporting"
+      :disabled="isPipelineImporting"
+      @click="baseImportRef?.handleImport()"
+    >
+      {{ t("dashboard.import") }}
+    </OButton>
+  </Teleport>
 </template>
 
 <script lang="ts">
@@ -360,6 +386,7 @@ import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -374,6 +401,7 @@ export default defineComponent({
   name: "ImportPipeline",
   components: {
     OSeparator,
+    OButton,
     BaseImport,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),

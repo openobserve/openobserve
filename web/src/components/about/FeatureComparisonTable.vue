@@ -15,374 +15,494 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="feature-comparison-wrapper">
-    <div class="feature-comparison-header tw:mb-6">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-        <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-          <OIcon name="compare-arrows" size="md" />
-        </div>
-        <h3 class="feature-title">{{ t("about.feature_comparison_lbl") }}</h3>
+  <div class="edition-comparison">
+
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="tw:flex tw:items-start tw:gap-3 tw:mb-2">
+      <div class="ec-icon-wrapper">
+        <OIcon name="compare-arrows" size="md" />
       </div>
-      <div class="feature-subtitle-wrapper">
-        <p
-          v-if="store.state.zoConfig.build_type === 'opensource'"
-          class="edition-info"
-        >
-          {{ t("about.feature_comparision_os_msg") }}
-        </p>
-        <p
-          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
-          class="edition-info"
-        >
-          {{ t("about.feature_comparision_ent_msg") }}
-        </p>
-        <p
-          v-else
-          class="feature-subtitle"
-        >
-          {{ t("about.feature_comparision_subtitle") }}
-        </p>
-        <p
-          v-if="store.state.zoConfig.build_type === 'opensource'"
-          class="enterprise-promotion"
-        >
-          {{ t("about.feature_comparision_good_news") }}
-        </p>
-        <p
-          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
-          class="enterprise-promotion"
-        >
-          {{ t("about.feature_comparision_plan_detail") }}
-        </p>
+      <div>
+        <p class="header-eyebrow">EDITIONS</p>
+        <h3 class="header-title">{{ t("about.feature_comparison_lbl") }}</h3>
+      </div>
+    </div>
+    <p class="header-desc tw:mb-8">
+      <template v-if="buildType === 'opensource'">{{ t("about.feature_comparision_os_msg") }}</template>
+      <template v-else-if="buildType === 'enterprise'">{{ t("about.feature_comparision_ent_msg") }}</template>
+      <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
+    </p>
+
+    <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
+    <div class="tw:grid tw:grid-cols-3 tw:gap-5 tw:pt-4">
+      <div
+        v-for="ed in editionList"
+        :key="ed.id"
+        class="edition-card"
+        :class="{ 'edition-card--active': buildType === ed.id }"
+      >
+        <!-- Your Plan badge (floats above the card top border) -->
+        <div v-if="buildType === ed.id" class="your-plan-badge">
+          <OIcon name="arrow-upward" size="sm" class="tw:mr-1" />
+          Your Plan
+        </div>
+
+        <!-- Edition name + hosting + price ────────────────────────────── -->
+        <div class="edition-card__top">
+          <p class="edition-name">{{ ed.shortName }}</p>
+          <p class="edition-hosting">{{ ed.hosting }}</p>
+          <p class="edition-price">{{ ed.price }}</p>
+          <p class="edition-price-sub">{{ ed.priceSub }}</p>
+        </div>
+
+        <!-- All Five Pillars chips ────────────────────────────────────── -->
+        <div class="pillars-section">
+          <p class="pillars-label">ALL FIVE PILLARS</p>
+          <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-1.5">
+            <span v-for="pillarId in PILLAR_IDS" :key="pillarId" class="pillar-chip">
+              {{ t(`about.feature_${pillarId}`) }}
+            </span>
+          </div>
+          <span class="pillar-chip">{{ t('about.feature_dashboards') }}</span>
+        </div>
+
+        <!-- Feature list ───────────────────────────────────────────────── -->
+        <ul class="feature-list">
+          <li
+            v-for="feature in listFeatures"
+            :key="feature.id"
+            class="feature-item"
+            :class="`feature-item--${getFeatureStatus(feature, ed.id)}`"
+          >
+            <span class="feature-item__icon">
+              <OIcon
+                v-if="getFeatureStatus(feature, ed.id) !== 'unavailable'"
+                name="check-circle"
+                size="sm"
+              />
+              <OIcon
+                v-else
+                name="cancel"
+                size="sm"
+              />
+            </span>
+            <span class="feature-item__body">
+              <span class="feature-item__name">{{ t(getFeatureNameKey(feature)) }}</span>
+              <span v-if="getFeatureNote(feature, ed.id)" class="feature-item__note">
+                {{ getFeatureNote(feature, ed.id) }}
+              </span>
+            </span>
+          </li>
+        </ul>
+
+        <!-- Footer: license + support + CTA ──────────────────────────── -->
+        <div class="edition-card__footer">
+          <div class="footer-divider"></div>
+          <div class="footer-meta">
+            <div class="footer-row">
+              <span class="footer-key">{{ t('about.feature_license') }}</span>
+              <span class="footer-val">{{ ed.license }}</span>
+            </div>
+            <div class="footer-row">
+              <span class="footer-key">{{ t('about.feature_support') }}</span>
+              <span class="footer-val">{{ ed.support }}</span>
+            </div>
+          </div>
+          <a
+            v-if="ed.ctaUrl"
+            :href="ed.ctaUrl"
+            target="_blank"
+            class="cta-btn cta-btn--action"
+          >
+            {{ ed.ctaLabel }}
+          </a>
+          <button v-else class="cta-btn cta-btn--current" disabled>
+            {{ ed.ctaLabel }}
+          </button>
+        </div>
       </div>
     </div>
 
-    <div class="table-wrapper">
-      <OTable
-        :data="featureData.features"
-        :columns="columns"
-        row-key="name"
-        pagination="none"
-        :show-global-filter="false"
-        :default-columns="false"
-        class="feature-comparison-table"
-      >
-        <template #cell-opensource="{ row }">
-          <span v-if="row.values.opensource === true" class="status-icon status-available">✅</span>
-          <span v-else-if="row.values.opensource === false" class="status-icon status-unavailable">❌</span>
-          <span v-else class="status-text">{{ row.values.opensource }}</span>
-        </template>
-        <template #cell-enterprise="{ row }">
-          <span v-if="row.values.enterprise === true" class="status-icon status-available">✅</span>
-          <span v-else-if="row.values.enterprise === false" class="status-icon status-unavailable">❌</span>
-          <span v-else class="status-text">{{ row.values.enterprise }}</span>
-        </template>
-        <template #cell-cloud="{ row }">
-          <span v-if="row.values.cloud === true" class="status-icon status-available">✅</span>
-          <span v-else-if="row.values.cloud === false" class="status-icon status-unavailable">❌</span>
-          <span v-else class="status-text">{{ row.values.cloud }}</span>
-        </template>
-      </OTable>
-    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
-
-interface FeatureValue {
-  opensource: boolean | string;
-  enterprise: boolean | string;
-  cloud: boolean | string;
-}
-
-interface Feature {
-  name: string;
-  values: FeatureValue;
-}
-
-interface Edition {
-  id: 'opensource' | 'enterprise' | 'cloud';
-  name: string;
-}
-
-interface FeatureData {
-  editions: Edition[];
-  features: Feature[];
-}
 
 const store = useStore();
 const { t } = useI18n();
 
-const buildType = store.state.zoConfig.build_type;
+const buildType: string = store.state.zoConfig.build_type;
 
-const columns: OTableColumnDef[] = [
+// Feature IDs shown as pillar chips (not repeated in the list below)
+const PILLAR_IDS = ['logs', 'metrics', 'traces', 'rum', 'alerts'];
+const EXCLUDED_FROM_LIST = new Set([
+  'logs', 'metrics', 'traces', 'rum', 'alerts',
+  'dashboards',   // shown as extra chip
+  'license',      // shown in footer
+  'support',      // shown in footer
+  'cost',         // not shown in card layout
+]);
+
+// Features rendered as check/X rows inside each edition card
+const listFeatures = computed(() =>
+  FEATURE_REGISTRY.filter((f) => !EXCLUDED_FROM_LIST.has(f.id))
+);
+
+// ── Edition metadata ──────────────────────────────────────────────────────────
+
+interface EditionMeta {
+  id: string;
+  shortName: string;
+  hosting: string;
+  price: string;
+  priceSub: string;
+  license: string;
+  support: string;
+  ctaLabel: string;
+  ctaUrl: string | null;
+}
+
+const editionList = computed((): EditionMeta[] => [
   {
-    id: "name",
-    header: t("about.feature_column_name"),
-    accessorKey: "name",
-    sortable: false,
-    size: 250,
-    minSize: 200,
-    meta: { align: "left", cellClass: "feature-name-cell" },
+    id: 'opensource',
+    shortName: 'Open Source',
+    hosting: 'Self-hosted',
+    price: t('about.value_cost_free'),
+    priceSub: 'Forever, no limits',
+    license: t('about.value_license_agpl'),
+    support: t('about.value_support_community'),
+    ctaLabel: buildType === 'opensource' ? 'Current plan' : 'Learn more',
+    ctaUrl: buildType === 'opensource' ? null : 'https://openobserve.ai',
   },
   {
-    id: "opensource",
-    header: t("about.edition_opensource"),
-    accessorFn: (row: Feature) => row.values.opensource,
-    sortable: false,
-    size: 150,
-    maxSize: 150,
-    meta: {
-      align: "center",
-      cellClass:
-        buildType === "opensource"
-          ? "feature-value-cell highlighted-column"
-          : "feature-value-cell",
-    },
+    id: 'enterprise',
+    shortName: 'Enterprise',
+    hosting: 'Self-hosted',
+    price: t('about.value_cost_free'),
+    priceSub: 'Up to 50 GB/day · paid beyond',
+    license: t('about.value_license_enterprise'),
+    support: t('about.value_support_enterprise'),
+    ctaLabel: buildType === 'enterprise' ? 'Current plan' : 'Download',
+    ctaUrl: buildType === 'enterprise' ? null : 'https://openobserve.ai/download',
   },
   {
-    id: "enterprise",
-    header: t("about.edition_enterprise"),
-    accessorFn: (row: Feature) => row.values.enterprise,
-    sortable: false,
-    size: 150,
-    maxSize: 150,
-    meta: {
-      align: "center",
-      cellClass:
-        buildType === "enterprise"
-          ? "feature-value-cell highlighted-column"
-          : "feature-value-cell",
-    },
+    id: 'cloud',
+    shortName: 'Cloud',
+    hosting: 'Fully managed',
+    price: '14-day trial',
+    priceSub: 'Usage-based thereafter',
+    license: t('about.value_license_cloud'),
+    support: t('about.value_support_cloud'),
+    ctaLabel: buildType === 'cloud' ? 'Current plan' : 'Start free trial',
+    ctaUrl: buildType === 'cloud' ? null : 'https://cloud.openobserve.ai',
   },
-  {
-    id: "cloud",
-    header: t("about.edition_cloud"),
-    accessorFn: (row: Feature) => row.values.cloud,
-    sortable: false,
-    size: 150,
-    maxSize: 150,
-    meta: { align: "center", cellClass: "feature-value-cell" },
-  },
-];
+]);
 
-/**
- * Converts feature registry to display format
- * Features are automatically loaded from the centralized registry
- */
-const loadFeaturesFromRegistry = (): Feature[] => {
-  return FEATURE_REGISTRY.map((feature: FeatureDefinition) => {
-    const nameKey = getFeatureNameKey(feature);
-    const featureValue = feature.availability;
+// ── Feature availability helpers ─────────────────────────────────────────────
 
-    // Resolve string values to their translations
-    const values: FeatureValue = {
-      opensource: typeof featureValue.opensource === 'string'
-        ? t(featureValue.opensource)
-        : featureValue.opensource,
-      enterprise: typeof featureValue.enterprise === 'string'
-        ? t(featureValue.enterprise)
-        : featureValue.enterprise,
-      cloud: typeof featureValue.cloud === 'string'
-        ? t(featureValue.cloud)
-        : featureValue.cloud,
-    };
+type FeatureStatus = 'available' | 'unavailable' | 'conditional';
 
-    return {
-      name: t(nameKey),
-      values
-    };
-  });
-};
+function getFeatureStatus(feature: FeatureDefinition, editionId: string): FeatureStatus {
+  const raw = feature.availability[editionId as keyof typeof feature.availability];
+  if (raw === true) return 'available';
+  if (raw === false) return 'unavailable';
+  return 'conditional'; // string value = available with a condition
+}
 
-const featureData = ref<FeatureData>({
-  editions: [
-    { id: 'opensource', name: t('about.edition_opensource') },
-    { id: 'enterprise', name: t('about.edition_enterprise') },
-    { id: 'cloud', name: t('about.edition_cloud') }
-  ],
-  features: loadFeaturesFromRegistry()
-});
-
-const currentPlanName = computed(() => {
-  const buildType = store.state.zoConfig.build_type;
-  const edition = featureData.value.editions.find((ed) => ed.id === buildType);
-  return edition ? edition.name : "";
-});
+function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
+  const raw = feature.availability[editionId as keyof typeof feature.availability];
+  if (typeof raw !== 'string') return '';
+  // Translate the key and strip any leading emoji (e.g. "✅ ") so we show clean text
+  return t(raw).replace(/^[✅❌]\s*/u, '').trim();
+}
 </script>
 
 <style lang="scss" scoped>
-.feature-comparison-wrapper {
-  padding: 0.1rem;
+.edition-comparison {
 
-  .feature-comparison-header {
-    .icon-wrapper {
-      width: 56px;
-      height: 56px;
-      border-radius: 0.375rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .icon-wrapper-dark {
-      background: rgba(33, 150, 243, 0.18);
-      color: #64B5F6;
-    }
-
-    .icon-wrapper-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-    }
-
-    .feature-title {
-      font-size: 1.375rem;
-      font-weight: 600;
-      margin: 0;
-      letter-spacing: -0.02em;
-    }
-
-    .feature-subtitle-wrapper {
-      .feature-subtitle {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        opacity: 0.8;
-        margin-bottom: 0;
-
-        strong {
-          font-weight: 600;
-          opacity: 1;
-        }
-      }
-
-      .edition-info {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        opacity: 0.9;
-        margin-bottom: 0;
-      }
-
-      .enterprise-promotion {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        margin-top: 0.5rem;
-        margin-bottom: 0;
-        padding: 0.75rem 1rem;
-        background: linear-gradient(
-          135deg,
-          rgba(76, 175, 80, 0.1),
-          rgba(33, 150, 243, 0.1)
-        );
-        border-left: 3px solid #4caf50;
-        border-radius: 0.375rem;
-
-        strong {
-          font-weight: 600;
-          color: #4caf50;
-        }
-      }
-    }
-  }
-
-  .table-wrapper {
-    overflow-x: auto;
+  // ─── Header ──────────────────────────────────────────────────────────────
+  .ec-icon-wrapper {
+    width: 48px;
+    height: 48px;
     border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: color-mix(in srgb, var(--o2-primary-color) 12%, var(--o2-card-bg));
+    color: var(--o2-primary-color);
   }
 
-  .feature-comparison-table {
-    width: auto;
-    margin: auto;
-    max-width: 800px;
+  .header-eyebrow {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--o2-primary-color);
+    margin: 0 0 0.125rem;
   }
 
-  // These classes are applied to OTable's internal <td> elements via meta.cellClass
-  :deep(.feature-name-cell) {
-    font-weight: 500;
-    color: var(--q-text-color);
-    padding: 0.875rem 1rem;
+  .header-title {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--color-text-heading);
+    margin: 0;
+    letter-spacing: -0.015em;
   }
 
-  :deep(.feature-value-cell) {
-    text-align: center;
-    padding: 0.875rem 1rem;
-    word-wrap: break-word;
-    white-space: normal;
+  .header-desc {
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--o2-text-secondary);
+    margin: 0.5rem 0 0;
   }
 
-  :deep(.status-icon) {
-    font-size: 0.9rem;
-    display: inline-block;
-  }
-
-  :deep(.status-icon.status-available) {
-    color: #4caf50;
-  }
-
-  :deep(.status-icon.status-unavailable) {
-    color: #f44336;
-  }
-
-  :deep(.status-text) {
-    font-size: 0.875rem;
-    color: var(--q-text-color);
-    display: block;
-    padding: 0 0.5rem;
-    word-wrap: break-word;
-    white-space: normal;
-  }
-
-  :deep(.highlighted-column) {
-    background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
-    font-weight: 500;
+  // ─── Edition Cards ───────────────────────────────────────────────────────
+  .edition-card {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--o2-card-bg);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    border: 1px solid var(--o2-border-color);
 
-    &::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 3px;
+    &--active {
+      border: 2px solid var(--o2-primary-color);
+      padding-top: 1.75rem;
     }
   }
 
-  // Dark theme striped rows
-  :deep(.body--dark .feature-comparison-table tbody tr:nth-child(even)) {
-    background: rgba(255, 255, 255, 0.03);
+  // ── "Your Plan" badge ─────────────────────────────────────────────────────
+  .your-plan-badge {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.875rem;
+    border-radius: 999px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    background: var(--o2-primary-color);
+    color: var(--o2-primary-foreground);
+  }
 
-    &:hover {
-      background: rgba(33, 150, 243, 0.08);
+  // ── Card top ─────────────────────────────────────────────────────────────
+  .edition-card__top {
+    margin-bottom: 1.25rem;
+  }
+
+  .edition-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--o2-text-heading);
+    margin: 0 0 0.125rem;
+  }
+
+  .edition-hosting {
+    font-size: 0.8125rem;
+    color: var(--o2-text-muted);
+    margin: 0 0 0.875rem;
+  }
+
+  .edition-price {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--o2-primary-color);
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .edition-price-sub {
+    font-size: 0.8125rem;
+    color: var(--o2-text-muted);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  // ── Pillars section ───────────────────────────────────────────────────────
+  .pillars-section {
+    background: color-mix(in srgb, var(--o2-primary-color) 5%, var(--o2-card-bg));
+    border: 1px solid color-mix(in srgb, var(--o2-primary-color) 15%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .pillars-label {
+    font-size: 0.5625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--o2-text-label);
+    margin: 0 0 0.5rem;
+  }
+
+  .pillar-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    background: color-mix(in srgb, var(--o2-primary-color) 10%, var(--o2-card-bg));
+    color: var(--o2-primary-color);
+    border: 1px solid color-mix(in srgb, var(--o2-primary-color) 20%, transparent);
+    margin-right: 0.375rem;
+    margin-bottom: 0.375rem;
+  }
+
+  // ── Feature list ─────────────────────────────────────────────────────────
+  .feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+  }
+
+  .feature-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.4375rem 0;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid var(--o2-border-color);
+
+    &:last-child { border-bottom: none; }
+
+    &__icon {
+      flex-shrink: 0;
+      margin-top: 0.125rem;
+      line-height: 1;
+    }
+
+    &__body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.0625rem;
+    }
+
+    &__name {
+      line-height: 1.45;
+    }
+
+    &__note {
+      font-size: 0.6875rem;
+      color: var(--o2-text-muted);
+      font-style: italic;
+    }
+
+    // Available: green icon + normal text
+    &--available {
+      color: var(--o2-text-body);
+
+      .feature-item__icon { color: var(--o2-positive); }
+    }
+
+    // Conditional (string availability, e.g. "Requires HA mode"): green icon + muted note
+    &--conditional {
+      color: var(--o2-text-body);
+
+      .feature-item__icon { color: var(--o2-positive); }
+    }
+
+    // Unavailable: gray icon + muted text
+    &--unavailable {
+      color: var(--o2-text-muted);
+
+      .feature-item__icon { color: var(--o2-text-muted); }
     }
   }
 
-  // Responsive design
-  @media (max-width: 768px) {
-    padding: 1rem;
+  // ── Card footer ───────────────────────────────────────────────────────────
+  .edition-card__footer {
+    margin-top: 1rem;
+  }
 
-    .feature-comparison-table {
-      font-size: 0.8125rem;
+  .footer-divider {
+    height: 1px;
+    background: var(--o2-border-color);
+    margin-bottom: 0.75rem;
+  }
+
+  .footer-meta {
+    margin-bottom: 0.875rem;
+  }
+
+  .footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.8125rem;
+    padding: 0.125rem 0;
+  }
+
+  .footer-key {
+    color: var(--o2-text-muted);
+    font-weight: 500;
+  }
+
+  .footer-val {
+    color: var(--o2-text-body);
+    font-weight: 600;
+  }
+
+  .cta-btn {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1.5px solid;
+
+    // Non-current plan: interactive link style
+    &--action {
+      background: color-mix(in srgb, var(--o2-primary-color) 10%, var(--o2-card-bg));
+      color: var(--o2-primary-color);
+      border-color: color-mix(in srgb, var(--o2-primary-color) 30%, transparent);
+
+      &:hover {
+        background: color-mix(in srgb, var(--o2-primary-color) 18%, var(--o2-card-bg));
+        border-color: var(--o2-primary-color);
+      }
     }
 
-    :deep(thead tr th) {
-      padding: 0.75rem 0.5rem;
-      font-size: 0.875rem;
+    // Current plan: muted/disabled
+    &--current {
+      background: transparent;
+      color: var(--o2-text-muted);
+      border-color: var(--o2-border-color);
+      cursor: default;
+    }
+  }
+
+  // ─── Responsive ──────────────────────────────────────────────────────────
+  // Cards always stay side-by-side; just reduce padding on tighter viewports
+  @media (max-width: 1024px) {
+    .edition-card {
+      padding: 1rem;
+
+      &--active { padding-top: 1.25rem; }
     }
 
-    :deep(.feature-name-cell),
-    :deep(.feature-value-cell) {
-      padding: 0.625rem 0.5rem;
-    }
-
-    :deep(.feature-value-cell .status-text) {
-      font-size: 0.8125rem;
+    .edition-price {
+      font-size: 1.375rem;
     }
   }
 }

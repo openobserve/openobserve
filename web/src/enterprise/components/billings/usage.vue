@@ -1034,20 +1034,20 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
   }
 
   .usage-tile-title {
-    font-size: 1rem;
-    font-weight: 500;
-    line-height: 1.25rem;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: var(--leading-base);
     letter-spacing: 0%;
-    color: var(--o2-text-heading);
+    color: var(--color-text-heading);
     text-align: left;
   }
 
   .usage-data-to-display {
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
     font-weight: 600;
-    line-height: 1.75rem;
+    line-height: var(--leading-xl);
     letter-spacing: 0px;
-    color: var(--o2-text-heading);
+    color: var(--color-text-heading);
     text-align: left;
   }
 
@@ -1060,13 +1060,13 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
   }
 
   .text-title {
-    font-size: 1rem;
-    font-weight: bold;
+    font-size: var(--text-md);
+    font-weight: 600;
   }
 
   .text-sub-title {
-    font-size: 1.25rem;
-    font-weight: bolder;
+    font-size: var(--text-xl);
+    font-weight: 600;
   }
 
   .usage-title > span {

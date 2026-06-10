@@ -4,8 +4,8 @@
 
 // Result info bar — same background as query editor footer
 .result-bar {
-  background: var(--o2-section-header-bg);
   border-bottom: 1px solid var(--o2-border-color);
+  background: var(--o2-card-bg);
 }
 
 .pagination-block {
@@ -219,7 +219,7 @@
 }
 
 .table-head-chip {
-  font-family: "Nunito Sans", sans-serif;
+  font-family: var(--font-sans);
 
   .field_overlay {
     background-color: #f5f5f5;

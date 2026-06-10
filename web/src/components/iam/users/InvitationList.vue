@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-2.5 tw:pt-2.5 tw:pb-2.5">
     <div class="card-container tw:mb-[0.625rem]">
       <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
         <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="invitation-title-text">
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
         >
           <template #empty>
-            <NoData />
+            <OEmptyState size="hero" preset="no-invitations" hide-action />
           </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
@@ -105,15 +105,16 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "InvitationList",
   components: {
-    NoData,
+    OEmptyState,
     OButton,
     ODialog,
     OTable,
@@ -138,7 +139,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 48,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 40,
         maxSize: 64,
         meta: { align: "center", compactPadding: true },

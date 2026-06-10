@@ -15,30 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="tw:rounded-md tw:p-0" style="min-height: inherit;">
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:mx-3 tw:pt-2">
-      <div class="tw:flex tw:items-center tw:py-2">
-        <div
-          no-caps
-            padding="xs"
-            outline
-            icon="arrow-back-ios-new"
-            class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          title="Go Back"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col" data-test="add-template-title">
-          <div v-if="isUpdatingCipherKey" class="tw:text-xl tw:font-semibold">
-            {{ t("cipherKey.update") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold">
-            {{ t("cipherKey.add") }}
-          </div>
-        </div>
-      </div>
-    </div>
-    <OSeparator />
+    <AppPageHeader
+      :back="{
+        label: t('cipherKey.header'),
+        onClick: () => emit('cancel:hideform'),
+      }"
+      class="tw:px-3 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span data-test="add-template-title">
+          {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
+        </span>
+      </template>
+    </AppPageHeader>
     <div
       class="create-cipher-form"
     >
@@ -150,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="tw:mx-2">
-            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2"
+            <div class="tw:flex tw:justify-end tw:px-2 tw:py-4 tw:w-full tw:gap-2 tw:border-t tw:border-border-default"
       style="position: sticky; bottom: 0px; z-index: 2"
       >
         <OButton
@@ -201,11 +190,10 @@ import CipherKeysService from "@/services/cipher_keys";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();

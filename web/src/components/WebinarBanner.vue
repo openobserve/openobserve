@@ -204,7 +204,7 @@ onMounted(async () => {
   text-align: center;
 
   strong {
-    font-weight: 800;
+    font-weight: 700;
   }
 }
 

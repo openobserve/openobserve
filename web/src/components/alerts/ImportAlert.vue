@@ -21,9 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="alert"
     :is-importing="isAlertImporting"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 288px)',
-      fileEditor: 'calc(100vh - 296px)',
-      outputContainer: 'calc(100vh - 130px)',
+      urlEditor: 'calc(100vh - 285px)',
+      fileEditor: 'calc(100vh - 282px)',
+      outputContainer: 'calc(100vh - 110px)',
       errorReport: 'calc(100vh - 192px)',
     }"
     @back="router.back()"
@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
+      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
       <div
         v-if="alertErrorsToDisplay.length > 0"
         class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
@@ -88,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         Error Validations
       </div>
       <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-      <OSeparator class="tw:mx-4 tw:mt-4" />
+      <OSeparator class="tw:mr-4 tw:mt-4" />
       <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
         <!-- Alert Errors Section -->
         <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
@@ -286,6 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </div>
+      </div>
       </div>
     </template>
   </base-import>

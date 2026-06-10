@@ -3,6 +3,8 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+
 const { t } = useI18n();
 
 defineProps<{
@@ -17,12 +19,10 @@ defineSlots<{
 <template>
   <div
     data-test="o2-table-empty"
-    class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:py-8 tw:text-center tw:min-h-[300px]"
+    class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:min-h-75"
   >
     <slot>
-      <div class="tw:text-secondary tw:text-sm">
-        {{ message ?? t("search.noData") }}
-      </div>
+      <OEmptyState size="inline" :title="message ?? t('search.noData')" />
     </slot>
   </div>
 </template>

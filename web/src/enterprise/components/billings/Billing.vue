@@ -17,22 +17,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="tw:rounded-md tw:p-0 tw:pt-1" style="min-height: inherit;" >
-    <div class="tw:flex tw:justify-between tw:items-center tw:pb-3 card-container tw:h-[62px] tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-4">
-    <div class="head tw:text-xl tw:tracking-[0.005em] ">
-      {{ headerBasedOnRoute() }}
-    </div>
-    <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
-      <OButton
-        v-if="orgGroupInvite.canInvite"
-        variant="primary"
-        size="sm-action"
-        data-test="org-group-invite-org-btn"
-        @click="orgGroupInvite.trigger++"
-      >
-        {{ t("billing.billingGroup.inviteOrgButton") }}
-      </OButton>
-    </div>
-    <div v-if="isUsageRoute" class="tw:flex tw:gap-2 tw:items-center ">
+    <!-- Standard page header: title + icon. Usage date / data-type controls live
+         in the toolbar row below. -->
+    <AppPageHeader
+      :title="headerBasedOnRoute()"
+      icon="paid"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2"
+    >
+      <template #actions>
+        <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
+          <OButton
+            v-if="orgGroupInvite.canInvite"
+            variant="primary"
+            size="sm-action"
+            data-test="org-group-invite-org-btn"
+            @click="orgGroupInvite.trigger++"
+          >
+            {{ t("billing.billingGroup.inviteOrgButton") }}
+          </OButton>
+        </div>
+      </template>
+    </AppPageHeader>
+    <div
+      v-if="isUsageRoute"
+      class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
+    >
       <div class="custom-usage-date-select">
           <OSelect
             v-model="usageDate"
@@ -54,7 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-      </div>
     <OSplitter
       v-model="splitterModel"
       unit="px"
@@ -169,6 +177,7 @@ import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -178,7 +187,7 @@ import UsageMemberList from "./UsageMemberList.vue";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    AppPageHeader, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList },
   setup() {
     const { t } = useI18n();

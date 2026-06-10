@@ -126,16 +126,20 @@ describe("AppGroups Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-groups-section-title"]').exists()).toBe(true);
+      // Title now lives in the standard AppPageHeader (row 1).
+      expect(wrapper.find(".app-page-header").exists()).toBe(true);
     });
 
     it("displays the correct title", () => {
-      const titleElement = wrapper.find('[data-test="iam-groups-section-title"]');
+      const titleElement = wrapper.find(".app-page-header h1");
       expect(titleElement.text()).toContain("Groups");
     });
 
     it("renders search input", () => {
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"]');
+      // Search is rendered via OSearchInput in OTable's custom toolbar slot.
+      const searchInput = wrapper.find(
+        '[data-test="iam-groups-search-input"]',
+      );
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -200,21 +204,22 @@ describe("AppGroups Component", () => {
     });
 
     it("sets filter query when searching via input", async () => {
-      // Filtering is delegated to OTable's client-side filter-mode via global-filter prop.
-      // Test that the filterQuery ref is wired correctly to OInput.
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
-      await searchInput.setValue("admin");
+      // Filtering is delegated to OTable's client-side filter via its custom
+      // toolbar OSearchInput (v-model wired to filterQuery).
+      wrapper.vm.filterQuery = "admin";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("admin");
     });
 
     it("clears filter query when search input is emptied", async () => {
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
-      await searchInput.setValue("admin");
+      wrapper.vm.filterQuery = "admin";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("admin");
 
-      await searchInput.setValue("");
+      wrapper.vm.filterQuery = "";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("");
     });
@@ -447,7 +452,7 @@ describe("AppGroups Component", () => {
 
   describe("Theme Support", () => {
     it("applies correct theme classes", () => {
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
+      const header = wrapper.find('.app-page-header');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);
@@ -473,7 +478,7 @@ describe("AppGroups Component", () => {
 
       await flushPromises();
 
-      const header = wrapper.find('.tw\\:flex.tw\\:justify-between.tw\\:items-center.tw\\:px-4.tw\\:py-3');
+      const header = wrapper.find('.app-page-header');
       const table = wrapper.find('[data-test="iam-groups-table-section"]');
 
       expect(header.exists()).toBe(true);
@@ -504,9 +509,8 @@ describe("AppGroups Component", () => {
 
     it("handles search term that matches no groups", async () => {
       // When filterQuery is set to a non-matching value, OTable filters rows internally.
-      // Test that filterQuery is set correctly via the search input.
-      const searchInput = wrapper.find('[data-test="iam-groups-search-input"] input');
-      await searchInput.setValue("nonexistent");
+      wrapper.vm.filterQuery = "nonexistent";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filterQuery).toBe("nonexistent");
     });

@@ -27,8 +27,7 @@ use arrow_schema::{DataType, Schema};
 use bytes::Bytes;
 use config::{
     FileFormat, INDEX_FIELD_NAME_FOR_ALL, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
-    get_config,
-    utils::{inverted_index::to_tantivy_name, tantivy::tokenizer::O2_TOKENIZER},
+    get_config, tantivy::tokenizer::O2_TOKENIZER, utils::inverted_index::to_tantivy_name,
 };
 use hashbrown::HashSet;
 use infra::storage;

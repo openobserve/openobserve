@@ -219,6 +219,9 @@ async fn adapt_tantivy_result(
         IndexOptimizeMode::SimpleTopN(field, limit, _ascend) => {
             create_top_n_arrow_array(&schema, result.top_n(), &field, limit)?
         }
+        IndexOptimizeMode::SimpleTopNMulti(ref fields, limit, _ascend) => {
+            create_top_n_multi_arrow_array(&schema, result.top_n_multi(), fields, limit)?
+        }
         IndexOptimizeMode::SimpleDistinct(_field, _limit, _ascend) => {
             vec![create_distinct_arrow_array(&schema, result.distinct())?]
         }
@@ -492,6 +495,67 @@ fn create_top_n_arrow_array(
         let count_array = create_count_array(count_field, count_chunk)?;
 
         batches.push(vec![field_array, count_array]);
+    }
+
+    Ok(batches)
+}
+
+fn create_top_n_multi_arrow_array(
+    schema: &SchemaRef,
+    top_n: Vec<(Vec<String>, u64)>,
+    _fields: &[String],
+    _limit: usize,
+) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
+    // Validate: schema should have 3 fields (field1, field2, count)
+    if schema.fields().len() != 3 {
+        return Err(DataFusionError::Internal(format!(
+            "Expected schema with 3 fields for TopNMulti, got {}",
+            schema.fields().len()
+        )));
+    }
+
+    let field1_field = &schema.fields()[0];
+    let field2_field = &schema.fields()[1];
+    let count_field = &schema.fields()[2];
+
+    let total_rows = top_n.len();
+    if total_rows == 0 {
+        return Ok(vec![]);
+    }
+
+    // Unzip the composite keys and counts
+    let mut field1_values = Vec::with_capacity(total_rows);
+    let mut field2_values = Vec::with_capacity(total_rows);
+    let mut count_values = Vec::with_capacity(total_rows);
+
+    for (keys, count) in top_n {
+        if keys.len() >= 2 {
+            field1_values.push(keys[0].clone());
+            field2_values.push(keys[1].clone());
+            count_values.push(count);
+        }
+    }
+
+    let total_rows = field1_values.len();
+    if total_rows == 0 {
+        return Ok(vec![]);
+    }
+
+    let mut batches = Vec::new();
+    let batch_size = get_batch_size();
+
+    for chunk_start in (0..total_rows).step_by(batch_size) {
+        let chunk_end = std::cmp::min(chunk_start + batch_size, total_rows);
+
+        let field1_chunk = field1_values[chunk_start..chunk_end].to_vec();
+        let field2_chunk = field2_values[chunk_start..chunk_end].to_vec();
+        let count_chunk = count_values[chunk_start..chunk_end].to_vec();
+
+        let field1_array = create_field_array(field1_field, field1_chunk)?;
+        let field2_array = create_field_array(field2_field, field2_chunk)?;
+        let count_array = create_count_array(count_field, count_chunk)?;
+
+        batches.push(vec![field1_array, field2_array, count_array]);
     }
 
     Ok(batches)

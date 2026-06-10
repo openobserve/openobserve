@@ -405,6 +405,12 @@
     "noData": "データはありません",
     "functionEditorLabel": "関数エディター",
     "loadingStream": "ストリームをロード中...",
+    "askAIPlaceholderRotation": {
+      "one": "過去 1 時間のエラーを表示...",
+      "two": "5 秒以上かかる遅いクエリを検索...",
+      "three": "サービスごとにグループ化された5xx件の回答をカウント...",
+      "four": "レベル = 'error' のログをフィルタする..."
+    },
     "hideHistogram": "ヒストグラムを非表示",
     "disableQuickMode": "クイックモードを無効にする",
     "menuGroupSetOnce": "1 回設定",
@@ -975,7 +981,8 @@
     "subscription_type": "プランタイプ",
     "proceed_subscription": "購読に進む",
     "subscription_plan": "サブスクリプションプラン",
-    "makeBilledMember": "この組織を {org} の請求メンバーにする"
+    "makeBilledMember": "この組織を {org} の請求メンバーにする",
+    "manage": "管理"
   },
   "template": {
     "header": "テンプレート",
@@ -1797,7 +1804,8 @@
     "noDataAvailable": "データはありません",
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
-    "tabUsage": "使い方"
+    "tabUsage": "使い方",
+    "subtitle": "一目でわかるオブザーバビリティワークスペース"
   },
   "billing": {
     "header": "使用状況と請求",
@@ -2960,7 +2968,10 @@
     "evaluationTemplate": "評価テンプレート",
     "evaluationTemplateHelp": "LLMジャッジの基準とディメンションを定義する評価テンプレートを選択してください。",
     "noTemplatesFound": "評価テンプレートが見つかりません。評価テンプレートページで作成してください。",
-    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました"
+    "evalTemplatesRefreshed": "評価テンプレートは正常に更新されました",
+    "subtitle": "転送中のデータの変換、強化、ルーティング",
+    "selectStream": "ストリームを選択...",
+    "queryEditorPlaceholder": "ストリームを選択するか、ここに SQL クエリを書き込んでください..."
   },
   "reports": {
     "header": "レポート",
@@ -3216,7 +3227,10 @@
         "spans": "スパン"
       }
     },
-    "openInFullView": "フルビューで開く"
+    "openInFullView": "フルビューで開く",
+    "serviceMap": "サービスマップ",
+    "patternView": "パターンビュー",
+    "spanView": "スパンビュー"
   },
   "actions": {
     "testAction": "アクションをテスト",
@@ -4068,6 +4082,237 @@
       "one": "過去 1 時間のエラーを表示...",
       "two": "nginx ログから JSON を解析するための VRL を書き込みます...",
       "three": "K8s ノードの状態を示すダッシュボードを作成..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "データが見つかりませんでした",
+      "description": "現在のフィルターまたは時間範囲と一致するものはありません。検索範囲を広げたり、時間範囲を広げたり、フィルターをクリアしたりしてみてください。",
+      "action": "フィルターをクリア",
+      "actionDesc": "適用されたすべてのフィルターをリセット"
+    },
+    "noLogs": {
+      "title": "この範囲にはログはありません",
+      "description": "選択したストリームと時間範囲のログが見つかりませんでした。より広い時間範囲または別のストリームを試してください。",
+      "action": "時間範囲を広げる",
+      "actionDesc": "より長い期間にわたる検索"
+    },
+    "noDashboards": {
+      "title": "はじめてのダッシュボードを作成",
+      "description": "ダッシュボードでは、メトリクス、ログ、トレースが 1 つのビューにまとめられます。作成して始めましょう。",
+      "action": "新しいダッシュボード",
+      "actionDesc": "空のキャンバスから始める",
+      "import": "ダッシュボードをインポート",
+      "importDesc": "ダッシュボード JSON ファイルのアップロード",
+      "templates": "テンプレートを閲覧する",
+      "templatesDesc": "コミュニティダッシュボードから始める"
+    },
+    "noPipelines": {
+      "title": "はじめてのパイプラインの作成",
+      "description": "パイプラインは、受信したデータを変換してルーティングします。パイプラインを設定してストリームの作成を始めましょう。",
+      "action": "新しいパイプライン",
+      "actionDesc": "フローをゼロから構築",
+      "import": "インポートパイプライン",
+      "importDesc": "パイプライン定義をアップロードする"
+    },
+    "noFunctions": {
+      "title": "はじめての関数を作成",
+      "description": "関数を使用すると、取り込み時またはクエリ時にデータをエンリッチして再形成できます。1 つ追加して始めましょう。",
+      "action": "新機能",
+      "actionDesc": "新しい VRL 関数を書く"
+    },
+    "noStreams": {
+      "title": "最初のデータを待っています",
+      "description": "データはまだ届いていません。ソースを接続すると、ストリームが自動的にここに表示されます。",
+      "action": "取り込みを設定する",
+      "actionDesc": "データソースを接続する"
+    },
+    "noAlerts": {
+      "title": "最初のアラートを作成する",
+      "description": "アラートは、データがしきい値を超えた瞬間に通知します。アラートを定義して監視を開始します。",
+      "action": "新しいアラート",
+      "actionDesc": "監視する条件を定義"
+    },
+    "noIncidents": {
+      "title": "アクティブなインシデントなし",
+      "description": "みなさん、追いつきました。今、注意が必要なことは何もありません。トリガーされたインシデントはここに表示されます。"
+    },
+    "loadError": {
+      "title": "何かがおかしくなった",
+      "description": "このデータを読み込めませんでした。通常は一時的なものです。しばらくしてからもう一度試してください。",
+      "action": "リトライ",
+      "actionDesc": "データをもう一度読み込んでください"
+    },
+    "noData": {
+      "title": "ここにはまだ何もありません",
+      "description": "現在表示できるデータはありません。"
+    },
+    "noTraces": {
+      "title": "トレースが見つかりません",
+      "description": "選択したサービスと時間範囲に一致するトレースはありません。より広い時間範囲または別のサービスを試してください。"
+    },
+    "noSearchHistory": {
+      "title": "検索履歴はまだありません",
+      "description": "実行した検索がここに一覧表示されるので、再度検索して再実行できます。"
+    },
+    "noUsers": {
+      "title": "まだユーザーはいません",
+      "description": "チームメイトをこの組織で共同作業するよう招待してください。",
+      "action": "ユーザーを追加",
+      "actionDesc": "チームメイトをメールで招待する"
+    },
+    "noReports": {
+      "title": "まだレポートはありません",
+      "description": "レポートをスケジュールして、ダッシュボードが受信トレイに配信されるようにします。",
+      "action": "新しいレポート",
+      "actionDesc": "ダッシュボードの配信をスケジュールする"
+    },
+    "noQueries": {
+      "title": "実行中のクエリなし",
+      "description": "現在、アクティブなクエリはありません。実行時間の長いクエリは、実行中もここに表示されます。"
+    },
+    "noServiceAccounts": {
+      "title": "サービスアカウントはまだありません",
+      "description": "サービスアカウントでは、アプリケーションを API で認証できます。アカウントを作成して始めましょう。",
+      "action": "サービスアカウントを追加",
+      "actionDesc": "API サービスアカウントを作成する"
+    },
+    "noInvitations": {
+      "title": "保留中の招待状はありません",
+      "description": "送信または受信した招待状はここに表示されます。"
+    },
+    "filtered": {
+      "title": "{noun} が見つかりません",
+      "description": "現在のフィルターまたは検索条件に一致する {noun} はありません。調整したりクリアしたりしてみてください。",
+      "action": "フィルターをクリア",
+      "actionDesc": "すべてのフィルターをリセットして検索",
+      "fallbackNoun": "結果"
+    },
+    "nouns": {
+      "logs": "ログ",
+      "dashboards": "ダッシュボード",
+      "pipelines": "パイプライン",
+      "functions": "機能",
+      "streams": "ストリーム",
+      "alerts": "アラート",
+      "incidents": "事件",
+      "traces": "トレース",
+      "searches": "検索",
+      "users": "ユーザー",
+      "reports": "レポート",
+      "queries": "クエリ",
+      "serviceAccounts": "サービスアカウント",
+      "invitations": "招待状"
+    },
+    "noDashboardsInFolder": {
+      "title": "このフォルダにはダッシュボードがありません",
+      "description": "このフォルダは空です。ここにダッシュボードを追加するか、別のフォルダからダッシュボードを移動してください。",
+      "action": "新しいダッシュボード",
+      "actionDesc": "このフォルダにダッシュボードを作成",
+      "import": "ダッシュボードをインポート",
+      "importDesc": "ダッシュボード JSON ファイルのアップロード",
+      "templates": "テンプレートを閲覧する",
+      "templatesDesc": "コミュニティダッシュボードから始める"
+    },
+    "noGroups": {
+      "title": "まだグループはありません",
+      "description": "グループを使用すると、複数のユーザーの権限を一度に管理できます。1 つ作成して始めましょう。",
+      "action": "新しいグループ",
+      "actionDesc": "ユーザーグループの作成"
+    },
+    "noRoles": {
+      "title": "ロールはまだありません",
+      "description": "ロールは、ユーザーが実行できるアクションを定義します。アクセスを制御するカスタムロールを作成します。",
+      "action": "新しい役割",
+      "actionDesc": "カスタムアクセスロールの定義"
+    },
+    "noAnomalyConfigs": {
+      "title": "異常検出は設定されていません",
+      "description": "異常検出を設定して、データ内の異常なパターンを自動的に識別します。",
+      "action": "新しい構成",
+      "actionDesc": "異常検出の設定"
+    },
+    "noApiLimits": {
+      "title": "API 制限は設定されていません",
+      "description": "API 制限は、各組織が時間枠ごとに取り込んでクエリできるデータ量を制御します。"
+    },
+    "noRoleLimits": {
+      "title": "ロール制限は設定されていません",
+      "description": "ロール制限は、組織内の個々のロールに適用されるインジェストクォータとクエリクォータを定義します。"
+    },
+    "noIngestionTokens": {
+      "title": "インジェストトークンはまだありません",
+      "description": "取り込みトークンは、ログ、メトリクス、トレースを送信する際にデータソースを認証します。",
+      "action": "新しいトークン",
+      "actionDesc": "取り込みトークンを生成する"
+    },
+    "noOrganizations": {
+      "title": "まだ組織はありません",
+      "description": "組織はユーザーとデータをグループ化します。作成して始めましょう。"
+    },
+    "noAlertDestinations": {
+      "title": "目的地はまだありません",
+      "description": "送信先は、アラート通知の送信先 (Slack、メール、Webhook など) を定義します。",
+      "action": "新しい目的地",
+      "actionDesc": "通知チャネルを接続する"
+    },
+    "noAlertTemplates": {
+      "title": "テンプレートはまだありません",
+      "description": "テンプレートはアラート通知メッセージの形式を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "通知テンプレートを作成する"
+    },
+    "noEnrichmentTables": {
+      "title": "エンリッチメントテーブルはまだありません",
+      "description": "エンリッチメントテーブルを使用すると、クエリ時にログデータに追加のコンテキストを添付できます。",
+      "action": "新しいテーブル",
+      "actionDesc": "エンリッチメントテーブルを作成する"
+    },
+    "noCipherKeys": {
+      "title": "暗号鍵はまだありません",
+      "description": "暗号鍵は、データストリームの機密フィールドを暗号化するために使用されます。",
+      "action": "新しいキー",
+      "actionDesc": "暗号鍵を生成"
+    },
+    "noAiToolsets": {
+      "title": "AI ツールセットはまだありません",
+      "description": "AI ツールセットは、組織を外部 AI 機能に接続します。",
+      "action": "新しいツールセット",
+      "actionDesc": "AI ツールセットの追加"
+    },
+    "noLlmProviders": {
+      "title": "LLM プロバイダーは設定されていません",
+      "description": "言語モデルプロバイダーに接続して AI を活用した機能を有効にします。",
+      "action": "プロバイダーを追加",
+      "actionDesc": "LLM プロバイダーの設定"
+    },
+    "noDiscoveredServices": {
+      "title": "サービスが見つかりませんでした",
+      "description": "トレースが到着し始めると、サービスが自動的にここに表示されます。"
+    },
+    "noNodes": {
+      "title": "使用可能なノードはありません",
+      "description": "クラスターノードは、登録するとここに表示されます。"
+    },
+    "noSourceMaps": {
+      "title": "ソースマップがアップロードされていません",
+      "description": "ソースマップをアップロードして、RUM エラーレポートで読みやすいスタックトレースを有効にします。",
+      "action": "アップロード",
+      "actionDesc": "ソースマップファイルのアップロード"
+    },
+    "noBackfillJobs": {
+      "title": "バックフィルジョブなし",
+      "description": "バックフィルジョブは、パイプラインを通じて履歴データを再処理します。1 つ実行して始めましょう。"
+    },
+    "noSearchJobs": {
+      "title": "スケジュールされた検索ジョブはありません",
+      "description": "スケジュールした長時間にわたる検索がここに表示され、検索のステータスを追跡したり、終了後に結果を確認したりできます。"
+    },
+    "noPipelineDestinations": {
+      "title": "目的地はまだありません",
+      "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
+      "action": "新しい目的地",
+      "actionDesc": "パイプラインデスティネーションの接続"
     }
   },
   "onlineEvals": {

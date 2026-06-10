@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :disable="disable"
     :hide-relative-timezone="hideRelativeTimezone"
     :menu-align="menuAlign"
+    :variant="variant"
     @hide="onHide"
     @show="onShow"
   >
@@ -73,6 +74,11 @@ export default defineComponent({
     menuAlign: {
       required: false,
       default: "end",
+      type: String,
+    },
+    variant: {
+      required: false,
+      default: "outline",
       type: String,
     },
   },
