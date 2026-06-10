@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:p-2">
-    <div class="title" data-test="vector-title-text">
+  <IngestionContent>
+    <div class="tw:flex tw:flex-col tw:gap-2" data-test="vector-title-text">
       <b>OTLP HTTP</b>
-    
       <CopyContent
         :content="copyHTTPTracesContentURL"
         :displayContent="'HTTP Endpoint: ' + copyHTTPTracesContentURL"
@@ -29,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="title tw:pt-3" data-test="vector-title-text" v-if="config.isCloud == 'false'">
+    <div class="tw:flex tw:flex-col tw:gap-2" data-test="vector-title-text" v-if="config.isCloud == 'false'">
       <b>OTLP gRPC</b>
       <CopyContent :content="copyGRPCTracesContent" />
     </div>
-  </div>
+  </IngestionContent>
 </template>
 
 <script lang="ts">
@@ -42,6 +41,7 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -53,7 +53,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent },
   setup(props) {
     const store = useStore();
     const endpoint: any = ref({

@@ -862,13 +862,9 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      // Find and click collapse button
-      const collapseBtn = wrapper.find(
-        '[data-test="logs-search-field-list-collapse-btn"]',
-      );
-      expect(collapseBtn.exists()).toBe(true);
-
-      await collapseBtn.trigger("click");
+      // collapseFieldList is exposed directly; there is no collapse button in the
+      // current template, so we call the method rather than triggering a DOM click.
+      await wrapper.vm.collapseFieldList();
       await flushPromises();
 
       expect(mockSearchObj.meta.showFields).toBe(false);
@@ -1597,7 +1593,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.splitterModel).toBe(15);
+      // splitterModel is initialized to 90 (horizontal px height for the search-bar panel)
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
     it("should render the second-level container with full-height class", async () => {

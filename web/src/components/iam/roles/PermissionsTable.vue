@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div v-if="level === 0" class="tw:py-16 tw:flex tw:justify-center tw:items-center">
-              <NoData />
+              <NoData :filtered="!!filter" @action="emits('update:filter', '')" />
             </div>
             <div
               v-else
@@ -181,7 +181,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row"]);
+const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row", "update:filter"]);
 
 const { t } = useI18n();
 

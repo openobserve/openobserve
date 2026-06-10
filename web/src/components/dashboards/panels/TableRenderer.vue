@@ -318,7 +318,7 @@ export default defineComponent({
 // Dashboard table cells should not use the monospace font from tenstack-table.scss
 // (that scss is shared with logs, which intentionally uses monospace for log data)
 :deep(td) {
-  font-family: "Nunito Sans", sans-serif;
+  font-family: var(--font-sans);
 }
 
 // Pivot table styles

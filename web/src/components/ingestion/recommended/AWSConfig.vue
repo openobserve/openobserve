@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 aws-config-page">
+  <div class="tw:m-3 tw:mt-1 aws-config-page">
     <div class="tw:mb-4">
       <div class="page-title">
         AWS Integrations

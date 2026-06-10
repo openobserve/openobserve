@@ -42,6 +42,19 @@ vi.mock("@/services/service_streams", () => ({
       related_streams: { logs: [], metrics: [], traces: [] },
     },
   }),
+  getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
+  getDimensionAnalytics: vi
+    .fn()
+    .mockResolvedValue({ data: { available_groups: [] } }),
+}));
+
+// fetchDatabaseOperations (called for nodes identified as database nodes) and
+// resolveWorkloadFields both call streamService.schema. Mock it so those calls
+// complete instantly instead of making real HTTP requests that hang in tests.
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: vi.fn().mockResolvedValue({ data: { schema: [], fields: [] } }),
+  },
 }));
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({

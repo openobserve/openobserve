@@ -352,3 +352,50 @@
   src: url(./fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t1R-tQKr51.woff2) format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* ============================================================
+   IBM Plex Sans + IBM Plex Mono — self-hosted woff2 (latin + latin-ext)
+   Design-system typeface (HANDOFF.md §2.1). Sans weights 400/500/600/700,
+   Mono weights 400/500/600. font-display: swap.
+   ============================================================ */
+
+$latin: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD";
+$latinExt: "U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF";
+
+@each $weight in 400, 500, 600, 700 {
+  @font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: $weight;
+    font-display: swap;
+    src: url('./fonts/ibm-plex-sans-latin-#{$weight}.woff2') format('woff2');
+    unicode-range: #{$latin};
+  }
+  @font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: $weight;
+    font-display: swap;
+    src: url('./fonts/ibm-plex-sans-latin-ext-#{$weight}.woff2') format('woff2');
+    unicode-range: #{$latinExt};
+  }
+}
+
+@each $weight in 400, 500, 600 {
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: $weight;
+    font-display: swap;
+    src: url('./fonts/ibm-plex-mono-latin-#{$weight}.woff2') format('woff2');
+    unicode-range: #{$latin};
+  }
+  @font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: $weight;
+    font-display: swap;
+    src: url('./fonts/ibm-plex-mono-latin-ext-#{$weight}.woff2') format('woff2');
+    unicode-range: #{$latinExt};
+  }
+}

@@ -407,6 +407,12 @@
     "noData": "Keine Daten verfügbar",
     "functionEditorLabel": "Funktionseditor",
     "loadingStream": "Stream wird geladen...",
+    "askAIPlaceholderRotation": {
+      "one": "Zeige mir Fehler der letzten Stunde...",
+      "two": "Finden Sie langsame Abfragen, die länger als 5 Sekunden dauern...",
+      "three": "Zählen Sie 5xx Antworten, gruppiert nach Service...",
+      "four": "Filtert Protokolle, bei denen level = 'error'..."
+    },
     "hideHistogram": "Histogramm ausblenden",
     "disableQuickMode": "Schnellmodus deaktivieren",
     "menuGroupSetOnce": "Einmal einstellen",
@@ -960,7 +966,8 @@
     "subscription_type": "Art des Abonnements",
     "proceed_subscription": "Weiter zum Abonnement",
     "subscription_plan": "Abonnementplan",
-    "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen"
+    "makeBilledMember": "Diese Organisation zu einem Rechnungsmitglied von {org} machen",
+    "manage": "Managen"
   },
   "template": {
     "header": "Vorlagen",
@@ -1813,7 +1820,8 @@
     "noDataAvailable": "Keine Daten verfügbar",
     "tabAiAssistant": "O2 KI-Assistent",
     "tabOverview": "Überblick",
-    "tabUsage": "Verwendungszweck"
+    "tabUsage": "Verwendungszweck",
+    "subtitle": "Ihr Observability-Workspace auf einen Blick"
   },
   "billing": {
     "header": "Nutzung und Abrechnung",
@@ -2972,7 +2980,10 @@
     "evaluationTemplate": "Vorlage für eine Bewertung",
     "evaluationTemplateHelp": "Wählen Sie eine Bewertungsvorlage aus, die die Kriterien und Dimensionen für den LLM-Richter definiert.",
     "noTemplatesFound": "Es wurden keine Bewertungsvorlagen gefunden. Erstellen Sie eine auf der Seite mit den Bewertungsvorlagen.",
-    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert"
+    "evalTemplatesRefreshed": "Die Bewertungsvorlagen wurden erfolgreich aktualisiert",
+    "subtitle": "Daten während des Fluges transformieren, anreichern und routen",
+    "selectStream": "Wählen Sie einen Stream aus...",
+    "queryEditorPlaceholder": "Wählen Sie hier einen Stream aus oder schreiben Sie eine SQL-Abfrage..."
   },
   "reports": {
     "header": "Berichte",
@@ -3228,7 +3239,10 @@
         "spans": "Spannweiten"
       }
     },
-    "openInFullView": "In Vollansicht öffnen"
+    "openInFullView": "In Vollansicht öffnen",
+    "serviceMap": "Karte des Service",
+    "patternView": "Musteransicht",
+    "spanView": "Span-Ansicht"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -4101,6 +4115,237 @@
       "one": "Zeige mir Fehler der letzten Stunde...",
       "two": "Schreiben Sie VRL, um JSON aus Nginx-Protokollen zu analysieren...",
       "three": "Erstellen Sie ein Dashboard für den K8s-Knotenstatus..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Wir konnten keine Daten finden",
+      "description": "Nichts entspricht Ihren aktuellen Filtern oder Ihrem aktuellen Zeitraum. Versuchen Sie, Ihre Suche zu erweitern, den Zeitraum zu erweitern oder die Filter zu löschen.",
+      "action": "Filter löschen",
+      "actionDesc": "Alle angewendeten Filter zurücksetzen"
+    },
+    "noLogs": {
+      "title": "Keine Logs in diesem Bereich",
+      "description": "Wir haben keine Logs für den ausgewählten Stream und Zeitbereich gefunden. Versuche es mit einem breiteren Zeitbereich oder einem anderen Stream.",
+      "action": "Zeitbereich erweitern",
+      "actionDesc": "Suche über einen längeren Zeitraum"
+    },
+    "noDashboards": {
+      "title": "Erstelle dein erstes Dashboard",
+      "description": "Dashboards führen Ihre Metriken, Logs und Traces in einer Ansicht zusammen. Erstellen Sie eines, um loszulegen.",
+      "action": "Neues Dashboard",
+      "actionDesc": "Beginne mit einer leeren Leinwand",
+      "import": "Dashboard importieren",
+      "importDesc": "Laden Sie eine Dashboard-JSON-Datei hoch",
+      "templates": "Vorlagen durchsuchen",
+      "templatesDesc": "Starte von einem Community-Dashboard"
+    },
+    "noPipelines": {
+      "title": "Erstellen Sie Ihre erste Pipeline",
+      "description": "Pipelines transformieren und leiten Ihre Daten weiter, sobald sie ankommen. Richten Sie eine ein, um mit der Gestaltung Ihrer Streams zu beginnen.",
+      "action": "Neue Pipeline",
+      "actionDesc": "Erstellen Sie einen Flow von Grund auf",
+      "import": "Pipeline importieren",
+      "importDesc": "Laden Sie eine Pipeline-Definition hoch"
+    },
+    "noFunctions": {
+      "title": "Erstelle deine erste Funktion",
+      "description": "Funktionen bereichern und gestalten Ihre Daten bei der Aufnahme oder Abfrage neu. Fügen Sie eine hinzu, um loszulegen.",
+      "action": "Neue Funktion",
+      "actionDesc": "Schreiben Sie eine neue VRL-Funktion"
+    },
+    "noStreams": {
+      "title": "Ich warte auf deine ersten Daten",
+      "description": "Es sind noch keine Daten eingetroffen. Verbinde eine Quelle und deine Streams werden hier automatisch angezeigt.",
+      "action": "Einnahme einrichten",
+      "actionDesc": "Eine Datenquelle verbinden"
+    },
+    "noAlerts": {
+      "title": "Erstelle deinen ersten Alert",
+      "description": "Benachrichtigungen benachrichtigen Sie, sobald Ihre Daten einen Schwellenwert überschreiten. Definieren Sie einen, um mit der Überwachung zu beginnen.",
+      "action": "Neue Warnung",
+      "actionDesc": "Definieren Sie eine zu überwachende Bedingung"
+    },
+    "noIncidents": {
+      "title": "Keine aktiven Vorfälle",
+      "description": "Sie sind alle beschäftigt — nichts braucht Ihre Aufmerksamkeit im Moment. Ausgelöste Vorfälle werden hier angezeigt."
+    },
+    "loadError": {
+      "title": "Etwas ist schief gelaufen",
+      "description": "Wir konnten diese Daten nicht laden. Es ist normalerweise vorübergehend — versuchen Sie es gleich noch einmal.",
+      "action": "Erneut versuchen",
+      "actionDesc": "Versuchen Sie erneut, die Daten zu laden"
+    },
+    "noData": {
+      "title": "Hier ist noch nichts",
+      "description": "Im Moment gibt es keine Daten zum Anzeigen."
+    },
+    "noTraces": {
+      "title": "Keine Spuren gefunden",
+      "description": "Keine Spuren stimmen mit dem ausgewählten Service und Zeitraum überein. Versuchen Sie es mit einem breiteren Zeitraum oder einem anderen Dienst."
+    },
+    "noSearchHistory": {
+      "title": "Noch kein Suchverlauf",
+      "description": "Suchanfragen, die Sie ausführen, werden hier aufgelistet, sodass Sie sie erneut aufrufen und ausführen können."
+    },
+    "noUsers": {
+      "title": "Noch keine Nutzer",
+      "description": "Laden Sie Ihre Teamkollegen ein, in dieser Organisation zusammenzuarbeiten.",
+      "action": "Nutzer hinzufügen",
+      "actionDesc": "Lade einen Teamkollegen per E-Mail ein"
+    },
+    "noReports": {
+      "title": "Noch keine Berichte",
+      "description": "Planen Sie einen Bericht, damit Dashboards in Ihren Posteingang geliefert werden.",
+      "action": "Neuer Bericht",
+      "actionDesc": "Planen Sie eine Dashboard-Lieferung"
+    },
+    "noQueries": {
+      "title": "Keine laufenden Abfragen",
+      "description": "Derzeit gibt es keine aktiven Abfragen. Abfragen mit langer Laufzeit werden hier angezeigt, während sie ausgeführt werden."
+    },
+    "noServiceAccounts": {
+      "title": "Noch keine Dienstkonten",
+      "description": "Dienstkonten ermöglichen es Anwendungen, sich mit der API zu authentifizieren. Erstellen Sie eine, um loszulegen.",
+      "action": "Dienstkonto hinzufügen",
+      "actionDesc": "Erstellen Sie ein API-Dienstkonto"
+    },
+    "noInvitations": {
+      "title": "Keine ausstehenden Einladungen",
+      "description": "Einladungen, die Sie gesendet oder erhalten haben, werden hier angezeigt."
+    },
+    "filtered": {
+      "title": "Kein {Substantiv} gefunden",
+      "description": "Kein {Substantiv} entspricht Ihren aktuellen Filtern oder Ihrer Suche. Versuchen Sie, sie anzupassen oder zu löschen.",
+      "action": "Filter löschen",
+      "actionDesc": "Alle Filter zurücksetzen und suchen",
+      "fallbackNoun": "Ergebnisse"
+    },
+    "nouns": {
+      "logs": "aufzeichnen",
+      "dashboards": "Dashboards",
+      "pipelines": "Rohrleitungen",
+      "functions": "Funktionen",
+      "streams": "Streams",
+      "alerts": "Warnungen",
+      "incidents": "Vorfälle",
+      "traces": "Spuren",
+      "searches": "sucht",
+      "users": "Benutzer",
+      "reports": "Berichte",
+      "queries": "Anfragen",
+      "serviceAccounts": "Dienstkonten",
+      "invitations": "Einladungen"
+    },
+    "noDashboardsInFolder": {
+      "title": "Keine Dashboards in diesem Ordner",
+      "description": "Dieser Ordner ist leer. Fügen Sie hier ein Dashboard hinzu oder verschieben Sie eines aus einem anderen Ordner.",
+      "action": "Neues Dashboard",
+      "actionDesc": "Erstellen Sie ein Dashboard in diesem Ordner",
+      "import": "Dashboard importieren",
+      "importDesc": "Laden Sie eine Dashboard-JSON-Datei hoch",
+      "templates": "Vorlagen durchsuchen",
+      "templatesDesc": "Starte von einem Community-Dashboard"
+    },
+    "noGroups": {
+      "title": "Noch keine Gruppen",
+      "description": "Mit Gruppen können Sie Berechtigungen für mehrere Benutzer gleichzeitig verwalten. Erstellen Sie eine, um loszulegen.",
+      "action": "Neue Gruppe",
+      "actionDesc": "Erstellen Sie eine Benutzergruppe"
+    },
+    "noRoles": {
+      "title": "Noch keine Rollen",
+      "description": "Rollen definieren, welche Aktionen Benutzer ausführen können. Erstellen Sie eine benutzerdefinierte Rolle, um den Zugriff zu kontrollieren.",
+      "action": "Neue Rolle",
+      "actionDesc": "Definieren Sie eine benutzerdefinierte Zugriffsrolle"
+    },
+    "noAnomalyConfigs": {
+      "title": "Keine Anomalieerkennung konfiguriert",
+      "description": "Richten Sie die Anomalieerkennung ein, um ungewöhnliche Muster in Ihren Daten automatisch zu erkennen.",
+      "action": "Neue Konfiguration",
+      "actionDesc": "Anomalieerkennung konfigurieren"
+    },
+    "noApiLimits": {
+      "title": "Keine API-Limits konfiguriert",
+      "description": "API-Limits steuern, wie viele Daten jede Organisation pro Zeitfenster aufnehmen und abfragen kann."
+    },
+    "noRoleLimits": {
+      "title": "Keine Rollenbeschränkungen konfiguriert",
+      "description": "Rollenlimits definieren die Aufnahme- und Abfragequoten, die auf einzelne Rollen innerhalb einer Organisation angewendet werden."
+    },
+    "noIngestionTokens": {
+      "title": "Noch keine Ingestion-Token",
+      "description": "Ingestion-Token authentifizieren Datenquellen beim Senden von Protokollen, Metriken und Traces.",
+      "action": "Neues Token",
+      "actionDesc": "Generieren Sie ein Aufnahme-Token"
+    },
+    "noOrganizations": {
+      "title": "Noch keine Organisationen",
+      "description": "Organisationen gruppieren Ihre Benutzer und Daten. Erstellen Sie eine, um loszulegen."
+    },
+    "noAlertDestinations": {
+      "title": "Noch keine Ziele",
+      "description": "Ziele definieren, wohin Warnmeldungen gesendet werden — Slack, E-Mail, Webhooks und mehr.",
+      "action": "Neues Reiseziel",
+      "actionDesc": "Einen Benachrichtigungskanal verbinden"
+    },
+    "noAlertTemplates": {
+      "title": "Noch keine Vorlagen",
+      "description": "Vorlagen definieren das Format von Warnmeldungen.",
+      "action": "Neue Vorlage",
+      "actionDesc": "Erstellen Sie eine Benachrichtigungsvorlage"
+    },
+    "noEnrichmentTables": {
+      "title": "Noch keine Anreicherungstabellen",
+      "description": "Mithilfe von Anreicherungstabellen können Sie Ihren Protokolldaten bei der Abfrage zusätzlichen Kontext hinzufügen.",
+      "action": "Neuer Tisch",
+      "actionDesc": "Erstellen Sie eine Anreicherungstabelle"
+    },
+    "noCipherKeys": {
+      "title": "Noch keine Chiffrierschlüssel",
+      "description": "Chiffrenschlüssel werden verwendet, um sensible Felder in Ihren Datenströmen zu verschlüsseln.",
+      "action": "Neuer Schlüssel",
+      "actionDesc": "Generieren Sie einen Chiffrenschlüssel"
+    },
+    "noAiToolsets": {
+      "title": "Noch keine KI-Toolsets",
+      "description": "KI-Toolsets verbinden Ihr Unternehmen mit externen KI-Funktionen.",
+      "action": "Neues Toolset",
+      "actionDesc": "Fügen Sie ein KI-Toolset hinzu"
+    },
+    "noLlmProviders": {
+      "title": "Keine LLM-Anbieter konfiguriert",
+      "description": "Stellen Sie eine Verbindung zu einem Sprachmodellanbieter her, um KI-gestützte Funktionen zu aktivieren.",
+      "action": "Anbieter hinzufügen",
+      "actionDesc": "Konfigurieren Sie einen LLM-Anbieter"
+    },
+    "noDiscoveredServices": {
+      "title": "Keine Dienste gefunden",
+      "description": "Dienste werden hier automatisch angezeigt, sobald Spuren eintreffen."
+    },
+    "noNodes": {
+      "title": "Keine Knoten verfügbar",
+      "description": "Clusterknoten werden hier angezeigt, sobald sie registriert sind."
+    },
+    "noSourceMaps": {
+      "title": "Keine Quellkarten hochgeladen",
+      "description": "Laden Sie Quellzuordnungen hoch, um lesbare Stack-Traces in Ihren RUM-Fehlerberichten zu aktivieren.",
+      "action": "Upload",
+      "actionDesc": "Laden Sie eine Quellkartendatei hoch"
+    },
+    "noBackfillJobs": {
+      "title": "Keine Backfill-Jobs",
+      "description": "Backfill-Jobs verarbeiten historische Daten über eine Pipeline erneut. Führen Sie einen aus, um loszulegen."
+    },
+    "noSearchJobs": {
+      "title": "Keine geplanten Suchaufträge",
+      "description": "Langfristige Suchanfragen, die Sie planen, werden hier angezeigt. Dort können Sie ihren Status verfolgen und die Ergebnisse einsehen, sobald sie abgeschlossen sind."
+    },
+    "noPipelineDestinations": {
+      "title": "Noch keine Ziele",
+      "description": "Externe Ziele für die Pipeline-Ausgabe — HTTP-Endpunkte und Remote-Schreibziele.",
+      "action": "Neues Reiseziel",
+      "actionDesc": "Pipeline-Ziel verbinden"
     }
   },
   "onlineEvals": {

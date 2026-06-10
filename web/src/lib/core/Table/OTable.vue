@@ -1,11 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, getCurrentInstance, onBeforeUnmount, provide, ref, toRef, useSlots, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, provide, ref, toRef, useSlots, watch } from "vue";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
-import type { OTableProps, OTableEmits, OTableSlots } from "./OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, type OTableProps, type OTableEmits, type OTableSlots } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
 import { useTablePagination } from "./composables/useTablePagination";
@@ -46,6 +46,10 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   error: null,
   dense: true,
   bordered: true,
+  // No outer box border on tables (design system): the app chrome already frames
+  // content, and CRUD listing tables sit flush to the edges. Row dividers (the
+  // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
+  frame: false,
   striped: false,
   stickyHeader: true,
   wrap: false,
@@ -220,6 +224,7 @@ provide("o2TableHorizontalScroll", computed(() => !!props.horizontalScroll));
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
+  effectiveColumns,
   columnOrder,
   columnSizing,
   isClientSort,
@@ -230,6 +235,8 @@ const {
     get data() { return tree.enabled.value ? tree.flatRows.value : props.data; },
     get columns() { return props.columns; },
     get pageSize() { return props.pageSize; },
+    get currentPage() { return props.currentPage; },
+    showIndex: props.showIndex,
     sortBy: props.sortBy,
     sortOrder: props.sortOrder,
     sortFieldMap: props.sortFieldMap,
@@ -246,9 +253,22 @@ const {
     sorting: props.sorting,
     rowHeight: props.rowHeight,
     filterMode: props.filterMode,
+    get horizontalScroll() { return props.horizontalScroll; },
   },
   emit,
 );
+
+// ── Column resize reset ─────────────────────────────────────────
+const hasResizedColumns = computed(() =>
+  Object.keys(table.getState().columnSizing).length > 0,
+);
+
+function handleResetColumnSizes(): void {
+  table.resetColumnSizing?.();
+  persistence.saveColumnSizes({});
+  // Drop the frozen floors so reset matches a fresh load (flex columns re-fill).
+  frozen.value = false;
+}
 
 // ── Pagination ──────────────────────────────────────────────────
 const pagination = useTablePagination(table, {
@@ -338,11 +358,339 @@ const {
   parentRef: scrollContainerRef,
   scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
   scrollMargin: props.scrollMargin ?? 0,
-  rowHeight: props.rowHeight ?? (props.dense ? 36 : 54),
+  // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
+  // virtualizer's measured height matches the actual rendered row height.
+  rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: 100,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
+
+// ── Actions column content-measurement ──────────────────────────
+// The actions column has no fixed semantic width — it's "as wide as its
+// buttons, no more". We can't know that from the column def (buttons live in a
+// slot), so after each render we measure the rendered action cells and pin the
+// column's CSS size var to the widest content. These vars override the nominal
+// sizes computed in useTableCore.
+const measuredColumnSizeVars = ref<Record<string, string>>({});
+
+function measureActionColumns() {
+  const root = scrollContainerRef.value;
+  if (!root) return;
+  const actionCols = effectiveColumns.value.filter(
+    (c) => c.isAction === true || c.id === "actions",
+  );
+  if (!actionCols.length) {
+    if (Object.keys(measuredColumnSizeVars.value).length) {
+      measuredColumnSizeVars.value = {};
+    }
+    return;
+  }
+  const next: Record<string, string> = {};
+  for (const col of actionCols) {
+    const safeId = col.id.replace(/[^a-zA-Z0-9]/g, "-");
+    const cells = root.querySelectorAll<HTMLElement>(
+      `td[data-test="o2-table-cell-${col.id}"]`,
+    );
+    if (!cells.length) continue;
+    let contentMax = 0;
+    let padX = 16; // fallback: tw:px-2 (8px each side)
+    cells.forEach((cell, i) => {
+      if (i === 0) {
+        const cs = getComputedStyle(cell);
+        padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      }
+      // The slot wrapper is inline-flex (natural content width) even when the
+      // td is momentarily narrower, so its rect is the true content width.
+      const wrapper = cell.firstElementChild as HTMLElement | null;
+      const w = wrapper
+        ? wrapper.getBoundingClientRect().width
+        : cell.getBoundingClientRect().width;
+      if (w > contentMax) contentMax = w;
+    });
+    if (contentMax > 0) {
+      const total = `${Math.ceil(contentMax + padX) + 1}px`;
+      next[`--header-${safeId}-size`] = total;
+      next[`--col-${col.id}-size`] = total;
+    }
+  }
+  const cur = measuredColumnSizeVars.value;
+  const changed =
+    Object.keys(next).length !== Object.keys(cur).length ||
+    Object.keys(next).some((k) => next[k] !== cur[k]);
+  if (changed) measuredColumnSizeVars.value = next;
+}
+
+// ── Flex-fill measurement ───────────────────────────────────────
+// While filling (not frozen), the flex column's width = the container's
+// clientWidth minus the ACTUAL rendered widths of every other header cell.
+// Measuring (rather than arithmetic) makes it pixel-exact: it accounts for the
+// vertical scrollbar (clientWidth excludes it) and any sub-pixel rounding, so
+// the table fills with no gap AND no 1-10px overflow scrollbar.
+const measuredFlexFill = ref<Record<string, number>>({});
+
+function measureFlexFill() {
+  const root = scrollContainerRef.value;
+  if (!root || frozen.value || !flexColIds.value.length) {
+    if (Object.keys(measuredFlexFill.value).length) measuredFlexFill.value = {};
+    return;
+  }
+  const cw = root.clientWidth;
+  if (!cw) return;
+  const ids = flexColIds.value;
+  const skip = new Set([...ids.map((id) => `o2-table-th-${id}`), `o2-table-th-${SPACER_ID}`]);
+  let nonFlexSum = 0;
+  root
+    .querySelectorAll<HTMLElement>('thead th[data-test^="o2-table-th-"]')
+    .forEach((th) => {
+      if (skip.has(th.getAttribute("data-test") || "")) return;
+      nonFlexSum += th.getBoundingClientRect().width;
+    });
+  const available = cw - nonFlexSum;
+  const per = Math.max(Math.floor(available / ids.length), 0);
+  const next: Record<string, number> = {};
+  ids.forEach((id, i) => {
+    const w = i === ids.length - 1 ? available - per * (ids.length - 1) : per;
+    next[id] = Math.max(Math.round(w), colMinSize(id));
+  });
+  const cur = measuredFlexFill.value;
+  const changed =
+    Object.keys(cur).length !== ids.length || ids.some((id) => cur[id] !== next[id]);
+  if (changed) measuredFlexFill.value = next;
+}
+
+function scheduleMeasureActions() {
+  nextTick(() =>
+    requestAnimationFrame(() => {
+      measureActionColumns();
+      // Re-measure flex on the next frame so the actions column's new width is
+      // already painted before we subtract it.
+      requestAnimationFrame(measureFlexFill);
+    }),
+  );
+}
+
+onMounted(scheduleMeasureActions);
+// NOTE: the watch that re-runs the measurements lives AFTER `frozen` /
+// `containerWidth` are declared (below), to avoid a temporal-dead-zone access.
+
+// ── Resizable-table width strategy (flex tables) ────────────────
+// `table-fixed; width:100%` would squeeze sibling columns when one is resized
+// (they can collapse past their min-width). Instead, for tables with a `flex`
+// column we drive widths explicitly:
+//   • the flex column fills the leftover (measured exactly, see measureFlexFill);
+//   • once a column is resized (`frozen`), every column holds its width and an
+//     invisible trailing spacer absorbs any slack so the pinned actions column
+//     stays flush-right and the table grows + scrolls only as needed.
+// `containerWidth` tracks the scroll container's live inner width.
+const EXPANSION_COL_WIDTH = 16; // tw:w-4
+const containerWidth = ref(0);
+let containerRO: ResizeObserver | null = null;
+
+onMounted(() => {
+  if (scrollContainerRef.value && typeof ResizeObserver !== "undefined") {
+    containerWidth.value = scrollContainerRef.value.clientWidth;
+    containerRO = new ResizeObserver(() => {
+      containerWidth.value = scrollContainerRef.value?.clientWidth ?? 0;
+    });
+    containerRO.observe(scrollContainerRef.value);
+  }
+});
+onBeforeUnmount(() => {
+  containerRO?.disconnect();
+  containerRO = null;
+});
+
+// ── Flex columns (fill-until-first-resize) ──────────────────────
+// Columns the page marks `meta.flex` divide the leftover width on initial
+// render (so the table fills the viewport with no empty space). The first time
+// the user drags any column, the flex columns freeze at their current width and
+// the table switches to Excel-style fixed widths (grow + horizontal scroll).
+const flexColIds = computed(() =>
+  table
+    .getVisibleLeafColumns()
+    .filter((c) => (c.columnDef.meta as any)?.flex)
+    .map((c) => c.id),
+);
+
+// Excel-style explicit-width mode applies ONLY to tables with a `flex` filler
+// (alerts/streams). Such tables NEVER use width:100% — they always set an
+// explicit table width so `table-fixed` can't squeeze columns: it fills the
+// container while flex fills, and grows + scrolls once a column is resized.
+// Tables that instead use `meta.autoWidth` keep the simpler width:100% elastic
+// layout (unchanged).
+const useComputedWidth = computed(
+  () =>
+    (props.enableColumnResize ?? false) &&
+    !props.horizontalScroll &&
+    !props.defaultColumns &&
+    flexColIds.value.length > 0,
+);
+
+const SPACER_ID = "__spacer__";
+
+function sizeVarKeys(id: string): [string, string] {
+  const safe = id.replace(/[^a-zA-Z0-9]/g, "-");
+  return [`--header-${safe}-size`, `--col-${id}-size`];
+}
+
+function colMinSize(id: string): number {
+  return table.getColumn(id)?.columnDef.minSize ?? 48;
+}
+
+// ── Fill ⇄ frozen state ─────────────────────────────────────────
+// Fill state (initial): flex columns ABSORB the leftover via the table's
+// width:100% — the browser computes their width (immune to any px-rounding in
+// our own sums, so no stray scrollbar). The spacer is 0.
+// Frozen state (after the first resize): each flex column holds an explicit
+// width stored in `columnSizing` (so it's independently resizable), and the
+// invisible `__spacer__` column absorbs leftover to keep the table ≥ container
+// (actions stays flush-right; blank space lands in the spacer on shrink).
+const frozen = ref(false);
+
+// Re-run the action + flex-fill measurements whenever the inputs change.
+// (Declared here — after `frozen`/`containerWidth` — to avoid a TDZ access.)
+watch(
+  [
+    displayRows,
+    effectiveColumns,
+    () => props.loading,
+    () => props.dense,
+    () => frozen.value,
+    () => measuredColumnSizeVars.value,
+    () => containerWidth.value,
+  ],
+  scheduleMeasureActions,
+  { flush: "post" },
+);
+
+// Frozen width of a flex column — TanStack's getSize() already reflects the
+// resized size (or the freeze-captured fill written into columnSizing, or the
+// base `size` after a double-click reset). Always at least its min.
+function frozenFlexWidth(id: string): number {
+  void columnSizing.value;
+  const sz = table.getColumn(id)?.getSize();
+  return Math.max(typeof sz === "number" ? sz : colMinSize(id), colMinSize(id));
+}
+
+// Sum of all columns whose width is fixed/known (everything except the flex
+// columns and the spacer): data columns + selection/expansion gutters. Actions
+// uses its measured width.
+function nonFlexFixedSum(): number {
+  const measured = measuredColumnSizeVars.value;
+  let sum = 0;
+  for (const col of table.getVisibleLeafColumns()) {
+    const m = col.columnDef.meta as any;
+    if (m?.flex || m?.spacer || m?.autoWidth) continue;
+    const measuredVar = m?.isAction ? measured[`--col-${col.id}-size`] : undefined;
+    sum += measuredVar ? parseFloat(measuredVar) : col.getSize();
+  }
+  if (selection.isMultiple.value) sum += TABLE_CHECKBOX_COL_SIZE;
+  if (expansion.isEnabled.value) sum += EXPANSION_COL_WIDTH;
+  return sum;
+}
+
+// Sum of the real columns in the frozen state (fixed + flex at their frozen
+// widths). The spacer fills (container − this).
+function realSum(): number {
+  return (
+    nonFlexFixedSum() +
+    flexColIds.value.reduce((a, id) => a + frozenFlexWidth(id), 0)
+  );
+}
+
+// CSS size-var overrides:
+//  • Fill state → each flex column = its (measured) fill width; spacer = 0.
+//  • Frozen state → each flex column = its frozen width; spacer = the leftover.
+const dynamicSizeVars = computed<Record<string, string>>(() => {
+  const vars: Record<string, string> = {};
+  if (!useComputedWidth.value || containerWidth.value <= 0) return vars;
+  void columnSizing.value;
+  // Each flex column gets an EXPLICIT width via its CSS var (never relies on the
+  // browser's table-fixed auto-distribution, which with border-separate could
+  // leave the leftover as a trailing gap): while filling, the MEASURED fill
+  // (exact) — falling back to the arithmetic estimate until measured — and its
+  // stored width once frozen.
+  const arith = frozen.value ? null : fillWidths();
+  for (const id of flexColIds.value) {
+    const w = frozen.value
+      ? frozenFlexWidth(id)
+      : (measuredFlexFill.value[id] ?? arith![id] ?? colMinSize(id));
+    const [h, c] = sizeVarKeys(id);
+    vars[h] = `${w}px`;
+    vars[c] = `${w}px`;
+  }
+  // Spacer: 0 while filling (flex fills exactly), the leftover once frozen.
+  const [spacerHeaderVar, spacerColVar] = sizeVarKeys(SPACER_ID);
+  const spacerW = frozen.value ? Math.max(0, containerWidth.value - realSum()) : 0;
+  vars[spacerHeaderVar] = `${spacerW}px`;
+  vars[spacerColVar] = `${spacerW}px`;
+  return vars;
+});
+
+// Arithmetic fill widths (container leftover split across the flex columns).
+// Drives both the fill-state CSS var and the freeze.
+function fillWidths(): Record<string, number> {
+  const ids = flexColIds.value;
+  const out: Record<string, number> = {};
+  if (!ids.length || containerWidth.value <= 0) return out;
+  const mins = ids.map(colMinSize);
+  const minTotal = mins.reduce((a, b) => a + b, 0);
+  const available = containerWidth.value - nonFlexFixedSum();
+  if (available <= minTotal) {
+    ids.forEach((id, i) => (out[id] = mins[i]));
+    return out;
+  }
+  const extra = available - minTotal;
+  const per = Math.floor(extra / ids.length);
+  ids.forEach((id, i) => {
+    out[id] = mins[i] + (i === ids.length - 1 ? extra - per * (ids.length - 1) : per);
+  });
+  return out;
+}
+
+// Freeze on the first resize (called SYNCHRONOUSLY from the header `resize-start`
+// before TanStack captures the drag). Measure each flex column's CURRENT filled
+// width from the DOM and pin it into `columnSizing`, then switch to frozen mode.
+function freezeFlexColumns(): void {
+  if (frozen.value) return;
+  const ids = flexColIds.value;
+  if (!ids.length) return;
+  // Pin each flex column to its ACTUAL rendered width so TanStack's resize
+  // starts from exactly where the column is — no jump. The DOM is current at
+  // mousedown, so getBoundingClientRect is reliable; the arithmetic fill is a
+  // fallback for when the element isn't found / has no layout (tests). (The
+  // arithmetic alone was off on some pages where a column's rendered width
+  // differs from its nominal size.)
+  const fills = fillWidths();
+  const sizing = { ...columnSizing.value };
+  for (const id of ids) {
+    let w = 0;
+    const th = scrollContainerRef.value?.querySelector(
+      `th[data-test="o2-table-th-${id}"]`,
+    ) as HTMLElement | null;
+    if (th) w = Math.round(th.getBoundingClientRect().width);
+    if (!w) w = fills[id] ?? colMinSize(id);
+    sizing[id] = Math.max(w, colMinSize(id));
+  }
+  columnSizing.value = sizing;
+  frozen.value = true;
+}
+
+const computedTableWidth = computed<string | undefined>(() => {
+  if (!useComputedWidth.value) return undefined;
+  // Fill state → width:100% (w-full class): the table can't overflow (no stray
+  // scrollbar); the flex column fills via its explicit measured width.
+  if (!frozen.value) return undefined;
+  void columnSizing.value;
+  void effectiveColumns.value;
+  void measuredColumnSizeVars.value;
+  // Frozen → width = max(container, Σ real columns). The spacer absorbs the
+  // difference: increase a column → Σ > container → scroll; decrease → Σ <
+  // container → spacer grows (blank before the flush-right actions). Real
+  // columns always get their exact width — no redistribution.
+  return `${Math.max(containerWidth.value || 0, realSum())}px`;
+});
 
 // Virtual measureElement callback — wraps the virtualizer's measure
 function measureElement(el: any) {
@@ -418,7 +766,10 @@ defineExpose({
   table,
   toggleAllRows: selection.toggleAllRows,
   clearSelection: selection.clearSelection,
-  resetColumnSizes: () => table.resetColumnSizing?.(),
+  resetColumnSizes: () => {
+    table.resetColumnSizing?.();
+    frozen.value = false;
+  },
   resetColumnOrder: () => {
     columnOrder.value = props.columns.map((c) => c.id);
   },
@@ -426,6 +777,7 @@ defineExpose({
     persistence.clearPersistedState();
     internalColumnVisibility.value = { ...(props.columnVisibility ?? {}) };
     table.resetColumnSizing?.();
+    frozen.value = false;
   },
   scrollToTop: () => {
     if (scrollContainerRef.value) {
@@ -447,10 +799,32 @@ defineExpose({
     <slot name="top" />
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
-    <div :class="['tw:flex tw:flex-col tw:min-h-0 tw:border tw:border-[var(--color-border-default)]', props.fillHeight ? 'tw:flex-1' : '']">
+    <div
+      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0"
+      :class="props.frame ? 'tw:border tw:border-border-default' : ''"
+    >
+    <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
+    <div
+      v-if="slots.toolbar || slots['toolbar-trailing']"
+      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:gap-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      data-test="o2-table-toolbar"
+    >
+      <slot name="toolbar" />
+      <OTableColumnToggle
+        v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
+        :columns="props.columns"
+        :column-visibility="internalColumnVisibility"
+        :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+        class="tw:shrink-0"
+        data-test="o2-table-column-toggle"
+        @update:column-visibility="handleColumnVisibilityChange"
+        @reset:column-sizes="handleResetColumnSizes"
+      />
+      <slot name="toolbar-trailing" />
+    </div>
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
-      v-if="props.showGlobalFilter && !slots.top"
+      v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
       class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
       data-test="o2-table-global-filter"
     >
@@ -475,8 +849,10 @@ defineExpose({
         v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
         :columns="props.columns"
         :column-visibility="internalColumnVisibility"
+        :has-resized-columns="props.enableColumnResize && hasResizedColumns"
         data-test="o2-table-column-toggle"
         @update:column-visibility="handleColumnVisibilityChange"
+        @reset:column-sizes="handleResetColumnSizes"
       />
     </div>
 
@@ -512,12 +888,15 @@ defineExpose({
     >
       <table
         :class="[
-          props.horizontalScroll ? 'tw:min-w-max' : 'tw:w-full',
+          props.horizontalScroll ? 'tw:min-w-max' : ((useComputedWidth && frozen) ? '' : 'tw:w-full'),
           props.horizontalScroll || props.defaultColumns ? 'tw:table-auto' : 'tw:table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
         ]"
         :style="{
           ...columnSizeVars,
+          ...measuredColumnSizeVars,
+          ...dynamicSizeVars,
+          ...(computedTableWidth ? { width: computedTableWidth } : {}),
           '--o2-table-row-height': props.rowHeight != null
             ? `${props.rowHeight}px`
             : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
@@ -551,13 +930,10 @@ defineExpose({
           :sticky-col-totals="props.stickyColTotals"
           @toggle-all-rows="selection.toggleAllRows"
           @sort="sorting.handleSort"
-          @column-close="(colId: string) => {
-            columnMgmt.closeColumn(colId);
-            persistence.saveColumnVisibility(internalColumnVisibility.value);
-          }"
           @update:column-order="(order: string[]) => { columnOrder = order; }"
           @drag-start="columnMgmt.onDragStart"
           @drag-end="columnMgmt.onDragEnd"
+          @resize-start="freezeFlexColumns"
         />
 
         <!-- ── Skeleton Body (loading with no existing data) ───── -->
@@ -663,7 +1039,7 @@ defineExpose({
               :colspan="header.colSpan"
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
-                'tw:px-2 tw:py-1 tw:text-left tw:font-semibold tw:text-primary tw:text-xs',
+                'tw:px-2 tw:py-1 tw:text-left tw:text-text-primary tw:text-xs',
                 'tw:border-t tw:border-[var(--color-table-header-border)]',
                 (header.column.columnDef.meta as any)?.align === 'center' ? 'tw:text-center' : '',
                 (header.column.columnDef.meta as any)?.align === 'right' ? 'tw:text-right' : '',
@@ -761,19 +1137,10 @@ defineExpose({
       <!-- OTablePagination authoritatively swaps the slot for a skeleton when
            its `loading` prop is true, so we can always pass the slot. -->
       <template
-        v-if="slots.bottom || (props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction))"
+        v-if="slots.bottom"
         #actions
       >
-        <!-- Column visibility toggle in the footer left area -->
-        <OTableColumnToggle
-          v-if="props.persistColumns && props.tableId && props.columns.some((c) => c.hideable && !c.isAction)"
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-        />
         <slot
-          v-if="slots.bottom"
           name="bottom"
           :current-page="pagination.currentPage.value"
           :page-size="pagination.pageSize.value"

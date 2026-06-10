@@ -187,11 +187,11 @@ export class AlertManagement {
         try {
             await Promise.race([
                 this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
             testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
-            throw new Error(`Failed to search for alert "${alertName}": Neither table nor "No data available" message appeared`);
+            throw new Error(`Failed to search for alert "${alertName}": Neither table nor empty state appeared`);
         }
     }
 

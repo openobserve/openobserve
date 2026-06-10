@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OTable
     v-if="isMetaOrg"
+    :frame="false"
     data-test="running-queries-table"
     :data="rows"
     :columns="columns"
@@ -30,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :show-global-filter="false"
   >
     <template #empty>
-      <NoData />
+      <OEmptyState size="hero" preset="no-queries" hide-action />
     </template>
     <template #cell-actions="{ row }">
       <OButton
@@ -68,17 +69,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import { durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { NoData, OTable, OButton, OSpinner, OCheckbox },
+  components: { OEmptyState, OTable, OButton, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -115,11 +117,11 @@ export default defineComponent({
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     const columns = ref<OTableColumnDef[]>([
-      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
-      { id: "user_id", header: t("user.email"), accessorKey: "user_id", sortable: true, meta: { align: "left" , autoWidth: true } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", sortable: true, meta: { align: "left"  } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
+      { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: COL.type, sortable: true, meta: { align: "left"  } },
       { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", sortable: true, meta: { align: "left" } },
-      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", cell: " ", sortable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);

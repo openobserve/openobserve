@@ -27,16 +27,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="full-height"
         v-model="splitterModel"
         :horizontal="true"
+        unit="px"
+        :limits="[85, 400]"
+        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
+          <!-- px-1 (4px), not 10px: the search bar's own content already carries
+               a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
+               lines the toolbar/editor up with the 10px field-list & results
+               panels below. -->
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full"
           >
             <search-bar
               data-test="logs-search-bar"
               ref="searchBarRef"
-              class="card-container"
               :fieldValues="fieldValues"
               @searchdata="searchData"
               @onChangeInterval="onChangeInterval"
@@ -54,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="tw:flex scroll relative-position thirdlevel full-height tw:overflow-hidden logsPageMainSection tw:w-full"
+            class="tw:flex scroll relative-position thirdlevel full-height tw:overflow-hidden logsPageMainSection tw:w-full tw:border-t tw:border-border-default"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -65,10 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               class="full-height tw:w-full logs-splitter-smooth"
+              separatorClass="tw:w-px"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position tw:h-full tw:pl-[0.625rem]">
+                <div class="relative-position tw:h-full tw:pl-[0.625rem] tw:pt-2 tw:border-r tw:border-border-default tw:bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
@@ -79,35 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </template>
-              <template #separator>
-                <OButton
-                  data-test="logs-search-field-list-collapse-btn"
-                  variant="sidebar-button"
-                  size="sidebar-button"
-                  :title="
-                    searchObj.meta.showFields
-                      ? 'Collapse Fields'
-                      : 'Open Fields'
-                  "
-                  :class="
-                    searchObj.meta.showFields
-                      ? 'logs-splitter-icon-expand'
-                      : 'logs-splitter-icon-collapse'
-                  "
-                  @click="collapseFieldList"
-                  ><template #icon-left>
-                    <OIcon
-                      :name="
-                        searchObj.meta.showFields
-                          ? 'chevron-left'
-                          : 'chevron-right'
-                      " size="sm"
-                    />
-                  </template>
-                </OButton>
-              </template>
               <template #after>
-                <div class="tw:pr-[0.625rem] tw:pb-[0.625rem] tw:h-full">
+                <div class="tw:h-full">
                   <div
                     class="card-container tw:h-full tw:w-full relative-position"
                   >
@@ -280,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="logs-search-search-result"
-                      class="full-height card-container"
+                      class="full-height"
                     >
                       <search-result
                         ref="searchResultRef"
@@ -317,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="visualize-container"
+            class="visualize-container tw:border-t tw:border-border-default"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
@@ -327,7 +307,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :is_ui_histogram="shouldUseHistogramQuery"
               :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
               :histogramQuery="storedHistogramQuery"
-              class="tw:pb-2.5!"
             >
             </VisualizeLogsQuery>
           </div>
@@ -344,7 +323,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
               :whereClause="!searchObj.meta.sqlMode ? searchObj.data.query : ''"
-              class="tw:pb-2.5!"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
@@ -355,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div v-show="showSearchHistory" class="full-height">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -400,7 +378,7 @@ size="md" />
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler">
+    <div v-show="showSearchScheduler" class="full-height">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
@@ -723,7 +701,7 @@ export default defineComponent({
     const isLogsMounted = ref(false);
 
     const expandedLogs = ref([]);
-    const splitterModel = ref(10);
+    const splitterModel = ref(90);
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -2338,8 +2316,8 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand splitter to 15 when either editor has >2 lines; collapse to 10 otherwise.
-    // Never overrides a user-set value above 15.
+    // Auto-expand splitter to 165px when either editor has >2 lines; collapse to 130px otherwise.
+    // Never overrides a user-set value above 165px.
     watch(
       [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent],
       ([queryValue, fnValue]) => {
@@ -2347,10 +2325,10 @@ export default defineComponent({
         const fnLines = (fnValue || '').split('\n').length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
 
-        if (hasMoreThanTwoLines && splitterModel.value < 15) {
-          splitterModel.value = 15;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= 15) {
-          splitterModel.value = 10;
+        if (hasMoreThanTwoLines && splitterModel.value < 130) {
+          splitterModel.value = 130;
+        } else if (!hasMoreThanTwoLines && splitterModel.value <= 130) {
+          splitterModel.value = 83;
         }
       },
       { immediate: true },
@@ -3489,9 +3467,12 @@ export default defineComponent({
 
 <style lang="scss">
 .logPage {
-  height: calc(100vh - var(--navbar-height));
-  min-height: calc(100vh - var(--navbar-height)) !important;
-  max-height: calc(100vh - var(--navbar-height)) !important;
+  // Fill the app content card (MainLayout's o2-content-scroll already sizes the
+  // available area below the nav + chrome). Computing height from 100vh here
+  // double-counts the content card's padding/border and overflows → page scroll.
+  height: 100%;
+  min-height: 100% !important;
+  max-height: 100% !important;
   overflow: hidden !important;
 
   .index-menu .field_list .field_overlay .field_label,

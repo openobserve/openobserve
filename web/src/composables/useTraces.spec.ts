@@ -88,6 +88,32 @@ vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
 }));
 
+// Mock serviceColorRegistry so the singleton internal registry does not
+// leak state between tests.  The composable imports
+//   `import { getOrSetServiceColor as registryGetOrSetServiceColor }`
+// which we replace with a controlled fn that delegates to the mocked
+// getSpanColorHex.
+const { mockRegistryGetOrSetServiceColor } = vi.hoisted(() => {
+  const localRegistry = new Map<string, string>();
+  let localColorIndex = 0;
+  const mockRegistryGetOrSetServiceColor = vi.fn((name: string) => {
+    if (!name) return "";
+    if (!localRegistry.has(name)) {
+      // Delegate to the mocked getSpanColorHex — but since we can't
+      // reference it inside a hoisted factory, we use a simple formula.
+      localRegistry.set(name, `#color-${localColorIndex}`);
+      localColorIndex++;
+    }
+    return localRegistry.get(name)!;
+  });
+  return { mockRegistryGetOrSetServiceColor };
+});
+
+vi.mock("@/utils/traces/serviceColorRegistry", () => ({
+  getOrSetServiceColor: mockRegistryGetOrSetServiceColor,
+  clearServiceColorRegistry: vi.fn(),
+}));
+
 import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { copyToClipboard } from "@/utils/clipboard";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
@@ -97,6 +123,21 @@ import useTraces, { DEFAULT_TRACE_COLUMNS } from "./useTraces";
 describe("useTraces", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-implement getSpanColorHex after clearAllMocks so it still returns valid colors
+    vi.mocked(getSpanColorHex).mockImplementation(
+      (index: number) => `#color-${index}`,
+    );
+    // Re-implement registryGetOrSetServiceColor with a fresh internal state
+    const localRegistry = new Map<string, string>();
+    let localColorIndex = 0;
+    mockRegistryGetOrSetServiceColor.mockImplementation((name: string) => {
+      if (!name) return "";
+      if (!localRegistry.has(name)) {
+        localRegistry.set(name, `#color-${localColorIndex}`);
+        localColorIndex++;
+      }
+      return localRegistry.get(name)!;
+    });
     // Reset the in-memory localStorage simulation
     localTraceFilterStore.value = {};
     // Re-wire the mock after clearAllMocks so it still has the implementation
@@ -1218,7 +1259,8 @@ describe("useTraces", () => {
       // [auto-generated]
       const { setServiceColors, searchObj, resetSearchObj } = useTraces();
       resetSearchObj();
-      // Pre-populate 2 colors so colorIndex starts at 2
+      // Pre-populate 2 colors — registryGetOrSetServiceColor uses its own
+      // internal registry, so the first call for "svc-3" gets index 0.
       searchObj.meta.serviceColors = {
         "svc-1": "#color-0",
         "svc-2": "#color-1",
@@ -1227,8 +1269,8 @@ describe("useTraces", () => {
       setServiceColors([{ service_name: "svc-3" }]);
 
       // getSpanColorHex is mocked as (index) => `#color-${index}`
-      // colorIndex = Object.keys(serviceColors).length = 2 before insertion
-      expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-2");
+      // registryGetOrSetServiceColor("svc-3") calls getSpanColorHex(0)
+      expect(searchObj.meta.serviceColors["svc-3"]).toBe("#color-0");
     });
   });
 
@@ -1255,25 +1297,24 @@ describe("useTraces", () => {
       resetSearchObj();
       searchObj.meta.serviceColors = {};
 
-      // Override the mock to return a specific hex for this test
-      vi.mocked(getSpanColorHex).mockReturnValueOnce("#abcdef");
-
+      // registryGetOrSetServiceColor is mocked to return #color-0 for the
+      // first unknown service (fresh beforeEach state).
       const color = getOrSetServiceColor("new-service");
 
-      expect(color).toBe("#abcdef");
-      expect(searchObj.meta.serviceColors["new-service"]).toBe("#abcdef");
-      // Should have been called with index 0 since serviceColors was empty
-      expect(getSpanColorHex).toHaveBeenCalledWith(0);
+      expect(color).toBe("#color-0");
+      expect(searchObj.meta.serviceColors["new-service"]).toBe("#color-0");
     });
 
-    it("should return undefined for empty string input", () => {
+    it("should return empty string for empty string input", () => {
       const { getOrSetServiceColor, searchObj, resetSearchObj } = useTraces();
       resetSearchObj();
       searchObj.meta.serviceColors = {};
 
       const color = getOrSetServiceColor("");
 
-      expect(color).toBeUndefined();
+      // registryGetOrSetServiceColor("") returns "", and since serviceName
+      // is falsy no entry is added to serviceColors. The fallback returns "".
+      expect(color).toBe("");
       // Should not have added any color for empty string
       expect(Object.keys(searchObj.meta.serviceColors)).toHaveLength(0);
     });

@@ -63,6 +63,7 @@ import { ThemePage } from "./generalPages/themePage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
+import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -157,6 +158,7 @@ class PageManager {
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
+    this.modelPricingPage = new ModelPricingPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 

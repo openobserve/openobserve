@@ -3,7 +3,11 @@
     class="tw:py-[2px]"
     :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
   >
-    <div class="tw:flex tw:justify-between">
+    <div
+      class="tw:flex tw:justify-between"
+      :class="{ 'tw:items-center': minHeaderHeight }"
+      :style="minHeaderHeight ? { minHeight: minHeaderHeight } : undefined"
+    >
       <div class="tw:flex tw:items-center">
         <OIcon
           v-if="showExpandIcon"
@@ -69,6 +73,14 @@ const props = defineProps({
     type: Boolean,
     default: true,
     required: false,
+  },
+  // Optional fixed header-row height (e.g. "2.125rem"). When set, the title row is
+  // given this min-height and its content is vertically centered — used to keep
+  // a header bar visually aligned with sibling headers that contain taller
+  // controls (e.g. a "Run query" button). Empty = natural content height.
+  minHeaderHeight: {
+    type: String,
+    default: "",
   },
 });
 

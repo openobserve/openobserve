@@ -16,13 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md">
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+    <!-- Standard page header on top (full-width). The filter panel (left) + table
+         (right) sit below in the splitter — the standard header + left + right model. -->
+    <AppPageHeader
+      :title="t('nodes.header')"
+      icon="hub"
+      :subtitle="'Cluster nodes and their health'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton variant="outline" size="sm-action" @click="getData(true)">
+          {{ t("common.refresh") }}
+        </OButton>
+      </template>
+    </AppPageHeader>
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
-      style="overflow: hidden; height: calc(100vh - 64px)"
+      class="tw:flex-1 tw:min-h-0"
+      style="overflow: hidden"
     >
       <template #before>
         <div class="tw:pt-6 tw:flex tw:flex-col" style="height: 100%">
@@ -75,10 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedRegionIdsUpdate"
                     >
                       <template #empty>
-                        <div class="tw:w-full tw:text-center tw:p-3">
-                          <OIcon name="warning" size="md" />
-                          <span class="tw:ml-2">No data available</span>
-                        </div>
+                        <OEmptyState size="block" preset="no-nodes" />
                       </template>
                     </OTable>
                   </div>
@@ -117,10 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:selected-ids="handleSelectedClusterIdsUpdate"
                     >
                       <template #empty>
-                        <div class="tw:w-full tw:text-center tw:p-3">
-                          <OIcon name="warning" size="md" />
-                          <span class="tw:ml-2">No data available</span>
-                        </div>
+                        <OEmptyState size="block" preset="no-nodes" />
                       </template>
                     </OTable>
                   </div>
@@ -410,26 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:px-4">
-        <div class="tw:flex tw:justify-between tw:w-full tw:pt-2 tw:items-center tw:shrink-0">
-          <div
-            class="tw:flex tw:flex-col tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="cipher-keys-list-title"
-          >
-            {{ t("nodes.header") }}
-          </div>
-          <div class="tw:flex tw:h-[36px] tw:mb-2">
-            <OSearchInput
-              data-test="nodes-search-input"
-              v-model="filterQuery"
-              class="tw:ml-0 tw:mb-1 tw:mr-2 no-border o2-search-input"
-              :placeholder="t('nodes.search')"
-            />
-            <OButton variant="outline" size="sm-action" @click="getData(true)">
-              {{ t("common.refresh") }}
-            </OButton>
-          </div>
-        </div>
+        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
         <OTable
           class="tw:flex-1 tw:min-h-0"
           ref="qTable"
@@ -448,7 +438,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :loading="loading"
         >
-          <template #empty><NoData /></template>
+          <template #toolbar>
+            <OSearchInput
+              data-test="nodes-search-input"
+              v-model="filterQuery"
+              class="tw:flex-1"
+              :placeholder="t('nodes.search')"
+            />
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-nodes"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
+          </template>
 
           <template #cell-id="{ row }">
             {{ row.id }}
@@ -523,7 +529,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -541,11 +547,13 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    NoData,
+    AppPageHeader,
+    OEmptyState,
     OButton,
     OProgressBar,
     OInput,

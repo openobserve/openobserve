@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <RenderDashboardCharts
           ref="apiDashboardChartsRef"
           :viewOnly="true"
+          :frame="false"
           :dashboardData="currentDashboardData.data"
           :currentTimeObj="dateTime"
           searchType="RUM"

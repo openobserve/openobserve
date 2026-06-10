@@ -23,32 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       flex-direction: column;
     "
   >
-    <div
-      class="tw:flex tw:items-center tw:flex-nowrap card-container tw:px-3 tw:mb-[0.675rem]"
+    <AppPageHeader
+      :back="{
+        label: t('alert_destinations.header'),
+        onClick: () => emit('cancel:hideform'),
+      }"
+      class="card-container tw:px-3 tw:border-b tw:border-border-default"
       style="flex-shrink: 0"
     >
-      <div class="tw:flex tw:items-center tw:h-[60px]">
-        <div
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow-back-ios-new"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          title="Go Back"
-          @click="$emit('cancel:hideform')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:flex tw:flex-col" data-test="add-destination-title">
-          <div v-if="destination" class="tw:text-xl tw:font-semibold">
-            {{ t("alert_destinations.updateTitle") }}
-          </div>
-          <div v-else class="tw:text-xl tw:font-semibold">
-            {{ t("alert_destinations.addTitle") }}
-          </div>
-        </div>
-      </div>
-    </div>
+      <template #title>
+        <span data-test="add-destination-title">
+          {{
+            destination
+              ? t("alert_destinations.updateTitle")
+              : t("alert_destinations.addTitle")
+          }}
+        </span>
+      </template>
+    </AppPageHeader>
     <div
       class="card-container tw:py-2"
       style="flex: 1; overflow-y: auto; overflow-x: hidden"
@@ -480,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
-      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full">
+      <div class="tw:flex tw:justify-between tw:px-4 tw:py-4 tw:w-full tw:border-t tw:border-border-default">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
@@ -562,6 +554,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type {
   Template,
   DestinationData,
@@ -969,13 +962,8 @@ const setupDestinationData = () => {
 
       prebuiltCredentials.value = credentials;
 
-      // If the saved destination is using the standard prebuilt template,
-      // surface that as the "Default" option in the dropdown rather than
-      // the raw `prebuilt_<type>` name, so create and edit look the same.
-      const standardName = `prebuilt_${typeId}`;
-      if (formData.value.template === standardName) {
-        formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
-      }
+      // Template name is stored and displayed as-is (e.g. "prebuilt_slack").
+      // The dropdown's first option has that value, so edit mode matches automatically.
     }
 
     if (Object.keys(formData.value?.headers || {}).length) {
@@ -1008,8 +996,9 @@ const getFormattedTemplates = computed(() =>
     .map((template: any) => template.name),
 );
 
-// Name of the prebuilt template the backend will auto-link if no override is
-// chosen (e.g. "prebuilt_slack"). Shown as the dropdown's default option.
+// The prebuilt template for this destination type, sourced from the API
+// (isPrebuilt: true). Falls back to the constructed name if the API hasn't
+// returned it yet (e.g. templates list still loading).
 const defaultPrebuiltTemplateName = computed(() => {
   if (
     !formData.value.destination_type ||
@@ -1017,37 +1006,33 @@ const defaultPrebuiltTemplateName = computed(() => {
   ) {
     return "";
   }
-  return `prebuilt_${formData.value.destination_type}`;
+  const expectedName = `prebuilt_${formData.value.destination_type}`;
+  const fromApi = props.templates.find(
+    (t: any) => t.isPrebuilt && t.name === expectedName
+  );
+  return fromApi?.name ?? expectedName;
 });
 
-// Sentinel for the "use the backend default" option. OSelect treats the
-// empty string as "no selection" and would show the placeholder instead
-// of the option label, so we need a distinct value and translate it back
-// to `undefined` when calling the create/update composable.
-const DEFAULT_TEMPLATE_SENTINEL = "__default__";
-
-// Template choices for a prebuilt destination: a "Default" option whose
-// value is the sentinel above, plus any user templates of the matching
-// kind (email vs http).
+// Template choices for a prebuilt destination: the API-sourced prebuilt
+// template for this type as the first (default) option, followed by any
+// user-created custom templates of the matching kind (email vs http).
+// Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = formData.value.destination_type === "email";
-  // Exclude all prebuilt templates: the DEFAULT sentinel already represents
-  // the canonical prebuilt_<type> for this destination, and showing other
-  // prebuilt templates (e.g. prebuilt_servicenow on a Slack destination)
-  // would allow cross-type mismatches.
   const matching = props.templates.filter((template: any) => {
     if (template.isPrebuilt) return false;
     if (isEmailType) return template.type === "email";
     return template.type !== "email";
   });
 
-  const defaultLabel = t('alert_destinations.templateDefaultOption', {
-    name: defaultPrebuiltTemplateName.value,
-  });
+  const options: { label: string; value: string }[] = [];
 
-  const options: { label: string; value: string }[] = [
-    { label: defaultLabel, value: DEFAULT_TEMPLATE_SENTINEL },
-  ];
+  if (defaultPrebuiltTemplateName.value) {
+    const defaultLabel = t('alert_destinations.templateDefaultOption', {
+      name: defaultPrebuiltTemplateName.value,
+    });
+    options.push({ label: defaultLabel, value: defaultPrebuiltTemplateName.value });
+  }
 
   matching.forEach((template: any) => {
     options.push({ label: template.name, value: template.name });
@@ -1110,10 +1095,8 @@ const selectDestinationType = (type: string) => {
     formData.value.url = "";
     formData.value.template = "";
   } else {
-    // Set up prebuilt type — pre-select the "Default" option so the field
-    // shows something instead of an empty placeholder.
     formData.value.type = type === "email" ? "email" : "http";
-    formData.value.template = DEFAULT_TEMPLATE_SENTINEL;
+    formData.value.template = defaultPrebuiltTemplateName.value;
   }
 };
 
@@ -1171,12 +1154,7 @@ const saveDestination = async () => {
         }
       });
 
-      // The "Default" option (sentinel value) means "let the backend
-      // auto-link the prebuilt template"; any other value is a user-chosen
-      // custom template name.
-      const selected = formData.value.template?.trim();
-      const templateOverride =
-        selected && selected !== DEFAULT_TEMPLATE_SENTINEL ? selected : undefined;
+      const templateOverride = formData.value.template?.trim() || undefined;
 
       if (isUpdatingDestination.value) {
         // Update existing prebuilt destination

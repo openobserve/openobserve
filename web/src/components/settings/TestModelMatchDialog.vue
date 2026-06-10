@@ -989,7 +989,7 @@ function formatRate(rate: number) {
 
 .tmm-cost-total-value {
   font-size: 17px;
-  font-weight: 800;
+  font-weight: 700;
   color: #16a34a;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;

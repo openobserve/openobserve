@@ -15,32 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full trial-period-container tw:p-3 gradient-banner" v-if="showTrialPeriodMsg == true">
-    <div class="tw:flex">
-      <div class="tw:flex tw:flex-col">
-        <span class="o2-trial-message">{{ getTrialPeriodMessage() }}</span>
-        <br />
-        <span class="o2-trial-subtitle">Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
-      </div>
-      <div class="tw:w-1/6 tw:mt-2" v-if="currentPage != 'billing'">
-        <OButton
-          variant="primary"
-          size="sm"
-          class="float-right"
-          @click="redirectBilling"
-          >{{ t("billing.upgradeNow") }}</OButton
-        >
-      </div>
-      <div class="tw:w-1/6 tw:mt-2" v-if="currentPage == 'billing'">
-        <OButton
-          variant="primary"
-          size="sm"
-          class="float-right"
-          @click="redirectContactSupport"
-          >{{ t("billing.contactSupport") }}</OButton
-        >
-      </div>
-    </div>
+  <div
+    v-if="showTrialPeriodMsg"
+    class="trial-banner tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full"
+  >
+    <!-- Warning icon -->
+    <OIcon name="warning" size="sm" class="tw:shrink-0 trial-banner-icon" />
+
+    <!-- Message + subtitle on one line -->
+    <p class="tw:flex-1 tw:min-w-0 tw:m-0 tw:text-sm tw:truncate">
+      <strong class="tw:font-semibold">{{ getTrialPeriodMessage() }}</strong>
+      <span class="tw:mx-1 tw:opacity-60">·</span>
+      <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
+    </p>
+
+    <!-- CTA button -->
+    <OButton
+      v-if="currentPage != 'billing'"
+      variant="warning"
+      size="xs"
+      class="tw:shrink-0"
+      @click="redirectBilling"
+    >{{ t("billing.upgradeNow") }}</OButton>
+    <OButton
+      v-else
+      variant="warning"
+      size="xs"
+      class="tw:shrink-0"
+      @click="redirectContactSupport"
+    >{{ t("billing.contactSupport") }}</OButton>
   </div>
 </template>
 
@@ -55,10 +58,11 @@ import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
 import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "TrialPeriod",
-  components: { OButton },
+  components: { OButton, OIcon },
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
@@ -127,43 +131,14 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.gradient-banner {
-  background: linear-gradient(
-    to right,
-    transparent 60%,
-    #f7f7ff 70%,
-    #cdf7e4 100%  );
+<style scoped>
+.trial-banner {
+  background-color: var(--o2-status-warning-bg);
+  border: 1px solid var(--o2-status-warning-text);
+  color: var(--o2-status-warning-text);
 }
 
-.trial-period-container {
-  border: 1px solid #D7D7D7;
-  border-radius: 6px;
-}
-
-.o2-trial-message {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-}
-
-.o2-trial-subtitle {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
-.body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #24262F 70%,
-      #2C3934 100%  );
-  }
-
-  .trial-period-container {
-    border: 1px solid #454F5B;
-  }
+.trial-banner-icon {
+  color: var(--o2-status-warning-text);
 }
 </style>

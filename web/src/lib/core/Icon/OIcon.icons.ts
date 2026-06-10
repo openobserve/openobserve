@@ -114,6 +114,8 @@ import Warning from "~icons/material-symbols/warning-outline";
 import Workspaces from "~icons/material-symbols/workspaces-outline";
 import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline";
 import UnfoldLess from "~icons/material-symbols/unfold-less";
+import LeftPanelClose from "~icons/material-symbols/left-panel-close";
+import LeftPanelOpen from "~icons/material-symbols/left-panel-open";
 import Reorder from "~icons/material-symbols/reorder";
 import FirstPage from "~icons/material-symbols/first-page";
 import LastPage from "~icons/material-symbols/last-page";
@@ -292,6 +294,7 @@ import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
+import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
 import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
@@ -426,6 +429,8 @@ export const iconRegistry = {
   "workspaces": Workspaces,
   "workspace-premium": WorkspacePremium,
   "unfold-less": UnfoldLess,
+  "left-panel-close": LeftPanelClose,
+  "left-panel-open": LeftPanelOpen,
   "reorder": Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
@@ -468,6 +473,7 @@ export const iconRegistry = {
   "dataset": Dataset,
   "folder-open": FolderOpen,
   "folder": Folder,
+  "folder-outline": FolderOutline,
   "widgets": Widgets,
   "lan": Lan,
   "trending-up-filled": TrendingUpFilled,

@@ -1,10 +1,13 @@
 @import "tailwindcss" prefix(tw);
 @import "tw-animate-css";
-@import "../lib/styles/tokens/_base.scss";
-@import "../lib/styles/tokens/_semantic.scss";
-@import "../lib/styles/tokens/_component.scss";
-@import "../lib/styles/tokens/_sdr-fields.scss";
-@import "../lib/styles/tokens/_dark.scss";
+/* Design tokens are now sourced from the .css files (Tailwind-only direction;
+   SCSS being phased out). The _*.scss token files hold identical content and
+   remain as a one-line revert until this flip is build-verified. */
+@import "../lib/styles/tokens/base.css";
+@import "../lib/styles/tokens/semantic.css";
+@import "../lib/styles/tokens/component.css";
+@import "../lib/styles/tokens/sdr-fields.css";
+@import "../lib/styles/tokens/dark.css";
 
 @plugin "@tailwindcss/typography";
 
@@ -28,5 +31,46 @@
     border-color: #e5e7eb;
   }
 
+}
+
+/*
+ * Reduced-motion: users who ask for less motion get a plain, near-instant
+ * fade instead of the slide/zoom enter-exit animations (tw-animate-css
+ * `animate-in` / `animate-out`). Keeps overlays usable without the movement.
+ */
+@media (prefers-reduced-motion: reduce) {
+  [data-reka-popper-content-wrapper] *,
+  [data-o2-dialog],
+  [data-o2-drawer],
+  [data-test="o-dialog-overlay"],
+  [data-test="o-drawer-overlay"] {
+    animation-duration: 0.01ms !important;
+    animation-timing-function: linear !important;
+  }
+}
+
+/*
+ * Clip-path "reveal" for popups (dropdown / select / combobox).
+ * The menu renders at full size and is progressively unveiled with a
+ * `clip-path` wipe — content never scales or squishes, it just gets
+ * revealed from the trigger edge. `-down-*` wipes top→bottom (bottom-placed
+ * menus), `-up-*` wipes bottom→top (top-placed menus, via `data-[side=top]`).
+ * `round 0.5rem` keeps the corners rounded throughout the wipe.
+ */
+@keyframes o2-reveal-down-in {
+  from { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+}
+@keyframes o2-reveal-down-out {
+  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  to   { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
+}
+@keyframes o2-reveal-up-in {
+  from { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+}
+@keyframes o2-reveal-up-out {
+  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  to   { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
 }
 

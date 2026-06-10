@@ -17,21 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:p-0 storage-settings-editor">
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:flex-nowrap card-container  tw:px-3 tw:mb-[0.675rem]">
-      <div class="tw:flex tw:items-center tw:h-[60px]">
-        <div
-          data-test="storage-settings-editor-back-btn"
-          class="el-border tw:w-6 tw:h-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer el-border-radius tw:mr-2"
-          :title="t('storage_settings.goBack')"
-          @click="emit('cancel')"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <div class="tw:text-xl tw:font-semibold" data-test="storage-settings-editor-title">
-          {{ isEditMode ? t("storage_settings.updateStorage") : t("storage_settings.newStorageConfiguration") }}
-        </div>
-      </div>
-    </div>
+    <AppPageHeader
+      :back="{
+        label: t('storage_settings.title'),
+        onClick: () => emit('cancel'),
+        dataTest: 'storage-settings-editor-back-btn',
+      }"
+      :title="headerTitle"
+      class="tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.675rem]"
+    >
+      <template #title>
+        <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Stepper -->
     <div class="card-container tw:h-[calc(100vh-7rem)] tw:py-2 tw:px-3 tw:overflow-auto">
@@ -416,6 +414,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps<{
@@ -445,6 +444,11 @@ const fieldErrors = reactive<Record<string, string>>({
 const existingConfig = ref<any>(null);
 
 const isEditMode = computed(() => props.action === "edit");
+const headerTitle = computed(() =>
+  isEditMode.value
+    ? t("storage_settings.updateStorage")
+    : t("storage_settings.newStorageConfiguration"),
+);
 const isCloud = computed(() => config.isCloud === "true");
 
 const formData = reactive({

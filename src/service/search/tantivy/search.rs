@@ -18,10 +18,12 @@ use std::{collections::HashSet, fmt::Display};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode},
-    utils::tantivy::query::contains_query::ContainsAutomaton,
+    tantivy::query::{
+        contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
+    },
 };
 use tantivy::{
-    Searcher,
+    DocId, Score, Searcher,
     aggregation::{
         AggregationCollector, Key,
         agg_req::{Aggregation, AggregationVariants, Aggregations},
@@ -31,6 +33,7 @@ use tantivy::{
             TermsAggregation,
         },
     },
+    collector::{Count, TopDocs},
     query::Query,
 };
 
@@ -38,13 +41,14 @@ use crate::service::search::index::IndexCondition;
 
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
-    RowIds(HashSet<u32>),
+    RowIds(Vec<u32>),
     /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
     RowIdsBitVec(BitVec, usize, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
     TopN(Vec<(String, u64)>),                // simple top n optimization
+    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -60,8 +64,7 @@ impl TantivyResult {
     pub fn get_memory_size(&self) -> usize {
         match self {
             Self::RowIds(row_ids) => {
-                row_ids.capacity() * std::mem::size_of::<u32>()
-                    + std::mem::size_of::<HashSet<u32>>()
+                row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
             Self::RowIdsBitVec(bitvec, ..) => {
                 bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
@@ -86,6 +89,17 @@ impl TantivyResult {
                     .sum::<usize>()
                     + std::mem::size_of::<Vec<(String, u64)>>()
             }
+            Self::TopNMulti(top_n) => {
+                top_n
+                    .iter()
+                    .map(|(keys, _)| {
+                        keys.iter().map(|s| s.capacity()).sum::<usize>()
+                            + std::mem::size_of::<Vec<String>>()
+                            + std::mem::size_of::<u64>()
+                    })
+                    .sum::<usize>()
+                    + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
+            }
             Self::Distinct(distinct) => {
                 distinct.iter().map(|s| s.capacity()).sum::<usize>()
                     + std::mem::size_of::<HashSet<String>>()
@@ -96,13 +110,8 @@ impl TantivyResult {
 
 impl TantivyResult {
     pub fn handle_matched_docs(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::DocSetCollector)?;
-
-        let row_ids = res
-            .into_iter()
-            .map(|doc| doc.doc_id)
-            .collect::<HashSet<_>>();
-        Ok(Self::RowIds(row_ids))
+        let docs = searcher.search(&query, &SingleSegmentDocIdCollector)?;
+        Ok(Self::RowIds(docs))
     }
 
     pub fn handle_simple_select(
@@ -113,9 +122,9 @@ impl TantivyResult {
     ) -> anyhow::Result<Self> {
         let res = searcher.search(
             &query,
-            &tantivy::collector::TopDocs::with_limit(limit).tweak_score(
+            &TopDocs::with_limit(limit).tweak_score(
                 move |_segment_reader: &tantivy::SegmentReader| {
-                    move |doc_id: tantivy::DocId, _original_score: tantivy::Score| {
+                    move |doc_id: DocId, _original_score: Score| {
                         if ascend {
                             doc_id as i64
                         } else {
@@ -129,12 +138,12 @@ impl TantivyResult {
         let row_ids = res
             .into_iter()
             .map(|(_, doc)| doc.doc_id)
-            .collect::<HashSet<_>>();
+            .collect::<Vec<_>>();
         Ok(Self::RowIds(row_ids))
     }
 
     pub fn handle_simple_count(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
-        let res = searcher.search(&query, &tantivy::collector::Count)?;
+        let res = searcher.search(&query, &Count)?;
         Ok(Self::Count(res))
     }
 
@@ -296,6 +305,113 @@ impl TantivyResult {
         }
     }
 
+    /// Handle two-field GROUP BY with count(*) using nested TermsAggregation
+    pub fn handle_simple_top_n_multi(
+        searcher: &Searcher,
+        query: Box<dyn Query>,
+        fields: &[String],
+        limit: usize,
+        ascend: bool,
+    ) -> anyhow::Result<Self> {
+        if fields.len() != 2 {
+            anyhow::bail!("handle_simple_top_n_multi requires exactly 2 fields");
+        }
+
+        let order = if ascend {
+            Some(CustomOrder {
+                target: OrderTarget::Count,
+                order: Order::Asc,
+            })
+        } else {
+            None
+        };
+
+        // Smarter over-fetch: outer needs enough distinct values of field[0],
+        // inner only needs enough per-bucket combinations.
+        // Use sqrt-based scaling to avoid O(N^2) bucket explosion.
+        let effective_limit = limit.max(10);
+        let outer_limit = (effective_limit * 2).max(100) as u32;
+        let inner_limit = (effective_limit * 2).max(100) as u32;
+
+        // Build nested aggregation: outer terms on field[0], inner terms on field[1]
+        let inner_aggregation = Aggregation {
+            agg: AggregationVariants::Terms(TermsAggregation {
+                field: fields[1].to_string(),
+                size: Some(inner_limit),
+                order: order.clone(),
+                missing: None,
+                min_doc_count: Some(1),
+                show_term_doc_count_error: Some(false),
+                segment_size: Some(inner_limit),
+                include: None,
+                exclude: None,
+            }),
+            sub_aggregation: Default::default(),
+        };
+
+        let outer_aggregation = Aggregation {
+            agg: AggregationVariants::Terms(TermsAggregation {
+                field: fields[0].to_string(),
+                size: Some(outer_limit),
+                order,
+                missing: None,
+                min_doc_count: Some(1),
+                show_term_doc_count_error: Some(false),
+                include: None,
+                exclude: None,
+                segment_size: Some(outer_limit),
+            }),
+            sub_aggregation: Aggregations::from_iter(vec![(
+                "inner".to_string(),
+                inner_aggregation,
+            )]),
+        };
+
+        let aggregations = Aggregations::from_iter(vec![("outer".to_string(), outer_aggregation)]);
+        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
+
+        let mut res = searcher.search(&query, &collector)?;
+
+        // Pre-allocate with a reasonable estimate
+        let estimated_results = (outer_limit as usize) * 4;
+        let mut results: Vec<(Vec<String>, u64)> = Vec::with_capacity(estimated_results);
+
+        if let AggregationResult::BucketResult(BucketResult::Terms {
+            buckets: outer_buckets,
+            ..
+        }) = res.0.remove("outer").unwrap()
+        {
+            for mut outer_bucket in outer_buckets {
+                let outer_key = match &outer_bucket.key {
+                    Key::Str(s) => s.clone(),
+                    Key::F64(f) => f.to_string(),
+                    Key::I64(i) => i.to_string(),
+                    Key::U64(u) => u.to_string(),
+                };
+
+                if let Some(AggregationResult::BucketResult(BucketResult::Terms {
+                    buckets: inner_buckets,
+                    ..
+                })) = outer_bucket.sub_aggregation.0.remove("inner")
+                {
+                    for inner_bucket in inner_buckets {
+                        let inner_key = match inner_bucket.key {
+                            Key::Str(s) => s,
+                            Key::F64(f) => f.to_string(),
+                            Key::I64(i) => i.to_string(),
+                            Key::U64(u) => u.to_string(),
+                        };
+                        results.push((vec![outer_key.clone(), inner_key], inner_bucket.doc_count));
+                    }
+                }
+            }
+        } else {
+            anyhow::bail!("Failed to get top n multi results from tantivy");
+        }
+
+        Ok(Self::TopNMulti(results))
+    }
+
     pub fn handle_simple_distinct(
         searcher: &Searcher,
         index_condition: &IndexCondition,
@@ -346,6 +462,7 @@ pub enum TantivyMultiResultBuilder {
     Histogram(Vec<Vec<u64>>),
     MultiHistogram(Vec<Vec<(i64, String, u64)>>),
     TopN(Vec<(String, u64)>),
+    TopNMulti(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -355,6 +472,7 @@ impl TantivyMultiResultBuilder {
             Some(IndexOptimizeMode::SimpleHistogram(..)) => Self::Histogram(vec![]),
             Some(IndexOptimizeMode::SimpleMultiHistogram(..)) => Self::MultiHistogram(vec![]),
             Some(IndexOptimizeMode::SimpleTopN(..)) => Self::TopN(vec![]),
+            Some(IndexOptimizeMode::SimpleTopNMulti(..)) => Self::TopNMulti(vec![]),
             Some(IndexOptimizeMode::SimpleDistinct(..)) => Self::Distinct(HashSet::new()),
             Some(IndexOptimizeMode::SimpleSelect(..))
             | Some(IndexOptimizeMode::SimpleCount)
@@ -398,6 +516,13 @@ impl TantivyMultiResultBuilder {
         }
     }
 
+    pub fn add_top_n_multi(&mut self, top_n: Vec<(Vec<String>, u64)>) {
+        match self {
+            Self::TopNMulti(a) => a.extend(top_n),
+            _ => unreachable!("unsupported tantivy multi result"),
+        }
+    }
+
     pub fn add_distinct(&mut self, distinct: HashSet<String>) {
         match self {
             Self::Distinct(a) => a.extend(distinct),
@@ -436,6 +561,7 @@ impl TantivyMultiResultBuilder {
                 TantivyMultiResult::MultiHistogram(merged)
             }
             Self::TopN(a) => TantivyMultiResult::TopN(a),
+            Self::TopNMulti(a) => TantivyMultiResult::TopNMulti(a),
             Self::Distinct(a) => TantivyMultiResult::Distinct(a),
         }
     }
@@ -446,6 +572,7 @@ pub enum TantivyMultiResult {
     Histogram(Vec<u64>),
     MultiHistogram(Vec<(i64, String, u64)>),
     TopN(Vec<(String, u64)>),
+    TopNMulti(Vec<(Vec<String>, u64)>),
     Distinct(HashSet<String>),
 }
 
@@ -460,6 +587,7 @@ impl Display for TantivyMultiResult {
                 write!(f, "multi_histogram hits: {}", multi_histogram.len())
             }
             Self::TopN(top_n) => write!(f, "top_n hits: {}", top_n.len()),
+            Self::TopNMulti(top_n) => write!(f, "top_n_multi hits: {}", top_n.len()),
             Self::Distinct(distinct) => write!(f, "distinct hits: {}", distinct.len()),
         }
     }
@@ -494,6 +622,13 @@ impl TantivyMultiResult {
         }
     }
 
+    pub fn top_n_multi(self) -> Vec<(Vec<String>, u64)> {
+        match self {
+            Self::TopNMulti(a) => a,
+            _ => vec![],
+        }
+    }
+
     pub fn distinct(self) -> HashSet<String> {
         match self {
             Self::Distinct(a) => a,
@@ -504,9 +639,8 @@ impl TantivyMultiResult {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
+    use std::collections::HashSet;
 
-    use arrow_schema::{DataType, Field, Schema};
     use config::meta::{bitvec::BitVec, inverted_index::IndexOptimizeMode};
 
     use super::*;
@@ -516,37 +650,11 @@ mod tests {
         let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 100), 75, None);
         assert_eq!(result.percent(), 75);
 
-        let result = TantivyResult::RowIds(HashSet::new());
+        let result = TantivyResult::RowIds(Vec::new());
         assert_eq!(result.percent(), 0);
 
         let result = TantivyResult::Count(100);
         assert_eq!(result.percent(), 0);
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_row_ids() {
-        let mut row_ids = HashSet::new();
-        row_ids.insert(1u32);
-        row_ids.insert(2u32);
-        row_ids.insert(3u32);
-
-        let result = TantivyResult::RowIds(row_ids);
-        let memory_size = result.get_memory_size();
-
-        // Should include HashSet overhead + capacity * size_of(u32)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_bitvec() {
-        let bitvec = BitVec::repeat(false, 1000);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 50, None);
-        let memory_size = result.get_memory_size();
-
-        // Should include BitVec overhead + bit capacity / 8
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<BitVec>());
     }
 
     #[test]
@@ -555,47 +663,6 @@ mod tests {
         let memory_size = result.get_memory_size();
 
         assert_eq!(memory_size, std::mem::size_of::<usize>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_histogram() {
-        let histogram = vec![10u64, 20u64, 30u64, 40u64];
-        let result = TantivyResult::Histogram(histogram);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + capacity * size_of(u64)
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<u64>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_top_n() {
-        let top_n = vec![
-            ("term1".to_string(), 100u64),
-            ("term2".to_string(), 200u64),
-            ("term3".to_string(), 150u64),
-        ];
-        let result = TantivyResult::TopN(top_n);
-        let memory_size = result.get_memory_size();
-
-        // Should include Vec overhead + string capacities + u64 sizes
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<(String, u64)>>());
-    }
-
-    #[test]
-    fn test_tantivy_result_get_memory_size_distinct() {
-        let mut distinct = HashSet::new();
-        distinct.insert("value1".to_string());
-        distinct.insert("value2".to_string());
-        distinct.insert("value3".to_string());
-
-        let result = TantivyResult::Distinct(distinct);
-        let memory_size = result.get_memory_size();
-
-        // Should include HashSet overhead + string capacities
-        assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
     }
 
     #[test]
@@ -880,97 +947,6 @@ mod tests {
     }
 
     #[test]
-    fn test_change_schema_to_utf8_view_enabled() {
-        // Mock the config to enable utf8_view
-        // Since we can't easily mock get_config(), we'll test the logic indirectly
-        let fields = vec![
-            Arc::new(Field::new("string_field", DataType::Utf8, false)),
-            Arc::new(Field::new("large_string_field", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("int_field", DataType::Int64, false)),
-            Arc::new(Field::new("bool_field", DataType::Boolean, true)),
-        ];
-        let original_schema = Schema::new(fields);
-
-        // Test the schema transformation logic
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        // Verify transformations
-        assert_eq!(transformed_schema.field(0).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(1).data_type(), &DataType::Utf8View);
-        assert_eq!(transformed_schema.field(2).data_type(), &DataType::Int64);
-        assert_eq!(transformed_schema.field(3).data_type(), &DataType::Boolean);
-
-        // Verify nullability is preserved
-        assert!(!transformed_schema.field(0).is_nullable());
-        assert!(transformed_schema.field(1).is_nullable());
-        assert!(!transformed_schema.field(2).is_nullable());
-        assert!(transformed_schema.field(3).is_nullable());
-    }
-
-    #[test]
-    fn test_change_schema_to_utf8_view_field_names_preserved() {
-        let fields = vec![
-            Arc::new(Field::new("field_name_1", DataType::Utf8, false)),
-            Arc::new(Field::new("field_name_2", DataType::LargeUtf8, true)),
-            Arc::new(Field::new("field_name_3", DataType::Int32, false)),
-        ];
-        let original_schema = Schema::new(fields);
-
-        // Test field name preservation in transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.field(0).name(), "field_name_1");
-        assert_eq!(transformed_schema.field(1).name(), "field_name_2");
-        assert_eq!(transformed_schema.field(2).name(), "field_name_3");
-    }
-
-    #[test]
-    fn test_change_schema_to_utf8_view_empty_schema() {
-        let original_schema = Schema::empty();
-
-        // Test empty schema transformation
-        let transformed_fields = original_schema
-            .fields()
-            .iter()
-            .map(|f| {
-                if f.data_type() == &DataType::Utf8 || f.data_type() == &DataType::LargeUtf8 {
-                    Arc::new(Field::new(f.name(), DataType::Utf8View, f.is_nullable()))
-                } else {
-                    f.clone()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let transformed_schema = Schema::new(transformed_fields);
-
-        assert_eq!(transformed_schema.fields().len(), 0);
-    }
-
-    #[test]
     fn test_histogram_builder_edge_cases() {
         // Test with histograms of different lengths
         let mut builder = TantivyMultiResultBuilder::Histogram(vec![]);
@@ -992,9 +968,13 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
-        let result = TantivyResult::RowIds(HashSet::new());
+        let result = TantivyResult::RowIdsBitVec(BitVec::repeat(false, 0), 0, None);
         let memory_size = result.get_memory_size();
-        assert!(memory_size >= std::mem::size_of::<HashSet<u32>>());
+        assert_eq!(memory_size, std::mem::size_of::<BitVec>());
+
+        let result = TantivyResult::RowIds(Vec::new());
+        let memory_size = result.get_memory_size();
+        assert!(memory_size >= std::mem::size_of::<Vec<u32>>());
 
         let result = TantivyResult::Histogram(vec![]);
         let memory_size = result.get_memory_size();

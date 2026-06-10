@@ -407,6 +407,12 @@
     "noData": "Aucune donnée disponible",
     "functionEditorLabel": "Éditeur de fonctions",
     "loadingStream": "Chargement du flux...",
+    "askAIPlaceholderRotation": {
+      "one": "Montrez-moi les erreurs de la dernière heure...",
+      "two": "Trouvez des requêtes lentes qui prennent plus de 5 secondes...",
+      "three": "Comptez 5xx réponses regroupées par service...",
+      "four": "Filtrer les journaux où level = « erreur »..."
+    },
     "hideHistogram": "Masquer l'histogramme",
     "disableQuickMode": "Désactiver le mode rapide",
     "menuGroupSetOnce": "Réglez une fois",
@@ -960,7 +966,8 @@
     "subscription_type": "Type de plan",
     "proceed_subscription": "Procéder à l'abonnement",
     "subscription_plan": "Plan d'abonnement",
-    "makeBilledMember": "Faire de cette organisation un membre facturant de {org}"
+    "makeBilledMember": "Faire de cette organisation un membre facturant de {org}",
+    "manage": "Gérez"
   },
   "template": {
     "header": "Modèles",
@@ -1813,7 +1820,8 @@
     "noDataAvailable": "Aucune donnée disponible",
     "tabAiAssistant": "Assistant O2 AI",
     "tabOverview": "Vue d'ensemble",
-    "tabUsage": "Utilisation"
+    "tabUsage": "Utilisation",
+    "subtitle": "Votre espace de travail d'observabilité en un coup d'œil"
   },
   "billing": {
     "header": "Utilisation et facturation",
@@ -2972,7 +2980,10 @@
     "evaluationTemplate": "Modèle d'évaluation",
     "evaluationTemplateHelp": "Sélectionnez un modèle d'évaluation qui définit les critères et les dimensions pour le juge LLM.",
     "noTemplatesFound": "Aucun modèle d'évaluation n'a été trouvé. Créez-en un sur la page Modèles d'évaluation.",
-    "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès"
+    "evalTemplatesRefreshed": "Les modèles d'évaluation ont été actualisés avec succès",
+    "subtitle": "Transformez, enrichissez et acheminez les données en vol",
+    "selectStream": "Sélectionnez un stream...",
+    "queryEditorPlaceholder": "Sélectionnez un flux ou écrivez une requête SQL ici..."
   },
   "reports": {
     "header": "Rapports",
@@ -3228,7 +3239,10 @@
         "spans": "S'étend"
       }
     },
-    "openInFullView": "Ouvrir en plein écran"
+    "openInFullView": "Ouvrir en plein écran",
+    "serviceMap": "Carte des services",
+    "patternView": "Affichage du motif",
+    "spanView": "Vue sur Span"
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",
@@ -4101,6 +4115,237 @@
       "one": "Montrez-moi les erreurs de la dernière heure...",
       "two": "Écrivez VRL pour analyser le JSON à partir des journaux Nginx...",
       "three": "Créez un tableau de bord pour l'état des nœuds K8s..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Nous n'avons trouvé aucune donnée",
+      "description": "Rien ne correspond à vos filtres ou à votre plage de temps actuels. Essayez d'élargir votre recherche, d'élargir la plage horaire ou de supprimer les filtres.",
+      "action": "Effacer les filtres",
+      "actionDesc": "Réinitialiser tous les filtres appliqués"
+    },
+    "noLogs": {
+      "title": "Aucun journal dans cette plage",
+      "description": "Nous n'avons trouvé aucun journal pour le flux et la plage de temps sélectionnés. Essayez un intervalle de temps plus large ou un flux différent.",
+      "action": "Élargir la plage horaire",
+      "actionDesc": "Recherche sur une période plus longue"
+    },
+    "noDashboards": {
+      "title": "Créez votre premier tableau de bord",
+      "description": "Les tableaux de bord regroupent vos statistiques, vos journaux et vos traces dans une seule vue. Créez-en un pour commencer.",
+      "action": "Nouveau tableau de bord",
+      "actionDesc": "Commencez à partir d'un canevas vide",
+      "import": "Tableau de bord d'importation",
+      "importDesc": "Charger un fichier JSON de tableau de bord",
+      "templates": "Parcourir les modèles",
+      "templatesDesc": "Commencez à partir d'un tableau de bord communautaire"
+    },
+    "noPipelines": {
+      "title": "Créez votre premier pipeline",
+      "description": "Les pipelines transforment et acheminent vos données au fur et à mesure de leur arrivée. Configurez-en un pour commencer à façonner vos streams.",
+      "action": "Nouveau gazoduc",
+      "actionDesc": "Créez un flux à partir de zéro",
+      "import": "Pipeline d'importation",
+      "importDesc": "Télécharger une définition de pipeline"
+    },
+    "noFunctions": {
+      "title": "Créez votre première fonction",
+      "description": "Les fonctions enrichissent et remodèlent vos données au moment de l'ingestion ou de la requête. Ajoutez-en un pour commencer.",
+      "action": "Nouvelle fonction",
+      "actionDesc": "Écrire une nouvelle fonction VRL"
+    },
+    "noStreams": {
+      "title": "En attente de vos premières données",
+      "description": "Aucune donnée n'est encore arrivée. Connectez une source et vos flux s'afficheront automatiquement ici.",
+      "action": "Configurer l'ingestion",
+      "actionDesc": "Connecter une source de données"
+    },
+    "noAlerts": {
+      "title": "Créez votre première alerte",
+      "description": "Les alertes vous avertissent dès que vos données franchissent un seuil. Définissez-en un pour démarrer la surveillance.",
+      "action": "Nouvelle alerte",
+      "actionDesc": "Définir une condition à surveiller"
+    },
+    "noIncidents": {
+      "title": "Aucun incident actif",
+      "description": "Vous êtes tous rattrapés, rien n'a besoin de votre attention pour le moment. Les incidents déclenchés apparaîtront ici."
+    },
+    "loadError": {
+      "title": "Quelque chose s'est mal passé",
+      "description": "Nous n'avons pas pu charger ces données. C'est généralement temporaire. Réessayez dans un instant.",
+      "action": "Réessayez",
+      "actionDesc": "Essayez à nouveau de charger les données"
+    },
+    "noData": {
+      "title": "Rien ici pour l'instant",
+      "description": "Il n'y a aucune donnée à afficher pour le moment."
+    },
+    "noTraces": {
+      "title": "Aucune trace trouvée",
+      "description": "Aucune trace ne correspond au service et à la plage horaire sélectionnés. Essayez un intervalle de temps plus large ou un autre service."
+    },
+    "noSearchHistory": {
+      "title": "Pas encore d'historique de recherche",
+      "description": "Les recherches que vous effectuez seront répertoriées ici afin que vous puissiez les consulter et les relancer."
+    },
+    "noUsers": {
+      "title": "Pas encore d'utilisateurs",
+      "description": "Invitez vos coéquipiers à collaborer au sein de cette organisation.",
+      "action": "Ajouter un utilisateur",
+      "actionDesc": "Invitez un coéquipier par e-mail"
+    },
+    "noReports": {
+      "title": "Aucun rapport pour l'instant",
+      "description": "Planifiez un rapport pour recevoir des tableaux de bord dans votre boîte de réception.",
+      "action": "Nouveau rapport",
+      "actionDesc": "Planifier la livraison d'un tableau de bord"
+    },
+    "noQueries": {
+      "title": "Aucune requête en cours",
+      "description": "Il n'y a aucune requête active pour le moment. Les requêtes de longue durée apparaîtront ici pendant leur exécution."
+    },
+    "noServiceAccounts": {
+      "title": "Aucun compte de service pour l'instant",
+      "description": "Les comptes de service permettent aux applications de s'authentifier auprès de l'API. Créez-en un pour commencer.",
+      "action": "Ajouter un compte de service",
+      "actionDesc": "Création d'un compte de service API"
+    },
+    "noInvitations": {
+      "title": "Aucune invitation en attente",
+      "description": "Les invitations que vous avez envoyées ou reçues s'afficheront ici."
+    },
+    "filtered": {
+      "title": "Aucun {nom} trouvé",
+      "description": "Aucun {nom} ne correspond à vos filtres ou recherches actuels. Essayez de les ajuster ou de les effacer.",
+      "action": "Effacer les filtres",
+      "actionDesc": "Réinitialiser tous les filtres et effectuer une recherche",
+      "fallbackNoun": "résultats"
+    },
+    "nouns": {
+      "logs": "journaux",
+      "dashboards": "tableaux de bord",
+      "pipelines": "pipelines",
+      "functions": "fonctions",
+      "streams": "ruisseaux",
+      "alerts": "alertes",
+      "incidents": "incidents",
+      "traces": "traces",
+      "searches": "recherches",
+      "users": "utilisateurs",
+      "reports": "rapports",
+      "queries": "requêtes",
+      "serviceAccounts": "comptes de service",
+      "invitations": "invitations"
+    },
+    "noDashboardsInFolder": {
+      "title": "Aucun tableau de bord dans ce dossier",
+      "description": "Ce dossier est vide. Ajoutez un tableau de bord ici ou déplacez-en un depuis un autre dossier.",
+      "action": "Nouveau tableau de bord",
+      "actionDesc": "Créez un tableau de bord dans ce dossier",
+      "import": "Tableau de bord d'importation",
+      "importDesc": "Charger un fichier JSON de tableau de bord",
+      "templates": "Parcourir les modèles",
+      "templatesDesc": "Commencez à partir d'un tableau de bord communautaire"
+    },
+    "noGroups": {
+      "title": "Pas encore de groupes",
+      "description": "Les groupes vous permettent de gérer les autorisations de plusieurs utilisateurs à la fois. Créez-en un pour commencer.",
+      "action": "Nouveau groupe",
+      "actionDesc": "Création d'un groupe d'utilisateurs"
+    },
+    "noRoles": {
+      "title": "Aucun rôle pour l'instant",
+      "description": "Les rôles définissent les actions que les utilisateurs peuvent effectuer. Créez un rôle personnalisé pour contrôler l'accès.",
+      "action": "Nouveau rôle",
+      "actionDesc": "Définir un rôle d'accès personnalisé"
+    },
+    "noAnomalyConfigs": {
+      "title": "Aucune détection d'anomalie configurée",
+      "description": "Configurez la détection des anomalies pour identifier automatiquement les tendances inhabituelles dans vos données.",
+      "action": "Nouvelle configuration",
+      "actionDesc": "Configuration de la détection des anomalies"
+    },
+    "noApiLimits": {
+      "title": "Aucune limite d'API configurée",
+      "description": "Les limites de l'API contrôlent la quantité de données que chaque organisation peut ingérer et interroger par fenêtre temporelle."
+    },
+    "noRoleLimits": {
+      "title": "Aucune limite de rôle configurée",
+      "description": "Les limites de rôles définissent les quotas d'ingestion et de requêtes appliqués aux rôles individuels au sein d'une organisation."
+    },
+    "noIngestionTokens": {
+      "title": "Pas encore de jetons d'ingestion",
+      "description": "Les jetons d'ingestion authentifient les sources de données lors de l'envoi de journaux, de métriques et de traces.",
+      "action": "Nouveau jeton",
+      "actionDesc": "Générer un jeton d'ingestion"
+    },
+    "noOrganizations": {
+      "title": "Aucune organisation pour le moment",
+      "description": "Les organisations regroupent vos utilisateurs et vos données. Créez-en un pour commencer."
+    },
+    "noAlertDestinations": {
+      "title": "Aucune destination pour le moment",
+      "description": "Les destinations définissent l'endroit où les notifications d'alerte sont envoyées : Slack, e-mail, webhooks, etc.",
+      "action": "Nouvelle destination",
+      "actionDesc": "Connecter un canal de notification"
+    },
+    "noAlertTemplates": {
+      "title": "Pas encore de modèles",
+      "description": "Les modèles définissent le format des messages de notification d'alerte.",
+      "action": "Nouveau modèle",
+      "actionDesc": "Création d'un modèle de notification"
+    },
+    "noEnrichmentTables": {
+      "title": "Pas encore de tables d'enrichissement",
+      "description": "Les tableaux d'enrichissement vous permettent de joindre un contexte supplémentaire aux données de votre journal au moment de la requête.",
+      "action": "Nouveau tableau",
+      "actionDesc": "Création d'un tableau d'enrichissement"
+    },
+    "noCipherKeys": {
+      "title": "Pas encore de clé de chiffrement",
+      "description": "Les clés de chiffrement sont utilisées pour chiffrer les champs sensibles de vos flux de données.",
+      "action": "Nouvelle clé",
+      "actionDesc": "Générer une clé de chiffrement"
+    },
+    "noAiToolsets": {
+      "title": "Aucun ensemble d'outils d'IA pour le moment",
+      "description": "Les outils d'IA connectent votre organisation à des capacités d'IA externes.",
+      "action": "Nouveau jeu d'outils",
+      "actionDesc": "Ajouter un ensemble d'outils d'IA"
+    },
+    "noLlmProviders": {
+      "title": "Aucun fournisseur LLM configuré",
+      "description": "Connectez un fournisseur de modèles linguistiques pour activer les fonctionnalités basées sur l'IA.",
+      "action": "Ajouter un fournisseur",
+      "actionDesc": "Configuration d'un fournisseur LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Aucun service n'a été découvert",
+      "description": "Les services apparaîtront automatiquement ici une fois que les traces commenceront à arriver."
+    },
+    "noNodes": {
+      "title": "Aucun nœud disponible",
+      "description": "Les nœuds de cluster apparaîtront ici une fois qu'ils seront enregistrés."
+    },
+    "noSourceMaps": {
+      "title": "Aucune carte source n'a été téléchargée",
+      "description": "Téléchargez des cartes sources pour activer des traces de pile lisibles dans vos rapports d'erreurs RUM.",
+      "action": "Téléverser",
+      "actionDesc": "Charger un fichier cartographique source"
+    },
+    "noBackfillJobs": {
+      "title": "Aucun travail de remblayage",
+      "description": "Les tâches de remblayage retraitent les données historiques via un pipeline. Exécutez-en un pour commencer."
+    },
+    "noSearchJobs": {
+      "title": "Aucune tâche de recherche planifiée",
+      "description": "Les recherches de longue durée que vous planifiez apparaîtront ici, où vous pourrez suivre leur statut et explorer les résultats une fois qu'elles sont terminées."
+    },
+    "noPipelineDestinations": {
+      "title": "Aucune destination pour le moment",
+      "description": "Cibles externes pour la sortie du pipeline : points de terminaison HTTP et cibles d'écriture distantes.",
+      "action": "Nouvelle destination",
+      "actionDesc": "Connecter une destination de pipeline"
     }
   },
   "onlineEvals": {

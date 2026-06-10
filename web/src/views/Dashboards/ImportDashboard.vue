@@ -14,46 +14,39 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2 tw:pt-1">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:px-4 tw:items-center tw:flex-nowrap tw:h-[68px]">
-        <div class="tw:flex tw:flex-col tw:flex-1">
-          <div class="tw:flex">
-            <OButton variant="outline" size="icon-xs" @click="goBack()" icon-left="arrow-back-ios-new" />
-
-            <div class="tw:text-xl tw:font-semibold tw:ml-3">
-              {{ t("dashboard.importDashboard") }}
-            </div>
-          </div>
-        </div>
-        <div class="tw:flex tw:justify-center tw:gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="goToCommunityDashboards"
-            data-test="dashboard-panel-tutorial-btn"
-            >{{ t("dashboard.communityDashboard") }}</OButton
-          >
-          <OButton
-            variant="outline"
-            size="sm-action"
-            v-close-popup
-            data-test="dashboard-import-cancel-btn"
-            @click="goBack()"
-            >{{ t("function.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :disabled="!!isLoading"
-            type="submit"
-            data-test="dashboard-import-submit-btn"
-            @click="importDashboard"
-            >{{ t("dashboard.import") }}</OButton
-          >
-        </div>
-      </div>
-    </div>
+  <div class="tw:mx-2">
+    <AppPageHeader
+      :title="t('dashboard.importDashboard')"
+      :back="{ label: t('dashboard.header'), onClick: goBack }"
+      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="goToCommunityDashboards"
+          data-test="dashboard-panel-tutorial-btn"
+          >{{ t("dashboard.communityDashboard") }}</OButton
+        >
+        <OButton
+          variant="outline"
+          size="sm-action"
+          v-close-popup
+          data-test="dashboard-import-cancel-btn"
+          @click="goBack()"
+          >{{ t("function.cancel") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!!isLoading"
+          type="submit"
+          data-test="dashboard-import-submit-btn"
+          @click="importDashboard"
+          >{{ t("dashboard.import") }}</OButton
+        >
+      </template>
+    </AppPageHeader>
     <div class="tw:flex">
       <div class="tw:flex">
         <OSplitter
@@ -179,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
+              class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
             >
               <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Error Validations</div>
               <OSeparator class="tw:mt-4" />
@@ -272,7 +265,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, reactive, watch } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  onMounted,
+  onActivated,
+  onDeactivated,
+  onUnmounted,
+  reactive,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
 import { useStore } from "vuex";
@@ -284,6 +287,7 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -728,6 +732,7 @@ export default defineComponent({
         },
       });
     };
+
     const updateActiveTab = () => {
       jsonStr.value = "";
       jsonFiles.value = null;
@@ -853,7 +858,7 @@ export default defineComponent({
       streamTypes,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, QueryEditor, OButton, OInput, OSelect, OFile,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect, OFile,
     OIcon, OSplitter,
 },
 });
@@ -865,14 +870,14 @@ export default defineComponent({
 }
 .editor-container-url {
   :deep(.monaco-editor) {
-    height: calc(100vh - 302px) !important;
+    height: calc(100vh - 285px) !important;
     overflow: hidden;
     resize: none;
   }
 }
 .dashboard-import-json-container {
   :deep(.monaco-editor) {
-    height: calc(100vh - 302px) !important;
+    height: calc(100vh - 282px) !important;
     overflow: hidden;
     resize: none;
   }
@@ -881,6 +886,11 @@ export default defineComponent({
   height: calc(81vh - 14px) !important;
   overflow: hidden;
   resize: none;
+}
+/* Border lives on the editor wrapper only (scoped, not pierced with :deep), so
+   Monaco's own internal .monaco-editor element doesn't get a second border.
+   Mirrors BaseImport.vue and removes the double-container look. */
+.monaco-editor {
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
 }

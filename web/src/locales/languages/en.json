@@ -1,4 +1,252 @@
 {
+  "emptyState": {
+    "noSearchResults": {
+      "title": "We couldn't find any data",
+      "description": "Nothing matches your current filters or time range. Try broadening your search, widening the time range, or clearing the filters.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all applied filters"
+    },
+    "noLogs": {
+      "title": "No logs in this range",
+      "description": "We didn't find any logs for the selected stream and time range. Try a wider time range or a different stream.",
+      "action": "Widen time range",
+      "actionDesc": "Search across a longer period"
+    },
+    "noDashboards": {
+      "title": "Create your first dashboard",
+      "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
+      "action": "New dashboard",
+      "actionDesc": "Start from an empty canvas",
+      "import": "Import dashboard",
+      "importDesc": "Upload a dashboard JSON file",
+      "templates": "Browse templates",
+      "templatesDesc": "Start from a community dashboard"
+    },
+    "noDashboardsInFolder": {
+      "title": "No dashboards in this folder",
+      "description": "This folder is empty. Add a dashboard here or move one from another folder.",
+      "action": "New dashboard",
+      "actionDesc": "Create a dashboard in this folder",
+      "import": "Import dashboard",
+      "importDesc": "Upload a dashboard JSON file",
+      "templates": "Browse templates",
+      "templatesDesc": "Start from a community dashboard"
+    },
+    "noGroups": {
+      "title": "No groups yet",
+      "description": "Groups let you manage permissions for multiple users at once. Create one to get started.",
+      "action": "New group",
+      "actionDesc": "Create a user group"
+    },
+    "noRoles": {
+      "title": "No roles yet",
+      "description": "Roles define what actions users can perform. Create a custom role to control access.",
+      "action": "New role",
+      "actionDesc": "Define a custom access role"
+    },
+    "noAnomalyConfigs": {
+      "title": "No anomaly detection configured",
+      "description": "Set up anomaly detection to automatically identify unusual patterns in your data.",
+      "action": "New config",
+      "actionDesc": "Configure anomaly detection"
+    },
+    "noApiLimits": {
+      "title": "No API limits configured",
+      "description": "API limits control how much data each organization can ingest and query per time window."
+    },
+    "noRoleLimits": {
+      "title": "No role limits configured",
+      "description": "Role limits define the ingest and query quotas applied to individual roles within an organization."
+    },
+    "noIngestionTokens": {
+      "title": "No ingestion tokens yet",
+      "description": "Ingestion tokens authenticate data sources when sending logs, metrics, and traces.",
+      "action": "New token",
+      "actionDesc": "Generate an ingestion token"
+    },
+    "noOrganizations": {
+      "title": "No organizations yet",
+      "description": "Organizations group your users and data together. Create one to get started."
+    },
+    "noAlertDestinations": {
+      "title": "No destinations yet",
+      "description": "Destinations define where alert notifications are sent — Slack, email, webhooks, and more.",
+      "action": "New destination",
+      "actionDesc": "Connect a notification channel"
+    },
+    "noPipelineDestinations": {
+      "title": "No destinations yet",
+      "description": "External targets for pipeline output — HTTP endpoints and remote write targets.",
+      "action": "New destination",
+      "actionDesc": "Connect a pipeline destination"
+    },
+    "noAlertTemplates": {
+      "title": "No templates yet",
+      "description": "Templates define the format of alert notification messages.",
+      "action": "New template",
+      "actionDesc": "Create a notification template"
+    },
+    "noEnrichmentTables": {
+      "title": "No enrichment tables yet",
+      "description": "Enrichment tables let you attach additional context to your log data at query time.",
+      "action": "New table",
+      "actionDesc": "Create an enrichment table"
+    },
+    "noCipherKeys": {
+      "title": "No cipher keys yet",
+      "description": "Cipher keys are used to encrypt sensitive fields in your data streams.",
+      "action": "New key",
+      "actionDesc": "Generate a cipher key"
+    },
+    "noAiToolsets": {
+      "title": "No AI toolsets yet",
+      "description": "AI toolsets connect your organization to external AI capabilities.",
+      "action": "New toolset",
+      "actionDesc": "Add an AI toolset"
+    },
+    "noLlmProviders": {
+      "title": "No LLM providers configured",
+      "description": "Connect a language model provider to enable AI-powered features.",
+      "action": "Add provider",
+      "actionDesc": "Configure an LLM provider"
+    },
+    "noDiscoveredServices": {
+      "title": "No services discovered",
+      "description": "Services will appear here automatically once traces start arriving."
+    },
+    "noNodes": {
+      "title": "No nodes available",
+      "description": "Cluster nodes will appear here once they are registered."
+    },
+    "noSourceMaps": {
+      "title": "No source maps uploaded",
+      "description": "Upload source maps to enable readable stack traces in your RUM error reports.",
+      "action": "Upload",
+      "actionDesc": "Upload a source map file"
+    },
+    "noBackfillJobs": {
+      "title": "No backfill jobs",
+      "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
+    },
+    "noPipelines": {
+      "title": "Create your first pipeline",
+      "description": "Pipelines transform and route your data as it arrives. Set one up to start shaping your streams.",
+      "action": "New pipeline",
+      "actionDesc": "Build a flow from scratch",
+      "import": "Import pipeline",
+      "importDesc": "Upload a pipeline definition"
+    },
+    "noFunctions": {
+      "title": "Create your first function",
+      "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
+      "action": "New function",
+      "actionDesc": "Write a new VRL function"
+    },
+    "noStreams": {
+      "title": "Waiting for your first data",
+      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "action": "Set up ingestion",
+      "actionDesc": "Connect a data source"
+    },
+    "noAlerts": {
+      "title": "Create your first alert",
+      "description": "Alerts notify you the moment your data crosses a threshold. Define one to start monitoring.",
+      "action": "New alert",
+      "actionDesc": "Define a condition to monitor"
+    },
+    "noIncidents": {
+      "title": "No active incidents",
+      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+    },
+    "loadError": {
+      "title": "Something went wrong",
+      "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
+      "action": "Retry",
+      "actionDesc": "Try loading the data again"
+    },
+    "noData": {
+      "title": "Nothing here yet",
+      "description": "There's no data to show right now."
+    },
+    "noTraces": {
+      "title": "No traces found",
+      "description": "No traces match the selected service and time range. Try a wider time range or a different service."
+    },
+    "noSearchHistory": {
+      "title": "No search history yet",
+      "description": "Searches you run will be listed here so you can revisit and re-run them."
+    },
+    "noSearchJobs": {
+      "title": "No scheduled search jobs",
+      "description": "Long-running searches you schedule will appear here, where you can track their status and explore results once they finish."
+    },
+    "noUsers": {
+      "title": "No users yet",
+      "description": "Invite your teammates to collaborate in this organization.",
+      "action": "Add user",
+      "actionDesc": "Invite a teammate by email"
+    },
+    "noReports": {
+      "title": "No reports yet",
+      "description": "Schedule a report to get dashboards delivered to your inbox.",
+      "action": "New report",
+      "actionDesc": "Schedule a dashboard delivery"
+    },
+    "noQueries": {
+      "title": "No running queries",
+      "description": "There are no active queries right now. Long-running queries will appear here while they run."
+    },
+    "noServiceAccounts": {
+      "title": "No service accounts yet",
+      "description": "Service accounts let applications authenticate with the API. Create one to get started.",
+      "action": "Add service account",
+      "actionDesc": "Create an API service account"
+    },
+    "noInvitations": {
+      "title": "No pending invitations",
+      "description": "Invitations you've sent or received will show up here."
+    },
+    "filtered": {
+      "title": "No {noun} found",
+      "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all filters and search",
+      "fallbackNoun": "results"
+    },
+    "nouns": {
+      "logs": "logs",
+      "dashboards": "dashboards",
+      "pipelines": "pipelines",
+      "functions": "functions",
+      "streams": "streams",
+      "alerts": "alerts",
+      "incidents": "incidents",
+      "traces": "traces",
+      "searches": "searches",
+      "searchJobs": "search jobs",
+      "users": "users",
+      "reports": "reports",
+      "queries": "queries",
+      "serviceAccounts": "service accounts",
+      "invitations": "invitations",
+      "groups": "groups",
+      "roles": "roles",
+      "anomalyConfigs": "anomaly detection configs",
+      "apiLimits": "API limits",
+      "roleLimits": "role limits",
+      "ingestionTokens": "ingestion tokens",
+      "organizations": "organizations",
+      "alertDestinations": "destinations",
+      "pipelineDestinations": "destinations",
+      "alertTemplates": "templates",
+      "enrichmentTables": "enrichment tables",
+      "cipherKeys": "cipher keys",
+      "aiToolsets": "AI toolsets",
+      "llmProviders": "LLM providers",
+      "sourceMaps": "source maps",
+      "backfillJobs": "backfill jobs"
+    }
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",
@@ -306,6 +554,12 @@
     "nlQueryGenerationSuccess": "Query generated successfully!",
     "askAIPlaceholder": "Ask AI to help with your query...",
     "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIPlaceholderRotation": {
+      "one": "Show me errors from the last hour…",
+      "two": "Find slow queries taking more than 5s…",
+      "three": "Count 5xx responses grouped by service…",
+      "four": "Filter logs where level = 'error'…"
+    },
     "enterPrompt": "Enter a prompt to generate query",
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "analyzingQuery": "Analyzing query...",
@@ -1035,7 +1289,8 @@
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
-    "subscription_plan": "Subscription Plan"
+    "subscription_plan": "Subscription Plan",
+    "manage": "Manage"
   },
   "template": {
     "header": "Templates",
@@ -1109,6 +1364,7 @@
   },
   "pipeline": {
     "header": "Pipelines",
+    "subtitle": "Transform, enrich and route data in flight",
     "create": "Create Pipeline",
     "SelectParentNode": "Select Parent Node",
     "SelectChildNode": "Select Child Node",
@@ -1226,7 +1482,9 @@
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
     "errorGettingResults": "Error while getting results",
     "save": "Save",
-    "evalTemplates": "Evaluation Templates"
+    "evalTemplates": "Evaluation Templates",
+    "selectStream": "Select a stream ...",
+    "queryEditorPlaceholder": "Select a stream or write SQL query here..."
   },
   "evalTemplate": {
     "header": "Evaluation Templates",
@@ -2082,7 +2340,8 @@
     "totalDashboard": "Dashboards",
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
-    "tabUsage": "Usage"
+    "tabUsage": "Usage",
+    "subtitle": "Your observability workspace at a glance"
   },
   "overview": {
     "title": "System Overview",
@@ -3431,6 +3690,9 @@
     "nextMatch": "Next match",
     "searchInSpans": "Search in spans",
     "spansTableView": "Spans Table View",
+    "serviceMap": "Service Map",
+    "patternView": "Pattern View",
+    "spanView": "Span View",
     "comingSoon": "Coming soon...",
     "fetchingTrace": "Fetching your trace.",
     "traceFilters": "Trace Filters",

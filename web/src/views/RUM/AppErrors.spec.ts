@@ -436,7 +436,7 @@ describe("AppErrors.vue", () => {
       wrapper = await createWrapper();
 
       const runQueryBtn = wrapper.find(
-        '[data-test="metrics-explorer-run-query-button"]',
+        '[data-test="errors-run-query-button"]',
       );
       expect(runQueryBtn.exists()).toBe(true);
       expect(runQueryBtn.text()).toBe("Run query");
@@ -446,7 +446,7 @@ describe("AppErrors.vue", () => {
       wrapper = await createWrapper();
 
       const runQueryBtn = wrapper.find(
-        '[data-test="metrics-explorer-run-query-button"]',
+        '[data-test="errors-run-query-button"]',
       );
       expect(runQueryBtn.exists()).toBe(true);
 

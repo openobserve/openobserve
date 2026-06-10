@@ -21,7 +21,7 @@ use std::{
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
     meta::inverted_index::UNKNOWN_NAME,
-    utils::tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
+    tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
 };
 use datafusion::{
     arrow::datatypes::{DataType, SchemaRef},

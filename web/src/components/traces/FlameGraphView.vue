@@ -176,7 +176,7 @@ import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
-import useTraces from "@/composables/useTraces";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { escapeHtml } from "@/utils/html";
 
 const ChartRenderer = defineAsyncComponent(
@@ -223,7 +223,6 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { searchObj } = useTraces();
 
 // State
 const cursorVisible = ref(false);
@@ -379,7 +378,7 @@ const flameGraphDataAndDepth = computed(() => {
         span.durationMs, // actual duration in ms
       ],
       itemStyle: {
-        color: searchObj.meta.serviceColors[span.serviceName] || "#9CA3AF",
+        color: getOrSetServiceColor(span.resolvedIdentity) || "#9CA3AF",
         borderColor: isSelected
           ? "#2563EB"
           : span.hasError

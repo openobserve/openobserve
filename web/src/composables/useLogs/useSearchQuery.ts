@@ -29,6 +29,8 @@ import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
+import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { buildContextualSqlMessage } from "@/utils/query/sqlDiagnostics";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -275,7 +277,28 @@ export const useSearchQuery = () => {
         searchObj.data.missingStreamMessage = "";
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         multiStreamFieldMapping = null;
+        searchObj.data.sqlSyntaxErrorRanges = [];
       }
+
+      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query
+      if (!readOnly && searchObj.meta.sqlMode && query) {
+        try {
+          const _sqlParser = new SqlParser();
+          _sqlParser.astify(query);
+        } catch (syntaxErr: any) {
+          const loc = syntaxErr?.location?.start;
+          const line = loc?.line ?? 1;
+          const col = loc?.column ?? 1;
+          const msg = buildContextualSqlMessage(query, syntaxErr);
+          searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
+          searchObj.data.sqlSyntaxErrorRanges = [
+            { startLine: line, endLine: line, column: col, error: msg },
+          ];
+          searchObj.loading = false;
+          return null;
+        }
+      }
+
       const req: any = {
         query: {
           sql: searchObj.meta.sqlMode

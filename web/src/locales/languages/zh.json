@@ -407,6 +407,12 @@
     "noData": "无可用数据",
     "functionEditorLabel": "函数编辑器",
     "loadingStream": "正在加载直播...",
+    "askAIPlaceholderRotation": {
+      "one": "让我看看过去一小时的错误...",
+      "two": "查找耗时超过 5 秒的慢速查询...",
+      "three": "计算按服务分组的 5xx 个响应...",
+      "four": "筛选等级 = “错误” 的日志..."
+    },
     "hideHistogram": "隐藏直方图",
     "disableQuickMode": "禁用快速模式",
     "menuGroupSetOnce": "设置一次",
@@ -960,7 +966,8 @@
     "subscription_type": "订阅类型",
     "proceed_subscription": "继续订阅",
     "subscription_plan": "订阅计划",
-    "makeBilledMember": "将此组织设为 {org} 的计费会员"
+    "makeBilledMember": "将此组织设为 {org} 的计费会员",
+    "manage": "管理"
   },
   "template": {
     "header": "模板",
@@ -1813,7 +1820,8 @@
     "noDataAvailable": "无可用数据",
     "tabAiAssistant": "O2 AI 助手",
     "tabOverview": "概述",
-    "tabUsage": "用法"
+    "tabUsage": "用法",
+    "subtitle": "您的可观测性工作空间一览"
   },
   "billing": {
     "header": "用量和账单",
@@ -2976,7 +2984,10 @@
     "evaluationTemplate": "评估模板",
     "evaluationTemplateHelp": "选择一个评估模板来定义 LLM 评委的标准和维度。",
     "noTemplatesFound": "未找到评估模板。在 “评估模板” 页面中创建一个。",
-    "evalTemplatesRefreshed": "评估模板已成功刷新"
+    "evalTemplatesRefreshed": "评估模板已成功刷新",
+    "subtitle": "在飞行中转换、丰富和路由数据",
+    "selectStream": "选择一个直播...",
+    "queryEditorPlaceholder": "在此处选择直播或编写 SQL 查询..."
   },
   "reports": {
     "header": "报表",
@@ -3232,7 +3243,10 @@
         "spans": "跨度"
       }
     },
-    "openInFullView": "以全视图打开"
+    "openInFullView": "以全视图打开",
+    "serviceMap": "服务地图",
+    "patternView": "图案视图",
+    "spanView": "跨度视图"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -4105,6 +4119,237 @@
       "one": "让我看看过去一小时的错误...",
       "two": "编写 VRL 来解析 nginx 日志中的 JSON...",
       "three": "为 K8s 节点运行状况构建仪表板..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "我们找不到任何数据",
+      "description": "没有与您当前的过滤条件或时间范围相匹配的内容。尝试扩大搜索范围、扩大时间范围或清除筛选条件。",
+      "action": "清除筛选条件",
+      "actionDesc": "重置所有应用的过滤器"
+    },
+    "noLogs": {
+      "title": "此范围内没有日志",
+      "description": "我们没有找到所选直播和时间范围的任何日志。尝试更宽的时间范围或其他直播。",
+      "action": "扩大时间范围",
+      "actionDesc": "在更长的时间内搜索"
+    },
+    "noDashboards": {
+      "title": "创建您的第一个仪表板",
+      "description": "仪表板将您的指标、日志和跟踪汇总到一个视图中。建造一个即可开始使用。",
+      "action": "新仪表板",
+      "actionDesc": "从空的画布开始",
+      "import": "导入控制面板",
+      "importDesc": "上传仪表板 JSON 文件",
+      "templates": "浏览模板",
+      "templatesDesc": "从社区仪表板开始"
+    },
+    "noPipelines": {
+      "title": "创建你的第一个管道",
+      "description": "管道会在数据到达时对其进行转换和路由。设置一个即可开始塑造您的直播。",
+      "action": "新管道",
+      "actionDesc": "从头开始构建流程",
+      "import": "导入管道",
+      "importDesc": "上传管道定义"
+    },
+    "noFunctions": {
+      "title": "创建你的第一个函数",
+      "description": "函数可在采集或查询时丰富和重塑您的数据。添加一个即可开始使用。",
+      "action": "新功能",
+      "actionDesc": "写一个新的 VRL 函数"
+    },
+    "noStreams": {
+      "title": "等待你的第一批数据",
+      "description": "尚未收到任何数据。连接来源，您的直播将自动显示在此处。",
+      "action": "设置摄取",
+      "actionDesc": "连接数据源"
+    },
+    "noAlerts": {
+      "title": "创建您的第一个提醒",
+      "description": "当您的数据超过阈值时，警报会通知您。定义一个开始监控。",
+      "action": "新警报",
+      "actionDesc": "定义要监控的条件"
+    },
+    "noIncidents": {
+      "title": "没有活跃事件",
+      "description": "你们都被困住了——现在没有什么需要你注意的。触发的事件将出现在此处。"
+    },
+    "loadError": {
+      "title": "出了点问题",
+      "description": "我们无法加载这些数据。这通常是暂时的，过一会再试一次。",
+      "action": "重试",
+      "actionDesc": "尝试再次加载数据"
+    },
+    "noData": {
+      "title": "这里还什么都没有",
+      "description": "目前没有数据可显示。"
+    },
+    "noTraces": {
+      "title": "未发现任何痕迹",
+      "description": "没有与所选服务和时间范围相匹配的追踪。尝试更宽的时间范围或其他服务。"
+    },
+    "noSearchHistory": {
+      "title": "尚无搜索记录",
+      "description": "您运行的搜索将在此处列出，因此您可以重新访问和重新运行这些搜索。"
+    },
+    "noUsers": {
+      "title": "还没有用户",
+      "description": "邀请你的队友在这个组织中协作。",
+      "action": "添加用户",
+      "actionDesc": "通过电子邮件邀请队友"
+    },
+    "noReports": {
+      "title": "尚无报告",
+      "description": "安排报告以将仪表板发送到您的收件箱。",
+      "action": "新报告",
+      "actionDesc": "安排仪表板交付"
+    },
+    "noQueries": {
+      "title": "没有正在运行的查询",
+      "description": "目前没有活跃的查询。长时间运行的查询将在运行时显示在此处。"
+    },
+    "noServiceAccounts": {
+      "title": "还没有服务账号",
+      "description": "服务帐号允许应用程序使用 API 进行身份验证。创建一个即可开始使用。",
+      "action": "添加服务账号",
+      "actionDesc": "创建 API 服务账号"
+    },
+    "noInvitations": {
+      "title": "没有待处理的邀请",
+      "description": "您发送或收到的邀请将显示在此处。"
+    },
+    "filtered": {
+      "title": "未找到 {名词}",
+      "description": "没有 {noun} 与您当前的筛选条件或搜索条件相匹配。尝试调整或清除它们。",
+      "action": "清除筛选条件",
+      "actionDesc": "重置所有筛选条件和搜索",
+      "fallbackNoun": "结果"
+    },
+    "nouns": {
+      "logs": "圆木",
+      "dashboards": "仪表板",
+      "pipelines": "管道",
+      "functions": "功能",
+      "streams": "流",
+      "alerts": "警报",
+      "incidents": "事件",
+      "traces": "痕迹",
+      "searches": "搜索",
+      "users": "用户",
+      "reports": "报告",
+      "queries": "查询",
+      "serviceAccounts": "服务账号",
+      "invitations": "邀请函"
+    },
+    "noDashboardsInFolder": {
+      "title": "此文件夹中没有仪表板",
+      "description": "这个文件夹是空的。在此处添加仪表板或将仪表板从另一个文件夹中移动。",
+      "action": "新仪表板",
+      "actionDesc": "在此文件夹中创建仪表板",
+      "import": "导入控制面板",
+      "importDesc": "上传仪表板 JSON 文件",
+      "templates": "浏览模板",
+      "templatesDesc": "从社区仪表板开始"
+    },
+    "noGroups": {
+      "title": "还没有群组",
+      "description": "群组允许您同时管理多个用户的权限。创建一个即可开始使用。",
+      "action": "新群组",
+      "actionDesc": "创建用户组"
+    },
+    "noRoles": {
+      "title": "还没有角色",
+      "description": "角色定义用户可以执行的操作。创建自定义角色来控制访问权限。",
+      "action": "新角色",
+      "actionDesc": "定义自定义访问角色"
+    },
+    "noAnomalyConfigs": {
+      "title": "未配置异常检测",
+      "description": "设置异常检测以自动识别数据中的异常模式。",
+      "action": "新配置",
+      "actionDesc": "配置异常检测"
+    },
+    "noApiLimits": {
+      "title": "未配置 API 限制",
+      "description": "API 限制控制每个组织在每个时间窗口可以摄取和查询多少数据。"
+    },
+    "noRoleLimits": {
+      "title": "未配置角色限制",
+      "description": "角色限制定义了适用于组织内单个角色的采集和查询配额。"
+    },
+    "noIngestionTokens": {
+      "title": "还没有摄取令牌",
+      "description": "在发送日志、指标和跟踪时，摄取令牌对数据源进行身份验证。",
+      "action": "新代币",
+      "actionDesc": "生成摄取令牌"
+    },
+    "noOrganizations": {
+      "title": "尚无组织",
+      "description": "组织将您的用户和数据分组在一起。创建一个即可开始使用。"
+    },
+    "noAlertDestinations": {
+      "title": "还没有目的地",
+      "description": "目的地定义警报通知的发送地点——Slack、电子邮件、网络挂钩等。",
+      "action": "新目的地",
+      "actionDesc": "连接通知频道"
+    },
+    "noAlertTemplates": {
+      "title": "还没有模板",
+      "description": "模板定义警报通知消息的格式。",
+      "action": "新模板",
+      "actionDesc": "创建通知模板"
+    },
+    "noEnrichmentTables": {
+      "title": "还没有浓缩表",
+      "description": "丰富表允许您在查询时为日志数据附加额外的上下文。",
+      "action": "新桌子",
+      "actionDesc": "创建浓缩表"
+    },
+    "noCipherKeys": {
+      "title": "还没有密钥",
+      "description": "密码密钥用于加密数据流中的敏感字段。",
+      "action": "新密钥",
+      "actionDesc": "生成密钥"
+    },
+    "noAiToolsets": {
+      "title": "还没有 AI 工具集",
+      "description": "AI 工具集将您的组织与外部 AI 功能连接起来。",
+      "action": "新工具集",
+      "actionDesc": "添加 AI 工具集"
+    },
+    "noLlmProviders": {
+      "title": "未配置 LLM 提供商",
+      "description": "连接语言模型提供商以启用 AI 驱动的功能。",
+      "action": "添加提供商",
+      "actionDesc": "配置 LLM 提供商"
+    },
+    "noDiscoveredServices": {
+      "title": "未发现任何服务",
+      "description": "一旦跟踪开始到达，服务将自动出现在此处。"
+    },
+    "noNodes": {
+      "title": "没有可用的节点",
+      "description": "群集节点注册后将显示在此处。"
+    },
+    "noSourceMaps": {
+      "title": "未上传任何源地图",
+      "description": "上传源映射以在 RUM 错误报告中启用可读的堆栈跟踪。",
+      "action": "上传",
+      "actionDesc": "上传源地图文件"
+    },
+    "noBackfillJobs": {
+      "title": "没有回填作业",
+      "description": "回填任务通过管道重新处理历史数据。运行一个即可开始。"
+    },
+    "noSearchJobs": {
+      "title": "没有预定的搜索任务",
+      "description": "您安排的长时间搜索将显示在此处，您可以在其中跟踪其状态并在搜索完成后浏览结果。"
+    },
+    "noPipelineDestinations": {
+      "title": "还没有目的地",
+      "description": "管道输出的外部目标 — HTTP 端点和远程写入目标。",
+      "action": "新目的地",
+      "actionDesc": "连接管道目的地"
     }
   },
   "onlineEvals": {

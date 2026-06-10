@@ -39,6 +39,7 @@ mod distinct;
 mod histogram;
 mod select;
 mod topn;
+mod topn_multi;
 mod utils;
 
 use crate::service::search::datafusion::{
@@ -49,6 +50,7 @@ use crate::service::search::datafusion::{
         histogram::{is_simple_histogram, is_simple_multi_histogram},
         select::is_simple_select,
         topn::is_simple_topn,
+        topn_multi::is_simple_topn_multi,
         utils::is_complex_plan,
     },
 };
@@ -145,10 +147,15 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
 
-            // check if the query is simple topn or simple distinct
+            // check if the query is simple topn, topn_multi or simple distinct
             if config::cluster::LOCAL_NODE.is_single_node() {
                 if let Some(index_optimize_mode) =
                     is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
+                {
+                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
+                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+                } else if let Some(index_optimize_mode) =
+                    is_simple_topn_multi(Arc::clone(&plan), self.index_fields.clone())
                 {
                     *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                     return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
@@ -266,6 +273,13 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
                 is_simple_topn(Arc::clone(&plan), index_fields.clone())
             {
                 // Check for SimpleTopN
+                let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
+                let plan = plan.rewrite(&mut rewriter)?.data;
+                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
+            } else if let Some(index_optimize_mode) =
+                is_simple_topn_multi(Arc::clone(&plan), index_fields.clone())
+            {
+                // Check for SimpleTopNMulti (two-field GROUP BY)
                 let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));

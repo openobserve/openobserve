@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2 tw:leading-tight tw:min-w-0 tw:h-full">
     <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
       <span :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`" />
-      <div class="tw:text-[0.6875rem] tw:truncate">{{ column.country }}</div>
+      <div class="tw:text-xs tw:truncate">{{ column.country }}</div>
     </div>
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-[0.625rem] tw:text-gray-500">
+    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-xs tw:text-text-secondary">
       <span class="tw:truncate">{{ column.city || "Unknown" }}</span>
       <OIcon
         data-test="circle-icon"
