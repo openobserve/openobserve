@@ -808,7 +808,8 @@ export default defineComponent({
 
       if (
         value.valueType === "absolute" &&
-        store.state.zoConfig?.auto_query_enabled
+        store.state.zoConfig?.auto_query_enabled && 
+        datetimeChanged
       ) {
         // Debounce query trigger so user can finish typing the full time value
         triggerAbsoluteQueryDebounced(value);
