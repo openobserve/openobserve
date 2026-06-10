@@ -291,6 +291,14 @@ async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
     Ok(LOCAL_NODE.uuid.clone())
 }
 
+fn is_root_password_valid(auth: &config::Auth) -> Result<(), &'static str> {
+    if auth.root_user_password_skip_validation {
+        return Ok(());
+    }
+
+    config::utils::password::validate_password_strength(&auth.root_user_password)
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
@@ -309,9 +317,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
-        if let Err(msg) =
-            config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
-        {
+        if let Err(msg) = is_root_password_valid(&cfg.auth) {
             panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
         }
         let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
@@ -928,4 +934,37 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_root_password_valid;
+
+    #[test]
+    fn should_skip_validation_when_user_requested() {
+        let auth = config::Auth {
+            root_user_password: "1".to_owned(),
+            root_user_password_skip_validation: true,
+            ..Default::default()
+        };
+
+        assert!(
+            is_root_password_valid(&auth).is_ok(),
+            "Password validation should be skipped"
+        )
+    }
+
+    #[test]
+    fn should_not_skip_validation_when_user_did_not_request() {
+        let auth = config::Auth {
+            root_user_password: "1".to_owned(),
+            root_user_password_skip_validation: false,
+            ..Default::default()
+        };
+
+        assert!(
+            is_root_password_valid(&auth).is_err(),
+            "Password validation should not be skipped"
+        )
+    }
 }

@@ -719,6 +719,12 @@ pub struct Auth {
     pub root_user_email: String,
     #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
     pub root_user_password: String,
+    #[env_config(
+        name = "ZO_ROOT_USER_PASSWORD_SKIP_VALIDATION",
+        default = false,
+        help = "Specifies bypass mandatory requirements on ZO_ROOT_USER_PASSWORD strength"
+    )]
+    pub root_user_password_skip_validation: bool,
     #[env_config(name = "ZO_ROOT_USER_TOKEN")]
     pub root_user_token: String,
     #[env_config(name = "ZO_CLI_USER_COOKIE")]
