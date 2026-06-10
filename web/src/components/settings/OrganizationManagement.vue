@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
-    <div>
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+    <div class="tw:flex tw:flex-col tw:h-full">
       <!-- Standard section header: title only. Search moved into the table toolbar. -->
       <AppPageHeader
         :title="t('settings.organizationManagement')"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="'Create and manage organizations'"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       />
-      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"
