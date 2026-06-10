@@ -1899,6 +1899,12 @@ pub struct Limit {
     )]
     pub histogram_enabled: bool,
     #[env_config(
+        name = "ZO_TIMECHART_ENABLED",
+        help = "Show timechart tab on logs page",
+        default = false
+    )]
+    pub timechart_enabled: bool,
+    #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
         default = "severity,log_level,level,status"
