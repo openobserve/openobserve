@@ -1038,7 +1038,7 @@ async fn search_tantivy_index(
                 ));
             }
             percent = row_ids_percent;
-            let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            let max_doc_id = row_ids.iter().copied().max().unwrap_or(0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {max_doc_id} is out of range, records {}",
