@@ -602,7 +602,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
-import streamService from "@/services/stream";
+import useStreams from "@/composables/useStreams";
 import {
   correlate as correlateStreams,
   getSemanticGroups,
@@ -865,6 +865,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
+    const { getStream } = useStreams();
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1381,7 +1382,9 @@ export default defineComponent({
     const schemaResolved = ref(false);
 
     /** Fetch the trace stream schema and populate streamFieldSet.
-     *  Idempotent — skips if already resolved for the current stream. */
+     *  Idempotent — skips if already resolved for the current stream.
+     *  Uses useStreams().getStream() which caches the schema in the Vuex store
+     *  so other components benefit from the cached data. */
     const resolveStreamSchema = async () => {
       if (
         !props.visible ||
@@ -1392,14 +1395,9 @@ export default defineComponent({
         return;
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const schemaResponse = await streamService.schema(
-          org,
-          props.streamFilter,
-          "traces",
-        );
+        const stream = await getStream(props.streamFilter, "traces", true);
         const schemaFields: { name: string; type: string }[] =
-          schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+          stream?.schema || [];
         streamFieldSet.value = new Set(schemaFields.map((f) => f.name));
         schemaResolved.value = true;
       } catch (err) {
@@ -1427,7 +1425,6 @@ export default defineComponent({
       if (!schemaResolved.value) return [];
       const resolved: ResourceTabConfig[] = [];
       for (const t of tabs) {
-        debugger;
         const present = t.fields.filter((f) => fieldSet.has(f));
         if (present.length === 0) continue;
         resolved.push({
