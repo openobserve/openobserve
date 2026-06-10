@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-custom-splitter"
         >
           <template #before>
+            <div style="display: flex; flex-direction: column; height: 100%;">
             <!-- Left panel header with collapse button -->
             <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:px-2 tw:py-1.5 tw:border-b tw:border-border-default tw:bg-surface-panel">
               <span class="tw:font-semibold tw:text-sm">{{ t("pipeline.buildQuery") }}</span>
@@ -54,19 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="collapseFieldList"
               />
             </div>
-            <OSplitter
-              v-model="sideBarSplitterModel"
-              style="width: 100%; height: calc(100vh - 126px) !important"
-              class="tw:h-full"
-              horizontal
+            <div class="tw:pl-2 tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+            <div
+              style="width: 100%; overflow-y: auto;"
+              class="tw:flex-1 tw:min-h-0"
             >
-              <template #before>
-                <!-- fieldlist section — flex column so FieldList fills remaining height -->
+                <!-- fieldlist section -->
                 <div
                   style="
                     display: flex;
                     flex-direction: column;
-                    height: 100%;
                     overflow: hidden;
                   "
                 >
@@ -79,14 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="query"
                       v-model:is-expanded="expandState.buildQuery"
                       :label="t('pipeline.buildQuery')"
-                      class="tw:mt-1"
                     />
                   </span>
                   <div
                     v-show="expandState.buildQuery"
                     style="
-                      flex: 1;
-                      min-height: 0;
                       display: flex;
                       flex-direction: column;
                       padding-top: 8px;
@@ -117,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
 
-                    <!-- FieldList grows to fill remaining height and scrolls internally -->
+                    <!-- FieldList scrolls within a capped height -->
                     <div
-                      style="flex: 1; min-height: 0; overflow: hidden"
+                      style="max-height: 40vh; overflow-y: auto;"
                       class="pipeline-field-list-wrapper"
                     >
                       <GroupedFieldList
@@ -217,8 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </template>
-              <template #after>
                 <span
                   @click.stop="
                     expandState.setVariables = !expandState.setVariables
@@ -234,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-show="expandState.setVariables"
-                  class="tw:flex tw:flex-col tw:pl-2 tw:pr-2 tw:pt-4 tw:h-full tw:overflow-y-auto"
+                  class="tw:flex tw:flex-col tw:pt-2"
                 >
                   <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
                     <div
@@ -820,14 +813,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   ></div>
                 </div>
-              </template>
-            </OSplitter>
+            </div>
+            </div>
+            </div>
           </template>
           <template #separator>
             <div class="splitter-vertical splitter-enabled"></div>
           </template>
           <template #after>
-            <div class="tw:w-full tw:flex tw:flex-col" style="height: 100%">
+            <div class="tw:w-full tw:flex tw:flex-col tw:border-l tw:border-border-default" style="height: 100%">
               <div
                 class="tw:flex-1 tw:overflow-auto"
                 style="height: calc(100vh - 200px) !important; width: 100%"
@@ -842,7 +836,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t('pipeline.sqlQuery')
                           : t('pipeline.promqlQuery')
                       "
-                      class="tw:mt-1"
                     />
                   </span>
                   <div class="tw:relative">
@@ -870,9 +863,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
-                </div>
 
-                <div>
+                  <div>
                   <span @click.stop="expandState.output = !expandState.output">
                     <FullViewContainer
                       name="output"
@@ -948,6 +940,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :dateTime="dateTime"
                     />
                   </div>
+                </div>
                 </div>
               </div>
 
@@ -2927,8 +2920,7 @@ defineExpose({
       width: 100%;
     }
     .query-editor-container {
-      width: 97% !important;
-      border: 1px solid $border-color;
+      width: 100% !important;
     }
 
     .q-btn {
