@@ -361,6 +361,10 @@
 
   .query-editor-container {
     height: calc(100% - 2.9rem) !important; // 35px
+
+    &.editor-fullscreen {
+      height: 70vh !important;
+    }
   }
 
   .logs-auto-refresh-interval {
