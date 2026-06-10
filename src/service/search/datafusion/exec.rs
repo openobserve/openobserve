@@ -93,6 +93,10 @@ pub fn create_session_config(
         cfg.common.feature_pushdown_filter_enabled;
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
+    if cfg.common.bloom_filter_parquet_enabled {
+        config.options_mut().execution.parquet.bloom_filter_on_read = true;
+    }
+
     if sorted_by_time {
         config
             .options_mut()

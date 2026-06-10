@@ -35,7 +35,10 @@ use config::{
     },
 };
 use hashbrown::HashSet;
-use infra::{cluster::get_node_from_consistent_hash, file_list as infra_file_list, storage};
+use infra::{
+    cluster::get_node_from_consistent_hash, file_list as infra_file_list,
+    schema::get_stream_setting_bloom_filter_fields, storage,
+};
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 
@@ -174,10 +177,16 @@ pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {
         get_config().common.column_all,
         file.key.strip_prefix("files/").unwrap()
     );
+    let org_id = columns[1];
+    let stream_type = StreamType::from(columns[2]);
+    let stream_name = columns[3];
+    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_setting);
     let new_schema = new_batches.first().unwrap().schema();
-    let new_data = write_recordbatch_to_parquet(new_schema, &new_batches, &file.meta)
-        .await
-        .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
+    let new_data =
+        write_recordbatch_to_parquet(new_schema, &new_batches, &bloom_filter_fields, &file.meta)
+            .await
+            .map_err(|e| anyhow::anyhow!("write_recordbatch_to_parquet error: {}", e))?;
     // upload filee
     storage::put(&file.account, &new_file, new_data.into()).await?;
     // delete from queue
