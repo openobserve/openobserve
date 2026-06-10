@@ -22,13 +22,11 @@ export const UNAUTHORIZED_MESSAGE =
  * text matching on the message body.
  */
 export const isAuthError = (message?: string, errorType?: string): boolean => {
-  if (errorType) {
-    return /unauthorized|forbidden|permission_denied/i.test(errorType);
+  if (errorType && /unauthorized|forbidden|permission_denied/i.test(errorType)) {
+    return true;
   }
-  if (message) {
-    return /unauthorized|forbidden|not\s+authorized|permission\s*denied/i.test(
-      message,
-    );
+  if (message && /unauthorized|forbidden|not\s+authorized|permission\s*denied/i.test(message)) {
+    return true;
   }
   return false;
 };
