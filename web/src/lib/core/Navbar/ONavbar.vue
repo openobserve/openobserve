@@ -146,4 +146,9 @@ function handleKeydown(event: KeyboardEvent) {
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
   background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
 }
+
+/* Right border only in dark mode — light mode uses shadow on the content card */
+:global(.body--dark) .o2-navbar-scroll {
+  border-right: 1px solid var(--o2-border-color);
+}
 </style>
