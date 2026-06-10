@@ -421,7 +421,8 @@
     "menuGroupSchedule": "스케줄",
     "menuGroupInspect": "검사",
     "validSql": "유효한 SQL",
-    "invalidSql": "잘못된 쿼리"
+    "invalidSql": "잘못된 쿼리",
+    "menuGroupExplain": "설명하다"
   },
   "menu": {
     "home": "홈",

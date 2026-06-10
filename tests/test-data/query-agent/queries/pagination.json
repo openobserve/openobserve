@@ -71,17 +71,17 @@
         ],
         "results": [
           [
-            "SORT-X1",
-            "hybrid",
-            "2"
-          ],
-          [
             "SORT-Z9",
             "manual",
             "2"
           ],
           [
             "SORT-X1",
+            "manual",
+            "2"
+          ],
+          [
+            "SORT-M3",
             "manual",
             "2"
           ],

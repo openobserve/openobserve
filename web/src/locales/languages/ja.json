@@ -421,7 +421,8 @@
     "menuGroupSchedule": "スケジュール",
     "menuGroupInspect": "検査",
     "validSql": "有効な SQL",
-    "invalidSql": "クエリが無効です"
+    "invalidSql": "クエリが無効です",
+    "menuGroupExplain": "説明してください"
   },
   "menu": {
     "home": "ホーム",

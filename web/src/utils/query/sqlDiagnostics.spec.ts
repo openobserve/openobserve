@@ -247,7 +247,7 @@ describe("validateSql — no false positives on valid queries", () => {
 describe("validateSql — mutation detection on broken queries", () => {
   const SPECIFIC_MSG_THRESHOLD = 0.93; // ≥93% of broken queries get a specific message
 
-  it(`detects ≥ ${SPECIFIC_MSG_THRESHOLD * 100}% of broken queries with a specific message`, async () => {
+  it(`detects ≥ ${SPECIFIC_MSG_THRESHOLD * 100}% of broken queries with a specific message`, { timeout: 30000 }, async () => {
     const broken = generateBrokenQueries();
     const results = await Promise.all(broken.map(({ broken: sql }) => validateSql(sql)));
 

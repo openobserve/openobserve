@@ -476,6 +476,7 @@
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schedule",
     "menuGroupInspect": "Inspect",
+    "menuGroupExplain": "Explain",
     "validSql": "Valid SQL",
     "invalidSql": "Invalid query",
     "toggleFunctionLabel": "Function",

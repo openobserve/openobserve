@@ -40,6 +40,11 @@ export default function useRumSpanBuilder(
     (router.currentRoute.value.query?.org_identifier as string) ||
     store.state.selectedOrganization.identifier;
 
+  // ±60s buffer around the trace time window for all RUM event queries,
+  // ensuring we capture RUM events that may have been ingested slightly
+  // before or after the backend trace spans.
+  const RUM_TIME_BUFFER_US = 60_000_000;
+
   /**
    * Fetch view events (type = 'view') for the given view IDs.
    */
@@ -56,8 +61,10 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              start_time: startTime - 60000000,
-              end_time: endTime + 60000000,
+              // +/- 60s around trace window to capture RUM events that may have
+              // been ingested slightly before or after the backend trace spans
+              start_time: startTime - RUM_TIME_BUFFER_US,
+              end_time: endTime + RUM_TIME_BUFFER_US,
               from: 0,
               size: 10,
             },
@@ -89,8 +96,10 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE action_id IN (${actionId.map((id) => `'${sanitizeTraceId(id)}'`).join(",")}) and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              start_time: startTime - 10000000,
-              end_time: endTime + 10000000,
+              // +/- 60s around trace window to capture RUM action events that may
+              // have been ingested slightly before or after the backend trace spans
+              start_time: startTime - RUM_TIME_BUFFER_US,
+              end_time: endTime + RUM_TIME_BUFFER_US,
               from: 0,
               size: 250,
             },
@@ -122,8 +131,11 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE view_id IN ('${viewIds.join("','")}') AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              start_time: startTime - 60000000,
-              end_time: endTime + 60000000,
+              // +/- 60s around trace window to capture RUM leaf events (resource,
+              // error, long_task) that may have been ingested slightly before or
+              // after the backend trace spans
+              start_time: startTime - RUM_TIME_BUFFER_US,
+              end_time: endTime + RUM_TIME_BUFFER_US,
               from: 0,
               size: 250,
             },
@@ -175,8 +187,10 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              start_time: startTime - 10000000,
-              end_time: endTime + 10000000,
+              // +/- 60s around trace window to capture the RUM resource that bridges
+              // the trace to the RUM session (view/action hierarchy)
+              start_time: startTime - RUM_TIME_BUFFER_US,
+              end_time: endTime + RUM_TIME_BUFFER_US,
               from: 0,
               size: 10,
             },

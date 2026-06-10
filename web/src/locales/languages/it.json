@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Pianificazione",
     "menuGroupInspect": "Ispezionare",
     "validSql": "SQL valido",
-    "invalidSql": "Query non valida"
+    "invalidSql": "Query non valida",
+    "menuGroupExplain": "Spiegare"
   },
   "menu": {
     "home": "Home",

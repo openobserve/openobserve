@@ -12,7 +12,7 @@ random.seed(42)
 
 # Number of queries this generator produces data for.
 # build_dataset() default must match this value.
-NUM_QUERIES = 520
+NUM_QUERIES = 575
 
 # Check for a BASE_TS override saved by compute_counts.py so that the
 # compute oracle and the test harness share the same BASE_TS. Without

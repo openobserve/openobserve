@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Calendrier",
     "menuGroupInspect": "Inspectez",
     "validSql": "SQL valide",
-    "invalidSql": "Requête non valide"
+    "invalidSql": "Requête non valide",
+    "menuGroupExplain": "Expliquez"
   },
   "menu": {
     "home": "Accueil",
