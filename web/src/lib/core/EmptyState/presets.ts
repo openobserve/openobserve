@@ -534,6 +534,25 @@ export const emptyStatePresets = {
       },
     ],
   },
+
+  // LLM Sessions list — sibling of `no-llm-insights`. Same three "no data"
+  // cases (no LLM streams in the org, the active stream has no
+  // gen_ai_conversation_id, or the window returned no sessions). No
+  // filtered branch — the page only has time + stream + page-size knobs.
+  "no-llm-sessions": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noLLMSessions.title",
+    descriptionKey: "emptyState.noLLMSessions.description",
+    actions: [
+      {
+        id: "instrument",
+        icon: "auto-awesome",
+        titleKey: "emptyState.noLLMSessions.action",
+        descriptionKey: "emptyState.noLLMSessions.actionDesc",
+      },
+    ],
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;

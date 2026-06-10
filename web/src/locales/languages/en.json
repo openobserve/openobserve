@@ -164,6 +164,12 @@
       "action": "Instrument with OpenTelemetry",
       "actionDesc": "Capture gen_ai_* attributes on your traces"
     },
+    "noLLMSessions": {
+      "title": "No LLM sessions yet",
+      "description": "Sessions are grouped by gen_ai_conversation_id. Instrument your services so each conversation tags its traces, and sessions will appear here.",
+      "action": "Instrument with OpenTelemetry",
+      "actionDesc": "Tag spans with gen_ai_conversation_id"
+    },
     "loadError": {
       "title": "Something went wrong",
       "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",

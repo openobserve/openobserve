@@ -71,22 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Shared EvalEmptyState shell (same design language used by every
-         Evaluate-tab page and LLM Insights), so the empty states across
-         the AI Observability section look identical. -->
-
-    <!-- No LLM streams in this org -->
+    <!-- Error stays separate — a failed request is a different signal from
+         "no sessions yet". Both empty shapes (no LLM streams in the org;
+         streams loaded but the window returned nothing) collapse into the
+         single OEmptyState branch below, mirroring LLM Insights. -->
     <EvalEmptyState
-      v-if="streamsLoaded && availableStreams.length === 0"
-      data-test="sessions-empty-no-streams"
-      icon="forum"
-      :title="t('traces.sessionsList.noStreamsFound')"
-      :description="`${t('traces.sessionsList.noStreamsDescription1')} gen_ai_conversation_id ${t('traces.sessionsList.noStreamsDescription2')}`"
-    />
-
-    <!-- Generic error -->
-    <EvalEmptyState
-      v-else-if="error && hasLoadedOnce"
+      v-if="error && hasLoadedOnce"
       data-test="sessions-empty-error"
       icon="error-outline"
       :title="t('traces.sessionsList.failedToLoad')"
@@ -96,14 +86,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @create="loadSessions()"
     />
 
-    <!-- Empty state — query succeeded but no sessions in this window -->
-    <EvalEmptyState
-      v-else-if="hasLoadedOnce && !loading && sessions.length === 0"
-      data-test="sessions-empty-no-data"
-      icon="forum"
-      :title="t('traces.sessionsList.noSessionsFound')"
-      :description="t('traces.sessionsList.noSessionsDescription', { stream: activeStream })"
-    />
+    <div
+      v-else-if="isEmpty"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="sessions-empty"
+    >
+      <OEmptyState
+        size="hero"
+        preset="no-llm-sessions"
+        @action="onEmptyAction"
+      />
+    </div>
 
     <!-- Table — OTable with built-in loading skeleton + own pagination
          disabled (the toolbar above already drives `currentPage` /
@@ -221,6 +214,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
@@ -272,6 +266,30 @@ const totalPages = computed(() =>
     ? Math.max(1, Math.ceil(total.value / rowsPerPage.value))
     : 1,
 );
+
+// Drives the consolidated OEmptyState branch. True for both "no LLM streams
+// in the org" and "streams exist but the window returned no sessions" — the
+// page has no filter widget to clear, so the same first-run preset (with
+// the "Instrument with OpenTelemetry" action) covers both shapes.
+const isEmpty = computed<boolean>(
+  () =>
+    streamsLoaded.value &&
+    (availableStreams.value.length === 0 ||
+      (hasLoadedOnce.value && !loading.value && sessions.value.length === 0)),
+);
+
+// `instrument` is the only action id the preset emits. Send the user to
+// the in-app AI integrations page (the closest "set this up" surface) so
+// they don't have to leave the product to find the OpenTelemetry guide.
+function onEmptyAction(id?: string) {
+  if (id !== "instrument") return;
+  router.push({
+    name: "ai-integrations",
+    query: {
+      org_identifier: store.state.selectedOrganization?.identifier,
+    },
+  });
+}
 
 watch(totalPages, (n) => {
   // Clamp the page when the total shrinks (e.g. after a re-fetch with
