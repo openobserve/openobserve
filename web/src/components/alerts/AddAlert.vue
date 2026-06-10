@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CREATE MODE: Alert Name + Folder -->
           <template v-else>
             <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-red-500">*</span></label>
+              <label class="alert-v3-inline-label">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></label>
               <OInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
@@ -114,12 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="card-container tw:shrink-0 stream-config-card">
         <div class="section-header">
           <div class="section-header-accent" />
-          <span class="section-header-title">Stream Config <span class="tw:text-red-500">*</span></span>
+          <span class="section-header-title">Stream Config <span class="tw:text-text-primary">*</span></span>
         </div>
         <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
         <!-- Stream Type -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-red-500">*</span></label>
+          <label class="alert-v3-inline-label">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamTypeRef"
             data-test="add-alert-stream-type-select-dropdown"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="tw:flex tw:items-center tw:gap-1.5">
-          <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-red-500">*</span></label>
+          <label class="alert-v3-inline-label">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></label>
           <OSelect
             ref="streamNameRef"
             data-test="add-alert-stream-name-select-dropdown"
