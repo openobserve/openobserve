@@ -20,6 +20,10 @@ import { createStore } from "vuex";
 import OtelConfig from "@/components/ingestion/logs/OtelConfig.vue";
 
 
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "false" },
+}));
+
 // Mock utility functions
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeStandard: vi.fn((str: string) => btoa(str)),

@@ -233,7 +233,7 @@ describe("SearchSchedulersList Component", () => {
         id: "user_id",
         accessorKey: "user_id",
         sortable: true,
-        size: 200,
+        size: 150,
       });
     });
 
