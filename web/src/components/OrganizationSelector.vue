@@ -86,7 +86,10 @@ const filtered = computed<OrgOption[]>(() => {
 });
 
 // ── Virtualization ──────────────────────────────────────────────
-const ROW_HEIGHT = 48;
+// One line per org: the name, with the id inline beside it only when it
+// differs from the name (an id equal to the name is redundant). Rows are a
+// uniform single line, so a fixed height is enough.
+const ROW_HEIGHT = 36;
 const scrollRef = ref<HTMLElement | null>(null);
 
 const virtualizer = useVirtualizer(
@@ -248,7 +251,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
       <div
         data-test="organization-menu-list"
-        class="tw:flex tw:flex-col tw:w-90 tw:max-w-[92vw]"
+        class="tw:flex tw:flex-col tw:w-80 tw:max-w-[92vw]"
       >
         <!-- Header: title + count (inline) + manage button -->
         <div
@@ -325,16 +328,20 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               @click="select(row.org)"
               @mousemove="highlightedIndex = row.index"
             >
-              <div
-                class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:flex-1 tw:gap-0.5"
-              >
+              <!-- Name with the id inline beside it. The id shows only when it
+                   differs from the name (an equal id is just a redundant echo).
+                   The name takes priority and is never truncated (it only clips
+                   if it alone exceeds the whole row); the id yields, truncating
+                   to whatever space is left. -->
+              <div class="tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:flex-1">
                 <span
-                  class="tw:text-[13px] tw:font-medium tw:leading-tight tw:truncate"
+                  class="tw:flex-none tw:max-w-full tw:min-w-0 tw:truncate tw:text-[13px] tw:font-medium tw:leading-tight"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
-                  class="tw:text-[11px] tw:font-mono tw:leading-tight tw:truncate tw:text-text-secondary"
+                  v-if="row.org.identifier && row.org.identifier !== row.org.label"
+                  class="tw:shrink tw:min-w-0 tw:truncate tw:text-[11px] tw:font-mono tw:leading-tight tw:text-text-secondary"
                 >
                   {{ row.org.identifier }}
                 </span>

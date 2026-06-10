@@ -43,19 +43,20 @@
        Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
        ═══════════════════════════════════════════════════════════ */
 
-    /* Surfaces — the model: BLACK page/content, BLUEISH raised panels.
+    /* Surfaces — the model: BLACK page/content, NEUTRAL-GREY raised panels.
        base + chrome share one near-black so the whole app reads black;
-       folder rails / cards / dialogs lift on the blueish slate panel. */
-    --d-chrome:    #0E1014;  /* top bar + left rail + gutter behind the card   */
-    --d-base:      #0E1014;  /* MAIN: content card + table canvas (black)       */
-    --d-well:      #16191F;  /* recessed wells, segmented-control track         */
-    --d-panel:     #252B35;  /* BLUEISH: folder/sub rails, cards, dialogs       */
-    --d-overlay:   #2F3640;  /* menus, inputs, table-header, dialog header      */
+       folder rails / cards / dialogs lift on a neutral slate (kept low on blue
+       so the org's blue theme accents pop instead of the whole UI reading blue). */
+    --d-chrome:    #0E0F11;  /* top bar + left rail + gutter behind the card   */
+    --d-base:      #0E0F11;  /* MAIN: content card + table canvas (black)       */
+    --d-well:      #17181A;  /* recessed wells, segmented-control track         */
+    --d-panel:     #282A2E;  /* raised: folder/sub rails, cards, dialogs        */
+    --d-overlay:   #313338;  /* menus, inputs, table-header, dialog header      */
 
     /* Borders & dividers — MUST read clearly against every surface above */
-    --d-divider:       #3D4550;  /* subtle: row & section separators            */
-    --d-border:        #58616F;  /* default: card / input / table / rail edges  */
-    --d-border-strong: #727C8B;  /* strong: checkbox / radio / file outlines    */
+    --d-divider:       #3C3E44;  /* subtle: row & section separators            */
+    --d-border:        #575A61;  /* default: card / input / table / rail edges  */
+    --d-border-strong: #70737B;  /* strong: checkbox / radio / file outlines    */
 
     /* Text — never pure white */
     --d-text:      #ECEEF1;  /* primary text, headings, record names            */
@@ -63,10 +64,11 @@
     --d-text-3:    #9BA3AE;  /* metadata, captions, column heads, IDs           */
 
     /* Row / item states on the content surface */
-    --d-hover:     #2C333D;  /* neutral row & list-item hover (above base)      */
+    --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
+                             the dashboard-folder hover (theme-tinted, not grey) */
     --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
                              /* selected row — teal-tinted (brand signal)       */
-    --d-zebra:     #181D25;  /* striped-row bg — a quiet lift above black base   */
+    --d-zebra:     #181A1E;  /* striped-row bg — a quiet lift above black base   */
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
