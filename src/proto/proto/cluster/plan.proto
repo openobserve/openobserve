@@ -120,17 +120,10 @@ message IdxOptimizeMode {
   oneof mode {
     SimpleTopN      simple_topn       = 4;
     SimpleDistinct  simple_distinct   = 5;
-    SimpleTopNMulti simple_topn_multi = 6;
   }
 }
 
 message SimpleTopN {
-  string field = 1;
-  uint32 limit = 2;
-  bool     asc = 3;
-}
-
-message SimpleTopNMulti {
   repeated string fields = 1;
   uint32          limit  = 2;
   bool            asc    = 3;
