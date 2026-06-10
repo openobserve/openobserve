@@ -974,6 +974,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below. -->
+    <!-- Teleport to body when expanded so position:fixed escapes every
+         overflow:hidden ancestor (content card + full-height wrappers). -->
+    <Teleport to="body" :disabled="!isFocused">
     <div
       ref="editorContainerRef"
       class="tw:flex tw:relative query-editor-container tw:w-full tw:overflow-visible"
@@ -1143,6 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSplitter>
       </div>
     </div>
+    </Teleport>
 
     <ODialog
       data-test="search-bar-confirm-dialog"
@@ -2026,32 +2030,56 @@ export default defineComponent({
 
     const isFocused = ref(false);
     const editorContainerRef = ref<HTMLElement | null>(null);
-    const fullscreenRect = ref<{ left: number; width: number; top: number } | null>(null);
+    // Saved before Teleport fires — parentElement changes to <body> after teleport
+    const editorOriginalParent = ref<HTMLElement | null>(null);
+    const fullscreenRect = ref<{ left: number; width: number; top: number; startHeight: number } | null>(null);
 
     const editorFullscreenStyle = computed(() => {
       if (!isFocused.value || !fullscreenRect.value) return {};
-      const { left, width, top } = fullscreenRect.value;
+      const { left, width, top, startHeight } = fullscreenRect.value;
       return {
         position: 'fixed' as const,
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
-        height: `${Math.round(window.innerHeight * 0.6)}px`,
+        height: `${Math.round(window.innerHeight * 0.5)}px`,
+        ['--qe-start-h' as any]: `${startHeight}px`,
         zIndex: 50,
       };
     });
+
+    let editorFullscreenResizeObserver: ResizeObserver | null = null;
+
+    const syncEditorFullscreenRect = () => {
+      // Use the saved original parent — after Teleport, parentElement becomes <body>
+      const parent = editorOriginalParent.value;
+      if (!parent || !isFocused.value || !fullscreenRect.value) return;
+      const rect = parent.getBoundingClientRect();
+      fullscreenRect.value = { ...fullscreenRect.value, left: rect.left, width: rect.width };
+    };
 
     const toggleEditorFullscreen = () => {
       if (!isFocused.value) {
         const el = editorContainerRef.value;
         if (el) {
           const rect = el.getBoundingClientRect();
-          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top };
+          fullscreenRect.value = { left: rect.left, width: rect.width, top: rect.top, startHeight: rect.height };
+          // Save original parent BEFORE isFocused flips so Teleport hasn't moved the element yet
+          editorOriginalParent.value = el.parentElement;
+          if (el.parentElement) {
+            editorFullscreenResizeObserver = new ResizeObserver(syncEditorFullscreenRect);
+            editorFullscreenResizeObserver.observe(el.parentElement);
+            window.addEventListener('resize', syncEditorFullscreenRect);
+          }
         }
         isFocused.value = true;
       } else {
         isFocused.value = false;
         fullscreenRect.value = null;
+        editorOriginalParent.value = null;
+        editorFullscreenResizeObserver?.disconnect();
+        editorFullscreenResizeObserver = null;
+        window.removeEventListener('resize', syncEditorFullscreenRect);
       }
     };
 
@@ -2312,6 +2340,10 @@ export default defineComponent({
     onBeforeUnmount(() => {
       queryEditorRef.value = null;
       fnEditorRef.value = null;
+      editorFullscreenResizeObserver?.disconnect();
+      editorFullscreenResizeObserver = null;
+      editorOriginalParent.value = null;
+      window.removeEventListener('resize', syncEditorFullscreenRect);
     });
 
     const transformsLabel = computed(() => {
@@ -5276,16 +5308,16 @@ export default defineComponent({
   top: 0;
   margin-right: 0.25rem;
   min-width: 10rem;
-  background-color: var(--o2-card-bg);
-  border: 0.063rem solid var(--o2-border-color);
+  background-color: var(--color-dropdown-bg);
+  border: 0.063rem solid var(--color-dropdown-border);
   border-radius: 0.375rem;
   box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   padding: 0.25rem 0;
   z-index: 9999;
 
   body.body--dark & {
-    background-color: var(--o2-card-bg);
-    border-color: var(--o2-border-color);
+    background-color: var(--color-dropdown-bg);
+    border-color: var(--color-dropdown-border);
     box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }
 }
@@ -5480,12 +5512,20 @@ html.dark .file-type label,
   min-height: 30px !important;
 }
 
+/* Clip-path animation: element is immediately full-height (no transparent gap),
+   only the visible region grows downward from the original editor height. */
+@keyframes editor-expand {
+  from { clip-path: inset(0 0 calc(100% - var(--qe-start-h, 3rem)) 0 round 0.375rem); }
+  to   { clip-path: inset(0 round 0.375rem); }
+}
+
 .editor-fullscreen {
   overflow: hidden !important;
   background: var(--o2-body-primary-bg) !important;
   border: 1px solid var(--o2-border-color);
   border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1.25rem 3rem rgba(0, 0, 0, 0.25);
+  animation: editor-expand 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .query-mode-toggle {
