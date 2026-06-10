@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimeRef"
           auto-apply
           menu-align="end"
-          :default-type="datetime.type"
+          :default-type="dateState.valueType"
           :default-absolute-time="{
-            startTime: datetime.startTime,
-            endTime: datetime.endTime,
+            startTime: dateState.startTime ?? 0,
+            endTime: dateState.endTime ?? 0,
           }"
-          :default-relative-time="datetime.relativeTimePeriod"
+          :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-llm-insights-date-time"
           class="tw:h-[2rem]"
           @on:date-change="onDateChange"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
@@ -72,6 +72,10 @@ import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import {
+  useAiDateRange,
+  resolveAiDateWindow,
+} from "@/enterprise/composables/useAiDateRange";
 
 defineOptions({ name: "AILLMInsightsPage" });
 
@@ -81,17 +85,10 @@ const router = useRouter();
 
 const DEFAULT_RELATIVE = "15m";
 
-const datetime = reactive<{
-  type: "relative" | "absolute";
-  startTime: number;
-  endTime: number;
-  relativeTimePeriod: string;
-}>({
-  type: "relative",
-  startTime: 0,
-  endTime: 0,
-  relativeTimePeriod: DEFAULT_RELATIVE,
-});
+// Shared across LLM Insights, LLM Sessions, and Quality — picking a window
+// on any of the three lands on the other two (singleton ref + localStorage
+// persistence). See useAiDateRange.ts for the contract.
+const { state: dateState } = useAiDateRange();
 
 const timeRange = ref({ startTime: 0, endTime: 0 });
 const streamName = ref("");
@@ -103,15 +100,23 @@ function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
   if (!range) return;
   timeRange.value = { startTime: range.startTime, endTime: range.endTime };
-  datetime.startTime = range.startTime;
-  datetime.endTime = range.endTime;
+  // Persist the re-anchored absolute bounds on the shared state too so a
+  // later page-mount that prefers absolute over relative still gets the
+  // correct window.
+  dateState.value = {
+    ...dateState.value,
+    valueType: "relative",
+    relativeTimePeriod: period,
+    startTime: range.startTime,
+    endTime: range.endTime,
+  };
 }
 
-// URL ↔ datetime sync. Mirrors the Logs convention:
+// URL ↔ shared date sync. Mirrors the Logs convention:
 //   - relative: ?period=15m
 //   - absolute: ?from=<micros>&to=<micros>
-// On mount, an existing absolute window wins over the default relative
-// period so deep-link / share-link URLs reproduce the same view.
+// On mount, an existing URL window wins over the cross-page shared state
+// so deep-link / share-link URLs reproduce the exact saved view.
 function readFromUrl(): boolean {
   const fromRaw = route.query.from;
   const toRaw = route.query.to;
@@ -121,18 +126,18 @@ function readFromUrl(): boolean {
     const startTime = Number(fromRaw);
     const endTime = Number(toRaw);
     if (Number.isFinite(startTime) && Number.isFinite(endTime) && endTime > startTime) {
-      datetime.type = "absolute";
-      datetime.startTime = startTime;
-      datetime.endTime = endTime;
-      datetime.relativeTimePeriod = "";
+      dateState.value = {
+        valueType: "absolute",
+        startTime,
+        endTime,
+        relativeTimePeriod: null,
+      };
       timeRange.value = { startTime, endTime };
       return true;
     }
   }
 
   if (typeof periodRaw === "string" && periodRaw) {
-    datetime.type = "relative";
-    datetime.relativeTimePeriod = periodRaw;
     applyRelative(periodRaw);
     return true;
   }
@@ -145,13 +150,13 @@ function writeToUrl() {
   // future filters, …). Use replace() so the date picker doesn't pollute
   // browser history with one entry per range change.
   const next: Record<string, any> = { ...route.query };
-  if (datetime.type === "relative") {
-    next.period = datetime.relativeTimePeriod;
+  if (dateState.value.valueType === "relative") {
+    next.period = dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE;
     delete next.from;
     delete next.to;
   } else {
-    next.from = String(datetime.startTime);
-    next.to = String(datetime.endTime);
+    next.from = String(dateState.value.startTime ?? 0);
+    next.to = String(dateState.value.endTime ?? 0);
     delete next.period;
   }
   router.replace({ query: next }).catch(() => {});
@@ -159,13 +164,14 @@ function writeToUrl() {
 
 async function onDateChange(value: any) {
   if (value?.valueType === "relative" && value.relativeTimePeriod) {
-    datetime.type = "relative";
-    datetime.relativeTimePeriod = value.relativeTimePeriod;
     applyRelative(value.relativeTimePeriod);
   } else {
-    datetime.type = "absolute";
-    datetime.startTime = value.startTime;
-    datetime.endTime = value.endTime;
+    dateState.value = {
+      valueType: "absolute",
+      startTime: value.startTime,
+      endTime: value.endTime,
+      relativeTimePeriod: null,
+    };
     timeRange.value = { startTime: value.startTime, endTime: value.endTime };
   }
   writeToUrl();
@@ -181,8 +187,8 @@ async function refresh() {
   if (isRefreshing.value) return;
   isRefreshing.value = true;
   try {
-    if (datetime.type === "relative") {
-      applyRelative(datetime.relativeTimePeriod);
+    if (dateState.value.valueType === "relative") {
+      applyRelative(dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
       // Re-anchored window means the absolute start/end shifted; mirror
       // that in the URL so a share-link captured right after refresh is
       // pointing at the same data the user just saw (we still keep the
@@ -200,11 +206,22 @@ async function refresh() {
 }
 
 onMounted(() => {
-  // Seed from URL if present; fall back to the default relative window
-  // (and write that default back so the URL always carries the state).
-  if (!readFromUrl()) {
+  // Precedence: URL > shared state (cross-page persisted) > default relative.
+  // The shared state is already loaded from localStorage by the composable.
+  if (readFromUrl()) return;
+
+  const window = resolveAiDateWindow(dateState.value);
+  if (window) {
+    timeRange.value = window;
+    // If the existing shared state is relative, re-anchor `startTime/endTime`
+    // on it too so other consumers reading the absolute fields get a window
+    // anchored to *this* page-mount instead of stale microsecond bounds.
+    if (dateState.value.valueType === "relative") {
+      applyRelative(dateState.value.relativeTimePeriod ?? DEFAULT_RELATIVE);
+    }
+  } else {
     applyRelative(DEFAULT_RELATIVE);
-    writeToUrl();
   }
+  writeToUrl();
 });
 </script>

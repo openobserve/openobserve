@@ -384,6 +384,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
+import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
 import { downloadFile } from "@/utils/dom";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
@@ -531,44 +532,14 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 // embedded AppPageHeader's #actions slot (matching LLM Insights / Sessions).
 // QualityPage consumes `qualityDateWindow` as a prop and exposes
 // `refreshAll` + `isAnyLoading` for the Refresh button below.
-const QUALITY_DATE_LS_KEY = "evaluations:quality:dateRange";
+//
+// Date state is the shared `useAiDateRange()` ref — the same singleton
+// driving LLM Insights and Sessions — so picking a window on one page
+// lands on the other two (incl. across reloads via localStorage).
+const { state: qualitySelectedDate } = useAiDateRange();
 
-interface QualityPersistedDate {
-  valueType: "relative" | "absolute";
-  startTime: number | null;
-  endTime: number | null;
-  relativeTimePeriod: string | null;
-}
-
-function loadQualityPersistedDate(): QualityPersistedDate {
-  const defaults: QualityPersistedDate = {
-    valueType: "relative",
-    startTime: null,
-    endTime: null,
-    relativeTimePeriod: "7d",
-  };
-  try {
-    const raw = localStorage.getItem(QUALITY_DATE_LS_KEY);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return defaults;
-    return {
-      valueType: parsed.valueType === "absolute" ? "absolute" : "relative",
-      startTime: typeof parsed.startTime === "number" ? parsed.startTime : null,
-      endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
-      relativeTimePeriod:
-        typeof parsed.relativeTimePeriod === "string"
-          ? parsed.relativeTimePeriod
-          : "7d",
-    };
-  } catch {
-    return defaults;
-  }
-}
-
-const qualitySelectedDate = ref<QualityPersistedDate>(loadQualityPersistedDate());
 const qualityDateWindow = ref<DateWindow>({
-  startUs: (Date.now() - 7 * 24 * 60 * 60 * 1000) * 1000,
+  startUs: (Date.now() - 15 * 60 * 1000) * 1000,
   endUs: Date.now() * 1000,
 });
 const qualityDatePickerRef = ref<{
@@ -588,16 +559,12 @@ function syncQualityDateWindow() {
   }
 }
 
-// No deep flag: DateTimePickerDashboard's `update:modelValue` emits a brand
-// new `{valueType,startTime,endTime,relativeTimePeriod}` object on every
-// commit, so the top-level ref identity changes and the watch fires
-// without needing to traverse the four primitive leaves.
-watch(qualitySelectedDate, (next) => {
-  try {
-    localStorage.setItem(QUALITY_DATE_LS_KEY, JSON.stringify(next));
-  } catch {
-    // ignore storage failures (private mode, quota, etc.)
-  }
+// LocalStorage persistence is handled inside the composable now. This watch
+// only forwards the change into the absolute `dateWindow` the QualityPage
+// reads as a prop. No deep flag: DateTimePickerDashboard's
+// `update:modelValue` emits a brand-new object on every commit, so the
+// top-level ref identity changes and this watch fires.
+watch(qualitySelectedDate, () => {
   syncQualityDateWindow();
 });
 
