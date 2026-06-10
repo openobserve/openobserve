@@ -3241,7 +3241,8 @@
     "confirmRejectMsg": "{org} 가입 초대를 정말로 거부하시겠습니까?",
     "expired": "만료",
     "expiresToday": "오늘 만료",
-    "daysLeft": "{일} 일 남음"
+    "daysLeft": "{일} 일 남음",
+    "search": "초대장 검색"
   },
   "serviceAccounts": {
     "header": "서비스 계정",
@@ -4327,6 +4328,16 @@
       "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
       "action": "새 목적지",
       "actionDesc": "파이프라인 대상 연결"
+    },
+    "noEvalTemplates": {
+      "title": "평가 템플릿이 아직 없습니다.",
+      "description": "평가 템플릿은 LLM 평가를 위한 재사용 가능한 채점 기준을 정의합니다.",
+      "action": "새 템플릿",
+      "actionDesc": "평가 템플릿 생성"
+    },
+    "noPipelineHistory": {
+      "title": "아직 파이프라인 기록이 없습니다.",
+      "description": "파이프라인이 실행되면 파이프라인 실행 기록이 여기에 표시됩니다."
     }
   },
   "onlineEvals": {

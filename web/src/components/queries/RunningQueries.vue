@@ -126,10 +126,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <RunningQueriesList
               :rows="rowsQuery"
+              :filtered="!!filterQuery"
               v-model:selectedRows="selectedRow['all']"
               @delete:query="confirmDeleteAction"
               @delete:queries="handleMultiQueryCancel"
               @show:schema="listSchema"
+              @clear:filters="filterQuery = ''"
             />
           </div>
           <div
@@ -139,9 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <SummaryList
               :rows="summaryRows"
+              :filtered="!!filterQuery"
               v-model:selectedRows="selectedRow['summary']"
               @filter:queries="filterUserQueries"
               @delete:queries="handleMultiQueryCancel"
+              @clear:filters="filterQuery = ''"
             />
           </div>
         </div>

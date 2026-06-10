@@ -3239,7 +3239,8 @@
     "confirmRejectMsg": "Sei sicuro di voler rifiutare l'invito a partecipare a {org}?",
     "expired": "Scaduto",
     "expiresToday": "Scade oggi",
-    "daysLeft": "{giorni} giorni rimanenti"
+    "daysLeft": "{giorni} giorni rimanenti",
+    "search": "Cerca inviti"
   },
   "serviceAccounts": {
     "header": "Account di servizio",
@@ -4325,6 +4326,16 @@
       "description": "Destinazioni esterne per l'output della pipeline: endpoint HTTP e destinazioni di scrittura remota.",
       "action": "Nuova destinazione",
       "actionDesc": "Connetti una destinazione della pipeline"
+    },
+    "noEvalTemplates": {
+      "title": "Non sono ancora disponibili modelli di valutazione",
+      "description": "I modelli di valutazione definiscono criteri di punteggio riutilizzabili per le valutazioni LLM.",
+      "action": "Nuovo modello",
+      "actionDesc": "Crea un modello di valutazione"
+    },
+    "noPipelineHistory": {
+      "title": "Ancora nessuna cronologia delle pipeline",
+      "description": "La cronologia delle esecuzioni delle pipeline verrà visualizzata qui una volta eseguite le pipeline."
     }
   },
   "onlineEvals": {

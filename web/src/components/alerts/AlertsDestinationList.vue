@@ -78,6 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-alert-destinations"
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
@@ -319,14 +322,19 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "type",
         header: "Type",
         accessorKey: "type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -334,6 +342,8 @@ export default defineComponent({
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
+        resizable: true,
+        hideable: true,
         size: COL.url,
         meta: { align: "left" },
       },
@@ -342,6 +352,8 @@ export default defineComponent({
         header: t("alert_destinations.template"),
         accessorKey: "template",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.template,
         meta: { align: "left" },
       },
@@ -350,6 +362,8 @@ export default defineComponent({
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.method,
         meta: { align: "left" },
       },

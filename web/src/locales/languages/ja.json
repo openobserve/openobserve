@@ -3337,7 +3337,8 @@
     "confirmRejectMsg": "{org} への招待を拒否してもよろしいですか？",
     "expired": "期限切れ",
     "expiresToday": "本日期限切れ",
-    "daysLeft": "残り {日} 日"
+    "daysLeft": "残り {日} 日",
+    "search": "招待状を検索"
   },
   "regex_patterns": {
     "title": "機密データの編集",
@@ -4314,6 +4315,16 @@
       "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
       "action": "新しい目的地",
       "actionDesc": "パイプラインデスティネーションの接続"
+    },
+    "noEvalTemplates": {
+      "title": "評価テンプレートはまだありません",
+      "description": "評価テンプレートは、LLM評価のための再利用可能な採点基準を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "評価テンプレートを作成する"
+    },
+    "noPipelineHistory": {
+      "title": "パイプライン履歴はまだありません",
+      "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
     }
   },
   "onlineEvals": {

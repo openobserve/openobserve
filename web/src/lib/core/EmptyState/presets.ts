@@ -427,6 +427,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-eval-templates": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noEvalTemplates.title",
+    descriptionKey: "emptyState.noEvalTemplates.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEvalTemplates.action",
+        descriptionKey: "emptyState.noEvalTemplates.actionDesc",
+      },
+    ],
+  },
   "no-enrichment-tables": {
     illustration: "box",
     variant: "create",
@@ -515,6 +529,12 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+  "no-pipeline-history": {
+    illustration: "history",
+    variant: "neutral",
+    titleKey: "emptyState.noPipelineHistory.title",
+    descriptionKey: "emptyState.noPipelineHistory.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -548,10 +568,12 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alert-destinations": "emptyState.nouns.alertDestinations",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
   "no-ai-toolsets": "emptyState.nouns.aiToolsets",
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-pipeline-history": "emptyState.nouns.pipelineHistory",
 };

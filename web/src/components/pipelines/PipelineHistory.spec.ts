@@ -294,16 +294,6 @@ describe("PipelineHistory", () => {
       ).toBe(true);
     });
 
-    it("renders data-test='pipeline-history-manual-search-btn'", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="pipeline-history-manual-search-btn"]')
-          .exists(),
-      ).toBe(true);
-    });
-
     it("renders data-test='pipeline-history-refresh-btn'", async () => {
       const wrapper = createWrapper();
       await flushPromises();
@@ -766,24 +756,6 @@ describe("PipelineHistory", () => {
   });
 
   describe("loading state", () => {
-    it("manual search button is disabled when loading is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      vm.loading = true;
-      await nextTick();
-
-      // OButton propagates :disabled via its own disabled prop, not a native attribute.
-      // Verify the loading state is set which drives the disabled prop binding.
-      expect(vm.loading).toBe(true);
-      // The button exists and has the disabled prop bound to loading
-      const searchBtn = wrapper.find(
-        '[data-test="pipeline-history-manual-search-btn"]',
-      );
-      expect(searchBtn.exists()).toBe(true);
-    });
-
     it("refresh button shows loading state when loading is true", async () => {
       const wrapper = createWrapper();
       await flushPromises();

@@ -228,6 +228,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -317,7 +318,7 @@ export default defineComponent({
           header: t("search_history.executed_at"),
           accessorKey: "executed_time",
           sortable: true,
-          size: 200,
+          size: COL.createdAt,
           meta: { align: "left" },
         },
         {

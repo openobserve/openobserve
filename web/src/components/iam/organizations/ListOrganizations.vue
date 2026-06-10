@@ -54,6 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-organizations-list"
         >
           <template #toolbar>
             <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
@@ -122,7 +125,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -166,6 +169,8 @@ export default defineComponent({
         header: t("organization.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 500,
         meta: { align: "left", isName: true },
       },
@@ -174,13 +179,18 @@ export default defineComponent({
         header: t("organization.identifier"),
         accessorKey: "identifier",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
+        resizable: true,
+        hideable: true,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "type",
         header: t("organization.type"),
         accessorKey: "type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 150,
         meta: { align: "left" },
       },
@@ -192,6 +202,9 @@ export default defineComponent({
         header: t("organization.subscription_plan"),
         accessorKey: "plan",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       });
     }

@@ -67,6 +67,10 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "true" },
+}));
+
 vi.mock("@/utils/zincutils", async () => {
   const actual = await vi.importActual("@/utils/zincutils");
   return {

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
-    <div data-test="add-report-section" class="tw:w-full create-report-page">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
+    <div data-test="add-report-section" class="tw:w-full tw:flex tw:flex-col tw:flex-1 tw:min-h-0 create-report-page">
       <AppPageHeader
         :title="isEditingReport ? t('reports.update') : t('reports.add')"
         :back="{
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           onClick: () => router.back(),
           dataTest: 'add-report-back-btn',
         }"
-        class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default tw:mb-[0.675rem]"
+        class="tw:px-4 tw:border-b tw:border-border-default"
       >
         <template #title>
           <span data-test="add-report-title">{{
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AppPageHeader>
       <div
-        class="tw:flex card-container tw:mb-[0.675rem] tw:h-[calc(100vh-12.5rem)] tw:overflow-auto"
+        class="tw:flex card-container tw:flex-1 tw:min-h-0 tw:overflow-auto"
       >
         <div
           ref="addAlertFormRef"
@@ -713,15 +713,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container tw:sticky! tw:bottom-2.5"
+      class="tw:flex tw:justify-end tw:px-3 tw:w-full tw:py-3 card-container tw:sticky! tw:bottom-0 tw:border-t tw:border-[var(--o2-border-color)]"
       style="z-index: 2"
       :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
-      :style="{
-        'box-shadow':
-          store.state.theme === 'dark'
-            ? 'rgb(45 45 45) 0px -4px 7px 0px'
-            : 'rgb(240 240 240) 0px -4px 7px 0px',
-      }"
     >
       <OButton
         data-test="add-report-cancel-btn"

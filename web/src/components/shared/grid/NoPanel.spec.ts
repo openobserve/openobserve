@@ -79,7 +79,7 @@ describe("NoPanel", () => {
 
     it("should show the descriptive message", () => {
       expect(wrapper.text()).toContain(
-        "Add your first panel to start visualizing logs, metrics, and traces.",
+        "Add a panel to start visualizing logs, metrics, and traces.",
       );
     });
 

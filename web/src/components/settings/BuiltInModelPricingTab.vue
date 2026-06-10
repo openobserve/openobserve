@@ -64,6 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         pagination="none"
         :bordered="false"
+        :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-builtin-model-pricing"
         selection="multiple"
         v-model:selected-ids="selectedIds"
         class="tw:h-[calc(100vh-120px)]"
@@ -172,6 +176,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface ModelTier {
@@ -210,14 +215,20 @@ export default defineComponent({
         header: t("modelPricing.colModel"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.defaultModel,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "pattern",
         header: t("modelPricing.colPattern"),
         accessorKey: "match_pattern",
         sortable: false,
-        size: 200,
+        resizable: true,
+        hideable: true,
+        size: COL.template,
         meta: { align: "left" },
       },
       {
@@ -225,6 +236,9 @@ export default defineComponent({
         header: t("modelPricing.colPricingSimple"),
         accessorKey: "tiers",
         sortable: false,
+        resizable: true,
+        hideable: true,
+        size: COL.description,
         meta: { align: "left" },
       },
     ];

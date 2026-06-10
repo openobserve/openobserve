@@ -86,6 +86,12 @@
       "action": "New template",
       "actionDesc": "Create a notification template"
     },
+    "noEvalTemplates": {
+      "title": "No evaluation templates yet",
+      "description": "Evaluation templates define reusable scoring criteria for LLM evaluations.",
+      "action": "New template",
+      "actionDesc": "Create an evaluation template"
+    },
     "noEnrichmentTables": {
       "title": "No enrichment tables yet",
       "description": "Enrichment tables let you attach additional context to your log data at query time.",
@@ -127,6 +133,10 @@
     "noBackfillJobs": {
       "title": "No backfill jobs",
       "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
+    },
+    "noPipelineHistory": {
+      "title": "No pipeline history yet",
+      "description": "Pipeline execution history will appear here once your pipelines run."
     },
     "noPipelines": {
       "title": "Create your first pipeline",
@@ -239,12 +249,14 @@
       "alertDestinations": "destinations",
       "pipelineDestinations": "destinations",
       "alertTemplates": "templates",
+      "evalTemplates": "evaluation templates",
       "enrichmentTables": "enrichment tables",
       "cipherKeys": "cipher keys",
       "aiToolsets": "AI toolsets",
       "llmProviders": "LLM providers",
       "sourceMaps": "source maps",
-      "backfillJobs": "backfill jobs"
+      "backfillJobs": "backfill jobs",
+      "pipelineHistory": "pipeline history"
     }
   },
   "common": {
@@ -1163,6 +1175,7 @@
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
+    "search": "Search Invitations",
     "organizationName": "Organization Name",
     "role": "Role",
     "invitedBy": "Invited By",
@@ -1532,7 +1545,7 @@
     "header": "Functions",
     "add": "New function",
     "search": "Search Function",
-    "name": "Name",
+    "name": "Enter Function Name",
     "function": "Function Detail",
     "save": "Save",
     "jsfunction": "JavaScript Function",
@@ -1721,6 +1734,7 @@
     "aiLabel": "AI Integrations",
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
+    "orgLevelSummary": "Organization-level tokens for ingestion endpoints.",
     "resetDefaultTokenLabel": "Reset Token",
     "tokenManagementTitle": "Manage Ingestion Tokens",
     "defaultTokenBadge": "DEFAULT",

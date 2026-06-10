@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
-    <div>
+  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
+    <div class="tw:flex tw:flex-col tw:h-full">
       <!-- Standard section header: title only. Search moved into the table toolbar. -->
       <AppPageHeader
         :title="t('settings.organizationManagement')"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="'Create and manage organizations'"
         class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       />
-      <div class="card-container tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"
@@ -37,6 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="org-management-list"
         :show-global-filter="false"
         :loading="loading"
       >
@@ -208,6 +211,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -274,12 +278,19 @@ export default defineComponent({
         header: t("settings.org_name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 200,
+        meta: { align: "left", flex: true },
       },
       {
         id: "identifier",
         header: t("settings.org_identifier"),
         accessorKey: "identifier",
+        resizable: true,
+        hideable: true,
+        size: COL.name,
         meta: { align: "left" },
       },
       {
@@ -287,6 +298,9 @@ export default defineComponent({
         header: t("settings.subscription_status"),
         accessorKey: "plan",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {
@@ -294,6 +308,9 @@ export default defineComponent({
         header: "Provider",
         accessorKey: "billing_provider",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -301,6 +318,9 @@ export default defineComponent({
         header: t("settings.created_on"),
         accessorKey: "created_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -308,6 +328,9 @@ export default defineComponent({
         header: t("settings.trial_expiry"),
         accessorKey: "trial_expires_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -315,6 +338,9 @@ export default defineComponent({
         header: "Contract End",
         accessorKey: "contract_end_date_display",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {

@@ -19,6 +19,7 @@
     /* --- Text --- */
     --color-text-heading:     var(--color-grey-50);   /* h1-h6, modal titles */
     --color-text-primary:     var(--color-grey-50);   /* alias for heading */
+    --color-text-soft:        var(--color-grey-50);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--color-grey-200) */
     --color-text-body:        var(--color-grey-200);  /* paragraphs, default body */
     --color-text-secondary:   var(--color-grey-400);  /* supporting text, descriptions */
     --color-text-caption:     var(--color-grey-400);  /* captions, footnotes, timestamps */

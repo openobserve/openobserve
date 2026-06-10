@@ -21,46 +21,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <EmptyState
-    title="This dashboard is empty"
-    description="Add your first panel to start visualizing logs, metrics, and traces."
-    :actions-label="viewOnly ? '' : 'Add a panel'"
+    title="No panels here yet"
+    description="Add a panel to start visualizing logs, metrics, and traces."
   >
     <template #illustration>
-      <!-- Animated SVG illustration — subtle motion conveys the "empty, waiting"
-           state without competing with the action below. -->
       <EmptyPanel data-test="empty-panel-art" />
     </template>
 
     <template #actions>
-      <template v-if="!viewOnly">
-        <QuickStartCard
-          icon="show-chart"
-          label="Time series"
-          sublabel="Trends over time"
-          data-test="dashboard-if-no-panel-add-panel-btn"
-          @click="$emit('add')"
-        />
-        <QuickStartCard
-          icon="bar-chart"
-          label="Bar chart"
-          sublabel="Compare categories"
-          @click="$emit('add')"
-        />
-        <QuickStartCard
-          icon="table-chart"
-          label="Table"
-          sublabel="Rows &amp; raw values"
-          @click="$emit('add')"
-        />
-      </template>
+      <QuickStartCard
+        v-if="!viewOnly"
+        icon="add"
+        label="Add panel"
+        sublabel="Charts, tables &amp; more"
+        data-test="dashboard-if-no-panel-add-panel-btn"
+        @click="$emit('add')"
+      />
     </template>
   </EmptyState>
 </template>
 
 <script setup lang="ts">
 import EmptyState from "./EmptyState.vue";
-import QuickStartCard from "./QuickStartCard.vue";
 import EmptyPanel from "../illustrations/EmptyPanel.vue";
+import QuickStartCard from "./QuickStartCard.vue";
 
 defineProps<{ viewOnly?: boolean }>();
 defineEmits<{ add: [] }>();

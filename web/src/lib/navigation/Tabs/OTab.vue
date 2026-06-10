@@ -90,6 +90,8 @@ const stateClasses = computed<string>(() => {
   if (props.disable) {
     return [
       'tw:text-tabs-disabled-text tw:cursor-not-allowed tw:opacity-60',
+      // Keep the transparent left border so disabled items don't shift width.
+      isVertical.value ? 'tw:border-l-2 tw:border-transparent' : '',
     ].join(' ')
   }
   if (isActive.value) {
@@ -97,12 +99,12 @@ const stateClasses = computed<string>(() => {
     // shared bar in OTabs that slides between tabs, so each tab keeps a
     // transparent 2px border (layout parity with inactive) rather than drawing
     // its own colored one.
-    // Vertical tabs (side rail): tint bg + primary text, NO left bar — identical
-    // to SectionRail and the prototype .l2-link so every vertical nav matches.
+    // Vertical tabs (side rail): tint bg + primary text + a colored left accent
+    // border that reads as the active rail marker.
     return [
       'tw:text-tabs-active-text tw:cursor-pointer',
       isVertical.value
-        ? 'tw:bg-tabs-active-bg'
+        ? 'tw:bg-tabs-active-bg tw:border-l-2 tw:border-tabs-indicator'
         : 'tw:border-b-2 tw:border-transparent',
     ].join(' ')
   }
@@ -111,8 +113,9 @@ const stateClasses = computed<string>(() => {
     isVertical.value
       ? 'tw:enabled:hover:text-tabs-hover-text tw:enabled:hover:bg-tabs-hover-bg'
       : 'tw:enabled:hover:text-tabs-hover-text',
-    // Horizontal keeps a transparent bottom border to avoid activation layout shift.
-    isVertical.value ? '' : 'tw:border-b-2 tw:border-transparent',
+    // Transparent border (left for vertical, bottom for horizontal) keeps inactive
+    // items the same size as the active one — no layout shift on activation.
+    isVertical.value ? 'tw:border-l-2 tw:border-transparent' : 'tw:border-b-2 tw:border-transparent',
   ].join(' ')
 })
 

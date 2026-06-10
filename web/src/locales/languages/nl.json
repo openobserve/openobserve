@@ -3241,7 +3241,8 @@
     "confirmRejectMsg": "Weet je zeker dat je de uitnodiging om lid te worden {org} wilt weigeren?",
     "expired": "Vervallen",
     "expiresToday": "Vervalt vandaag",
-    "daysLeft": "{dagen} resterende dagen"
+    "daysLeft": "{dagen} resterende dagen",
+    "search": "Uitnodigingen zoeken"
   },
   "serviceAccounts": {
     "header": "Serviceaccounts",
@@ -4327,6 +4328,16 @@
       "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
       "action": "Nieuwe bestemming",
       "actionDesc": "Een pijplijnbestemming aansluiten"
+    },
+    "noEvalTemplates": {
+      "title": "Nog geen evaluatiesjablonen",
+      "description": "Evaluatiesjablonen definiëren herbruikbare scorecriteria voor LLM-evaluaties.",
+      "action": "Nieuw sjabloon",
+      "actionDesc": "Maak een evaluatiesjabloon"
+    },
+    "noPipelineHistory": {
+      "title": "Nog geen geschiedenis van de pijplijn",
+      "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
     }
   },
   "onlineEvals": {
