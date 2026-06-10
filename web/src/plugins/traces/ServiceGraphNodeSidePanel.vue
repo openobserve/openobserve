@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
               <OTab
+                v-if="!isInferred"
                 name="metrics"
                 label="Metrics"
                 style="text-transform: capitalize"
@@ -181,8 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTabs>
 
             <!-- Resource tabs dropdown — shows/hides individual OTEL resource tabs -->
+            <!-- Hidden for inferred services (they have fixed tabs from the registry) -->
             <ODropdown
-              v-if="availableResourceTabConfigs.length > 0"
+              v-if="!isInferred && availableResourceTabConfigs.length > 0"
               side="bottom"
               align="end"
             >
@@ -279,7 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @sort-change="handleSortChange"
                     @click:data-row="
                       (row: any) =>
-                        navigateToTraces({ operationName: row.operation })
+                        navigateToTraces({
+                          operationName: row.operation,
+                          callerService: isInferred ? row.caller : undefined,
+                        })
                     "
                   >
                     <template #cell-errors="{ item }">
@@ -332,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click.stop="
                           navigateToTraces({
                             operationName: row.operation,
+                            callerService: isInferred ? row.caller : undefined,
                             errorsOnly: column.id === 'errors',
                             minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
@@ -401,10 +407,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click:data-row="
                       (row: any) =>
                         navigateToTraces({
-                          resourceFilter: {
-                            field: cfg.groupField,
-                            value: row[cfg.colId],
-                          },
+                          resourceFilter: cfg.fields
+                            ? { fields: cfg.fields, value: row[cfg.colId] }
+                            : { field: cfg.groupField, value: row[cfg.colId] },
                         })
                     "
                   >
@@ -417,10 +422,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                         @click.stop="
                           navigateToTraces({
-                            resourceFilter: {
-                              field: cfg.groupField,
-                              value: row[cfg.colId],
-                            },
+                            resourceFilter: cfg.fields
+                              ? { fields: cfg.fields, value: row[cfg.colId] }
+                              : { field: cfg.groupField, value: row[cfg.colId] },
                             errorsOnly: column.id === 'errors',
                             minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                           })
@@ -485,6 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Metrics Tab -->
             <OTabPanel
+              v-if="!isInferred"
               name="metrics"
               class="tw:p-0! panel-section tw:mb-0! tw:h-full!"
               data-test="service-graph-side-panel-metrics"
@@ -661,7 +666,100 @@ export interface ResourceTabConfig {
   colId: string; // row property key for the entity name column
   environment: string; // env key derived from group_id first segment
   isDefault: boolean; // pre-selected when the environment is first detected
+  /** Fallback field chain for inferred service tabs. When set, the GROUP BY
+   *  expression is COALESCE(NULLIF(fields[0], ''), NULLIF(fields[1], ''), …).
+   *  When absent, groupField is used directly (existing OTEL resource tabs). */
+  fields?: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Inferred Service Tabs — one entry per dependency type, with field fallback
+// chains that generate COALESCE expressions for both SELECT/GROUP BY and
+// the downstream filter clause.
+// ---------------------------------------------------------------------------
+export interface InferredServiceTab {
+  id: string;        // unique tab name, e.g. "hosts", "databases"
+  label: string;     // display label, e.g. "Hosts", "Databases"
+  colLabel: string;  // table column header, e.g. "Host", "Database"
+  fields: string[];  // fallback order for COALESCE, e.g. ["server_address", "net_peer_name"]
+}
+
+const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
+  database: [
+    {
+      id: "hosts",
+      label: "Hosts",
+      colLabel: "Host",
+      fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
+    },
+    {
+      id: "databases",
+      label: "Databases",
+      colLabel: "Database",
+      fields: ["db_namespace", "db_name"],
+    },
+    {
+      id: "queries",
+      label: "Queries",
+      colLabel: "DB Operation",
+      fields: ["db_operations"],
+    },
+  ],
+  queue: [
+    {
+      id: "hosts",
+      label: "Hosts",
+      colLabel: "Host",
+      fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
+    },
+    {
+      id: "destinations",
+      label: "Destinations",
+      colLabel: "Destination",
+      fields: ["messaging_destination_name", "messaging_destination"],
+    },
+  ],
+  rpc: [
+    {
+      id: "hosts",
+      label: "Hosts",
+      colLabel: "Host",
+      fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
+    },
+    {
+      id: "rpc_services",
+      label: "RPC Services",
+      colLabel: "RPC Service",
+      fields: ["rpc_service"],
+    },
+  ],
+  external: [
+    {
+      id: "hosts",
+      label: "Hosts",
+      colLabel: "Host",
+      fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
+    },
+    {
+      id: "urls",
+      label: "URLs",
+      colLabel: "URL",
+      fields: ["http_url", "url_full"],
+    },
+  ],
+};
+
+/** Build a COALESCE expression from a fallback field chain.
+ *  e.g. ["server_address", "net_peer_name"]
+ *    → "COALESCE(NULLIF(server_address, ''), NULLIF(net_peer_name, ''))" */
+const buildCoalesceExpr = (fields: string[]): string =>
+  fields.map((f) => `NULLIF(${f}, '')`).join(", ");
+
+/** Build a WHERE clause fragment to exclude rows where all fallback fields are null.
+ *  e.g. ["server_address", "net_peer_name"]
+ *    → "(server_address IS NOT NULL OR net_peer_name IS NOT NULL)" */
+const buildNullCheck = (fields: string[]): string =>
+  fields.map((f) => `${f} IS NOT NULL`).join(" OR ");
 
 export interface ResourceRow {
   name: string;
@@ -1274,11 +1372,89 @@ export default defineComponent({
     // Resource groups from getDimensionAnalytics that match the current stream schema
     // (after platform-priority filtering — see resolveWorkloadFields)
     const availableResourceTabConfigs = ref<ResourceTabConfig[]>([]);
-    // Tabs actually shown = those selected by the user in the dropdown
+    // IDs of alias entries the user has checked in the dropdown
+    const selectedWorkloadFields = ref<string[]>([]);
+
+    // Shared cache of stream schema field names — populated by resolveStreamSchema,
+    // consumed by both resolveWorkloadFields and inferredTabConfigs.
+    const streamFieldSet = ref<Set<string>>(new Set());
+    const schemaResolved = ref(false);
+
+    /** Fetch the trace stream schema and populate streamFieldSet.
+     *  Idempotent — skips if already resolved for the current stream. */
+    const resolveStreamSchema = async () => {
+      if (
+        !props.visible ||
+        props.streamFilter === "all" ||
+        !props.streamFilter ||
+        schemaResolved.value
+      )
+        return;
+
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const schemaResponse = await streamService.schema(
+          org,
+          props.streamFilter,
+          "traces",
+        );
+        const schemaFields: { name: string; type: string }[] =
+          schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+        streamFieldSet.value = new Set(schemaFields.map((f) => f.name));
+        schemaResolved.value = true;
+      } catch (err) {
+        console.error(
+          "[ServiceGraphNodeSidePanel] Failed to resolve stream schema:",
+          err,
+        );
+        streamFieldSet.value = new Set();
+      }
+    };
+
+    // Inferred service tabs — built from INFERRED_SERVICE_TABS registry when
+    // the selected node has a service_type (database/queue/rpc/external).
+    // Each tab's fallback field chain is filtered to only include fields that
+    // actually exist in the stream schema. Tabs with zero surviving fields are
+    // dropped entirely.
+    const inferredTabConfigs = computed<ResourceTabConfig[]>(() => {
+      const st = props.selectedNode?.service_type as string | undefined;
+      if (!st) return [];
+      const tabs = INFERRED_SERVICE_TABS[st];
+      if (!tabs?.length) return [];
+      const fieldSet = streamFieldSet.value;
+      // If schema hasn't resolved yet, return empty — tabs appear once the
+      // schema fetch completes (reactive via streamFieldSet).
+      if (!schemaResolved.value) return [];
+      const resolved: ResourceTabConfig[] = [];
+      for (const t of tabs) {
+        debugger;
+        const present = t.fields.filter((f) => fieldSet.has(f));
+        if (present.length === 0) continue;
+        resolved.push({
+          id: t.id,
+          label: t.label,
+          groupField: `COALESCE(${buildCoalesceExpr(present)})`,
+          colLabel: t.colLabel,
+          colId: t.id,
+          environment: "",
+          isDefault: true,
+          fields: present,
+        });
+      }
+      return resolved;
+    });
+
+    /** Whether the selected node is an inferred service (uninstrumented dependency). */
+    const isInferred = computed(() => !!props.selectedNode?.service_type);
+
+    // Tabs actually shown. For inferred services use the registry tabs;
+    // for instrumented services use the user-selected OTEL resource tabs.
     const activeResourceTabConfigs = computed(() =>
-      availableResourceTabConfigs.value.filter((c) =>
-        selectedWorkloadFields.value.includes(c.id),
-      ),
+      isInferred.value
+        ? inferredTabConfigs.value
+        : availableResourceTabConfigs.value.filter((c) =>
+            selectedWorkloadFields.value.includes(c.id),
+          ),
     );
     // Deduped list of environments detected from visible resource groups
     const detectedEnvironments = computed<{ key: string; label: string }[]>(
@@ -1302,8 +1478,6 @@ export default defineComponent({
     const resolvedWorkloadFields = ref<{ field: string; alias: FieldAlias }[]>(
       [],
     );
-    // IDs of alias entries the user has checked in the dropdown
-    const selectedWorkloadFields = ref<string[]>([]);
 
     // Toggle a workload field id in the selected set — invoked when the user
     // selects the surrounding ODropdownItem (in addition to clicking the
@@ -1585,14 +1759,26 @@ export default defineComponent({
     ];
 
     // Computed: Operations table columns
-    const operationsTableColumns = computed(() =>
-      buildEntityTableColumns("operation", "Operation"),
-    );
+    const operationsTableColumns = computed(() => {
+      const cols = buildEntityTableColumns("operation", "Operation");
+      if (isInferred.value) {
+        cols.unshift({
+          id: "caller",
+          accessorKey: "caller",
+          header: "Caller",
+          size: 180,
+          enableSorting: true,
+          meta: { slot: false, sortable: true },
+        });
+      }
+      return cols;
+    });
 
     // Computed: Operations table rows
     const operationsTableRows = computed(() =>
       recentOperations.value.map((op) => ({
         operation: op.name,
+        caller: op.callerService || "",
         requests: op.requestCount,
         errors: op.errorCount,
         p99: op.p99Latency,
@@ -1602,7 +1788,8 @@ export default defineComponent({
       })),
     );
 
-    // Fetch aggregated operations (grouped by operation_name with percentiles)
+    // Fetch aggregated operations (grouped by operation_name with percentiles).
+    // For inferred services we also GROUP BY service_name so the caller is visible.
     const fetchAggregatedOperations = async () => {
       if (!props.selectedNode || !props.visible || props.streamFilter === "all")
         return;
@@ -1613,7 +1800,14 @@ export default defineComponent({
       try {
         const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
-        const sql = `SELECT operation_name, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY operation_name`;
+        const isInf = isInferred.value;
+        const selectCols = isInf
+          ? "service_name as caller_service, operation_name"
+          : "operation_name";
+        const groupCols = isInf
+          ? "service_name, operation_name"
+          : "operation_name";
+        const sql = `SELECT ${selectCols}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1632,6 +1826,7 @@ export default defineComponent({
         if (response.data && response.data.hits) {
           recentOperations.value = response.data.hits.map((op: any) => ({
             name: op.operation_name || "unknown",
+            callerService: op.caller_service || undefined,
             requestCount: op.request_count || 0,
             errorCount: op.error_count || 0,
             p50Latency: op.p50_latency || 0,
@@ -1741,7 +1936,8 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Generic fetch for any OTEL resource tab config
+    // Generic fetch for any OTEL resource tab config (supports both instrumented
+    // and inferred service tabs; inferred tabs use a COALESCE field chain).
     const fetchResourceData = async (config: ResourceTabConfig) => {
       if (!props.selectedNode || !props.visible || props.streamFilter === "all")
         return;
@@ -1758,7 +1954,13 @@ export default defineComponent({
         const groupField = config.groupField;
         const alias = config.colId + "_name";
 
-        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND ${groupField} IS NOT NULL GROUP BY ${groupField} ORDER BY request_count DESC`;
+        // For inferred tabs with fallback fields, the null-check must span all
+        // fields in the chain; for instrumented tabs a simple IS NOT NULL works.
+        const nullClause = config.fields
+          ? `(${buildNullCheck(config.fields)})`
+          : `${groupField} IS NOT NULL`;
+
+        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND ${nullClause} GROUP BY ${alias} ORDER BY request_count DESC`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1807,6 +2009,10 @@ export default defineComponent({
       if (!props.visible || props.streamFilter === "all" || !props.streamFilter)
         return;
 
+      // Ensure the stream schema is resolved (shared with inferred tab resolution)
+      await resolveStreamSchema();
+      if (streamFieldSet.value.size === 0) return;
+
       try {
         const org = store.state.selectedOrganization.identifier;
 
@@ -1819,25 +2025,16 @@ export default defineComponent({
           }
         }
 
-        // Fetch trace stream schema
-        const schemaResponse = await streamService.schema(
-          org,
-          props.streamFilter,
-          "traces",
-        );
-        const schemaFields: { name: string; type: string }[] =
-          schemaResponse.data?.schema || schemaResponse.data?.fields || [];
-        const schemaFieldSet = new Set(schemaFields.map((f) => f.name));
-
         // Filter for service_ fields, intersect with semantic groups, deduplicate by alias.id
         const seen = new Set<string>();
         const matched: { field: string; alias: FieldAlias }[] = [];
-        for (const schemaField of schemaFields) {
-          if (!schemaField.name.startsWith("service_")) continue;
-          const alias = fieldToAliasMap.get(schemaField.name);
+        const schemaFields = [...streamFieldSet.value]; // already resolved above
+        for (const fieldName of schemaFields) {
+          if (!fieldName.startsWith("service_")) continue;
+          const alias = fieldToAliasMap.get(fieldName);
           if (!alias || seen.has(alias.id)) continue;
           seen.add(alias.id);
-          matched.push({ field: schemaField.name, alias });
+          matched.push({ field: fieldName, alias });
         }
         resolvedWorkloadFields.value = matched;
 
@@ -1849,7 +2046,7 @@ export default defineComponent({
         // Filter to groups whose traces (or spans) alias exists in this stream's schema
         const schemaMatchedGroups = allGroups.filter((g) => {
           const field = g.aliases["traces"] ?? g.aliases["spans"];
-          return field && schemaFieldSet.has(field);
+          return field && streamFieldSet.value.has(field);
         });
 
         // Apply ENV_SEGMENTS priority
@@ -1928,12 +2125,18 @@ export default defineComponent({
       },
     );
 
-    // Trigger workload field discovery when the panel becomes visible with a valid stream
+    // Trigger workload field discovery when the panel becomes visible with a valid stream.
+    // For inferred services, resolve the stream schema so inferredTabConfigs can filter
+    // fallback field chains to only those present in the schema.
     watch(
       () => [props.visible, props.selectedNode?.id, props.streamFilter],
       ([visible]) => {
         if (visible && props.selectedNode && props.streamFilter !== "all") {
-          resolveWorkloadFields();
+          if (isInferred.value) {
+            resolveStreamSchema();
+          } else {
+            resolveWorkloadFields();
+          }
         }
       },
       { immediate: true },
@@ -1948,6 +2151,8 @@ export default defineComponent({
         availableResourceTabConfigs.value = [];
         resolvedWorkloadFields.value = [];
         selectedWorkloadFields.value = [];
+        schemaResolved.value = false;
+        streamFieldSet.value = new Set();
         metricsCorrelationData.value = null;
         metricsCorrelationError.value = null;
         metricsCorrelationLoaded.value = false;
@@ -1960,12 +2165,15 @@ export default defineComponent({
     // Navigate to traces explore page with contextual filters
     const navigateToTraces = (params: {
       operationName?: string;
+      /** When the service is inferred, this is the caller's service_name. */
+      callerService?: string;
       /** @deprecated use resourceFilter instead */
       nodeName?: string;
       /** @deprecated use resourceFilter instead */
       podName?: string;
-      /** Generic OTEL resource filter: { field: stream field name, value: field value } */
-      resourceFilter?: { field: string; value: string };
+      /** Generic OTEL resource filter. Use `field` for a single field,
+       *  or `fields` for a fallback chain (OR clause in the filter). */
+      resourceFilter?: { field?: string; fields?: string[]; value: string };
       errorsOnly?: boolean;
       minDurationMicros?: number;
       maxDurationMicros?: number;
@@ -1979,6 +2187,7 @@ export default defineComponent({
           props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
         operationName: params.operationName,
+        callerService: params.callerService,
         nodeName: params.nodeName,
         podName: params.podName,
         resourceFilter: params.resourceFilter,
@@ -2111,6 +2320,7 @@ export default defineComponent({
       serviceMetrics,
       serviceHealth,
       isAllStreamsSelected,
+      isInferred,
       formatNumber,
       getErrorRateClass,
       getLatencyClass,

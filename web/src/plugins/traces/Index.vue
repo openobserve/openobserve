@@ -2223,9 +2223,21 @@ const handleServiceGraphViewTraces = (data: any) => {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
     }
-    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+    if (data.callerService) {
+      const escapedCaller = escapeSingleQuotes(data.callerService);
+      filterQuery += ` AND service_name = '${escapedCaller}'`;
+    }
+    if (data.resourceFilter?.value) {
       const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      if (data.resourceFilter.fields?.length) {
+        // Fallback chain: (field1 = 'val' OR field2 = 'val')
+        const clauses = data.resourceFilter.fields
+          .map((f: string) => `${f} = '${escapedValue}'`)
+          .join(" OR ");
+        filterQuery += ` AND (${clauses})`;
+      } else if (data.resourceFilter.field) {
+        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      }
     }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;
