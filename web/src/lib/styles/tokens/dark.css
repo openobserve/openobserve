@@ -43,12 +43,14 @@
        Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
        ═══════════════════════════════════════════════════════════ */
 
-    /* Surfaces — deepest (recessed) → lightest (raised) */
+    /* Surfaces — the model: BLACK page/content, BLUEISH raised panels.
+       base + chrome share one near-black so the whole app reads black;
+       folder rails / cards / dialogs lift on the blueish slate panel. */
     --d-chrome:    #0E1014;  /* top bar + left rail + gutter behind the card   */
+    --d-base:      #0E1014;  /* MAIN: content card + table canvas (black)       */
     --d-well:      #16191F;  /* recessed wells, segmented-control track         */
-    --d-panel:     #1C212A;  /* folder/sub rails, cards, table-header base      */
-    --d-base:      #252B35;  /* MAIN: content card + table canvas (lifted)      */
-    --d-overlay:   #2F3640;  /* menus, dialogs, inputs, table-header, tooltips  */
+    --d-panel:     #252B35;  /* BLUEISH: folder/sub rails, cards, dialogs       */
+    --d-overlay:   #2F3640;  /* menus, inputs, table-header, dialog header      */
 
     /* Borders & dividers — MUST read clearly against every surface above */
     --d-divider:       #3D4550;  /* subtle: row & section separators            */
@@ -62,9 +64,9 @@
 
     /* Row / item states on the content surface */
     --d-hover:     #2C333D;  /* neutral row & list-item hover (above base)      */
-    --d-selected:  color-mix(in srgb, var(--color-primary-500) 26%, var(--d-base));
+    --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
                              /* selected row — teal-tinted (brand signal)       */
-    --d-zebra:     #20262F;  /* striped-row bg — one step below base            */
+    --d-zebra:     #181D25;  /* striped-row bg — a quiet lift above black base   */
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
@@ -331,7 +333,7 @@
 
     /* Dialog */
     --color-dialog-overlay: color-mix(in srgb, var(--d-chrome) 80%, transparent);
-    --color-dialog-bg: var(--d-base);
+    --color-dialog-bg: var(--d-panel);
     --color-dialog-border: var(--d-border);
     --color-dialog-header-bg: var(--d-overlay);
     --color-dialog-header-text: var(--d-text);
