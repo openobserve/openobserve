@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:pb-[0.625rem]">
                   <div
                     v-if="
                       searchObj.data.errorMsg !== '' &&

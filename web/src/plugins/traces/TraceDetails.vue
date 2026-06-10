@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container tw:border-b tw:border-border-default">
         <!-- New Modern Header -->
         <header
           class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
@@ -217,6 +217,7 @@ size="xs"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
+              class="tw:mr-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -234,7 +235,7 @@ size="xs"
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.25rem]"
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.325rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
@@ -2946,7 +2947,6 @@ $traceChartCollapseHeight: 42px;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding: 0.325rem 0.625rem;
   box-sizing: border-box;
 }
 .histogram-container-full {
@@ -3128,8 +3128,7 @@ html:has(.trace-details) {
   }
 
   .trace-combined-header-wrapper {
-    padding: 0.375rem;
-    margin-bottom: 0.625rem;
+    padding: 0.2rem 0rem;
     flex-shrink: 0;
   }
 
