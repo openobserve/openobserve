@@ -1400,7 +1400,7 @@ pub struct Common {
     pub model_pricing_enabled: bool,
     #[env_config(
         name = "ZO_ONLINE_EVALS_ENABLED",
-        default = false,
+        default = true,
         help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
     )]
     pub online_evals_enabled: bool,

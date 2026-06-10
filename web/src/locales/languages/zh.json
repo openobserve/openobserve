@@ -456,7 +456,8 @@
     "language": "语言",
     "actions": "操作",
     "incidents": "事件",
-    "evals": "Evals"
+    "evals": "Evals",
+    "aiObservability": "AI 可观测性"
   },
   "rum": {
     "title": "用户体验监控",
@@ -1208,7 +1209,8 @@
     "tokenRotateError": "轮换令牌失败。",
     "tokenDeleteError": "删除令牌失败。",
     "noTokensFound": "未找到写入令牌。",
-    "createdBy": "由... 创建"
+    "createdBy": "由... 创建",
+    "orgLevelSummary": "摄取端点的组织级令牌。"
   },
   "dashboard": {
     "selectField": "字段",
@@ -4320,6 +4322,36 @@
       "action": "新目的地",
       "actionDesc": "连接管道目的地"
     },
+    "noLLMInsights": {
+      "title": "还没有 LLM 活动",
+      "description": "使用 OpenTelemetry Gen-AI 语义约定来检测您的服务，并提取至少一条轨迹以填充此仪表板。",
+      "action": "带有 OpenTelemetry",
+      "actionDesc": "捕获痕迹上的 gen_ai_* 属性"
+    },
+    "noLLMSessions": {
+      "title": "还没有 LLM 课程",
+      "description": "会话按 gen_ai_conversation_id 分组。对您的服务进行检测，以便每个对话都标记其痕迹，会话将显示在此处。",
+      "action": "带有 OpenTelemetry",
+      "actionDesc": "使用 gen_ai_conversation_id 标记跨度"
+    },
+    "noScorers": {
+      "title": "还没有得分手",
+      "description": "评分员根据你的分数配置对 LLM 回复进行评分——从 LLM 评委开始，或者从库中导入一个。",
+      "action": "创建记分员",
+      "actionDesc": "定义 LLM 评委或远程记分员"
+    },
+    "noEvalJobs": {
+      "title": "尚无评估职位",
+      "description": "在 LLM 直播中安排记分员。创建一个，开始按节奏对对话进行评分。",
+      "action": "创建评估任务",
+      "actionDesc": "选择直播 + 得分手 + 节奏"
+    },
+    "noScoreConfigs": {
+      "title": "还没有分数配置",
+      "description": "分数配置定义评分器生成的架构——数字、布尔值或分类。添加一个即可开始得分。",
+      "action": "创建分数配置",
+      "actionDesc": "定义分数形状 + 健康范围"
+    },
     "noEvalTemplates": {
       "title": "尚无评估模板",
       "description": "评估模板为 LLM 评估定义了可重复使用的评分标准。",
@@ -4671,6 +4703,21 @@
     "empty": {
       "title": "还没有 LLM 提供商",
       "description": "LLM 提供商存储您的 LLM Judge 评分员调用的语言模型的连接详细信息（端点 + 凭据）。添加一个即可开始进行基于法官的评估。"
+    }
+  },
+  "aiObservability": {
+    "title": "LLM 可观测性",
+    "sections": {
+      "monitor": "监视器",
+      "evaluate": "评估"
+    },
+    "nav": {
+      "overview": "概述",
+      "sessions": "会话",
+      "quality": "质量",
+      "evalJobs": "评估职位",
+      "scorers": "记分员",
+      "scoreConfigs": "分数配置"
     }
   }
 }

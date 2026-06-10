@@ -168,6 +168,36 @@
       "title": "No active incidents",
       "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
     },
+    "noLLMInsights": {
+      "title": "No LLM activity yet",
+      "description": "Instrument your services with the OpenTelemetry Gen-AI semantic conventions and ingest at least one trace to populate this dashboard.",
+      "action": "Instrument with OpenTelemetry",
+      "actionDesc": "Capture gen_ai_* attributes on your traces"
+    },
+    "noLLMSessions": {
+      "title": "No LLM sessions yet",
+      "description": "Sessions are grouped by gen_ai_conversation_id. Instrument your services so each conversation tags its traces, and sessions will appear here.",
+      "action": "Instrument with OpenTelemetry",
+      "actionDesc": "Tag spans with gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "No scorers yet",
+      "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
+      "action": "Create scorer",
+      "actionDesc": "Define an LLM judge or remote scorer"
+    },
+    "noEvalJobs": {
+      "title": "No evaluation jobs yet",
+      "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
+      "action": "Create eval job",
+      "actionDesc": "Pick a stream + scorers + cadence"
+    },
+    "noScoreConfigs": {
+      "title": "No score configs yet",
+      "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
+      "action": "Create score config",
+      "actionDesc": "Define the score shape + healthy range"
+    },
     "loadError": {
       "title": "Something went wrong",
       "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
@@ -256,6 +286,9 @@
       "llmProviders": "LLM providers",
       "sourceMaps": "source maps",
       "backfillJobs": "backfill jobs",
+      "scorers": "scorers",
+      "evalJobs": "evaluation jobs",
+      "scoreConfigs": "score configs",
       "pipelineHistory": "pipeline history"
     }
   },
@@ -698,6 +731,7 @@
     "search": "Logs",
     "traces": "Traces",
     "evals": "Evaluations",
+    "aiObservability": "AI",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
@@ -4425,6 +4459,21 @@
     "tierDefaultName": "Default",
     "tierConditionalName": "Conditional Tier"
   },
+  "aiObservability": {
+    "title": "AI Observability",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evaluate"
+    },
+    "nav": {
+      "llmInsights": "LLM Insights",
+      "sessions": "LLM Sessions",
+      "quality": "Quality",
+      "evalJobs": "Eval Jobs",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score Configs"
+    }
+  },
   "onlineEvals": {
     "title": "Evaluations",
     "description": "Configure LLM providers, score definitions, scorers, and live evaluation jobs.",
@@ -4484,11 +4533,6 @@
           "title": "Evaluated Spans",
           "unit": "",
           "hint": "Distinct span IDs in _llm_scores within the window"
-        },
-        "qualityIssueRate": {
-          "title": "Quality Issue Rate",
-          "unit": "%",
-          "hint": "Evaluated spans with any dimension below threshold"
         },
         "evaluationCost": {
           "title": "Evaluation Cost",
@@ -4634,6 +4678,9 @@
       "useAsDefault": "Use as default provider",
       "authConfigLabel": "Auth config JSON",
       "authConfigHelp": "Credentials are encrypted at rest and cannot be read back after saving.",
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "Enter API key",
+      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when editing to keep the existing key.",
       "authSection": "Authentication",
       "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
       "cannotRename": "Cannot be renamed after creation.",

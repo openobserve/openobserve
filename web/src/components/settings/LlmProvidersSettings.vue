@@ -48,20 +48,17 @@
         v-else-if="!providers.length"
         class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
       >
-        <EvalEmptyState
-          data-test="llm-providers-empty-state"
-          icon="hub"
+        <!-- First-run state — uses the same `no-llm-providers` preset the
+             OTable's #empty slot uses for the filtered case, so the empty
+             surface in this page reads consistently with the rest of the
+             app (matches Scorers' "Add a Provider First" treatment). -->
+        <OEmptyState
+          size="hero"
+          preset="no-llm-providers"
           :title="t('llmProviders.empty.title')"
           :description="t('llmProviders.empty.description')"
-          :chips="[
-            { label: 'OpenAI' },
-            { label: 'Anthropic' },
-            { label: 'Ollama' },
-            { label: 'OpenAI-compatible' },
-          ]"
-          :cta-label="t('llmProviders.newButton')"
-          cta-data-test="llm-providers-empty-create-btn"
-          @create="openCreate"
+          data-test="llm-providers-empty-state"
+          @action="(id) => id === 'create' && openCreate()"
         />
       </div>
 
@@ -171,7 +168,6 @@ import {
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";

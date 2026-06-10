@@ -456,7 +456,8 @@
     "language": "Idioma",
     "actions": "Acciones",
     "incidents": "Incidentes",
-    "evals": "Evaluaciones"
+    "evals": "Evaluaciones",
+    "aiObservability": "Observabilidad de la IA"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",
@@ -1208,7 +1209,8 @@
     "tokenRotateError": "No se pudo rotar el token.",
     "tokenDeleteError": "No se pudo eliminar el token.",
     "noTokensFound": "No se ha encontrado ningún token de ingestión.",
-    "createdBy": "Creado por"
+    "createdBy": "Creado por",
+    "orgLevelSummary": "Tokens a nivel de organización para puntos finales de ingestión."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -4314,6 +4316,36 @@
       "action": "Nuevo destino",
       "actionDesc": "Conectar un destino de canalización"
     },
+    "noLLMInsights": {
+      "title": "Aún no hay actividad de LLM",
+      "description": "Instrumente sus servicios con las convenciones semánticas de la generación AI de OpenTelemetry e ingiera al menos un rastro para rellenar este panel.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Captura los atributos gen_ai_* en tus rastros"
+    },
+    "noLLMSessions": {
+      "title": "Aún no hay sesiones de LLM",
+      "description": "Las sesiones se agrupan por gen_ai_conversation_id. Instrumente sus servicios para que cada conversación etiquete sus rastros y las sesiones aparezcan aquí.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Etiquete intervalos con gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Aún no hay goleadores",
+      "description": "Los evaluadores califican las respuestas del LLM en función de sus configuraciones de puntuación: comience con un juez de LLM o importe uno de la biblioteca.",
+      "action": "Crear anotador",
+      "actionDesc": "Defina un juez de LLM o un anotador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Aún no hay trabajos de evaluación",
+      "description": "Los puntajes del calendario de trabajos se comparan con un flujo de LLM. Crea uno para empezar a calificar las conversaciones siguiendo una cadencia.",
+      "action": "Crear un trabajo de evaluación",
+      "actionDesc": "Elige una transmisión + goleadores + cadencia"
+    },
+    "noScoreConfigs": {
+      "title": "Aún no hay configuraciones de puntuación",
+      "description": "Las configuraciones de puntuación definen el esquema que producen los puntuadores: numérico, booleano o categórico. Agregue uno para empezar a puntuar.",
+      "action": "Crear configuración de puntuación",
+      "actionDesc": "Defina la forma de la puntuación + el rango saludable"
+    },
     "noEvalTemplates": {
       "title": "Aún no hay plantillas de evaluación",
       "description": "Las plantillas de evaluación definen criterios de puntuación reutilizables para las evaluaciones de LLM.",
@@ -4665,6 +4697,21 @@
     "empty": {
       "title": "Aún no hay proveedores de LLM",
       "description": "Los proveedores de LLM almacenan los detalles de conexión (punto final y credenciales) de los modelos lingüísticos a los que llaman los evaluadores de LLM Judge. Agregue uno para comenzar a realizar evaluaciones basadas en jueces."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM Observabilidad",
+    "sections": {
+      "monitor": "Supervisar",
+      "evaluate": "Evalúe"
+    },
+    "nav": {
+      "overview": "Visión general",
+      "sessions": "Sesiones",
+      "quality": "Calidad",
+      "evalJobs": "Empleos en Eval",
+      "scorers": "Goleadores",
+      "scoreConfigs": "Configuraciones de puntuación"
     }
   }
 }

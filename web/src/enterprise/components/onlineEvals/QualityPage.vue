@@ -1,38 +1,10 @@
 <template>
   <div class="quality-page" data-test="quality-page">
-    <div class="quality-page__scope-row">
-      <span class="quality-page__scope-label">{{ t("onlineEvals.quality.scopeLabel") }}</span>
-      <div class="quality-page__controls">
-        <DateTimePickerDashboard
-          ref="dateTimePickerRef"
-          v-model="selectedDate"
-          :auto-apply-dashboard="true"
-          class="quality-page__date-picker"
-          data-test="quality-time-range-picker"
-        />
-        <!--
-          Stream selector is intentionally hidden. All evaluation scores land in
-          the single `_llm_scores` stream, so filtering by source is meaningless
-          for the current single-stream setup. Re-enable when multi-stream
-          score sinks become a real use case.
-        -->
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isLoading || isConfigsLoading || isDetailLoading || isChartsLoading"
-          :title="t('onlineEvals.quality.refresh')"
-          data-test="quality-refresh-btn"
-          @click="refreshAll"
-        />
-      </div>
-    </div>
-
     <QualityKpiSkeleton
-      v-if="!selectedConfig && showKpiSkeleton"
+      v-if="showKpiSkeleton"
       :count="visibleKpis.length"
     />
-    <section v-else-if="!selectedConfig" class="quality-page__kpis" aria-label="Tier 1 KPIs">
+    <section v-else class="quality-page__kpis" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -41,22 +13,43 @@
       />
     </section>
 
-    <div class="quality-page__tier2" :class="{ 'quality-page__tier2--split': !!selectedConfig }">
+    <!-- Tier 2: the configs table is now the persistent view; selecting a
+         row opens the detail in a right-side ODrawer (70% width) instead
+         of replacing the whole page. The user keeps full context of the
+         list behind the drawer. -->
+    <div class="quality-page__tier2">
       <QualityScoreConfigsTable
-        v-if="!selectedConfig"
         :rows="configRows"
         :is-loading="isConfigsLoading"
         @select="selectConfig"
         @refresh="refreshAll"
       />
+    </div>
 
-      <QualityConfigSidebar
-        v-else
-        :rows="configRows"
-        :selected-id="selectedConfigId"
-        @select="selectConfig"
-        @clear="clearSelection"
-      />
+    <ODrawer
+      v-model:open="detailDrawerOpen"
+      side="right"
+      :width="70"
+      :title="selectedConfig?.name || ''"
+      data-test="quality-config-detail-drawer"
+    >
+      <!-- Type badge + version pulled out of the inner panel header so
+           the drawer chrome owns the entire identification block;
+           the inner panel no longer renders its own title row. -->
+      <template #header-right>
+        <span
+          class="qpd-type"
+          :class="`qpd-type--${detailDataType}`"
+          data-test="quality-detail-type-badge"
+        >
+          {{ shortType(detailDataType) }}
+        </span>
+        <span
+          v-if="selectedConfig?.version"
+          class="qpd-version"
+          data-test="quality-detail-version-badge"
+        >v{{ selectedConfig.version }}</span>
+      </template>
 
       <QualityDetailPanel
         v-if="selectedConfig"
@@ -79,7 +72,7 @@
         @back="clearSelection"
         @drill="onDrill"
       />
-    </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -88,8 +81,6 @@ import { computed, onMounted, ref, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
 import {
@@ -101,11 +92,15 @@ import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
 import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
-import QualityConfigSidebar from "./quality/QualityConfigSidebar.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
+  // Date window is owned by OnlineEvals (so the picker + refresh button live
+  // in the embedded AppPageHeader). Quality just consumes it as a reactive
+  // input to its data loaders.
+  dateWindow: DateWindow;
 }>();
 
 const { t } = useI18n();
@@ -113,67 +108,20 @@ const route = useRoute();
 const router = useRouter();
 const store = useStore();
 
-// Time-range picker state — mirrors LLM Insights / Metrics pattern.
-// Persisted in localStorage so navigating away from Quality and coming back
-// keeps the user's selection (same approach LLM Insights uses for stream).
-const DATE_LS_KEY = "evaluations:quality:dateRange";
-
-interface PersistedDate {
-  valueType: "relative" | "absolute";
-  startTime: number | null;
-  endTime: number | null;
-  relativeTimePeriod: string | null;
-}
-
-function loadPersistedDate(): PersistedDate {
-  const defaults: PersistedDate = {
-    valueType: "relative",
-    startTime: null,
-    endTime: null,
-    relativeTimePeriod: "7d",
-  };
-  try {
-    const raw = localStorage.getItem(DATE_LS_KEY);
-    if (!raw) return defaults;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return defaults;
-    return {
-      valueType: parsed.valueType === "absolute" ? "absolute" : "relative",
-      startTime: typeof parsed.startTime === "number" ? parsed.startTime : null,
-      endTime: typeof parsed.endTime === "number" ? parsed.endTime : null,
-      relativeTimePeriod:
-        typeof parsed.relativeTimePeriod === "string" ? parsed.relativeTimePeriod : "7d",
-    };
-  } catch {
-    return defaults;
-  }
-}
-
-const dateTimePickerRef = ref<{ getConsumableDateTime: () => { startTime: number; endTime: number } } | null>(null);
-const selectedDate = ref<any>(loadPersistedDate());
-const dateWindow = ref<DateWindow>({
-  startUs: (Date.now() - 7 * 24 * 60 * 60 * 1000) * 1000,
-  endUs: Date.now() * 1000,
-});
-
-function syncDateWindow() {
-  const picker = dateTimePickerRef.value;
-  if (!picker) return;
-  const dt = picker.getConsumableDateTime();
-  // DateTime.getConsumableDateTime returns startTime/endTime in microseconds.
-  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
-    dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
-  }
-}
+const dateWindowRef = toRef(props, "dateWindow");
 
 // `sourceStream` is intentionally not destructured — the composable keeps its
 // internal default ("__all__"), which is correct now that the UI selector is
 // hidden and we only have one score sink (`_llm_scores`).
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindow);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef);
 
 // Evaluation cost is intentionally hidden until the backend writes cost data.
 // To restore it, remove this filter and re-add `kpis` to the v-for.
-const HIDDEN_KPI_IDS = new Set(["evaluationCost"]);
+// Now that `gen_ai_usage_cost` on `_evaluator` is populated, the
+// Evaluation Cost card is sourced live (see useQualityData) — no longer
+// hidden. Keep the set in place so future placeholder KPIs can be
+// hidden the same way without touching the render loop.
+const HIDDEN_KPI_IDS = new Set<string>();
 const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
@@ -181,7 +129,7 @@ const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindow);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const splitByScorer = ref(false);
@@ -200,7 +148,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindow);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef);
 
 const {
   isLoading: isChartsLoading,
@@ -209,7 +157,7 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindow, splitByScorer, splitBySourceType);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, splitByScorer, splitBySourceType);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
@@ -228,9 +176,20 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  syncDateWindow();
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
 }
+
+const isAnyLoading = computed(
+  () =>
+    isLoading.value ||
+    isConfigsLoading.value ||
+    isDetailLoading.value ||
+    isChartsLoading.value,
+);
+
+// Surface refresh + an aggregated loading flag so OnlineEvals can drive the
+// Refresh button it now renders in the embedded AppPageHeader actions slot.
+defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the skeleton only on the *initial* load — i.e. when we're loading AND
  * no KPI values have been populated yet. Subsequent refreshes keep the rendered
@@ -243,19 +202,13 @@ onMounted(() => {
   void refreshAll();
 });
 
-watch(
-  selectedDate,
-  (next) => {
-    try {
-      localStorage.setItem(DATE_LS_KEY, JSON.stringify(next));
-    } catch {
-      // ignore storage failures (private mode, quota, etc.)
-    }
-    syncDateWindow();
-    void refreshAll();
-  },
-  { deep: true },
-);
+// No deep flag: the parent (OnlineEvals) always assigns a fresh
+// `{startUs,endUs}` object via `qualityDateWindow.value = …`, so the ref's
+// identity changes and the top-level watch already fires. Deep traversal
+// would just walk two numeric leaves on every change for no benefit.
+watch(dateWindowRef, () => {
+  void refreshAll();
+});
 
 watch(scoreConfigsRef, () => {
   void refreshConfigs();
@@ -287,6 +240,17 @@ function clearSelection() {
   delete query.config;
   router.replace({ name: route.name as string, query }).catch(() => {});
 }
+
+// ODrawer drives its `:open` via the presence of a selected config. Opening
+// is owned by selectConfig() (from a row click); closing the drawer
+// (backdrop click, Esc, header ×) routes through clearSelection so the
+// `?config=` query param drops in sync.
+const detailDrawerOpen = computed<boolean>({
+  get: () => selectedConfigId.value != null,
+  set: (open) => {
+    if (!open) clearSelection();
+  },
+});
 
 function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
@@ -358,7 +322,54 @@ function onDrill(kpiId: string) {
 
   router.push({ name: "logs", query: queryParams }).catch(() => {});
 }
+
+// Used by the drawer header's #header-right slot — same mapping the
+// detail panel used for its in-panel badge so type/version chrome looks
+// identical, just relocated into the drawer header.
+function shortType(type: string): string {
+  if (type === "numeric") return "Num";
+  if (type === "categorical") return "Cat";
+  if (type === "boolean") return "Bool";
+  return "—";
+}
 </script>
+
+<style lang="scss" scoped>
+// Type + version chrome relocated from QualityDetailPanel's `qdp__head`
+// into the drawer header (#header-right). Visuals are kept identical to
+// the previous in-panel pill so the move feels purely structural.
+.qpd-type {
+  display: inline-flex;
+  padding: 0 4px;
+  border-radius: 2px;
+  font: 700 8px/1.4 inherit;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, #6b76e3 14%, transparent);
+  color: #4f5bcf;
+}
+
+.qpd-type--numeric {
+  background: color-mix(in srgb, #6b76e3 14%, transparent);
+  color: #4f5bcf;
+}
+
+.qpd-type--categorical {
+  background: color-mix(in srgb, #9333ea 14%, transparent);
+  color: #7c3aed;
+}
+
+.qpd-type--boolean {
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+  color: #15803d;
+}
+
+.qpd-version {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary, var(--o2-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+</style>
 
 <style lang="scss" scoped>
 .quality-page {

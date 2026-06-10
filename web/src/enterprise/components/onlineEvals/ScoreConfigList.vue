@@ -1,116 +1,8 @@
 <template>
   <EvalListShell
     data-test="score-config"
-    :title="t('onlineEvals.scoreConfig.listTitle')"
-    :search="search"
-    :search-placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
-    :add-label="t('onlineEvals.scoreConfig.newButton')"
-    :show-empty="showEmptyState"
-    @update:search="$emit('update:search', $event)"
-    @create="$emit('create')"
+    :show-empty="false"
   >
-    <template #empty>
-      <EvalEmptyState
-        data-test="score-config-empty-state"
-        icon="fact-check"
-        :title="t('onlineEvals.scoreConfig.empty.title')"
-        :description="t('onlineEvals.scoreConfig.empty.description')"
-        :chips="[
-          { icon: 'data-array', label: t('onlineEvals.scoreConfig.empty.chipTypes') },
-          { icon: 'favorite', label: t('onlineEvals.scoreConfig.empty.chipThreshold') },
-        ]"
-        :cta-label="t('onlineEvals.scoreConfig.newButton')"
-        cta-data-test="score-config-empty-create-btn"
-        @create="$emit('create')"
-      >
-        <template #secondary>
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="md"
-                data-test="score-config-empty-import"
-                icon-right="expand-more"
-              >
-                {{ t("onlineEvals.scoreConfig.import.button") }}
-              </OButton>
-            </template>
-            <ODropdownItem
-              @select="$emit('import-custom')"
-              data-test="score-config-empty-import-custom"
-            >
-              <div class="tw:flex tw:flex-col">
-                <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-                  {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
-                </span>
-              </div>
-            </ODropdownItem>
-            <ODropdownItem
-              @select="$emit('open-library')"
-              data-test="score-config-empty-import-library"
-            >
-              <div class="tw:flex tw:flex-col">
-                <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-                  {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
-                </span>
-              </div>
-            </ODropdownItem>
-          </ODropdown>
-        </template>
-      </EvalEmptyState>
-    </template>
-
-    <template #actions>
-      <ODropdown side="bottom" align="end">
-        <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="tw:ml-2"
-            data-test="score-config-import"
-            icon-right="expand-more"
-          >
-            {{ t("onlineEvals.scoreConfig.import.button") }}
-          </OButton>
-        </template>
-        <ODropdownItem
-          @select="$emit('import-custom')"
-          data-test="score-config-import-custom"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scoreConfig.import.customLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scoreConfig.import.customSubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-        <ODropdownItem
-          @select="$emit('open-library')"
-          data-test="score-config-import-library"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scoreConfig.import.libraryLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scoreConfig.import.librarySubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-      </ODropdown>
-    </template>
-
-    <template #filter>
-      <OSelect
-        v-model="typeFilter"
-        :options="typeOptions"
-        :placeholder="t('onlineEvals.scoreConfig.allTypes')"
-        size="md"
-        class="tw:ml-2 tw:w-[140px]"
-        data-test="score-config-list-type-filter"
-      />
-    </template>
-
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -130,6 +22,38 @@
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #toolbar>
+          <OSearchInput
+            :model-value="search"
+            class="tw:flex-1 tw:min-w-0"
+            :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
+            data-test="score-config-list-search-input"
+            clearable
+            @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OSelect
+            v-model="typeFilter"
+            :options="typeOptions"
+            :placeholder="t('onlineEvals.scoreConfig.allTypes')"
+            size="md"
+            width="sm"
+            class="tw:shrink-0"
+            data-test="score-config-list-type-filter"
+          />
+        </template>
+
+        <template #empty>
+          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+            <OEmptyState
+              size="hero"
+              preset="no-score-configs"
+              :filtered="hasFilters"
+              data-test="score-config-empty-state"
+              @action="onEmptyAction"
+            />
+          </div>
+        </template>
+
         <template #cell-type="{ row }">
           <span class="sc-dtype-chip" :class="`sc-dtype-chip--${dataTypeOf(row)}`">
             {{ dataTypeOf(row) }}
@@ -215,13 +139,12 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
@@ -350,13 +273,21 @@ const filteredRows = computed(() =>
 
 const numberedRows = useNumberedRows(filteredRows);
 
-const showEmptyState = computed(
-  () =>
-    !props.loading &&
-    props.allScoreConfigs.length === 0 &&
-    !props.search &&
-    !typeFilter.value,
+// Drives OEmptyState's `:filtered` — true whenever the user has narrowed
+// the list (search or type filter). The filtered case auto-renders the
+// "No score configs match these filters" + Clear-filters card; the
+// first-run case shows the preset's "Create score config" CTA.
+const hasFilters = computed(
+  () => !!props.search?.trim() || !!typeFilter.value,
 );
+
+function onEmptyAction(id?: string) {
+  if (id === "create") emit("create");
+  else if (id === "clear-filters") {
+    emit("update:search", "");
+    typeFilter.value = null;
+  }
+}
 
 function rowCreated(row: ScoreConfig) {
   return Number(

@@ -70,13 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog' &&
-            searchObj.meta.searchMode !== 'llm-insights' &&
-            searchObj.meta.searchMode !== 'sessions'
+            searchObj.meta.searchMode !== 'services-catalog'
           "
         >
           <!-- Reset: icon+text at wide widths, icon-only when narrow -->
@@ -122,7 +120,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- More menu: Sessions, LLM Insights, Syntax Guide — always last -->
+        <!-- More menu: Syntax Guide — always last.
+             Sessions + LLM Insights were removed from Traces; they now
+             live as standalone pages under AI Observability. -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -134,35 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               More
             </OButton>
           </template>
-
-          <ODropdownGroup v-if="config.showLLMUI !== 'false'" label="LLM">
-            <ODropdownItem
-              data-test="traces-search-mode-sessions-btn"
-              @select="$emit('update:searchMode', 'sessions')"
-            >
-              <template #icon-left>
-                <span class="more-menu-icon-badge"><OIcon name="forum" size="sm" /></span>
-              </template>
-              Sessions
-              <template v-if="searchObj.meta.searchMode === 'sessions'" #icon-right>
-                <OIcon name="check" size="sm" />
-              </template>
-            </ODropdownItem>
-            <ODropdownItem
-              data-test="traces-search-mode-llm-insights-btn"
-              @select="$emit('update:searchMode', 'llm-insights')"
-            >
-              <template #icon-left>
-                <span class="more-menu-icon-badge"><OIcon name="auto-awesome" size="sm" /></span>
-              </template>
-              LLM Insights
-              <template v-if="searchObj.meta.searchMode === 'llm-insights'" #icon-right>
-                <OIcon name="check" size="sm" />
-              </template>
-            </ODropdownItem>
-          </ODropdownGroup>
-
-          <ODropdownSeparator v-if="config.showLLMUI !== 'false'" />
 
           <SyntaxGuide
             :sqlmode="searchObj.meta.sqlMode"
@@ -415,8 +386,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
-        searchObj.meta.searchMode !== 'llm-insights' &&
-        searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
       class="tw:flex tw:flex-1 tw:min-h-0 tw:border-b tw:border-border-default"
@@ -481,8 +450,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -517,8 +484,6 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    ODropdownGroup,
-    ODropdownSeparator,
     OSwitch,
     OSelect,
     OTooltip,
@@ -548,20 +513,6 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
-    },
-    isLLMSpanPresent: {
-      type: Boolean,
-      default: false,
-    },
-    // True when the parent (`Index.vue`) has confirmed at least one
-    // traces stream is flagged `is_llm_stream === true`. Drives the
-    // LLM Insights tab visibility — we hide the toggle entirely when
-    // no org has opted in (avoids a dead button that opens an empty
-    // dashboard). Defaults to `true` so the tab doesn't flicker
-    // during the brief window before streams resolve on first mount.
-    hasLLMStreams: {
-      type: Boolean,
-      default: true,
     },
   },
   methods: {
@@ -831,9 +782,7 @@ export default defineComponent({
       // The DateTime component also fires `on:date-change` once on its own
       // mount with the current value (no actual change). The `prev`
       // comparison above filters out that mount-time replay so a tab
-      // switch that remounts the picker doesn't fire a redundant search
-      // (visible in LLM Insights as a duplicate fetchAll right after the
-      // dashboard's own initial load).
+      // switch that remounts the picker doesn't fire a redundant search.
       if (
         store.state.zoConfig?.auto_query_enabled &&
         searchObj.meta.liveMode &&

@@ -456,7 +456,8 @@
     "language": "taal",
     "actions": "Acties",
     "incidents": "Incidenten",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "aiObservability": "AI-waarneembaarheid"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -1208,7 +1209,8 @@
     "tokenRotateError": "Het roteren van het token is mislukt.",
     "tokenDeleteError": "Het verwijderen van het token is mislukt.",
     "noTokensFound": "Geen innametokens gevonden.",
-    "createdBy": "Gemaakt door"
+    "createdBy": "Gemaakt door",
+    "orgLevelSummary": "Tokens op organisatieniveau voor eindpunten voor opname."
   },
   "dashboard": {
     "selectField": "Veld",
@@ -4329,6 +4331,36 @@
       "action": "Nieuwe bestemming",
       "actionDesc": "Een pijplijnbestemming aansluiten"
     },
+    "noLLMInsights": {
+      "title": "Nog geen LLM-activiteit",
+      "description": "Instrument uw services met de OpenTelemetry Gen-AI semantische conventies en gebruik ten minste één spoor om dit dashboard te vullen.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Leg gen_ai_* attributen vast op je sporen"
+    },
+    "noLLMSessions": {
+      "title": "Nog geen LLM-sessies",
+      "description": "Sessies worden gegroepeerd op gen_ai_conversation_id. Instrumenteer uw services zodat elk gesprek zijn sporen tagt, en sessies worden hier weergegeven.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Tag omspant met gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Nog geen scorers",
+      "description": "Scorers beoordelen LLM-reacties op basis van je scoreconfiguraties — begin met een LLM-jurylid of importeer er een uit de bibliotheek.",
+      "action": "Maak een scorer",
+      "actionDesc": "Definieer een LLM-jurylid of externe scorer"
+    },
+    "noEvalJobs": {
+      "title": "Nog geen evaluatieopdrachten",
+      "description": "Jobs rangschik scorers tegen een LLM-stream. Maak er een om te beginnen met het beoordelen van gesprekken op basis van een cadans.",
+      "action": "Een evaluatietaak aanmaken",
+      "actionDesc": "Kies een stream + scorers + cadans"
+    },
+    "noScoreConfigs": {
+      "title": "Nog geen scoreconfiguraties",
+      "description": "Scoreconfiguraties definiëren het schema dat scorers produceren: numeriek, booleaans of categorisch. Voeg er een toe om te beginnen met scoren.",
+      "action": "Scoreconfiguratie aanmaken",
+      "actionDesc": "Definieer de scorevorm + gezond bereik"
+    },
     "noEvalTemplates": {
       "title": "Nog geen evaluatiesjablonen",
       "description": "Evaluatiesjablonen definiëren herbruikbare scorecriteria voor LLM-evaluaties.",
@@ -4680,6 +4712,21 @@
     "empty": {
       "title": "Nog geen LLM-aanbieders",
       "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM-waarneembaarheid",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evalueer"
+    },
+    "nav": {
+      "overview": "Overzicht",
+      "sessions": "Sessies",
+      "quality": "Kwaliteit",
+      "evalJobs": "Vacatures bij Eval",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score-configuraties"
     }
   }
 }

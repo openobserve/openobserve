@@ -456,7 +456,8 @@
     "language": "Sprache",
     "actions": "Aktionen",
     "incidents": "Vorfälle",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "aiObservability": "KI-Beobachtbarkeit"
   },
   "rum": {
     "title": "Echte Benutzerüberwachung",
@@ -1208,7 +1209,8 @@
     "tokenRotateError": "Das Token konnte nicht gedreht werden.",
     "tokenDeleteError": "Das Token konnte nicht gelöscht werden.",
     "noTokensFound": "Es wurden keine Aufnahme-Token gefunden.",
-    "createdBy": "Erstellt von"
+    "createdBy": "Erstellt von",
+    "orgLevelSummary": "Token auf Organisationsebene für Aufnahmeendpunkte."
   },
   "dashboard": {
     "selectField": "Feld",
@@ -4316,6 +4318,36 @@
       "action": "Neues Reiseziel",
       "actionDesc": "Pipeline-Ziel verbinden"
     },
+    "noLLMInsights": {
+      "title": "Noch keine LLM-Aktivität",
+      "description": "Instrumentieren Sie Ihre Dienste mit den semantischen Konventionen der OpenTelemetry Gen-AI und nehmen Sie mindestens einen Trace auf, um dieses Dashboard zu füllen.",
+      "action": "Instrument mit OpenTelemetrie",
+      "actionDesc": "Erfasse gen_ai_*-Attribute auf deinen Spuren"
+    },
+    "noLLMSessions": {
+      "title": "Noch keine LLM-Sitzungen",
+      "description": "Sitzungen werden nach gen_ai_conversation_id gruppiert. Instrumentieren Sie Ihre Dienste so, dass jede Konversation ihre Spuren markiert und die Sitzungen hier angezeigt werden.",
+      "action": "Instrument mit OpenTelemetrie",
+      "actionDesc": "Tag-Spans mit gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Noch keine Torschützen",
+      "description": "Scorer bewerten LLM-Antworten anhand Ihrer Score-Konfigurationen — beginnen Sie mit einem LLM-Judge oder importieren Sie einen aus der Bibliothek.",
+      "action": "Torschütze erstellen",
+      "actionDesc": "Definieren Sie einen LLM-Richter oder Remote-Scorer"
+    },
+    "noEvalJobs": {
+      "title": "Noch keine Bewertungsjobs",
+      "description": "Jobs plant Torschützen gegen einen LLM-Stream. Erstellen Sie einen, um mit der Bewertung von Konversationen in einer bestimmten Reihenfolge zu beginnen.",
+      "action": "Evaluationsjob erstellen",
+      "actionDesc": "Wähle einen Stream + Torschützen + Trittfrequenz"
+    },
+    "noScoreConfigs": {
+      "title": "Noch keine Score-Konfigurationen",
+      "description": "Score-Konfigurationen definieren das Schema, das Scorer erzeugen — numerisch, boolesch oder kategorial. Fügen Sie eine hinzu, um mit der Bewertung zu beginnen.",
+      "action": "Score-Konfiguration erstellen",
+      "actionDesc": "Definieren Sie die Punkteform + den gesunden Bereich"
+    },
     "noEvalTemplates": {
       "title": "Noch keine Bewertungsvorlagen",
       "description": "Bewertungsvorlagen definieren wiederverwendbare Bewertungskriterien für LLM-Bewertungen.",
@@ -4667,6 +4699,21 @@
     "empty": {
       "title": "Noch keine LLM-Anbieter",
       "description": "LLM-Anbieter speichern die Verbindungsdetails (Endpunkt und Anmeldeinformationen) für die Sprachmodelle, die Ihre LLM-Judge-Scorer aufrufen. Fügen Sie eines hinzu, um mit der Durchführung von Bewertungen durch Richter zu beginnen."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM Beobachtbarkeit",
+    "sections": {
+      "monitor": "Überwachen",
+      "evaluate": "Evaluieren"
+    },
+    "nav": {
+      "overview": "Überblick",
+      "sessions": "Sessions",
+      "quality": "Qualität",
+      "evalJobs": "Stellenangebote evaluieren",
+      "scorers": "Torschützen",
+      "scoreConfigs": "Score-Konfigurationen"
     }
   }
 }
