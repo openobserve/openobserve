@@ -31,7 +31,7 @@ export const COL = {
   updatedAt:    180,
   duration:     120,
   frequency:    130,
-  type:         120,
+  type:         180,
   streamType:   120,
   streamName:   180,
   method:        80,
