@@ -1209,7 +1209,8 @@
     "tokenRotateError": "Impossible de faire pivoter le jeton.",
     "tokenDeleteError": "Impossible de supprimer le jeton.",
     "noTokensFound": "Aucun jeton d'ingestion n'a été trouvé.",
-    "createdBy": "Créé par"
+    "createdBy": "Créé par",
+    "orgLevelSummary": "Jetons au niveau de l'organisation pour les points de terminaison d'ingestion."
   },
   "dashboard": {
     "selectField": "Champ",

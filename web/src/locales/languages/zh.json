@@ -1209,7 +1209,8 @@
     "tokenRotateError": "轮换令牌失败。",
     "tokenDeleteError": "删除令牌失败。",
     "noTokensFound": "未找到写入令牌。",
-    "createdBy": "由... 创建"
+    "createdBy": "由... 创建",
+    "orgLevelSummary": "摄取端点的组织级令牌。"
   },
   "dashboard": {
     "selectField": "字段",

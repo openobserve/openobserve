@@ -1209,7 +1209,8 @@
     "tokenRotateError": "Belirteç döndürülemedi.",
     "tokenDeleteError": "Belirteç silinemedi.",
     "noTokensFound": "Yutma belirteci bulunamadı.",
-    "createdBy": "Tarafından oluşturuldu"
+    "createdBy": "Tarafından oluşturuldu",
+    "orgLevelSummary": "Alım uç noktaları için kuruluş düzeyinde belirteçler."
   },
   "dashboard": {
     "selectField": "Tarla",

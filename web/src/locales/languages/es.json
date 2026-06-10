@@ -1209,7 +1209,8 @@
     "tokenRotateError": "No se pudo rotar el token.",
     "tokenDeleteError": "No se pudo eliminar el token.",
     "noTokensFound": "No se ha encontrado ningún token de ingestión.",
-    "createdBy": "Creado por"
+    "createdBy": "Creado por",
+    "orgLevelSummary": "Tokens a nivel de organización para puntos finales de ingestión."
   },
   "dashboard": {
     "selectField": "Campo",
