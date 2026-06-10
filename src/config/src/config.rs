@@ -1112,6 +1112,12 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_PARQUET_ENABLED",
+        default = false,
+        help = "Enable bloom filter for parquet files"
+    )]
+    pub bloom_filter_parquet_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(

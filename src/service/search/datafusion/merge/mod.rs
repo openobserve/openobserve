@@ -55,6 +55,7 @@ pub async fn merge_parquet_files(
     stream_name: &str,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
+    bloom_filter_fields: &[String],
     mut metadata: FileMeta,
     is_ingester: bool,
 ) -> Result<MergeParquetResult> {
@@ -68,7 +69,14 @@ pub async fn merge_parquet_files(
             log::info!(
                 "merge_parquet_files: stream_type={stream_type}, stream_name={stream_name}, downsampling rule={rule:?}"
             );
-            return merge_parquet_files_with_downsampling(schema, tables, rule, &metadata).await;
+            return merge_parquet_files_with_downsampling(
+                schema,
+                tables,
+                bloom_filter_fields,
+                rule,
+                &metadata,
+            )
+            .await;
         }
     }
 
@@ -145,7 +153,15 @@ pub async fn merge_parquet_files(
     // write batches to the appropriate format
     let buf = match cfg.common.file_format {
         FileFormat::Parquet => {
-            write_parquet(&schema, &metadata, is_ingester, &mut rx, read_task).await?
+            write_parquet(
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                is_ingester,
+                &mut rx,
+                read_task,
+            )
+            .await?
         }
         FileFormat::Vortex => write_vortex(schema, rx, read_task).await?,
     };
@@ -161,6 +177,7 @@ pub async fn merge_parquet_files(
 
 async fn write_parquet(
     schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
     metadata: &FileMeta,
     is_ingester: bool,
     rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
@@ -173,7 +190,14 @@ async fn write_parquet(
     } else {
         None
     };
-    let mut writer = new_parquet_writer(&mut buf, schema, metadata, false, compression);
+    let mut writer = new_parquet_writer(
+        &mut buf,
+        schema,
+        bloom_filter_fields,
+        metadata,
+        false,
+        compression,
+    );
 
     let mut new_file_meta = metadata.clone();
     new_file_meta.records = 0;
@@ -262,6 +286,7 @@ mod tests {
             "test_stream",
             schema,
             empty_tables,
+            &[],
             metadata,
             false,
         )
