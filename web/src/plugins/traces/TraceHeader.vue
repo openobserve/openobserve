@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-gray-100 trace-header-container"
-    :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
+    class="tw:flex tw:justify-start tw:items-center header-bg tw:bg-surface-panel trace-header-container"
     data-test="trace-header"
     :style="
       isSidebarOpen && {

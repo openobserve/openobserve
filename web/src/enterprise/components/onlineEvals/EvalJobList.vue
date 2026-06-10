@@ -49,6 +49,7 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
@@ -129,6 +130,7 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type {
   EvalJob,
   EvalJobStatus,
@@ -191,15 +193,15 @@ const columns = computed(() => [
     header: t("onlineEvals.job.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "status",
     header: t("onlineEvals.job.columns.status"),
     accessorFn: (row: EvalJob) => statusOf(row),
     sortable: true,
-    size: 120,
+    size: COL.status,
     meta: { align: "left" },
   },
   {
@@ -207,7 +209,7 @@ const columns = computed(() => [
     header: t("onlineEvals.job.columns.stream"),
     accessorKey: "stream",
     sortable: true,
-    size: 180,
+    size: COL.streamName,
     meta: { align: "left" },
   },
   {
@@ -215,14 +217,14 @@ const columns = computed(() => [
     header: t("onlineEvals.job.columns.scorers"),
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
     sortable: true,
-    size: 120,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
     id: "lastRun",
     header: t("onlineEvals.job.columns.lastRun"),
     sortable: false,
-    size: 120,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -230,7 +232,7 @@ const columns = computed(() => [
     header: t("onlineEvals.job.columns.created"),
     accessorFn: (row: EvalJob) => rowCreated(row),
     sortable: true,
-    size: 180,
+    size: COL.createdAt,
     meta: { align: "left" },
   },
   {

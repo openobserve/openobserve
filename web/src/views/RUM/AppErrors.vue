@@ -138,6 +138,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -254,7 +255,7 @@ const tableColumns = [
     header: t("rum.error"),
     accessorKey: "error",
     sortable: true,
-    size: 300,
+    size: COL.description,
     meta: { align: "left" }
   },
   {
@@ -262,7 +263,7 @@ const tableColumns = [
     header: t("rum.events"),
     accessorKey: "events",
     sortable: true,
-    size: 100,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -270,7 +271,7 @@ const tableColumns = [
     header: t("rum.viewURL"),
     accessorKey: "view_url",
     sortable: true,
-    size: 500,
+    size: COL.url,
     meta: { align: "left" },
   },
 ];

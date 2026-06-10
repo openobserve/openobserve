@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <nav
-    ref="navRef"
     v-show="visible"
     v-bind="$attrs"
     role="navigation"
@@ -26,20 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:py-1"
     @keydown="handleKeydown"
   >
-    <!-- Single shared accent bar — slides to whichever item is active so the
-         indicator animates from the previously selected item to the new one. -->
-    <div class="tw:relative tw:flex tw:flex-col">
-      <span
-        v-show="indicator.visible"
-        aria-hidden="true"
-        data-test="navbar-active-indicator"
-        class="tw:absolute tw:left-0.5 tw:w-1 tw:rounded-full tw:bg-primary-600 tw:pointer-events-none tw:z-10"
-        :class="indicatorReady ? 'tw:transition-[transform,height] tw:duration-300 tw:ease-out' : ''"
-        :style="{
-          transform: `translateY(${indicator.top}px)`,
-          height: `${indicator.height}px`,
-        }"
-      />
+    <!-- Each active item carries its own left accent border (see MenuLink), so
+         no separate floating indicator bar is needed. -->
+    <div class="tw:flex tw:flex-col">
       <menu-link
         v-for="(nav, index) in linksList"
         :key="nav.title"
@@ -59,12 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import type { NavbarProps, NavbarEmits, NavbarSlots } from "./ONavbar.types";
 import MenuLink from "@/components/MenuLink.vue";
-import { onMounted, reactive, ref, watch, nextTick } from "vue";
-import { useRoute } from "vue-router";
 
 defineOptions({ inheritAttrs: false });
 
-const props = withDefaults(defineProps<NavbarProps>(), {
+withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
 });
@@ -72,49 +58,6 @@ const props = withDefaults(defineProps<NavbarProps>(), {
 const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
-
-// ── Sliding active indicator ────────────────────────────────────
-// A single accent bar (in the template) is positioned over the active item.
-// On route change it animates (translateY + height) from the previously
-// selected item to the new one, instead of each item drawing its own bar.
-const navRef = ref<HTMLElement | null>(null);
-const indicator = reactive({ top: 0, height: 0, visible: false });
-// Suppress the transition on the very first paint so the bar doesn't fly in
-// from the top on initial load — only subsequent moves animate.
-const indicatorReady = ref(false);
-const route = useRoute();
-
-// The bar is a vertically-centered pill (≈60% of the item height, clamped)
-// rather than a near-full-height slab — reads as a clean accent rail.
-const BAR_MIN = 20;
-const BAR_MAX = 34;
-
-const updateIndicator = async () => {
-  await nextTick();
-  const root = navRef.value;
-  if (!root) return;
-  const active = root.querySelector<HTMLElement>('[aria-current="page"]');
-  if (!active) {
-    indicator.visible = false;
-    return;
-  }
-  const full = active.offsetHeight;
-  const barHeight = Math.min(Math.max(Math.round(full * 0.6), BAR_MIN), BAR_MAX);
-  indicator.top = active.offsetTop + Math.round((full - barHeight) / 2);
-  indicator.height = barHeight;
-  indicator.visible = true;
-};
-
-watch(() => route.fullPath, updateIndicator);
-// The menu list is built/filtered asynchronously — re-measure when it changes.
-watch(() => props.linksList, updateIndicator, { deep: true });
-
-onMounted(async () => {
-  await updateIndicator();
-  requestAnimationFrame(() => {
-    indicatorReady.value = true;
-  });
-});
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
 
@@ -169,14 +112,24 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <style scoped>
-/* Slim, unobtrusive scrollbar that floats in the reserved gutter
-   (scrollbar-gutter: stable) so it never steals width from the labels. */
+/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
+   it never reserves layout width, so there is no empty strip beside the labels.
+
+   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
+   what previously pushed the labels inward and clipped "Management"). The only
+   way a native scrollbar floats *over* content instead of reserving space is
+   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
+   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
+   nothing. Either way the rail keeps its full width and still scrolls via
+   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
 .o2-navbar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-width: none; /* Firefox: hidden, reserves nothing */
+  -ms-overflow-style: none; /* legacy Edge/IE */
 }
-.o2-navbar-scroll:hover {
-  scrollbar-color: var(--color-border-soft, rgba(148, 163, 184, 0.5)) transparent;
+@supports (overflow: overlay) {
+  .o2-navbar-scroll {
+    overflow-y: overlay; /* Blink/WebKit: scrollbar floats over content */
+  }
 }
 .o2-navbar-scroll::-webkit-scrollbar {
   width: 6px;
@@ -187,8 +140,15 @@ function handleKeydown(event: KeyboardEvent) {
 .o2-navbar-scroll::-webkit-scrollbar-thumb {
   background-color: transparent;
   border-radius: 9999px;
+  transition: background-color 150ms ease;
 }
+/* Reveal the thumb only while the rail is hovered. */
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
   background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
+}
+
+/* Right border only in dark mode — light mode uses shadow on the content card */
+:global(.body--dark) .o2-navbar-scroll {
+  border-right: 1px solid var(--o2-border-color);
 }
 </style>

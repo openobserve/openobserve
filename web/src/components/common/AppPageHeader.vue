@@ -123,7 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :items="breadcrumb!"
               :max-inline="breadcrumbMaxInline"
             />
-            <span v-else class="tw:truncate tw:min-w-0">{{ subtitle }}</span>
+            <!-- leading-normal (not the meta variant's leading-none): truncate
+                 sets overflow:hidden, and a 1em line box clips descenders
+                 (g/y/p). The h-5 band + items-center leaves room for it. -->
+            <span v-else class="tw:truncate tw:min-w-0 tw:leading-normal">{{ subtitle }}</span>
           </slot>
         </OText>
       </div>

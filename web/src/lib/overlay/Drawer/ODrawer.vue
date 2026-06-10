@@ -338,8 +338,8 @@ watch(internalOpen, (open) => {
           // Surface — reuse dialog tokens (same visual language)
           'tw:bg-dialog-bg tw:text-dialog-content-text',
           isRight
-            ? 'tw:border-s tw:border-dialog-border'
-            : 'tw:border-e tw:border-dialog-border',
+            ? 'tw:border-s tw:border-t tw:border-dialog-border'
+            : 'tw:border-e tw:border-t tw:border-dialog-border',
           'tw:shadow-xl',
           // Focus ring
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',

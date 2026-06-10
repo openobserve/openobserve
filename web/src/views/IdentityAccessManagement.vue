@@ -83,7 +83,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
 
   const groups: { label: string; items: SectionHubItem[] }[] = [
     {
-      label: "ACCESS",
+      label: "Access",
       items: [
         {
           key: "users",
@@ -122,7 +122,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
       ],
     },
     {
-      label: "PERMISSIONS",
+      label: "Permissions",
       items: [
         {
           key: "groups",
@@ -154,7 +154,7 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
       ],
     },
     {
-      label: "ORGANIZATION",
+      label: "Organization",
       items: [
         {
           key: "organizations",

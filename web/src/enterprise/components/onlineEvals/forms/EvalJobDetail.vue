@@ -9,7 +9,7 @@
             <span
               v-if="row.name"
               :class="[
-                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -286,10 +286,7 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+              <span class="jd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -406,10 +403,7 @@
                 </div>
               </template>
               <template #cell-scoreDisplay="{ row }">
-                <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+                <span class="jd-mono">{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
                 <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>

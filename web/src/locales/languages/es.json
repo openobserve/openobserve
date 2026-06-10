@@ -3226,7 +3226,8 @@
     "confirmRejectMsg": "¿Estás seguro de que quieres rechazar la invitación para unirte a {org}?",
     "expired": "Expirado",
     "expiresToday": "Caduca hoy",
-    "daysLeft": "Quedan {días} días"
+    "daysLeft": "Quedan {días} días",
+    "search": "Buscar invitaciones"
   },
   "serviceAccounts": {
     "header": "Cuentas de servicio",
@@ -4312,6 +4313,16 @@
       "description": "Destinos externos para la salida de canalización: puntos finales HTTP y destinos de escritura remota.",
       "action": "Nuevo destino",
       "actionDesc": "Conectar un destino de canalización"
+    },
+    "noEvalTemplates": {
+      "title": "Aún no hay plantillas de evaluación",
+      "description": "Las plantillas de evaluación definen criterios de puntuación reutilizables para las evaluaciones de LLM.",
+      "action": "Nueva plantilla",
+      "actionDesc": "Crear una plantilla de evaluación"
+    },
+    "noPipelineHistory": {
+      "title": "Aún no hay historial de oleoductos",
+      "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
     }
   },
   "onlineEvals": {

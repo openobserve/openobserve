@@ -77,6 +77,7 @@ import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import { formatToReadable } from "@/utils/date";
 
@@ -105,13 +106,15 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.name"),
     accessorKey: "alert_name",
     sortable: true,
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "total_evaluations",
     header: t("alerts.totalEvaluations"),
     accessorKey: "total_evaluations",
     sortable: true,
+    size: COL.count,
     meta: { align: "center" },
   },
   {
@@ -119,6 +122,7 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.firingCount"),
     accessorKey: "firing_count",
     sortable: true,
+    size: COL.count,
     meta: { align: "center" },
   },
   {
@@ -126,6 +130,7 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.currentState"),
     accessorKey: "current_state",
     sortable: true,
+    size: COL.status,
     meta: { align: "center" },
   },
   {
@@ -133,6 +138,7 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.frequency"),
     accessorKey: "frequency",
     sortable: true,
+    size: COL.frequency,
     meta: { align: "center" },
   },
   {
@@ -140,6 +146,7 @@ const columns: OTableColumnDef[] = [
     header: t("alerts.lastEvaluation"),
     accessorKey: "last_evaluation",
     sortable: true,
+    size: COL.date,
     meta: { align: "center" },
   },
 ];

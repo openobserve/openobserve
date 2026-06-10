@@ -16,20 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="tw:rounded-md quota-page tw:text-left tw:h-full tw:py-2.5"
+  <div class="tw:rounded-md quota-page tw:text-left tw:h-full tw:flex tw:flex-col"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
   >
-    <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:h-full">
-      <div class="card-container tw:mb-[0.625rem]">
+    <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
+    <AppPageHeader
+      :title="t('quota.header')"
+      :subtitle="'Usage limits applied per role'"
+      icon="speed"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span data-test="user-title-text">{{ t("quota.header") }}</span>
+      </template>
+    </AppPageHeader>
+    <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:mb-[0.625rem] tw:mt-2.5">
         <div class="tw:px-3 tw:py-2">
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:w-full tw:pb-2"
-            data-test="user-title-text"
-          >
-            {{ t("quota.header") }}
-          </div>
           <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
             <div class="tw:flex tw:items-center">
               <OSelect
@@ -139,6 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="iam-quota-api-limits"
         :show-global-filter="false"
       >
         <template #empty>
@@ -206,6 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           expansion="single"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-quota-role-limits"
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
@@ -385,9 +396,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
@@ -406,6 +419,7 @@ export default defineComponent({
     OSelect,
     OSearchInput,
     AppTabs,
+    AppPageHeader,
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -508,13 +522,19 @@ export default defineComponent({
           header: t("quota.moduleName"),
           accessorKey: "module_name",
           sortable: true,
-          meta: { align: "left", cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+          resizable: true,
+          hideable: true,
+          size: COL.name,
+          minSize: 160,
+          meta: { align: "left", flex: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",
           header: `${t("quota.listLimit")} ${unitLabel}`,
           accessorKey: "list",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -523,6 +543,8 @@ export default defineComponent({
           header: `${t("quota.getLimit")} ${unitLabel}`,
           accessorKey: "get",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -531,6 +553,8 @@ export default defineComponent({
           header: `${t("quota.createLimit")} ${unitLabel}`,
           accessorKey: "create",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -539,6 +563,8 @@ export default defineComponent({
           header: `${t("quota.updateLimit")} ${unitLabel}`,
           accessorKey: "update",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -547,6 +573,8 @@ export default defineComponent({
           header: `${t("quota.deleteLimit")} ${unitLabel}`,
           accessorKey: "delete",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -560,14 +588,20 @@ export default defineComponent({
           header: t("quota.roleName"),
           accessorKey: "role_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           cell: (info: any) => info.getValue(),
-          meta: { align: "left" },
+          size: COL.role,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         {
           id: "list",
           header: `${t("quota.listLimit")} ${unitLabel}`,
           accessorKey: "list",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -576,6 +610,8 @@ export default defineComponent({
           header: `${t("quota.getLimit")} ${unitLabel}`,
           accessorKey: "get",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -584,6 +620,8 @@ export default defineComponent({
           header: `${t("quota.createLimit")} ${unitLabel}`,
           accessorKey: "create",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -592,6 +630,8 @@ export default defineComponent({
           header: `${t("quota.updateLimit")} ${unitLabel}`,
           accessorKey: "update",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -600,6 +640,8 @@ export default defineComponent({
           header: `${t("quota.deleteLimit")} ${unitLabel}`,
           accessorKey: "delete",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },

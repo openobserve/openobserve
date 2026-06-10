@@ -3228,7 +3228,8 @@
     "confirmRejectMsg": "Bist du sicher, dass du die Einladung zum Beitritt zu {org} ablehnen möchtest?",
     "expired": "Abgelaufen",
     "expiresToday": "Läuft heute ab",
-    "daysLeft": "{Tage} verbleibende Tage"
+    "daysLeft": "{Tage} verbleibende Tage",
+    "search": "Einladungen suchen"
   },
   "serviceAccounts": {
     "header": "Dienstkonten",
@@ -4314,6 +4315,16 @@
       "description": "Externe Ziele für die Pipeline-Ausgabe — HTTP-Endpunkte und Remote-Schreibziele.",
       "action": "Neues Reiseziel",
       "actionDesc": "Pipeline-Ziel verbinden"
+    },
+    "noEvalTemplates": {
+      "title": "Noch keine Bewertungsvorlagen",
+      "description": "Bewertungsvorlagen definieren wiederverwendbare Bewertungskriterien für LLM-Bewertungen.",
+      "action": "Neue Vorlage",
+      "actionDesc": "Erstellen Sie eine Bewertungsvorlage"
+    },
+    "noPipelineHistory": {
+      "title": "Noch keine Pipeline-Historie",
+      "description": "Der Verlauf der Pipeline-Ausführung wird hier angezeigt, sobald Ihre Pipelines ausgeführt werden."
     }
   },
   "onlineEvals": {

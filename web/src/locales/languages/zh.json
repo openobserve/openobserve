@@ -3232,7 +3232,8 @@
     "confirmRejectMsg": "您确定要拒绝加入 {org} 的邀请吗？",
     "expired": "已过期",
     "expiresToday": "今天到期",
-    "daysLeft": "还剩 {天} 天"
+    "daysLeft": "还剩 {天} 天",
+    "search": "搜索邀请"
   },
   "serviceAccounts": {
     "header": "服务账号",
@@ -4318,6 +4319,16 @@
       "description": "管道输出的外部目标 — HTTP 端点和远程写入目标。",
       "action": "新目的地",
       "actionDesc": "连接管道目的地"
+    },
+    "noEvalTemplates": {
+      "title": "尚无评估模板",
+      "description": "评估模板为 LLM 评估定义了可重复使用的评分标准。",
+      "action": "新模板",
+      "actionDesc": "创建评估模板"
+    },
+    "noPipelineHistory": {
+      "title": "尚无管道历史记录",
+      "description": "管道运行后，管道执行历史记录将显示在此处。"
     }
   },
   "onlineEvals": {

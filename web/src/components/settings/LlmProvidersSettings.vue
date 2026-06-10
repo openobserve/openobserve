@@ -75,6 +75,10 @@
           :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-llm-providers"
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
@@ -202,14 +206,19 @@ const columns = computed(() => [
     header: t("llmProviders.columns.name"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.name,
-    meta: { align: "left" },
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "type",
     header: t("llmProviders.columns.type"),
     accessorFn: (row: Provider) => providerTypeOf(row),
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.type,
     meta: { align: "left" },
   },
@@ -218,6 +227,8 @@ const columns = computed(() => [
     header: t("llmProviders.columns.endpoint"),
     accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
     sortable: false,
+    resizable: true,
+    hideable: true,
     size: COL.url,
     meta: { align: "left" },
   },
@@ -226,7 +237,9 @@ const columns = computed(() => [
     header: t("llmProviders.columns.defaultModel"),
     accessorFn: (row: Provider) => defaultModelOf(row),
     sortable: false,
-    size: 180,
+    resizable: true,
+    hideable: true,
+    size: COL.defaultModel,
     meta: { align: "left" },
   },
   {
@@ -234,6 +247,8 @@ const columns = computed(() => [
     header: t("llmProviders.columns.default"),
     accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: COL.toggle,
     meta: { align: "left" },
   },

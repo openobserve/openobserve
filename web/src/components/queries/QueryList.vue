@@ -26,6 +26,7 @@
       class="my-sticky-virtscroll-table o2-table-hide-header"
       :data="queryRows"
       :columns="queryListColumns"
+      :default-columns="false"
       row-key="_rowKey"
       pagination="none"
       dense
@@ -42,6 +43,7 @@ import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTable from '@/lib/core/Table/OTable.vue';
+import { COL } from "@/lib/core/Table/OTable.types";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -155,8 +157,8 @@ export default defineComponent({
     });
 
     const queryListColumns = [
-      { id: "key", header: "", accessorKey: "key", sortable: false, meta: { align: "left" as const } },
-      { id: "value", header: "", accessorKey: "value", sortable: false, meta: { align: "left" as const } },
+      { id: "key", header: "", accessorKey: "key", sortable: false, size: COL.owner, meta: { align: "left" as const } },
+      { id: "value", header: "", accessorKey: "value", sortable: false, size: COL.description, meta: { align: "left" as const, autoWidth: true } },
     ];
 
     return {

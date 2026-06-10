@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(value, key) in additionalDimensions"
               :key="`additional-${key}`"
-              class="tw:flex tw:items-center tw:gap-3 tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-gray-50"
+              class="tw:flex tw:items-center tw:gap-3 tw:p-3 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded tw:bg-surface-panel"
               :data-test="`additional-dimension-${key}`"
             >
               <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-2">

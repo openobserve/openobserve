@@ -134,13 +134,6 @@ describe("PipelineHistory.vue", () => {
       expect(wrapper.find('[data-test="pipeline-history-search-select"]').exists()).toBe(true);
     });
 
-    it("should render manual search button", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="pipeline-history-manual-search-btn"]').exists()).toBe(true);
-    });
-
     it("should render refresh button", async () => {
       const wrapper = mountComponent();
       await flushPromises();
@@ -353,17 +346,5 @@ describe("PipelineHistory.vue", () => {
       expect(vm.loading).toBe(false);
     });
 
-    it("should disable manual search button when loading ref is true", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      // Access the underlying ref via the component's exposed reactive state
-      // and verify the disabled binding is wired to vm.loading
-      const searchBtn = wrapper.find('[data-test="pipeline-history-manual-search-btn"]');
-      expect(searchBtn.exists()).toBe(true);
-      // When not loading, button should not be disabled
-      expect(vm.loading).toBe(false);
-    });
   });
 });
