@@ -31,6 +31,16 @@ vi.mock("@/services/search", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock stream service
+// ---------------------------------------------------------------------------
+const mockStreamSchema = vi.fn().mockResolvedValue({ data: { schema: [] } });
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: (...args: any[]) => mockStreamSchema(...args),
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // Shared reactive searchObj
 // ---------------------------------------------------------------------------
 const now = Date.now();
