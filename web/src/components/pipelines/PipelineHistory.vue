@@ -59,16 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-xs-sq"
-        @click="manualSearch"
-        data-test="pipeline-history-manual-search-btn"
-        :disabled="loading"
-        icon-left="search"
-      >
-        <OTooltip :content="t('common.search') || 'Search'" side="top" />
-      </OButton>
-      <OButton
-        variant="ghost"
-        size="icon-xs-sq"
         @click="refreshData"
         data-test="pipeline-history-refresh-btn"
         :loading="loading"
@@ -202,7 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <no-data />
+            <OEmptyState
+              size="hero"
+              preset="no-pipeline-history"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && clearSearch()"
+            />
           </template>
 
           <template #bottom="{ totalRows }">
@@ -477,7 +473,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
@@ -684,12 +680,6 @@ const onPipelineSelected = (val: any) => {
 const clearSearch = () => {
   searchQuery.value = "";
   selectedPipeline.value = undefined;
-  pagination.value.page = 1;
-  fetchPipelineHistory();
-};
-
-const manualSearch = () => {
-  searchQuery.value = (selectedPipeline.value as any) ?? "";
   pagination.value.page = 1;
   fetchPipelineHistory();
 };

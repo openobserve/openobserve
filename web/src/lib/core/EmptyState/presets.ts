@@ -529,6 +529,12 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+  "no-pipeline-history": {
+    illustration: "history",
+    variant: "neutral",
+    titleKey: "emptyState.noPipelineHistory.title",
+    descriptionKey: "emptyState.noPipelineHistory.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -569,4 +575,5 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-pipeline-history": "emptyState.nouns.pipelineHistory",
 };

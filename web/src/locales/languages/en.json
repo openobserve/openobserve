@@ -134,6 +134,10 @@
       "title": "No backfill jobs",
       "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
     },
+    "noPipelineHistory": {
+      "title": "No pipeline history yet",
+      "description": "Pipeline execution history will appear here once your pipelines run."
+    },
     "noPipelines": {
       "title": "Create your first pipeline",
       "description": "Pipelines transform and route your data as it arrives. Set one up to start shaping your streams.",
@@ -251,7 +255,8 @@
       "aiToolsets": "AI toolsets",
       "llmProviders": "LLM providers",
       "sourceMaps": "source maps",
-      "backfillJobs": "backfill jobs"
+      "backfillJobs": "backfill jobs",
+      "pipelineHistory": "pipeline history"
     }
   },
   "common": {
