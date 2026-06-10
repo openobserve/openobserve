@@ -202,13 +202,13 @@ onMounted(() => {
   void refreshAll();
 });
 
-watch(
-  dateWindowRef,
-  () => {
-    void refreshAll();
-  },
-  { deep: true },
-);
+// No deep flag: the parent (OnlineEvals) always assigns a fresh
+// `{startUs,endUs}` object via `qualityDateWindow.value = …`, so the ref's
+// identity changes and the top-level watch already fires. Deep traversal
+// would just walk two numeric leaves on every change for no benefit.
+watch(dateWindowRef, () => {
+  void refreshAll();
+});
 
 watch(scoreConfigsRef, () => {
   void refreshConfigs();

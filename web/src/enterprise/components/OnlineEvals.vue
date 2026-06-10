@@ -588,18 +588,18 @@ function syncQualityDateWindow() {
   }
 }
 
-watch(
-  qualitySelectedDate,
-  (next) => {
-    try {
-      localStorage.setItem(QUALITY_DATE_LS_KEY, JSON.stringify(next));
-    } catch {
-      // ignore storage failures (private mode, quota, etc.)
-    }
-    syncQualityDateWindow();
-  },
-  { deep: true },
-);
+// No deep flag: DateTimePickerDashboard's `update:modelValue` emits a brand
+// new `{valueType,startTime,endTime,relativeTimePeriod}` object on every
+// commit, so the top-level ref identity changes and the watch fires
+// without needing to traverse the four primitive leaves.
+watch(qualitySelectedDate, (next) => {
+  try {
+    localStorage.setItem(QUALITY_DATE_LS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage failures (private mode, quota, etc.)
+  }
+  syncQualityDateWindow();
+});
 
 // Aggregated "is any quality query in flight" — exposed by QualityPage so the
 // Refresh button can show its spinner regardless of which loader is running.
@@ -607,9 +607,22 @@ const qualityRefreshing = computed(
   () => qualityPageRef.value?.isAnyLoading ?? false,
 );
 
-async function onQualityRefresh() {
-  syncQualityDateWindow();
-  await qualityPageRef.value?.refreshAll?.();
+// Manual refresh: re-anchor the window from the picker (so relative ranges
+// like "Past 15 minutes" advance to "now") and let the QualityPage watch on
+// `dateWindow` drive the actual refetch. We deliberately don't call
+// `qualityPageRef.refreshAll()` here — `syncQualityDateWindow` always
+// assigns a fresh `{startUs,endUs}` object, so the prop's ref identity
+// changes and the watch fires. Calling refreshAll() explicitly on top of
+// that would race two concurrent loads on every Refresh click.
+function onQualityRefresh() {
+  if (qualityDatePickerRef.value) {
+    syncQualityDateWindow();
+  } else {
+    // Picker isn't mounted (shouldn't happen — button + picker render
+    // together for the quality tab — but cover the race during initial
+    // teardown). Run the refresh directly so the click isn't lost.
+    void qualityPageRef.value?.refreshAll?.();
+  }
 }
 
 // Sync the initial dateWindow once the picker mounts (it only mounts while
