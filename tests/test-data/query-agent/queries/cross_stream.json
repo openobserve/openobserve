@@ -686,6 +686,97 @@
         ],
         "results_mode": "rowsort"
       }
+    },
+    {
+      "id": "Q553",
+      "sql": "SELECT a.facility_zone, a.pallet_id AS pallet_a, b.pallet_id AS pallet_b, a.throughput_rate AS rate_a, b.throughput_rate AS rate_b FROM \"{stream}\" a LEFT JOIN \"{stream2}\" b ON a.facility_zone = b.facility_zone AND a.control_center = b.control_center WHERE a.throughput_rate > 300 ORDER BY a.throughput_rate DESC LIMIT 10",
+      "category": "cross_stream",
+      "time_offset": {
+        "start_offset": 33119000000,
+        "end_offset": 33193000000
+      },
+      "expected": {
+        "columns": [
+          "facility_zone",
+          "pallet_a",
+          "pallet_b",
+          "rate_a",
+          "rate_b"
+        ],
+        "results": [
+          [
+            "ZONE-4",
+            "PL-002",
+            "PL-006",
+            "725.0",
+            "725.0"
+          ],
+          [
+            "ZONE-4",
+            "PL-002",
+            "PL-002",
+            "725.0",
+            "480.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-003",
+            "PL-003",
+            "610.0",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "PL-005",
+            "610.0",
+            "840.0"
+          ],
+          [
+            "ZONE-3",
+            "PL-001",
+            "PL-001",
+            "610.0",
+            "320.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "PL-004",
+            "480.0",
+            "725.0"
+          ],
+          [
+            "ZONE-2",
+            "PL-008",
+            "PL-008",
+            "480.0",
+            "480.0"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "PL-005",
+            "320.0",
+            "840.0"
+          ],
+          [
+            "ZONE-1",
+            "PL-007",
+            "PL-003",
+            "320.0",
+            "610.0"
+          ],
+          [
+            "ZONE-3",
+            "PL-005",
+            "PL-001",
+            "320.0",
+            "320.0"
+          ]
+        ],
+        "results_mode": "rowsort"
+      }
     }
   ]
 }
