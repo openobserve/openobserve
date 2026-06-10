@@ -174,7 +174,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.type,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -184,7 +184,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.type,
+        size: 140,
         meta: { align: "left" },
       },
       {
@@ -194,7 +194,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.duration,
+        size: 150,
         meta: { align: "left" },
       },
       {
@@ -204,7 +204,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.duration,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -214,7 +214,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.type,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -234,7 +234,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.streamType,
+        size: 130,
         meta: { align: "left" },
       },
       {

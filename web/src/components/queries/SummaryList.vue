@@ -131,10 +131,10 @@ export default defineComponent({
     const columns = ref<OTableColumnDef[]>([
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: COL.type, sortable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: COL.count, sortable: true, meta: { align: "left" } },
-      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: COL.duration, cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, meta: { align: "left"  } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, meta: { align: "left" } },
+      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 
