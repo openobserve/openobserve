@@ -72,9 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="iam-group-roles"
         :show-global-filter="false"
         :footer-title="t('iam.roles')"
         dense
@@ -192,11 +189,8 @@ const columns: OTableColumnDef[] = [
     header: t("iam.roleName"),
     accessorKey: "role_name",
     sortable: true,
-    resizable: true,
-    hideable: true,
     size: COL.role,
-    minSize: 160,
-    meta: { align: "left", flex: true },
+    meta: { align: "left", autoWidth: true },
   },
 ];
 

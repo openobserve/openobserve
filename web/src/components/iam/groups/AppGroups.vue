@@ -55,9 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           filter-mode="client"
           :default-columns="false"
-          :enable-column-resize="true"
-          :persist-columns="true"
-          table-id="iam-groups-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -209,10 +206,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.groupName"),
     accessorKey: "group_name",
     sortable: true,
-    resizable: true,
-    hideable: true,
-    minSize: 160,
-    meta: { align: "left", flex: true, isName: true },
+    meta: { align: "left", autoWidth: true, isName: true },
   },
   {
     id: "actions",

@@ -42,10 +42,7 @@ const columns: OTableColumnDef[] = [
     header: t("iam.roleName"),
     accessorKey: "role_name",
     sortable: true,
-    resizable: true,
-    hideable: true,
-    minSize: 160,
-    meta: { align: "left", flex: true, isName: true },
+    meta: { align: "left", autoWidth: true, isName: true },
   },
   {
     id: "actions",
@@ -78,9 +75,6 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
-    :enable-column-resize="true"
-    :persist-columns="true"
-    table-id="iam-roles-list"
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
   >

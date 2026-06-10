@@ -69,9 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          :enable-column-resize="true"
-          :persist-columns="true"
-          table-id="iam-group-service-accounts"
           :show-global-filter="false"
           :footer-title="t('serviceAccounts.header')"
           dense
@@ -186,11 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: t("iam.serviceAccountsName"),
       accessorKey: "email",
       sortable: true,
-      resizable: true,
-      hideable: true,
       size: COL.email,
-      minSize: 160,
-      meta: { align: "left" , flex: true },
+      meta: { align: "left" , autoWidth: true },
     },
   ];
   

@@ -78,9 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="settings-alert-templates"
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -261,10 +258,7 @@ const columns: OTableColumnDef[] = [
     header: t("alert_templates.name"),
     accessorKey: "name",
     sortable: true,
-    resizable: true,
-    hideable: true,
-    minSize: 160,
-    meta: { align: "left", flex: true },
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "actions",
