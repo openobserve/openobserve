@@ -1409,6 +1409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="localSavedViews.length > 0 ? 'tw:border-r tw:border-[var(--o2-border-color)]' : ''"
               :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
+              <div style="max-height: 486px; min-height: 280px; overflow: hidden; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1417,7 +1418,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :global-filter="searchObj.data.savedViewFilterFields"
                 :page-size="rowsPerPage"
                 :page-size-options="[10, 20, 50]"
-                :style="{ minHeight: '420px', height: '420px' }"
                 class="saved-view-table full-height o2-table-hide-header"
               >
                 <template #top>
@@ -1511,12 +1511,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
+              </div>
             </div>
 
             <div
               class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0 tw:pl-3"
               v-if="localSavedViews.length > 0"
             >
+              <div style="max-height: 480px; min-height: 280px; overflow: hidden; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -1581,6 +1583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
+              </div>
             </div>
           </div>
       </div>
@@ -5276,7 +5279,7 @@ export default defineComponent({
   top: 0;
   margin-right: 0.25rem;
   min-width: 10rem;
-  background-color: var(--o2-card-bg);
+  background-color: var(--color-dropdown-bg);
   border: 0.063rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
@@ -5284,7 +5287,7 @@ export default defineComponent({
   z-index: 9999;
 
   body.body--dark & {
-    background-color: var(--o2-card-bg);
+    background-color: var(--color-dropdown-bg);
     border-color: var(--o2-border-color);
     box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }
