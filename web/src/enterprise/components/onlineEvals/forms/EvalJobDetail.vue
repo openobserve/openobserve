@@ -697,7 +697,7 @@ const updatedAt = computed<number | null>(() => {
 });
 
 // — Tabs — no badge counts on Runs / Failures (the KPI strip already shows
-// these numbers at the top of every tab).
+// these numbers at the top of every tab in eval job list).
 const tabs = computed(() => [
   {
     id: "configuration" as TabId,
