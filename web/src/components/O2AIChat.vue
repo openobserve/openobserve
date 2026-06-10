@@ -1917,8 +1917,11 @@ export default defineComponent({
                     const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
                     const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
+                    // Check if this is an authorization/access error
                     const authErr = isAuthError(errorText, data.error_type);
-                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                    let errorMessage = authErr
+                      ? UNAUTHORIZED_MESSAGE
+                      : `Error: ${errorText}`;
                     if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -2176,14 +2179,24 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage = data.message || data.error || 'An error occurred';
-                    const authErr = isAuthError(rawErrorMessage, data.error_type);
+                    const rawErrorMessage =
+                      data.message || data.error || 'An error occurred';
+                    const authErr = isAuthError(
+                      rawErrorMessage,
+                      data.error_type,
+                    );
                     const errorBlock: ContentBlock = {
                       type: 'error',
-                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
+                      message: authErr
+                        ? UNAUTHORIZED_MESSAGE
+                        : rawErrorMessage,
                       errorType: data.error_type || undefined,
-                      suggestion: authErr ? undefined : data.suggestion || undefined,
-                      recoverable: authErr ? false : data.recoverable ?? undefined,
+                      suggestion: authErr
+                        ? undefined
+                        : data.suggestion || undefined,
+                      recoverable: authErr
+                        ? false
+                        : data.recoverable ?? undefined,
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -2374,8 +2387,11 @@ export default defineComponent({
                   const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
                   const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
 
+                  // Check if this is an authorization/access error
                   const authErr = isAuthError(errorText, data.error_type);
-                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                  let errorMessage = authErr
+                    ? UNAUTHORIZED_MESSAGE
+                    : `Error: ${errorText}`;
                   if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -2520,12 +2536,24 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
+                  const rawErrorMessage =
+                    data.message || data.error || 'An error occurred';
+                  const authErr = isAuthError(
+                    rawErrorMessage,
+                    data.error_type,
+                  );
                   const errorBlock: ContentBlock = {
                     type: 'error',
-                    message: data.message || 'An error occurred',
+                    message: authErr
+                      ? UNAUTHORIZED_MESSAGE
+                      : rawErrorMessage,
                     errorType: data.error_type || undefined,
-                    suggestion: data.suggestion || undefined,
-                    recoverable: data.recoverable ?? undefined,
+                    suggestion: authErr
+                      ? undefined
+                      : data.suggestion || undefined,
+                    recoverable: authErr
+                      ? false
+                      : data.recoverable ?? undefined,
                   };
                   let lastMessage = msgs[msgs.length - 1];
                   if (lastMessage && lastMessage.role === 'assistant') {
