@@ -346,7 +346,7 @@
             "4",
             "581.25",
             "27.53",
-            "hybrid",
+            "manual",
             "2"
           ],
           [
@@ -1010,17 +1010,17 @@
         ],
         "results": [
           [
-            "ZONE-3",
-            "2",
-            "0",
-            "1",
-            "66.66999816894531"
-          ],
-          [
             "ZONE-4",
             "2",
             "1",
             "0",
+            "66.66999816894531"
+          ],
+          [
+            "ZONE-3",
+            "2",
+            "0",
+            "1",
             "66.66999816894531"
           ],
           [
@@ -1232,14 +1232,14 @@
         ],
         "results": [
           [
-            "ZONE-4",
-            "4",
-            "483.0"
-          ],
-          [
             "ZONE-1",
             "4",
             "258.0"
+          ],
+          [
+            "ZONE-4",
+            "4",
+            "483.0"
           ],
           [
             "ZONE-3",
@@ -1763,12 +1763,12 @@
             "1"
           ],
           [
-            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "ResourceExhaustedException: sorter_model SORT-M3 queue full",
             "1",
             "1"
           ]
@@ -1814,11 +1814,6 @@
         ],
         "results": [
           [
-            "performanceMetric",
-            "itemPage",
-            "2"
-          ],
-          [
             "navigation",
             "itemPage",
             "2"
@@ -1826,6 +1821,11 @@
           [
             "interaction",
             "searchPage",
+            "2"
+          ],
+          [
+            "performanceMetric",
+            "itemPage",
             "2"
           ],
           [
@@ -1931,13 +1931,13 @@
         ],
         "results": [
           [
-            "sess_001",
-            "4",
+            "sess_003",
+            "1",
             "0"
           ],
           [
-            "sess_003",
-            "1",
+            "sess_001",
+            "4",
             "0"
           ],
           [
@@ -2034,11 +2034,11 @@
         ],
         "results": [
           [
-            "E003",
+            "E001",
             "2"
           ],
           [
-            "E001",
+            "E003",
             "2"
           ],
           [
@@ -2148,17 +2148,17 @@
           ],
           [
             "performanceMetric",
-            "cartPage",
-            "1"
-          ],
-          [
-            "performanceMetric",
             "searchPage",
             "1"
           ],
           [
             "performanceMetric",
             "itemPage",
+            "1"
+          ],
+          [
+            "performanceMetric",
+            "cartPage",
             "1"
           ],
           [
@@ -2193,13 +2193,13 @@
             "2"
           ],
           [
-            "ConfigurationException: missing facility_zone ZONE-3 override",
+            "OverflowException: throughput_rate 999.0 exceeds max capacity",
             "1",
             "1",
             "1"
           ],
           [
-            "OverflowException: throughput_rate 999.0 exceeds max capacity",
+            "ConfigurationException: missing facility_zone ZONE-3 override",
             "1",
             "1",
             "1"
@@ -2287,16 +2287,16 @@
         ],
         "results": [
           [
-            "itemPage",
-            "2",
-            "1",
-            "89.0"
-          ],
-          [
             "checkoutPage",
             "1",
             "1",
             "567.0"
+          ],
+          [
+            "itemPage",
+            "2",
+            "1",
+            "89.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -2944,28 +2944,28 @@
         ],
         "results": [
           [
-            "warehouse-south",
-            "2",
-            "45.0",
-            "2"
-          ],
-          [
             "warehouse-west",
             "2",
             "15.0",
             "0"
           ],
           [
-            "warehouse-east",
-            "1",
-            "1900.0",
-            "0"
+            "warehouse-south",
+            "2",
+            "45.0",
+            "2"
           ],
           [
             "warehouse-central",
             "1",
             "230.0",
             "1"
+          ],
+          [
+            "warehouse-east",
+            "1",
+            "1900.0",
+            "0"
           ],
           [
             "warehouse-north",

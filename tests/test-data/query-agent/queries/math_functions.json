@@ -1218,6 +1218,16 @@
         ],
         "results": [
           [
+            "pallet-mapper",
+            "100.0",
+            "2"
+          ],
+          [
+            "batch-sync",
+            "100.0",
+            "1"
+          ],
+          [
             "track-router",
             "100.0",
             "2"
@@ -1226,16 +1236,6 @@
             "lane-monitor",
             "100.0",
             "1"
-          ],
-          [
-            "batch-sync",
-            "100.0",
-            "1"
-          ],
-          [
-            "pallet-mapper",
-            "100.0",
-            "2"
           ]
         ],
         "results_mode": "rowsort"

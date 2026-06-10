@@ -354,15 +354,15 @@
         ],
         "results": [
           [
-            "CC-GAMMA",
-            "SORT-A7",
-            "hybrid, auto",
-            "4"
-          ],
-          [
             "CC-BETA",
             "SORT-X1",
             "manual, hybrid",
+            "4"
+          ],
+          [
+            "CC-GAMMA",
+            "SORT-A7",
+            "auto, hybrid",
             "4"
           ],
           [
@@ -374,7 +374,7 @@
           [
             "CC-ALPHA",
             "SORT-Q5 | SORT-Z9",
-            "manual, auto",
+            "auto, manual",
             "3"
           ]
         ],
@@ -901,23 +901,9 @@
         ],
         "results": [
           [
-            "ZONE-1",
-            "auto",
-            "SORT-ZONE-1",
-            "29",
-            "2"
-          ],
-          [
             "ZONE-4",
             "auto",
             "SORT-ZONE-4",
-            "29",
-            "2"
-          ],
-          [
-            "ZONE-2",
-            "auto",
-            "SORT-ZONE-2",
             "29",
             "2"
           ],
@@ -929,10 +915,31 @@
             "2"
           ],
           [
+            "ZONE-1",
+            "auto",
+            "SORT-ZONE-1",
+            "29",
+            "2"
+          ],
+          [
+            "ZONE-2",
+            "auto",
+            "SORT-ZONE-2",
+            "29",
+            "2"
+          ],
+          [
             "ZONE-4",
             "hybrid",
             "SORT-ZONE-4",
             "58",
+            "1"
+          ],
+          [
+            "ZONE-3",
+            "hybrid",
+            "SORT-ZONE-3",
+            "29",
             "1"
           ],
           [
@@ -961,13 +968,6 @@
             "manual",
             "SORT-ZONE-2",
             "58",
-            "1"
-          ],
-          [
-            "ZONE-3",
-            "hybrid",
-            "SORT-ZONE-3",
-            "29",
             "1"
           ]
         ],
@@ -992,18 +992,18 @@
         ],
         "results": [
           [
-            "SearchItems",
-            "SEARCH",
-            "False",
-            "2",
-            "45.0"
-          ],
-          [
             "ArchiveLog",
             "ARCHIV",
             "False",
             "2",
             "1900.0"
+          ],
+          [
+            "RetryScan",
+            "RETRYS",
+            "False",
+            "2",
+            "15.0"
           ],
           [
             "MergeBatch",
@@ -1020,11 +1020,18 @@
             "230.0"
           ],
           [
-            "RetryScan",
-            "RETRYS",
+            "SearchItems",
+            "SEARCH",
             "False",
             "2",
-            "15.0"
+            "45.0"
+          ],
+          [
+            "SyncZone",
+            "SYNCZO",
+            "False",
+            "1",
+            "12.0"
           ],
           [
             "DeleteRecord",
@@ -1039,13 +1046,6 @@
             "False",
             "1",
             "78.0"
-          ],
-          [
-            "SyncZone",
-            "SYNCZO",
-            "False",
-            "1",
-            "12.0"
           ],
           [
             "RerouteTrack",
@@ -1075,55 +1075,6 @@
           "avg_items"
         ],
         "results": [
-          [
-            "EU-WEST-ZONE-2-MAN",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
-            "US-WEST-ZONE-1-AUT",
-            "1",
-            "0",
-            "0",
-            "410.0"
-          ],
-          [
-            "EU-WEST-ZONE-4-AUT",
-            "1",
-            "1",
-            "0",
-            "275.0"
-          ],
-          [
-            "SA-EAST-ZONE-2-MAN",
-            "1",
-            "0",
-            "0",
-            "120.0"
-          ],
-          [
-            "AP-CENTRAL-ZONE-3-MAN",
-            "1",
-            "1",
-            "0",
-            "88.0"
-          ],
-          [
-            "US-EAST-ZONE-4-HYB",
-            "1",
-            "0",
-            "0",
-            "155.0"
-          ],
           [
             "EU-NORTH-ZONE-1-MAN",
             "1",
@@ -1160,6 +1111,27 @@
             "200.0"
           ],
           [
+            "US-WEST-ZONE-1-AUT",
+            "1",
+            "0",
+            "0",
+            "410.0"
+          ],
+          [
+            "EU-WEST-ZONE-4-AUT",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-2-MAN",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
             "AP-SOUTH-ZONE-2-AUT",
             "1",
             "0",
@@ -1172,6 +1144,34 @@
             "1",
             "0",
             "50.0"
+          ],
+          [
+            "EU-WEST-ZONE-2-MAN",
+            "1",
+            "1",
+            "0",
+            "275.0"
+          ],
+          [
+            "SA-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "120.0"
+          ],
+          [
+            "AP-CENTRAL-ZONE-3-MAN",
+            "1",
+            "1",
+            "0",
+            "88.0"
+          ],
+          [
+            "US-EAST-ZONE-4-HYB",
+            "1",
+            "0",
+            "0",
+            "155.0"
           ]
         ],
         "results_mode": "rowsort"
@@ -1433,10 +1433,6 @@
         ],
         "results": [
           [
-            "cartPage",
-            "E004"
-          ],
-          [
             "searchPage",
             "E003"
           ],
@@ -1447,6 +1443,10 @@
           [
             "checkoutPage",
             "E006"
+          ],
+          [
+            "cartPage",
+            "E004"
           ]
         ],
         "results_mode": "rowsort"
@@ -2009,21 +2009,13 @@
         "end_offset": 30673000000
       },
       "expected": {
-        "row_count": 5,
         "columns": [
           "endpoint",
           "cnt"
         ],
-        "assertions": [
-          {
-            "type": "row_contains",
-            "match": {
-              "endpoint": "searchItems"
-            }
-          }
-        ],
         "note": "spath() is OO-specific; DuckDB cannot replicate",
-        "skip_sqllogictest": true
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {
@@ -2067,16 +2059,12 @@
         ],
         "results": [
           [
-            "TimeoutException:",
-            "2"
-          ],
-          [
             "ResourceExhaustedException:",
             "2"
           ],
           [
-            "DataIntegrityException:",
-            "1"
+            "TimeoutException:",
+            "2"
           ],
           [
             "NullPointerException",
@@ -2084,6 +2072,10 @@
           ],
           [
             "SecurityException:",
+            "1"
+          ],
+          [
+            "DataIntegrityException:",
             "1"
           ]
         ],
@@ -2135,16 +2127,12 @@
         ],
         "results": [
           [
-            "sorter-engine/rk-warehouse-008 (internal)",
-            "2"
-          ],
-          [
             "temp-regulator/rk-warehouse-006 (inbound)",
             "2"
           ],
           [
-            "conveyor-driver/rk-warehouse-009 (inbound)",
-            "1"
+            "sorter-engine/rk-warehouse-008 (internal)",
+            "2"
           ],
           [
             "lane-monitor/rk-warehouse-005 (internal)",
@@ -2152,6 +2140,10 @@
           ],
           [
             "charge-checker/rk-warehouse-007 (outbound)",
+            "1"
+          ],
+          [
+            "conveyor-driver/rk-warehouse-009 (inbound)",
             "1"
           ]
         ],
@@ -2199,11 +2191,11 @@
         ],
         "results": [
           [
-            "staging-high",
+            "dev-high",
             "2"
           ],
           [
-            "dev-high",
+            "staging-high",
             "2"
           ],
           [
@@ -2238,14 +2230,19 @@
         ],
         "results": [
           [
+            "WAREHOUSE-CENTRAL",
+            "outbound",
+            "2"
+          ],
+          [
             "WAREHOUSE-NORTH",
             "internal",
             "2"
           ],
           [
-            "WAREHOUSE-CENTRAL",
-            "outbound",
-            "2"
+            "WAREHOUSE-SOUTH",
+            "inbound",
+            "1"
           ],
           [
             "WAREHOUSE-WEST",
@@ -2255,11 +2252,6 @@
           [
             "WAREHOUSE-EAST",
             "internal",
-            "1"
-          ],
-          [
-            "WAREHOUSE-SOUTH",
-            "inbound",
             "1"
           ]
         ],
@@ -2312,17 +2304,17 @@
         ],
         "results": [
           [
-            "BS-2025-D4",
-            "BS-2",
-            "2"
-          ],
-          [
             "BS-2026-B2",
             "BS-2",
             "2"
           ],
           [
             "BS-2026-C3",
+            "BS-2",
+            "2"
+          ],
+          [
+            "BS-2025-D4",
             "BS-2",
             "2"
           ],

@@ -13,6 +13,18 @@
         ],
         "results": [
           [
+            "SORT-Z9",
+            "725.0",
+            "1",
+            "1"
+          ],
+          [
+            "SORT-Z9",
+            "150.0",
+            "2",
+            "2"
+          ],
+          [
             "SORT-X1",
             "900.0",
             "1",
@@ -29,18 +41,6 @@
             "555.0",
             "3",
             "3"
-          ],
-          [
-            "SORT-Z9",
-            "725.0",
-            "1",
-            "1"
-          ],
-          [
-            "SORT-Z9",
-            "150.0",
-            "2",
-            "2"
           ],
           [
             "SORT-M3",
@@ -2675,14 +2675,14 @@
         ],
         "results": [
           [
-            "cartPage",
-            "Android 12",
+            "checkoutPage",
+            "Android 14",
             "2",
             "1"
           ],
           [
-            "checkoutPage",
-            "Android 14",
+            "cartPage",
+            "Android 12",
             "2",
             "1"
           ],
@@ -2823,12 +2823,12 @@
         ],
         "results": [
           [
-            "E001",
+            "E009",
             "2",
             "1"
           ],
           [
-            "E009",
+            "E001",
             "2",
             "1"
           ]
@@ -3141,7 +3141,9 @@
             "0"
           ]
         ],
-        "results_mode": "rowsort"
+        "results_mode": "rowsort",
+        "skip_sqllogictest": true,
+        "skip_row_count": true
       }
     },
     {

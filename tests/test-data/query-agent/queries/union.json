@@ -38,11 +38,11 @@
         "results": [
           [
             "SORT-A7",
-            "1"
+            "2"
           ],
           [
             "SORT-A7",
-            "2"
+            "1"
           ],
           [
             "SORT-M3",
@@ -115,22 +115,22 @@
         "results": [
           [
             "SORT-A7",
-            "hybrid",
+            "auto",
             "2"
           ],
           [
             "SORT-A7",
+            "hybrid",
+            "2"
+          ],
+          [
+            "SORT-M3",
             "auto",
             "2"
           ],
           [
             "SORT-M3",
             "manual",
-            "2"
-          ],
-          [
-            "SORT-M3",
-            "auto",
             "2"
           ],
           [
@@ -811,14 +811,14 @@
         "results": [
           [
             "AP-CENTRAL",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "900.0",
             "94.6"
           ],
           [
             "AP-CENTRAL",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "900.0",
             "94.6"
@@ -839,14 +839,14 @@
           ],
           [
             "US-WEST",
-            "ZONE-1",
+            "ZONE-3",
             "1",
             "320.0",
             "67.9"
           ],
           [
             "US-WEST",
-            "ZONE-3",
+            "ZONE-1",
             "1",
             "320.0",
             "67.9"
@@ -988,12 +988,12 @@
           ],
           [
             "desktop",
-            "performanceMetric",
+            "navigation",
             "1"
           ],
           [
             "desktop",
-            "navigation",
+            "performanceMetric",
             "1"
           ]
         ],
@@ -1261,12 +1261,12 @@
         "results": [
           [
             "error_bucket",
-            "E002",
+            "E004",
             "2"
           ],
           [
             "error_bucket",
-            "E004",
+            "E002",
             "2"
           ],
           [
@@ -1276,12 +1276,12 @@
           ],
           [
             "error_bucket",
-            "E003",
+            "E005",
             "1"
           ],
           [
             "error_bucket",
-            "E005",
+            "E003",
             "1"
           ],
           [
