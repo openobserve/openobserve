@@ -62,10 +62,7 @@
         @row-click="(row: any) => $emit('select', row)"
       >
         <template #cell-status="{ row }">
-          <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">
-            <template v-if="row.status === 'unhealthy'">▲</template>
-            <template v-else>●</template>
-          </span>
+          <span class="qsc-status" :class="`qsc-status--${row.status}`" :aria-label="row.status">●</span>
         </template>
 
         <template #cell-name="{ row }">
@@ -85,25 +82,6 @@
         <template #cell-coverage="{ row }">
           <span v-if="row.coveragePct != null" class="qsc-mono">{{ formatPct(row.coveragePct) }}</span>
           <span v-else class="qsc-muted">—</span>
-        </template>
-
-        <template #cell-unhealthy="{ row }">
-          <span v-if="row.status === 'noData'" class="qsc-muted">—</span>
-          <span v-else-if="!row.hasThreshold" class="qsc-no-threshold">
-            {{ t("onlineEvals.quality.overview.noThreshold") }}
-          </span>
-          <div v-else class="qsc-unhealthy">
-            <div class="qsc-bar">
-              <div
-                class="qsc-bar__fill"
-                :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
-              />
-            </div>
-            <span class="qsc-unhealthy__pct">{{ formatPct(row.unhealthyPct) }}</span>
-            <span v-if="row.unhealthyCount != null" class="qsc-unhealthy__count">
-              ({{ formatCount(row.unhealthyCount) }})
-            </span>
-          </div>
         </template>
 
         <template #cell-trend="{ row }">
@@ -231,14 +209,6 @@ const columns = computed(() => [
     accessorKey: "coveragePct",
     sortable: true,
     size: 110,
-    meta: { align: "left" },
-  },
-  {
-    id: "unhealthy",
-    header: t("onlineEvals.quality.overview.columns.unhealthy"),
-    accessorKey: "unhealthyPct",
-    sortable: true,
-    size: 200,
     meta: { align: "left" },
   },
   {

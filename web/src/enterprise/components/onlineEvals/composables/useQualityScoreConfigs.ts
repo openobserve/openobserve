@@ -1,7 +1,7 @@
 // Tier 2 Overview composable.
-// Builds a single batched aggregate query against `_llm_scores`
-// — one CASE branch per Score Config so the "unhealthy" count is
-// computed using each config's own healthy_threshold definition.
+// Single batched aggregate query against `_llm_scores` per config,
+// keyed by entity_id. No per-config "unhealthy" detection — the table no
+// longer surfaces an unhealthy column.
 
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -10,15 +10,9 @@ import {
   dataTypeOf,
   entityId,
 } from "../utils/evalEntity";
-import { thresholdForConfig, buildUnhealthyCaseBranches } from "../utils/scoreThreshold";
 import { chooseBucketInterval, type DateWindow } from "./useQualityData";
 
-export type ConfigStatus =
-  | "unhealthy"
-  | "warn"
-  | "healthy"
-  | "noThreshold"
-  | "noData";
+export type ConfigStatus = "healthy" | "noData";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -29,11 +23,7 @@ export interface ScoreConfigRow {
   totalScores: number;
   uniqueSpans: number;
   coveragePct: number | null;
-  unhealthyCount: number | null;
-  unhealthyPct: number | null;
   lastUpdatedMs: number | null;
-  hasThreshold: boolean;
-  thresholdLabel: string;
   status: ConfigStatus;
   statusPriority: number;
   trendSparkline: number[];
@@ -43,7 +33,6 @@ interface AggRow {
   score_config_id?: string | null;
   total_scores?: number | string;
   unique_spans?: number | string;
-  unhealthy_count?: number | string;
   last_updated_us?: number | string | null;
 }
 
@@ -59,9 +48,6 @@ function toNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Rich aggregate SQL with per-config unhealthy CASE. Fails at parse time if
- * any branch references a `value_*` column whose data_type has not yet been
- * written to `_llm_scores`. */
 /** The ID stored on score records under `score_config_id` is the Score
  * Config's stable `entity_id` (the per-row version is tracked in a separate
  * `score_config_version` column on `_llm_scores`). Joining on `entity_id`
@@ -71,36 +57,16 @@ function joinId(config: ScoreConfig): string {
   return entityId(config);
 }
 
-function buildRichAggSql(configs: ScoreConfig[]): string {
-  const caseFragment = buildUnhealthyCaseBranches(configs, "1");
-  const unhealthyExpr = caseFragment
-    ? `  COUNT(${caseFragment}) AS unhealthy_count,`
-    : "  CAST(NULL AS INTEGER) AS unhealthy_count,";
-
+/** Aggregate SQL that only references columns guaranteed to exist on the
+ * `_llm_scores` schema, so it never trips DataFusion's parse-time column
+ * check. No per-config unhealthy detection — the table doesn't render an
+ * unhealthy column anymore. */
+function buildAggSql(): string {
   return [
     "SELECT",
     "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
     "  COUNT(*) AS total_scores,",
     "  COUNT(DISTINCT span_id) AS unique_spans,",
-    unhealthyExpr,
-    "  MAX(_timestamp) AS last_updated_us",
-    'FROM "_llm_scores"',
-    "WHERE score_config_id IS NOT NULL",
-    "GROUP BY score_config_id",
-  ].join("\n");
-}
-
-/** Plain aggregate SQL with no unhealthy detection. Only references columns
- * that always exist (`score_config_id`, `trace_id`, `_timestamp`), so it
- * survives even when only one `data_type`'s `value_*` column has been
- * written to the schema. Used as a fallback when the rich query fails. */
-function buildPlainAggSql(): string {
-  return [
-    "SELECT",
-    "  CAST(score_config_id AS VARCHAR) AS score_config_id,",
-    "  COUNT(*) AS total_scores,",
-    "  COUNT(DISTINCT span_id) AS unique_spans,",
-    "  CAST(NULL AS INTEGER) AS unhealthy_count,",
     "  MAX(_timestamp) AS last_updated_us",
     'FROM "_llm_scores"',
     "WHERE score_config_id IS NOT NULL",
@@ -121,24 +87,12 @@ function buildTrendSql(interval: string): string {
   ].join("\n");
 }
 
-function statusOf(
-  hasThreshold: boolean,
-  unhealthyCount: number | null,
-  dataType: ScoreConfigRow["dataType"],
-  totalScores: number,
-): { status: ConfigStatus; priority: number } {
+function statusOf(totalScores: number): { status: ConfigStatus; priority: number } {
   // No scores in the window — config exists but is dormant. Reported as a
-  // distinct status (gray dot, dimmed row, sorted to bottom) so it doesn't
-  // get mistaken for a "healthy" config that actually has passing scores.
-  if (totalScores === 0) return { status: "noData", priority: 5 };
-  if (!hasThreshold) return { status: "noThreshold", priority: 4 };
-  if (unhealthyCount != null && unhealthyCount > 0) {
-    return { status: "unhealthy", priority: 1 };
-  }
-  if (dataType === "boolean" && unhealthyCount == null) {
-    return { status: "warn", priority: 2 };
-  }
-  return { status: "healthy", priority: 3 };
+  // distinct status (gray dot, sorted to bottom) so it doesn't get mistaken
+  // for a config that actually has scores in this window.
+  if (totalScores === 0) return { status: "noData", priority: 2 };
+  return { status: "healthy", priority: 1 };
 }
 
 export function useQualityScoreConfigs(
@@ -160,11 +114,14 @@ export function useQualityScoreConfigs(
     try {
       const { startUs, endUs } = dateWindow.value;
       const interval = chooseBucketInterval((endUs - startUs) / 1000);
-      const richSql = buildRichAggSql(scoreConfigs.value);
-      const plainSql = buildPlainAggSql();
+      const aggSql = buildAggSql();
       const trendSql = buildTrendSql(interval);
 
-      const runQuery = async <T>(sqlText: string, label: string): Promise<T[] | null> => {
+      // `runQuery` swallows failures so one bad query doesn't blank the page.
+      const runQuery = async <T>(
+        sqlText: string,
+        label: string,
+      ): Promise<T[] | null> => {
         try {
           const hits = await executeQuery(sqlText, startUs, endUs, "logs");
           console.debug(`[Quality:${label}]`, { hitCount: hits.length });
@@ -175,12 +132,7 @@ export function useQualityScoreConfigs(
         }
       };
 
-      // Try the rich query first; if it errors (e.g. a CASE branch references
-      // a `value_*` column whose data_type hasn't been written yet), retry
-      // with the plain query so the table still shows totals.
-      const richHits = await runQuery<AggRow>(richSql, "configs.agg.rich");
-      const aggHits: AggRow[] =
-        richHits ?? (await runQuery<AggRow>(plainSql, "configs.agg.plain")) ?? [];
+      const aggHits = (await runQuery<AggRow>(aggSql, "configs.agg")) ?? [];
       const trendHits = (await runQuery<TrendRow>(trendSql, "configs.trend")) ?? [];
 
       const byId: Record<string, AggRow> = {};
@@ -234,11 +186,9 @@ export function useQualityScoreConfigs(
       const agg = aggByConfig.value[lookup];
       const total = toNumber(agg?.total_scores) ?? 0;
       const uniqueSpans = toNumber(agg?.unique_spans) ?? 0;
-      const unhealthy = toNumber(agg?.unhealthy_count);
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
-      const t = thresholdForConfig(config);
       const dataType = (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
-      const { status, priority } = statusOf(t.unhealthyExpr != null, unhealthy, dataType, total);
+      const { status, priority } = statusOf(total);
 
       return {
         config,
@@ -249,12 +199,7 @@ export function useQualityScoreConfigs(
         totalScores: total,
         uniqueSpans,
         coveragePct: denom > 0 ? (uniqueSpans / denom) * 100 : null,
-        unhealthyCount: unhealthy,
-        unhealthyPct:
-          unhealthy != null && total > 0 ? (unhealthy / total) * 100 : null,
         lastUpdatedMs: lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
-        hasThreshold: t.unhealthyExpr != null,
-        thresholdLabel: t.label,
         status,
         statusPriority: priority,
         trendSparkline: trendByConfig.value[lookup] ?? [],
@@ -263,9 +208,7 @@ export function useQualityScoreConfigs(
 
     out.sort((a, b) => {
       if (a.statusPriority !== b.statusPriority) return a.statusPriority - b.statusPriority;
-      const aPct = a.unhealthyPct ?? -1;
-      const bPct = b.unhealthyPct ?? -1;
-      if (aPct !== bPct) return bPct - aPct;
+      if (a.totalScores !== b.totalScores) return b.totalScores - a.totalScores;
       return a.name.localeCompare(b.name);
     });
 
