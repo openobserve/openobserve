@@ -86,6 +86,12 @@
       "action": "New template",
       "actionDesc": "Create a notification template"
     },
+    "noEvalTemplates": {
+      "title": "No evaluation templates yet",
+      "description": "Evaluation templates define reusable scoring criteria for LLM evaluations.",
+      "action": "New template",
+      "actionDesc": "Create an evaluation template"
+    },
     "noEnrichmentTables": {
       "title": "No enrichment tables yet",
       "description": "Enrichment tables let you attach additional context to your log data at query time.",
@@ -239,6 +245,7 @@
       "alertDestinations": "destinations",
       "pipelineDestinations": "destinations",
       "alertTemplates": "templates",
+      "evalTemplates": "evaluation templates",
       "enrichmentTables": "enrichment tables",
       "cipherKeys": "cipher keys",
       "aiToolsets": "AI toolsets",

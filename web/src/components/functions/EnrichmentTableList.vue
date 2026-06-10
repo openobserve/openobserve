@@ -102,8 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="hero"
                   preset="no-enrichment-tables"
                   :filtered="!!filterQuery"
-                  :hide-action="!filterQuery"
-                  @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? (filterQuery = '')
+                        : showAddUpdateFn(null)
+                  "
                 />
               </template>
               <template #cell-type="{ row }">

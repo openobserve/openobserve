@@ -427,6 +427,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-eval-templates": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noEvalTemplates.title",
+    descriptionKey: "emptyState.noEvalTemplates.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEvalTemplates.action",
+        descriptionKey: "emptyState.noEvalTemplates.actionDesc",
+      },
+    ],
+  },
   "no-enrichment-tables": {
     illustration: "box",
     variant: "create",
@@ -548,6 +562,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alert-destinations": "emptyState.nouns.alertDestinations",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
   "no-ai-toolsets": "emptyState.nouns.aiToolsets",

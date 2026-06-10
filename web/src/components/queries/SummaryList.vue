@@ -32,7 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :default-columns="false"
   >
     <template #empty>
-      <OEmptyState size="hero" preset="no-queries" hide-action />
+      <OEmptyState
+        size="hero"
+        preset="no-queries"
+        :filtered="filtered"
+        :hide-action="!filtered"
+        @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+      />
     </template>
     <template #cell-actions="{ row }">
       <OButton
@@ -91,12 +97,17 @@ export default defineComponent({
       type: Array,
       required: true,
     },
+    filtered: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "cancel:hideform",
     "filter:queries",
     "update:selectedRows",
     "delete:queries",
+    "clear:filters",
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();

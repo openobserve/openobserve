@@ -113,7 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Empty state -->
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-eval-templates"
+              :filtered="!!filterQuery"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : goToCreate())
+              "
+            />
           </template>
 
           <!-- Pagination footer -->
@@ -170,7 +177,7 @@ import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
