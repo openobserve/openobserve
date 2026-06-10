@@ -48,6 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[20, 50, 100]"
         sorting="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-ai-toolsets"
         :show-global-filter="false"
       >
         <template #toolbar>
@@ -166,9 +169,9 @@ export default defineComponent({
 
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
-      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, size: COL.type, meta: { align: "left" } },
-      { id: "description", header: t("aiToolset.description"), accessorKey: "description", size: COL.description, meta: { align: "left" } },
+      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
+      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, resizable: true, hideable: true, size: COL.type, meta: { align: "left" } },
+      { id: "description", header: t("aiToolset.description"), accessorKey: "description", resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
       {
         id: "actions",
         header: t("aiToolset.actions"),

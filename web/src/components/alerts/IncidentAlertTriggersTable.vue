@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="[20, 50, 100, 250, 500]"
       sorting="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="incidents-alert-triggers"
       :show-global-filter="false"
       @row-click="onRowClick"
     >
@@ -109,14 +112,19 @@ export default defineComponent({
         header: "Alert Name",
         accessorKey: "alert_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "alert_fired_at",
         header: "Fired At",
         accessorKey: "alert_fired_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.date,
         meta: { align: "left" },
       },
@@ -125,6 +133,8 @@ export default defineComponent({
         header: "Correlation Reason",
         accessorKey: "correlation_reason",
         sortable: false,
+        resizable: true,
+        hideable: true,
         size: 150,
         meta: { align: "right" },
       },

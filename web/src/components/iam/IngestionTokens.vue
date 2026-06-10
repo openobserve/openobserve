@@ -46,6 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-ingestion-tokens"
           filter-mode="client"
         >
           <template #toolbar>
@@ -213,14 +216,19 @@ export default defineComponent({
         header: t("ingestion.tokenNameLabel"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', autoWidth: true },
+        minSize: 160,
+        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
       },
       {
         id: "token",
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
+        resizable: true,
+        hideable: true,
         size: COL.token,
       },
       {
@@ -228,6 +236,8 @@ export default defineComponent({
         header: t("ingestion.createdBy"),
         accessorKey: "created_by",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.owner,
       },
       {

@@ -37,6 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-invitations-list"
         >
           <template #toolbar>
             <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
@@ -170,14 +173,19 @@ export default defineComponent({
         header: t("invitation.organizationName"),
         accessorKey: "org_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "role",
         header: t("invitation.role"),
         accessorKey: "role",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.role,
         meta: { align: "left" },
       },
@@ -186,6 +194,8 @@ export default defineComponent({
         header: t("invitation.invitedBy"),
         accessorKey: "inviter_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.owner,
         meta: { align: "left" },
       },
@@ -194,6 +204,8 @@ export default defineComponent({
         header: t("invitation.expiry"),
         accessorKey: "expiry",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.duration,
         meta: { align: "left" },
       },

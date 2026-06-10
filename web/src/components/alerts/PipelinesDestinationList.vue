@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :footer-title="t('pipeline_destinations.header')"
         sorting="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-pipeline-destinations"
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -220,14 +223,19 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "destination_type",
         header: "Destination Type",
         accessorKey: "destination_type_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 150,
         meta: { align: "left" },
       },
@@ -235,6 +243,8 @@ export default defineComponent({
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
+        resizable: true,
+        hideable: true,
         size: COL.url,
         meta: { align: "left" },
       },
@@ -243,6 +253,8 @@ export default defineComponent({
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 120,
         meta: { align: "left" },
       },
@@ -251,6 +263,8 @@ export default defineComponent({
         header: "Output Format",
         accessorKey: "output_format",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 140,
         meta: { align: "left" },
       },

@@ -30,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="settings-query-management"
       :show-global-filter="false"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
@@ -148,14 +151,19 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "user_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.email,
-        meta: { align: "left" , autoWidth: true },
+        minSize: 160,
+        meta: { align: "left" , flex: true },
       },
       {
         id: "org_id",
         header: t("organization.id"),
         accessorKey: "org_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.owner,
         meta: { align: "left" },
       },
@@ -164,6 +172,8 @@ export default defineComponent({
         header: t("queries.searchType"),
         accessorKey: "search_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -172,6 +182,8 @@ export default defineComponent({
         header: t("queries.querySource"),
         accessorKey: "query_source",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -180,6 +192,8 @@ export default defineComponent({
         header: t("queries.duration"),
         accessorKey: "duration",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.duration,
         meta: { align: "left" },
       },
@@ -188,6 +202,8 @@ export default defineComponent({
         header: t("queries.queryRange"),
         accessorKey: "queryRange",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.duration,
         meta: { align: "left" },
       },
@@ -196,6 +212,8 @@ export default defineComponent({
         header: t("queries.queryType"),
         accessorKey: "work_group",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -204,6 +222,8 @@ export default defineComponent({
         header: t("queries.status"),
         accessorKey: "status",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.status,
         meta: { align: "left" },
       },
@@ -212,6 +232,8 @@ export default defineComponent({
         header: t("alerts.streamType"),
         accessorKey: "stream_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.streamType,
         meta: { align: "left" },
       },

@@ -102,6 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-model-pricing"
         :show-global-filter="false"
         tree
         tree-column-id="name"
@@ -575,22 +578,28 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     minSize: 180,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "match_pattern",
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "pricing",
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "actions",

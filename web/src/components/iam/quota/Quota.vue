@@ -144,6 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="iam-quota-api-limits"
         :show-global-filter="false"
       >
         <template #empty>
@@ -211,6 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           expansion="single"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-quota-role-limits"
           :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
@@ -516,14 +522,19 @@ export default defineComponent({
           header: t("quota.moduleName"),
           accessorKey: "module_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: COL.name,
-          meta: { align: "left", autoWidth: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+          minSize: 160,
+          meta: { align: "left", flex: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
         },
         {
           id: "list",
           header: `${t("quota.listLimit")} ${unitLabel}`,
           accessorKey: "list",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -532,6 +543,8 @@ export default defineComponent({
           header: `${t("quota.getLimit")} ${unitLabel}`,
           accessorKey: "get",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -540,6 +553,8 @@ export default defineComponent({
           header: `${t("quota.createLimit")} ${unitLabel}`,
           accessorKey: "create",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -548,6 +563,8 @@ export default defineComponent({
           header: `${t("quota.updateLimit")} ${unitLabel}`,
           accessorKey: "update",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -556,6 +573,8 @@ export default defineComponent({
           header: `${t("quota.deleteLimit")} ${unitLabel}`,
           accessorKey: "delete",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -569,15 +588,20 @@ export default defineComponent({
           header: t("quota.roleName"),
           accessorKey: "role_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           cell: (info: any) => info.getValue(),
           size: COL.role,
-          meta: { align: "left", autoWidth: true },
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         {
           id: "list",
           header: `${t("quota.listLimit")} ${unitLabel}`,
           accessorKey: "list",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -586,6 +610,8 @@ export default defineComponent({
           header: `${t("quota.getLimit")} ${unitLabel}`,
           accessorKey: "get",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -594,6 +620,8 @@ export default defineComponent({
           header: `${t("quota.createLimit")} ${unitLabel}`,
           accessorKey: "create",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -602,6 +630,8 @@ export default defineComponent({
           header: `${t("quota.updateLimit")} ${unitLabel}`,
           accessorKey: "update",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },
@@ -610,6 +640,8 @@ export default defineComponent({
           header: `${t("quota.deleteLimit")} ${unitLabel}`,
           accessorKey: "delete",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "center" },
         },

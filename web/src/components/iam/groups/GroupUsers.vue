@@ -90,6 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="iam-group-users"
         :show-global-filter="false"
         :footer-title="t('iam.basicUsers')"
         dense
@@ -241,8 +244,11 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
+      resizable: true,
+      hideable: true,
       size: COL.email,
-      meta: { align: "left" , autoWidth: true},
+      minSize: 160,
+      meta: { align: "left" , flex: true},
     },
   ];
 
@@ -253,6 +259,8 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "Organizations",
       accessorKey: "org",
       sortable: true,
+      resizable: true,
+      hideable: true,
       size: COL.owner,
       meta: { align: "left" },
     });

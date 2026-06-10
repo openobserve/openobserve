@@ -54,6 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="settings-regex-patterns"
       :show-global-filter="false"
       :loading="listLoading"
       @update:selected-ids="handleSelectedIdsUpdate"
@@ -212,13 +215,18 @@ export default defineComponent({
         header: t("regex_patterns.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "pattern",
         header: t("regex_patterns.pattern"),
         accessorKey: "pattern",
+        resizable: true,
+        hideable: true,
         size: 400,
         meta: { align: "left" },
       },
@@ -226,6 +234,8 @@ export default defineComponent({
         id: "created_at",
         header: t("regex_patterns.created_at"),
         accessorKey: "created_at",
+        resizable: true,
+        hideable: true,
         size: 180,
         meta: { align: "left" },
       },
@@ -234,6 +244,8 @@ export default defineComponent({
         header: t("regex_patterns.updated_at"),
         accessorKey: "updated_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 180,
         meta: { align: "left" },
       },

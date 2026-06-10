@@ -53,6 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-cipher-keys"
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -187,14 +190,19 @@ export default defineComponent({
         header: t("cipherKey.name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "store_type",
         header: t("cipherKey.storeType"),
         accessorKey: "store_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -203,6 +211,8 @@ export default defineComponent({
         header: t("cipherKey.mechanismType"),
         accessorKey: "mechanism_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },

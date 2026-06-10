@@ -37,6 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="org-management-list"
         :show-global-filter="false"
         :loading="loading"
       >
@@ -275,13 +278,18 @@ export default defineComponent({
         header: t("settings.org_name"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.name,
-        meta: { align: "left", autoWidth: true },
+        minSize: 200,
+        meta: { align: "left", flex: true },
       },
       {
         id: "identifier",
         header: t("settings.org_identifier"),
         accessorKey: "identifier",
+        resizable: true,
+        hideable: true,
         size: COL.name,
         meta: { align: "left" },
       },
@@ -290,6 +298,8 @@ export default defineComponent({
         header: t("settings.subscription_status"),
         accessorKey: "plan",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.status,
         meta: { align: "left" },
       },
@@ -298,6 +308,8 @@ export default defineComponent({
         header: "Provider",
         accessorKey: "billing_provider",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -306,6 +318,8 @@ export default defineComponent({
         header: t("settings.created_on"),
         accessorKey: "created_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.date,
         meta: { align: "left" },
       },
@@ -314,6 +328,8 @@ export default defineComponent({
         header: t("settings.trial_expiry"),
         accessorKey: "trial_expires_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.date,
         meta: { align: "left" },
       },
@@ -322,6 +338,8 @@ export default defineComponent({
         header: "Contract End",
         accessorKey: "contract_end_date_display",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.date,
         meta: { align: "left" },
       },

@@ -435,6 +435,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-nodes"
           :show-global-filter="false"
           :loading="loading"
         >
@@ -601,12 +604,17 @@ export default defineComponent({
           header: t("nodes.name"),
           accessorKey: "name",
           sortable: true,
-          meta: { align: "left" , autoWidth: true },
+          resizable: true,
+          hideable: true,
+          minSize: 160,
+          meta: { align: "left" , flex: true },
         },
         {
           id: "region",
           header: t("nodes.region"),
           accessorKey: "region",
+          resizable: true,
+          hideable: true,
           size: 50,
           meta: { align: "left" },
         },
@@ -615,6 +623,8 @@ export default defineComponent({
           header: t("nodes.version"),
           accessorKey: "version",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 100,
           meta: { align: "center" },
         },
@@ -623,6 +633,8 @@ export default defineComponent({
           header: t("nodes.cpu"),
           accessorKey: "cpu_usage",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "left" },
         },
@@ -631,6 +643,8 @@ export default defineComponent({
           header: t("nodes.memory"),
           accessorKey: "percentage_memory_usage",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: 200,
           meta: { align: "left" },
         },
@@ -638,6 +652,8 @@ export default defineComponent({
           id: "tcp",
           header: t("nodes.tcp"),
           accessorKey: "tcp_conns",
+          resizable: true,
+          hideable: true,
           size: 150,
           meta: { align: "left" },
         },
