@@ -71,7 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               class="full-height tw:w-full logs-splitter-smooth"
-              separatorClass="tw:w-px"
+              separatorClass="field-list-separator"
+              :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
@@ -3512,6 +3513,22 @@ export default defineComponent({
   //   box-sizing: border-box !important;
   //   overflow: hidden !important;
   // }
+}
+
+.field-list-separator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+.field-list-separator:hover::after {
+  background-color: orange;
 }
 </style>
 
