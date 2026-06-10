@@ -788,7 +788,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -846,7 +846,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
