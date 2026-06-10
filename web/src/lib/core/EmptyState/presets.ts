@@ -515,6 +515,25 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+
+  // LLM Insights dashboard — single empty-state shape (used for all three
+  // "no data" cases: no LLM streams in the org, the active stream has no
+  // gen_ai_* fields, or the window came up empty). Filtered branch is
+  // intentionally not used (the page exposes no filter UI to clear).
+  "no-llm-insights": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noLLMInsights.title",
+    descriptionKey: "emptyState.noLLMInsights.description",
+    actions: [
+      {
+        id: "instrument",
+        icon: "auto-awesome",
+        titleKey: "emptyState.noLLMInsights.action",
+        descriptionKey: "emptyState.noLLMInsights.actionDesc",
+      },
+    ],
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
