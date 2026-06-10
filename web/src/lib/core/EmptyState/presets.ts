@@ -553,6 +553,52 @@ export const emptyStatePresets = {
       },
     ],
   },
+
+  // Evaluate-tab list presets. Each list has real search/filter widgets in
+  // its toolbar, so `:filtered` is wired up — clicking "Clear filters" in
+  // the filtered state resets the list's search + dropdown.
+  "no-scorers": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noScorers.title",
+    descriptionKey: "emptyState.noScorers.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noScorers.action",
+        descriptionKey: "emptyState.noScorers.actionDesc",
+      },
+    ],
+  },
+  "no-eval-jobs": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noEvalJobs.title",
+    descriptionKey: "emptyState.noEvalJobs.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEvalJobs.action",
+        descriptionKey: "emptyState.noEvalJobs.actionDesc",
+      },
+    ],
+  },
+  "no-score-configs": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noScoreConfigs.title",
+    descriptionKey: "emptyState.noScoreConfigs.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noScoreConfigs.action",
+        descriptionKey: "emptyState.noScoreConfigs.actionDesc",
+      },
+    ],
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -592,4 +638,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-scorers": "emptyState.nouns.scorers",
+  "no-eval-jobs": "emptyState.nouns.evalJobs",
+  "no-score-configs": "emptyState.nouns.scoreConfigs",
 };

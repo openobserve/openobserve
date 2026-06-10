@@ -1,25 +1,8 @@
 <template>
   <EvalListShell
     data-test="eval-job"
-    :show-empty="showEmptyState"
+    :show-empty="false"
   >
-    <template #empty>
-      <EvalEmptyState
-        data-test="eval-job-empty-state"
-        icon="assessment"
-        :title="t('onlineEvals.job.empty.title')"
-        :description="t('onlineEvals.job.empty.description')"
-        :chips="[
-          { icon: 'stream', label: t('onlineEvals.job.empty.chipStreams') },
-          { icon: 'rule', label: t('onlineEvals.job.empty.chipScorers') },
-          { icon: 'tune', label: t('onlineEvals.job.empty.chipSampling') },
-        ]"
-        :cta-label="t('onlineEvals.job.newButton')"
-        cta-data-test="eval-job-empty-create-btn"
-        @create="$emit('create')"
-      />
-    </template>
-
     <template #table>
       <OTable
         data-test="eval-job-list-table"
@@ -54,6 +37,18 @@
             class="tw:shrink-0"
             data-test="eval-job-list-status-filter"
           />
+        </template>
+
+        <template #empty>
+          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+            <OEmptyState
+              size="hero"
+              preset="no-eval-jobs"
+              :filtered="hasFilters"
+              data-test="eval-job-empty-state"
+              @action="onEmptyAction"
+            />
+          </div>
         </template>
 
         <template #cell-status="{ row }">
@@ -139,7 +134,7 @@ import type {
 } from "@/services/online-evals.service";
 import { statusOf, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
@@ -151,7 +146,7 @@ const props = defineProps<{
   pendingStatusId?: string | null;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: EvalJob): void;
@@ -255,13 +250,24 @@ const filteredRows = computed(() =>
 
 const numberedRows = useNumberedRows(filteredRows);
 
-const showEmptyState = computed(
-  () =>
-    !props.loading &&
-    props.rows.length === 0 &&
-    !props.search &&
-    !statusFilter.value,
+// Whether the user has narrowed the list with the search box or the status
+// dropdown. Drives OEmptyState's `:filtered` so the body switches between
+// the first-run preset ("Create your first eval job") and the auto
+// "No evaluation jobs match these filters" + Clear-filters card.
+const hasFilters = computed(
+  () => !!props.search?.trim() || !!statusFilter.value,
 );
+
+// Wire OEmptyState's action ids back into the existing emit contract.
+// `create` mirrors a click on the AppPageHeader's "New job" button;
+// `clear-filters` resets the search + status filter inline.
+function onEmptyAction(id?: string) {
+  if (id === "create") emit("create");
+  else if (id === "clear-filters") {
+    emit("update:search", "");
+    statusFilter.value = null;
+  }
+}
 
 function statusLabel(status: EvalJobStatus) {
   return t(`onlineEvals.jobStatus.${status}`);

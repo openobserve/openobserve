@@ -170,6 +170,24 @@
       "action": "Instrument with OpenTelemetry",
       "actionDesc": "Tag spans with gen_ai_conversation_id"
     },
+    "noScorers": {
+      "title": "No scorers yet",
+      "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
+      "action": "Create scorer",
+      "actionDesc": "Define an LLM judge or remote scorer"
+    },
+    "noEvalJobs": {
+      "title": "No evaluation jobs yet",
+      "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
+      "action": "Create eval job",
+      "actionDesc": "Pick a stream + scorers + cadence"
+    },
+    "noScoreConfigs": {
+      "title": "No score configs yet",
+      "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
+      "action": "Create score config",
+      "actionDesc": "Define the score shape + healthy range"
+    },
     "loadError": {
       "title": "Something went wrong",
       "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
@@ -256,7 +274,10 @@
       "aiToolsets": "AI toolsets",
       "llmProviders": "LLM providers",
       "sourceMaps": "source maps",
-      "backfillJobs": "backfill jobs"
+      "backfillJobs": "backfill jobs",
+      "scorers": "scorers",
+      "evalJobs": "evaluation jobs",
+      "scoreConfigs": "score configs"
     }
   },
   "common": {

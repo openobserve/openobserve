@@ -26,66 +26,24 @@
       <span>{{ t("onlineEvals.quality.overview.loading") }}</span>
     </div>
 
-    <div v-else-if="rows.length === 0" class="qsc-overview__empty">
-      <OIcon name="rule" size="lg" />
-      <h4>{{ t("onlineEvals.quality.overview.emptyNoConfigsTitle") }}</h4>
-      <p>{{ t("onlineEvals.quality.overview.emptyNoConfigsHint") }}</p>
+    <div
+      v-else-if="rows.length === 0"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="quality-overview-empty"
+    >
+      <OEmptyState
+        size="hero"
+        preset="no-score-configs"
+        @action="onEmptyAction"
+      />
     </div>
 
-    <div v-else-if="allZeroScores && !isLoading" class="qsc-waiting" data-test="quality-overview-waiting">
-      <div class="qsc-waiting__panel">
-        <div class="qsc-waiting__icon-ring">
-          <div class="qsc-waiting__icon-inner">
-            <OIcon name="hourglass-top" size="lg" />
-          </div>
-          <span class="qsc-waiting__pulse qsc-waiting__pulse--a" />
-          <span class="qsc-waiting__pulse qsc-waiting__pulse--b" />
-        </div>
-
-        <h4 class="qsc-waiting__title">
-          {{ t("onlineEvals.quality.overview.emptyWaitingTitle") }}
-        </h4>
-        <p class="qsc-waiting__desc">
-          {{ t("onlineEvals.quality.overview.emptyWaitingHint") }}
-        </p>
-
-        <div class="qsc-waiting__steps">
-          <div class="qsc-waiting__step">
-            <span class="qsc-waiting__step-num">1</span>
-            <span>{{ t("onlineEvals.quality.overview.waitingStepJob") }}</span>
-          </div>
-          <div class="qsc-waiting__step">
-            <span class="qsc-waiting__step-num">2</span>
-            <span>{{ t("onlineEvals.quality.overview.waitingStepRange") }}</span>
-          </div>
-          <div class="qsc-waiting__step">
-            <span class="qsc-waiting__step-num">3</span>
-            <span>{{ t("onlineEvals.quality.overview.waitingStepRefresh") }}</span>
-          </div>
-        </div>
-
-        <div class="qsc-waiting__actions">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            icon-left="rocket-launch"
-            data-test="quality-overview-waiting-jobs-cta"
-            @click="goToJobs"
-          >
-            {{ t("onlineEvals.quality.overview.waitingPrimaryCta") }}
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="refresh"
-            data-test="quality-overview-waiting-refresh"
-            @click="$emit('refresh')"
-          >
-            {{ t("onlineEvals.quality.overview.waitingRefreshCta") }}
-          </OButton>
-        </div>
-      </div>
-    </div>
+    <!-- The previous "waiting for scores" empty card (allZeroScores) is
+         intentionally gone: as long as at least one score config exists,
+         we render the table so the user sees the configured shapes. Each
+         row already handles the no-data case (status === 'noData' → "—")
+         so a fresh setup reads as "configs are here, scores will fill in"
+         rather than a blank screen. -->
 
     <div v-else class="qsc-overview__table-wrap">
       <OTable
@@ -185,7 +143,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
 
@@ -204,8 +162,17 @@ const route = useRoute();
 const router = useRouter();
 const filter = ref("");
 
-function goToJobs() {
-  const query = { ...route.query, tab: "jobs" } as Record<string, any>;
+// The "Create score config" CTA in the empty state can't be handled inline
+// (the create dialog lives in the Score Configs tab's OnlineEvals shell).
+// We hop tabs + set `action=add` so OnlineEvals's URL→state machine opens
+// the create form on landing.
+function onEmptyAction(id?: string) {
+  if (id !== "create") return;
+  const query: Record<string, any> = {
+    ...route.query,
+    tab: "scoreConfigs",
+    action: "add",
+  };
   delete query.config;
   router.push({ name: route.name as string, query }).catch(() => {});
 }
@@ -217,10 +184,6 @@ const filteredRows = computed(() => {
     (r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q),
   );
 });
-
-const allZeroScores = computed(
-  () => props.rows.length > 0 && props.rows.every((r) => r.totalScores === 0),
-);
 
 // De-emphasize configs that have no scores in the selected window. They
 // stay visible (so users can spot a scorer they defined but never wired
@@ -387,8 +350,7 @@ function relativeTime(timestampMs: number): string {
   max-width: 320px;
 }
 
-.qsc-overview__loading,
-.qsc-overview__empty {
+.qsc-overview__loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -398,150 +360,6 @@ function relativeTime(timestampMs: number): string {
   border-radius: 6px;
   text-align: center;
   color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.qsc-overview__empty h4 {
-  margin: 6px 0 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-overview__empty p {
-  margin: 0;
-  font-size: 12px;
-  max-width: 460px;
-}
-
-/* — Waiting-for-scores empty state — */
-.qsc-waiting {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 18px 16px 12px;
-}
-
-.qsc-waiting__panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 18px 22px 16px;
-  max-width: 520px;
-  width: 100%;
-  border-radius: 8px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--o2-card-bg)) 0%,
-    var(--o2-card-bg) 100%
-  );
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  text-align: center;
-}
-
-.qsc-waiting__icon-ring {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 2px;
-}
-
-.qsc-waiting__icon-inner {
-  position: relative;
-  z-index: 2;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 16%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--color-primary-600, #3F7994) 35%, transparent);
-  color: var(--color-primary-600, #3F7994);
-}
-
-.qsc-waiting__pulse {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--color-primary-600, #3F7994) 30%, transparent);
-  opacity: 0;
-  animation: qsc-pulse 2.6s ease-out infinite;
-}
-
-.qsc-waiting__pulse--b {
-  animation-delay: 1.3s;
-}
-
-@keyframes qsc-pulse {
-  0%   { transform: scale(0.7); opacity: 0.6; }
-  70%  { transform: scale(1.2); opacity: 0; }
-  100% { transform: scale(1.2); opacity: 0; }
-}
-
-.qsc-waiting__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-}
-
-.qsc-waiting__desc {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  max-width: 420px;
-}
-
-.qsc-waiting__steps {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  max-width: 440px;
-  margin: 6px 0 2px;
-}
-
-.qsc-waiting__step {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  padding: 7px 10px;
-  background: color-mix(in srgb, var(--color-text-secondary) 5%, transparent);
-  border-radius: 5px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  text-align: left;
-}
-
-.qsc-waiting__step-num {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 18%, transparent);
-  color: var(--color-primary-600, #3F7994);
-  font-size: 9px;
-  font-weight: 700;
-  margin-top: 1px;
-}
-
-.qsc-waiting__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 2px;
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .qsc-overview__table-wrap {
