@@ -1241,6 +1241,7 @@ describe("Commons Utility Functions", () => {
 
       (dashboardService.new_Folder as any).mockResolvedValue(mockResponse);
       (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
 
       const result = await createFolder(mockStore, data);
 
@@ -1254,6 +1255,7 @@ describe("Commons Utility Functions", () => {
 
       (dashboardService.edit_Folder as any).mockResolvedValue({ success: true });
       (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
 
       await updateFolder(mockStore, folderId, data);
 

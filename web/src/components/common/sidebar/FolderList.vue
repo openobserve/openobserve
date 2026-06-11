@@ -233,7 +233,7 @@ export default defineComponent({
       });
       
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
-        activeFolderId.value = newVal;
+        activeFolderId.value = newVal || "default";
       })
       const addFolder = () => {
       isFolderEditMode.value = false;
