@@ -1791,7 +1791,23 @@
     "tabAiAssistant": "O2 AI Asistanı",
     "tabOverview": "Genel Bakış",
     "tabUsage": "Kullanımı",
-    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız"
+    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız",
+    "noDataState": {
+      "title": "Henüz veri alınmadı",
+      "description": "Bu kuruluş herhangi bir veri almadı, bu yüzden çizeleyecek bir şey yok. Olaylar akmaya başladığında, alım <strong>hacminiz, depolama ve sorgu kullanım</strong> ınız burada otomatik olarak görünecektir.",
+      "logs": "Günlükleri gönder",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector ve daha fazlası",
+      "traces": "İzleri gönder",
+      "tracesDesc": "OTLP/Jaeger/Zipkin dağıtılmış izleme",
+      "metrics": "Metrik gönder",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf ve daha fazlası",
+      "or": "Veya:",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Yapay zeka entegrasyonları",
+      "shippers": "Kütük göndericileri"
+    }
   },
   "billing": {
     "header": "Kullanım ve Faturalandırma",
@@ -3986,7 +4002,13 @@
     "elevatedErrorRate": "Yükseltilmiş hata oranı",
     "reqPerSec": "istek/s",
     "allClear": "Hepsi temiz",
-    "allClearDesc": "Seçilen zaman aralığında etkin anormallikler, olaylar veya bozulmuş hizmetler yok."
+    "allClearDesc": "Seçilen zaman aralığında etkin anormallikler, olaylar veya bozulmuş hizmetler yok.",
+    "emptyActionAlerts": "Uyarı kurallarını görüntüle",
+    "emptyActionAlertsDesc": "Yapılandırılmış uyarıları ve eşikleri gözden geçirin",
+    "emptyActionLogs": "Günlükleri keşfedin",
+    "emptyActionLogsDesc": "Günlük akışlarınızı arayın ve filtreleyin",
+    "emptyActionTraces": "İzleri keşfedin",
+    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin"
   },
   "chatHistory": {
     "title": "Sohbetler",
@@ -4370,6 +4392,14 @@
     "noPipelineHistory": {
       "title": "Henüz boru hattı geçmişi yok",
       "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
+    },
+    "noStreamSelected": {
+      "title": "Başlamak için bir yayın seçin",
+      "description": "Soldaki açılır menüden bir akış seçin, ardından günlüklerinizi keşfetmek için 'Sorguyu çalıştır'a basın. Ayrıca ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz."
+    },
+    "noQueryApplied": {
+      "title": "Günlükleri görmek için bir sorgu çalıştırın",
+      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
     }
   },
   "onlineEvals": {
@@ -4727,6 +4757,45 @@
       "evalJobs": "Eval İş İlanları",
       "scorers": "Gol Sahipleri",
       "scoreConfigs": "Puan Yapılandırmaları"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "OpenObservere'ye veri göndermeye başlayın",
+      "description": "Bu organizasyonda henüz veri yok, bu yüzden keşfedilecek akış yok. İlk günlüklerinizi gönderin ve burada otomatik olarak görünecekler - nasıl başlamak istediğinizi seçin.",
+      "curl": "Curl/HTTP API ile gönder",
+      "curlDesc": "En hızlı yol - bir komut yapıştırın ve günlükler akmaya başlar",
+      "shippers": "Bir günlük göndericisi kullanın",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng ve daha fazlası",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Günlükler, izler ve ölçümler için satıcıdan bağımsız OTLP alımı",
+      "or": "Veya:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "AI'dan alımı ayarlamasını isteyin"
+    },
+    "noStream": {
+      "title": "Keşfetmeye başlamak için bir yayın seçin",
+      "description": "Bir akış seçin, ardından Sorguyu <strong>çalıştır'a</strong> basın. Sonuçlar geldiğinde filtreler, bir VRL işlevi ve özel bir zaman aralığı ile hassaslaştırabilirsiniz.",
+      "selectStream": "Bir akış seçin",
+      "selectStreamDesc": "Günlüklere, izlere, metriklere ve RUM akışlarına göz atın",
+      "queryGuide": "Sorgu kılavuzunu okuyun",
+      "queryGuideDesc": "Filtreler, SQL modu, VRL ve kaydedilmiş görünümler",
+      "recent": "En son:"
+    },
+    "noEvents": {
+      "title": "Etkinlik bulunamadı",
+      "descNoFilters": "{range} 'de hiçbir olay bulunamadı. Sonuçları yüklemek için zaman aralığını genişletmeyi deneyin.",
+      "descWithFilters": "Seçilen pencerede <strong>bu sorguy</strong> la eşleşen hiçbir şey yok. Zaman aralığını genişletmeyi, filtreyi kolaylaştırmayı veya sorguyu sıfırlamayı deneyin.",
+      "expandRange": "Zaman aralığını genişletin",
+      "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
+      "removeFilter": "Filtreyi kaldırma",
+      "removeFilterDescSql": "Bu sorguya uygulanan SQL koşullarınız var",
+      "openHistory": "Arama geçmişini aç",
+      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
+      "selectedRange": "Seçilen aralık"
     }
   }
 }
