@@ -3239,7 +3239,39 @@
     "openInFullView": "Apri a piena vista",
     "serviceMap": "Mappa dei servizi",
     "patternView": "Visualizzazione del modello",
-    "spanView": "Vista Span"
+    "spanView": "Vista Span",
+    "noData": {
+      "title": "Inizia a inviare tracce a OpenObserve",
+      "description": "Non sono ancora state trovate tracce in questa organizzazione. Instrument: i tuoi servizi e le tracce appariranno qui automaticamente.",
+      "otlp": "Invia tracce tramite OTLP",
+      "otlpDesc": "Jaeger, Zipkin e qualsiasi SDK compatibile con OpenTelemery",
+      "otelCollector": "Collezionista/Agente Hotel",
+      "otelCollectorDesc": "Instrada tutti i segnali di telemetria tramite OTel Collector",
+      "or": "Oppure:",
+      "kubernetes": "Kubernetes",
+      "python": "Pitone",
+      "java": "Giava",
+      "nodejs": "Node.js",
+      "askAi": "Chiedi all'IA di configurare il tracciamento"
+    },
+    "noStream": {
+      "title": "Scegli uno stream per iniziare a esplorare",
+      "description": "Scegli un flusso di traccia, quindi premi <strong>Esegui query</strong>. Puoi filtrare per servizio, durata, stato dell'intervallo e altro ancora una volta caricati i risultati.",
+      "selectStream": "Seleziona uno stream",
+      "selectStreamDesc": "Sfoglia i flussi di traccia disponibili in questa organizzazione",
+      "queryGuide": "Leggi la guida alle tracce",
+      "queryGuideDesc": "Grafico del servizio, filtro span, metriche RED e altro",
+      "recent": "Recenti:"
+    },
+    "noEvents": {
+      "title": "Nessuna traccia trovata",
+      "descNoFilters": "Nessuna traccia è stata trovata in {range}. Prova ad ampliare l'intervallo di tempo per caricare i risultati.",
+      "descWithFilters": "Niente corrisponde a <strong>questa query</strong> nella finestra selezionata. Prova ad ampliare l'intervallo di tempo o a rimuovere un filtro.",
+      "expandRange": "Espandi l'intervallo di tempo",
+      "expandRangeDescAbsolute": "Passa a un intervallo di tempo relativo più ampio",
+      "removeFilter": "Rimuovi un filtro",
+      "selectedRange": "la gamma selezionata"
+    }
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
