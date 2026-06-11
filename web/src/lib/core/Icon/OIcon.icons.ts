@@ -123,6 +123,8 @@ import Dashboard from "~icons/material-symbols/dashboard-outline";
 import AccessTime from "~icons/material-symbols/schedule-outline";
 import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
+import AlignCenter from "~icons/material-symbols/format-align-center";
+import AlignRight from "~icons/material-symbols/format-align-right";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
 import AutoAwesome from "~icons/material-symbols/wand-stars-outline";
@@ -438,6 +440,8 @@ export const iconRegistry = {
   "access-time": AccessTime,
   "activity": Activity,
   "align-left": AlignLeft,
+  "align-center": AlignCenter,
+  "align-right": AlignRight,
   "all-inclusive": AllInclusive,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,

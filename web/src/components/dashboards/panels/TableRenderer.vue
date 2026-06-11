@@ -42,6 +42,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-panel-table"
       @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
     >
+      <!-- Inline per-column formatting affordance (edit-panel mode only) -->
+      <template v-if="enableInlineFormatting" #header-cell="{ columnId }">
+        <InlineColumnFormat
+          :field="aliasForColumn(columnId)"
+          :label="labelForColumn(columnId)"
+          :is-numeric="isNumericColumn(columnId)"
+          :override-configs="overrideConfigs"
+          :preview-column="previewDataByColumn[columnId]?.column"
+          :preview-rows="previewDataByColumn[columnId]?.rows || []"
+          :value-mapping="valueMapping"
+          @update:override-config="onOverrideConfigUpdate"
+          @edit-all="openEditAll"
+        />
+      </template>
+
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
@@ -66,20 +81,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </slot>
       </template>
     </TenstackTable>
+
+    <!-- "Edit all…" power path — the full multi-column dialog over the same model -->
+    <OverrideConfigPopup
+      v-if="enableInlineFormatting"
+      :open="showEditAll"
+      :columns="editAllColumns"
+      :override-config="editAllModel"
+      @close="showEditAll = false"
+      @save="onOverrideConfigUpdate"
+    />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, inject } from "vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import InlineColumnFormat from "@/components/dashboards/InlineColumnFormat.vue";
+import OverrideConfigPopup from "@/components/dashboards/OverrideConfigPopup.vue";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 
 export default defineComponent({
   name: "TableRenderer",
-  components: { TenstackTable, TablePaginationControls },
+  components: {
+    TenstackTable,
+    TablePaginationControls,
+    InlineColumnFormat,
+    OverrideConfigPopup,
+  },
   props: {
     data: {
       required: true,
@@ -111,10 +144,98 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /**
+     * Enables the per-column inline formatting affordance in the header.
+     * True only in Edit Panel mode, where writes go to the editable
+     * dashboardPanelData store (and ride the existing Apply/Save flow).
+     */
+    enableInlineFormatting: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["row-click"],
   setup(props) {
     const tableRef = ref<any>(null);
+
+    // ── Inline column formatting (edit-panel only) ────────────────────────────
+    // Writes go straight to the editable panel store, exactly like the
+    // OverrideConfig config-panel entry point — so inline edits persist through
+    // the existing Apply/Save flow and re-render the preview live.
+    const dashboardPanelDataPageKey = inject(
+      "dashboardPanelDataPageKey",
+      "dashboard",
+    );
+    const { dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+    );
+
+    const overrideConfigs = computed(
+      () => dashboardPanelData?.data?.config?.override_config ?? [],
+    );
+
+    // Stable per-column preview data (column def + a few sample rows) for the
+    // inline popover's mini TableRenderer — memoized per data change so the
+    // references stay stable between renders.
+    const previewDataByColumn = computed(() => {
+      const cols = (props.data?.columns as any[]) || [];
+      const rows = (props.data?.rows as any[]) || [];
+      const map: Record<string, { column: any; rows: any[] }> = {};
+      for (const c of cols) {
+        const id = String(c.field ?? c.name);
+        const key = c.field ?? id;
+        const sample: any[] = [];
+        for (const row of rows) {
+          const v = row?.[key];
+          if (v !== null && v !== undefined && v !== "") sample.push(row);
+          if (sample.length >= 6) break;
+        }
+        map[id] = { column: c, rows: sample };
+      }
+      return map;
+    });
+
+    /** Find the converted column object for a TanStack column id (= field). */
+    const columnObjFor = (columnId: string): any =>
+      ((props.data?.columns as any[]) || []).find(
+        (c: any) => String(c.field ?? c.name) === columnId,
+      );
+
+    // override_config is keyed by column alias; fall back to the id (field).
+    const aliasForColumn = (columnId: string): string =>
+      columnObjFor(columnId)?.alias ?? columnId;
+
+    const labelForColumn = (columnId: string): string => {
+      const c = columnObjFor(columnId);
+      return c?.label ?? c?.name ?? columnId;
+    };
+
+    const isNumericColumn = (columnId: string): boolean =>
+      !!columnObjFor(columnId)?.isNumeric;
+
+    const onOverrideConfigUpdate = (next: any[]) => {
+      if (!dashboardPanelData?.data?.config) return;
+      dashboardPanelData.data.config.override_config = next;
+    };
+
+    // "Edit all…" — open the full dialog over the same store-backed model.
+    const showEditAll = ref(false);
+    const editAllModel = computed(() => ({
+      overrideConfigs: overrideConfigs.value,
+    }));
+    const editAllColumns = computed(() =>
+      ((props.data?.columns as any[]) || [])
+        .filter((c: any) => !c._isTotalColumn)
+        .map((c: any) => ({
+          label: c.label ?? c.name,
+          alias: c.alias ?? String(c.field ?? c.name),
+          isNumeric: !!c.isNumeric,
+        })),
+    );
+    const openEditAll = () => {
+      showEditAll.value = true;
+    };
 
     /** Returns true when the hex colour is dark (needs white text). */
     const isDashboardColor = (hex: string): boolean => {
@@ -298,6 +419,17 @@ export default defineComponent({
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,
+      // inline column formatting
+      overrideConfigs,
+      previewDataByColumn,
+      aliasForColumn,
+      labelForColumn,
+      isNumericColumn,
+      onOverrideConfigUpdate,
+      showEditAll,
+      editAllModel,
+      editAllColumns,
+      openEditAll,
     };
   },
 });

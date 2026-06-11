@@ -48,235 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <template v-if="col.field">
-          <!-- VALUE FORMATTING (numeric only) -->
-          <template v-if="isNumericColumn(col.field)">
-            <div class="config-section">
-              <div class="section-label">{{ t("dashboard.sectionValueFormatting") }}</div>
-              <div class="control-row">
-                <OSelect
-                  v-model="col.unit"
-                  :options="unitOptions"
-                  :label="t('dashboard.overrideConfigUnitLabel')"
-                  style="min-width: 160px"
-                />
-                <OInput
-                  v-if="col.unit === 'custom'"
-                  v-model="col.customUnit"
-                  :label="t('dashboard.customunitLabel')"
-                  size="sm"
-                  style="min-width: 110px"
-                />
-              </div>
-            </div>
-          </template>
-
-          <!-- CELL TYPE (numeric only) -->
-          <template v-if="isNumericColumn(col.field)">
-            <div class="config-section">
-              <div class="section-label">{{ t("dashboard.sectionCellType") }}</div>
-              <div class="toggle-group">
-                <OButton
-                  v-for="ct in cellTypeOptions"
-                  :key="ct.value"
-                  variant="ghost"
-                  size="sm"
-                  :class="['toggle-btn', col.cellType === ct.value && 'toggle-btn--active']"
-                  @click="col.cellType = ct.value"
-                >
-                  {{ ct.label }}
-                </OButton>
-              </div>
-
-              <!-- Color (shown for progress_bar and sparkline) -->
-              <template v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'">
-                <div class="inline-control tw:mt-2">
-                  <span class="option-label">{{ t("dashboard.progressColor") }}</span>
-                  <label class="color-swatch-label">
-                    <span
-                      class="color-swatch"
-                      :style="col.progressColor ? { background: col.progressColor } : {}"
-                      :class="{ 'color-swatch--empty': !col.progressColor }"
-                    />
-                    <input
-                      type="color"
-                      class="color-input-hidden"
-                      :value="col.progressColor || '#1976d2'"
-                      @input="(e) => col.progressColor = (e.target as HTMLInputElement).value"
-                    />
-                  </label>
-                  <template v-if="col.progressColor">
-                    <span class="hex-value">{{ col.progressColor }}</span>
-                    <OButton variant="ghost" size="icon-xs" icon-left="close" @click="col.progressColor = ''" />
-                  </template>
-                  <span v-else class="color-none-text">{{ t("dashboard.colorNone") }}</span>
-                </div>
-              </template>
-
-              <!-- Sparkline style -->
-              <template v-if="col.cellType === 'sparkline'">
-                <div class="inline-control tw:mt-2">
-                  <span class="option-label">{{ t("dashboard.sparklineStyle") }}</span>
-                  <div class="toggle-group">
-                    <OButton
-                      v-for="s in sparklineStyleOptions"
-                      :key="s.value"
-                      variant="ghost"
-                      size="sm"
-                      :class="['toggle-btn', (col.sparklineStyle || 'line') === s.value && 'toggle-btn--active']"
-                      @click="col.sparklineStyle = s.value as 'line' | 'bar'"
-                    >
-                      {{ s.label }}
-                    </OButton>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </template>
-
-          <!-- ALIGNMENT -->
-          <div class="config-section">
-            <div class="section-label">{{ t("dashboard.sectionAlignment") }}</div>
-            <div class="toggle-group">
-              <OButton
-                v-for="dir in alignOptions"
-                :key="dir.value"
-                variant="ghost"
-                size="sm"
-                :title="dir.label"
-                :class="['toggle-btn', col.alignment === dir.value && 'toggle-btn--active']"
-                @click="col.alignment = col.alignment === dir.value ? '' : dir.value"
-              >
-                {{ dir.label }}
-              </OButton>
-            </div>
-          </div>
-
-          <!-- STYLING -->
-          <div class="config-section">
-            <div class="section-label">{{ t("dashboard.sectionStyling") }}</div>
-            <div class="control-row tw:flex-wrap" style="gap: 16px">
-              <div class="inline-control">
-                <span class="option-label">{{ t("dashboard.textColor") }}</span>
-                <label class="color-swatch-label">
-                  <span
-                    class="color-swatch"
-                    :style="col.textColor ? { background: col.textColor } : {}"
-                    :class="{ 'color-swatch--empty': !col.textColor }"
-                  />
-                  <input
-                    type="color"
-                    class="color-input-hidden"
-                    :value="col.textColor || '#000000'"
-                    @input="(e) => col.textColor = (e.target as HTMLInputElement).value"
-                  />
-                </label>
-                <template v-if="col.textColor">
-                  <span class="hex-value">{{ col.textColor }}</span>
-                  <OButton variant="ghost" size="icon-xs" icon-left="close" @click="col.textColor = ''" />
-                </template>
-                <span v-else class="color-none-text">{{ t("dashboard.colorNone") }}</span>
-              </div>
-
-              <div class="inline-control">
-                <span class="option-label">{{ t("dashboard.bgColor") }}</span>
-                <label class="color-swatch-label">
-                  <span
-                    class="color-swatch"
-                    :style="col.bgColor ? { background: col.bgColor } : {}"
-                    :class="{ 'color-swatch--empty': !col.bgColor }"
-                  />
-                  <input
-                    type="color"
-                    class="color-input-hidden"
-                    :value="col.bgColor || '#ffffff'"
-                    @input="(e) => col.bgColor = (e.target as HTMLInputElement).value"
-                  />
-                </label>
-                <template v-if="col.bgColor">
-                  <span class="hex-value">{{ col.bgColor }}</span>
-                  <OButton variant="ghost" size="icon-xs" icon-left="close" @click="col.bgColor = ''" />
-                </template>
-                <span v-else class="color-none-text">{{ t("dashboard.colorNone") }}</span>
-              </div>
-
-              <OCheckbox
-                v-model="col.autoColor"
-                :label="t('dashboard.overrideConfigUniqueValueColor')"
-                size="sm"
-              />
-            </div>
-          </div>
-
-          <!-- CONDITIONAL STYLING (numeric only) -->
-          <template v-if="isNumericColumn(col.field)">
-            <div class="config-section">
-              <div class="section-label">{{ t("dashboard.sectionConditionalStyling") }}</div>
-              <div
-                v-for="(rule, ruleIdx) in col.conditions"
-                :key="ruleIdx"
-                class="condition-rule"
-              >
-                <OSelect
-                  v-model="rule.operator"
-                  :options="conditionOperators"
-                  class="condition-operator"
-                />
-                <OInput
-                  v-model="rule.threshold"
-                  :label="t('dashboard.conditionThreshold')"
-                  type="number"
-                  size="sm"
-                  class="condition-value"
-                />
-                <div class="inline-control">
-                  <span class="option-label color-none-text">{{ t("dashboard.textColor") }}</span>
-                  <label class="color-swatch-label">
-                    <span
-                      class="color-swatch color-swatch--sm"
-                      :style="rule.textColor ? { background: rule.textColor } : {}"
-                      :class="{ 'color-swatch--empty': !rule.textColor }"
-                    />
-                    <input
-                      type="color"
-                      class="color-input-hidden"
-                      :value="rule.textColor || '#000000'"
-                      @input="(e) => rule.textColor = (e.target as HTMLInputElement).value"
-                    />
-                  </label>
-                  <OButton v-if="rule.textColor" variant="ghost" size="icon-xs" icon-left="close" @click="rule.textColor = ''" />
-                </div>
-                <div class="inline-control">
-                  <span class="option-label color-none-text">{{ t("dashboard.bgColor") }}</span>
-                  <label class="color-swatch-label">
-                    <span
-                      class="color-swatch color-swatch--sm"
-                      :style="rule.bgColor ? { background: rule.bgColor } : {}"
-                      :class="{ 'color-swatch--empty': !rule.bgColor }"
-                    />
-                    <input
-                      type="color"
-                      class="color-input-hidden"
-                      :value="rule.bgColor || '#ffffff'"
-                      @input="(e) => rule.bgColor = (e.target as HTMLInputElement).value"
-                    />
-                  </label>
-                  <OButton v-if="rule.bgColor" variant="ghost" size="icon-xs" icon-left="close" @click="rule.bgColor = ''" />
-                </div>
-                <div class="tw:flex-1" />
-                <OButton variant="ghost" size="icon-xs" icon-left="delete-outline" @click="col.conditions.splice(ruleIdx, 1)" />
-              </div>
-              <OButton
-                variant="ghost"
-                size="sm"
-                class="tw:mt-1"
-                @click="col.conditions.push({ operator: '<', threshold: '', textColor: '', bgColor: '' })"
-              >
-                {{ t("dashboard.conditionAddRule") }}
-              </OButton>
-            </div>
-          </template>
-        </template>
+        <!-- Shared formatting controls — identical to the inline header popover. -->
+        <ColumnFormatControls
+          v-if="col.field"
+          :col="col"
+          :is-numeric="isNumericColumn(col.field)"
+        />
       </div>
     </div>
   </ODialog>
@@ -290,31 +67,17 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-
-interface ConditionalRuleUI {
-  operator: string;
-  threshold: string;
-  textColor: string;
-  bgColor: string;
-}
-
-interface ColumnOverrideUI {
-  field: string;
-  unit: string;
-  customUnit: string;
-  alignment: string;
-  textColor: string;
-  bgColor: string;
-  autoColor: boolean;
-  cellType: string;
-  progressColor: string;
-  sparklineStyle: "line" | "bar";
-  conditions: ConditionalRuleUI[];
-}
+import ColumnFormatControls from "./ColumnFormatControls.vue";
+import {
+  type ColumnOverrideUI,
+  emptyColumnOverride,
+  loadAllFromRaw,
+  serializeOverrides,
+} from "@/composables/dashboard/useColumnFormatting";
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton, ODialog, OSelect, OInput, OCheckbox },
+  components: { OButton, ODialog, OSelect, OInput, OCheckbox, ColumnFormatControls },
   props: {
     open: {
       type: Boolean,
@@ -335,117 +98,13 @@ export default defineComponent({
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
 
-    // ── Options ────────────────────────────────────────────────────────────────
-    const unitOptions = [
-      { label: t("dashboard.default"), value: "" },
-      { label: t("dashboard.numbers"), value: "numbers" },
-      { label: t("dashboard.bytes"), value: "bytes" },
-      { label: t("dashboard.kilobytes"), value: "kilobytes" },
-      { label: t("dashboard.megabytes"), value: "megabytes" },
-      { label: t("dashboard.bytesPerSecond"), value: "bps" },
-      { label: t("dashboard.seconds"), value: "seconds" },
-      { label: t("dashboard.milliseconds"), value: "milliseconds" },
-      { label: t("dashboard.microseconds"), value: "microseconds" },
-      { label: t("dashboard.nanoseconds"), value: "nanoseconds" },
-      { label: t("dashboard.percent1"), value: "percent-1" },
-      { label: t("dashboard.percent"), value: "percent" },
-      { label: t("dashboard.currencyDollar"), value: "currency-dollar" },
-      { label: t("dashboard.currencyEuro"), value: "currency-euro" },
-      { label: t("dashboard.currencyPound"), value: "currency-pound" },
-      { label: t("dashboard.currencyYen"), value: "currency-yen" },
-      { label: t("dashboard.currencyRupees"), value: "currency-rupee" },
-      { label: t("dashboard.custom"), value: "custom" },
-    ];
-
-    const alignOptions = [
-      { value: "left", label: t("dashboard.alignLeft") },
-      { value: "center", label: t("dashboard.alignCenter") },
-      { value: "right", label: t("dashboard.alignRight") },
-    ];
-
-    const cellTypeOptions = [
-      { value: "text", label: t("dashboard.cellTypeText") },
-      { value: "progress_bar", label: t("dashboard.cellTypeProgressBar") },
-      { value: "sparkline", label: t("dashboard.cellTypeSparkline") },
-    ];
-
-    const sparklineStyleOptions = [
-      { value: "line", label: t("dashboard.sparklineStyleLine") },
-      { value: "bar", label: t("dashboard.sparklineStyleBar") },
-    ];
-
-    const conditionOperators = [
-      { label: "<", value: "<" },
-      { label: ">", value: ">" },
-      { label: "<=", value: "<=" },
-      { label: ">=", value: ">=" },
-      { label: "=", value: "=" },
-      { label: "!=", value: "!=" },
-    ];
-
-    // ── Load existing config into UI state ─────────────────────────────────────
-    const emptyRow = (): ColumnOverrideUI => ({
-      field: "",
-      unit: "",
-      customUnit: "",
-      alignment: "",
-      textColor: "",
-      bgColor: "",
-      autoColor: false,
-      cellType: "text",
-      progressColor: "",
-      sparklineStyle: "line",
-      conditions: [],
-    });
-
-    const loadFromRaw = (raw: any[]): ColumnOverrideUI[] => {
-      const byColumn: Record<string, ColumnOverrideUI> = {};
-      for (const entry of raw ?? []) {
-        const alias = entry?.field?.value;
-        if (!alias) continue;
-        if (!byColumn[alias]) byColumn[alias] = { ...emptyRow(), field: alias };
-        for (const cfg of entry?.config ?? []) {
-          switch (cfg?.type) {
-            case "unit":
-              byColumn[alias].unit = cfg.value?.unit ?? "";
-              byColumn[alias].customUnit = cfg.value?.customUnit ?? "";
-              break;
-            case "unique_value_color":
-              byColumn[alias].autoColor = !!cfg.autoColor;
-              break;
-            case "alignment":
-              byColumn[alias].alignment = cfg.value ?? "";
-              break;
-            case "text_color":
-              byColumn[alias].textColor = cfg.value ?? "";
-              break;
-            case "background_color":
-              byColumn[alias].bgColor = cfg.value ?? "";
-              break;
-            case "cell_type":
-              byColumn[alias].cellType = cfg.value?.type ?? "text";
-              byColumn[alias].progressColor = cfg.value?.color ?? "";
-              byColumn[alias].sparklineStyle = cfg.value?.sparklineStyle ?? "line";
-              break;
-            case "conditional_styles":
-              byColumn[alias].conditions = (cfg.rules ?? []).map((r: any) => ({
-                operator: r.operator ?? "<",
-                threshold: r.threshold != null ? String(r.threshold) : "",
-                textColor: r.textColor ?? "",
-                bgColor: r.bgColor ?? "",
-              }));
-              break;
-          }
-        }
-      }
-      return Object.values(byColumn);
-    };
-
+    // ── Load existing config into UI state (shared loader) ─────────────────────
     const columnOverrides = ref<ColumnOverrideUI[]>([]);
 
     const initFromProps = () => {
-      const loaded = loadFromRaw(props.overrideConfig.overrideConfigs ?? []);
-      columnOverrides.value = loaded.length > 0 ? loaded : [emptyRow()];
+      const loaded = loadAllFromRaw(props.overrideConfig.overrideConfigs ?? []);
+      columnOverrides.value =
+        loaded.length > 0 ? loaded : [emptyColumnOverride()];
     };
 
     // Re-initialize UI state whenever the dialog is (re)opened.
@@ -509,67 +168,15 @@ export default defineComponent({
     );
 
     // ── Mutations ──────────────────────────────────────────────────────────────
-    const addColumn = () => columnOverrides.value.push(emptyRow());
+    const addColumn = () => columnOverrides.value.push(emptyColumnOverride());
     const removeColumn = (idx: number) => columnOverrides.value.splice(idx, 1);
-
-    // ── Serialize to override_config format ────────────────────────────────────
-    const toRaw = (cols: ColumnOverrideUI[]): any[] =>
-      cols
-        .filter((c) => c.field)
-        .map((c) => {
-          const config: any[] = [];
-          if (c.unit && isNumericColumn(c.field))
-            config.push({
-              type: "unit",
-              value: { unit: c.unit, customUnit: c.customUnit },
-            });
-          if (c.alignment)
-            config.push({ type: "alignment", value: c.alignment });
-          if (c.textColor)
-            config.push({ type: "text_color", value: c.textColor });
-          if (c.bgColor)
-            config.push({ type: "background_color", value: c.bgColor });
-          if (c.autoColor)
-            config.push({ type: "unique_value_color", autoColor: true });
-
-          if (c.cellType && c.cellType !== "text") {
-            config.push({
-              type: "cell_type",
-              value: {
-                type: c.cellType,
-                color: c.progressColor || "",
-                sparklineStyle:
-                  c.cellType === "sparkline"
-                    ? c.sparklineStyle || "line"
-                    : undefined,
-              },
-            });
-          }
-
-          const validConditions = c.conditions.filter(
-            (r) => r.threshold !== "" && r.operator,
-          );
-          if (validConditions.length) {
-            config.push({
-              type: "conditional_styles",
-              rules: validConditions.map((r) => ({
-                operator: r.operator,
-                threshold: parseFloat(r.threshold),
-                textColor: r.textColor || "",
-                bgColor: r.bgColor || "",
-              })),
-            });
-          }
-
-          return { field: { matchBy: "name", value: c.field }, config };
-        })
-        .filter((entry) => entry.config.length > 0);
 
     // ── Actions ────────────────────────────────────────────────────────────────
     const closePopup = () => emit("close");
 
     const saveOverrides = () => {
-      const raw = toRaw(columnOverrides.value);
+      // Shared serializer keeps the dialog and inline menu output identical.
+      const raw = serializeOverrides(columnOverrides.value, isNumericColumn);
       props.overrideConfig.overrideConfigs = raw;
       emit("save", raw);
       emit("close");
@@ -578,11 +185,6 @@ export default defineComponent({
     return {
       t,
       columnOverrides,
-      unitOptions,
-      alignOptions,
-      cellTypeOptions,
-      sparklineStyleOptions,
-      conditionOperators,
       columnOptionsFor,
       availableColumnsToAdd,
       getFieldLabel,

@@ -2691,13 +2691,14 @@ defineExpose({
   }
 }
 
-// Sparkline cell type (dashboard table) — always right-aligned (numeric value)
+// Sparkline cell type (dashboard table). Content-sized (not width:100%) so the
+// parent cell flex container can position the whole group — value + chart + copy
+// button — together according to the column's alignment.
 .sparkline-cell {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 6px;
-  width: 100%;
+  max-width: 100%;
   height: 100%;
   min-height: 20px;
   overflow: hidden;

@@ -137,6 +137,10 @@ export const convertTableData = (
       obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
       obj["label"] = it.label || it.alias;
+      // alias + isNumeric power inline column formatting: override_config is keyed
+      // by the column alias, while the TanStack column id is the data field.
+      obj["alias"] = it.alias;
+      obj["isNumeric"] = isNumber;
       obj["align"] = styleConfigMap?.[aliasLower]?.alignment || (!isNumber ? "left" : "right");
       obj["sortable"] = true;
 
