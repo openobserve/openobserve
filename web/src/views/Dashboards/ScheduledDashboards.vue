@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           variant="primary"
-          size="sm-action"
+          size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
           >{{ t("dashboard.newReport") }}</OButton
@@ -64,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :default-columns="false"
       :loading="loading"
       style="width: 100%"
-      class="tw:px-3"
     >
       <template #cell-name="{ row }">
         <span class="tw:cursor-pointer" @click="openReport(row)">{{ row.name }}</span>

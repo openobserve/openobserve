@@ -463,6 +463,7 @@ pub async fn get_partitions(
         streaming_output: true,
         histogram_interval: req.query.histogram_interval,
         sampling_ratio: req.query.sampling_ratio,
+        search_type: req.search_type,
     };
 
     let res = SearchService::search_partition(
@@ -471,7 +472,6 @@ pub async fn get_partitions(
         Some(user_id),
         stream_type,
         &search_partition_req,
-        false,
         false,
         req.use_cache,
     )

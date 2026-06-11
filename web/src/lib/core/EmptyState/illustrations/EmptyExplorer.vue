@@ -113,19 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </g>
     </g>
 
-    <!-- "no signal" bubble (floats independently) -->
-    <g class="es-bubble">
-      <path d="M250 56 L262 70 L246 70 Z" fill="var(--color-surface-base)" />
-      <rect x="256" y="36" width="84" height="66" rx="16" fill="var(--color-surface-base)" stroke="var(--color-border-default)" stroke-width="2" />
-      <!-- wifi arcs -->
-      <path d="M282 74 Q298 58 314 74" stroke="var(--color-border-strong)" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.55" />
-      <path d="M288 80 Q298 70 308 80" stroke="var(--color-primary-500)" stroke-width="3" stroke-linecap="round" fill="none" />
-      <circle cx="298" cy="86" r="3" fill="var(--color-primary-600)" />
-      <!-- exclamation -->
-      <line x1="324" y1="52" x2="324" y2="64" stroke="var(--color-primary-600)" stroke-width="3" stroke-linecap="round" />
-      <circle cx="324" cy="70" r="1.8" fill="var(--color-primary-600)" />
-    </g>
-
     <!-- floating accents -->
     <circle class="es-dot es-dot-a" cx="298" cy="150" r="5" fill="var(--color-primary-400)" />
     <circle class="es-dot es-dot-b" cx="120" cy="92" r="4" fill="var(--color-primary-300)" />
@@ -146,7 +133,6 @@ withDefaults(
 /* Subtle, looping motion. transform-box/origin keep scale + translate sane on
    SVG groups. All gated behind `animated` (es-static) and the OS reduce-motion
    preference. */
-.es-bubble,
 .es-blob,
 .es-dot {
   transform-box: fill-box;
@@ -162,10 +148,6 @@ withDefaults(
   transform-box: view-box;
   transform-origin: 200px 134px;
   animation: es-headtilt 3.6s ease-in-out infinite;
-}
-.es-bubble {
-  animation: es-float 3.8s ease-in-out infinite;
-  animation-delay: -1.2s;
 }
 .es-blob {
   animation: es-drift 15s ease-in-out infinite;
@@ -199,15 +181,6 @@ withDefaults(
     transform: rotate(-1.2deg);
   }
 }
-@keyframes es-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-7px);
-  }
-}
 @keyframes es-bob {
   0%,
   100% {
@@ -239,11 +212,11 @@ withDefaults(
 }
 
 /* honour explicit opt-out and the OS preference */
-.es-static :where(.es-scratch, .es-head, .es-bubble, .es-blob, .es-dot) {
+.es-static :where(.es-scratch, .es-head, .es-blob, .es-dot) {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-scratch, .es-head, .es-bubble, .es-blob, .es-dot) {
+  :where(.es-scratch, .es-head, .es-blob, .es-dot) {
     animation: none;
   }
 }

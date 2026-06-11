@@ -67,32 +67,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="">
-        <div
-          class="card-container tw:p-4 tw:max-w-full tw:flex-1 tw:min-h-0"
-        >
-          <div class="tw:pb-4">
-            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
-              {{ t("rum.aboutRUMTitle") }}
-            </div>
-            <div class="tw:text-base tw:font-medium">
-              {{ t("rum.aboutRUMMessage") }}
-            </div>
-            <div>
-              <div></div>
-            </div>
-          </div>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :title="t('rum.getStartedTitle')"
+      <OEmptyState illustration="radar" size="hero" :hide-action="true">
+        <template #title>{{ t("rum.emptyState.title") }}</template>
+        <template #description><span v-html="t('rum.emptyState.description')" /></template>
+
+        <template #actions>
+          <!-- Instrument a web app -->
+          <EmptyStateIngestionCard
+            icon="devices"
+            :label="t('rum.emptyState.webApp')"
+            :sublabel="t('rum.emptyState.webAppDesc')"
+            icon-variant="blue"
+            data-test="rum-empty-web-card"
             @click="getStarted"
-          >
-            {{ t("rum.getStartedLabel") }}
-            <template #icon-right><OIcon name="arrow-forward" size="sm" class="tw:ml-1" /></template>
-          </OButton>
-        </div>
-      </div>
+          />
+
+          <!-- Session Replay -->
+          <EmptyStateIngestionCard
+            icon="play-circle"
+            :label="t('rum.emptyState.sessionReplay')"
+            :sublabel="t('rum.emptyState.sessionReplayDesc')"
+            icon-variant="purple"
+            data-test="rum-empty-session-card"
+            @click="getStarted"
+          />
+        </template>
+
+        <template #extra>
+          <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+            <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+              {{ t("rum.emptyState.learnMore") }}
+            </span>
+            <EmptyStateIngestionChip
+              icon="bolt"
+              href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
+              data-test="rum-empty-quickstart-btn"
+            >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip>
+            <EmptyStateIngestionChip
+              icon="menu-book"
+              href="https://openobserve.ai/blog/frontend-monitoring-basics/"
+              data-test="rum-empty-blog-btn"
+            >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip>
+          </div>
+        </template>
+      </OEmptyState>
     </template>
   </div>
 </template>
@@ -120,8 +138,10 @@ import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 
 const route = useRoute();
 const router = useRouter();

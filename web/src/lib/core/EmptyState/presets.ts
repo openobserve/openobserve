@@ -87,6 +87,18 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-stream-selected": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.noStreamSelected.title",
+    descriptionKey: "emptyState.noStreamSelected.description",
+  },
+  "no-query-applied": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.noQueryApplied.title",
+    descriptionKey: "emptyState.noQueryApplied.description",
+  },
 
   // --- first-run "create your first X" -------------------------------------
   "no-dashboards": {

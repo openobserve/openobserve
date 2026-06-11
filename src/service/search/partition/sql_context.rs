@@ -20,9 +20,7 @@ use config::{
     },
     utils::{
         base64,
-        sql::{
-            is_complex_query, is_eligible_for_histogram, is_explain_query, is_simple_distinct_query,
-        },
+        sql::{is_complex_query, is_eligible_for_histogram, is_explain_query},
     },
 };
 use infra::errors::Error;
@@ -51,7 +49,6 @@ impl PartitionSqlContext {
         req: &SearchPartitionRequest,
         org_id: &str,
         stream_type: StreamType,
-        is_http_req: bool,
     ) -> Result<Self, Error> {
         let query = cluster_rpc::SearchQuery {
             start_time: req.start_time,
@@ -64,15 +61,13 @@ impl PartitionSqlContext {
 
         let is_explain = is_explain_query(&req.sql);
         let is_complex = is_complex_query(&req.sql).unwrap_or(false);
-        let is_http_distinct = is_simple_distinct_query(&req.sql).unwrap_or(false) && is_http_req;
         let ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex).map(|(v, _)| v);
         let is_streaming_agg = is_streaming_aggregate(&req.sql, ts_column.as_deref());
         let apply_over_hits = req.query_fn.as_ref().is_some_and(|v| {
             !v.is_empty() && RESULT_ARRAY.is_match(&base64::decode_url(v).unwrap_or(v.to_string()))
         });
 
-        let use_single_partition = is_http_distinct
-            || is_explain
+        let use_single_partition = is_explain
             || ((ts_column.is_none() || apply_over_hits)
                 && !(req.streaming_output && is_streaming_agg));
 

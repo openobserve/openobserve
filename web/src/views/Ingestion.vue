@@ -38,12 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="recommended-list-search-input"
           />
         </div>
-        <!-- Token selector: only meaningful when there's more than one token to
-             choose between. With 0/1 tokens the curl examples auto-use the only
-             token (see the tokenOptions watcher), so the dropdown is hidden to
-             avoid a pointless single-option control in the header. -->
         <OSelect
-          v-if="!isRUMPage && tokenOptions.length > 1"
+          v-if="!isRUMPage && tokenOptions.length > 0"
           v-model="selectedTokenName"
           :options="tokenOptions"
           label-key="label"
