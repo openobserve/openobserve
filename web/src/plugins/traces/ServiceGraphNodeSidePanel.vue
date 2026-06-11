@@ -242,25 +242,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:p-0! panel-section tw:mb-0!"
               data-test="service-graph-side-panel-recent-operations"
             >
-              <!-- Loading State -->
               <div
-                v-if="loadingOperations"
-                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                v-if="recentOperations.length === 0 && !loadingOperations"
+                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" data-test="service-graph-operations-loading-indicator" />
-                <span>Loading operations...</span>
+                No operations found
               </div>
-
-              <template v-else>
-                <div
-                  v-if="recentOperations.length === 0"
-                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
-                  style="color: var(--o2-text-secondary)"
-                >
-                  No operations found
-                </div>
-                <div
+              <div
                   v-else
                   class="tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-operations-table"
@@ -270,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :rows="sortedOperationsTableRows"
                     :sort-by="sortBy"
                     :sort-order="sortOrder"
-                    :loading="false"
+                    :loading="loadingOperations"
                     :default-columns="false"
                     :enable-column-reorder="false"
                     :enable-row-expand="false"
@@ -356,8 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </template>
                   </TenstackTable>
-                </div>
-              </template>
+              </div>
             </OTabPanel>
 
             <!-- Nodes Tab -->
@@ -370,121 +358,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`service-graph-side-panel-${cfg.id}`"
             >
               <div
-                v-if="resourceTabLoading[cfg.id]"
-                class="tw:flex tw:items-center tw:gap-2 tw:py-3 tw:text-sm"
+                v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
+                class="tw:text-xs tw:italic tw:py-2 tw:text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                <OSpinner size="xs" data-test="service-graph-resource-loading-indicator" />
-                <span>Loading {{ cfg.label.toLowerCase() }}...</span>
+                No {{ cfg.label.toLowerCase() }} data found
               </div>
-              <template v-else>
-                <div
-                  v-if="!resourceTabData[cfg.id]?.length"
-                  class="tw:text-xs tw:italic tw:py-2 tw:text-center"
-                  style="color: var(--o2-text-secondary)"
+              <div
+                v-else
+                class="tw:overflow-hidden tw:rounded"
+                :data-test="`service-graph-side-panel-${cfg.id}-table`"
+              >
+                <TenstackTable
+                  :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
+                  :rows="sortResourceRows(buildResourceTableRows(cfg))"
+                  :sort-by="sortBy"
+                  :sort-order="sortOrder"
+                  :loading="resourceTabLoading[cfg.id]"
+                  :default-columns="false"
+                  :enable-column-reorder="false"
+                  :enable-row-expand="false"
+                  :enable-text-highlight="false"
+                  :enable-status-bar="false"
+                  :enable-ai-context-button="false"
+                  :row-height="28"
+                  @sort-change="handleSortChange"
+                  @click:data-row="
+                    (row: any) =>
+                      navigateToTraces({
+                        resourceFilter: cfg.fields
+                          ? { fields: cfg.fields, value: row[cfg.colId] }
+                          : { field: cfg.groupField, value: row[cfg.colId] },
+                      })
+                  "
                 >
-                  No {{ cfg.label.toLowerCase() }} data found
-                </div>
-                <div
-                  v-else
-                  class="tw:overflow-hidden tw:rounded"
-                  :data-test="`service-graph-side-panel-${cfg.id}-table`"
-                >
-                  <TenstackTable
-                    :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
-                    :rows="sortResourceRows(buildResourceTableRows(cfg))"
-                    :sort-by="sortBy"
-                    :sort-order="sortOrder"
-                    :loading="false"
-                    :default-columns="false"
-                    :enable-column-reorder="false"
-                    :enable-row-expand="false"
-                    :enable-text-highlight="false"
-                    :enable-status-bar="false"
-                    :enable-ai-context-button="false"
-                    :row-height="28"
-                    @sort-change="handleSortChange"
-                    @click:data-row="
-                      (row: any) =>
+                  <template #cell-actions="{ row, column, active }">
+                    <OButton
+                      v-if="active"
+                      variant="ghost"
+                      size="icon"
+                      class="tw:ml-1 tw:absolute! tw:right-2!"
+                      :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
+                      @click.stop="
                         navigateToTraces({
                           resourceFilter: cfg.fields
                             ? { fields: cfg.fields, value: row[cfg.colId] }
                             : { field: cfg.groupField, value: row[cfg.colId] },
+                          errorsOnly: column.id === 'errors',
+                          minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
                         })
-                    "
-                  >
-                    <template #cell-actions="{ row, column, active }">
-                      <OButton
-                        v-if="active"
-                        variant="ghost"
-                        size="icon"
-                        class="tw:ml-1 tw:absolute! tw:right-2!"
-                        :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
-                        @click.stop="
-                          navigateToTraces({
-                            resourceFilter: cfg.fields
-                              ? { fields: cfg.fields, value: row[cfg.colId] }
-                              : { field: cfg.groupField, value: row[cfg.colId] },
-                            errorsOnly: column.id === 'errors',
-                            minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined
-                          })
-                        "
-                      >
-                        <OIcon name="search" size="xs" />
-                        <OTooltip content="View in Traces" />
-                      </OButton>
-                    </template>
-                    <template #cell-errors="{ item }">
-                      <span
-                        :class="
-                          item.errors > 0
-                            ? 'tw:text-[var(--q-negative)] tw:font-semibold'
-                            : ''
-                        "
-                        >{{ item.errors }}</span
-                      >
-                    </template>
-                    <template #cell-p99="{ item }">
-                      <span
-                        :class="
-                          item.p99 > 0
-                            ? 'tw:text-[var(--o2-latency-p99)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p99) }}</span
-                      >
-                    </template>
-                    <template #cell-p95="{ item }">
-                      <span
-                        :class="
-                          item.p95 > 0
-                            ? 'tw:text-[var(--o2-latency-p95)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p95) }}</span
-                      >
-                    </template>
-                    <template #cell-p75="{ item }">
-                      <span
-                        :class="
-                          item.p75 > 0
-                            ? 'tw:text-[var(--o2-latency-p75)]'
-                            : ''
-                        "
-                        >{{ formatOperationLatency(item.p75) }}</span
-                      >
-                    </template>
-                    <template #empty>
-                      <div
-                        class="tw:text-xs tw:italic tw:py-2 tw:text-center"
-                        style="color: var(--o2-text-secondary)"
-                      >
-                        No {{ cfg.label.toLowerCase() }} data found
-                      </div>
-                    </template>
-                  </TenstackTable>
-                </div>
-              </template>
+                      "
+                    >
+                      <OIcon name="search" size="xs" />
+                      <OTooltip content="View in Traces" />
+                    </OButton>
+                  </template>
+                  <template #cell-errors="{ item }">
+                    <span
+                      :class="
+                        item.errors > 0
+                          ? 'tw:text-[var(--q-negative)] tw:font-semibold'
+                          : ''
+                      "
+                      >{{ item.errors }}</span
+                    >
+                  </template>
+                  <template #cell-p99="{ item }">
+                    <span
+                      :class="
+                        item.p99 > 0
+                          ? 'tw:text-[var(--o2-latency-p99)]'
+                          : ''
+                      "
+                      >{{ formatOperationLatency(item.p99) }}</span
+                    >
+                  </template>
+                  <template #cell-p95="{ item }">
+                    <span
+                      :class="
+                        item.p95 > 0
+                          ? 'tw:text-[var(--o2-latency-p95)]'
+                          : ''
+                      "
+                      >{{ formatOperationLatency(item.p95) }}</span
+                    >
+                  </template>
+                  <template #cell-p75="{ item }">
+                    <span
+                      :class="
+                        item.p75 > 0
+                          ? 'tw:text-[var(--o2-latency-p75)]'
+                          : ''
+                      "
+                      >{{ formatOperationLatency(item.p75) }}</span
+                    >
+                  </template>
+                  <template #empty>
+                    <div
+                      class="tw:text-xs tw:italic tw:py-2 tw:text-center"
+                      style="color: var(--o2-text-secondary)"
+                    >
+                      No {{ cfg.label.toLowerCase() }} data found
+                    </div>
+                  </template>
+                </TenstackTable>
+              </div>
             </OTabPanel>
 
             <!-- Metrics Tab -->
