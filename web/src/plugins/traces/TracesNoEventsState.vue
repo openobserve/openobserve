@@ -143,9 +143,5 @@ const removeFilterSublabel = computed(() => {
 
 const onWidenRange = () => emit("widen-range", suggestedPeriod.value);
 
-const onRemoveFilter = () => {
-  // Clearing the filter doesn't involve the date picker, so mutate directly.
-  searchObj.data.editorValue = "";
-  searchObj.runQuery = true;
-};
+const onRemoveFilter = () => emit("remove-filter");
 </script>
