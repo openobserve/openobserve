@@ -105,6 +105,14 @@ describe("metricsUrlState · decodeMetricsConfig (defensive)", () => {
     const future = encodeMetricsConfig({ v: 999, data: { type: "bar" } });
     expect(decodeMetricsConfig(future)).toBeNull();
   });
+  it("returns null for a JSON array (has no `data`)", () => {
+    expect(
+      decodeMetricsConfig(b64EncodeUnicode("[1,2,3]") as string),
+    ).toBeNull();
+  });
+  it("returns null for a JSON primitive", () => {
+    expect(decodeMetricsConfig(b64EncodeUnicode("42") as string)).toBeNull();
+  });
 });
 
 describe("metricsUrlState · applyMetricsBlob", () => {
@@ -137,6 +145,24 @@ describe("metricsUrlState · applyMetricsBlob", () => {
     const ok = applyMetricsBlob("garbage!!!", target);
     expect(ok).toBe(false);
     expect(target.data.type).toBe("line");
+  });
+
+  it("forces stream_type=metrics on EVERY query of a multi-query blob", () => {
+    const src = getDefaultDashboardPanelData(store);
+    src.data.queries.push(JSON.parse(JSON.stringify(src.data.queries[0])));
+    src.data.queries[0].query = "q0";
+    src.data.queries[0].fields.stream_type = "logs";
+    src.data.queries[1].query = "q1";
+    src.data.queries[1].fields.stream_type = "logs";
+    const blob = encodeMetricsConfig(getMetricsConfig(src));
+
+    const target = getDefaultDashboardPanelData(store);
+    applyMetricsBlob(blob, target);
+    expect(target.data.queries).toHaveLength(2);
+    expect(target.data.queries[0].query).toBe("q0");
+    expect(target.data.queries[1].query).toBe("q1");
+    expect(target.data.queries[0].fields.stream_type).toBe("metrics");
+    expect(target.data.queries[1].fields.stream_type).toBe("metrics");
   });
 });
 

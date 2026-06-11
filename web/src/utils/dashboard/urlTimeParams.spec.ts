@@ -130,6 +130,11 @@ describe("urlTimeParams · refreshLabelToInterval", () => {
     expect(refreshLabelToInterval("1h")).toBe(3600);
   });
 
+  it("parses larger units (d/w)", () => {
+    expect(refreshLabelToInterval("1d")).toBe(86400);
+    expect(refreshLabelToInterval("1w")).toBe(604800);
+  });
+
   it("clamps to 0 (off) when below the configured minimum", () => {
     expect(refreshLabelToInterval("3s", 5)).toBe(0);
   });
