@@ -1432,7 +1432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="localSavedViews.length > 0 ? 'tw:border-r tw:border-[var(--o2-border-color)]' : ''"
               :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
-              <div style="max-height: 486px; min-height: 280px; overflow: hidden; display: flex; flex-direction: column;">
+              <div style="max-height: 486px; min-height: 280px; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1541,7 +1541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0 tw:pl-3"
               v-if="localSavedViews.length > 0"
             >
-              <div style="max-height: 480px; min-height: 280px; overflow: hidden; display: flex; flex-direction: column;">
+              <div style="max-height: 480px; min-height: 280px; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -4163,8 +4163,8 @@ export default defineComponent({
           return;
         }
         localSavedView[row.view_id] = JSON.parse(JSON.stringify(row));
-        favoriteViews.value.push(row.view_id);
-        localSavedViews.value.push(row);
+        favoriteViews.value = [...favoriteViews.value, row.view_id];
+        localSavedViews.value = [...localSavedViews.value, row];
 
         // moveItemsToTop(localSavedView, favoriteViews.value);
 
@@ -5578,6 +5578,11 @@ html.dark .file-type label,
 // Remove pagination top separator
 .saved-view-table :deep(.tw\:border-t) {
   border-top: none;
+}
+
+// Hide the redundant total-count chip on the left — "of N" on the right already shows it
+.saved-view-table :deep([data-test="o2-table-pagination-bottom"] .o2-table-footer-title) {
+  display: none;
 }
 
 // VRL disabled warning background — theme-aware via CSS cascade

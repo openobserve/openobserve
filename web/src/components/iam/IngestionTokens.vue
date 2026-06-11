@@ -247,7 +247,8 @@ export default defineComponent({
         sortable: false,
         resizable: true,
         hideable: true,
-        size: COL.token,
+        // Wide enough for the truncated token (code max-w 280) + gap + copy btn.
+        size: 340,
       },
       {
         id: "created_by",

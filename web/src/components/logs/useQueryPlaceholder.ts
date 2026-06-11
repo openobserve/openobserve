@@ -37,24 +37,6 @@ const SYSTEM_FIELDS = new Set([
 
 const NUMERIC_TYPES = new Set(["Int64", "Float64", "UInt64", "Int32", "UInt32"]);
 
-// Rotate through several example patterns per FTS field so the animation feels varied
-function makeFtsExamples(val: string | undefined): string[] {
-  const term = val ?? "error";
-  return [
-    `match_all('${term}')`,           // inverted index search
-    `match_all('${term}*')`,          // prefix search
-    `match_all('*${term}')`,          // postfix search
-  ];
-}
-
-function makeColumnExamples(name: string, val: string): string[] {
-  return [
-    `str_match(${name}, '${val}')`,                   // column search
-    `str_match_ignore_case(${name}, '${val}')`,        // case-insensitive column search
-    `fuzzy_match(${name}, '${val}', 1)`,               // fuzzy match
-  ];
-}
-
 /**
  * Builds animated typewriter example queries from real stream field/value data.
  * Priority: interesting (key) fields → FTS fields → other fields.
@@ -104,7 +86,6 @@ export function useQueryPlaceholder(
     const fv = fieldValues.value ?? {};
     const isSql = sqlMode.value;
 
-    // Exclude group header rows (label: true) — they are section dividers, not fields
     const realFields = f.filter((x) => !x.label);
 
     const interesting = realFields.filter(
@@ -114,10 +95,12 @@ export function useQueryPlaceholder(
       (x) => x.ftsKey && !SYSTEM_FIELDS.has(x.name) && !x.isInterestingField,
     );
     const others = realFields
-      .filter(
-        (x) => !x.isInterestingField && !x.ftsKey && !SYSTEM_FIELDS.has(x.name),
-      )
+      .filter((x) => !x.isInterestingField && !x.ftsKey && !SYSTEM_FIELDS.has(x.name))
       .slice(0, 3);
+
+    const strFields = realFields.filter(
+      (x) => !SYSTEM_FIELDS.has(x.name) && !NUMERIC_TYPES.has(x.dataType ?? ""),
+    ).slice(0, 3);
 
     const fieldExpr = (field: StreamField): string => {
       const name = field.name;
@@ -137,57 +120,77 @@ export function useQueryPlaceholder(
       return firstVal != null ? `${name} = '${firstVal}'` : `${name} = 'value'`;
     };
 
-    const makeKeyExample = (field: StreamField, pairField?: StreamField): string | null => {
-      if (isSql) {
-        const base = `SELECT * FROM stream WHERE ${fieldExprSql(field)}`;
-        if (pairField) {
-          const op = Math.random() < 0.5 ? "AND" : "OR";
-          return `${base} ${op} ${fieldExprSql(pairField)}`;
-        }
-        return base;
-      }
-      if (pairField) {
-        const op = Math.random() < 0.5 ? " AND " : " OR ";
-        return `${fieldExpr(field)}${op}${fieldExpr(pairField)}`;
-      }
-      return fieldExpr(field);
-    };
-
-    const makeFtsExample = (field: StreamField, variant: number): string | null => {
-      if (isSql) return null;
+    const ftsVal = (field: StreamField): string => {
       const vals = fv[field.name]?.values ?? [];
-      const firstVal = vals[0]?.key;
-      const examples = makeFtsExamples(firstVal);
-      return examples[variant % examples.length] ?? null;
+      return vals[0]?.key ?? "error";
     };
 
-    // Build alternating list: key field, fts variant, key field, fts variant, …
+    const strVal = (field: StreamField): string => {
+      const vals = fv[field.name]?.values ?? [];
+      return vals[0]?.key ?? "error";
+    };
+
     const keyFields = [...interesting, ...others.filter((x) => !x.ftsKey)].slice(0, 4);
     const allFts = [...interesting.filter((x) => x.ftsKey), ...ftsOnly].slice(0, 4);
+    const kf0 = keyFields[0];
+    const kf1 = keyFields[1];
+    const ff0 = allFts[0];
+    const sf0 = strFields[0];
 
-    const result: string[] = [];
-    const len = Math.max(keyFields.length, allFts.length, 1);
-
-    for (let i = 0; i < len && result.length < 8; i++) {
-      const kf = keyFields[i % keyFields.length];
-      const ff = allFts[i % (allFts.length || 1)];
-      // Every other iteration pair with the next key field for AND/OR examples
-      const pairKf = keyFields.length > 1 && i % 2 === 1
-        ? keyFields[(i + 1) % keyFields.length]
-        : undefined;
-
-      if (kf) {
-        const ex = makeKeyExample(kf, pairKf);
-        if (ex) result.push(ex);
+    if (isSql) {
+      const result: string[] = [];
+      if (kf0) {
+        const base = `SELECT * FROM stream WHERE ${fieldExprSql(kf0)}`;
+        result.push(base);
+        if (kf1) result.push(`${base} AND ${fieldExprSql(kf1)}`);
+        if (kf1) result.push(`${base} OR ${fieldExprSql(kf1)}`);
+        if (ff0) result.push(`SELECT * FROM stream WHERE match_all('${ftsVal(ff0)}')`);
+        if (ff0 && kf1) result.push(`SELECT * FROM stream WHERE ${fieldExprSql(kf0)} AND match_all('${ftsVal(ff0)}')`);
       }
-
-      if (ff && !isSql) {
-        const ex = makeFtsExample(ff, i);
-        if (ex) result.push(ex);
-      }
+      return result;
     }
 
-    return result;
+    // Filter mode — interleaved variations covering raw filters, match_all, and other functions
+    const result: string[] = [];
+    const term = ff0 ? ftsVal(ff0) : "error";
+
+    // 1. Simple raw filter
+    if (kf0) result.push(fieldExpr(kf0));
+
+    // 2. match_all exact
+    result.push(`match_all('${term}')`);
+
+    // 3. Raw filter AND match_all
+    if (kf0) result.push(`${fieldExpr(kf0)} AND match_all('${term}')`);
+
+    // 4. match_all prefix variant
+    result.push(`match_all('${term}*')`);
+
+    // 5. Two raw filters AND match_all (covers AND + OR operators together)
+    if (kf0 && kf1) result.push(`${fieldExpr(kf0)} AND ${fieldExpr(kf1)} AND match_all('${term}')`);
+    else if (kf0) result.push(`${fieldExpr(kf0)} OR match_all('${term}')`);
+
+    // 6. match_all postfix variant
+    result.push(`match_all('*${term}')`);
+
+    // 7. str_match combined with match_all prefix
+    if (sf0) {
+      result.push(`str_match(${sf0.name}, '${strVal(sf0)}') AND match_all('${term}*')`);
+    } else if (kf0) {
+      result.push(`${fieldExpr(kf0)} AND match_all('${term}*')`);
+    }
+
+    // 8. fuzzy_match combined with raw filter
+    if (sf0 && kf0 && sf0.name !== kf0.name) {
+      result.push(`${fieldExpr(kf0)} AND fuzzy_match(${sf0.name}, '${strVal(sf0)}', 1)`);
+    } else if (sf0) {
+      result.push(`fuzzy_match(${sf0.name}, '${strVal(sf0)}', 1)`);
+    }
+
+    // 9. Raw filter OR match_all postfix
+    if (kf0) result.push(`${fieldExpr(kf0)} OR match_all('*${term}')`);
+
+    return result.slice(0, 9);
   });
 
   async function loop(): Promise<void> {
