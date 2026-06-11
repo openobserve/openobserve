@@ -652,7 +652,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(
         wrapper
-          .find('[data-test="logs-search-no-stream-selected-text"]')
+          .find('[data-test="traces-no-stream-selected-text"]')
           .exists(),
       ).toBe(true);
     });
@@ -753,6 +753,9 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("Error Handling", () => {
     it("should display error message when query fails", async () => {
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
       mockSearchObj.data.errorMsg = "Query failed";
       mockSearchObj.data.errorCode = 429; // Non-zero code → real error, not "no data"
       mockSearchObj.loading = false;
@@ -810,6 +813,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should display error code 20003 with configuration link", async () => {
+      mockSearchObj.data.stream.streamLists = [
+        { label: "test-stream", value: "test-stream" },
+      ];
       mockSearchObj.data.stream.selectedStream = {
         label: "test-stream",
         value: "test-stream",
