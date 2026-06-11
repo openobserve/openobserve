@@ -428,8 +428,6 @@ pub fn get_stream_setting_index_updated_at_for_fields(
         .iter()
         .map(|f| {
             if SQL_SECONDARY_INDEX_SEARCH_FIELDS.contains(f) {
-                // default-enabled index fields are indexed since the stream's first file,
-                // so they never constrain the cutoff
                 BASE_TIME.timestamp_micros()
             } else {
                 settings
