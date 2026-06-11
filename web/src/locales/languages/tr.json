@@ -3284,7 +3284,10 @@
       "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
       "removeFilter": "Filtreyi kaldırma",
       "selectedRange": "Seçilen aralık"
-    }
+    },
+    "showAll": "Tümünü Göster",
+    "filterByErrors": "Hatalara göre filtrele",
+    "clearErrorFilter": "Hata filtresini temizle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",

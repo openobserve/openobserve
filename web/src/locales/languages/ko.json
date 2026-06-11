@@ -3284,7 +3284,10 @@
       "expandRangeDescAbsolute": "더 넓은 상대 시간 범위로 전환",
       "removeFilter": "필터 제거",
       "selectedRange": "선택한 범위"
-    }
+    },
+    "showAll": "모두 보기",
+    "filterByErrors": "오류별 필터링",
+    "clearErrorFilter": "오류 필터 지우기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

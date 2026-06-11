@@ -3269,7 +3269,10 @@
       "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
       "removeFilter": "Eliminar un filtro",
       "selectedRange": "el rango seleccionado"
-    }
+    },
+    "showAll": "Mostrar todo",
+    "filterByErrors": "Filtrar por errores",
+    "clearErrorFilter": "Borrar filtro de errores"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",

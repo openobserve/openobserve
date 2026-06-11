@@ -3284,7 +3284,10 @@
       "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
       "removeFilter": "Een filter verwijderen",
       "selectedRange": "het geselecteerde bereik"
-    }
+    },
+    "showAll": "Alles weergeven",
+    "filterByErrors": "Filteren op fouten",
+    "clearErrorFilter": "Foutfilter wissen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

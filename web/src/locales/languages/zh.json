@@ -3275,7 +3275,10 @@
       "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
       "removeFilter": "移除过滤器",
       "selectedRange": "所选范围"
-    }
+    },
+    "showAll": "显示全部",
+    "filterByErrors": "按错误筛选",
+    "clearErrorFilter": "清除错误过滤器"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

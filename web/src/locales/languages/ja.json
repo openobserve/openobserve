@@ -3292,7 +3292,10 @@
       "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
       "removeFilter": "フィルターを削除する",
       "selectedRange": "選択した範囲"
-    }
+    },
+    "showAll": "[すべて表示]",
+    "filterByErrors": "エラーで絞り込む",
+    "clearErrorFilter": "エラーフィルターをクリア"
   },
   "actions": {
     "testAction": "アクションをテスト",
