@@ -94,6 +94,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="
+                        !searchObj.loadingStream &&
+                        searchObj.data.stream.streamLists.length == 0 &&
+                        searchObj.loading == false
+                      "
+                    >
+                      <LogsNoDataState
+                        :ai-enabled="isAiEnabled"
+                        data-test="logs-search-no-streams-in-org-text"
+                        @ask-ai="onAskAiFixQuery"
+                      />
+                    </div>
+                    <div
+                      v-else-if="
                         searchObj.data.filterErrMsg !== '' &&
                         searchObj.loading == false
                       "
@@ -184,15 +197,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
+                      <LogsNoStreamState
+                        :org-id="store.state.selectedOrganization.identifier"
                         data-test="logs-search-no-stream-selected-text"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.noStreamSelectedMessage") }}
-                      </div>
+                        @select-stream="onSelectStream"
+                        @pick-stream="onPickStream"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -202,26 +213,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.noRecordFound") }}
-                        <OButton
-                          v-if="
-                            searchObj.data.errorMsg != '' ||
-                            searchObj?.data?.functionError != ''
-                          "
-                          @click="toggleErrorDetails"
-                          variant="outline"
-                          size="sm-action"
-                          data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</OButton
-                        ><br />
-                      </div>
+                      <LogsNoEventsState
+                        :sql-mode="searchObj.meta.sqlMode"
+                        :query="searchObj.data.query"
+                        :editor-value="searchObj.data.editorValue"
+                        :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+                        :date-type="searchObj.data.datetime.type || 'relative'"
+                        :ai-enabled="isAiEnabled"
+                        data-test="logs-search-no-events-found-text"
+                        @widen-range="onWidenRange"
+                        @remove-filter="onRemoveFilter"
+                        @open-history="showSearchHistoryfn"
+                        @ask-ai="onAskAiFixQuery"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -231,15 +236,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.applySearch") }}
-                      </div>
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="logs-search-apply-search-text"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -248,15 +250,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.searchApplied == false &&
                         searchObj.loading == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.applySearch") }}
-                      </div>
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="logs-search-patterns-apply-search-text"
+                      />
                     </div>
                     <div
                       v-else
@@ -468,6 +467,9 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -499,6 +501,9 @@ export default defineComponent({
     ),
     OIcon,
     OSplitter,
+    OEmptyState,
+    LogsNoEventsState,
+    LogsNoDataState,
 },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -1546,6 +1551,48 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
+    };
+
+    const onSelectStream = () => {
+      // Focus the stream selector trigger so the user can immediately pick a stream.
+      const trigger = document.querySelector<HTMLElement>(
+        '[data-test="log-search-index-list-select-stream"] button',
+      );
+      trigger?.click();
+    };
+
+    const onPickStream = (stream: string) => {
+      searchObj.data.stream.selectedStream = [stream];
+      searchObj.runQuery = true;
+    };
+
+    const isAiEnabled = computed(
+      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const onWidenRange = (period: string) => {
+      searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
+      searchObj.data.datetime.relativeTimePeriod = period;
+      searchObj.data.datetime.type = "relative";
+      searchObj.runQuery = true;
+    };
+
+    const onRemoveFilter = () => {
+      searchObj.data.query = "";
+      searchObj.data.editorValue = "";
+      searchBarRef.value?.updateQuery?.();
+      searchObj.runQuery = true;
+    };
+
+    const onAskAiFixQuery = () => {
+      const queryContext = searchObj.meta.sqlMode
+        ? searchObj.data.editorValue
+        : searchObj.data.query;
+      emit(
+        "sendToAiChat",
+        `My logs query returned no results. Query: ${queryContext || "(none)"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me fix it?`,
+        false,
+      );
     };
 
     const redirectBackToLogs = () => {
@@ -3188,6 +3235,12 @@ export default defineComponent({
       onAutoIntervalTrigger,
       showSearchHistory,
       showSearchHistoryfn,
+      isAiEnabled,
+      onSelectStream,
+      onPickStream,
+      onWidenRange,
+      onRemoveFilter,
+      onAskAiFixQuery,
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,

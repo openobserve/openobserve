@@ -525,7 +525,18 @@
     "seekToMoment": "Suchen Sie in der Sitzung nach diesem Moment",
     "timeInSession": "Uhrzeit der Sitzung",
     "route": "Route",
-    "duration": "Dauer"
+    "duration": "Dauer",
+    "emptyState": {
+      "title": "Überwachen Sie Ihre Benutzer mit Real User Monitoring",
+      "description": "RUM verfolgt echte Benutzerinteraktionen — Seitenladevorgänge, Fehler, API-Aufrufe und Sitzungswiederholungen —, sodass Sie genau sehen können, wie Benutzer Ihre Anwendung erleben.",
+      "webApp": "Instrument einer Web-App",
+      "webAppDesc": "Fügen Sie das OpenObserve RUM SDK zu einer beliebigen JavaScript-App hinzu",
+      "sessionReplay": "Sitzungswiedergabe aktivieren",
+      "sessionReplayDesc": "Benutzersitzungen aufzeichnen und wiedergeben, um UX-Probleme zu debuggen",
+      "learnMore": "Erfahre mehr:",
+      "quickImpl": "Anleitung zur schnellen Implementierung",
+      "blogPost": "Grundlagen der Frontend-Überwachung"
+    }
   },
   "about": {
     "name": "Observe öffnen",
@@ -1791,7 +1802,23 @@
     "tabAiAssistant": "O2 KI-Assistent",
     "tabOverview": "Überblick",
     "tabUsage": "Verwendungszweck",
-    "subtitle": "Ihr Observability-Workspace auf einen Blick"
+    "subtitle": "Ihr Observability-Workspace auf einen Blick",
+    "noDataState": {
+      "title": "Es wurden noch keine Daten aufgenommen",
+      "description": "Diese Organisation hat keine Daten erhalten, es gibt also nichts, was man grafisch darstellen könnte. Sobald die Ereignisse beginnen, werden Ihr <strong>Aufnahmevolumen, Ihr Speicherplatz und Ihre Abfragenutzung</strong> hier automatisch angezeigt.",
+      "logs": "Logs senden",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector und mehr",
+      "traces": "Spuren senden",
+      "tracesDesc": "OTLP//Jaeger//Verteiltes Tracing mit Zipkin",
+      "metrics": "Metriken senden",
+      "metricsDesc": "Prometheus, Hotelsammler, Telegraf & mehr",
+      "or": "Oder:",
+      "otel": "Telemetrie öffnen",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS//CloudWatch",
+      "aiIntegrations": "KI-Integrationen",
+      "shippers": "Holzversender"
+    }
   },
   "billing": {
     "header": "Nutzung und Abrechnung",
@@ -3212,7 +3239,39 @@
     "openInFullView": "In Vollansicht öffnen",
     "serviceMap": "Karte des Service",
     "patternView": "Musteransicht",
-    "spanView": "Span-Ansicht"
+    "spanView": "Span-Ansicht",
+    "noData": {
+      "title": "Beginne mit dem Senden von Traces an OpenObserve",
+      "description": "In dieser Organisation wurden noch keine Trace-Streams gefunden. Instrument Ihre Dienste und Traces werden hier automatisch angezeigt.",
+      "otlp": "Traces über OTLP senden",
+      "otlpDesc": "Jaeger, Zipkin und jedes OpenTelemetry-kompatible SDK",
+      "otelCollector": "Hotelsammler//Agent",
+      "otelCollectorDesc": "Leitet alle Telemetriesignale durch den OTEL Collector",
+      "or": "Oder:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Bitten Sie die KI, das Tracing einzurichten"
+    },
+    "noStream": {
+      "title": "Wähle einen Stream aus, um mit der Erkundung zu beginnen",
+      "description": "Wählen Sie einen Trace-Stream aus und drücken Sie dann <strong>auf Abfrage ausführen</strong>. Sobald die Ergebnisse geladen sind, können Sie nach Service, Dauer, Span-Status und mehr filtern.",
+      "selectStream": "Wähle einen Stream",
+      "selectStreamDesc": "Verfügbare Trace-Streams in dieser Organisation durchsuchen",
+      "queryGuide": "Lesen Sie den Trace-Leitfaden",
+      "queryGuideDesc": "Servicegeschrift, Spanenfilterung, RED-Metriken und mehr",
+      "recent": "Kürzlich:"
+    },
+    "noEvents": {
+      "title": "Keine Spuren gefunden",
+      "descNoFilters": "In {range} wurden keine Spuren gefunden. Versuchen Sie, den Zeitraum zu erweitern, um die Ergebnisse zu laden.",
+      "descWithFilters": "Im ausgewählten Fenster stimmte nichts mit <strong>dieser Abfrage</strong> überein. Versuchen Sie, den Zeitraum zu erweitern oder einen Filter zu entfernen.",
+      "expandRange": "Erweitern Sie den Zeitbereich",
+      "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
+      "removeFilter": "Einen Filter entfernen",
+      "selectedRange": "der gewählte Bereich"
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
@@ -3973,7 +4032,13 @@
     "elevatedErrorRate": "Erhöhte Fehlerrate",
     "reqPerSec": "Anforderung/en",
     "allClear": "Alles klar",
-    "allClearDesc": "Keine aktiven Anomalien, Vorfälle oder beeinträchtigte Dienste im ausgewählten Zeitfenster."
+    "allClearDesc": "Keine aktiven Anomalien, Vorfälle oder beeinträchtigte Dienste im ausgewählten Zeitfenster.",
+    "emptyActionAlerts": "Warnungsregeln anzeigen",
+    "emptyActionAlertsDesc": "Überprüfen Sie die konfigurierten Warnungen und Schwellenwerte",
+    "emptyActionLogs": "Logs erkunden",
+    "emptyActionLogsDesc": "Suchen und filtern Sie Ihre Log-Streams",
+    "emptyActionTraces": "Spuren erkunden",
+    "emptyActionTracesDesc": "Untersuchen Sie verteilte Traces und die Servicelatenz"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4357,6 +4422,14 @@
     "noPipelineHistory": {
       "title": "Noch keine Pipeline-Historie",
       "description": "Der Verlauf der Pipeline-Ausführung wird hier angezeigt, sobald Ihre Pipelines ausgeführt werden."
+    },
+    "noStreamSelected": {
+      "title": "Wählen Sie einen Stream aus, um loszulegen",
+      "description": "Wähle einen Stream aus dem Drop-down-Menü auf der linken Seite aus und klicke dann auf „Abfrage ausführen“, um deine Logs zu durchsuchen. Du kannst auch zusätzliche Filter anwenden und den Datumsbereich anpassen."
+    },
+    "noQueryApplied": {
+      "title": "Führen Sie eine Abfrage aus, um Protokolle anzuzeigen",
+      "description": "Passen Sie Ihre Filter an und klicken Sie auf „Abfrage ausführen“, um Ereignisse für diesen Stream zu laden."
     }
   },
   "onlineEvals": {
@@ -4714,6 +4787,45 @@
       "evalJobs": "Stellenangebote evaluieren",
       "scorers": "Torschützen",
       "scoreConfigs": "Score-Konfigurationen"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Starten Sie das Senden von Daten an OpenObserve",
+      "description": "In dieser Organisation gibt es noch keine Daten, daher gibt es keine Streams, die es zu erkunden gilt. Senden Sie Ihre ersten Logs und sie werden hier automatisch angezeigt — wählen Sie aus, wie Sie beginnen möchten.",
+      "curl": "Per Curl/HTTP API senden",
+      "curlDesc": "Schnellster Weg — fügen Sie einen Befehl ein und die Protokolle beginnen zu fließen",
+      "shippers": "Verwenden Sie einen Holzversender",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng und mehr",
+      "otel": "Telemetrie öffnen",
+      "otelDesc": "Anbieterneutrale OTLP-Erfassung für Logs, Traces und Metriken",
+      "or": "Oder:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS//CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "Bitten Sie die KI, die Aufnahme einzurichten"
+    },
+    "noStream": {
+      "title": "Wähle einen Stream aus, um mit der Erkundung zu beginnen",
+      "description": "Wählen Sie einen Stream aus und drücken Sie dann <strong>auf Abfrage ausführen</strong>. Sobald die Ergebnisse vorliegen, kannst du ihn mit Filtern, einer VRL-Funktion und einem benutzerdefinierten Zeitraum verfeinern.",
+      "selectStream": "Wähle einen Stream",
+      "selectStreamDesc": "Logs, Traces, Metriken und RUM-Streams durchsuchen",
+      "queryGuide": "Lesen Sie den Query Guide",
+      "queryGuideDesc": "Filter, SQL-Modus, VRL und gespeicherte Ansichten",
+      "recent": "Kürzlich:"
+    },
+    "noEvents": {
+      "title": "Keine Ereignisse gefunden",
+      "descNoFilters": "In {range} wurden keine Ereignisse gefunden. Versuchen Sie, den Zeitraum zu erweitern, um die Ergebnisse zu laden.",
+      "descWithFilters": "Im ausgewählten Fenster stimmte nichts mit <strong>dieser Abfrage</strong> überein. Versuchen Sie, den Zeitraum zu erweitern, einen Filter zu lockern oder die Abfrage zurückzusetzen.",
+      "expandRange": "Erweitern Sie den Zeitbereich",
+      "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
+      "removeFilter": "Einen Filter entfernen",
+      "removeFilterDescSql": "Sie haben SQL-Bedingungen auf diese Abfrage angewendet",
+      "openHistory": "Suchverlauf öffnen",
+      "askAi": "Bitten Sie AI, meine Anfrage zu korrigieren",
+      "selectedRange": "der gewählte Bereich"
     }
   }
 }
