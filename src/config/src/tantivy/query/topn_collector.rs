@@ -77,6 +77,7 @@ pub struct TopNCollector<K: OrdKey> {
     /// groups kept per file when truncating (over-fetch for cross-file accuracy)
     k: usize,
     /// up to this many distinct groups, a file returns all of them
+    /// (ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM, at least k)
     max_groups: usize,
     /// keep the K smallest counts (ORDER BY count ASC) instead of the K largest
     ascend: bool,
@@ -86,8 +87,9 @@ pub struct TopNCollector<K: OrdKey> {
 }
 
 impl<K: OrdKey> TopNCollector<K> {
-    pub fn new(fields: Vec<String>, k: usize, max_groups: usize, ascend: bool) -> Self {
+    pub fn new(fields: Vec<String>, k: usize, ascend: bool) -> Self {
         debug_assert!(!fields.is_empty() && fields.len() <= K::CAPACITY);
+        let max_groups = crate::get_config().limit.inverted_index_topn_max_group_num;
         Self {
             fields,
             k,
@@ -96,6 +98,12 @@ impl<K: OrdKey> TopNCollector<K> {
             dense_limit: DENSE_GROUP_SPACE_LIMIT,
             _key: std::marker::PhantomData,
         }
+    }
+
+    #[cfg(test)]
+    fn with_max_groups(mut self, max_groups: usize) -> Self {
+        self.max_groups = max_groups.max(self.k);
+        self
     }
 
     #[cfg(test)]
@@ -520,7 +528,8 @@ mod tests {
                     searcher
                         .search(
                             &AllQuery,
-                            &TopNCollector::<u64>::new(fields, k, max_groups, ascend)
+                            &TopNCollector::<u64>::new(fields, k, ascend)
+                                .with_max_groups(max_groups)
                                 .with_dense_limit(dense_limit),
                         )
                         .unwrap()
@@ -528,7 +537,8 @@ mod tests {
                     searcher
                         .search(
                             &AllQuery,
-                            &TopNCollector::<u128>::new(fields, k, max_groups, ascend)
+                            &TopNCollector::<u128>::new(fields, k, ascend)
+                                .with_max_groups(max_groups)
                                 .with_dense_limit(dense_limit),
                         )
                         .unwrap()

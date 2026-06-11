@@ -261,16 +261,14 @@ impl TantivyResult {
             );
         }
 
-        // the collector clamps max_groups to at least k
         let k = simple_topn_over_fetch_size(fields.len(), limit);
-        let max_groups = config::get_config().limit.inverted_index_topn_max_group_num;
 
         // one or two ordinals pack into a u64 key; three or four need a u128
         let results = if fields.len() <= 2 {
-            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, max_groups, ascend);
+            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, ascend);
             searcher.search(&query, &collector)?
         } else {
-            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, max_groups, ascend);
+            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, ascend);
             searcher.search(&query, &collector)?
         };
 
