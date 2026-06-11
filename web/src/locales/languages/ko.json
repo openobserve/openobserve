@@ -3225,7 +3225,10 @@
     "openInFullView": "전체 화면으로 열기",
     "serviceMap": "서비스 맵",
     "patternView": "패턴 뷰",
-    "spanView": "스팬 뷰"
+    "spanView": "스팬 뷰",
+    "showAll": "모두 보기",
+    "filterByErrors": "오류별 필터링",
+    "clearErrorFilter": "오류 필터 지우기"
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

@@ -3223,7 +3223,10 @@
     "openInFullView": "Apri a piena vista",
     "serviceMap": "Mappa dei servizi",
     "patternView": "Visualizzazione del modello",
-    "spanView": "Vista Span"
+    "spanView": "Vista Span",
+    "showAll": "Mostra tutto",
+    "filterByErrors": "Filtra per errori",
+    "clearErrorFilter": "Cancella filtro errori"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

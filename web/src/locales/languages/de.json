@@ -3212,7 +3212,10 @@
     "openInFullView": "In Vollansicht öffnen",
     "serviceMap": "Karte des Service",
     "patternView": "Musteransicht",
-    "spanView": "Span-Ansicht"
+    "spanView": "Span-Ansicht",
+    "showAll": "Zeige alles",
+    "filterByErrors": "Nach Fehlern filtern",
+    "clearErrorFilter": "Fehlerfilter löschen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

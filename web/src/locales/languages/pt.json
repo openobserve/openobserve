@@ -3212,7 +3212,10 @@
     "openInFullView": "Abrir à vista completa",
     "serviceMap": "Mapa de serviços",
     "patternView": "Visualização de padrões",
-    "spanView": "Vista da Espanha"
+    "spanView": "Vista da Espanha",
+    "showAll": "Mostrar tudo",
+    "filterByErrors": "Filtrar por erros",
+    "clearErrorFilter": "Limpar filtro de erro"
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",

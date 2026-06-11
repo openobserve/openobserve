@@ -3225,7 +3225,10 @@
     "openInFullView": "In volledige weergave openen",
     "serviceMap": "Servicekaart",
     "patternView": "Patroonweergave",
-    "spanView": "Spanweergave"
+    "spanView": "Spanweergave",
+    "showAll": "Alles weergeven",
+    "filterByErrors": "Filteren op fouten",
+    "clearErrorFilter": "Foutfilter wissen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

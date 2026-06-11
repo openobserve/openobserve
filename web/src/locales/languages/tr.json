@@ -3225,7 +3225,10 @@
     "openInFullView": "Tam görünümde aç",
     "serviceMap": "Servis Haritası",
     "patternView": "Desen Görünümü",
-    "spanView": "Açıklık Görünümü"
+    "spanView": "Açıklık Görünümü",
+    "showAll": "Tümünü Göster",
+    "filterByErrors": "Hatalara göre filtrele",
+    "clearErrorFilter": "Hata filtresini temizle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
