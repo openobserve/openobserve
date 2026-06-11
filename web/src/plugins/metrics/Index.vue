@@ -52,6 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="dashboard-icons"
           data-test="metrics-auto-refresh"
         />
+        <ShareButton
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          :url="metricsShareUrl"
+          variant="outline"
+          size="icon-toolbar"
+          data-test="metrics-share-btn"
+          class="dashboard-icons"
+        />
         <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
@@ -134,6 +142,22 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
+import { useRoute, useRouter } from "vue-router";
+import ShareButton from "@/components/common/ShareButton.vue";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  applyMetricsBlob,
+  applyDeepLinkOverrides,
+} from "@/composables/metrics/metricsUrlState";
+import {
+  queryParamsToSelectedDate,
+  selectedDateToQueryParams,
+  refreshLabelToInterval,
+  refreshIntervalToLabel,
+} from "@/utils/dashboard/urlTimeParams";
+import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
+import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -153,6 +177,7 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    ShareButton,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -165,6 +190,8 @@ export default defineComponent({
     const chartData = ref();
     const { t } = useI18n();
     const store = useStore();
+    const route = useRoute();
+    const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
@@ -194,6 +221,129 @@ export default defineComponent({
       data: {},
     });
 
+    // ---- Share-URL (Feature 1) + deep-link redirection (Feature 2) wiring ----
+    // The metrics route is NOT kept-alive (MainLayout's <router-view> renders the
+    // component directly), so it re-mounts on every navigation -> onMounted is the
+    // single restore point; no onActivated/keepAlive guard is needed.
+    let pendingAutoRun = false;
+
+    // reset the panel to the metrics defaults (factored so it can be reused).
+    const applyMetricsDefaults = () => {
+      errorData.errors = [];
+      editMode.value = false;
+      resetDashboardPanelData();
+
+      // for metrics page, use stream type as metric
+      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+
+      if (store.state.zoConfig?.auto_query_enabled) {
+        const persisted = restoreMetricsStream(
+          store.state.selectedOrganization.identifier,
+        );
+        if (persisted) {
+          dashboardPanelData.data.queries[0].fields.stream = persisted;
+        }
+      }
+
+      dashboardPanelData.data.type = "line";
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.queries[0].customQuery = false;
+      dashboardPanelData.layout.showQueryBar = true;
+      chartData.value = {};
+    };
+
+    // panel -> URL: invoked at the end of runQuery. Encodes the whole panel into
+    // a fresh metrics_data blob + time/refresh, dropping inbound-only override
+    // params (normalization). Diff-before-write avoids history spam.
+    const syncStateToUrl = () => {
+      const query: Record<string, any> = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        refresh: refreshIntervalToLabel(refreshInterval.value),
+        ...selectedDateToQueryParams(selectedDate.value),
+        metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      };
+      const changed =
+        Object.keys(query).some(
+          (k) => String(query[k]) !== String(route.query[k] ?? ""),
+        ) || Object.keys(route.query).some((k) => !(k in query));
+      if (changed) router.replace({ query }).catch(() => {});
+    };
+
+    // URL -> panel: base (blob) -> overrides -> time/refresh. Returns whether an
+    // inbound state is present (the auto-run gate).
+    const hydrateFromUrl = (): boolean => {
+      const q = route.query as Record<string, any>;
+
+      // 1) BASE: blob if present, else keep the just-reset defaults
+      if (q.metrics_data) applyMetricsBlob(q.metrics_data, dashboardPanelData);
+
+      // 2) OVERRIDES (deep-link redirection)
+      applyDeepLinkOverrides(q, dashboardPanelData);
+
+      // 3) time + refresh (shared urlTimeParams helper)
+      if (q.period || (q.from && q.to)) {
+        selectedDate.value = queryParamsToSelectedDate(q);
+      }
+      if (q.refresh != null) {
+        refreshInterval.value = refreshLabelToInterval(
+          q.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval || 0,
+        );
+      }
+
+      return !!q.metrics_data || hasAnyDeepLinkParam(q, METRICS_PARAMS);
+    };
+
+    // seed builder-mode slots (a stream but no query) so they get a starter
+    // query before auto-run (covers multi-query stream_name-only deep-links).
+    const seedBuilderSlots = async () => {
+      const queries = dashboardPanelData.data.queries;
+      for (let i = 0; i < queries.length; i++) {
+        const qq = queries[i];
+        if (qq?.fields?.stream && !qq.customQuery && !qq.query) {
+          dashboardPanelData.layout.currentQueryIndex = i;
+          await applyDefaultPanelFields();
+        }
+      }
+      dashboardPanelData.layout.currentQueryIndex = 0;
+    };
+
+    // share URL: freeze a relative period into absolute from/to (mirrors the
+    // dashboardShareURL behaviour) so a shared link reproduces the exact window.
+    // Share URL: snapshot the CURRENT editor state (whole panel + time +
+    // refresh) into a fresh /metrics link, independent of whether the browser
+    // URL has been synced yet — so Share works even before the first Run. A
+    // relative period is frozen to absolute from/to so the recipient sees the
+    // exact same window. Building fresh (not from window.location) also avoids
+    // carrying any not-yet-normalized inbound override params into the link.
+    const metricsShareUrl = computed(() => {
+      void route.fullPath; // recompute as the URL / state changes
+      const url = new URL(window.location.origin + window.location.pathname);
+      const sp = url.searchParams;
+      sp.set("org_identifier", store.state.selectedOrganization.identifier);
+
+      // freeze the window: getConsumableDateTime() is in MICROSECONDS -> ms
+      const ct: any = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        sp.set("from", String(Math.floor(ct.startTime / 1000)));
+        sp.set("to", String(Math.floor(ct.endTime / 1000)));
+      } else {
+        const tp: any = selectedDateToQueryParams(selectedDate.value);
+        if (tp.period) sp.set("period", tp.period);
+        else if (tp.from != null) {
+          sp.set("from", String(tp.from));
+          sp.set("to", String(tp.to));
+        }
+      }
+
+      sp.set("refresh", refreshIntervalToLabel(refreshInterval.value));
+      sp.set(
+        "metrics_data",
+        encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      );
+      return url.href;
+    });
+
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
@@ -213,32 +363,11 @@ export default defineComponent({
     // streams?type=logs request and the double stream-list fetch that results
     // from stream_type changing logs → metrics after children have mounted.
     onBeforeMount(() => {
-      errorData.errors = [];
-      editMode.value = false;
-      resetDashboardPanelData();
-
-      // for metrics page, use stream type as metric
-      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
-
-      if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization.identifier,
-        );
-        if (persisted) {
-          dashboardPanelData.data.queries[0].fields.stream = persisted;
-        }
-      }
-
-      // set default chart type as line
-      dashboardPanelData.data.type = "line";
-      // set the default query type as promql for metrics
-      dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.queries[0].customQuery = false;
-
-      // set the show query bar by default for metrics page
-      dashboardPanelData.layout.showQueryBar = true;
-
-      chartData.value = {};
+      // Reset to metrics defaults, then hydrate any URL state (blob base ->
+      // deep-link overrides -> time/refresh). pendingAutoRun is consumed in
+      // onMounted once the picker + PanelEditor are available.
+      applyMetricsDefaults();
+      pendingAutoRun = hydrateFromUrl();
     });
 
     onMounted(async () => {
@@ -249,15 +378,15 @@ export default defineComponent({
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
-      // Seed the default builder query on initial load (the PromQL builder only
-      // rebuilds on label/operation change, so the bar would otherwise be empty).
-      const initialQuery = dashboardPanelData.data.queries[0];
-      if (
-        initialQuery?.fields?.stream &&
-        !initialQuery.customQuery &&
-        !initialQuery.query
-      ) {
-        await applyDefaultPanelFields();
+      // Seed builder-mode slots (a stream but no query) so the PromQL builder bar
+      // is populated — on fresh load (queries[0]) and for deep-link builder slots.
+      await seedBuilderSlots();
+
+      // Auto-run a restored blob / inbound deep-link, then normalize the URL.
+      if (pendingAutoRun) {
+        pendingAutoRun = false;
+        updateDateTime(selectedDate.value);
+        runQuery();
       }
     });
 
@@ -266,6 +395,15 @@ export default defineComponent({
       async () => {
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+
+        // A chart-type change re-renders without going through runQuery(), so
+        // the metrics_data blob on the URL would otherwise go stale. Re-sync —
+        // but only for an already-established view (metrics_data already on the
+        // URL): we still don't write a URL before the first Run (D1), and this
+        // skips the programmatic type changes during load/hydration.
+        if (isPanelConfigWatcherActivated && route.query.metrics_data) {
+          syncStateToUrl();
+        }
       },
     );
 
@@ -332,6 +470,9 @@ export default defineComponent({
       if (panelEditorRef.value) {
         panelEditorRef.value.runQuery();
       }
+
+      // panel -> URL (full blob + time/refresh); normalizes any inbound params.
+      syncStateToUrl();
     };
 
     const updateDateTime = (value: object) => {
@@ -522,6 +663,7 @@ export default defineComponent({
       addToDashboard,
       refreshInterval,
       panelEditorRef,
+      metricsShareUrl,
     };
   },
 });
