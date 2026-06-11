@@ -122,6 +122,19 @@ export function useTableCore<TData>(
   const isRigidColumn = (col: OTableColumnDef<TData>) =>
     col.isAction === true || col.id === "actions" || col.id === "#";
 
+  // Deterministic actions-column width from its icon count: N icon buttons
+  // (icon-sm = 32px) + gaps + cell padding, never narrower than the "Actions"
+  // header. Computed (not DOM-measured) so the skeleton and loaded table match.
+  const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
+  const ACTION_BTN_GAP = 4; // gap-1 between buttons
+  const ACTION_CELL_PAD = 16; // td px-2
+  const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
+  const actionColumnWidth = (actionCount?: number): number => {
+    const n = Math.max(1, Number(actionCount) || 2);
+    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + ACTION_CELL_PAD;
+    return Math.max(content, ACTIONS_HEADER_MIN);
+  };
+
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
 
@@ -176,11 +189,16 @@ export function useTableCore<TData>(
   const tanstackColumns = computed<ColumnDef<TData>[]>(() => {
     return effectiveColumns.value.map((col) => {
       const rigid = isRigidColumn(col);
+      const isActionCol = col.isAction === true || col.id === "actions";
       // Rigid columns (selection index, actions) hold a width that does not
       // depend on the other columns: min === size === max so the table layout
-      // can neither grow nor shrink them. The actions column's `size` is later
-      // overridden at runtime by a content measurement in OTable.vue.
-      const size = col.size ?? 150;
+      // can neither grow nor shrink them. The actions column's width is computed
+      // DETERMINISTICALLY from its icon count (not DOM-measured at runtime) so
+      // the loading skeleton and the loaded table render it at the exact same
+      // width — no flash when data arrives.
+      const size = isActionCol
+        ? Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
+        : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
         header: col.header as any,
