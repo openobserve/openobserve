@@ -503,6 +503,7 @@ export default defineComponent({
     OSplitter,
     OEmptyState,
     LogsNoEventsState,
+<<<<<<< HEAD
     LogsNoDataState,
 },
   mixins: [MainLayoutCloudMixin],
