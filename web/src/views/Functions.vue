@@ -34,9 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tw:px-4 tw:border-b tw:border-border-default"
     >
       <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
-           title on the list page; hidden on detail sub-pages (editor/history). -->
-      <template v-if="showPipelineActions" #tabs>
-        <PipelineSectionTabs />
+           title on the list page; hidden on detail sub-pages (editor/history).
+           Always pass the slot so hasTabs tracks showPipelineActions reactively
+           via the slot function call instead of relying on slot presence tracking. -->
+      <template #tabs>
+        <PipelineSectionTabs v-if="showPipelineActions" />
       </template>
       <!-- Pipeline name input rendered inline with the title on the create page -->
       <template v-if="routeName === 'createPipeline'" #title-trail>
