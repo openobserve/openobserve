@@ -492,6 +492,9 @@ export default defineComponent({
             ? streamingResponse.value
             : t("search.nlQueryGenerationFailed");
           showErrorNotification(errorMsg);
+          if (isAuthError(streamingResponse.value)) {
+            return; // Auth error already handled, don't trigger catch block
+          }
           throw new Error("Query generation failed");
         }
 
