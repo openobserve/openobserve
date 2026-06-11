@@ -242,7 +242,6 @@ impl Search for Searcher {
             stream_type,
             &request,
             req.skip_max_query_range,
-            true,
             true, // allow streamings aggs cache for grpc search partition
         )
         .await;
