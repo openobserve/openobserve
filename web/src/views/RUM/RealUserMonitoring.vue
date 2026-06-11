@@ -67,32 +67,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </router-view>
     </template>
     <template v-else>
-      <div class="">
-        <div
-          class="card-container tw:p-4 tw:max-w-full tw:flex-1 tw:min-h-0"
-        >
-          <div class="tw:pb-4">
-            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
-              {{ t("rum.aboutRUMTitle") }}
-            </div>
-            <div class="tw:text-base tw:font-medium">
-              {{ t("rum.aboutRUMMessage") }}
-            </div>
-            <div>
-              <div></div>
-            </div>
+      <OEmptyState illustration="radar" size="hero" :hide-action="true">
+        <template #title>{{ t("rum.emptyState.title") }}</template>
+        <template #description><span v-html="t('rum.emptyState.description')" /></template>
+
+        <template #actions>
+          <!-- Instrument a web app -->
+          <button type="button" class="rum-card" data-test="rum-empty-web-card" @click="getStarted">
+            <span class="rum-card__icon rum-card__icon--blue">
+              <OIcon name="devices" size="md" />
+            </span>
+            <span class="rum-card__body">
+              <span class="rum-card__label">{{ t("rum.emptyState.webApp") }}</span>
+              <span class="rum-card__sublabel">{{ t("rum.emptyState.webAppDesc") }}</span>
+            </span>
+            <OIcon name="chevron-right" size="sm" class="rum-card__chevron" />
+          </button>
+
+          <!-- Session Replay -->
+          <button type="button" class="rum-card" data-test="rum-empty-session-card" @click="getStarted">
+            <span class="rum-card__icon rum-card__icon--purple">
+              <OIcon name="play-circle" size="md" />
+            </span>
+            <span class="rum-card__body">
+              <span class="rum-card__label">{{ t("rum.emptyState.sessionReplay") }}</span>
+              <span class="rum-card__sublabel">{{ t("rum.emptyState.sessionReplayDesc") }}</span>
+            </span>
+            <OIcon name="chevron-right" size="sm" class="rum-card__chevron" />
+          </button>
+        </template>
+
+        <template #extra>
+          <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+            <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+              {{ t("rum.emptyState.learnMore") }}
+            </span>
+            <a
+              class="rum-chip"
+              href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-test="rum-empty-quickstart-btn"
+            >
+              <OIcon name="bolt" size="xs" class="tw:shrink-0" />
+              {{ t("rum.emptyState.quickImpl") }}
+            </a>
+            <a
+              class="rum-chip"
+              href="https://openobserve.ai/blog/frontend-monitoring-basics/"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-test="rum-empty-blog-btn"
+            >
+              <OIcon name="menu-book" size="xs" class="tw:shrink-0" />
+              {{ t("rum.emptyState.blogPost") }}
+            </a>
           </div>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            :title="t('rum.getStartedTitle')"
-            @click="getStarted"
-          >
-            {{ t("rum.getStartedLabel") }}
-            <template #icon-right><OIcon name="arrow-forward" size="sm" class="tw:ml-1" /></template>
-          </OButton>
-        </div>
-      </div>
+        </template>
+      </OEmptyState>
     </template>
   </div>
 </template>
@@ -122,6 +154,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -422,3 +455,103 @@ const getRumDataFields = () => {
   });
 };
 </script>
+
+<style scoped>
+.rum-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 19rem;
+  max-width: 100%;
+  min-height: 4rem;
+  padding: 0.625rem 0.875rem 0.625rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-base);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.rum-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-400);
+  background: var(--color-tabs-hover-bg);
+}
+.rum-card:focus-visible {
+  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
+}
+
+.rum-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 150ms, color 150ms;
+}
+.rum-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
+.rum-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
+.rum-card:hover .rum-card__icon,
+.rum-card:hover .rum-card__icon--blue,
+.rum-card:hover .rum-card__icon--purple {
+  background: var(--color-primary-600);
+  color: #fff;
+}
+
+.rum-card__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.rum-card__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rum-card__sublabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+.rum-card__chevron {
+  flex-shrink: 0;
+  color: var(--color-text-disabled);
+  transition: transform 150ms, color 150ms;
+}
+.rum-card:hover .rum-card__chevron {
+  transform: translateX(0.125rem);
+  color: var(--color-primary-600);
+}
+
+.rum-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-surface-panel);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 150ms, color 150ms, background-color 150ms;
+  outline: none;
+}
+.rum-chip:hover {
+  border-color: var(--color-primary-400);
+  color: var(--color-primary-600);
+  background: color-mix(in srgb, var(--color-primary-500) 6%, transparent);
+}
+</style>

@@ -776,6 +776,17 @@
     "webVitals": "Web Vitals",
     "errors": "Errors",
     "api": "API",
+    "emptyState": {
+      "title": "Monitor your users with Real User Monitoring",
+      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
+      "webApp": "Instrument a web app",
+      "webAppDesc": "Add the OpenObserve RUM SDK to any JavaScript app",
+      "sessionReplay": "Enable Session Replay",
+      "sessionReplayDesc": "Record and replay user sessions to debug UX issues",
+      "learnMore": "Learn more:",
+      "quickImpl": "Quick implementation guide",
+      "blogPost": "Frontend monitoring basics"
+    },
     "aboutRUMTitle": "Discover Real User Monitoring to Enhance Your User Experience",
     "aboutRUMMessage": "Real User Monitoring allows you to track and analyze the performance of your website or application from the perspective of real users. This means understanding how actual users experience your site, where they face slowdowns, which pages they frequently use, and more.",
     "getStartedTitle": "Get Started with Real User Monitoring",
