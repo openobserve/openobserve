@@ -5263,6 +5263,22 @@
     }
   },
   "logs": {
+    "noData": {
+      "title": "Start sending data to OpenObserve",
+      "description": "There's no data in this organization yet, so there are no streams to explore. Send your first logs and they'll show up here automatically — pick how you want to start.",
+      "curl": "Send via Curl / HTTP API",
+      "curlDesc": "Quickest way — paste one command and logs start flowing",
+      "shippers": "Use a log shipper",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SyslogNg & more",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Vendor-neutral OTLP ingestion for logs, traces & metrics",
+      "or": "Or:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS / CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "Ask AI to set up ingestion"
+    },
     "noStream": {
       "title": "Pick a stream to start exploring",
       "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",

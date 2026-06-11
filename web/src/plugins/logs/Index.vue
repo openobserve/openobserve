@@ -94,6 +94,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="
+                        !searchObj.loadingStream &&
+                        searchObj.data.stream.streamLists.length == 0 &&
+                        searchObj.loading == false
+                      "
+                    >
+                      <LogsNoDataState
+                        :ai-enabled="isAiEnabled"
+                        data-test="logs-search-no-streams-in-org-text"
+                        @ask-ai="onAskAiFixQuery"
+                      />
+                    </div>
+                    <div
+                      v-else-if="
                         searchObj.data.filterErrMsg !== '' &&
                         searchObj.loading == false
                       "
@@ -457,6 +470,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
+import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -491,6 +505,7 @@ export default defineComponent({
     OEmptyState,
     LogsNoEventsState,
     LogsNoStreamState,
+    LogsNoDataState,
 },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
