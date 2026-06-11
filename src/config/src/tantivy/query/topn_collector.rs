@@ -22,12 +22,9 @@ use tantivy::{
 
 use crate::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS;
 
-/// Packed multi-field term-ordinal key.
-///
-/// Ordinals always fit in 32 bits: a segment holds at most u32::MAX docs (DocId is u32) and a
-/// dictionary cannot have more terms than docs. Field `i`'s ordinal occupies bits
-/// `32*i..32*(i+1)`. A single integer key hashes faster (and uses less memory bandwidth) than
-/// a tuple or Vec on the 100M+ insert hot path.
+/// Packed multi-field term-ordinal key: field `i`'s ordinal occupies bits `32*i..32*(i+1)`.
+/// Ordinals always fit in 32 bits (a segment holds at most u32::MAX docs), and a single
+/// integer key is much cheaper than a tuple or Vec on the per-doc hot path.
 pub trait OrdKey: Copy + Eq + Ord + std::hash::Hash + Send + Sync + 'static {
     /// max number of ordinals this key can hold
     const CAPACITY: usize;
@@ -66,28 +63,20 @@ impl OrdKey for u128 {
     }
 }
 
-/// Flat collector for `GROUP BY field0[, .., fieldN] COUNT(*)` (N in 1..=4).
+/// Flat collector for `GROUP BY field0[, .., fieldN] COUNT(*)` (N in 1..=4): counts packed
+/// fast-field term ordinals into a single flat map, keeps all groups when the file has at
+/// most `max_groups` distinct groups (its contribution is exact) or only the top-K otherwise
+/// (approximate), and resolves ordinals to strings for the survivors only.
 ///
-/// Aggregates over the fields' columnar (fast field) term ordinals into a single flat
-/// map and returns the per-file `(fields, count)` groups:
-///   - read each field's term ordinal for each matching doc,
-///   - count into a single flat `packed ordinals -> count` map (bounded by the file's rows),
-///   - if the distinct group count fits within `max_groups`, return ALL groups — the file's
-///     contribution to the merged result is exact,
-///   - otherwise keep only the top-K (the result becomes approximate; for near-uniform
-///     distributions no practical K helps, so a small limit-derived K keeps it fast),
-///   - resolve ordinals to strings for the survivors only.
-///
-/// This replaces tantivy's `TermsAggregation`, which keeps a separate sub-collector per
-/// bucket level, materializes a string per group, and over-fetches the product of the
-/// per-level segment sizes (exponential in the field count).
+/// This replaces tantivy's nested `TermsAggregation`, which materializes a string per group
+/// and over-fetches exponentially in the field count.
 ///
 /// `K` selects the packed key width: `u64` for 1..=2 fields, `u128` for 3..=4 fields.
 pub struct TopNCollector<K: OrdKey> {
     fields: Vec<String>,
-    /// number of groups to keep per file when truncating (over-fetch for cross-file accuracy)
+    /// groups kept per file when truncating (over-fetch for cross-file accuracy)
     k: usize,
-    /// up to this many distinct groups, a file returns all of them (exact contribution)
+    /// up to this many distinct groups, a file returns all of them
     max_groups: usize,
     /// keep the K smallest counts (ORDER BY count ASC) instead of the K largest
     ascend: bool,
@@ -116,26 +105,35 @@ impl<K: OrdKey> TopNCollector<K> {
     }
 }
 
-/// Above this many cells (8 bytes each), the dense per-ordinal counting array gives way to a
-/// hash map. 4M cells = 32MB per segment, transient and smaller than a hash map holding the
-/// same number of groups.
+/// Above this many cells (8 bytes each = 32MB) the dense counting array gives way to a hash map.
 const DENSE_GROUP_SPACE_LIMIT: usize = 4_000_000;
 
-/// Per-segment group counters.
-///
-/// Term ordinals are dense (0..num_terms per field), so when the product of the fields'
-/// dictionary sizes is small the counts fit in a flat array indexed by the mixed-radix
-/// ordinal — one add per doc, no hashing, matching what tantivy's own terms aggregation does
-/// for a single field. Larger product spaces fall back to a hash map keyed by the packed
-/// ordinals.
+/// Per-segment group counters: a flat array indexed by the mixed-radix ordinal when the
+/// product of the fields' dictionary sizes is small (one add per doc, no hashing), otherwise
+/// a hash map keyed by the packed ordinals.
 enum GroupCounts<K> {
     /// counts indexed by `ord0 + dims0*(ord1 + dims1*(ord2 + ..))`
     Dense {
         counts: Vec<u64>,
         dims: [usize; MAX_SIMPLE_TOPN_FIELDS],
     },
-    /// packed segment-local term ordinals -> count
     Sparse(HashMap<K, u64>),
+}
+
+impl<K: OrdKey> GroupCounts<K> {
+    #[inline]
+    fn add(&mut self, ords: &[u64]) {
+        match self {
+            Self::Dense { counts, dims } => {
+                let mut index = 0usize;
+                for i in (0..ords.len()).rev() {
+                    index = index * dims[i] + ords[i] as usize;
+                }
+                counts[index] += 1;
+            }
+            Self::Sparse(counts) => *counts.entry(K::pack(ords)).or_insert(0) += 1,
+        }
+    }
 }
 
 pub struct TopNSegmentCollector<K: OrdKey> {
@@ -201,13 +199,11 @@ impl<K: OrdKey> Collector for TopNCollector<K> {
         &self,
         mut segment_fruits: Vec<Vec<(Vec<String>, u64)>>,
     ) -> tantivy::Result<Self::Fruit> {
-        // Common case (one segment per file): the single per-segment fruit is already the
-        // resolved, truncated top-K — return it as-is instead of rebuilding a string map.
+        // common case: one segment per file, its fruit is already resolved and truncated
         if segment_fruits.len() == 1 {
             return Ok(segment_fruits.pop().unwrap());
         }
-        // Otherwise sum partial counts for identical groups across segments, then apply the
-        // same keep rule as per segment: all groups when they fit, the top-K otherwise.
+        // otherwise sum counts across segments, then apply the same keep rule as per segment
         let mut merged: HashMap<Vec<String>, u64> = HashMap::new();
         for fruit in segment_fruits {
             for (key, count) in fruit {
@@ -229,8 +225,7 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
         let Some(cols) = &self.cols else {
             return;
         };
-        // index_fields are single-valued raw columns: take the first ordinal if present.
-        // Docs missing any field do not form a group (matches `missing: None` before).
+        // columns are single-valued; a doc missing any field forms no group
         let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
         for (ord, col) in ords.iter_mut().zip(cols.iter()) {
             match col.ords().first(doc) {
@@ -238,23 +233,11 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
                 None => return,
             }
         }
-        match &mut self.counts {
-            GroupCounts::Dense { counts, dims } => {
-                let mut index = 0usize;
-                for i in (0..cols.len()).rev() {
-                    index = index * dims[i] + ords[i] as usize;
-                }
-                counts[index] += 1;
-            }
-            GroupCounts::Sparse(counts) => {
-                let key = K::pack(&ords[..cols.len()]);
-                *counts.entry(key).or_insert(0) += 1;
-            }
-        }
+        self.counts.add(&ords[..cols.len()]);
     }
 
-    /// Block variant of [`Self::collect`]: fetch each field's ordinals for the whole block at
-    /// once (vectorized for full columns) instead of paying a per-document column lookup.
+    /// Block variant of [`Self::collect`]: fetch each field's ordinals for the whole block
+    /// at once instead of paying a per-document column lookup.
     // the doc index addresses one slot in EVERY field's buffer, which iterators can't express
     #[allow(clippy::needless_range_loop)]
     fn collect_block(&mut self, docs: &[DocId]) {
@@ -316,10 +299,9 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
             return Vec::new();
         };
 
-        // When the distinct groups fit within max_groups, return all of them: this segment's
-        // contribution to the merged result is exact. Beyond that the result is approximate
-        // for any keep size, so reduce to the small top-K on cheap integer ordinals BEFORE
-        // resolving strings — the term dictionary is only touched for the surviving groups.
+        // Within max_groups distinct groups, return all of them (this segment's contribution
+        // is exact); beyond that keep only the top-K on cheap integer ordinals BEFORE
+        // touching the term dictionary — the merged result becomes approximate.
         let top: Vec<(K, u64)> = match counts {
             GroupCounts::Dense { counts, dims } => {
                 let unpack_index = |index: usize| {
@@ -332,27 +314,24 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
                     K::pack(&ords[..cols.len()])
                 };
                 let groups = counts.iter().filter(|count| **count > 0).count();
-                if groups <= max_groups {
+                let entries: Vec<(usize, u64)> = if groups <= max_groups {
                     counts
-                        .into_iter()
+                        .iter()
                         .enumerate()
-                        .filter(|(_, count)| *count > 0)
-                        .map(|(index, count)| (unpack_index(index), count))
+                        .filter(|(_, count)| **count > 0)
+                        .map(|(index, count)| (index, *count))
                         .collect()
                 } else {
                     log::debug!(
                         "tantivy topn collector: segment has {groups} distinct groups > max \
                          groups {max_groups}, keeping top {k}, the merged top-n is approximate",
                     );
-                    // Select the top-K with a bounded heap instead of materializing all
-                    // groups: indexes iterate in ascending key order and ties prefer the
-                    // smaller key, so once the heap is full the (dominant) tied candidates
-                    // are rejected in O(1).
                     select_top_k_dense(&counts, k, ascend)
-                        .into_iter()
-                        .map(|(index, count)| (unpack_index(index), count))
-                        .collect()
-                }
+                };
+                entries
+                    .into_iter()
+                    .map(|(index, count)| (unpack_index(index), count))
+                    .collect()
             }
             GroupCounts::Sparse(counts) => {
                 let mut top = counts.into_iter().collect::<Vec<_>>();
@@ -368,10 +347,8 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
             }
         };
 
-        // Resolve survivors to strings in one sorted forward pass per field (see
-        // `resolve_ords`) instead of a random per-group lookup. `truncate_top_k` breaks count
-        // ties toward smaller keys (= smaller ordinals), so survivors cluster near the start
-        // of each dictionary and the sorted pass walks far fewer blocks.
+        // Resolve survivors to strings in one sorted forward pass per field. Count ties broke
+        // toward smaller keys, so survivors cluster near the start of each dictionary.
         let maps = cols
             .iter()
             .enumerate()
@@ -393,19 +370,15 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
     }
 }
 
-/// Resolve a set of segment-local term ordinals to strings in a single sorted forward pass
-/// over the term dictionary.
-///
-/// `Dictionary::ord_to_term` re-opens and re-scans a block from its first ordinal on every
-/// call, so resolving K ordinals one-by-one (in arbitrary order) is `O(K * block_size)`.
-/// `sorted_ords_to_term_cb` opens each block once and walks forward, which is what makes bulk
-/// resolution cheap — and what Tantivy's own terms aggregation relies on.
+/// Resolve term ordinals to strings in one sorted forward pass over the term dictionary:
+/// `sorted_ords_to_term_cb` opens each dictionary block once, while `ord_to_term` would
+/// re-scan a block per call.
 fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
     ords.sort_unstable();
     ords.dedup();
     let mut strings: Vec<String> = Vec::with_capacity(ords.len());
-    // the callback is invoked once per input ordinal in order, so `strings[i]` pairs with
-    // `ords[i]`; on error only the unresolved tail is dropped (zip stops at the shorter side)
+    // the callback fires once per input ordinal in order, so `strings[i]` pairs with `ords[i]`;
+    // on error only the unresolved tail is dropped (zip stops at the shorter side)
     if let Err(e) = col
         .dictionary()
         .sorted_ords_to_term_cb(ords.iter().copied(), |bytes| {
@@ -422,63 +395,40 @@ fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
     ords.into_iter().zip(strings).collect()
 }
 
-/// Select the top-K `(index, count)` entries from a dense counting array without
-/// materializing all groups, with the same ordering contract as [`truncate_top_k`]: `ascend`
-/// selects the K smallest counts, otherwise the K largest; count ties prefer the smaller
-/// index. A bounded heap of the currently-kept worst entry makes the scan O(n): indexes
-/// iterate in ascending order, so once the heap is full, tied candidates lose to what is
-/// already kept and are rejected without heap operations.
+/// Select the top-K `(index, count)` entries from a dense counting array, with the same
+/// ordering contract as [`truncate_top_k`]. A bounded max-heap of the worst kept entry makes
+/// the scan O(n): indexes arrive in ascending order, so once the heap is full tied candidates
+/// lose to what is already kept and are rejected in O(1).
 fn select_top_k_dense(counts: &[u64], k: usize, ascend: bool) -> Vec<(usize, u64)> {
-    use std::{cmp::Reverse, collections::BinaryHeap};
+    use std::collections::BinaryHeap;
     if k == 0 {
         return Vec::new();
     }
-    if ascend {
-        // max-heap of (count, index): the top is the worst kept (largest count, largest index)
-        let mut heap: BinaryHeap<(u64, usize)> = BinaryHeap::with_capacity(k + 1);
-        for (index, &count) in counts.iter().enumerate() {
-            if count == 0 {
-                continue;
-            }
-            if heap.len() < k {
-                heap.push((count, index));
-            } else if let Some(&worst) = heap.peek()
-                && (count, index) < worst
-            {
-                heap.pop();
-                heap.push((count, index));
-            }
+    // flip counts for descending so both orders keep the K smallest (key, index) entries
+    let sort_key = |count: u64| if ascend { count } else { !count };
+    let mut heap: BinaryHeap<(u64, usize)> = BinaryHeap::with_capacity(k + 1);
+    for (index, &count) in counts.iter().enumerate() {
+        if count == 0 {
+            continue;
         }
-        heap.into_iter()
-            .map(|(count, index)| (index, count))
-            .collect()
-    } else {
-        // max-heap of (Reverse(count), index): the top is the worst kept (smallest count,
-        // largest index)
-        let mut heap: BinaryHeap<(Reverse<u64>, usize)> = BinaryHeap::with_capacity(k + 1);
-        for (index, &count) in counts.iter().enumerate() {
-            if count == 0 {
-                continue;
-            }
-            if heap.len() < k {
-                heap.push((Reverse(count), index));
-            } else if let Some(&(Reverse(worst_count), worst_index)) = heap.peek()
-                && (count > worst_count || (count == worst_count && index < worst_index))
-            {
-                heap.pop();
-                heap.push((Reverse(count), index));
-            }
+        let entry = (sort_key(count), index);
+        if heap.len() < k {
+            heap.push(entry);
+        } else if let Some(&worst) = heap.peek()
+            && entry < worst
+        {
+            heap.pop();
+            heap.push(entry);
         }
-        heap.into_iter()
-            .map(|(Reverse(count), index)| (index, count))
-            .collect()
     }
+    heap.into_iter()
+        .map(|(_, index)| (index, counts[index]))
+        .collect()
 }
 
-/// Keep only the top-K entries by count, in place. `ascend` selects the K smallest counts
-/// (ORDER BY count ASC), otherwise the K largest (ORDER BY count DESC). Count ties are broken
-/// toward the smaller key, which keeps survivors clustered by ordinal for cheaper resolution;
-/// this is valid because SQL leaves tie order unspecified and DataFusion applies the final sort.
+/// Keep the top-K entries by count, in place: the K smallest when `ascend`, the K largest
+/// otherwise. Count ties break toward the smaller key, which keeps survivors clustered by
+/// ordinal for cheaper resolution (SQL leaves tie order unspecified).
 fn truncate_top_k<K: Ord>(items: &mut Vec<(K, u64)>, k: usize, ascend: bool) {
     if k == 0 {
         items.clear();
@@ -615,9 +565,7 @@ mod tests {
                 search(&["f0", "f1"], 1, 1, false),
                 vec![row(&["a", "x"], 3)]
             );
-            // max_groups above the distinct count keeps everything even when k is small:
-            // the per-segment groups (2 in the larger segment) fit within max_groups, so no
-            // truncation happens anywhere
+            // max_groups above the distinct count keeps everything even when k is small
             assert_eq!(search(&["f0", "f1"], 1, 10, false).len(), 3);
 
             // three fields via the u128 key

@@ -549,16 +549,13 @@ async fn search_tantivy_index(
             )
         }
         Some(IndexOptimizeMode::SimpleTopN(fields, limit, ascend)) => {
-            handle_simple_top_n_guarded(
-                &searcher,
-                &tantivy_schema,
-                query,
-                &fields,
-                limit,
-                ascend,
-                &trace_id_clone,
-                &ttv_file_name,
-            )
+            // files indexed before a field was added to index_fields lack its column
+            if let Some(field) = fields.iter().find(|f| tantivy_schema.get_field(f).is_err()) {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                Ok(TantivyResult::TopN(vec![]))
+            } else {
+                TantivyResult::handle_simple_top_n(&searcher, query, &fields, limit, ascend)
+            }
         }
         Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {
             if tantivy_schema.get_field(&field).is_err() {
@@ -641,29 +638,6 @@ async fn search_tantivy_index(
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
-}
-
-/// Run the top-n group by handler after checking every group field exists in this file's
-/// tantivy schema. Files indexed before a field was added to index_fields lack its column;
-/// they cannot contribute to the group by, same convention as the histogram handlers.
-#[allow(clippy::too_many_arguments)]
-fn handle_simple_top_n_guarded(
-    searcher: &tantivy::Searcher,
-    tantivy_schema: &tantivy::schema::Schema,
-    query: Box<dyn Query>,
-    fields: &[String],
-    limit: usize,
-    ascend: bool,
-    trace_id: &str,
-    ttv_file_name: &str,
-) -> anyhow::Result<TantivyResult> {
-    if let Some(field) = fields.iter().find(|f| tantivy_schema.get_field(f).is_err()) {
-        log::warn!(
-            "[trace_id {trace_id}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}"
-        );
-        return Ok(TantivyResult::TopN(vec![]));
-    }
-    TantivyResult::handle_simple_top_n(searcher, query, fields, limit, ascend)
 }
 
 /// if simple distinct without filter, we need to warm up the field

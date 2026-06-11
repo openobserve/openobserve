@@ -35,11 +35,9 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 #[rustfmt::skip]
 /// SimpleTopN(Vec<String>, usize, bool):
 /// the sql can like: select name, count(*) as cnt from table where match_all() group by name order by cnt desc limit 10;
-///                   or select name as key, count(*) as cnt from table where match_all() group by key order by cnt desc, key asc limit 10;
-///                   or select userid, searchphrase, count(*) as cnt from table where match_all() group by userid, searchphrase order by cnt desc limit 10;
-/// condition: only select 1..=MAX_SIMPLE_TOPN_FIELDS index_fields, and only have count(*) as aggregate function,
-/// group by those index_fields in select clause, order by count(*) [, field asc...], and have limit
-/// (secondary sorts are optional, must be ASC and reference the group by fields)
+///                   or select userid, searchphrase, count(*) as cnt from table where match_all() group by userid, searchphrase order by cnt desc, userid asc limit 10;
+/// condition: group by 1..=MAX_SIMPLE_TOPN_FIELDS index_fields with count(*) as the only aggregate,
+/// order by count(*) first (optional secondary sorts must be ASC group by fields), and have limit
 /// example plan:
 ///   SortPreservingMergeExec: [cnt@1 DESC], fetch=10
 ///     SortExec: TopK(fetch=10), expr=[cnt@1 DESC], preserve_partitioning=[true]
@@ -56,9 +54,7 @@ pub(crate) fn is_simple_topn(plan: Arc<dyn ExecutionPlan>, index_fields: HashSet
     let mut visitor = SimpleTopnVisitor::new(index_fields);
     let _ = plan.visit(&mut visitor);
     match visitor.simple_topn {
-        Some((fields, fetch, ascend))
-            if !fields.is_empty() && fields.len() <= MAX_SIMPLE_TOPN_FIELDS =>
-        {
+        Some((fields, fetch, ascend)) if !fields.is_empty() => {
             Some(IndexOptimizeMode::SimpleTopN(fields, fetch, ascend))
         }
         _ => None,
@@ -81,6 +77,11 @@ impl SimpleTopnVisitor {
             projection_len: None,
         }
     }
+
+    fn reject(&mut self) -> Result<TreeNodeRecursion> {
+        self.simple_topn = None;
+        Ok(TreeNodeRecursion::Stop)
+    }
 }
 
 impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
@@ -88,107 +89,82 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if let Some(sort_merge) = node.as_any().downcast_ref::<SortPreservingMergeExec>() {
-            // Check if this is a SortPreservingMergeExec with fetch limit
-            if let Some(fetch) = sort_merge.fetch()
-                && fetch > 0
-                && !sort_merge.expr().is_empty()
-                && sort_merge.expr().len() <= MAX_SIMPLE_TOPN_FIELDS + 1
-            // primary sort on count(*) + up to one secondary sort per group field
+            // need a fetch limit, a primary sort plus up to one secondary sort per group field
+            let fetch = sort_merge.fetch().unwrap_or(0);
+            let sort_exprs = sort_merge.expr();
+            if fetch == 0 || sort_exprs.is_empty() || sort_exprs.len() > MAX_SIMPLE_TOPN_FIELDS + 1
             {
-                // the first sort should be on the count(*) result, not directly on an index field
-                // should not sort by index field as primary sort
-                let sort_expr = sort_merge.expr().first();
-                let column_name = get_column_name(&sort_expr.expr);
-                if is_column(&sort_expr.expr) && self.index_fields.contains(column_name) {
-                    self.simple_topn = None;
-                    return Ok(TreeNodeRecursion::Stop);
-                }
-
-                // Secondary sorts must be ASC (not descending) columns; their names are
-                // validated against the group by fields when visiting the ProjectionExec
-                for secondary_sort in sort_merge.expr().iter().skip(1) {
-                    if secondary_sort.options.descending || !is_column(&secondary_sort.expr) {
-                        self.simple_topn = None;
-                        return Ok(TreeNodeRecursion::Stop);
-                    }
-                    self.secondary_sort_columns
-                        .push(get_column_name(&secondary_sort.expr).to_string());
-                }
-
-                self.simple_topn = Some((
-                    vec![], // Will be set when we find the group by fields
-                    fetch,
-                    !sort_merge.expr().first().options.descending,
-                ));
-                return Ok(TreeNodeRecursion::Continue);
+                return self.reject();
             }
-            // If not a valid SortPreservingMergeExec, stop visiting
-            self.simple_topn = None;
-            return Ok(TreeNodeRecursion::Stop);
+
+            // the primary sort must be on the count(*) result, not on an index field
+            let first_sort = sort_exprs.first();
+            if is_column(&first_sort.expr)
+                && self
+                    .index_fields
+                    .contains(get_column_name(&first_sort.expr))
+            {
+                return self.reject();
+            }
+
+            // secondary sorts must be ASC columns; their names are validated against the
+            // group by fields at the ProjectionExec
+            for sort in sort_exprs.iter().skip(1) {
+                if sort.options.descending || !is_column(&sort.expr) {
+                    return self.reject();
+                }
+                self.secondary_sort_columns
+                    .push(get_column_name(&sort.expr).to_string());
+            }
+
+            // fields are filled in at the AggregateExec
+            self.simple_topn = Some((vec![], fetch, !first_sort.options.descending));
         } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
-            // Check ProjectionExec for the structure: [field1, .., fieldN, count(*)]
+            // expect [field1, .., fieldN, count(*)]; the exact length is validated against
+            // the group by at the AggregateExec
             let exprs = projection.expr();
-            if exprs.len() >= 2 && exprs.len() <= MAX_SIMPLE_TOPN_FIELDS + 1 {
-                self.projection_len = Some(exprs.len());
-                // Secondary sort columns must reference the group by fields, i.e. the
-                // aliases of the leading projection columns
-                let group_aliases: HashSet<&str> = exprs[..exprs.len() - 1]
-                    .iter()
-                    .map(|expr| expr.alias.as_str())
-                    .collect();
-                if self
-                    .secondary_sort_columns
-                    .iter()
-                    .any(|col| !group_aliases.contains(col.as_str()))
-                {
-                    // Secondary sort doesn't match the grouped fields
-                    self.simple_topn = None;
-                    return Ok(TreeNodeRecursion::Stop);
-                }
-                return Ok(TreeNodeRecursion::Continue);
+            if !(2..=MAX_SIMPLE_TOPN_FIELDS + 1).contains(&exprs.len()) {
+                return self.reject();
             }
-            // If projection doesn't have 2..=MAX_SIMPLE_TOPN_FIELDS+1 expressions, stop visiting
-            self.simple_topn = None;
-            return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
-            // Check if the AggregateExec matches SimpleTopN pattern
-            let group_len = aggregate.group_expr().expr().len();
-            if (1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
-                && aggregate.aggr_expr().len() == 1
-                // the projection (if any) should be exactly the group by fields + count(*)
-                && self.projection_len.is_none_or(|len| len == group_len + 1)
+            self.projection_len = Some(exprs.len());
+
+            // secondary sorts must reference the group by fields (the leading projection aliases)
+            let group_aliases: HashSet<&str> = exprs[..exprs.len() - 1]
+                .iter()
+                .map(|expr| expr.alias.as_str())
+                .collect();
+            if self
+                .secondary_sort_columns
+                .iter()
+                .any(|col| !group_aliases.contains(col.as_str()))
             {
-                let mut fields = Vec::with_capacity(group_len);
-
-                // Check all group by fields are in index_fields
-                for (group_expr, _) in aggregate.group_expr().expr().iter() {
-                    let column_name = get_column_name(group_expr);
-                    if is_column(group_expr) && self.index_fields.contains(column_name) {
-                        fields.push(column_name.to_string());
-                    } else {
-                        // One of the group by fields is not an index field
-                        self.simple_topn = None;
-                        return Ok(TreeNodeRecursion::Stop);
-                    }
-                }
-
-                // Check aggregate function is count(*)
-                let aggr_expr = &aggregate.aggr_expr()[0];
-                if aggr_expr.name() == "count(Int64(1))" {
-                    // Update the simple_topn with the correct field names
-                    if let Some(simple_topn) = &mut self.simple_topn {
-                        simple_topn.0 = fields;
-                    }
-                    return Ok(TreeNodeRecursion::Continue);
-                }
+                return self.reject();
             }
-            // If AggregateExec doesn't match SimpleTopN pattern, stop visiting
-            self.simple_topn = None;
-            return Ok(TreeNodeRecursion::Stop);
+        } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+            let group_len = aggregate.group_expr().expr().len();
+            if !(1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
+                || aggregate.aggr_expr().len() != 1
+                || aggregate.aggr_expr()[0].name() != "count(Int64(1))"
+                // the projection (if any) should be exactly the group by fields + count(*)
+                || self.projection_len.is_some_and(|len| len != group_len + 1)
+            {
+                return self.reject();
+            }
+
+            // all group by fields must be index fields
+            let mut fields = Vec::with_capacity(group_len);
+            for (group_expr, _) in aggregate.group_expr().expr().iter() {
+                let column_name = get_column_name(group_expr);
+                if !is_column(group_expr) || !self.index_fields.contains(column_name) {
+                    return self.reject();
+                }
+                fields.push(column_name.to_string());
+            }
+            if let Some(simple_topn) = &mut self.simple_topn {
+                simple_topn.0 = fields;
+            }
         } else if is_complex_plan(node) {
-            // If encounter complex plan, stop visiting
-            self.simple_topn = None;
-            return Ok(TreeNodeRecursion::Stop);
+            return self.reject();
         }
         Ok(TreeNodeRecursion::Continue)
     }

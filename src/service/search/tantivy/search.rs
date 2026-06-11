@@ -243,12 +243,9 @@ impl TantivyResult {
     }
 
     /// Handle GROUP BY with count(*) over 1..=4 indexed fields using the flat
-    /// [`TopNCollector`]: count packed fast-field term ordinals into a single flat map, keep
-    /// only the per-file top-K, and resolve ordinals to strings for the survivors only.
-    ///
-    /// DataFusion's `AggregateExec` re-aggregates the per-file partials and applies the final
-    /// ORDER BY + LIMIT. The merged result is exact when every file's distinct group count
-    /// fits within the per-file keep size, and approximate beyond that (see
+    /// [`TopNCollector`]. DataFusion re-aggregates the per-file partials and applies the
+    /// final ORDER BY + LIMIT: the merged result is exact when every file's distinct group
+    /// count fits within `max_groups`, and approximate beyond that (see
     /// `ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM`).
     pub fn handle_simple_top_n(
         searcher: &Searcher,
@@ -264,12 +261,6 @@ impl TantivyResult {
             );
         }
 
-        // A file with up to `max_groups` distinct groups returns all of them, so its
-        // contribution to the merged result is exact. Beyond that no practical keep size
-        // helps (a group's total is spread thin across files), so keep only the small
-        // limit-derived top-K per file: the result is approximate — acceptable for the skewed
-        // distributions that top-n queries target — and stays fast. The env raises the exact
-        // threshold for deployments that prefer accuracy over speed.
         let k = simple_topn_over_fetch_size(fields.len(), limit);
         let max_groups = k.max(config::get_config().limit.inverted_index_topn_max_group_num);
 

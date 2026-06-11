@@ -20,7 +20,10 @@ use arrow::array::{
 };
 use config::{
     get_batch_size,
-    meta::{inverted_index::IndexOptimizeMode, stream::FileKey},
+    meta::{
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
+        stream::FileKey,
+    },
 };
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
@@ -450,26 +453,21 @@ fn create_top_n_arrow_array(
     schema: &SchemaRef,
     top_n: Vec<(Vec<String>, u64)>,
 ) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
-    // Validate: schema should have N group fields (1..=MAX) plus a count field
+    // schema is the group fields plus a trailing count field
     let schema_fields = schema.fields().len();
-    if !(2..=config::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS + 1).contains(&schema_fields) {
+    if !(2..=MAX_SIMPLE_TOPN_FIELDS + 1).contains(&schema_fields) {
         return Err(DataFusionError::Internal(format!(
             "Expected schema with 2..={} fields for TopN, got {schema_fields}",
-            config::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS + 1
+            MAX_SIMPLE_TOPN_FIELDS + 1
         )));
     }
     let num_group_fields = schema_fields - 1;
     let count_field = &schema.fields()[num_group_fields];
 
-    let total_rows = top_n.len();
-    if total_rows == 0 {
-        return Ok(vec![]);
-    }
-
-    // Unzip the composite keys and counts
-    let mut group_values: Vec<Vec<String>> = vec![Vec::with_capacity(total_rows); num_group_fields];
-    let mut count_values = Vec::with_capacity(total_rows);
-
+    // unzip the composite keys and counts, dropping any malformed row
+    let mut group_values: Vec<Vec<String>> =
+        vec![Vec::with_capacity(top_n.len()); num_group_fields];
+    let mut count_values = Vec::with_capacity(top_n.len());
     for (keys, count) in top_n {
         if keys.len() == num_group_fields {
             for (values, key) in group_values.iter_mut().zip(keys) {
