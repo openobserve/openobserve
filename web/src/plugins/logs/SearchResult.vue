@@ -203,22 +203,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="showInspectBtn"
                 variant="outline"
-                size="icon-chip"
+                :size="showActionLabels ? 'chip' : 'icon-chip'"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
               >
                 <OIcon name="troubleshoot" size="sm" />
-                <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
+                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.inspectBtnLabel') }}</span>
+                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.searchInspectionsLabel')" />
               </OButton>
               <OButton
                 v-if="showAnalyzeBtn"
                 variant="outline"
-                size="icon-chip"
+                :size="showActionLabels ? 'chip' : 'icon-chip'"
                 @click="openVolumeAnalysisDashboard"
                 data-test="logs-analyze-dimensions-button"
               >
                 <OIcon name="timeline" size="sm" />
-                <OTooltip :content="t('volumeInsights.analyzeTooltipLogs')" />
+                <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipLogs')" />
               </OButton>
               <OButton
                 v-if="showWrapBtn"
@@ -1993,6 +1995,10 @@ export default defineComponent({
     // Responsive: collapse action buttons to overflow menu when container is narrow
     shouldMoveActionsToMenu() {
       return this.containerWidth < 700;
+    },
+    // Show icon + label on action buttons when container is wide enough
+    showActionLabels() {
+      return this.containerWidth >= 900;
     },
     showInspectBtn() {
       return (
