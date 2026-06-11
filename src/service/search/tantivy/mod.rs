@@ -24,10 +24,9 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
         inverted_index::IndexOptimizeMode,
         search::ScanStats,
-        stream::{FileKey, StreamType},
+        stream::{FileKey, FileSelection, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
     tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
@@ -264,15 +263,20 @@ pub async fn tantivy_search(
                         continue;
                     }
                     match result {
-                        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
-                            if num_rows == 0 {
-                                // if the bitmap is empty then we remove the file from the list
+                        TantivyResult::RowIdsSelection {
+                            row_ids,
+                            row_group_size,
+                        } => {
+                            if row_ids.is_empty() {
+                                // if no rows matched then we remove the file from the list
                                 file_list_map.remove(&file_name);
                             } else {
-                                // Replace the segment IDs in the existing `FileKey` with the found
-                                tantivy_result_builder.add_row_nums(num_rows as u64);
+                                tantivy_result_builder.add_row_nums(row_ids.len() as u64);
                                 let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_segment_ids(bitvec, row_group_size);
+                                file.with_selection(
+                                    FileSelection::Rows(Arc::new(row_ids)),
+                                    row_group_size,
+                                );
                             }
                         }
                         TantivyResult::Count(count) => {
@@ -297,6 +301,11 @@ pub async fn tantivy_search(
                         }
                         TantivyResult::RowIds(_) => {
                             unreachable!("RowIds should not be returned");
+                        }
+                        TantivyResult::Skipped { .. } => {
+                            // skipped results always come with an empty file
+                            // name and are handled before this match
+                            unreachable!("Skipped should not be returned with a file name");
                         }
                     }
                 }
@@ -578,11 +587,14 @@ async fn search_tantivy_index(
         }
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
-        TantivyResult::RowIds(row_ids) => {
+        TantivyResult::RowIds(mut row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
                 return Ok((
                     key,
-                    TantivyResult::RowIdsBitVec(BitVec::EMPTY, 0, row_group_size),
+                    TantivyResult::RowIdsSelection {
+                        row_ids: Vec::new(),
+                        row_group_size,
+                    },
                     false,
                 ));
             }
@@ -597,31 +609,30 @@ async fn search_tantivy_index(
                 );
                 return Ok((
                     "".to_string(),
-                    TantivyResult::RowIdsBitVec(
-                        BitVec::EMPTY,
-                        row_ids_percent as usize,
-                        row_group_size,
-                    ),
+                    TantivyResult::Skipped {
+                        percent: row_ids_percent as usize,
+                    },
                     true,
                 ));
             }
             percent = row_ids_percent;
-            let max_doc_id = row_ids.iter().copied().max().unwrap_or(0) as i64;
+            // the doc-id collector emits ids in ascending order already, but
+            // the TopDocs-based SimpleSelect path returns them in score order
+            row_ids.sort_unstable();
+            row_ids.dedup();
+            let max_doc_id = *row_ids.last().unwrap() as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {max_doc_id} is out of range, records {}",
                     parquet_file.meta.records,
                 ));
             }
-            // NOTE: the BitVec's length should equal to the number of records in the parquet file
-            let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
-            let num_rows = row_ids.len();
-            for id in row_ids {
-                res.set(id as usize, true);
+            TantivyResult::RowIdsSelection {
+                row_ids,
+                row_group_size,
             }
-            TantivyResult::RowIdsBitVec(res, num_rows, row_group_size)
         }
-        TantivyResult::RowIdsBitVec(..) => {
+        TantivyResult::RowIdsSelection { .. } | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
@@ -634,7 +645,7 @@ async fn search_tantivy_index(
         && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
             || percent < 1.0)
     {
-        let entry = get_cache_entry(result.clone(), percent, parquet_file.meta.records as usize);
+        let entry = get_cache_entry(result.clone());
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
@@ -649,24 +660,17 @@ fn get_simple_distinct_field(idx_optimize_rule: &Option<IndexOptimizeMode>) -> V
     }
 }
 
-fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: usize) -> CacheEntry {
+fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
     match tantivy_result {
-        TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
-            // if the percent is less than 1.0, we use roaring bitmap to store the row ids
-            // otherwise, we use bitvec to store the row ids.
-            // because the bitvec is not efficient for small percent, and the roaring bitmap is not
-            // efficient for large percent.
-            if percent < 1.0 {
-                let mut roaring = RoaringBitmap::new();
-                for (i, bit) in bitvec.into_iter().enumerate() {
-                    if bit {
-                        roaring.insert(i as u32);
-                    }
-                }
-                CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size)
-            } else {
-                CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size)
-            }
+        TantivyResult::RowIdsSelection {
+            row_ids,
+            row_group_size,
+        } => {
+            // row_ids are sorted and deduped, so the fast sorted constructor
+            // always succeeds
+            let roaring = RoaringBitmap::from_sorted_iter(row_ids)
+                .expect("RowIdsSelection row ids must be sorted");
+            CacheEntry::RowIds(roaring, row_group_size)
         }
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
@@ -675,7 +679,7 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: us
         }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
-        TantivyResult::RowIds(_) => {
+        TantivyResult::RowIds(_) | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
@@ -815,58 +819,29 @@ mod tests {
     }
 
     #[test]
-    fn test_get_cache_entry_row_ids_bitvec_small_percent() {
-        let mut bitvec = BitVec::repeat(false, 4);
-        bitvec.set(0, true);
-        bitvec.set(2, true);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 2, None);
-        let percent = 0.5; // Less than 1.0, should use roaring bitmap
-        let parquet_rows = 4;
+    fn test_get_cache_entry_row_ids_selection() {
+        let result = TantivyResult::RowIdsSelection {
+            row_ids: vec![0, 2],
+            row_group_size: Some(1024),
+        };
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
-            CacheEntry::RowIdsRoaring(roaring, num_rows, rows, _) => {
-                assert_eq!(num_rows, 2);
-                assert_eq!(rows, 4);
-                assert_eq!(roaring.len(), 2); // Should contain positions 0 and 2
+            CacheEntry::RowIds(roaring, row_group_size) => {
+                assert_eq!(roaring.len(), 2);
                 assert!(roaring.contains(0));
                 assert!(roaring.contains(2));
+                assert_eq!(row_group_size, Some(1024));
             }
-            _ => panic!("Expected RowIdsRoaring cache entry"),
-        }
-    }
-
-    #[test]
-    fn test_get_cache_entry_row_ids_bitvec_large_percent() {
-        let mut bitvec = BitVec::repeat(false, 4);
-        bitvec.set(0, true);
-        bitvec.set(1, true);
-        bitvec.set(3, true);
-        let result = TantivyResult::RowIdsBitVec(bitvec, 3, None);
-        let percent = 2.0; // Greater than 1.0, should use bitvec
-        let parquet_rows = 4;
-
-        let entry = get_cache_entry(result, percent, parquet_rows);
-        match entry {
-            CacheEntry::RowIdsBitVec(returned_bitvec, num_rows, _) => {
-                assert_eq!(num_rows, 3);
-                assert_eq!(returned_bitvec.len(), 4);
-                assert_eq!(returned_bitvec.get(0).unwrap(), true);
-                assert_eq!(returned_bitvec.get(1).unwrap(), true);
-                assert_eq!(returned_bitvec.get(2).unwrap(), false);
-                assert_eq!(returned_bitvec.get(3).unwrap(), true);
-            }
-            _ => panic!("Expected RowIdsBitVec cache entry"),
+            _ => panic!("Expected RowIds cache entry"),
         }
     }
 
     #[test]
     fn test_get_cache_entry_count() {
         let result = TantivyResult::Count(42);
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Count(count) => {
                 assert_eq!(count, 42);
@@ -879,10 +854,8 @@ mod tests {
     fn test_get_cache_entry_histogram() {
         let histogram_data = vec![1, 2, 3, 4];
         let result = TantivyResult::Histogram(histogram_data.clone());
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Histogram(histogram) => {
                 assert_eq!(histogram, histogram_data);
@@ -897,10 +870,8 @@ mod tests {
         distinct_values.insert("value1".to_string());
         distinct_values.insert("value2".to_string());
         let result = TantivyResult::Distinct(distinct_values.clone());
-        let percent = 1.0;
-        let parquet_rows = 100;
 
-        let entry = get_cache_entry(result, percent, parquet_rows);
+        let entry = get_cache_entry(result);
         match entry {
             CacheEntry::Distinct(distinct) => {
                 assert_eq!(distinct, distinct_values);

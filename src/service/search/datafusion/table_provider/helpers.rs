@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use arrow_schema::{DataType, SchemaRef};
-use config::{FileFormat, TIMESTAMP_COL_NAME, meta::bitvec::BitVec};
+use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileSelection};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
@@ -33,7 +33,9 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 #[cfg(all(feature = "enterprise", feature = "vortex"))]
-use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
+use o2_enterprise::enterprise::search::{
+    sampling::execution::generate_row_group_access_plan, vortex::generate_vortex_access_plan,
+};
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
@@ -44,14 +46,34 @@ const LEGACY_ROW_GROUP_SIZE: usize = 1024 * 1024;
 pub fn generate_access_plan(
     file: &PartitionedFile,
 ) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-    let info = storage::file_list::get_segment_info(file.path().as_ref())?;
+    let storage::file_list::ScanSelection {
+        selection,
+        row_group_size,
+    } = storage::file_list::get_scan_selection(file.path().as_ref())?;
     let file_format = FileFormat::from_extension(file.path().as_ref())?;
     match file_format {
-        FileFormat::Parquet => {
-            generate_parquet_access_plan(file, info.segment_ids, info.row_group_size)
-        }
+        FileFormat::Parquet => match selection {
+            FileSelection::Rows(row_ids) => {
+                generate_parquet_access_plan(file, &row_ids, row_group_size)
+            }
+            #[cfg(feature = "enterprise")]
+            FileSelection::RowGroups(row_group_ids) => {
+                let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
+                Some(generate_row_group_access_plan(
+                    &row_group_ids,
+                    num_rows.div_ceil(row_group_size),
+                    file.path().as_ref(),
+                ))
+            }
+            #[cfg(not(feature = "enterprise"))]
+            FileSelection::RowGroups(_) => None,
+        },
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
-        FileFormat::Vortex => generate_vortex_access_plan(info.segment_ids),
+        FileFormat::Vortex => match selection {
+            FileSelection::Rows(row_ids) => generate_vortex_access_plan(&row_ids),
+            // row-group-level sampling is parquet only; fall back to a full scan
+            FileSelection::RowGroups(_) => None,
+        },
         #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
         FileFormat::Vortex => None,
     }
@@ -59,71 +81,53 @@ pub fn generate_access_plan(
 
 fn generate_parquet_access_plan(
     file: &PartitionedFile,
-    segment_ids: Arc<BitVec>,
+    row_ids: &[u32],
     row_group_size: Option<u32>,
 ) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-    let stats = file.statistics.as_ref()?;
-    let Precision::Exact(num_rows) = stats.num_rows else {
-        return None;
-    };
-    // Use the row group size recorded in the tantivy index when it was built.
-    // Fall back to PARQUET_MAX_ROW_GROUP_SIZE for legacy .ttv files that
-    // predate this property (those were always written with the 1M default).
-    let row_group_size = row_group_size
-        .map(|v| v as usize)
-        .unwrap_or(LEGACY_ROW_GROUP_SIZE);
+    let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
     let row_group_count = num_rows.div_ceil(row_group_size);
 
-    // Determine sampling mode based on BitVec size:
-    // - If BitVec size == row_group_count: row-group-level sampling (enterprise feature)
-    // - If BitVec size == num_rows: row-level sampling (original behavior)
-    #[cfg(feature = "enterprise")]
-    if segment_ids.len() == row_group_count {
-        // Row-group-level sampling: each bit represents a row group
-        return Some(
-            o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan(
-                &segment_ids,
-                row_group_count,
-                file.path().as_ref(),
-            ),
+    if let Some(&last) = row_ids.last()
+        && last as usize >= num_rows
+    {
+        log::warn!(
+            "file path: file={:?}, row_id {last} out of range (num_rows={num_rows}), skip access plan",
+            file.path().as_ref()
         );
+        return None;
     }
 
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    for (row_group_id, chunk) in segment_ids.chunks(row_group_size).enumerate() {
-        let mut selection = Vec::new();
-        let mut current_count = 0;
-        let mut current_select = false;
+    let mut i = 0;
+    while i < row_ids.len() {
+        let row_group_id = row_ids[i] as usize / row_group_size;
+        let rg_start = row_group_id * row_group_size;
+        let rg_end = (rg_start + row_group_size).min(num_rows);
 
-        for val in chunk.iter().take(num_rows - row_group_id * row_group_size) {
-            if *val == current_select {
-                current_count += 1;
-            } else {
-                if current_count > 0 {
-                    if current_select {
-                        selection.push(RowSelector::select(current_count));
-                    } else {
-                        selection.push(RowSelector::skip(current_count));
-                    }
-                }
-                current_select = *val;
-                current_count = 1;
+        let mut selection: Vec<RowSelector> = Vec::new();
+        let mut cursor = rg_start;
+        while i < row_ids.len() && (row_ids[i] as usize) < rg_end {
+            let run_start = row_ids[i] as usize;
+            let mut run_end = run_start + 1;
+            i += 1;
+            // a run must stop at the row group boundary; ids beyond it belong
+            // to the next row group's selection
+            while run_end < rg_end && i < row_ids.len() && row_ids[i] as usize == run_end {
+                run_end += 1;
+                i += 1;
             }
-        }
-
-        // handle the last batch
-        if current_count > 0 {
-            if current_select {
-                selection.push(RowSelector::select(current_count));
-            } else {
-                selection.push(RowSelector::skip(current_count));
+            if run_start > cursor {
+                selection.push(RowSelector::skip(run_start - cursor));
             }
+            selection.push(RowSelector::select(run_end - run_start));
+            cursor = run_end;
+        }
+        if cursor < rg_end {
+            selection.push(RowSelector::skip(rg_end - cursor));
         }
 
-        if selection.iter().any(|s| !s.skip) {
-            access_plan.scan(row_group_id);
-            access_plan.scan_selection(row_group_id, RowSelection::from(selection));
-        }
+        access_plan.scan(row_group_id);
+        access_plan.scan_selection(row_group_id, RowSelection::from(selection));
     }
 
     log::debug!(
@@ -131,6 +135,21 @@ fn generate_parquet_access_plan(
         file.path().as_ref()
     );
     Some(Arc::new(access_plan))
+}
+
+/// Exact row count of the file and the row group size.
+fn parquet_file_layout(
+    file: &PartitionedFile,
+    row_group_size: Option<u32>,
+) -> Option<(usize, usize)> {
+    let stats = file.statistics.as_ref()?;
+    let Precision::Exact(num_rows) = stats.num_rows else {
+        return None;
+    };
+    let row_group_size = row_group_size
+        .map(|v| v as usize)
+        .unwrap_or(LEGACY_ROW_GROUP_SIZE);
+    Some((num_rows, row_group_size))
 }
 
 pub fn apply_projection(
@@ -215,8 +234,97 @@ pub fn apply_combined_filter(
 #[cfg(test)]
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::common::Statistics;
 
     use super::*;
+
+    fn make_partitioned_file(num_rows: usize) -> PartitionedFile {
+        let mut file = PartitionedFile::new("test.parquet".to_string(), 100);
+        let mut stats = Statistics::new_unknown(&Schema::empty());
+        stats.num_rows = Precision::Exact(num_rows);
+        file.statistics = Some(Arc::new(stats));
+        file
+    }
+
+    fn downcast_plan(plan: &Arc<dyn std::any::Any + Send + Sync>) -> &ParquetAccessPlan {
+        plan.downcast_ref::<ParquetAccessPlan>().unwrap()
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_from_sorted_row_ids() {
+        // 10 rows, row groups of 4: rg0=[0..4), rg1=[4..8), rg2=[8..10)
+        let file = make_partitioned_file(10);
+        let row_ids = vec![0u32, 1, 5, 9];
+
+        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(0);
+        expected.scan_selection(
+            0,
+            RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
+        );
+        expected.scan(1);
+        expected.scan_selection(
+            1,
+            RowSelection::from(vec![
+                RowSelector::skip(1),
+                RowSelector::select(1),
+                RowSelector::skip(2),
+            ]),
+        );
+        expected.scan(2);
+        expected.scan_selection(
+            2,
+            RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(1)]),
+        );
+        assert_eq!(downcast_plan(&plan), &expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_skips_untouched_row_groups() {
+        // only the middle row group has matches
+        let file = make_partitioned_file(12);
+        let row_ids = vec![4u32, 5, 6, 7];
+
+        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(1);
+        expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
+        assert_eq!(downcast_plan(&plan), &expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_run_crossing_row_group_boundary() {
+        // a consecutive run 2..=5 spans rg0 [0..4) and rg1 [4..8); it must be
+        // split at the boundary so both row groups get their own selection
+        let file = make_partitioned_file(10);
+        let row_ids = vec![2u32, 3, 4, 5];
+
+        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(0);
+        expected.scan_selection(
+            0,
+            RowSelection::from(vec![RowSelector::skip(2), RowSelector::select(2)]),
+        );
+        expected.scan(1);
+        expected.scan_selection(
+            1,
+            RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
+        );
+        assert_eq!(downcast_plan(&plan), &expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_out_of_range_returns_none() {
+        let file = make_partitioned_file(10);
+        let row_ids = vec![0u32, 10];
+
+        assert!(generate_parquet_access_plan(&file, &row_ids, Some(4)).is_none());
+    }
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
