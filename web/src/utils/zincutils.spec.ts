@@ -24,6 +24,7 @@ import {
   getLocalTime,
   getBasicAuth,
   convertToTitleCase,
+  truncateText,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
   formatSizeFromMB,
@@ -535,6 +536,28 @@ if .severity == "error" {
       it("should convert hyphenated string to title case", () => {
         expect(convertToTitleCase("hello-world")).toBe("Hello World");
         expect(convertToTitleCase("test-case-string")).toBe("Test Case String");
+      });
+    });
+
+    describe("truncateText", () => {
+      it("should truncate text exceeding maxLength and append ellipsis", () => {
+        expect(truncateText("oteldemo.RecommendationService", 24)).toBe(
+          "oteldemo.Recommendation…",
+        );
+        expect(truncateText("oteldemo.RecommendationService", 24).length).toBe(
+          24,
+        );
+      });
+
+      it("should return text unchanged when within maxLength", () => {
+        expect(truncateText("frontend", 24)).toBe("frontend");
+        expect(truncateText("exactly-24-characters-ok", 24)).toBe(
+          "exactly-24-characters-ok",
+        );
+      });
+
+      it("should handle empty string", () => {
+        expect(truncateText("", 24)).toBe("");
       });
     });
 

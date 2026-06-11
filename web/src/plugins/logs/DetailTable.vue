@@ -232,10 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre tw:flex-1"
+                    class="table-pre tw:flex-1 tw:min-w-0"
                     :class="
                       !shouldWrapValues
-                        ? 'tw:whitespace-nowrap'
+                        ? 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis'
                         : 'tw:whitespace-pre-wrap'
                     "
                   ><ChunkedContent

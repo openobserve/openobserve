@@ -137,7 +137,7 @@ pub async fn save_pipeline(
     }
     let pipeline_id = pipeline.id.to_string();
     let pipeline_name = pipeline.name.clone();
-    match pipeline::save_pipeline(pipeline).await {
+    match pipeline::save_user_pipeline(pipeline).await {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Pipeline created successfully")
                 .with_id(pipeline_id)
@@ -206,7 +206,7 @@ pub async fn list_pipelines(
         // Get List of allowed objects ends
     }
 
-    let pipelines = match pipeline::list_pipelines(&org_id, _permitted).await {
+    let pipelines = match pipeline::list_user_pipelines(&org_id, _permitted).await {
         Ok(pipelines) => pipelines,
         Err(e) => return e.into(),
     };
@@ -271,15 +271,7 @@ pub async fn list_pipelines(
     )
 )]
 pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
-    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
-        .await
-        .as_deref()
-        != Some(org_id.as_str())
-    {
-        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
-    }
-
-    let meta_pipeline = match crate::service::db::pipeline::get_by_id(&pipeline_id).await {
+    let meta_pipeline = match pipeline::get_user_pipeline(&org_id, &pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => return e.into(),
     };
@@ -378,15 +370,7 @@ pub async fn list_streams_with_pipeline(Path(org_id): Path<String>) -> Response 
     )
 )]
 pub async fn delete_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -> Response {
-    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
-        .await
-        .as_deref()
-        != Some(org_id.as_str())
-    {
-        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
-    }
-
-    match pipeline::delete_pipeline(&pipeline_id).await {
+    match pipeline::delete_user_pipeline(&org_id, &pipeline_id).await {
         Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
             "Pipeline deleted successfully",
@@ -451,7 +435,7 @@ pub async fn delete_pipeline_bulk(
     let mut err = None;
 
     for id in req.ids {
-        match pipeline::delete_pipeline(&id).await {
+        match pipeline::delete_user_pipeline(&org_id, &id).await {
             Ok(()) => {
                 successful.push(id);
             }
@@ -504,7 +488,8 @@ pub async fn update_pipeline(
     Json(mut pipeline): Json<Pipeline>,
 ) -> Response {
     pipeline.org = org_id;
-    match pipeline::update_pipeline(pipeline).await {
+    let org_id = pipeline.org.clone();
+    match pipeline::update_user_pipeline(&org_id, pipeline).await {
         Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
             "Pipeline updated successfully",
@@ -545,13 +530,6 @@ pub async fn enable_pipeline(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
-        .await
-        .as_deref()
-        != Some(org_id.as_str())
-    {
-        return MetaHttpResponse::not_found(format!("Pipeline not found: {pipeline_id}"));
-    }
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
@@ -562,7 +540,7 @@ pub async fn enable_pipeline(
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
 
-    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
+    match pipeline::enable_user_pipeline(&org_id, &pipeline_id, enable, starts_from_now).await {
         Ok(()) => {
             let resp_msg = format!(
                 "Pipeline successfully {}",
@@ -644,7 +622,7 @@ pub async fn enable_pipeline_bulk(
     let mut err = None;
 
     for id in req.ids {
-        match pipeline::enable_pipeline(&org_id, &id, enable, starts_from_now).await {
+        match pipeline::enable_user_pipeline(&org_id, &id, enable, starts_from_now).await {
             Ok(()) => {
                 successful.push(id);
             }

@@ -44,7 +44,7 @@ use crate::{
     },
     handler::http::{extractors::Headers, request::alerts::history::escape_like},
     service::{
-        db::pipeline::list_by_org as list_pipelines,
+        pipeline::list_user_pipelines,
         search::{self as SearchService},
     },
 };
@@ -562,7 +562,7 @@ pub async fn get_pipeline_history(
 /// Helper function to get all pipeline IDs for an organization
 async fn get_organization_pipeline_ids(org_id: &str) -> Result<Vec<String>, anyhow::Error> {
     // Get all pipelines for the organization
-    let pipelines = list_pipelines(org_id).await?;
+    let pipelines = list_user_pipelines(org_id, None).await?;
 
     // Extract pipeline IDs
     let ids: Vec<String> = pipelines.into_iter().map(|pipeline| pipeline.id).collect();

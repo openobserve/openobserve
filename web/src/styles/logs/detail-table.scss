@@ -11,7 +11,10 @@
 }
 
 .table-pre {
-  white-space: pre-wrap;
+  // `white-space` is intentionally not set here: the Wrap toggle drives it via
+  // the conditional `tw:whitespace-pre-wrap` / `tw:whitespace-nowrap` classes on
+  // the element. Hardcoding it here would override those (equal specificity, SCSS
+  // wins by source order) and make the toggle a no-op.
   word-wrap: break-word;
   display: inline;
   font-weight: normal;

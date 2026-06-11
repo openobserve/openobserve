@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md search-job-inspector tw:p-0">
-    <div class="tw:w-full tw:flex tw:flex-col tw:h-[calc(100vh_-_var(--navbar-height))] tw:overflow-hidden">
+    <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
       <!-- Header Card -->
       <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:mx-2.5 tw:shrink-0">
         <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
@@ -277,6 +277,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tree
             tree-column-id="index"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="logs-search-job-inspector"
             style="width: 100%;"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
@@ -298,8 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
+            <template #cell-component="{ row }">
+              <span :title="row.component">{{ row.component }}</span>
+            </template>
+
             <template #cell-desc="{ row }">
-              <div class="tw:text-xs">{{ row.desc || '-' }}</div>
+              <span class="tw:text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
             </template>
 
             <template #empty>
@@ -455,7 +462,7 @@ export default defineComponent({
         header: "Node Name",
         accessorKey: "node_name",
         meta: { align: "left" },
-        size: 200,
+        size: 280,
       },
       {
         id: "search_role",
@@ -469,7 +476,7 @@ export default defineComponent({
         header: "Operation",
         accessorKey: "component",
         meta: { align: "left" },
-        size: 250,
+        size: 340,
       },
       {
         id: "desc",
