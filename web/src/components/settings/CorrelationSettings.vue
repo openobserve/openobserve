@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:bg-(--o2-card-bg)">
     <!-- Sticky tabs band (section title is provided full-width by the shell). -->
     <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]" data-test="correlation-settings-tabs">
       <div class="tw:px-4 tw:pt-3 tw:flex tw:justify-start">
