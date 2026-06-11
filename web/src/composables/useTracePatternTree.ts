@@ -57,6 +57,13 @@ export function useTracePatternTree(
         // Add relationship
         serviceMap.get(fromService)!.children.push(pattern)
         serviceMap.get(toService)!.parents.push(fromService)
+      } else if (services.length === 1 && services[0]) {
+        // Self-pattern — register standalone services so they still get a
+        // node when they have no cross-service relationships (e.g. traces
+        // whose root spans all belong to the same service)
+        if (!serviceMap.has(services[0])) {
+          serviceMap.set(services[0], { children: [], parents: [] })
+        }
       }
     })
 
@@ -65,6 +72,11 @@ export function useTracePatternTree(
       service => serviceMap.get(service)!.parents.length === 0
     )
 
+    // Track every service reached from a root so services that are
+    // unreachable (cyclic relationships between root services) can be
+    // promoted to roots afterwards instead of disappearing from the graph
+    const globalVisited = new Set<string>()
+
     // Build tree recursively from root services
     const buildServiceTree = (serviceName: string, visited = new Set<string>()): TreeNode | null => {
       if (visited.has(serviceName)) return null // Prevent cycles
@@ -72,6 +84,8 @@ export function useTracePatternTree(
 
       const serviceInfo = serviceMap.get(serviceName)
       if (!serviceInfo) return null
+
+      globalVisited.add(serviceName)
 
       // Create children from outgoing relationships
       const children: TreeNode[] = []
@@ -126,6 +140,17 @@ export function useTracePatternTree(
     const treeNodes: TreeNode[] = rootServices
       .map(serviceName => buildServiceTree(serviceName))
       .filter((node): node is TreeNode => node !== null)
+
+    // Services unreachable from any parentless root — e.g. two root spans
+    // whose services call each other (A→B and B→A) leave no parentless
+    // service at all. Promote one uncovered service at a time to a root;
+    // each promotion marks everything it reaches as visited
+    serviceMap.forEach((_info, serviceName) => {
+      if (!globalVisited.has(serviceName)) {
+        const node = buildServiceTree(serviceName)
+        if (node) treeNodes.push(node)
+      }
+    })
 
     return treeNodes
   }

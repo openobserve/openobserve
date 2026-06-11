@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="showHeader" class="trace-combined-header-wrapper card-container tw:border-b tw:border-border-default">
         <!-- New Modern Header -->
         <header
-          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)] tw:pl-1"
         >
           <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
