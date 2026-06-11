@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </AppPageHeader>
       </template>
 
+      <div class="card-container tw:h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"
@@ -189,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTable>
+      </div>
     </PageLayout>
 
     <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
