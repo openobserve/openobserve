@@ -1517,7 +1517,12 @@ export default defineComponent({
         ? searchObj.data.editorValue
         : searchObj.data.query;
       const errorContext = searchObj.data.errorMsg
-        ? ` Error: ${searchObj.data.errorMsg.replace(/<[^>]+>/g, "").trim()}.`
+        ? (() => {
+            const el = document.createElement("div");
+            el.innerHTML = searchObj.data.errorMsg;
+            const text = (el.textContent ?? "").trim();
+            return text ? ` Error: ${text}.` : "";
+          })()
         : "";
       emit(
         "sendToAiChat",

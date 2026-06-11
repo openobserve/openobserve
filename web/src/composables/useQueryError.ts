@@ -32,6 +32,7 @@
  *   });
  */
 
+import DOMPurify from "dompurify";
 import { computed, ref, type MaybeRefOrGetter, toValue } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -159,8 +160,7 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
   /** Human-readable message — all HTML stripped, TraceID fragment removed. */
   const cleanMessage = computed<string>(() => {
     if (!rawMsg.value) return "";
-    return rawMsg.value
-      .replace(/<[^>]+>/g, "")
+    return DOMPurify.sanitize(rawMsg.value, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
       .replace(/TraceID:\s*[a-f0-9A-F-]+/gi, "")
       .replace(/\s+/g, " ")
       .trim();
