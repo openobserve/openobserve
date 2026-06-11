@@ -726,19 +726,14 @@ pub async fn update_stream_settings(
     }
     if !new_settings.full_text_search_keys.add.is_empty() {
         let now = now_micros();
-        let mut added = false;
         for field in new_settings.full_text_search_keys.add.iter() {
             if !settings.full_text_search_keys.contains(field) {
                 settings.index_fields_updated_at.insert(field.clone(), now);
-                added = true;
             }
         }
         settings
             .full_text_search_keys
             .extend(new_settings.full_text_search_keys.add);
-        if added {
-            settings.index_updated_at = now;
-        }
     }
 
     // index_fields: remove first, then add
@@ -749,17 +744,12 @@ pub async fn update_stream_settings(
     }
     if !new_settings.index_fields.add.is_empty() {
         let now = now_micros();
-        let mut added = false;
         for field in new_settings.index_fields.add.iter() {
             if !settings.index_fields.contains(field) {
                 settings.index_fields_updated_at.insert(field.clone(), now);
-                added = true;
             }
         }
         settings.index_fields.extend(new_settings.index_fields.add);
-        if added {
-            settings.index_updated_at = now;
-        }
     }
 
     // bloom_filter_fields: remove first, then add
@@ -1371,7 +1361,6 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
             settings.index_fields_updated_at.insert(field.clone(), now);
         }
         settings.index_fields.extend(missing_index);
-        settings.index_updated_at = now;
     }
 
     // 3. prune per-field timestamps of fields no longer indexed
@@ -1437,7 +1426,6 @@ mod tests {
                 .get("b")
                 .is_some_and(|v| *v > 0)
         );
-        assert!(settings.index_updated_at > 0);
         // entry of a field no longer indexed is pruned
         assert!(!settings.index_fields_updated_at.contains_key("removed"));
         // entry of a still-indexed field is preserved
