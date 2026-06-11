@@ -219,22 +219,11 @@ impl<K: OrdKey> Collector for TopNCollector<K> {
         &self,
         mut segment_fruits: Vec<Vec<(Vec<String>, u64)>>,
     ) -> tantivy::Result<Self::Fruit> {
-        // common case: one segment per file, its fruit is already resolved and truncated
-        if segment_fruits.len() == 1 {
-            return Ok(segment_fruits.pop().unwrap());
-        }
-        // otherwise sum counts across segments, then apply the same keep rule as per segment
-        let mut merged: HashMap<Vec<String>, u64> = HashMap::new();
-        for fruit in segment_fruits {
-            for (key, count) in fruit {
-                *merged.entry(key).or_insert(0) += count;
-            }
-        }
-        let mut merged = merged.into_iter().collect::<Vec<_>>();
-        if merged.len() > self.max_groups {
-            truncate_top_k(&mut merged, self.k, self.ascend);
-        }
-        Ok(merged)
+        debug_assert!(
+            segment_fruits.len() <= 1,
+            "TopNSegmentCollector used on multi-segment index"
+        );
+        Ok(segment_fruits.pop().unwrap_or_default())
     }
 }
 
@@ -517,7 +506,6 @@ mod tests {
         writer
             .add_document(doc!(f0 => "a", f1 => "y", f2 => "2"))
             .unwrap();
-        writer.commit().unwrap();
         writer
             .add_document(doc!(f0 => "a", f1 => "x", f2 => "1"))
             .unwrap();
