@@ -212,6 +212,7 @@ use crate::{common::meta, handler::http::request};
         request::authz::fga::get_roles,
         request::authz::fga::update_role,
         request::authz::fga::get_role_permissions,
+        request::authz::fga::get_all_role_permissions,
         request::authz::fga::get_users_with_role,
         request::authz::fga::create_group,
         request::authz::fga::update_group,

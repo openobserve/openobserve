@@ -486,6 +486,62 @@ pub async fn get_role_permissions(
     }
 }
 
+#[cfg(feature = "enterprise")]
+/// GetRolePermissions
+#[utoipa::path(
+    get,
+    path = "/{org_id}/roles/{role_id}/permissions",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "GetRolePermissions",
+    summary = "Get all role permissions",
+    description = "Retrieves all permissions a role has across every resource type in a single request. Replaces issuing one request per resource type. Requires enterprise features to be enabled.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_all_role_permissions(
+    Path((org_id, role_id)): Path<(String, String)>,
+) -> Response {
+    match o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await {
+        Ok(res) => Json(res).into_response(),
+        Err(err) => MetaHttpResponse::internal_error(err),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/roles/{role_id}/permissions",
+    context_path = "/api",
+    tag = "Roles",
+    operation_id = "GetRolePermissions",
+    summary = "Get all role permissions",
+    description = "Retrieves all permissions a role has across every resource type in a single request. This endpoint is only available with enterprise features enabled and will return a forbidden error in the community edition.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("role_id" = String, Path, description = "Role Id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(Vec<Object>)),
+        (status = 500, description = "Failure", content_type = "application/json", body = ()),
+    )
+)]
+pub async fn get_all_role_permissions(Path(_path): Path<(String, String)>) -> Response {
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
     get,

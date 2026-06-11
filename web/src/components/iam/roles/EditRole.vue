@@ -285,10 +285,9 @@ import { onBeforeMount } from "vue";
 import {
   updateRole,
   getResources,
-  getResourcePermission,
+  getAllRolePermissions,
   getRoleUsers,
 } from "@/services/iam";
-import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
@@ -637,24 +636,15 @@ const modifyResourcePermissions = (resource: Resource) => {
 };
 
 const getResourcePermissions = () => {
-  const promises: AxiosPromise<any>[] = [];
-  permissionsState.resources.forEach((resource) => {
-    promises.push(
-      getResourcePermission({
-        role_name: editingRole.value,
-        org_identifier: store.state.selectedOrganization.identifier,
-        resource: resource.key,
-      }),
-    );
-  });
-
+  // Single request returns the role's permissions across all resource types,
+  // replacing one request per resource. Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
-    Promise.all(promises)
-      .then((res) => {
-        res.forEach((resourcePermissions: { data: Permission[] }) => {
-          permissions.value.push(...resourcePermissions.data);
-        });
-        promises.length = 0;
+    getAllRolePermissions({
+      role_name: editingRole.value,
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+      .then((res: { data: Permission[] }) => {
+        permissions.value.push(...res.data);
         resolve(true);
       })
       .catch((err) => {
