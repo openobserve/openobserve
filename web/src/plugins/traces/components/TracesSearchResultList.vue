@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="noResults"
       data-test="traces-search-result-not-found-text"
       @widen-range="(p) => emit('widen-range', p)"
+      @remove-filter="emit('remove-filter')"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -282,6 +283,7 @@ const emit = defineEmits<{
   copy: [value: any];
   "send-to-ai-chat": [value: string];
   "widen-range": [period: string];
+  "remove-filter": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>

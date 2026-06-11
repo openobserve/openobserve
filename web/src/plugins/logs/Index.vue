@@ -1582,6 +1582,7 @@ export default defineComponent({
     const onRemoveFilter = () => {
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
+      searchBarRef.value?.updateQuery?.();
       searchObj.runQuery = true;
     };
 

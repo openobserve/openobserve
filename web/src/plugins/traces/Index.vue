@@ -261,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
                       @widen-range="onWidenTracesRange"
+                      @remove-filter="onRemoveTracesFilter"
                     />
                   </div>
                 </div>
@@ -1737,6 +1738,12 @@ const onFiltersReset = () => {
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
+
+const onRemoveTracesFilter = () => {
+  searchObj.data.editorValue = "";
+  searchBarRef.value?.updateQuery?.();
+  searchObj.runQuery = true;
+};
 
 const onWidenTracesRange = (period: string) => {
   searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
