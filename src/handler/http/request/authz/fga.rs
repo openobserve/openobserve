@@ -508,9 +508,7 @@ pub async fn get_role_permissions(
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     )
 )]
-pub async fn get_all_role_permissions(
-    Path((org_id, role_id)): Path<(String, String)>,
-) -> Response {
+pub async fn get_all_role_permissions(Path((org_id, role_id)): Path<(String, String)>) -> Response {
     match o2_openfga::authorizer::roles::get_all_role_permissions(&org_id, &role_id).await {
         Ok(res) => Json(res).into_response(),
         Err(err) => MetaHttpResponse::internal_error(err),
