@@ -201,8 +201,15 @@ pub async fn search(
 
     log::info!("[trace_id {trace_id}] super cluster leader: search finished");
 
+    let wait_in_queue = scan_stats.wait_in_queue as usize;
     scan_stats.format_to_mb();
-    Ok((data, scan_stats, 0, !partial_err.is_empty(), partial_err))
+    Ok((
+        data,
+        scan_stats,
+        wait_in_queue,
+        !partial_err.is_empty(),
+        partial_err,
+    ))
 }
 
 async fn run_datafusion(
