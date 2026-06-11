@@ -3511,7 +3511,9 @@
     "timeRangeLabel": "Zaman Aralığı:",
     "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
     "insightsButtonLabel": "İçgörüler",
-    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin"
+    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin",
+    "inspectBtnLabel": "İnceleyin",
+    "analyzeBtnLabel": "İçgörüler"
   },
   "errorInsights": {
     "title": "İçgörüler",

@@ -3498,7 +3498,9 @@
     "timeRangeLabel": "Plage de temps :",
     "analyzeTooltipTraces": "Analysez les dimensions des traces pour déterminer le taux, la latence et les modèles d'erreur",
     "insightsButtonLabel": "Perspectives",
-    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche"
+    "searchInspectionsLabel": "Inspectez les détails de l'exécution des tâches de recherche",
+    "inspectBtnLabel": "Inspectez",
+    "analyzeBtnLabel": "Perspectives"
   },
   "errorInsights": {
     "title": "Perspectives",

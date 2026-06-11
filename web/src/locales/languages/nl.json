@@ -3511,7 +3511,9 @@
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
     "insightsButtonLabel": "Inzichten",
-    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht",
+    "inspectBtnLabel": "Inspecteer",
+    "analyzeBtnLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
