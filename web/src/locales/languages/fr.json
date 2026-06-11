@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Ajouter une règle",
     "textColor": "Texte",
     "bgColor": "Contexte",
-    "colorNone": "aucune"
+    "colorNone": "aucune",
+    "cellTypeBar": "Bar",
+    "cellTypeSpark": "Étincelle",
+    "cellColor": "couleur",
+    "conditionNoRules": "Il n'y a pas encore de règles.",
+    "customColor": "Couleur personnalisée",
+    "formatColumn": "Colonne de format",
+    "resetColumn": "Réinitialiser la colonne",
+    "editAll": "Tout modifier",
+    "inlinePreview": "Aperçu",
+    "tapActiveToClear": "appuyez sur actif pour effacer"
   },
   "panel": {
     "header": "Panneau",

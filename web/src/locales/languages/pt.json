@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Adicionar regra",
     "textColor": "Texto",
     "bgColor": "Plano de fundo",
-    "colorNone": "nenhum"
+    "colorNone": "nenhum",
+    "cellTypeBar": "Barra",
+    "cellTypeSpark": "Faísca",
+    "cellColor": "Cor",
+    "conditionNoRules": "Ainda não há regras.",
+    "customColor": "Cor personalizada",
+    "formatColumn": "Formatar coluna",
+    "resetColumn": "Redefinir coluna",
+    "editAll": "Editar tudo",
+    "inlinePreview": "prévia",
+    "tapActiveToClear": "toque em ativo para limpar"
   },
   "panel": {
     "header": "Painel",

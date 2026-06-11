@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Añadir regla",
     "textColor": "Texto",
     "bgColor": "Antecedentes",
-    "colorNone": "ninguna"
+    "colorNone": "ninguna",
+    "cellTypeBar": "Bar",
+    "cellTypeSpark": "Chispa",
+    "cellColor": "Color",
+    "conditionNoRules": "Aún no hay reglas.",
+    "customColor": "Color personalizado",
+    "formatColumn": "Columna de formato",
+    "resetColumn": "Restablecer columna",
+    "editAll": "Editar todo",
+    "inlinePreview": "Vista previa",
+    "tapActiveToClear": "toca activo para borrar"
   },
   "panel": {
     "header": "Panel",

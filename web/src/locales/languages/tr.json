@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Kural ekle",
     "textColor": "Metin",
     "bgColor": "Arkaplan",
-    "colorNone": "hiçbiri"
+    "colorNone": "hiçbiri",
+    "cellTypeBar": "Bar",
+    "cellTypeSpark": "Kıvılcım",
+    "cellColor": "Renk",
+    "conditionNoRules": "Henüz kural yok.",
+    "customColor": "Özel renk",
+    "formatColumn": "Biçim sütunu",
+    "resetColumn": "Sütunu sıfırla",
+    "editAll": "Tümünü düzenle",
+    "inlinePreview": "Önizleme",
+    "tapActiveToClear": "temizlemek için etkin'e dokunun"
   },
   "panel": {
     "header": "Panel",

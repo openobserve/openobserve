@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Regel hinzufügen",
     "textColor": "Text",
     "bgColor": "Hintergrund",
-    "colorNone": "keine"
+    "colorNone": "keine",
+    "cellTypeBar": "Bar",
+    "cellTypeSpark": "Funke",
+    "cellColor": "Farbe",
+    "conditionNoRules": "Noch keine Regeln.",
+    "customColor": "Benutzerdefinierte Farbe",
+    "formatColumn": "Spalte formatieren",
+    "resetColumn": "Spalte zurücksetzen",
+    "editAll": "Alles bearbeiten",
+    "inlinePreview": "Vorschau",
+    "tapActiveToClear": "zum Löschen auf Aktiv tippen"
   },
   "panel": {
     "header": "Panel",

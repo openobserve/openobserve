@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ Regel toevoegen",
     "textColor": "Tekst",
     "bgColor": "Achtergrond",
-    "colorNone": "geen"
+    "colorNone": "geen",
+    "cellTypeBar": "Bar",
+    "cellTypeSpark": "Vonk",
+    "cellColor": "Kleur",
+    "conditionNoRules": "Nog geen regels.",
+    "customColor": "Aangepaste kleur",
+    "formatColumn": "Kolom opmaken",
+    "resetColumn": "Kolom opnieuw instellen",
+    "editAll": "Alles bewerken",
+    "inlinePreview": "voorsmaak",
+    "tapActiveToClear": "tik op actief om te wissen"
   },
   "panel": {
     "header": "Paneel",

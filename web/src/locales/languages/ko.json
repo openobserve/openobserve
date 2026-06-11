@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ 규칙 추가",
     "textColor": "텍스트",
     "bgColor": "백그라운드",
-    "colorNone": "없음"
+    "colorNone": "없음",
+    "cellTypeBar": "바",
+    "cellTypeSpark": "스파크",
+    "cellColor": "색상",
+    "conditionNoRules": "아직 규칙이 없습니다.",
+    "customColor": "사용자 지정 색상",
+    "formatColumn": "형식 컬럼",
+    "resetColumn": "열 재설정",
+    "editAll": "전체 편집",
+    "inlinePreview": "시사",
+    "tapActiveToClear": "지우려면 활성을 탭하세요"
   },
   "panel": {
     "header": "패널",

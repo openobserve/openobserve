@@ -1705,7 +1705,17 @@
     "conditionAddRule": "+ 添加规则",
     "textColor": "文本",
     "bgColor": "背景",
-    "colorNone": "无"
+    "colorNone": "无",
+    "cellTypeBar": "酒吧",
+    "cellTypeSpark": "火花",
+    "cellColor": "颜色",
+    "conditionNoRules": "还没有规则。",
+    "customColor": "自定义颜色",
+    "formatColumn": "格式化列",
+    "resetColumn": "重置列",
+    "editAll": "全部编辑",
+    "inlinePreview": "预览",
+    "tapActiveToClear": "点击激活即可清除"
   },
   "panel": {
     "header": "面板",
