@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stretch
         >
           <div
-            class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-1"
+            class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
           >
             <!-- Empty state -->
             <div
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- History Table -->
             <div
               v-else
-              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:mb-2"
+              class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
               :class="
                 store.state.theme === 'dark'
                   ? 'code-block-dark'
@@ -307,12 +307,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           stretch
         >
           <div
-            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:pt-2 tw:pb-2"
+            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
           >
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden"
+                class="code-block tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden "
                 :class="
                   store.state.theme === 'dark'
                     ? 'code-block-dark'
@@ -861,7 +861,7 @@ watch(
 }
 .code-block-dark {
   border-color: #374151;
-  background: #111827;
+  // background: #111827;
 }
 
 .code-block-header {
@@ -876,7 +876,7 @@ watch(
   border-color: #e5e7eb;
 }
 .code-block-header-dark {
-  background: #1f2937;
+  // background: #1f2937;
   border-color: #374151;
 }
 
