@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !searchObj.data.errorMsg?.trim()?.length &&
           searchObj.searchApplied
         "
+        ref="sectionHeaderRef"
         data-test="traces-section-header"
         class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
@@ -90,12 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           variant="outline"
-          size="icon-chip"
+          :size="showActionLabels ? 'chip' : 'icon-chip'"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
           <OIcon name="timeline" size="sm" />
-          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
+          <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
@@ -187,6 +189,8 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  onBeforeUnmount,
+  onMounted,
   ref,
   watch,
 } from "vue";
@@ -265,6 +269,25 @@ export default defineComponent({
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const metricsDashboardRef: any = ref(null);
+
+    const sectionHeaderRef = ref<HTMLElement | null>(null);
+    const containerWidth = ref(9999);
+    let headerResizeObserver: ResizeObserver | null = null;
+    const showActionLabels = computed(() => containerWidth.value >= 900);
+
+    onMounted(() => {
+      if (sectionHeaderRef.value) {
+        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
+        headerResizeObserver = new ResizeObserver((entries) => {
+          containerWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        headerResizeObserver.observe(sectionHeaderRef.value);
+      }
+    });
+
+    onBeforeUnmount(() => {
+      headerResizeObserver?.disconnect();
+    });
 
     watch(
       () => searchObj.loading,
@@ -390,6 +413,8 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      sectionHeaderRef,
+      showActionLabels,
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
