@@ -4769,8 +4769,9 @@
       "reportsRefresh": "Aggiorna elenco"
     },
     "search": "Scorciatoie per la ricerca...",
-    "noResults": "Nessuna scorciatoia trovata",
-    "aiObservability": {
+    "noResults": "Nessuna scorciatoia trovata"
+  },
+  "aiObservability": {
     "title": "Osservabilità LLM",
     "sections": {
       "monitor": "Monitorare",

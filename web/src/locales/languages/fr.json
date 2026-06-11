@@ -4758,8 +4758,9 @@
       "reportsRefresh": "Actualiser la liste"
     },
     "search": "Raccourcis de recherche...",
-    "noResults": "Aucun raccourci n'a été trouvé",
-    "aiObservability": {
+    "noResults": "Aucun raccourci n'a été trouvé"
+  },
+  "aiObservability": {
     "title": "Observabilité LLM",
     "sections": {
       "monitor": "Moniteur",

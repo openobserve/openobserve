@@ -4756,8 +4756,9 @@
       "reportsRefresh": "Actualizar lista"
     },
     "search": "Atajos de búsqueda...",
-    "noResults": "No se han encontrado atajos",
-    "aiObservability": {
+    "noResults": "No se han encontrado atajos"
+  },
+  "aiObservability": {
     "title": "LLM Observabilidad",
     "sections": {
       "monitor": "Supervisar",

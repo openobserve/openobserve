@@ -4771,8 +4771,9 @@
       "reportsRefresh": "Lijst verversen"
     },
     "search": "Sneltoetsen zoeken...",
-    "noResults": "Geen sneltoetsen gevonden",
-    "aiObservability": {
+    "noResults": "Geen sneltoetsen gevonden"
+  },
+  "aiObservability": {
     "title": "LLM-waarneembaarheid",
     "sections": {
       "monitor": "Monitor",

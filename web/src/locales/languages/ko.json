@@ -4771,8 +4771,9 @@
       "reportsRefresh": "목록 새로 고침"
     },
     "search": "검색 단축키...",
-    "noResults": "단축키를 찾을 수 없습니다",
-    "aiObservability": {
+    "noResults": "단축키를 찾을 수 없습니다"
+  },
+  "aiObservability": {
     "title": "LLM 옵저버빌리티",
     "sections": {
       "monitor": "모니터",

@@ -4758,8 +4758,9 @@
       "reportsRefresh": "Liste aktualisieren"
     },
     "search": "Kurzbefehle suchen...",
-    "noResults": "Keine Abkürzungen gefunden",
-    "aiObservability": {
+    "noResults": "Keine Abkürzungen gefunden"
+  },
+  "aiObservability": {
     "title": "LLM Beobachtbarkeit",
     "sections": {
       "monitor": "Überwachen",

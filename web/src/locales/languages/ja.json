@@ -4758,8 +4758,9 @@
       "reportsRefresh": "リストを更新"
     },
     "search": "ショートカットを検索...",
-    "noResults": "ショートカットが見つかりません",
-    "aiObservability": {
+    "noResults": "ショートカットが見つかりません"
+  },
+  "aiObservability": {
     "title": "LLM オブザーバビリティ",
     "sections": {
       "monitor": "モニター",

@@ -4758,8 +4758,9 @@
       "reportsRefresh": "Atualizar lista"
     },
     "search": "Atalhos de pesquisa...",
-    "noResults": "Nenhum atalho encontrado",
-    "aiObservability": {
+    "noResults": "Nenhum atalho encontrado"
+  },
+  "aiObservability": {
     "title": "Observabilidade do LLM",
     "sections": {
       "monitor": "Monitor",
