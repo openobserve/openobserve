@@ -2400,8 +2400,14 @@
     "viewLatencyCharts": "View latency & RED charts",
     "elevatedErrorRate": "Elevated error rate",
     "reqPerSec": "req/s",
-    "allClear": "All clear",
-    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window."
+    "allClear": "All systems clear",
+    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window. Your infrastructure looks healthy.",
+    "emptyActionAlerts": "View alert rules",
+    "emptyActionAlertsDesc": "Review configured alerts and thresholds",
+    "emptyActionLogs": "Explore logs",
+    "emptyActionLogsDesc": "Search and filter your log streams",
+    "emptyActionTraces": "Explore traces",
+    "emptyActionTracesDesc": "Inspect distributed traces and service latency"
   },
   "chatHistory": {
     "title": "Chats",
