@@ -147,7 +147,7 @@ mod tests {
                 bloom_ver: 0,
             },
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }

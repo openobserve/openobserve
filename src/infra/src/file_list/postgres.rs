@@ -3507,7 +3507,7 @@ mod tests {
             meta: create_test_file_meta(),
             deleted,
             id: 0,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }

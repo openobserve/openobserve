@@ -1098,7 +1098,7 @@ mod tests {
             key: "test.parquet".to_string(),
             meta: FileMeta::default(),
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }];
         let index_condition = None;
@@ -1141,7 +1141,7 @@ mod tests {
                 key: "file1.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -1150,7 +1150,7 @@ mod tests {
                 key: "file2.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -1159,7 +1159,7 @@ mod tests {
                 key: "file3.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -1168,7 +1168,7 @@ mod tests {
                 key: "file4.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -1177,7 +1177,7 @@ mod tests {
                 key: "file5.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
             FileKey {
@@ -1186,7 +1186,7 @@ mod tests {
                 key: "file6.parquet".to_string(),
                 meta: FileMeta::default(),
                 deleted: false,
-                segment_ids: None,
+                selection: None,
                 row_group_size: None,
             },
         ];
@@ -1235,7 +1235,7 @@ mod tests {
             key: "test.parquet".to_string(),
             meta: FileMeta::default(),
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }];
         let index_condition = None;
@@ -1277,7 +1277,7 @@ mod tests {
             key: "test.parquet".to_string(),
             meta: FileMeta::default(),
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }];
         let index_condition = None;
@@ -1320,7 +1320,7 @@ mod tests {
             key: "test.parquet".to_string(),
             meta: FileMeta::default(),
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }];
         let index_condition = None;

@@ -18,7 +18,7 @@ use std::{
     sync::{Arc, LazyLock as Lazy},
 };
 
-use config::{meta::bitvec::BitVec, metrics};
+use config::metrics;
 use dashmap::DashMap;
 use roaring::RoaringBitmap;
 
@@ -29,10 +29,9 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
-    /// (row_id_bitvec, matched_row_count, row_group_size_from_index_file)
-    RowIdsBitVec(BitVec, usize, Option<u32>),
-    /// (sparse_row_ids, matched_row_count, parquet_row_count, row_group_size_from_index_file)
-    RowIdsRoaring(RoaringBitmap, usize, usize, Option<u32>),
+    /// (matched_row_ids, row_group_size_from_index_file)
+    /// roaring adapts its container layout to sparse and dense id sets alike
+    RowIds(RoaringBitmap, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -43,16 +42,12 @@ pub enum CacheEntry {
 impl From<CacheEntry> for TantivyResult {
     fn from(entry: CacheEntry) -> Self {
         match entry {
-            CacheEntry::RowIdsBitVec(bitvec, num_rows, row_group_size) => {
-                TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size)
-            }
-            CacheEntry::RowIdsRoaring(roaring, num_rows, parquet_rows, row_group_size) => {
-                let mut bitvec = BitVec::repeat(false, parquet_rows);
-                for i in roaring.into_iter() {
-                    bitvec.set(i as usize, true);
-                }
-                TantivyResult::RowIdsBitVec(bitvec, num_rows, row_group_size)
-            }
+            CacheEntry::RowIds(roaring, row_group_size) => TantivyResult::RowIdsSelection {
+                // roaring iterates in ascending order, matching the sorted
+                // contract of RowIdsSelection
+                row_ids: roaring.into_iter().collect(),
+                row_group_size,
+            },
             CacheEntry::Count(count) => TantivyResult::Count(count),
             CacheEntry::Histogram(histogram) => TantivyResult::Histogram(histogram),
             CacheEntry::MultiHistogram(multi_histogram) => {
@@ -67,13 +62,8 @@ impl From<CacheEntry> for TantivyResult {
 impl CacheEntry {
     pub fn get_memory_size(&self) -> usize {
         match self {
-            CacheEntry::RowIdsBitVec(bitvec, ..) => {
-                bitvec.capacity().div_ceil(8) + std::mem::size_of::<BitVec>()
-            }
-            CacheEntry::RowIdsRoaring(roaring, ..) => {
-                roaring.serialized_size()
-                    + std::mem::size_of::<RoaringBitmap>()
-                    + std::mem::size_of::<usize>() * 2
+            CacheEntry::RowIds(roaring, ..) => {
+                roaring.serialized_size() + std::mem::size_of::<RoaringBitmap>()
             }
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
@@ -186,16 +176,10 @@ impl Default for TantivyResultCache {
 mod tests {
     use std::{collections::HashSet, sync::Arc, time::Duration};
 
-    use config::meta::bitvec::BitVec;
-
     use super::*;
 
     fn create_test_tantivy_result() -> CacheEntry {
-        let mut bitvec = BitVec::repeat(false, 100);
-        bitvec.set(10, true);
-        bitvec.set(20, true);
-        bitvec.set(30, true);
-        CacheEntry::RowIdsBitVec(bitvec, 3, None)
+        CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20, 30]), None)
     }
 
     fn create_test_count_result() -> CacheEntry {
@@ -222,12 +206,8 @@ mod tests {
         CacheEntry::Distinct(distinct)
     }
 
-    fn create_test_bitvec_result() -> CacheEntry {
-        let mut bitvec = BitVec::repeat(false, 100);
-        bitvec.set(10, true);
-        bitvec.set(20, true);
-        bitvec.set(30, true);
-        CacheEntry::RowIdsBitVec(bitvec, 3, None)
+    fn create_test_row_ids_result() -> CacheEntry {
+        CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20, 30]), None)
     }
 
     #[test]
@@ -246,10 +226,12 @@ mod tests {
         cache.put(key.clone(), result.clone());
         let retrieved = cache.get(&key);
         assert!(retrieved.is_some());
-        assert!(matches!(
-            retrieved.unwrap(),
-            TantivyResult::RowIdsBitVec(_, _, _)
-        ));
+        match retrieved.unwrap() {
+            TantivyResult::RowIdsSelection { row_ids, .. } => {
+                assert_eq!(row_ids, vec![10, 20, 30]);
+            }
+            _ => panic!("Expected RowIdsSelection result"),
+        }
     }
 
     #[test]
@@ -267,13 +249,13 @@ mod tests {
         cache.put("histogram_key".to_string(), create_test_histogram_result());
         cache.put("topn_key".to_string(), create_test_top_n_result());
         cache.put("distinct_key".to_string(), create_test_distinct_result());
-        cache.put("bitvec_key".to_string(), create_test_bitvec_result());
+        cache.put("row_ids_key".to_string(), create_test_row_ids_result());
 
         assert!(cache.get("count_key").is_some());
         assert!(cache.get("histogram_key").is_some());
         assert!(cache.get("topn_key").is_some());
         assert!(cache.get("distinct_key").is_some());
-        assert!(cache.get("bitvec_key").is_some());
+        assert!(cache.get("row_ids_key").is_some());
 
         if let Some(TantivyResult::Count(count)) = cache.get("count_key") {
             assert_eq!(count, 42);
@@ -465,20 +447,21 @@ mod tests {
     }
 
     #[test]
-    fn test_tantivy_result_cache_percent_method() {
+    fn test_tantivy_result_cache_row_ids_roundtrip() {
         let cache = TantivyResultCache::new(10);
 
-        let mut bitvec = BitVec::repeat(false, 100);
-        bitvec.set(10, true);
-        bitvec.set(20, true);
-        let bitvec_result = CacheEntry::RowIdsBitVec(bitvec, 25, None);
+        let entry = CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20]), Some(1024));
+        cache.put("row_ids_key".to_string(), entry);
 
-        cache.put("percent_key".to_string(), bitvec_result);
-
-        if let Some(TantivyResult::RowIdsBitVec(_, percent, ..)) = cache.get("percent_key") {
-            assert_eq!(percent, 25);
+        if let Some(TantivyResult::RowIdsSelection {
+            row_ids,
+            row_group_size,
+        }) = cache.get("row_ids_key")
+        {
+            assert_eq!(row_ids, vec![10, 20]);
+            assert_eq!(row_group_size, Some(1024));
         } else {
-            panic!("Expected RowIdsBitVec result");
+            panic!("Expected RowIdsSelection result");
         }
     }
 }
