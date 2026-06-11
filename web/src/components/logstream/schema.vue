@@ -333,19 +333,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         label="Configuration"
                         data-test="schema-configuration-tab"
                       />
-                      <!-- LLM Evaluation Tab (enterprise + ai_enabled + traces only) -->
-                      <OTab
-                        v-if="
-                          config.isEnterprise == 'true' &&
-                          store.state.zoConfig.ai_enabled &&
-                          indexData.stream_type === 'traces'
-                        "
-                        name="llmEvaluation"
-                        icon="psychology"
-                        :label="t('pipeline.llmEvaluation')"
-                        data-test="stream-llm-evaluation-tab"
-                      />
-
                       <!-- Cross-Linking Tab -->
                       <OTab
                         v-if="
@@ -773,15 +760,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
 
-                <!-- LLM Evaluation tab -->
-                <LlmEvaluationSettings
-                  v-if="activeMainTab == 'llmEvaluation'"
-                  ref="llmEvalSettingsRef"
-                  :stream-name="indexData.name"
-                  :stream-fields="llmEvalStreamFields"
-                  @dirty="llmEvalFormDirty = true"
-                />
-
                 <!-- cross-linking tab -->
                 <div v-if="activeMainTab == 'crossLinking'">
                   <div class="tw:p-4">
@@ -810,32 +788,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- floating footer for the table -->
                 <div class="floating-buttons tw:flex-shrink-0 tw:px-2 tw:py-1">
-                  <!-- LLM Evaluation tab footer -->
                   <div
-                    v-if="activeMainTab === 'llmEvaluation'"
-                    class="tw:flex tw:items-center tw:justify-end tw:gap-2"
-                  >
-                    <OButton
-                      data-test="schema-cancel-button"
-                      variant="outline"
-                      size="sm-action"
-                      @click="llmEvalFormDirty = false; $emit('close')"
-                    >
-                      {{ t("logStream.cancel") }}
-                    </OButton>
-                    <OButton
-                      :disabled="!llmEvalFormDirty"
-                      data-test="schema-update-settings-button"
-                      variant="primary"
-                      size="sm-action"
-                      @click="llmEvalSettingsRef?.save()"
-                    >
-                      {{ t("logStream.updateSettings") }}
-                    </OButton>
-                  </div>
-
-                  <div
-                    v-else-if="indexData.schema.length > 0"
+                    v-if="indexData.schema.length > 0"
                     class="tw:flex tw:items-center tw:justify-between"
                   >
                     <div class="tw:flex tw:items-center tw:gap-2">
@@ -1032,7 +986,6 @@ import DateTime from "@/components/DateTime.vue";
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
-import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -1082,7 +1035,6 @@ export default defineComponent({
     AssociatedRegexPatterns,
     ODrawer,
     PerformanceFieldsDialog,
-    LlmEvaluationSettings,
     CrossLinkManager,
     OButton,
     OIcon,
@@ -1137,14 +1089,6 @@ export default defineComponent({
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
 
-    const llmEvalStreamFields = computed(() =>
-      (indexData.value.schema || []).map((f: any) => ({
-        label: f.name,
-        value: f.name,
-      })),
-    );
-    const llmEvalSettingsRef = ref<any>(null);
-    const llmEvalFormDirty = ref(false);
     const streamCrossLinks = ref<any[]>([]);
     const orgCrossLinks = computed(
       () =>
@@ -2112,7 +2056,6 @@ export default defineComponent({
 
     const updateActiveMainTab = (tab) => {
       activeMainTab.value = tab;
-      if (tab !== "llmEvaluation") llmEvalFormDirty.value = false;
     };
 
     // Function to get missing FTS and Secondary Index fields
@@ -2770,9 +2713,6 @@ export default defineComponent({
       quickModeIcon,
       getConfigIcon,
       getTimelineIcon,
-      llmEvalStreamFields,
-      llmEvalSettingsRef,
-      llmEvalFormDirty,
     };
   },
   created() {
