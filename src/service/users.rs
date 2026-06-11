@@ -737,8 +737,16 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
-    let key = format!("{DEFAULT_ORG}/{token}");
-    if let Some(user) = rum_tokens.get(&key) {
+
+    // Fast-path only for root users whose tokens are cached under DEFAULT_ORG.
+    // A non-root member of the literal "default" org also lands under this key,
+    // so we must verify they are actually a root user before bypassing the
+    // org-scoped lookup — otherwise any default-org token authenticates against
+    // every other org (cross-tenant write IDOR).
+    let default_key = format!("{DEFAULT_ORG}/{token}");
+    if let Some(user) = rum_tokens.get(&default_key)
+        && is_root_user(&user.email)
+    {
         return get_user(None, &user.email).await;
     }
 
