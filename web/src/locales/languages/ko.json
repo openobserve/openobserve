@@ -525,7 +525,18 @@
     "seekToMoment": "세션에서 이 순간을 찾아라",
     "timeInSession": "세션 시간",
     "route": "노선",
-    "duration": "지속"
+    "duration": "지속",
+    "emptyState": {
+      "title": "실제 사용자 모니터링으로 사용자 모니터링",
+      "description": "RUM은 페이지 로드, 오류, API 호출 및 세션 재생과 같은 실제 사용자 상호 작용을 추적하므로 사용자가 애플리케이션을 어떻게 경험하는지 정확히 확인할 수 있습니다.",
+      "webApp": "웹 앱 인스트루먼트",
+      "webAppDesc": "모든 자바스크립트 앱에 오픈옵저브 RUM SDK를 추가하세요.",
+      "sessionReplay": "세션 리플레이 활성화",
+      "sessionReplayDesc": "사용자 세션을 기록하고 재생하여 UX 문제를 디버깅합니다.",
+      "learnMore": "자세히 알아보기:",
+      "quickImpl": "빠른 구현 가이드",
+      "blogPost": "프런트엔드 모니터링 기본 사항"
+    }
   },
   "about": {
     "name": "오픈 옵저브",
