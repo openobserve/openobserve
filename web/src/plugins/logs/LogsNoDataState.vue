@@ -84,10 +84,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("logs.noData.windows") }}</EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
-          icon="bolt"
+          class="ai-hover-btn"
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
-        >{{ t("logs.noData.askAi") }}</EmptyStateIngestionChip>
+        >
+          <img :src="aiIconSrc" class="tw:w-3.5 tw:h-3.5 tw:shrink-0" alt="" />
+          {{ t("logs.noData.askAi") }}
+        </EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>
@@ -101,6 +104,7 @@ import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import { useAiIcon } from "@/composables/useAiIcon";
 
 const props = defineProps<{
   aiEnabled: boolean;
@@ -113,6 +117,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
+const { aiIconSrc } = useAiIcon();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,
