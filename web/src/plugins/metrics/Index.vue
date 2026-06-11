@@ -399,7 +399,7 @@ export default defineComponent({
         // A chart-type change re-renders without going through runQuery(), so
         // the metrics_data blob on the URL would otherwise go stale. Re-sync —
         // but only for an already-established view (metrics_data already on the
-        // URL): we still don't write a URL before the first Run (D1), and this
+        // URL): we still don't write a URL before the first Run, and this
         // skips the programmatic type changes during load/hydration.
         if (isPanelConfigWatcherActivated && route.query.metrics_data) {
           syncStateToUrl();

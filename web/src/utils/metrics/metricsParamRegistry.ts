@@ -102,7 +102,7 @@ export const METRICS_PARAMS: ParamDescriptor[] = [
   {
     key: "query",
     scope: "perQuery",
-    // base64 (url-safe) of the raw PromQL/SQL; presence ⇒ custom, verbatim (D10).
+    // base64 (url-safe) of the raw PromQL/SQL; presence ⇒ custom, honored verbatim.
     decode: (raw) => b64DecodeUnicodeSafe(raw),
     encode: (value) => b64EncodeUnicode(String(value)),
     apply: (slot, value) => {
