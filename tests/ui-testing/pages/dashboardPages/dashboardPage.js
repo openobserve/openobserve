@@ -490,6 +490,61 @@ export class DashboardPage {
     await this.page.keyboard.press('Delete');
   }
 
+  // Custom chart Monaco editor (data-test="dashboard-markdown-editor-query-editor")
+  // shares the page with the SQL query Monaco editor. Setting content via
+  // keyboard.insertText races against the subsequent .inputarea fill on the query
+  // editor — focus shifts before Monaco commits the chart code, leaving the chart
+  // empty when Apply runs (CI flake on custom-charts.spec.js). Set the model
+  // directly via Monaco's API and poll until the value sticks.
+  async setCustomChartCode(code) {
+    await this.page.waitForFunction(
+      (chartCode) => {
+        const host = document.querySelector('[data-test="dashboard-markdown-editor-query-editor"]');
+        if (!host || !window.monaco?.editor?.getEditors) return false;
+        const editor = window.monaco.editor.getEditors().find((ed) => {
+          const dom = ed.getDomNode?.();
+          return dom && host.contains(dom);
+        });
+        if (!editor) return false;
+        if (editor.getValue() !== chartCode) editor.setValue(chartCode);
+        return editor.getValue() === chartCode;
+      },
+      code,
+      { timeout: 10000 }
+    );
+    // CodeQueryEditor debounces its update:query emit by 500ms — wait past the
+    // window so the panel schema receives the value before subsequent steps.
+    await this.page.waitForTimeout(600);
+  }
+
+  // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
+  // locator(".inputarea").fill() stopped overriding the model on main — the panel
+  // auto-generates a histogram query from the default-selected stream and the
+  // .fill() input is silently ignored, so panelSchema.queries[0].query stays
+  // whatever the auto-gen produced (or empty). Drive Monaco's model directly and
+  // poll to confirm the value lands before Apply.
+  async setDashboardPanelQuery(sql) {
+    await this.page.waitForFunction(
+      (query) => {
+        const host = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+        if (!host || !window.monaco?.editor?.getEditors) return false;
+        const editor = window.monaco.editor.getEditors().find((ed) => {
+          const dom = ed.getDomNode?.();
+          return dom && host.contains(dom);
+        });
+        if (!editor) return false;
+        if (editor.getValue() !== query) editor.setValue(query);
+        return editor.getValue() === query;
+      },
+      sql,
+      { timeout: 10000 }
+    );
+    // CodeQueryEditor.vue:107 / 726 debounces its onDidChangeModelContent->
+    // emit('update:query') by 500ms. Without this wait, panelSchema.queries[i].query
+    // stays empty when Apply fires and the panel shows "Please enter query for
+    // custom chart" — even though the Monaco model already shows the SQL.
+    await this.page.waitForTimeout(600);
+  }
 
 }
 
