@@ -43,32 +43,34 @@
        Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
        ═══════════════════════════════════════════════════════════ */
 
-    /* Surfaces — the model: BLACK page/content, NEUTRAL-GREY raised panels.
-       base + chrome share one near-black so the whole app reads black;
-       folder rails / cards / dialogs lift on a neutral slate (kept low on blue
-       so the org's blue theme accents pop instead of the whole UI reading blue). */
-    --d-chrome:    #0E0F11;  /* top bar + left rail + gutter behind the card   */
-    --d-base:      #0E0F11;  /* MAIN: content card + table canvas (black)       */
-    --d-well:      #17181A;  /* recessed wells, segmented-control track         */
-    --d-panel:     #282A2E;  /* raised: folder/sub rails, cards, dialogs        */
-    --d-overlay:   #313338;  /* menus, inputs, table-header, dialog header      */
+    /* Surfaces — VS Code Dark+ exact values.
+       chrome  = title bar + activity bar (icon strip)   #333333
+       panel   = sidebar / folder list                   #252526
+       base    = editor / main content canvas            #1E1E1E
+       well    = recessed / segmented track              #2D2D2D
+       overlay = menus, inputs, dropdowns                #3C3C3C */
+    --d-chrome:    #0E0F11;  /* title bar + left activity-bar strip             */
+    --d-base:      #0d1117;  /* MAIN: content card + table canvas               */
+    --d-well:      #2D2D2D;  /* recessed wells, segmented-control track         */
+    --d-panel:     #252526;  /* folder sidebar, sub rails, cards, dialogs       */
+    --d-overlay:   #3C3C3C;  /* menus, inputs, table-header, dialog header      */
 
-    /* Borders & dividers — MUST read clearly against every surface above */
-    --d-divider:       #3C3E44;  /* subtle: row & section separators            */
-    --d-border:        #575A61;  /* default: card / input / table / rail edges  */
-    --d-border-strong: #70737B;  /* strong: checkbox / radio / file outlines    */
+    /* Borders & dividers — VS Code widget / panel borders */
+    --d-divider:       #3C3C3C;  /* subtle: row & section separators            */
+    --d-border:        #454545;  /* default: card / input / table / rail edges  */
+    --d-border-strong: #6B6B6B;  /* strong: checkbox / radio / file outlines    */
 
-    /* Text — never pure white */
-    --d-text:      #ECEEF1;  /* primary text, headings, record names            */
-    --d-text-2:    #BFC6CF;  /* secondary: body, nav, labels                    */
-    --d-text-3:    #9BA3AE;  /* metadata, captions, column heads, IDs           */
+    /* Text — VS Code editor foreground scale */
+    --d-text:      #D4D4D4;  /* primary text, headings, record names            */
+    --d-text-2:    #AAAAAA;  /* secondary: body, nav, labels                    */
+    --d-text-3:    #858585;  /* metadata, captions, column heads, IDs           */
 
     /* Row / item states on the content surface */
     --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
                              the dashboard-folder hover (theme-tinted, not grey) */
     --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
                              /* selected row — teal-tinted (brand signal)       */
-    --d-zebra:     #181A1E;  /* striped-row bg — a quiet lift above black base   */
+    --d-zebra:     #252526;  /* striped-row bg — VS Code list alternating row    */
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */

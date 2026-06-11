@@ -599,9 +599,9 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-toggle-track-bg: var(--o2-dark-theme-color);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
 
-  --o2-card-bg: #1f2223;
+  --o2-card-bg: var(--color-surface-base);
 
-  --o2-card-bg-solid: #1f2223;
+  --o2-card-bg-solid: var(--color-surface-base);
 
 
   --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
