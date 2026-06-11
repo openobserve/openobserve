@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, datafusion::request::Request};
 use datafusion::{
@@ -41,6 +38,7 @@ use datafusion::{
     prelude::SessionContext,
     sql::TableReference,
 };
+use hashbrown::HashSet;
 use infra::schema::get_stream_setting_index_fields;
 #[cfg(feature = "enterprise")]
 use {

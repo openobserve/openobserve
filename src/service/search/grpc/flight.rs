@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
@@ -39,7 +39,7 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
@@ -199,17 +199,13 @@ pub async fn search(
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
 
-    // the index cutoff only depends on the fields the query actually reads from the
-    // index, so a query that references none of them (e.g. a histogram without filters)
-    // can use the index of every file regardless of index settings changes
+    // the index cutoff only depends on the fields the query actually reads from the index
+    // and we don't check the FTS fields here on purpose
     let index_updated_at = {
-        let mut index_used_fields = index_condition
+        let index_used_fields = idx_optimize_rule
             .as_ref()
-            .map(|v| v.get_schema_fields(&fst_fields))
+            .map(|rule| rule.referenced_fields())
             .unwrap_or_default();
-        if let Some(rule) = idx_optimize_rule.as_ref() {
-            index_used_fields.extend(rule.referenced_fields());
-        }
         get_stream_setting_index_updated_at_for_fields(
             &stream_settings,
             stream_created_at,
