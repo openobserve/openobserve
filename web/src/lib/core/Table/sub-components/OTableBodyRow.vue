@@ -2,11 +2,12 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, onBeforeUnmount, useSlots } from "vue";
+import { computed, inject, ref, onMounted, onBeforeUnmount, watch, useSlots } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
 
 const props = defineProps<{
   row: Row<any>;
@@ -176,6 +177,7 @@ function onRowMouseleave() {
     ref="rowRef"
     :data-test="`o2-table-row-${row.index}`"
     :class="[
+      'tw:group/row',
       'tw:transition-colors tw:duration-150',
       clickable ? 'tw:cursor-pointer' : '',
       'tw:hover:bg-[var(--color-table-row-hover-bg)]',

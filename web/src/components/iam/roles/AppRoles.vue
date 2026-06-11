@@ -246,6 +246,7 @@ const bulkDeleteUserRoles = async () => {
         variant: "error",
       });
     }
+    confirmBulkDelete.value = false;
   }
 };
 

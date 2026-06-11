@@ -113,20 +113,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="tw:text-gray-500">{{ row.created_by }}</span>
           </template>
 
-              <template #cell-actions="{ row }">
-                <OButton
-                  :data-test="`ingestion-token-${row.name}-toggle`"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-sm"
-                  :title="row.enabled ? t('common.disable') : t('common.enable')"
-                  :disabled="loading"
-                  @click.stop="toggleEnabled(row.name, !row.enabled)"
-                />
-              </template>
-            </OTable>
-          </div>
-        </div>
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`ingestion-token-${row.name}-toggle`"
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+              size="icon-sm"
+              :title="row.enabled ? t('common.disable') : t('common.enable')"
+              :disabled="loading"
+              @click.stop="toggleEnabled(row.name, !row.enabled)"
+            />
+          </template>
+        </OTable>
       </div>
     </div>
 
@@ -202,6 +200,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 interface Token {
   name: string;

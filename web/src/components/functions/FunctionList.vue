@@ -207,6 +207,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

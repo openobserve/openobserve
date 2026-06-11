@@ -357,6 +357,7 @@ const bulkDeleteUserGroups = async () => {
         variant: "error",
       });
     }
+    confirmBulkDelete.value = false;
   }
 };
 

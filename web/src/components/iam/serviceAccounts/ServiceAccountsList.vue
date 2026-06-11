@@ -20,34 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:full-width tw:h-[68px] tw:border-b-[1px]"
-      >
-
-        <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:w-full tw:font-[600]"
-            data-test="service-accounts-title-text"
-          >
-            {{ t("serviceAccounts.header") }}
-          </div>
-          <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-            <OSearchInput
-                v-model="filterQuery"
-                class="tw:w-[12.5rem]"
-                :placeholder="t('serviceAccounts.search')"
-              />
-              <OButton
-                data-test="service-accounts-add-btn"
-                variant="primary"
-                size="sm"
-                class="tw:!h-8"
-                @click="addRoutePush({})"
-              >
-                {{ t('serviceAccounts.add') }}
-              </OButton>
-          </div>
-      </div>
-      </div>
+    <!-- Standard page header: title + actions only. Search moved into the
+         table's own toolbar (built-in global filter). -->
+    <AppPageHeader
+      :title="t('serviceAccounts.header')"
+      icon="manage-accounts"
+      :subtitle="'Programmatic access tokens for APIs'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          data-test="service-accounts-add-btn"
+          variant="primary"
+          size="sm"
+          @click="addRoutePush({})"
+        >
+          {{ t('serviceAccounts.add') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
       <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <div class="card-container tw:h-full">
           <OTable
@@ -683,8 +674,7 @@ export default defineComponent({
 
     const confirmRefreshAction = (row: any) => {
       confirmRefresh.value = true;
-
-toBeRefreshed.value = row;
+      toBeRefreshed.value = row;
     };
 
 
