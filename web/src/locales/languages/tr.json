@@ -525,7 +525,18 @@
     "seekToMoment": "Oturumda bu anı arayın",
     "timeInSession": "Oturum Saati",
     "route": "Güzergah",
-    "duration": "Süre"
+    "duration": "Süre",
+    "emptyState": {
+      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
+      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
+      "webApp": "Bir web uygulaması düzenleyin",
+      "webAppDesc": "OpenObserve RUM SDK'yı herhangi bir JavaScript uygulamasına ekleyin",
+      "sessionReplay": "Oturum Tekrarını Etkinleştir",
+      "sessionReplayDesc": "UX sorunlarında hata ayıklamak için kullanıcı oturumlarını kaydedin ve tekrarlayın",
+      "learnMore": "Daha fazla bilgi edinin:",
+      "quickImpl": "Hızlı uygulama kılavuzu",
+      "blogPost": "Ön uç izleme temelleri"
+    }
   },
   "about": {
     "name": "Açık Gözlem",
