@@ -605,27 +605,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:p-4 tw:flex tw:items-start tw:gap-4 home-no-data-panel"
+      class="tw:flex tw:flex-col tw:h-full"
       data-test="home-usage-tab-no-data"
     >
-      <TrialPeriod></TrialPeriod>
-      <div class="my-card">
-        <div align="center" class="my-card tw:py-4">
-          <div class="tw:text-xl tw:font-medium">{{ t("home.noData") }}</div>
-          <div class="tw:text-base">{{ t("home.ingestionMsg") }}</div>
-        </div>
-
-        <OSeparator />
-
-        <div class="tw:py-2 tw:text-center">
-          <OButton
-            variant="ghost-primary"
-            data-test="home-usage-tab-find-ingestion-btn"
-            @click="() => $router.push({ name: 'ingestion' })"
-            >{{ t("home.findIngestion") }}
-          </OButton>
-        </div>
-      </div>
+      <TrialPeriod />
+      <HomeNoDataState />
     </div>
 
     <!-- Loading state -->
@@ -654,6 +638,7 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
 const { t } = useI18n();
 const store = useStore();

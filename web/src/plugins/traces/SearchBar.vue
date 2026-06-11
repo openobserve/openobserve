@@ -115,8 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @update:model-value="onErrorOnlyToggle"
             />
-            <OIcon name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
-            <OTooltip :content="t('traces.showErrorOnly')" />
+            <OIcon v-if="shouldHideToggleText" name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
+            <span v-else class="tw:text-sm tw:font-medium tw:whitespace-nowrap">{{ t('traces.showErrorOnly') }}</span>
+            <OTooltip v-if="shouldHideToggleText" :content="t('traces.showErrorOnly')" />
           </div>
         </template>
 
@@ -968,6 +969,7 @@ export default defineComponent({
       _traceFieldValues,
       _traceSqlMode,
       _traceNoStream,
+      { excludeMatchAll: true },
     );
 
     // Responsive toolbar — shared composable tracks available left-section width
