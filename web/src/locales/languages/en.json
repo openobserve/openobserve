@@ -14,10 +14,10 @@
     },
     "noStreamSelected": {
       "title": "Select a stream to get started",
-      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to explore your logs. You can also apply additional filters and adjust the date range."
+      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to start exploring. You can also apply additional filters and adjust the date range."
     },
     "noQueryApplied": {
-      "title": "Run a query to see logs",
+      "title": "Run a query to see results",
       "description": "Adjust your filters and click 'Run query' to load events for this stream."
     },
 
@@ -3709,6 +3709,20 @@
     "loadingStream": "Loading Stream...",
     "noTracesFound": "Result not found.",
     "noLogsAvailableForService": "No Logs available for this service",
+    "noData": {
+      "title": "Start sending traces to OpenObserve",
+      "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
+      "otlp": "Send traces via OTLP",
+      "otlpDesc": "Jaeger, Zipkin & any OpenTelemetry-compatible SDK",
+      "otelCollector": "OTel Collector / Agent",
+      "otelCollectorDesc": "Route all telemetry signals through the OTel Collector",
+      "or": "Or:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Ask AI to set up tracing"
+    },
     "configureFullTextSearch": "to configure a full text search field to the stream.",
     "collapseFields": "Collapse Fields",
     "openFields": "Open Fields",
@@ -3717,6 +3731,24 @@
     "errorRetrievingTraces": "Error occurred while retrieving traces.",
     "fetchingTraces": "Loading Traces...",
     "noTracesFoundAdjust": "No traces found. Please adjust the filters and try again.",
+    "noStream": {
+      "title": "Pick a stream to start exploring",
+      "description": "Choose a trace stream, then press <strong>Run query</strong>. You can filter by service, duration, span status, and more once results load.",
+      "selectStream": "Select a stream",
+      "selectStreamDesc": "Browse available trace streams in this organization",
+      "queryGuide": "Read the traces guide",
+      "queryGuideDesc": "Service graph, span filtering, RED metrics & more",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "No traces found",
+      "descNoFilters": "No traces were found in {range}. Try widening the time range to load results.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range or removing a filter.",
+      "expandRange": "Expand the time range",
+      "expandRangeDescAbsolute": "Switch to a wider relative time range",
+      "removeFilter": "Remove a filter",
+      "selectedRange": "the selected range"
+    },
     "tracesTitle": "TRACES",
     "tracesFound": "Traces Found",
     "spansTitle": "SPANS",
