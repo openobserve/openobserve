@@ -215,6 +215,7 @@ impl TraceListIndex {
                 approx_partition: false,
                 distinct_value_fields: vec![],
                 index_updated_at: 0,
+                index_fields_updated_at: Default::default(),
                 extended_retention_days: vec![],
                 index_all_values: false,
                 index_original_data: false,
