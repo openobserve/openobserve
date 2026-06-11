@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @run-query="searchData"
                       @widen-range="onWidenTracesRange"
                       @remove-filter="onRemoveTracesFilter"
+                      @error-only-toggled="onErrorOnlyToggled"
                     />
                   </div>
                 </div>
