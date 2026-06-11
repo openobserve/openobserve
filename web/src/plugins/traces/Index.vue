@@ -1580,7 +1580,7 @@ function restoreUrlQueryParams() {
 
   const date = {
     startTime: typeof queryParams.from === "string" ? Number(queryParams.from) : queryParams.from,
-    endTime: typeof queryParams.from === "string" ? Number(queryParams.to) : queryParams.to,
+    endTime: typeof queryParams.to === "string" ? Number(queryParams.to) : queryParams.to,
     relativeTimePeriod: queryParams.period || null,
     type: queryParams.period ? "relative" : "absolute",
   };
@@ -2069,60 +2069,12 @@ const debouncedAutoRunOnQuery = debounce(() => {
   }
 }, 500);
 
-// Debounced auto-run on datetime changes in live mode.
-// Traces has no existing auto-run on datetime, so no guard needed.
-const debouncedAutoRunOnDatetime = debounce(() => {
-  // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
-  // Only auto-run here for relative time to avoid double-triggering.
-  if (
-    searchObj.data.datetime.type === "relative" &&
-    searchObj.meta.liveMode &&
-    store.state.zoConfig?.auto_query_enabled &&
-    !searchObj.loading
-  ) {
-    searchData();
-  }
-}, 500);
-
 watch(
   () => searchObj.data.query,
   () => {
     debouncedAutoRunOnQuery();
   },
 );
-
-watch(
-  () => [
-    searchObj.data.datetime.type,
-    searchObj.data.datetime.startTime,
-    searchObj.data.datetime.endTime,
-    searchObj.data.datetime.relativeTimePeriod,
-  ],
-  () => {
-    debouncedAutoRunOnDatetime();
-  },
-  { deep: true },
-);
-
-// watch(
-//   changeStream,
-//   (stream, oldStream) => {
-//     if (stream.value === oldStream.value) return;
-//     if (searchObj.data.stream.selectedStream.hasOwnProperty("value")) {
-//       if (oldStream.value) {
-//         searchObj.data.query = "";
-//         searchObj.data.advanceFiltersQuery = "";
-//       }
-//       setTimeout(() => {
-//         runQueryFn();
-//         extractFields();
-//       }, 500);
-//     }
-//   },
-//   {
-//     immediate: false,
-//   },
-// );
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {

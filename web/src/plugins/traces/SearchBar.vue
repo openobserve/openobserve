@@ -760,24 +760,13 @@ export default defineComponent({
 
       if (
         value.valueType === "absolute" &&
+        searchObj.meta.liveMode &&
         store.state.zoConfig?.auto_query_enabled && 
         datetimeChanged
       ) {
         // Debounce query trigger so user can finish typing the full time value
         triggerAbsoluteQueryDebounced(value);
         return;
-      }
-
-      if (config.isCloud == "true" && value.userChangedValue) {
-        segment.track("Button Click", {
-          button: "Date Change",
-          tab: value.tab,
-          value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
-          stream_name: searchObj.data.stream.selectedStream.value,
-          page: "Search Logs",
-        });
       }
 
       // Live mode: auto-trigger search on a real time-range change.
@@ -791,6 +780,18 @@ export default defineComponent({
         datetimeChanged
       ) {
         emit("searchdata");
+      }
+
+      if (config.isCloud == "true" && value.userChangedValue) {
+        segment.track("Button Click", {
+          button: "Date Change",
+          tab: value.tab,
+          value: value,
+          //user_org: this.store.state.selectedOrganization.identifier,
+          //user_id: this.store.state.userInfo.email,
+          stream_name: searchObj.data.stream.selectedStream.value,
+          page: "Search Logs",
+        });
       }
     };
 
