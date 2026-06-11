@@ -225,6 +225,7 @@ mod tests {
             file_list_took: 50,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
         CustomMessage::ScanStats(scan_stats)
     }
