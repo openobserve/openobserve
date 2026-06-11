@@ -407,6 +407,42 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
     get_default_semantic_field_groups()
 }
 
+/// Get the Gen-AI agent fallback mapping config for an organization.
+///
+/// Defaults to empty fallback lists when no org-level config is saved.
+pub async fn get_gen_ai_agent_mapping_config(
+    org_id: &str,
+) -> config::meta::gen_ai::GenAiAgentMappingConfig {
+    use config::meta::{
+        gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
+    };
+
+    match get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await {
+        Ok(Some(setting)) => {
+            serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
+                .unwrap_or_default()
+        }
+        _ => GenAiAgentMappingConfig::default(),
+    }
+}
+
+/// Save the Gen-AI agent fallback mapping config for an organization.
+pub async fn set_gen_ai_agent_mapping_config(
+    org_id: &str,
+    user_id: &str,
+    config: config::meta::gen_ai::GenAiAgentMappingConfig,
+) -> Result<SystemSetting> {
+    use config::meta::system_settings::{SettingCategory, keys::GEN_AI_AGENT_MAPPING};
+
+    let value = serde_json::to_value(config)?;
+    let mut setting = SystemSetting::new_org(org_id, GEN_AI_AGENT_MAPPING, value)
+        .with_category(SettingCategory::Ingestion)
+        .with_description("Gen-AI agent name/id fallback mapping");
+    setting.updated_by = Some(user_id.to_string());
+
+    set(&setting).await
+}
+
 /// Get the default semantic field groups from enterprise config
 ///
 /// For enterprise builds, loads from enterprise JSON file.

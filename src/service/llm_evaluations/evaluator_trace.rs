@@ -43,6 +43,9 @@ pub struct EvaluatorTraceInput {
     pub target_span_id: String,
     pub target_trace_id: String,
     pub target_stream: String,
+    pub target_stream_type: String,
+    pub target_agent_name: Option<String>,
+    pub target_agent_id: Option<String>,
     pub scorer_id: Option<String>,
     pub scorer_version: Option<String>,
     pub scorer_type: Option<ScorerType>,
@@ -112,6 +115,21 @@ pub fn create_evaluator_trace(input: EvaluatorTraceInput) -> EvaluatorTrace {
         &mut attributes,
         evaluator_attr_key(evaluator::ATTR_TARGET_STREAM),
         &input.target_stream,
+    );
+    push_string_attr(
+        &mut attributes,
+        evaluator_attr_key(evaluator::ATTR_TARGET_STREAM_TYPE),
+        &input.target_stream_type,
+    );
+    push_optional_string_attr(
+        &mut attributes,
+        evaluator_attr_key(evaluator::ATTR_TARGET_AGENT_NAME),
+        input.target_agent_name.as_deref(),
+    );
+    push_optional_string_attr(
+        &mut attributes,
+        evaluator_attr_key(evaluator::ATTR_TARGET_AGENT_ID),
+        input.target_agent_id.as_deref(),
     );
 
     if let Some(ref scorer_id) = input.scorer_id {
@@ -527,6 +545,9 @@ mod tests {
             target_span_id: "span-1".to_string(),
             target_trace_id: "trace-1".to_string(),
             target_stream: "traces".to_string(),
+            target_stream_type: "traces".to_string(),
+            target_agent_name: Some("agent-a".to_string()),
+            target_agent_id: Some("agent-1".to_string()),
             scorer_id: Some("sc-1".to_string()),
             scorer_version: Some("1".to_string()),
             scorer_type: Some(ScorerType::LlmJudge),
@@ -576,6 +597,25 @@ mod tests {
         assert_eq!(
             attr_str(span, &evaluator_attr_key(evaluator::ATTR_TARGET_SPAN_ID)),
             Some("span-1")
+        );
+        assert_eq!(
+            attr_str(span, &evaluator_attr_key(evaluator::ATTR_TARGET_STREAM)),
+            Some("traces")
+        );
+        assert_eq!(
+            attr_str(
+                span,
+                &evaluator_attr_key(evaluator::ATTR_TARGET_STREAM_TYPE)
+            ),
+            Some("traces")
+        );
+        assert_eq!(
+            attr_str(span, &evaluator_attr_key(evaluator::ATTR_TARGET_AGENT_NAME)),
+            Some("agent-a")
+        );
+        assert_eq!(
+            attr_str(span, &evaluator_attr_key(evaluator::ATTR_TARGET_AGENT_ID)),
+            Some("agent-1")
         );
         assert_eq!(
             attr_str(span, &evaluator_attr_key(evaluator::ATTR_SCORER_ID)),
@@ -654,6 +694,9 @@ mod tests {
             target_span_id: "span-2".to_string(),
             target_trace_id: "trace-2".to_string(),
             target_stream: "traces".to_string(),
+            target_stream_type: "traces".to_string(),
+            target_agent_name: None,
+            target_agent_id: None,
             scorer_id: Some("sc-2".to_string()),
             scorer_version: Some("2".to_string()),
             scorer_type: Some(ScorerType::LlmJudge),
@@ -710,6 +753,9 @@ mod tests {
             target_span_id: "span-3".to_string(),
             target_trace_id: "trace-3".to_string(),
             target_stream: "traces".to_string(),
+            target_stream_type: "traces".to_string(),
+            target_agent_name: None,
+            target_agent_id: None,
             scorer_id: Some("sc-3".to_string()),
             scorer_version: Some("3".to_string()),
             scorer_type: Some(ScorerType::Remote),
@@ -760,6 +806,9 @@ mod tests {
             target_span_id: "span-5".to_string(),
             target_trace_id: "trace-5".to_string(),
             target_stream: "traces".to_string(),
+            target_stream_type: "traces".to_string(),
+            target_agent_name: None,
+            target_agent_id: None,
             scorer_id: None,
             scorer_version: None,
             scorer_type: None,

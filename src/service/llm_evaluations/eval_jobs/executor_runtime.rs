@@ -42,9 +42,12 @@ pub struct SpanEvalContext {
     pub org_id: String,
     pub span_id: String,
     pub trace_id: String,
+    pub target_agent_name: Option<String>,
+    pub target_agent_id: Option<String>,
     pub evaluator_trace_id: String,
     pub session_id: Option<String>,
     pub source_stream: String,
+    pub source_stream_type: String,
     pub job_id: Option<String>,
     pub eval_run_id: Option<String>,
     pub sampling_rate: Option<f64>,
@@ -81,6 +84,8 @@ pub fn extract_context_from_span(
     org_id: &str,
     job_id: Option<&str>,
     record: &Value,
+    default_source_stream: &str,
+    default_source_stream_type: &str,
 ) -> Option<SpanEvalContext> {
     let span_id = record
         .get("span_id")
@@ -115,7 +120,12 @@ pub fn extract_context_from_span(
     let source_stream = record
         .get("pipeline_source_stream")
         .and_then(|v| v.as_str())
-        .unwrap_or("traces")
+        .unwrap_or(default_source_stream)
+        .to_string();
+    let source_stream_type = record
+        .get("pipeline_source_stream_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or(default_source_stream_type)
         .to_string();
 
     let mut attributes: HashMap<String, Value> = HashMap::new();
@@ -132,6 +142,7 @@ pub fn extract_context_from_span(
             || key == "session_id"
             || key == "attributes"
             || key == "pipeline_source_stream"
+            || key == "pipeline_source_stream_type"
         {
             continue;
         }
@@ -140,18 +151,69 @@ pub fn extract_context_from_span(
             .or_insert_with(|| value.clone());
     }
 
+    let target_agent_name = non_empty_string(record, &["gen_ai.agent.name", "gen_ai_agent_name"])
+        .or_else(|| {
+            non_empty_string_from_map(
+                &attributes,
+                &[
+                    "gen_ai.agent.name",
+                    "gen_ai_agent_name",
+                    "attributes_gen_ai_agent_name",
+                ],
+            )
+        });
+    let target_agent_id = non_empty_string(record, &["gen_ai.agent.id", "gen_ai_agent_id"])
+        .or_else(|| {
+            non_empty_string_from_map(
+                &attributes,
+                &[
+                    "gen_ai.agent.id",
+                    "gen_ai_agent_id",
+                    "attributes_gen_ai_agent_id",
+                ],
+            )
+        });
+
     Some(SpanEvalContext {
         org_id: org_id.to_string(),
         span_id,
         trace_id,
+        target_agent_name,
+        target_agent_id,
         evaluator_trace_id: config::ider::generate_trace_id(),
         session_id,
         source_stream,
+        source_stream_type,
         job_id: job_id.map(|s| s.to_string()),
         eval_run_id: None,
         sampling_rate: None,
         sampled: None,
         attributes,
+    })
+}
+
+fn non_empty_string(record: &Value, fields: &[&str]) -> Option<String> {
+    fields.iter().find_map(|field| {
+        let value = record.get(*field)?.as_str()?;
+        if value.trim().is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    })
+}
+
+fn non_empty_string_from_map(
+    attributes: &HashMap<String, Value>,
+    fields: &[&str],
+) -> Option<String> {
+    fields.iter().find_map(|field| {
+        let value = attributes.get(*field)?.as_str()?;
+        if value.trim().is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
     })
 }
 
@@ -213,6 +275,10 @@ fn input_mapping_attributes(ctx: &SpanEvalContext) -> HashMap<String, Value> {
     attrs.insert(
         "pipeline_source_stream".to_string(),
         Value::String(ctx.source_stream.clone()),
+    );
+    attrs.insert(
+        "pipeline_source_stream_type".to_string(),
+        Value::String(ctx.source_stream_type.clone()),
     );
     if let Some(session_id) = &ctx.session_id {
         attrs.insert("session_id".to_string(), Value::String(session_id.clone()));
@@ -306,6 +372,9 @@ pub async fn execute_scorers(
                     target_span_id: ctx.span_id.clone(),
                     target_trace_id: ctx.trace_id.clone(),
                     target_stream: ctx.source_stream.clone(),
+                    target_stream_type: ctx.source_stream_type.clone(),
+                    target_agent_name: ctx.target_agent_name.clone(),
+                    target_agent_id: ctx.target_agent_id.clone(),
                     scorer_id: Some(scorer_ref.id.clone()),
                     scorer_version: Some("?".to_string()),
                     scorer_type: resolved_scorer_type,
@@ -361,10 +430,13 @@ mod tests {
             }
         });
 
-        let ctx = extract_context_from_span("org1", Some("job-1"), &record).unwrap();
+        let ctx =
+            extract_context_from_span("org1", Some("job-1"), &record, "traces", "traces").unwrap();
         assert_eq!(ctx.org_id, "org1");
         assert_eq!(ctx.span_id, "span-1");
         assert_eq!(ctx.trace_id, "trace-1");
+        assert_eq!(ctx.source_stream, "traces");
+        assert_eq!(ctx.source_stream_type, "traces");
         assert_eq!(ctx.evaluator_trace_id.len(), 32);
         assert_ne!(ctx.evaluator_trace_id, ctx.trace_id);
         assert_eq!(ctx.job_id, Some("job-1".to_string()));
@@ -378,7 +450,7 @@ mod tests {
             "trace_id": "trace-1",
             "some_field": "value"
         });
-        assert!(extract_context_from_span("org1", None, &record).is_none());
+        assert!(extract_context_from_span("org1", None, &record, "traces", "traces").is_none());
     }
 
     #[test]
@@ -389,9 +461,56 @@ mod tests {
             "session_id": "session-1",
             "attributes": {}
         });
-        let ctx = extract_context_from_span("org2", None, &record).unwrap();
+        let ctx = extract_context_from_span("org2", None, &record, "traces", "traces").unwrap();
         assert_eq!(ctx.session_id, Some("session-1".to_string()));
         assert_eq!(ctx.attributes.is_empty(), true);
+    }
+
+    #[test]
+    fn test_extract_context_uses_pipeline_source_stream_defaults() {
+        let record = serde_json::json!({
+            "span_id": "span-2",
+            "trace_id": "trace-2",
+            "attributes": {}
+        });
+
+        let ctx = extract_context_from_span("org2", None, &record, "app_traces", "traces").unwrap();
+
+        assert_eq!(ctx.source_stream, "app_traces");
+        assert_eq!(ctx.source_stream_type, "traces");
+    }
+
+    #[test]
+    fn test_extract_context_with_target_agent_identity() {
+        let record = serde_json::json!({
+            "span_id": "span-2",
+            "trace_id": "trace-2",
+            "attributes": {
+                "gen_ai.agent.name": "agent-a",
+                "gen_ai.agent.id": "agent-1"
+            }
+        });
+
+        let ctx = extract_context_from_span("org2", None, &record, "traces", "traces").unwrap();
+
+        assert_eq!(ctx.target_agent_name, Some("agent-a".to_string()));
+        assert_eq!(ctx.target_agent_id, Some("agent-1".to_string()));
+    }
+
+    #[test]
+    fn test_extract_context_with_flattened_target_agent_identity() {
+        let record = serde_json::json!({
+            "span_id": "span-2",
+            "trace_id": "trace-2",
+            "attributes_gen_ai_agent_name": "agent-a",
+            "attributes_gen_ai_agent_id": "agent-1",
+            "attributes": {}
+        });
+
+        let ctx = extract_context_from_span("org2", None, &record, "traces", "traces").unwrap();
+
+        assert_eq!(ctx.target_agent_name, Some("agent-a".to_string()));
+        assert_eq!(ctx.target_agent_id, Some("agent-1".to_string()));
     }
 
     #[test]
@@ -422,9 +541,12 @@ mod tests {
             org_id: "org1".to_string(),
             span_id: "span-1".to_string(),
             trace_id: "trace-1".to_string(),
+            target_agent_name: None,
+            target_agent_id: None,
             evaluator_trace_id: "11111111111111111111111111111111".to_string(),
             session_id: Some("session-1".to_string()),
             source_stream: "traces".to_string(),
+            source_stream_type: "traces".to_string(),
             job_id: Some("job-1".to_string()),
             eval_run_id: None,
             sampling_rate: None,
@@ -438,6 +560,7 @@ mod tests {
                     "span_id": "{{span_id}}",
                     "session_id": "{{session_id}}",
                     "stream": "{{pipeline_source_stream}}",
+                    "stream_type": "{{pipeline_source_stream_type}}",
                     "input": "{{input}}"
                 }
             }))
@@ -457,6 +580,10 @@ mod tests {
             Some(&serde_json::json!("session-1"))
         );
         assert_eq!(variables.get("stream"), Some(&serde_json::json!("traces")));
+        assert_eq!(
+            variables.get("stream_type"),
+            Some(&serde_json::json!("traces"))
+        );
         assert_eq!(variables.get("input"), Some(&serde_json::json!("question")));
     }
 
@@ -466,9 +593,12 @@ mod tests {
             org_id: "org1".to_string(),
             span_id: "span-1".to_string(),
             trace_id: "trace-1".to_string(),
+            target_agent_name: None,
+            target_agent_id: None,
             evaluator_trace_id: "11111111111111111111111111111111".to_string(),
             session_id: Some("session-1".to_string()),
             source_stream: "traces".to_string(),
+            source_stream_type: "traces".to_string(),
             job_id: Some("job-1".to_string()),
             eval_run_id: None,
             sampling_rate: None,

@@ -38,6 +38,13 @@ pub enum ProviderError {
 
     #[error("Invalid provider config: {0}")]
     InvalidConfig(String),
+
+    #[error("Provider is used by active scorers: {0}")]
+    ProviderInUse(String),
+}
+
+fn scorer_uses_provider(scorer: &table::scorers::Scorer, provider_id: &str) -> bool {
+    scorer.params.get("provider_id").and_then(|v| v.as_str()) == Some(provider_id)
 }
 
 #[tracing::instrument(skip(provider))]
@@ -132,6 +139,17 @@ pub async fn delete_provider(org_id: &str, provider_id: &str) -> Result<(), Prov
     if provider.org_id != org_id {
         return Err(ProviderError::NotFound);
     }
+
+    let dependent_scorers: Vec<_> = table::scorers::get_all_by_org(org_id)
+        .await?
+        .into_iter()
+        .filter(|scorer| scorer_uses_provider(scorer, provider_id))
+        .map(|scorer| scorer.name)
+        .collect();
+    if !dependent_scorers.is_empty() {
+        return Err(ProviderError::ProviderInUse(dependent_scorers.join(", ")));
+    }
+
     table::providers::delete(provider_id).await?;
     remove_ownership(org_id, "providers", Authz::new(provider_id)).await;
     publish_provider_delete(provider_id).await;
@@ -223,6 +241,9 @@ mod tests {
 
         let invalid_config = ProviderError::InvalidConfig("bad endpoint".to_string());
         assert!(matches!(invalid_config, ProviderError::InvalidConfig(_)));
+
+        let provider_in_use = ProviderError::ProviderInUse("judge".to_string());
+        assert!(matches!(provider_in_use, ProviderError::ProviderInUse(_)));
     }
 
     #[test]
@@ -230,5 +251,29 @@ mod tests {
         let name = "  OpenAI  ";
         let trimmed = name.trim().to_string();
         assert_eq!(trimmed, "OpenAI");
+    }
+
+    #[test]
+    fn test_scorer_uses_provider() {
+        let scorer = table::scorers::Scorer {
+            id: "scorer-1".to_string(),
+            org_id: "org".to_string(),
+            entity_id: "scorer-entity-1".to_string(),
+            name: "judge".to_string(),
+            version: 1,
+            scorer_type: table::scorers::ScorerType::LlmJudge,
+            description: None,
+            produces_score_config_id: None,
+            produces_score_config_version: None,
+            template: String::new(),
+            output_schema: None,
+            params: serde_json::json!({"provider_id": "provider-1"}),
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        };
+
+        assert!(scorer_uses_provider(&scorer, "provider-1"));
+        assert!(!scorer_uses_provider(&scorer, "provider-2"));
     }
 }

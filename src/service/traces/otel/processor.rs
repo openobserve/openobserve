@@ -20,16 +20,20 @@
 
 use std::collections::HashMap;
 
-use config::utils::{json, time::parse_timestamp_micro_from_value};
+use config::{
+    meta::gen_ai::GenAiAgentMappingConfig,
+    utils::{json, time::parse_timestamp_micro_from_value},
+};
 
 use super::{
     attributes::{
         GenAiAttributes, GenAiExtensions, LangfuseAttributes, O2Attributes, OtelAttributes,
     },
     extractors::{
-        Evaluation, EvaluationExtractor, InputOutputExtractor, MetadataExtractor, ModelExtractor,
-        ParametersExtractor, PromptExtractor, ProviderExtractor, ScopeInfo, ServiceNameExtractor,
-        ToolExtractor, UsageExtractor, is_generation_or_embedding, map_to_gen_ai_operation_name,
+        AgentExtractor, AgentIdentity, Evaluation, EvaluationExtractor, InputOutputExtractor,
+        MetadataExtractor, ModelExtractor, ParametersExtractor, PromptExtractor, ProviderExtractor,
+        ScopeInfo, ServiceNameExtractor, ToolExtractor, UsageExtractor, is_generation_or_embedding,
+        map_to_gen_ai_operation_name,
     },
     pricing,
 };
@@ -54,6 +58,7 @@ struct SpanExtractions {
     tool_call_id: Option<String>,
     tool_call_arguments: Option<json::Value>,
     tool_call_result: Option<json::Value>,
+    agent: AgentIdentity,
     evaluation: Evaluation,
 }
 
@@ -66,6 +71,7 @@ pub struct OtelIngestionProcessor {
     metadata_extractor: MetadataExtractor,
     prompt_extractor: PromptExtractor,
     tool_extractor: ToolExtractor,
+    agent_extractor: AgentExtractor,
     service_name_extractor: ServiceNameExtractor,
     evaluation_extractor: EvaluationExtractor,
 }
@@ -87,6 +93,7 @@ impl OtelIngestionProcessor {
             metadata_extractor: MetadataExtractor,
             prompt_extractor: PromptExtractor,
             tool_extractor: ToolExtractor,
+            agent_extractor: AgentExtractor,
             service_name_extractor: ServiceNameExtractor,
             evaluation_extractor: EvaluationExtractor,
         }
@@ -116,8 +123,35 @@ impl OtelIngestionProcessor {
         org_pricing_entries: &[CachedModelPricing],
         span_start_nanos: u64,
     ) {
+        self.process_span_with_pricing_and_agent_mapping(
+            span_attributes,
+            resource_attributes,
+            scope_name,
+            events,
+            org_pricing_entries,
+            span_start_nanos,
+            &GenAiAgentMappingConfig::default(),
+        );
+    }
+
+    pub fn process_span_with_pricing_and_agent_mapping(
+        &self,
+        span_attributes: &mut HashMap<String, json::Value>,
+        resource_attributes: &HashMap<String, json::Value>,
+        scope_name: Option<&str>,
+        events: &[Event],
+        org_pricing_entries: &[CachedModelPricing],
+        span_start_nanos: u64,
+        agent_mapping_config: &GenAiAgentMappingConfig,
+    ) {
         // Phase 1: Extract all raw data from span attributes.
-        let extracted = self.extract_all(span_attributes, resource_attributes, scope_name, events);
+        let extracted = self.extract_all(
+            span_attributes,
+            resource_attributes,
+            scope_name,
+            events,
+            agent_mapping_config,
+        );
 
         // Remove input/output attributes now that extraction is complete.
         span_attributes
@@ -139,6 +173,7 @@ impl OtelIngestionProcessor {
         resource_attributes: &HashMap<String, json::Value>,
         scope_name: Option<&str>,
         events: &[Event],
+        agent_mapping_config: &GenAiAgentMappingConfig,
     ) -> SpanExtractions {
         let scope_info = scope_name.map(|name| ScopeInfo {
             name: Some(name.to_string()),
@@ -177,6 +212,9 @@ impl OtelIngestionProcessor {
         let tool_call_result = self
             .tool_extractor
             .extract_tool_call_result(span_attributes);
+        let agent = self
+            .agent_extractor
+            .extract(span_attributes, agent_mapping_config);
         let evaluation = self.evaluation_extractor.extract(span_attributes);
 
         SpanExtractions {
@@ -196,6 +234,7 @@ impl OtelIngestionProcessor {
             tool_call_id,
             tool_call_arguments,
             tool_call_result,
+            agent,
             evaluation,
         }
     }
@@ -424,6 +463,17 @@ impl OtelIngestionProcessor {
             );
         }
 
+        if let Some(ref agent_name) = extracted.agent.name {
+            span_attributes.insert(
+                GenAiAttributes::AGENT_NAME.to_string(),
+                json::json!(agent_name),
+            );
+        }
+
+        if let Some(ref agent_id) = extracted.agent.id {
+            span_attributes.insert(GenAiAttributes::AGENT_ID.to_string(), json::json!(agent_id));
+        }
+
         // Evaluation scores and metadata.
         let evaluation = &extracted.evaluation;
         if evaluation.has_any() {
@@ -569,6 +619,60 @@ mod tests {
 
         // Original provider attribute should remain
         assert!(span_attrs.contains_key("gen_ai.provider.name"));
+    }
+
+    #[test]
+    fn test_process_span_emits_standard_agent_fields() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("gen_ai.agent.name".to_string(), json::json!("agent-a"));
+        span_attrs.insert("gen_ai.agent.id".to_string(), json::json!("agent-1"));
+
+        processor.process_span(&mut span_attrs, &HashMap::new(), None, &[]);
+
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::AGENT_NAME),
+            Some(&json::json!("agent-a"))
+        );
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::AGENT_ID),
+            Some(&json::json!("agent-1"))
+        );
+    }
+
+    #[test]
+    fn test_process_span_uses_configured_agent_mapping() {
+        let processor = OtelIngestionProcessor::new();
+
+        let mut span_attrs = HashMap::new();
+        span_attrs.insert("gen_ai.operation.name".to_string(), json::json!("chat"));
+        span_attrs.insert("custom.agent_name".to_string(), json::json!("agent-a"));
+        span_attrs.insert("custom.agent_id".to_string(), json::json!("agent-1"));
+        let config = GenAiAgentMappingConfig {
+            agent_name_fields: vec!["custom.agent_name".to_string()],
+            agent_id_fields: vec!["custom.agent_id".to_string()],
+        };
+
+        processor.process_span_with_pricing_and_agent_mapping(
+            &mut span_attrs,
+            &HashMap::new(),
+            None,
+            &[],
+            &[],
+            0,
+            &config,
+        );
+
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::AGENT_NAME),
+            Some(&json::json!("agent-a"))
+        );
+        assert_eq!(
+            span_attrs.get(GenAiAttributes::AGENT_ID),
+            Some(&json::json!("agent-1"))
+        );
     }
 
     #[test]

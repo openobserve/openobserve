@@ -24,6 +24,7 @@ pub mod destinations;
 pub mod enrichment_table;
 pub mod folder;
 pub mod function;
+pub mod gen_ai;
 pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;

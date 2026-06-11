@@ -315,6 +315,9 @@ pub async fn handle_otlp_request(
         std::sync::Arc::clone(EMPTY_PRICING.get_or_init(|| std::sync::Arc::new(vec![])))
     };
 
+    let gen_ai_agent_mapping_config =
+        crate::service::db::system_settings::get_gen_ai_agent_mapping_config(org_id).await;
+
     for res_span in res_spans {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         let mut service_name_explicitly_set = false;
@@ -419,13 +422,14 @@ pub async fn handle_otlp_request(
                 // Enrich span attributes with OTEL processor if enabled
                 // This adds AI/ML observability fields like model_name, usage_details, etc.
                 if is_llm_span {
-                    otel_processor.process_span_with_pricing(
+                    otel_processor.process_span_with_pricing_and_agent_mapping(
                         &mut span_att_map,
                         &service_att_map,
                         scope_name,
                         &events,
                         &org_pricing_entries,
                         start_time,
+                        &gen_ai_agent_mapping_config,
                     );
 
                     // set stream to llm stream if not already set
@@ -572,6 +576,25 @@ pub async fn handle_otlp_request(
         let records = stream_pipeline_inputs.clone();
 
         for exec_pl in &executable_pipelines {
+            if exec_pl.contains_llm_evaluation_node() {
+                let exec_pl = exec_pl.clone();
+                let org_id = org_id.to_string();
+                let records = records.clone();
+                let in_stream_name = in_stream_name.map(String::from);
+                let traces_stream_name = traces_stream_name.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = exec_pl
+                        .process_batch(&org_id, records, in_stream_name)
+                        .await
+                    {
+                        log::error!(
+                            "[TRACES:OTLP] evaluation pipeline({org_id}/{traces_stream_name}) batch execution error: {e}."
+                        );
+                    }
+                });
+                continue;
+            }
+
             let records_count = records.len();
             match exec_pl
                 .process_batch(org_id, records.clone(), in_stream_name.map(String::from))
@@ -657,9 +680,18 @@ pub async fn handle_otlp_request(
         // When only evaluation pipelines exist for this stream (no user pipeline
         // is responsible for writing to the source stream), preserve original
         // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
+        let has_user_pipeline = executable_pipelines.iter().any(|p| {
+            p.kind == config::meta::pipeline::PipelineKind::User
+                && !p.contains_llm_evaluation_node()
+        });
+        let has_evaluation_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.contains_llm_evaluation_node());
+        log::debug!(
+            "[TRACES:OTLP] source preservation check stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
+            executable_pipelines.len(),
+            json_data_by_stream.contains_key(&traces_stream_name)
+        );
         if !has_user_pipeline && !json_data_by_stream.contains_key(&traces_stream_name) {
             for value in &stream_pipeline_inputs {
                 let _ = finalize_and_buffer_trace_span(

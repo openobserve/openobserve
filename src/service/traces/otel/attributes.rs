@@ -108,6 +108,12 @@ impl GenAiAttributes {
 
     // Gen-AI Provider
     pub const PROVIDER_NAME: &'static str = "gen_ai.provider.name";
+
+    // Gen-AI Agent
+    pub const AGENT_NAME: &'static str = "gen_ai.agent.name";
+    pub const AGENT_ID: &'static str = "gen_ai.agent.id";
+    pub const AGENT_DESCRIPTION: &'static str = "gen_ai.agent.description";
+    pub const AGENT_VERSION: &'static str = "gen_ai.agent.version";
 }
 
 /// OpenObserve extensions in the `gen_ai.*` namespace.

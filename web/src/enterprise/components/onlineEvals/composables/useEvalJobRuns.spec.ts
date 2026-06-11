@@ -220,6 +220,29 @@ describe("useEvalJobRuns — score extraction from attributes_response", () => {
     expect(runs.value[0].scoreDisplay).toBe("0.87");
   });
 
+  it("maps target agent identity fields", async () => {
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      {
+        span_id: "span-1",
+        attributes_status: "success",
+        attributes_target_agent_name: "agent-a",
+        attributes_target_agent_id: "agent-1",
+      },
+    ]);
+    mockExecuteQuery.mockResolvedValueOnce([]);
+
+    const { runs } = useEvalJobRuns(
+      ref<string | null>("job-1"),
+      ref(DEFAULT_WINDOW),
+      ref(true),
+    );
+    await flushAsync();
+
+    expect(runs.value[0].targetAgentName).toBe("agent-a");
+    expect(runs.value[0].targetAgentId).toBe("agent-1");
+  });
+
   it("extracts boolean scores from value_boolean", async () => {
     mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
     mockExecuteQuery.mockResolvedValueOnce([

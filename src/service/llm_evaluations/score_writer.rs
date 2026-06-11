@@ -38,6 +38,7 @@ pub struct ScoreWriterInput {
     pub score_name: Option<String>,
     pub source_type: LlmScoreDataSourceType,
     pub source_stream: Option<String>,
+    pub source_stream_type: Option<String>,
     pub job_id: Option<String>,
     pub value_numeric: Option<f64>,
     pub value_categorical: Option<String>,
@@ -89,6 +90,7 @@ pub fn create_score(input: ScoreWriterInput) -> WrittenScore {
         score_config_version: input.score_config_version,
         source_type: input.source_type,
         source_stream: input.source_stream,
+        source_stream_type: input.source_stream_type,
         job_id: input.job_id,
         reasoning: input.reasoning,
         metadata: input.metadata,
@@ -119,6 +121,7 @@ mod tests {
             score_name: Some("faithfulness".to_string()),
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some("traces".to_string()),
+            source_stream_type: Some("traces".to_string()),
             job_id: Some("job-1".to_string()),
             value_numeric: Some(0.95),
             value_categorical: None,
@@ -146,6 +149,8 @@ mod tests {
         assert_eq!(json["level"], "span");
         assert_eq!(json["scorer_id"], "scorer-entity-1");
         assert_eq!(json["source_type"], "llm_judge");
+        assert_eq!(json["source_stream"], "traces");
+        assert_eq!(json["source_stream_type"], "traces");
         assert_eq!(json["score_config_id"], "cfg-entity-1");
         assert!(json.get("score_config_entity_id").is_none());
     }
@@ -163,6 +168,7 @@ mod tests {
             score_name: Some("quality".to_string()),
             source_type: LlmScoreDataSourceType::Remote,
             source_stream: None,
+            source_stream_type: None,
             job_id: None,
             value_numeric: None,
             value_categorical: Some("excellent".to_string()),
@@ -196,6 +202,7 @@ mod tests {
             score_name: Some("pass_fail".to_string()),
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: None,
+            source_stream_type: None,
             job_id: None,
             value_numeric: None,
             value_categorical: None,
@@ -225,6 +232,7 @@ mod tests {
             score_name: Some("custom".to_string()),
             source_type: LlmScoreDataSourceType::LlmJudge,
             source_stream: Some("traces".to_string()),
+            source_stream_type: Some("traces".to_string()),
             job_id: None,
             value_numeric: Some(0.5),
             value_categorical: None,

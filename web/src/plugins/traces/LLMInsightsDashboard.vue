@@ -40,6 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onStreamChange"
         />
       </div>
+      <div
+        data-test="llm-insights-agent-selector"
+        class="tw:w-[14rem] tw:flex-shrink-0"
+      >
+        <OSelect
+          v-model="activeAgent"
+          :options="agentOptions"
+          labelKey="label"
+          valueKey="value"
+          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          @update:model-value="onAgentChange"
+        />
+      </div>
     </div>
 
     <!-- Skeleton shown only while a real request is in flight -->
@@ -167,6 +180,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import useStreams from "@/composables/useStreams";
+import genAiAgentMappingService, {
+  type GenAiAgentListItem,
+} from "@/services/gen-ai-agent-mapping.service";
 
 const { getStreams } = useStreams();
 const router = useRouter();
@@ -202,6 +218,17 @@ const {
 const activeStream = ref<string>(
   localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
+const AGENT_LS_KEY = "llmInsights_agentFilter";
+const ALL_AGENTS_VALUE = "__all__";
+const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
+const agents = ref<GenAiAgentListItem[]>([]);
+const agentOptions = computed(() => [
+  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  ...agents.value.map((agent) => ({
+    label: agent.id ? `${agent.name} (${agent.id})` : agent.name,
+    value: agent.name,
+  })),
+]);
 
 function onViewTrace(traceId: string) {
   if (!traceId) return;
@@ -235,6 +262,27 @@ async function loadTraceStreams() {
     activeStream.value = "";
   } finally {
     streamsLoaded.value = true;
+  }
+}
+
+async function loadAgents(startTime?: number, endTime?: number) {
+  const orgId = store.state.selectedOrganization?.identifier;
+  const start = startTime ?? props.startTime;
+  const end = endTime ?? props.endTime;
+  if (!orgId || !start || !end) return;
+  try {
+    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    agents.value = agentList.agents;
+    if (
+      activeAgent.value !== ALL_AGENTS_VALUE &&
+      !agents.value.some((agent) => agent.name === activeAgent.value)
+    ) {
+      activeAgent.value = ALL_AGENTS_VALUE;
+    }
+  } catch (e) {
+    console.warn("Failed to load GenAI agents", e);
+    agents.value = [];
+    activeAgent.value = ALL_AGENTS_VALUE;
   }
 }
 
@@ -373,10 +421,17 @@ async function loadInsights(startTime?: number, endTime?: number) {
   const end = endTime ?? props.endTime;
   if (!activeStream.value || !start || !end) return;
   localStorage.setItem(STREAM_LS_KEY, activeStream.value);
+  localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+  await loadAgents(start, end);
   await fetchAll(activeStream.value, start, end);
 }
 
 function onStreamChange() {
+  loadInsights();
+}
+
+function onAgentChange() {
+  localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
   loadInsights();
 }
 

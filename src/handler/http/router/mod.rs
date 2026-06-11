@@ -662,6 +662,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/llm/models/test", post(model_pricing::test_model_match))
         .route("/{org_id}/llm/models/{model_id}", get(model_pricing::get).put(model_pricing::update).delete(model_pricing::delete))
 
+        // Gen-AI settings
+        .route("/{org_id}/settings/gen_ai/agent_mapping", get(gen_ai::get_agent_mapping).put(gen_ai::save_agent_mapping))
+        .route("/{org_id}/gen_ai/agents", get(gen_ai::list_scored_agents))
+
         // Metrics
         .route("/{org_id}/ingest/metrics/_json", post(metrics::ingest::json))
 

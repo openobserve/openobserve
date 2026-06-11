@@ -26,6 +26,9 @@ export interface JobRunRow {
   targetSpanId: string;
   targetTraceId: string;
   targetStream: string;
+  targetStreamType: string;
+  targetAgentName: string;
+  targetAgentId: string;
   latencyMs: number | null;
   scoreNumeric: number | null;
   scoreBoolean: boolean | null;
@@ -137,6 +140,9 @@ interface RawRunRow {
   attributes_target_span_id?: string | null;
   attributes_target_trace_id?: string | null;
   attributes_target_stream?: string | null;
+  attributes_target_stream_type?: string | null;
+  attributes_target_agent_name?: string | null;
+  attributes_target_agent_id?: string | null;
   attributes_response?: any;
   span_id?: string;
 }
@@ -200,6 +206,9 @@ export function useEvalJobRuns(
       "  attributes_target_span_id,",
       "  attributes_target_trace_id,",
       "  attributes_target_stream,",
+      "  attributes_target_stream_type,",
+      "  attributes_target_agent_name,",
+      "  attributes_target_agent_id,",
       "  attributes_response",
       'FROM "_evaluator"',
       `WHERE CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
@@ -287,6 +296,9 @@ export function useEvalJobRuns(
           targetSpanId: r.attributes_target_span_id ?? "",
           targetTraceId: r.attributes_target_trace_id ?? "",
           targetStream: r.attributes_target_stream ?? "",
+          targetStreamType: r.attributes_target_stream_type ?? "traces",
+          targetAgentName: r.attributes_target_agent_name ?? "",
+          targetAgentId: r.attributes_target_agent_id ?? "",
           latencyMs: toNumber(r.attributes_latency_ms),
           scoreNumeric: score.numeric,
           scoreBoolean: score.boolean,

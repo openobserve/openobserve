@@ -268,6 +268,14 @@
             </template>
             <template #cell-target="{ row }">
               <div class="jd-target-cell">
+                <div v-if="row.targetAgentName" class="jd-target-cell__line">
+                  <span class="jd-target-cell__label">Agent</span>
+                  <span class="jd-mono jd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
+                </div>
+                <div v-if="row.targetAgentId" class="jd-target-cell__line">
+                  <span class="jd-target-cell__label">Agent ID</span>
+                  <span class="jd-mono jd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
+                </div>
                 <div v-if="row.targetSpanId" class="jd-target-cell__line">
                   <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
                   <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>
@@ -385,6 +393,14 @@
               </template>
               <template #cell-target="{ row }">
                 <div class="jd-target-cell">
+                  <div v-if="row.targetAgentName" class="jd-target-cell__line">
+                    <span class="jd-target-cell__label">Agent</span>
+                    <span class="jd-mono jd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
+                  </div>
+                  <div v-if="row.targetAgentId" class="jd-target-cell__line">
+                    <span class="jd-target-cell__label">Agent ID</span>
+                    <span class="jd-mono jd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
+                  </div>
                   <div v-if="row.targetSpanId" class="jd-target-cell__line">
                     <span class="jd-target-cell__label">{{ t("onlineEvals.job.detail.runs.spanLabel") }}</span>
                     <span class="jd-mono jd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>

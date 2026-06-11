@@ -622,37 +622,7 @@ pub async fn merge_by_stream(
         orphan_blooms.extend(task.await??);
     }
 
-    // Build bloom for the current hour (enterprise-only).
-    #[cfg(feature = "enterprise")]
-    {
-        let build_start = std::time::Instant::now();
-        match o2_enterprise::enterprise::bloom::compact::build_for_stream(
-            org_id,
-            stream_type,
-            stream_name,
-            &date_start,
-            is_incremental,
-            orphan_blooms,
-        )
-        .await
-        {
-            Ok(false) => {}
-            Ok(true) => {
-                let build_time = build_start.elapsed().as_millis();
-                log::info!(
-                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} took: {build_time} ms"
-                );
-            }
-            Err(e) => {
-                log::warn!(
-                    "[COMPACTOR] bloom build for {org_id}/{stream_type}/{stream_name}/{date_start} failed: {e}"
-                );
-            }
-        }
-    }
-    // `orphan_blooms` is only consumed by the enterprise bloom builder above.
-    #[cfg(not(feature = "enterprise"))]
-    let _ = orphan_blooms;
+    let _ = (is_incremental, orphan_blooms);
 
     // update job status
     if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
