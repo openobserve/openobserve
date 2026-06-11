@@ -14,10 +14,10 @@
     },
     "noStreamSelected": {
       "title": "Select a stream to get started",
-      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to explore your logs. You can also apply additional filters and adjust the date range."
+      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to start exploring. You can also apply additional filters and adjust the date range."
     },
     "noQueryApplied": {
-      "title": "Run a query to see logs",
+      "title": "Run a query to see results",
       "description": "Adjust your filters and click 'Run query' to load events for this stream."
     },
 
