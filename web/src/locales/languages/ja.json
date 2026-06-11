@@ -3557,7 +3557,9 @@
     "timeRangeLabel": "時間範囲:",
     "analyzeTooltipTraces": "レート、レイテンシー、エラーパターンのトレースディメンションを分析",
     "insightsButtonLabel": "インサイト",
-    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する"
+    "searchInspectionsLabel": "検索ジョブの実行詳細を検査する",
+    "inspectBtnLabel": "検査",
+    "analyzeBtnLabel": "インサイト"
   },
   "errorInsights": {
     "title": "インサイト",
