@@ -525,7 +525,18 @@
     "seekToMoment": "在会议中寻求这一刻",
     "timeInSession": "会话时间",
     "route": "路线",
-    "duration": "持续时间"
+    "duration": "持续时间",
+    "emptyState": {
+      "title": "使用真实用户监控监控您的用户",
+      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
+      "webApp": "对 Web 应用程序进行检测",
+      "webAppDesc": "将 OpenObserve RUM SDK 添加到任何 Jav",
+      "sessionReplay": "启用会话重播",
+      "sessionReplayDesc": "记录和重播用户会话以调试 UX 问题",
+      "learnMore": "了解更多：",
+      "quickImpl": "快速实施指南",
+      "blogPost": "前端监控基础知识"
+    }
   },
   "about": {
     "name": "OpenObserve",

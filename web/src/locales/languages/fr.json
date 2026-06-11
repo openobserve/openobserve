@@ -525,7 +525,18 @@
     "seekToMoment": "Recherchez ce moment de la session",
     "timeInSession": "Durée de la session",
     "route": "Parcours",
-    "duration": "Durée"
+    "duration": "Durée",
+    "emptyState": {
+      "title": "Surveillez vos utilisateurs grâce à Real User Monitoring",
+      "description": "RUM suit les interactions réelles des utilisateurs (chargements de pages, erreurs, appels d'API et rediffusions de session) afin que vous puissiez voir exactement comment les utilisateurs utilisent votre application.",
+      "webApp": "Instrument une application Web",
+      "webAppDesc": "Ajoutez le SDK OpenObserve RUM à n'importe quelle application JavaScript",
+      "sessionReplay": "Activer la rediffusion de session",
+      "sessionReplayDesc": "Enregistrez et rejouez les sessions utilisateur pour résoudre les problèmes d'expérience utilisateur",
+      "learnMore": "Pour en savoir plus :",
+      "quickImpl": "Guide de mise en œuvre rapide",
+      "blogPost": "Principes de base de la surveillance frontale"
+    }
   },
   "about": {
     "name": "Ouvrez Observe",

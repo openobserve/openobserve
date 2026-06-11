@@ -525,7 +525,18 @@
     "seekToMoment": "Cerca questo momento della sessione",
     "timeInSession": "Durata della sessione",
     "route": "Percorso",
-    "duration": "Durata"
+    "duration": "Durata",
+    "emptyState": {
+      "title": "Monitora i tuoi utenti con Real User Monitoring",
+      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
+      "webApp": "Strumenta un'app web",
+      "webAppDesc": "Aggiungi l'SDK OpenObserve RUM a qualsiasi app JavaScript",
+      "sessionReplay": "Abilita la riproduzione della sessione",
+      "sessionReplayDesc": "Registra e riproduci le sessioni utente per eseguire il debug dei problemi di UX",
+      "learnMore": "Per saperne di più:",
+      "quickImpl": "Guida rapida all'implementazione",
+      "blogPost": "Nozioni di base sul monitoraggio frontend"
+    }
   },
   "about": {
     "name": "Apri Observe",

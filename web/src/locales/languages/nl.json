@@ -525,7 +525,18 @@
     "seekToMoment": "Streef naar dit moment in de sessie",
     "timeInSession": "Sessietijd",
     "route": "Route",
-    "duration": "Duur"
+    "duration": "Duur",
+    "emptyState": {
+      "title": "Bewaak uw gebruikers met Real User Monitoring",
+      "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
+      "webApp": "Instrument: een webapp",
+      "webAppDesc": "Voeg de OpenObserve RUM SDK toe aan elke JavaScript-app",
+      "sessionReplay": "Sessie opnieuw afspelen inschakelen",
+      "sessionReplayDesc": "Gebruikerssessies opnemen en opnieuw afspelen om UX-problemen op te lossen",
+      "learnMore": "Meer informatie:",
+      "quickImpl": "Beknopte implementatiegids",
+      "blogPost": "Basisprincipes van frontend-monitoring"
+    }
   },
   "about": {
     "name": "OpenObserve",

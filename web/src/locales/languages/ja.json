@@ -525,7 +525,18 @@
     "seekToMoment": "セッションの今この瞬間を探して",
     "timeInSession": "セッション時間",
     "route": "ルート",
-    "duration": "所要時間"
+    "duration": "所要時間",
+    "emptyState": {
+      "title": "リアルユーザーモニタリングでユーザーを監視する",
+      "description": "RUM は実際のユーザーインタラクション (ページの読み込み、エラー、API 呼び出し、セッションリプレイ) を追跡するので、ユーザーがアプリケーションをどのように体験しているかを正確に把握できます。",
+      "webApp": "Web アプリをインストゥルメントする",
+      "webAppDesc": "OpenObserve RUM SDK を任意の JavaScript アプリに追加してください",
+      "sessionReplay": "セッションリプレイを有効にする",
+      "sessionReplayDesc": "ユーザーセッションを記録および再生して、UX の問題をデバッグする",
+      "learnMore": "さらに詳しく:",
+      "quickImpl": "クイック実装ガイド",
+      "blogPost": "フロントエンド監視の基本"
+    }
   },
   "about": {
     "name": "OpenObserve",

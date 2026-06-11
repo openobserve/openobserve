@@ -525,7 +525,18 @@
     "seekToMoment": "Suchen Sie in der Sitzung nach diesem Moment",
     "timeInSession": "Uhrzeit der Sitzung",
     "route": "Route",
-    "duration": "Dauer"
+    "duration": "Dauer",
+    "emptyState": {
+      "title": "Überwachen Sie Ihre Benutzer mit Real User Monitoring",
+      "description": "RUM verfolgt echte Benutzerinteraktionen — Seitenladevorgänge, Fehler, API-Aufrufe und Sitzungswiederholungen —, sodass Sie genau sehen können, wie Benutzer Ihre Anwendung erleben.",
+      "webApp": "Instrument einer Web-App",
+      "webAppDesc": "Fügen Sie das OpenObserve RUM SDK zu einer beliebigen JavaScript-App hinzu",
+      "sessionReplay": "Sitzungswiedergabe aktivieren",
+      "sessionReplayDesc": "Benutzersitzungen aufzeichnen und wiedergeben, um UX-Probleme zu debuggen",
+      "learnMore": "Erfahre mehr:",
+      "quickImpl": "Anleitung zur schnellen Implementierung",
+      "blogPost": "Grundlagen der Frontend-Überwachung"
+    }
   },
   "about": {
     "name": "Observe öffnen",
