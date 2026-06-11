@@ -144,12 +144,22 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_fruits_returns_last_segment() {
+    fn test_merge_fruits_returns_single_segment() {
+        let collector = SingleSegmentDocIdCollector;
+        let fruits = vec![vec![0, 1, 2]];
+        let merged = collector.merge_fruits(fruits).unwrap();
+        assert_eq!(merged, vec![0, 1, 2]);
+    }
+
+    // debug_assert! is compiled out in release builds, so only test the panic
+    // when debug assertions are enabled.
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "SingleSegmentDocIdCollector used on multi-segment index")]
+    fn test_merge_fruits_panics_on_multiple_segments() {
         let collector = SingleSegmentDocIdCollector;
         let fruits = vec![vec![0, 1, 2], vec![3, 4, 5]];
-        let merged = collector.merge_fruits(fruits).unwrap();
-        // merge_fruits pops — returns the last segment's fruit
-        assert_eq!(merged, vec![3, 4, 5]);
+        let _ = collector.merge_fruits(fruits);
     }
 
     #[test]
