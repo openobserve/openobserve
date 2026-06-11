@@ -71,9 +71,11 @@ export class LogsQueryPage {
     // Try data-test selectors in priority order:
     //   logs-search-no-events-found-text — Index.vue LogsNoEventsState (0 hits, search applied)
     //   logs-search-no-data-histogram    — SearchResult.vue histogram empty state
+    //   logs-search-error-state          — Index.vue error banner (SQL parse / backend error)
     const locators = [
       this.page.locator('[data-test="logs-search-no-events-found-text"]'),
       this.page.locator('[data-test="logs-search-no-data-histogram"]'),
+      this.page.locator('[data-test="logs-search-error-state"]'),
     ];
     for (const locator of locators) {
       try {
@@ -84,7 +86,7 @@ export class LogsQueryPage {
         continue;
       }
     }
-    throw new Error('No "no data" message found — checked: logs-search-no-events-found-text, logs-search-no-data-histogram');
+    throw new Error('No "no data" message found — checked: logs-search-no-events-found-text, logs-search-no-data-histogram, logs-search-error-state');
   }
 
   async clickResultDetail() {

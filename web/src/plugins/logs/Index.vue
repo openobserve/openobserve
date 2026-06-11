@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
+                      data-test="logs-search-no-events-found-text"
                     >
                       <LogsNoEventsState
                         :sql-mode="searchObj.meta.sqlMode"
@@ -170,7 +171,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
                         :ai-enabled="isAiEnabled"
-                        data-test="logs-search-no-events-found-text"
                         @widen-range="onWidenRange"
                         @remove-filter="onRemoveFilter"
                         @open-history="showSearchHistoryfn"
