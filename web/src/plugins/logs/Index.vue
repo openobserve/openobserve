@@ -110,12 +110,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.filterErrMsg !== '' &&
                         searchObj.loading == false
                       "
+                      data-test="logs-search-filter-error-message"
                     >
                       <LogsErrorState
                         :error-code="0"
                         :error-msg="searchObj.data.filterErrMsg"
                         :ai-enabled="isAiEnabled"
-                        data-test="logs-search-filter-error-message"
                         @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"
@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.errorMsg !== '' &&
                         searchObj.loading == false
                       "
+                      data-test="logs-search-error-state"
                     >
                       <LogsErrorState
                         :error-code="parseInt(searchObj.data.errorCode) || 0"
@@ -134,7 +135,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-detail="searchObj.data.errorDetail"
                         :ai-enabled="isAiEnabled"
                         :stream-name="searchObj.data.stream.selectedStream[0]"
-                        data-test="logs-search-error-state"
                         @ask-ai="onAskAiFixQuery"
                         @fix-query="onFixQuery"
                         @configure-stream="onConfigureStream"

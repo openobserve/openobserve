@@ -113,7 +113,7 @@ export class TracesPage {
 
     // Error States
     this.noStreamSelectedText = '[data-test="logs-search-no-stream-selected-text"]';
-    this.resultNotFoundText = '[data-test="logs-search-result-not-found-text"]';
+    this.resultNotFoundText = '[data-test="traces-search-result-not-found-text"]';
     this.errorMessage = '[data-test="traces-search-error-message"]';
 
     // Query Editor
