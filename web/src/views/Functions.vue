@@ -144,7 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
-import type { SectionHubItem } from "@/components/common/SectionHub.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -193,9 +192,6 @@ export default defineComponent({
       pipelineBackfill: "streamPipelines",
       functionList: "functions",
       enrichmentTables: "enrichmentTables",
-      evalTemplates: "evalTemplates",
-      evalTemplatesAdd: "evalTemplates",
-      evalTemplatesEdit: "evalTemplates",
     };
 
     const routeName = computed(() => router.currentRoute.value.name as string);
@@ -210,42 +206,6 @@ export default defineComponent({
     const orgIdentifier = computed(
       () => store.state.selectedOrganization.identifier,
     );
-
-    // L2 sections for the switcher dropdown.
-    const pipelineSections = computed<SectionHubItem[]>(() => {
-      const q = { org_identifier: orgIdentifier.value };
-      const hideStreamPipelines = store.state.zoConfig?.custom_hide_menus
-        ?.split(",")
-        .includes("pipelines");
-      return [
-        {
-          key: "streamPipelines",
-          label: t("function.streamPipeline"),
-          icon: "lan",
-          to: { name: "pipelines", query: q },
-          visible: !hideStreamPipelines,
-        },
-        {
-          key: "functions",
-          label: t("function.header"),
-          icon: "function",
-          to: { name: "functionList", query: q },
-        },
-        {
-          key: "enrichmentTables",
-          label: t("function.enrichmentTables"),
-          icon: "dataset",
-          to: { name: "enrichmentTables", query: q },
-        },
-        {
-          key: "evalTemplates",
-          label: t("pipeline.evalTemplates"),
-          icon: "fact-check",
-          to: { name: "evalTemplates", query: q },
-          visible: config.isEnterprise == "true",
-        },
-      ];
-    });
 
     // ── Level 3 detail crumb ────────────────────────────────────────────────
     const detailLabels: Record<string, () => string> = {
@@ -345,7 +305,6 @@ export default defineComponent({
       config,
       orgIdentifier,
       activeTab,
-      pipelineSections,
       isDetailView,
       breadcrumbLabel,
       detailBack,

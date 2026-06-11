@@ -26,6 +26,14 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 use crate::service::alerts::backfill;
 
+#[cfg(feature = "enterprise")]
+async fn ensure_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), Response> {
+    crate::service::pipeline::get_user_pipeline(org_id, pipeline_id)
+        .await
+        .map(|_| ())
+        .map_err(Into::into)
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
     /// Start time in microseconds
@@ -83,12 +91,8 @@ pub async fn create_backfill(
     Path((org_id, pipeline_id)): Path<(String, String)>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
-    if crate::service::db::pipeline::get_org_by_id(&pipeline_id)
-        .await
-        .as_deref()
-        != Some(org_id.as_str())
-    {
-        return MetaHttpResponse::not_found(format!("Pipeline with id {pipeline_id} not found"));
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
     }
 
     log::info!(
@@ -244,6 +248,10 @@ pub async fn list_backfills(Path(_org_id): Path<String>) -> Response {
 pub async fn get_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
 ) -> Response {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
+    }
+
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
             // Verify the job belongs to the specified pipeline
@@ -330,6 +338,10 @@ pub async fn enable_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
+    }
+
     let enable = query
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
@@ -441,6 +453,10 @@ pub async fn enable_backfill(
 pub async fn delete_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
 ) -> Response {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
+    }
+
     // Verify the job belongs to the specified pipeline
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {
@@ -554,6 +570,10 @@ pub async fn update_backfill(
     Path((org_id, pipeline_id, job_id)): Path<(String, String, String)>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
+    }
+
     // Verify the job belongs to the specified pipeline
     match backfill::get_backfill_job(&org_id, &job_id).await {
         Ok(job) => {

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   PipelineSectionTabs — the L2 section switcher (Stream Pipelines / Functions /
-  Enrichment Tables / Eval Templates) rendered as tabs next to a page title.
+  Enrichment Tables) rendered as tabs next to a page title.
   Drop it into an AppPageHeader's #tabs slot on any pipeline section page; the
   active tab is derived from the current route and clicking a tab navigates.
   This mirrors the breadcrumb section dropdown as faster inline navigation.
@@ -57,7 +57,6 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import config from "@/aws-exports";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -81,8 +80,6 @@ const routeToSection: Record<string, string> = {
   pipelineBackfill: "streamPipelines",
   functionList: "functions",
   enrichmentTables: "enrichmentTables",
-  evalTemplates: "evalTemplates",
-  evalTemplatesAdd: "evalTemplates",
 };
 
 const activeSectionKey = computed(() => {
@@ -126,13 +123,6 @@ const sections = computed<Section[]>(() => {
       icon: "dataset",
       to: { name: "enrichmentTables", query: q },
       visible: true,
-    },
-    {
-      key: "evalTemplates",
-      label: t("pipeline.evalTemplates"),
-      icon: "fact-check",
-      to: { name: "evalTemplates", query: q },
-      visible: config.isEnterprise == "true",
     },
   ];
 });

@@ -358,28 +358,6 @@ describe("Functions.vue", () => {
       expect((wrapper.vm as any).isDetailView).toBe(false);
     });
 
-    it("should compute pipelineSections excluding hidden pipelines", async () => {
-      wrapper = await createWrapper(
-        { zoConfig: { custom_hide_menus: "pipelines" } },
-        "pipelines",
-      );
-      const sections = (wrapper.vm as any).pipelineSections;
-      const streamPipelinesSection = sections.find(
-        (s: any) => s.key === "streamPipelines",
-      );
-      expect(streamPipelinesSection?.visible).toBe(false);
-    });
-
-    it("should compute pipelineSections with streamPipelines present when not hidden", async () => {
-      wrapper = await createWrapper({}, "pipelines");
-      const sections = (wrapper.vm as any).pipelineSections;
-      const streamPipelinesSection = sections.find(
-        (s: any) => s.key === "streamPipelines",
-      );
-      // When not hidden, visible is not explicitly set to false
-      expect(streamPipelinesSection).toBeDefined();
-      expect(streamPipelinesSection?.to?.name).toBe("pipelines");
-    });
   });
 
   describe("Store Integration", () => {
