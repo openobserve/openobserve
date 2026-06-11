@@ -105,7 +105,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-// ⌘K on macOS, Ctrl+K everywhere else
 // Show up to 3 recently used streams (deduplicated, most recent first).
 const recentStreams = computed<string[]>(() => {
   if (!props.orgId) return [];
