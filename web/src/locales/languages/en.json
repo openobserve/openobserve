@@ -5263,6 +5263,15 @@
     }
   },
   "logs": {
+    "noStream": {
+      "title": "Pick a stream to start exploring",
+      "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
+      "selectStream": "Select a stream",
+      "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
+      "queryGuide": "Read the query guide",
+      "queryGuideDesc": "Filters, SQL mode, VRL & saved views",
+      "recent": "Recent:"
+    },
     "noEvents": {
       "title": "No events found",
       "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
