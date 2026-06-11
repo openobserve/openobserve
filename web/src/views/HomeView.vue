@@ -15,66 +15,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:px-[0.625rem] tw:pt-1 home-page"
-    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view tw:pb-2' : ''"
+    class="tw:rounded-md home-page"
+    :class="store.state.isAiChatEnabled ? 'ai-enabled-home-view' : ''"
     data-test="home-page"
   >
+    <!-- No card-container here: the page already renders inside MainLayout's
+         bordered content card, so an inner panel border would double-frame the
+         home page. Keep only the layout classes.
+
+         The page is NOT padded at the root: the header must be full-bleed so its
+         bottom divider reaches the card edges (like Data Sources / Pipelines) —
+         a padded root insets the header and makes it read as a floating bar.
+         Padding is reintroduced on the body wrapper below the header instead. -->
     <div
-      class="card-container tw:mb-[0.625rem] tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
     >
-      <!-- Tab bar (drag to reorder) — shown when multiple tabs exist -->
-      <div
-        v-if="tabOrder.length > 1"
-        class="home-tab-bar"
-        @dragover.prevent
-        @drop="onTabDrop($event)"
+      <!-- Top-level page header: module icon + "Home" title, with the home tabs
+           rendered as a full-width strip below (tabsBelow). The header owns its
+           own bottom divider when tabs are present; when only a single tab
+           exists we hand-draw the border so the header still reads as a header.
+           The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
+           OTabs draws the active underline flush with the header's divider. -->
+      <AppPageHeader
+        :title="t('menu.home')"
+        :subtitle="t('home.subtitle')"
+        icon="home"
+        :tabs-below="tabOrder.length > 1"
+        class="tw:shrink-0 tw:px-4"
+        :class="
+          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+        "
       >
-        <OButton
-          v-for="tab in tabOrder"
-          :key="tab.id"
-          variant="ghost"
-          class="home-tab-btn"
-          :class="{
-            'home-tab-active': activeHomeTab === tab.id,
-            'home-tab-dragging': draggingTab === tab.id,
-          }"
-          draggable="true"
-          @click="activeHomeTab = tab.id"
-          @dragstart="onTabDragStart($event, tab.id)"
-          @dragend="onTabDragEnd"
-          @dragenter.prevent="onTabDragEnter(tab.id)"
-        >
-          <OIcon
-            name="drag-indicator"
-            class="home-tab-drag-handle"
-            size="sm"
+        <template v-if="tabOrder.length > 1" #tabs>
+          <OTabs
+            v-model="activeHomeTab"
+            align="left"
+            reorderable
+            data-test="home-tab-bar"
+            @reorder="onTabReorder"
+          >
+            <OTab
+              v-for="tab in tabOrder"
+              :key="tab.id"
+              :name="tab.id"
+              :label="tab.label"
+              :data-test="`home-tab-${tab.id}`"
+            />
+          </OTabs>
+        </template>
+      </AppPageHeader>
+
+      <!-- Body: padded wrapper that holds the active tab panel. Padding lives
+           here (not on the root) so the header above stays full-bleed. -->
+      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:p-2.5">
+        <!-- O2 AI Assistant tab -->
+        <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
+          <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+          <O2AIChat
+            ref="homeChat"
+            :is-open="true"
+            :header-height="0"
+            :centered-start="true"
           />
-          {{ tab.label }}
-        </OButton>
-      </div>
+        </div>
 
-      <!-- O2 AI Assistant tab -->
-      <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
-        <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-        <O2AIChat
-          ref="homeChat"
-          :is-open="true"
-          :header-height="0"
-          :centered-start="true"
-        />
-      </div>
+        <!-- Overview tab (no inner card-container — the outer section panel
+             already provides the border; avoids a double-bordered card). -->
+        <div
+          v-if="activeHomeTab === 'overview'"
+          class="home-tab-panel"
+        >
+          <OverviewTab />
+        </div>
 
-      <!-- Overview tab -->
-      <div
-        v-if="activeHomeTab === 'overview'"
-        class="card-container home-tab-panel"
-      >
-        <OverviewTab />
-      </div>
-
-      <!-- Usage tab -->
-      <div v-if="activeHomeTab === 'usage'" class="home-tab-panel">
-        <UsageTab />
+        <!-- Usage tab -->
+        <div v-if="activeHomeTab === 'usage'" class="home-tab-panel">
+          <UsageTab />
+        </div>
       </div>
     </div>
   </div>
@@ -96,8 +113,9 @@ import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "PageHome",
@@ -174,46 +192,34 @@ export default defineComponent({
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
-    // Drag state
-    const draggingTab = ref<string | null>(null);
-    const dragOverTab = ref<string | null>(null);
-
-    function onTabDragStart(e: DragEvent, id: string) {
-      draggingTab.value = id;
-      e.dataTransfer!.effectAllowed = "move";
-      e.dataTransfer!.setData("text/plain", id);
-    }
-
-    function onTabDragEnter(id: string) {
-      dragOverTab.value = id;
-    }
-
-    function onTabDragEnd() {
-      draggingTab.value = null;
-      dragOverTab.value = null;
-    }
-
-    function onTabDrop(e: DragEvent) {
-      e.preventDefault();
-      const fromId = e.dataTransfer?.getData("text/plain") ?? draggingTab.value;
-      const toId = dragOverTab.value;
-      if (!fromId || !toId || fromId === toId) return;
-
+    // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
+    // side of the target) and we apply it to our own ordered list, then persist.
+    function onTabReorder({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string | number;
+      to: string | number;
+      before?: boolean;
+    }) {
+      if (from === to) return;
       const order = [...tabOrder.value];
-      const fromIdx = order.findIndex((t) => t.id === fromId);
-      const toIdx = order.findIndex((t) => t.id === toId);
-      if (fromIdx === -1 || toIdx === -1) return;
+      const fromIdx = order.findIndex((t) => t.id === from);
+      if (fromIdx === -1) return;
 
       const [moved] = order.splice(fromIdx, 1);
+      // Recompute the target index after removal, then insert on the chosen side.
+      let toIdx = order.findIndex((t) => t.id === to);
+      if (toIdx === -1) return;
+      if (!before) toIdx += 1;
       order.splice(toIdx, 0, moved);
+
       tabOrder.value = order;
       localStorage.setItem(
         LS_TAB_ORDER_KEY,
         JSON.stringify(order.map((t) => t.id)),
       );
-
-      draggingTab.value = null;
-      dragOverTab.value = null;
     }
 
     const homeChat = ref<any>(null);
@@ -241,12 +247,7 @@ export default defineComponent({
       config,
       activeHomeTab,
       tabOrder,
-      draggingTab,
-      dragOverTab,
-      onTabDragStart,
-      onTabDragEnter,
-      onTabDragEnd,
-      onTabDrop,
+      onTabReorder,
       isEnterpriseOrCloud,
       homeChat,
       onLoadChat,
@@ -258,8 +259,9 @@ export default defineComponent({
     UsageTab,
     O2AIChat,
     HomeChatHistory,
-    OButton,
-    OIcon,
+    OTabs,
+    OTab,
+    AppPageHeader,
   },
 });
 </script>
@@ -270,56 +272,7 @@ export default defineComponent({
  * Usage-tab-specific styles live in UsageTab.vue.
  */
 
-/* ── Home tab bar ── */
-.home-tab-bar {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--color-tabs-bar-border);
-  margin: 0 0.625rem 0 0.625rem;
-  padding-top: 0.25rem;
-}
-
-.home-tab-btn {
-  background: none;
-  border: none;
-  border-top-left-radius: 0.375rem;
-  border-top-right-radius: 0.375rem;
-  border-bottom: 2px solid transparent;
-  border-radius: 0.375rem 0.375rem 0 0 !important;
-  padding: 0 0.75rem;
-  height: 40px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-tabs-inactive-text);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    background-color 0.15s,
-    opacity 0.15s;
-  margin-bottom: -1px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  user-select: none;
-}
-
-.home-tab-drag-handle {
-  opacity: 0.5;
-  transition: opacity 0.15s;
-  cursor: grab;
-}
-
-.home-tab-dragging {
-  opacity: 0.4;
-}
-
-.home-tab-active {
-  color: var(--color-tabs-active-text) !important;
-  border-bottom-color: var(--color-tabs-indicator) !important;
-  background: var(--color-tabs-active-bg) !important;
-}
+/* Home tab bar now uses the shared OTabs component (see template). */
 
 .home-tab-panel {
   flex: 1;
@@ -349,6 +302,17 @@ export default defineComponent({
 .home-ai-panel :deep(.chat-content-wrapper),
 .home-ai-panel :deep(.chat-content) {
   overflow: visible;
+}
+
+/* The home tab sets chat-content to overflow:visible (above) so the input's
+   glow can spill — but that removes the clip that normally bounds the message
+   list. Without min-height:0, the flex:1 chat-content + messages-container grow
+   to their content height and push the input bar off the bottom. min-height:0
+   lets them shrink within their flex columns so the message list scrolls and
+   the input stays pinned at the bottom. */
+.home-ai-panel :deep(.chat-content),
+.home-ai-panel :deep(.messages-container) {
+  min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */

@@ -316,7 +316,7 @@ watch(internalOpen, (open) => {
             : 'tw:bg-dialog-overlay',
           'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
           'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-          'tw:duration-200',
+          'tw:data-[state=open]:duration-120 tw:data-[state=closed]:duration-120',
         ]"
         :style="{ zIndex: overlayZIndex }"
       />
@@ -338,12 +338,13 @@ watch(internalOpen, (open) => {
           // Surface — reuse dialog tokens (same visual language)
           'tw:bg-dialog-bg tw:text-dialog-content-text',
           isRight
-            ? 'tw:border-s tw:border-dialog-border'
-            : 'tw:border-e tw:border-dialog-border',
+            ? 'tw:border-s tw:border-t tw:border-dialog-border'
+            : 'tw:border-e tw:border-t tw:border-dialog-border',
           'tw:shadow-xl',
           // Focus ring
           'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
-          // Slide-in animation — direction matches side
+          // Slide-in animation — direction matches side.
+          // Strong decel curve so it shoots in (170ms) and settles; exit is quicker (120ms).
           isRight
             ? [
                 'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-right',
@@ -353,7 +354,8 @@ watch(internalOpen, (open) => {
                 'tw:data-[state=open]:animate-in tw:data-[state=open]:slide-in-from-left',
                 'tw:data-[state=closed]:animate-out tw:data-[state=closed]:slide-out-to-left',
               ],
-          'tw:duration-300',
+          'tw:data-[state=open]:duration-170 tw:data-[state=open]:ease-[cubic-bezier(0.32,0.72,0,1)]',
+          'tw:data-[state=closed]:duration-120 tw:data-[state=closed]:ease-in',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
@@ -388,7 +390,7 @@ watch(internalOpen, (open) => {
             <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
               <span
                 v-if="title"
-                class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
               >
                 {{ title }}
               </span>

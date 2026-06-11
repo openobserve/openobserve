@@ -37,7 +37,7 @@ export class CrossLinkPage {
         this.schemaUpdateSettingsBtn = '[data-test="schema-update-settings-button"]';
 
         // Organization Settings page selectors
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.orgSettingsSaveBtn = '[data-test="add-alert-submit-btn"]';
 
         // Logs result-table expand toggle — kept as a Locator class member so
@@ -511,7 +511,9 @@ export class CrossLinkPage {
      * the multi-stream spec used to inline.
      */
     async expandFirstLogRow() {
-        await this.firstLogRowExpand.waitFor({ state: 'visible', timeout: 15000 });
+        // The table renders after the search API responds — allow up to 30 s
+        // on CI where UNION ALL queries can be slow to return rows.
+        await this.firstLogRowExpand.waitFor({ state: 'visible', timeout: 30000 });
         await this.firstLogRowExpand.click();
         await this.page.waitForTimeout(2000);
     }

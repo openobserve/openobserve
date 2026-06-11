@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component tw:h-full" id="searchBarComponent">
-    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full">
-      <div class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem]">
+  <div class="search-bar-component tw:h-full tw:flex tw:flex-col" id="searchBarComponent">
+    <div class="tw:flex tw:m-0! tw:p-[0.375rem] tw:items-center tw:justify-between tw:w-full tw:border-b tw:border-border-default">
+      <div ref="toolbarLeftRef" class="tw:flex tw:flex-row tw:items-center tw:gap-[0.375rem] tw:flex-1 tw:min-w-0 tw:overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -27,90 +27,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-search-mode-spans-btn"
             value="spans"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Spans' : undefined"
           >
             <template #icon-left
               ><OIcon name="layers" size="sm" class="tw:shrink-0"
             /></template>
-            Spans
+            <span v-if="!shouldHideToggleText">Spans</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-traces-btn"
             value="traces"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Traces' : undefined"
           >
             <template #icon-left
               ><OIcon name="account-tree" size="sm" class="tw:shrink-0"
             /></template>
-            Traces
+            <span v-if="!shouldHideToggleText">Traces</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             v-if="config.isEnterprise == 'true'"
             data-test="traces-service-graph-toggle"
             value="service-graph"
             size="sm"
+            :tooltip="shouldHideToggleText ? 'Service Graph' : undefined"
           >
             <template #icon-left
               ><OIcon name="share" size="sm" class="tw:shrink-0"
             /></template>
-            Service Graph
+            <span v-if="!shouldHideToggleText">Service Graph</span>
           </OToggleGroupItem>
           <OToggleGroupItem
             data-test="traces-search-mode-services-catalog-btn"
             value="services-catalog"
             size="sm"
+            :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
           >
             <template #icon-left
               ><OIcon name="menu-book" size="sm" class="tw:shrink-0"
             /></template>
-            {{ t("traces.servicesCatalog.tabLabel") }}
-          </OToggleGroupItem>
-          <!--
-            Two-gate visibility:
-              1. The deployment-wide `VITE_SHOW_LLM_UI` env flag must
-                 NOT be `"false"`. Unset (default), `"true"`, or any
-                 other value keeps the UI visible — only the literal
-                 string `"false"` hides it. Prevents accidental hide
-                 on typo / missing .env file.
-              2. The org must have at least one traces stream flagged
-                 `is_llm_stream === true` (resolved by `Index.vue` and
-                 passed as `hasLLMStreams`).
-            We also keep the toggle visible when the user is already
-            on the LLM Insights tab (e.g., navigated via URL) so the
-            active selection isn't orphaned mid-session.
-          -->
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-sessions-btn"
-            value="sessions"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="forum" size="sm" class="tw:shrink-0"
-            /></template>
-            Sessions
-          </OToggleGroupItem>
-          <OToggleGroupItem
-            v-if="config.showLLMUI !== 'false'"
-            data-test="traces-search-mode-llm-insights-btn"
-            value="llm-insights"
-            size="sm"
-          >
-            <template #icon-left
-              ><OIcon name="auto-awesome" size="sm" class="tw:shrink-0"
-            /></template>
-            LLM Insights
+            <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Show search controls only when not on Service Graph or Services Catalog or llm insights or sessions -->
+        <!-- Show search controls only when not on Service Graph or Services Catalog -->
         <template
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
-            searchObj.meta.searchMode !== 'services-catalog' &&
-            searchObj.meta.searchMode !== 'llm-insights' &&
-            searchObj.meta.searchMode !== 'sessions'
+            searchObj.meta.searchMode !== 'services-catalog'
           "
         >
+          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
+          <OButton
+            data-test="traces-search-bar-reset-filters-btn"
+            variant="outline"
+            size="xs"
+            @click="resetFilters"
+          >
+            <template #icon-left>
+              <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
+            </template>
+            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+          </OButton>
+
           <div
             class="toolbar-toggle-container element-box-shadow"
           >
@@ -120,13 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
               size="lg"
             />
-            <OIcon
-              name="bar-chart"
-              size="sm"
-              class="tw:shrink-0"
-            />
+            <OIcon name="bar-chart" size="sm" class="tw:shrink-0" />
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
+
           <!-- Error Only Toggle -->
           <div
             class="toolbar-toggle-container element-box-shadow"
@@ -139,35 +115,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="lg"
               @update:model-value="onErrorOnlyToggle"
             />
-            <OIcon
-              name="error"
-              size="sm"
-              class="tw:shrink-0 tw:text-[var(--o2-status-error)]"
-            />
+            <OIcon name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
             <OTooltip :content="t('traces.showErrorOnly')" />
           </div>
-          <OButton
-            data-test="traces-search-bar-reset-filters-btn"
-            variant="outline"
-            size="icon-toolbar"
-            @click="resetFilters"
-          >
-            <OIcon name="restart-alt" size="sm" class="tw:shrink-0" />
-            <OTooltip :content="t('search.resetFilters')" />
-          </OButton>
-          <syntax-guide
-            data-test="logs-search-bar-sql-mode-toggle-btn"
-            :sqlmode="searchObj.meta.sqlMode"
-            class=" tw:h-[2rem]! tw:w-[2.25rem]!"
-          />
         </template>
+
+        <!-- More menu: Syntax Guide — always last.
+             Sessions + LLM Insights were removed from Traces; they now
+             live as standalone pages under AI Observability. -->
+        <ODropdown side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              data-test="traces-search-bar-more-menu-btn"
+              variant="outline"
+              size="xs"
+              icon-left="more-horiz"
+            >
+              More
+            </OButton>
+          </template>
+
+          <SyntaxGuide
+            :sqlmode="searchObj.meta.sqlMode"
+            :menuItem="true"
+            data-test="traces-search-bar-syntax-guide-btn"
+          />
+        </ODropdown>
       </div>
+      <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
+      <div ref="toolbarRightRef" class="tw:flex-shrink-0 tw:flex tw:items-center">
       <div
         v-if="
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="tw:ml-auto tw:flex tw:items-center tw:gap-[0.375rem]"
+        class="tw:flex tw:items-center tw:gap-[0.375rem]"
       >
         <date-time
           ref="dateTimeRef"
@@ -397,25 +379,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </div>
+      </div><!-- /toolbarRightRef wrapper -->
 
     </div>
     <div
       v-if="
         searchObj.meta.searchMode !== 'service-graph' &&
         searchObj.meta.searchMode !== 'services-catalog' &&
-        searchObj.meta.searchMode !== 'llm-insights' &&
-        searchObj.meta.searchMode !== 'sessions' &&
         searchObj.meta.showQuery
       "
-      class="tw:flex tw:h-[calc(100%-3.1rem)]!"
+      class="tw:flex tw:flex-1 tw:min-h-0 tw:border-b tw:border-border-default"
     >
       <div
-        class="tw:flex tw:flex-col tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mx-[0.375rem] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-full! tw:w-full"
+        class="tw:flex tw:flex-col tw:overflow-hidden tw:h-full tw:w-full tw:relative"
       >
         <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
-          class="monaco-editor tw:px-[0.325rem] tw:py-[0.125rem]"
+          class="monaco-editor"
           v-model:query="searchObj.data.editorValue"
           :keywords="effectiveKeywords"
           :class="
@@ -427,9 +408,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           language="sql"
           @update:query="updateQueryValue"
           @run-query="searchData"
-          @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-          @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
+          @focus="onQueryEditorFocus"
+          @blur="onQueryEditorBlur"
         />
+        <div
+          v-if="
+            searchObj.data.editorValue == '' &&
+            searchObj.meta.queryEditorPlaceholderFlag
+          "
+          class="query-editor-placeholder-overlay"
+        >
+          <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -447,6 +437,7 @@ import {
   onActivated,
   computed,
 } from "vue";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -464,11 +455,13 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import useTraces from "@/composables/useTraces";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
 
 import { debounce } from "lodash-es";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import useStreams from "@/composables/useStreams";
 import {
@@ -521,20 +514,6 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    isLLMSpanPresent: {
-      type: Boolean,
-      default: false,
-    },
-    // True when the parent (`Index.vue`) has confirmed at least one
-    // traces stream is flagged `is_llm_stream === true`. Drives the
-    // LLM Insights tab visibility — we hide the toggle entirely when
-    // no org has opted in (avoids a dead button that opens an empty
-    // dashboard). Defaults to `true` so the tab doesn't flicker
-    // during the brief window before streams resolve on first mount.
-    hasLLMStreams: {
-      type: Boolean,
-      default: true,
-    },
   },
   methods: {
     searchData() {
@@ -555,6 +534,23 @@ export default defineComponent({
 
     const { searchObj, tracesShareURL } = useTraces();
     const queryEditorRef = ref(null);
+
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef,
+        sqlMode: computed(() => searchObj.meta.sqlMode),
+        query: computed(() => searchObj.data.editorValue ?? ""),
+        streamName: computed(() => searchObj.data.stream.selectedStream?.value),
+      });
+
+    const onQueryEditorFocus = () => {
+      searchObj.meta.queryEditorPlaceholderFlag = false;
+      _sqlOnFocus();
+    };
+    const onQueryEditorBlur = async () => {
+      searchObj.meta.queryEditorPlaceholderFlag = true;
+      await _sqlOnBlur();
+    };
 
     let parser: any;
     let streamName = "";
@@ -641,6 +637,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = async (value: string, event?: any) => {
+      _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
         searchObj.data.parsedQuery = parser.astify(value);
@@ -785,9 +782,7 @@ export default defineComponent({
       // The DateTime component also fires `on:date-change` once on its own
       // mount with the current value (no actual change). The `prev`
       // comparison above filters out that mount-time replay so a tab
-      // switch that remounts the picker doesn't fire a redundant search
-      // (visible in LLM Insights as a duplicate fetchAll right after the
-      // dashboard's own initial load).
+      // switch that remounts the picker doesn't fire a redundant search.
       if (
         store.state.zoConfig?.auto_query_enabled &&
         searchObj.meta.liveMode &&
@@ -962,6 +957,28 @@ export default defineComponent({
       localStorage.setItem("serviceGraph_layoutType", type);
     };
 
+    const _traceStreamFields = computed(
+      () => searchObj.data.stream.selectedStreamFields ?? [],
+    );
+    const _traceFieldValues = computed(() => props.fieldValues ?? {});
+    const _traceSqlMode = computed(() => false);
+    const _traceNoStream = computed(() => !searchObj.data.stream.selectedStream?.value);
+    const { placeholder: traceEditorPlaceholder } = useQueryPlaceholder(
+      _traceStreamFields,
+      _traceFieldValues,
+      _traceSqlMode,
+      _traceNoStream,
+    );
+
+    // Responsive toolbar — shared composable tracks available left-section width
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+
+    // Traces-specific breakpoints (actual content widths + 60px buffer to fire before clipping):
+    //   Toggle items with text: ~682px total → hide at 750 (682+68 buffer)
+    //   After toggle icon-only (~459px) + reset text: hide reset text at 540
+    const shouldHideToggleText = computed(() => availableLeftWidth.value < 750);
+    const shouldHideResetText  = computed(() => availableLeftWidth.value < 540);
+
     return {
       t,
       router,
@@ -971,6 +988,8 @@ export default defineComponent({
       btnRefreshInterval,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
+      onQueryEditorFocus,
+      onQueryEditorBlur,
       updateQueryValue,
       updateDateTime,
       updateQuery,
@@ -992,6 +1011,11 @@ export default defineComponent({
       onServiceGraphVisualizationChange,
       onServiceGraphLayoutChange,
       toggleLiveMode,
+      traceEditorPlaceholder,
+      toolbarLeftRef,
+      toolbarRightRef,
+      shouldHideToggleText,
+      shouldHideResetText,
     };
   },
   computed: {
@@ -1045,6 +1069,18 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.more-menu-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--o2-section-header-bg);
+  color: var(--o2-text-secondary);
+  flex-shrink: 0;
+}
+
 .search-bar-component {
   padding-bottom: 1px;
 
@@ -1186,8 +1222,11 @@ export default defineComponent({
   font-size: var(--text-xs);
   font-weight: var(--font-medium) !important;
   line-height: 1rem !important;
-  padding: 0 !important;
+  padding: 0 0.25rem !important;
   width: 5.875rem !important;
+  white-space: normal;
+  word-break: break-word;
+  text-align: center;
   transition:
     box-shadow 0.3s ease,
     opacity 0.2s ease;
@@ -1238,5 +1277,43 @@ export default defineComponent({
 
 :global(.body--dark) .toolbar-toggle-container {
   border: 0.0625rem solid var(--color-button-outline-border);
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  /* Align with Monaco's text start in CodeQueryEditor: host padding-left
+     (0.5rem) + line-number gutter (lineNumbersMinChars: 2 @ 14px ≈ 1.05rem) +
+     lineDecorationsWidth (10px ≈ 0.625rem) ≈ 2.15rem. top 0.1875rem matches the
+     editor's padding.top (3px) so it sits on line 1 next to the gutter number.
+     Keep in sync with those editor options. */
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    /* Mirror Monaco's rendered text so the placeholder reads as the future
+       typed query, not a different (proportional) font on a different baseline:
+       same monospace family and same ~21px (1.5 × 14px) line height. */
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+:global(.body--dark) .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
 }
 </style>

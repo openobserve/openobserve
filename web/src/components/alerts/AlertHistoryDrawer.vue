@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="alertDetails"
               :class="[
-                'tw:font-bold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-44 tw:truncate tw:inline-block',
+                'tw:font-semibold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -208,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :total-count="resultTotal"
                 :loading="isLoadingHistory"
                 :row-class="getRowClass"
+                :default-columns="false"
                 :show-global-filter="false"
                 class="history-table tw:flex-1 tw:overflow-hidden"
                 data-test="alert-details-history-table"
@@ -483,6 +484,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
@@ -606,6 +608,8 @@ const alertHistoryColumns = [
     header: t("alerts.historyTable.error"),
     accessorKey: "true",
     sortable: false,
+    size: COL.description,
+    meta: { align: "left" as const, autoWidth: true },
   },
 ];
 

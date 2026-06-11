@@ -179,8 +179,8 @@ export const generateServiceNodeTooltipContent = (metadata: any): string => {
  */
 export const generatePatternNodeTooltipContent = (metadata: any): string => {
   if (!metadata) return '';
-  // console.log('[TOOLTIP CONTENT DEBUG] metadata:', metadata);
   const {
+    serviceName,
     pathSignature = 'Unknown Pattern',
     count = 1,
     avg = 0,
@@ -189,6 +189,7 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
 
   return `
     <div class="tw:flex tw:flex-col tw:gap-0.5">
+      <div class="tw:font-semibold tw:pb-1 tw:text-left">${escapeHtml(serviceName || pathSignature)}</div>
       <div class="tw:flex tw:justify-between tw:gap-3">
         <span class="tw:w-12 tw:text-left">Spans:</span>
         <span class="tw:font-mono tw:text-left tw:flex-1">${count}</span>

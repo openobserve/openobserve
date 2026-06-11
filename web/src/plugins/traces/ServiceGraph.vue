@@ -148,7 +148,7 @@
       </div>
     </div>
     <OCardSection
-      class="tw:p-[0.375rem]! tw:flex-1 tw:min-h-0  service-graph-container"
+      class="tw:flex-1 tw:min-h-0  service-graph-container"
     >
       <!-- Graph Visualization -->
       <OCard class="graph-card tw:h-full">
@@ -1143,6 +1143,7 @@ export default defineComponent({
           errors: node.errors || 0,
           error_rate: node.error_rate || 0,
           is_virtual: node.is_virtual || false,
+          service_type: node.service_type || undefined,
         }));
 
         // Ensure edges have all required fields and valid node references

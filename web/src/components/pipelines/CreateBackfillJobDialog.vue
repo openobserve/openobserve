@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit"
     data-test="create-backfill-job-dialog"
   >
-    <template #header-right>
+    <template #header-left>
       <span
         :class="[
-          'tw:text-xl tw:font-semibold tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+          'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
           store.state.theme === 'dark'
             ? 'tw:text-blue-400 tw:bg-blue-900/50'
             : 'tw:text-blue-600 tw:bg-blue-50'

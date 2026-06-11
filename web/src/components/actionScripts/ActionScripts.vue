@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,59 +17,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="action-scripts-list-page">
-    <div
-      v-if="!showAddActionScriptDialog"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
-    >
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:w-full tw:h-[68px]"
+  <div data-test="action-scripts-list-page" class="tw:h-full">
+    <div v-if="!showAddActionScriptDialog" class="tw:h-full">
+      <PageLayout
+        :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      >
+        <!-- Row 1: standard header — title + actions only. Search moved into the
+             table's own toolbar below. -->
+        <template #header>
+          <AppPageHeader :title="t('actions.header')" icon="code" :subtitle="'Custom automation and scripting'">
+            <template #actions>
+              <OButton
+                data-test="action-list-add-btn"
+                variant="primary"
+                size="sm"
+                @click="showAddUpdateFn({})"
+                >{{ t("actions.add") }}</OButton
+              >
+            </template>
+          </AppPageHeader>
+        </template>
+        <OTable
+          data-test="action-scripts-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="id"
+          :frame="false"
+          :loading="loading"
+          :selected-ids="selectedActionScriptIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
         >
-          <div
-            class="tw:font-[600] tw:text-[20px]"
-            data-test="alerts-list-title"
-          >
-            {{ t("actions.header") }}
-          </div>
-          <div
-            class="tw:full-width tw:flex tw:items-center tw:justify-end tw:gap-3"
-          >
+          <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:ml-auto no-border o2-search-input"
+              class="tw:w-64 no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
-            <OButton
-              data-test="action-list-add-btn"
-              variant="primary"
-              size="sm"
-              @click="showAddUpdateFn({})"
-              >{{ t("actions.add") }}</OButton
-            >
-          </div>
-        </div>
-      </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-124px)]">
-          <OTable
-            data-test="action-scripts-table"
-            :data="visibleRows"
-            :columns="columns"
-            row-key="id"
-            :loading="loading"
-            :selected-ids="selectedActionScriptIds"
-            selection="multiple"
-            pagination="client"
-            :page-size="20"
-            :page-size-options="[5, 10, 20, 50, 100]"
-            sorting="client"
-            filter-mode="client"
-            :default-columns="false"
-            :show-global-filter="false"
-            @update:selected-ids="handleSelectedIdsUpdate"
-          >
+          </template>
             <template #empty>
               <NoData />
             </template>
@@ -125,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-        </div>
-      </div>
+      </PageLayout>
     </div>
     <template v-else>
       <div class="tw:w-full">
@@ -208,12 +200,13 @@ import {
   defineComponent,
   ref,
   onBeforeMount,
-  onActivated,
   watch,
   defineAsyncComponent,
   computed,
 } from "vue";
 import type { Ref } from "vue";
+import PageLayout from "@/components/common/PageLayout.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -249,6 +242,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ActionScriptList {
   "#": string | number;
@@ -265,6 +259,8 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
+    PageLayout,
+    AppPageHeader,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
@@ -336,7 +332,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "center" },
       },
       {
@@ -344,13 +340,15 @@ export default defineComponent({
         header: t("alerts.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "created_by",
         header: t("alerts.createdBy"),
         accessorKey: "created_by",
         sortable: true,
+        size: COL.owner,
         meta: { align: "center" },
       },
       {
@@ -358,6 +356,7 @@ export default defineComponent({
         header: t("alerts.createdAt"),
         accessorKey: "created_at",
         sortable: true,
+        size: COL.createdAt,
         meta: { align: "left" },
       },
       {
@@ -365,6 +364,7 @@ export default defineComponent({
         header: t("actions.type"),
         accessorKey: "execution_details_type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -372,6 +372,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -379,6 +380,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -386,6 +388,7 @@ export default defineComponent({
         header: t("alerts.status"),
         accessorKey: "status",
         sortable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {

@@ -187,11 +187,11 @@ export class AlertManagement {
         try {
             await Promise.race([
                 this.page.locator(this.locators.tableLocator).waitFor({ state: 'visible', timeout: 30000 }),
-                this.page.getByText('No data available').waitFor({ state: 'visible', timeout: 30000 })
+                this.page.locator('[data-test="o2-empty-state"]').waitFor({ state: 'visible', timeout: 30000 })
             ]);
         } catch (error) {
             testLogger.error('Neither table nor no data message found after search', { alertName, error: error.message });
-            throw new Error(`Failed to search for alert "${alertName}": Neither table nor "No data available" message appeared`);
+            throw new Error(`Failed to search for alert "${alertName}": Neither table nor empty state appeared`);
         }
     }
 
@@ -211,7 +211,7 @@ export class AlertManagement {
             testLogger.debug('Already on alerts page, skipping navigation');
         }
 
-        const toggleBtn = this.page.locator('[data-test="alert-list-search-across-folders-toggle-btn"]');
+        const toggleBtn = this.page.locator('[data-test="alert-list-search-across-folders-toggle"]');
         await toggleBtn.click({ force: true });
         await this.page.waitForTimeout(500);
 
@@ -478,7 +478,7 @@ export class AlertManagement {
             testLogger.info('Alert not found in current folder, retrying across all folders', { alertName });
             const toggle = this.page.locator(this.locators.searchAcrossFoldersToggle);
             if (await toggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-                const toggleBtnAlt = this.page.locator('[data-test="alert-list-search-across-folders-toggle-btn"]');
+                const toggleBtnAlt = this.page.locator('[data-test="alert-list-search-across-folders-toggle"]');
                 await toggleBtnAlt.click({ force: true });
                 await this.page.waitForTimeout(500);
             }

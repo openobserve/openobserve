@@ -12,7 +12,7 @@ import {
   type Table,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
-import type { OTableColumnDef } from "../OTable.types";
+import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 /**
  * Creates and manages the TanStack Table instance.
@@ -24,6 +24,9 @@ export function useTableCore<TData>(
     data: TData[];
     columns: OTableColumnDef<TData>[];
     pageSize?: number;
+    currentPage?: number;
+    /** Auto-render a fixed-width, auto-numbered row-index ("#") column. */
+    showIndex?: boolean;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     sortFieldMap?: Record<string, string>;
@@ -39,11 +42,99 @@ export function useTableCore<TData>(
     sorting: string;
     rowHeight?: number;
     filterMode?: string;
+    horizontalScroll?: boolean;
     /** Initial column sizes loaded from localStorage (for persistence) */
     initialColumnSizes?: Record<string, number> | null;
   },
   emit: any,
 ) {
+  // ── Effective columns ───────────────────────────────────────────
+  // When `showIndex` is set (and the caller hasn't already declared a `#`
+  // column), prepend an auto-rendered, auto-numbered row-index column. Its
+  // value is derived from the row's position so pages no longer hand-roll a
+  // `"#"` field in their data. Under server pagination we add the page offset
+  // so numbering stays continuous across pages.
+  const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
+    if (!props.showIndex) return null;
+    if (props.columns.some((c) => c.id === "#")) return null;
+    const isServer = props.pagination === "server";
+    const offset = isServer
+      ? Math.max(((props.currentPage ?? 1) - 1) * (props.pageSize ?? 0), 0)
+      : 0;
+    return {
+      id: "#",
+      header: "#",
+      size: TABLE_INDEX_COL_SIZE,
+      sortable: false,
+      hideable: false,
+      resizable: false,
+      // accessorFn receives (row, index); returning the value lets the default
+      // text cell render it. (A `cell` *function* can't be used here — the core
+      // cell wrapper only forwards string/component cells.)
+      accessorFn: ((_row: TData, index: number) => {
+        const n = index + 1 + offset;
+        return n <= 9 ? `0${n}` : `${n}`;
+      }) as any,
+      meta: { align: "left" },
+    };
+  });
+
+  // Invisible trailing spacer that absorbs the table's leftover width so the
+  // real columns keep their exact widths (Excel-style resize) and an action
+  // column can stay pinned flush-right. Only added when resizing is on and the
+  // table has no explicit elastic (`autoWidth`) column — if a column is marked
+  // autoWidth, THAT column is the filler instead and no spacer is needed.
+  const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
+    const base = indexColumn.value
+      ? [indexColumn.value, ...props.columns]
+      : props.columns;
+    // An `autoWidth` column flexes permanently and absorbs leftover on its own,
+    // so those tables need no spacer. Every other resizable table gets an
+    // invisible trailing spacer: it sits before the pinned actions column and
+    // absorbs leftover width so the table stays ≥ container (actions stays
+    // flush-right) and blank space lands in the spacer when a column shrinks.
+    // `flex` tables need it too — the flex column freezes after the first resize
+    // and no longer re-absorbs, so the spacer takes over.
+    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
+    const wantSpacer =
+      (props.enableColumnResize ?? false) &&
+      !props.horizontalScroll &&
+      !props.defaultColumns &&
+      !hasAutoWidth;
+    if (!wantSpacer) return base;
+    const spacer: OTableColumnDef<TData> = {
+      id: "__spacer__",
+      header: "",
+      sortable: false,
+      hideable: false,
+      resizable: false,
+      size: 0,
+      minSize: 0,
+      // Not `autoWidth`: its width is driven explicitly by OTable (0 while
+      // filling, the leftover once frozen). `spacer` marks it for skip logic.
+      meta: { align: "left", spacer: true },
+    };
+    return [...base, spacer];
+  });
+
+  // A column is "rigid" — width pinned independently of the other columns —
+  // when it's the selection-driven row index, or an action/buttons column.
+  const isRigidColumn = (col: OTableColumnDef<TData>) =>
+    col.isAction === true || col.id === "actions" || col.id === "#";
+
+  // Deterministic actions-column width from its icon count: N icon buttons
+  // (icon-sm = 32px) + gaps + cell padding, never narrower than the "Actions"
+  // header. Computed (not DOM-measured) so the skeleton and loaded table match.
+  const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
+  const ACTION_BTN_GAP = 4; // gap-1 between buttons
+  const ACTION_CELL_PAD = 16; // td px-2
+  const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
+  const actionColumnWidth = (actionCount?: number): number => {
+    const n = Math.max(1, Number(actionCount) || 2);
+    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + ACTION_CELL_PAD;
+    return Math.max(content, ACTIONS_HEADER_MIN);
+  };
+
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
 
@@ -69,12 +160,12 @@ export function useTableCore<TData>(
     return raw.map((c: any) => (typeof c === "string" ? c : c.id));
   });
   const rightPinnedIds = computed(() =>
-    props.columns
+    effectiveColumns.value
       .filter((c) => c.pinned === "right" || c.isAction)
       .map((c) => c.id),
   );
   const leftPinnedIds = computed(() => {
-    const explicit = props.columns
+    const explicit = effectiveColumns.value
       .filter((c) => c.pinned === "left")
       .map((c) => c.id);
     const pivot = pivotRowColumnIds.value ?? [];
@@ -96,7 +187,18 @@ export function useTableCore<TData>(
 
   // Build TanStack ColumnDef array from our OTableColumnDef
   const tanstackColumns = computed<ColumnDef<TData>[]>(() => {
-    return props.columns.map((col) => {
+    return effectiveColumns.value.map((col) => {
+      const rigid = isRigidColumn(col);
+      const isActionCol = col.isAction === true || col.id === "actions";
+      // Rigid columns (selection index, actions) hold a width that does not
+      // depend on the other columns: min === size === max so the table layout
+      // can neither grow nor shrink them. The actions column's width is computed
+      // DETERMINISTICALLY from its icon count (not DOM-measured at runtime) so
+      // the loading skeleton and the loaded table render it at the exact same
+      // width — no flash when data arrives.
+      const size = isActionCol
+        ? Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
+        : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
         header: col.header as any,
@@ -108,13 +210,20 @@ export function useTableCore<TData>(
               return col.cell;
             })
           : undefined,
-        size: col.size ?? 150,
-        minSize: col.minSize ?? 40,
-        maxSize: col.maxSize ?? 800,
+        size,
+        // Resize floor: just enough that the dragged column stays usable (its
+        // resize handle is still grabbable and content can ellipsize) — NOT a
+        // layout guard, since the Excel-style width strategy means a drag only
+        // ever changes the dragged column. Columns that need a larger minimum
+        // (e.g. the name column) set their own `minSize`. Rigid columns locked.
+        minSize: rigid ? size : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
+        maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
-        // Actions and row-index (#) columns must never be resizable.
-        enableResizing: (col.isAction || col.id === "actions" || col.id === "#") ? false : (col.resizable ?? props.enableColumnResize ?? false),
+        // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
+        // spacer are never resizable. `flex` columns ARE resizable — dragging one
+        // freezes it (OTable) then resizes it like any other column.
+        enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           align: col.meta?.align ?? "left",
@@ -125,6 +234,9 @@ export function useTableCore<TData>(
           hideable: col.hideable,
           closable: col.hideable,
           showWrap: false,
+          // Width is independent of sibling columns; OTableHeader/BodyCell pin
+          // min+max to the column's CSS size var.
+          fixedWidth: rigid,
           ...col.meta,
         },
         footer: col.footer as any,
@@ -202,7 +314,7 @@ export function useTableCore<TData>(
       columnPinning.value = next;
     },
     defaultColumn: {
-      minSize: 40,
+      minSize: 20,
       maxSize: 800,
     },
     state: {
@@ -230,7 +342,7 @@ export function useTableCore<TData>(
 
   // Sync columnOrder when columns change
   watch(
-    () => props.columns.map((c) => c.id),
+    () => effectiveColumns.value.map((c) => c.id),
     (newIds) => {
       const existing = columnOrder.value.filter((id) => newIds.includes(id));
       const added = newIds.filter((id) => !existing.includes(id));
@@ -264,6 +376,7 @@ export function useTableCore<TData>(
 
   return {
     table,
+    effectiveColumns,
     columnOrder,
     columnSizing,
     sortingState,

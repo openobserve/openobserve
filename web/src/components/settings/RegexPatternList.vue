@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,18 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <template v-if="!showImportRegexPatternDialog">
-    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0">
-      <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="regex-pattern-list-title">
-        {{ t("regex_patterns.title") }}
-      </div>
-      <div class="tw:flex">
-        <OSearchInput
-          v-model="filterQuery"
-          class="tw:ml-auto no-border o2-search-input"
-          :placeholder="t('regex_patterns.search')"
-        />
+    <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+    <AppPageHeader
+      :title="t('regex_patterns.title')"
+      icon="pattern"
+      :subtitle="'Reusable regex patterns for redaction'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
         <OButton
-          class="tw:ml-2"
           variant="outline"
           size="sm"
           @click="importRegexPattern"
@@ -36,15 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("regex_patterns.import") }}</OButton>
         <OButton
           data-test="regex-pattern-list-add-pattern-btn"
-          class="tw:ml-2"
           variant="primary"
           size="sm"
           @click="createRegexPattern"
         >{{ t("regex_patterns.create_pattern") }}</OButton>
-      </div>
-    </div>
-    <div class="tw:flex-1 tw:min-h-0">
+      </template>
+    </AppPageHeader>
+    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
     <OTable
+      :frame="false"
       data-test="regex-pattern-list-table"
       :data="visibleRows"
       :columns="columns"
@@ -57,15 +54,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="settings-regex-patterns"
       :show-global-filter="false"
       :loading="listLoading"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
+      <template #toolbar>
+        <OSearchInput
+          v-model="filterQuery"
+          class="tw:flex-1"
+          :placeholder="t('regex_patterns.search')"
+        />
+      </template>
       <template #empty>
         <div v-if="!listLoading && filterQuery == ''">
           <NoRegexPatterns @create-new-regex-pattern="createRegexPattern" @import-regex-pattern="importRegexPattern" />
         </div>
-        <NoData v-else-if="!listLoading && filterQuery != ''" />
+        <OEmptyState
+          v-else-if="!listLoading && filterQuery != ''"
+          size="hero"
+          filtered
+          :title="t('emptyState.filtered.title', { noun: t('regex_patterns.header').toLowerCase() })"
+          :description="t('emptyState.filtered.description', { noun: t('regex_patterns.header').toLowerCase() })"
+          @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+        />
       </template>
       <template #cell-actions="{ row }">
         <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
@@ -160,21 +174,24 @@ import regexPatternsService from "@/services/regex_pattern";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RegexPatternList",
   components: {
+    AppPageHeader,
     NoRegexPatterns,
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,
-    NoData,
+    OEmptyState,
     OButton,
     OSearchInput,
     OTable,
@@ -190,7 +207,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -198,12 +215,18 @@ export default defineComponent({
         header: t("regex_patterns.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "pattern",
         header: t("regex_patterns.pattern"),
         accessorKey: "pattern",
+        resizable: true,
+        hideable: true,
         size: 400,
         meta: { align: "left" },
       },
@@ -211,7 +234,9 @@ export default defineComponent({
         id: "created_at",
         header: t("regex_patterns.created_at"),
         accessorKey: "created_at",
-        size: 180,
+        resizable: true,
+        hideable: true,
+        size: COL.createdAt,
         meta: { align: "left" },
       },
       {
@@ -219,7 +244,9 @@ export default defineComponent({
         header: t("regex_patterns.updated_at"),
         accessorKey: "updated_at",
         sortable: true,
-        size: 180,
+        resizable: true,
+        hideable: true,
+        size: COL.updatedAt,
         meta: { align: "left" },
       },
       {

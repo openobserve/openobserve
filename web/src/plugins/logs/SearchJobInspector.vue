@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md search-job-inspector tw:p-0">
-    <div class="tw:w-full tw:flex tw:flex-col tw:h-[calc(100vh_-_var(--navbar-height))] tw:overflow-hidden tw:px-[0.625rem] tw:pb-[0.625rem]">
+    <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
       <!-- Header Card -->
-      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:shrink-0">
+      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:mx-2.5 tw:shrink-0">
         <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
           <div class="tw:flex tw:items-center tw:gap-3">
             <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="inspector-title">
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="tw:mb-[0.625rem] tw:shrink-0">
+      <div v-if="!loading" class="tw:mb-[0.625rem] tw:mx-2.5 tw:shrink-0">
         <div class="tw:grid tw:gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
           <!-- Results Returned -->
           <div class="stat-tile">
@@ -265,8 +265,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
-      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:flex-1 tw:min-h-0">
-        <div class="tw:h-full card-container">
+      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+        <div class="card-container tw:h-full">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"
@@ -276,6 +276,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             tree
             tree-column-id="index"
+            :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="logs-search-job-inspector"
             style="width: 100%;"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
@@ -297,8 +301,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
+            <template #cell-component="{ row }">
+              <span :title="row.component">{{ row.component }}</span>
+            </template>
+
             <template #cell-desc="{ row }">
-              <div class="tw:text-xs">{{ row.desc || '-' }}</div>
+              <span class="tw:text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
             </template>
 
             <template #empty>
@@ -365,6 +373,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -453,27 +462,28 @@ export default defineComponent({
         header: "Node Name",
         accessorKey: "node_name",
         meta: { align: "left" },
-        size: 200,
+        size: 280,
       },
       {
         id: "search_role",
         header: "Role",
         accessorKey: "search_role",
         meta: { align: "left" },
-        size: 100,
+        size: COL.role,
       },
       {
         id: "component",
         header: "Operation",
         accessorKey: "component",
         meta: { align: "left" },
-        size: 250,
+        size: 340,
       },
       {
         id: "desc",
         header: "Description",
         accessorKey: "desc",
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
+        size: COL.description,
       },
     ]);
 

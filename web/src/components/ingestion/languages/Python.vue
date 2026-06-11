@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "python";
 const store = useStore();
@@ -28,18 +29,18 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
 </script>
 
 <template>
-  <div class="tw:p-2">
-    <div class="tw:text-[16px]">
-      <CopyContent :content="content" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">Check further documentation at:</div>
-      <ol class="tw:list-decimal tw:pl-3">
-        <li class="tw:py-1">
-          <a :href="docURL" target="_blank" class="text-blue-500 tw:underline">Python</a>
+  <IngestionContent>
+    <CopyContent :content="content" />
+    <div>
+      <div class="tw:font-medium">Check further documentation at:</div>
+      <ol class="tw:list-decimal tw:pl-5 tw:mt-1">
+        <li class="tw:py-0.5">
+          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="tw:text-text-link hover:tw:text-text-link-hover tw:underline">Python</a>
         </li>
-        <li class="tw:py-1">
-          <a :href="docURLFastAPI" target="_blank" class="text-blue-500 tw:underline">FastAPI</a>
+        <li class="tw:py-0.5">
+          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="tw:text-text-link hover:tw:text-text-link-hover tw:underline">FastAPI</a>
         </li>
       </ol>
     </div>
-  </div>
+  </IngestionContent>
 </template>

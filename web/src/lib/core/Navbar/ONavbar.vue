@@ -22,17 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links tw:flex tw:flex-col tw:py-2 tw:bg-surface-panel tw:rounded-md tw:border tw:border-border-default tw:mt-1 tw:mb-[0.675rem] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.625rem]"
+    class="left-drawer navbar-links o2-navbar-scroll tw:flex tw:flex-col tw:bg-[var(--color-surface-chrome-deeper)] tw:shrink-0 tw:min-h-0 tw:overflow-y-auto tw:w-[5.25rem] tw:py-1"
     @keydown="handleKeydown"
   >
-    <menu-link
-      v-for="(nav, index) in linksList"
-      :key="nav.title"
-      :link-name="nav.name"
-      :animation-index="index"
-      v-bind="{ ...nav, mini: miniMode }"
-      @mouseenter="emit('menu-hover', nav.link)"
-    />
+    <!-- Each active item carries its own left accent border (see MenuLink), so
+         no separate floating indicator bar is needed. -->
+    <div class="tw:flex tw:flex-col">
+      <menu-link
+        v-for="(nav, index) in linksList"
+        :key="nav.title"
+        :link-name="nav.name"
+        :animation-index="index"
+        v-bind="{ ...nav, mini: miniMode }"
+        @mouseenter="emit('menu-hover', nav.link)"
+      />
+    </div>
   </nav>
 </template>
 
@@ -106,3 +110,45 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 </script>
+
+<style scoped>
+/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
+   it never reserves layout width, so there is no empty strip beside the labels.
+
+   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
+   what previously pushed the labels inward and clipped "Management"). The only
+   way a native scrollbar floats *over* content instead of reserving space is
+   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
+   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
+   nothing. Either way the rail keeps its full width and still scrolls via
+   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
+.o2-navbar-scroll {
+  scrollbar-width: none; /* Firefox: hidden, reserves nothing */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+@supports (overflow: overlay) {
+  .o2-navbar-scroll {
+    overflow-y: overlay; /* Blink/WebKit: scrollbar floats over content */
+  }
+}
+.o2-navbar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.o2-navbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.o2-navbar-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 9999px;
+  transition: background-color 150ms ease;
+}
+/* Reveal the thumb only while the rail is hovered. */
+.o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
+}
+
+/* Right border only in dark mode — light mode uses shadow on the content card */
+:global(.body--dark) .o2-navbar-scroll {
+  border-right: 1px solid var(--o2-border-color);
+}
+</style>

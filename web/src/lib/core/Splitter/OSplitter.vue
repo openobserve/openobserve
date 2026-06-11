@@ -34,7 +34,7 @@
         'tw:relative',
         'tw:z-10',
         disable ? 'tw:cursor-default! tw:opacity-50' : '',
-        horizontal ? 'tw:h-[0.625rem] tw:w-full tw:cursor-row-resize' : 'tw:w-[0.625rem] tw:h-full tw:cursor-col-resize',
+        horizontal ? 'tw:h-px tw:w-full tw:cursor-row-resize' : 'tw:h-full tw:cursor-col-resize',
         separatorClass
       ]"
       :style="[separatorStyle]"

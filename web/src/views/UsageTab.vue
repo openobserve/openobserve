@@ -18,12 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:px-[0.625rem] tw:py-[0.625rem] tw:overflow-y-auto"
+      class="tw:w-full tw:h-full tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
         <div>
-          <WebinarBanner v-if="config.isCloud === 'true'" variant="home" />
           <TrialPeriod></TrialPeriod>
         </div>
         <LicensePeriod
@@ -651,7 +650,6 @@ import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import UsageReportBanner from "@/enterprise/components/billings/UsageReportBanner.vue";
 import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vue";
-import WebinarBanner from "@/components/WebinarBanner.vue";
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

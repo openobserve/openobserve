@@ -141,9 +141,9 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.group_name = "test-group";
       await wrapper.vm.$nextTick();
 
-      const titleElement = wrapper.find('[data-test="edit-group-section-title"]');
+      // Group name now renders as the AppPageHeader title (row 1).
+      const titleElement = wrapper.find(".app-page-header h1");
       expect(titleElement.exists()).toBe(true);
-      // The title div contains both the group name and tabs, so we check if it includes the group name
       expect(titleElement.text()).toContain("test-group");
     });
 

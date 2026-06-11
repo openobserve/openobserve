@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-[calc(100vh - var(--navbar-height))]! tw:max-h-[calc(100vh - var(--navbar-height))]! tw:overflow-hidden!"
+  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -24,25 +24,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter
         :class="[
           'traces-horizontal-splitter tw:h-full',
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'hide-splitter-separator'
             : '',
         ]"
         v-model="splitterModel"
         :disable="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
         "
         :horizontal="true"
+        unit="px"
+        :limits="[85, 400]"
+        :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
         :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog' || activeTab === 'llm-insights' || activeTab === 'sessions'
+          activeTab === 'service-graph' || activeTab === 'services-catalog'
             ? 'tw:max-h-[3.125rem]!'
             : ''
         "
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
+          <!-- px-1 (4px): the search bar's own 6px internal inset (toolbar p-1.5)
+               + 4px = 10px, aligning the bar with the 10px field-list & results
+               panels below (matches the Logs page). -->
           <div
-            class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pt-1"
+            class="tw:w-full tw:h-full"
           >
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <search-bar
@@ -51,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
-              :isLLMSpanPresent="isLLMSpanPresent"
-              :hasLLMStreams="hasLLMStreams"
               class="card-container"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
@@ -69,12 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-slot:after>
+          <div class="tw:h-full tw:overflow-hidden">
           <!-- Service Graph Tab Content -->
           <div
             v-if="
               activeTab === 'service-graph' && config.isEnterprise == 'true'
             "
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <service-graph
               ref="serviceGraphRef"
@@ -86,42 +91,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Services Catalog Tab Content -->
           <div
             v-if="activeTab === 'services-catalog'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
+            class="tw:h-full tw:overflow-hidden"
           >
             <services-catalog
               ref="servicesCatalogRef"
               class="tw:h-full"
               @view-traces="handleServicesCatalogViewTraces"
-            />
-          </div>
-
-          <!-- LLM Insights Tab Content -->
-          <div
-            v-if="activeTab === 'llm-insights'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
-          >
-            <LLMInsightsDashboard
-              :key="'llm-' + store.state.selectedOrganization.identifier"
-              ref="llmInsightsRef"
-              :streamName="selectedStreamName"
-              :startTime="insightsTimeRange.startTime"
-              :endTime="insightsTimeRange.endTime"
-              class="tw:h-full"
-            />
-          </div>
-
-          <!-- Sessions Tab Content -->
-          <div
-            v-if="activeTab === 'sessions'"
-            class="tw:px-[0.625rem] tw:pb-[0.625rem] tw:h-full tw:overflow-hidden"
-          >
-            <SessionsList
-              :key="'sessions-' + store.state.selectedOrganization.identifier"
-              ref="sessionsListRef"
-              :streamName="selectedStreamName"
-              :startTime="insightsTimeRange.startTime"
-              :endTime="insightsTimeRange.endTime"
-              class="tw:h-full"
             />
           </div>
 
@@ -136,11 +111,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
               style="width: 100%"
+              separatorClass="tw:w-px"
               @update:model-value="onSplitterUpdate"
               class="tw:h-full"
             >
               <template #before>
-                <div class="tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
                   <index-list
                     v-show="searchObj.meta.showFields"
                     ref="indexListRef"
@@ -155,34 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </template>
-              <template #separator>
-                <OButton
-                  data-test="logs-search-field-list-collapse-btn"
-                  variant="sidebar-button"
-                  size="sidebar-button"
-                  :title="
-                    searchObj.meta.showFields
-                      ? t('traces.collapseFields')
-                      : t('traces.openFields')
-                  "
-                  :class="
-                    searchObj.meta.showFields
-                      ? 'splitter-icon-collapse'
-                      : 'splitter-icon-expand'
-                  "
-                  @click="collapseFieldList"
-                  ><template #icon-left>
-                    <OIcon
-                      :name="
-                        searchObj.meta.showFields
-                          ? 'chevron-left'
-                          : 'chevron-right'
-                      " size="sm"
-                    /> </template
-                ></OButton>
-              </template>
               <template #after>
-                <div class="tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
+                <div class="tw:h-full tw:pb-[0.625rem]">
                   <div
                     v-if="
                       searchObj.data.errorMsg !== '' &&
@@ -308,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OSplitter>
           </div>
+          </div>
         </template>
       </OSplitter>
     </div>
@@ -356,7 +307,6 @@ import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { computeInsightsTimeRange } from "./tracesIndex.utils";
 import { cloneDeep, debounce } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -394,20 +344,12 @@ const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(
   () => import("./ServicesCatalog.vue"),
 );
-const LLMInsightsDashboard = defineAsyncComponent(
-  () => import("./LLMInsightsDashboard.vue"),
-);
-const SessionsList = defineAsyncComponent(
-  () => import("./SessionsList.vue"),
-);
 
 const store = useStore();
 const activeTab = computed(() => {
   if (searchObj.meta.searchMode === "service-graph") return "service-graph";
   if (searchObj.meta.searchMode === "services-catalog")
     return "services-catalog";
-  if (searchObj.meta.searchMode === "llm-insights") return "llm-insights";
-  if (searchObj.meta.searchMode === "sessions") return "sessions";
   return "search";
 });
 const router = useRouter();
@@ -442,9 +384,7 @@ const searchResultRef = ref(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
-const llmInsightsRef = ref<any>(null);
-const sessionsListRef = ref<any>(null);
-const splitterModel = ref(15);
+const splitterModel = ref(90);
 let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
@@ -493,34 +433,7 @@ const selectedStreamName = computed(
   () => searchObj.data.stream.selectedStream.value,
 );
 
-// Snapshot the current datetime as microseconds. Refreshed in-place by
-// `searchData` when the LLM Insights tab is active — no nonce, no
-// `Date.now()`-as-reactive-dep trick.
-const insightsTimeRange = ref({ startTime: 0, endTime: 0 });
-
-function recomputeInsightsTimeRange() {
-  insightsTimeRange.value = computeInsightsTimeRange(
-    searchObj.data.datetime,
-    getConsumableRelativeTime,
-  );
-}
-
 const isLLMSpanPresent = ref(false);
-
-// True when the org has at least one traces stream marked as an LLM
-// stream (strict opt-in: `settings.is_llm_stream === true`). Drives
-// the LLM Insights tab visibility in `SearchBar` — we hide the tab
-// entirely when nothing is opted in.
-//
-// Implemented as a `computed` (not a `ref`) so resolving `streamResults`
-// doesn't fire an extra reactive write inside `getStreamList`'s async
-// chain — that would force an unrelated re-render and surface latent
-// reactivity assumptions elsewhere on the page.
-const hasLLMStreams = computed(() =>
-  (searchObj.data.streamResults?.list || []).some(
-    (s: any) => s?.settings?.is_llm_stream === true,
-  ),
-);
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -569,9 +482,6 @@ async function getStreamList() {
     return getStreams("traces", false)
       .then(async (res) => {
         searchObj.data.streamResults = res;
-        // `hasLLMStreams` is a computed that reads from
-        // `searchObj.data.streamResults` — no explicit write needed
-        // here. See the computed's declaration above for why.
 
         if (res.list.length > 0) {
           if (config.isCloud == "true") {
@@ -1586,9 +1496,6 @@ async function loadPageData() {
 
   //get stream list
   await getStreamList();
-  // Always seed the LLM Insights datetime snapshot so the dashboard's
-  // first onMounted has a real (non-zero) window to read from props.
-  recomputeInsightsTimeRange();
   if (searchObj.data.stream.selectedStream.value) {
     searchData();
   }
@@ -1677,8 +1584,8 @@ function restoreUrlQueryParams() {
   if (
     tab !== undefined &&
     (
-      ["service-graph", "traces", "spans", "llm-insights", "services-catalog", "sessions"] as const
-    ).includes(tab as "service-graph" | "traces" | "spans" | "llm-insights" | "services-catalog" | "sessions")
+      ["service-graph", "traces", "spans", "services-catalog"] as const
+    ).includes(tab as "service-graph" | "traces" | "spans" | "services-catalog")
   ) {
     if (tab === "service-graph" && config.isEnterprise !== "true") return;
     searchObj.meta.searchMode = tab as TraceSearchMode;
@@ -1782,17 +1689,11 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog / Sessions / LLM Insights)
+// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
 const onSearchModeChange = (
-  mode: "traces" | "spans" | "llm-insights" | "service-graph" | "services-catalog" | "sessions",
+  mode: "traces" | "spans" | "service-graph" | "services-catalog",
 ) => {
   searchObj.meta.searchMode = mode;
-  // Refresh the datetime snapshot on every tab-enter so the dashboard's
-  // first onMounted has the up-to-date window for relative ranges.
-  if (mode === "llm-insights" || mode === "sessions") {
-    recomputeInsightsTimeRange();
-    return;
-  }
   if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
@@ -1955,35 +1856,6 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
 });
 
 const searchData = () => {
-  // LLM Insights uses its own stream selector + cache. We refresh the
-  // dashboard by recomputing the datetime snapshot then calling its
-  // exposed refresh() method directly — no nonce, no watcher chain.
-  // The auto-trigger path is already gated by the user's "Auto-run on
-  // change" / live-mode toggle in SearchBar, so the toggle controls
-  // whether time changes propagate here (matching the behaviour of every
-  // other Traces sub-tab).
-  if (activeTab.value === "llm-insights") {
-    recomputeInsightsTimeRange();
-    // Pass the freshly computed start/end directly — Vue propagates the
-    // `insightsTimeRange` ref update to the dashboard's `props.startTime`
-    // only on the next tick, so the child reading `props` here would
-    // fetch with the *previous* window.
-    llmInsightsRef.value?.refresh?.(
-      insightsTimeRange.value.startTime,
-      insightsTimeRange.value.endTime,
-    );
-    return;
-  }
-
-  if (activeTab.value === "sessions") {
-    recomputeInsightsTimeRange();
-    sessionsListRef.value?.refresh?.(
-      insightsTimeRange.value.startTime,
-      insightsTimeRange.value.endTime,
-    );
-    return;
-  }
-
   if (
     !(
       searchObj.data.stream.streamLists.length &&
@@ -2149,16 +2021,6 @@ const debouncedAutoRunOnQuery = debounce(() => {
 // Debounced auto-run on datetime changes in live mode.
 // Traces has no existing auto-run on datetime, so no guard needed.
 const debouncedAutoRunOnDatetime = debounce(() => {
-  // LLM Insights owns its refresh lifecycle explicitly: the dashboard's
-  // toolbar has a dedicated refresh button, the parent calls
-  // `recomputeInsightsTimeRange()` on tab-enter, and `searchData` is
-  // wired through `llmInsightsRef.refresh()`. Bailing here prevents the
-  // double-fetch caused by the LLM-tab date-picker's mount-time
-  // `on:date-change` emit (re-writes `searchObj.data.datetime`, which
-  // would otherwise trigger a second `searchData` 500ms after mount).
-  if (activeTab.value === "llm-insights") return;
-  if (activeTab.value === "sessions") return;
-
   // Absolute time is handled by SearchBar's triggerAbsoluteQueryDebounced (2500ms).
   // Only auto-run here for relative time to avoid double-triggering.
   if (
@@ -2227,7 +2089,8 @@ const handleServiceGraphViewTraces = (data: any) => {
   // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
   if (data.serviceName) {
     const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    let filterQuery = `service_name = '${escapedServiceName}'`;
+    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
+    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
     if (data.operationName) {
       const escapedOpName = escapeSingleQuotes(data.operationName);
       filterQuery += ` AND operation_name = '${escapedOpName}'`;
@@ -2240,9 +2103,21 @@ const handleServiceGraphViewTraces = (data: any) => {
       const escapedPodName = escapeSingleQuotes(data.podName);
       filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
     }
-    if (data.resourceFilter?.field && data.resourceFilter?.value) {
+    if (data.callerService) {
+      const escapedCaller = escapeSingleQuotes(data.callerService);
+      filterQuery += ` AND service_name = '${escapedCaller}'`;
+    }
+    if (data.resourceFilter?.value) {
       const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      if (data.resourceFilter.fields?.length) {
+        // Fallback chain: (field1 = 'val' OR field2 = 'val')
+        const clauses = data.resourceFilter.fields
+          .map((f: string) => `${f} = '${escapedValue}'`)
+          .join(" OR ");
+        filterQuery += ` AND (${clauses})`;
+      } else if (data.resourceFilter.field) {
+        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+      }
     }
     if (data.errorsOnly) {
       filterQuery += ` AND span_status = 'ERROR'`;
@@ -2274,16 +2149,24 @@ const handleServiceGraphViewTraces = (data: any) => {
   });
 };
 
-// Handler for services catalog row click — switches to traces mode filtered by service
-const handleServicesCatalogViewTraces = (serviceName: string) => {
-  const escapedName = escapeSingleQuotes(serviceName);
-  searchObj.data.editorValue = `service_name = '${escapedName}'`;
-  searchObj.data.query = searchObj.data.editorValue;
-  searchObj.meta.sqlMode = false;
-  searchObj.meta.searchMode = "traces";
-  nextTick(() => {
-    runQueryFn();
-  });
+/**
+ * Handler for the services catalog `view-traces` event.
+ *
+ * Normalizes the payload (which may be a plain service name string for backward
+ * compatibility, or a full object with `serviceName`, `serviceType`,
+ * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
+ * to populate the search bar and run the filtered traces query.
+ *
+ * @param data - Service name string (legacy) or structured filter object.
+ *               Structured objects may include `serviceName`, `serviceType`,
+ *               `operationName`, `nodeName`, `podName`, `callerService`,
+ *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
+ *               `maxDurationMicros`, `mode`, and `stream`.
+ */
+const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
+  // Normalize plain string to object then delegate to the full handler
+  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
+  handleServiceGraphViewTraces(payload);
 };
 
 // watch(updateSelectedColumns, () => {

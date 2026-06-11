@@ -23,6 +23,7 @@ import {
   findIncomingEdgeForNode,
   calculateRootNodeMetrics,
   generateTracePatternTooltipContent,
+  generatePatternNodeTooltipContent,
 } from './treeTooltipHelpers';
 
 describe('treeTooltipHelpers', () => {
@@ -267,6 +268,50 @@ describe('treeTooltipHelpers', () => {
       const metrics = calculateRootNodeMetrics('node', edges);
 
       expect(metrics.errorRate).toBe(0);
+    });
+  });
+
+  describe('generatePatternNodeTooltipContent', () => {
+    it('should show the full service name as the tooltip header', () => {
+      const result = generatePatternNodeTooltipContent({
+        serviceName: 'oteldemo.RecommendationService',
+        count: 3,
+        avg: 39.49,
+        traceTimePercent: 27.9,
+        errorCount: 0,
+      });
+
+      expect(result).toContain('oteldemo.RecommendationService');
+      expect(result).toContain('Spans:');
+      expect(result).toContain('Average:');
+    });
+
+    it('should fall back to the path signature when service name is missing', () => {
+      const result = generatePatternNodeTooltipContent({
+        pathSignature: 'frontend→recommendation',
+        count: 1,
+        avg: 1.5,
+        traceTimePercent: 10,
+      });
+
+      expect(result).toContain('frontend→recommendation');
+    });
+
+    it('should escape HTML in the service name', () => {
+      const result = generatePatternNodeTooltipContent({
+        serviceName: '<img src=x onerror=alert(1)>',
+        count: 1,
+        avg: 0,
+        traceTimePercent: 0,
+      });
+
+      expect(result).not.toContain('<img');
+      expect(result).toContain('&lt;img');
+    });
+
+    it('should return empty string when metadata is missing', () => {
+      expect(generatePatternNodeTooltipContent(null)).toBe('');
+      expect(generatePatternNodeTooltipContent(undefined)).toBe('');
     });
   });
 

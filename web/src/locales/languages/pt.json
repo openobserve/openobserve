@@ -405,6 +405,12 @@
     "noData": "Não há dados disponíveis",
     "functionEditorLabel": "Editor de funções",
     "loadingStream": "Carregando Stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Mostre-me os erros da última hora...",
+      "two": "Encontre consultas lentas que demoram mais de 5s...",
+      "three": "Conte 5xx respostas agrupadas por serviço...",
+      "four": "Filtrar registros em que nível = 'erro'..."
+    },
     "hideHistogram": "Ocultar histograma",
     "disableQuickMode": "Desativar o Modo Rápido",
     "menuGroupSetOnce": "Definir uma vez",
@@ -415,7 +421,8 @@
     "menuGroupSchedule": "Cronograma",
     "menuGroupInspect": "Inspecionar",
     "validSql": "SQL válido",
-    "invalidSql": "Consulta inválida"
+    "invalidSql": "Consulta inválida",
+    "menuGroupExplain": "Explique"
   },
   "menu": {
     "home": "Início",
@@ -449,7 +456,8 @@
     "language": "Idioma",
     "actions": "Ações",
     "incidents": "Incidentes",
-    "evals": "Evals"
+    "evals": "Evals",
+    "aiObservability": "Observabilidade da IA"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -958,7 +966,8 @@
     "subscription_type": "Tipo de plano",
     "proceed_subscription": "Prosseguir com a assinatura",
     "subscription_plan": "Plano de assinatura",
-    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}"
+    "makeBilledMember": "Torne esta organização um membro de cobrança de {org}",
+    "manage": "Gerenciar"
   },
   "template": {
     "header": "Modelos",
@@ -1200,7 +1209,8 @@
     "tokenRotateError": "Falha ao girar o token.",
     "tokenDeleteError": "Falha ao excluir o token.",
     "noTokensFound": "Nenhum token de ingestão foi encontrado.",
-    "createdBy": "Criado por"
+    "createdBy": "Criado por",
+    "orgLevelSummary": "Tokens de nível organizacional para endpoints de ingestão."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -1780,7 +1790,8 @@
     "noDataAvailable": "Não há dados disponíveis",
     "tabAiAssistant": "Assistente de IA O2",
     "tabOverview": "Visão geral",
-    "tabUsage": "Uso"
+    "tabUsage": "Uso",
+    "subtitle": "Seu espaço de trabalho de observabilidade em um piscar de olhos"
   },
   "billing": {
     "header": "Uso e cobrança",
@@ -2939,7 +2950,10 @@
     "evaluationTemplate": "Modelo de avaliação",
     "evaluationTemplateHelp": "Selecione um modelo de avaliação que defina os critérios e as dimensões para o juiz do LLM.",
     "noTemplatesFound": "Nenhum modelo de avaliação encontrado. Crie um na página Modelos de avaliação.",
-    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso"
+    "evalTemplatesRefreshed": "Modelos de avaliação atualizados com sucesso",
+    "subtitle": "Transforme, enriqueça e direcione dados em voo",
+    "selectStream": "Selecione um stream...",
+    "queryEditorPlaceholder": "Selecione um stream ou escreva uma consulta SQL aqui..."
   },
   "reports": {
     "header": "Relatórios",
@@ -3216,7 +3230,8 @@
     "confirmRejectMsg": "Tem certeza de que deseja rejeitar o convite para entrar em {org}?",
     "expired": "Expirado",
     "expiresToday": "Expira hoje",
-    "daysLeft": "{dias} dias restantes"
+    "daysLeft": "{dias} dias restantes",
+    "search": "Pesquisar convites"
   },
   "serviceAccounts": {
     "header": "Contas de serviço",
@@ -4073,6 +4088,277 @@
       "three": "Crie um painel para a integridade do nó K8s..."
     }
   },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Não conseguimos encontrar nenhum dado",
+      "description": "Nada corresponde aos seus filtros ou intervalo de tempo atuais. Tente ampliar sua pesquisa, ampliar o intervalo de tempo ou limpar os filtros.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefinir todos os filtros aplicados"
+    },
+    "noLogs": {
+      "title": "Não há registros neste intervalo",
+      "description": "Não encontramos nenhum registro para o stream e o intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um stream diferente.",
+      "action": "Amplie o intervalo de tempo",
+      "actionDesc": "Pesquise em um período mais longo"
+    },
+    "noDashboards": {
+      "title": "Crie seu primeiro painel",
+      "description": "Os painéis reúnem suas métricas, registros e rastreamentos em uma única visualização. Crie um para começar.",
+      "action": "Novo painel",
+      "actionDesc": "Comece com uma tela vazia",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noPipelines": {
+      "title": "Crie seu primeiro funil",
+      "description": "Os pipelines transformam e roteiam seus dados à medida que eles chegam. Configure um para começar a moldar seus streams.",
+      "action": "Novo gasoduto",
+      "actionDesc": "Crie um fluxo do zero",
+      "import": "Pipeline de importação",
+      "importDesc": "Faça upload de uma definição de pipeline"
+    },
+    "noFunctions": {
+      "title": "Crie sua primeira função",
+      "description": "As funções enriquecem e remodelam seus dados no momento da ingestão ou da consulta. Adicione um para começar.",
+      "action": "Nova função",
+      "actionDesc": "Escreva uma nova função VRL"
+    },
+    "noStreams": {
+      "title": "Aguardando seus primeiros dados",
+      "description": "Nenhum dado chegou ainda. Conecte uma fonte e seus streams aparecerão aqui automaticamente.",
+      "action": "Configurar a ingestão",
+      "actionDesc": "Conectar uma fonte de dados"
+    },
+    "noAlerts": {
+      "title": "Crie seu primeiro alerta",
+      "description": "Os alertas notificam você no momento em que seus dados ultrapassam um limite. Defina um para iniciar o monitoramento.",
+      "action": "Novo alerta",
+      "actionDesc": "Defina uma condição a ser monitorada"
+    },
+    "noIncidents": {
+      "title": "Sem incidentes ativos",
+      "description": "Você está ocupado — nada precisa de sua atenção no momento. Os incidentes desencadeados aparecerão aqui."
+    },
+    "loadError": {
+      "title": "Algo deu errado",
+      "description": "Não foi possível carregar esses dados. Geralmente é temporário — tente novamente em um momento.",
+      "action": "Tente novamente",
+      "actionDesc": "Tente carregar os dados novamente"
+    },
+    "noData": {
+      "title": "Nada aqui ainda",
+      "description": "Não há dados para mostrar no momento."
+    },
+    "noTraces": {
+      "title": "Nenhum vestígio encontrado",
+      "description": "Nenhum traço corresponde ao serviço e ao intervalo de tempo selecionados. Experimente um intervalo de tempo maior ou um serviço diferente."
+    },
+    "noSearchHistory": {
+      "title": "Ainda não há histórico de pesquisa",
+      "description": "As pesquisas que você executa serão listadas aqui para que você possa revisitá-las e executá-las novamente."
+    },
+    "noUsers": {
+      "title": "Ainda não há usuários",
+      "description": "Convide seus colegas de equipe para colaborar nessa organização.",
+      "action": "Adicionar usuário",
+      "actionDesc": "Convide um colega de equipe por e-mail"
+    },
+    "noReports": {
+      "title": "Ainda não há relatórios",
+      "description": "Agende um relatório para que os painéis sejam entregues em sua caixa de entrada.",
+      "action": "Novo relatório",
+      "actionDesc": "Agende a entrega de um painel"
+    },
+    "noQueries": {
+      "title": "Sem consultas em execução",
+      "description": "Não há consultas ativas no momento. As consultas de longa duração aparecerão aqui enquanto são executadas."
+    },
+    "noServiceAccounts": {
+      "title": "Ainda não há contas de serviço",
+      "description": "As contas de serviço permitem que os aplicativos se autentiquem com a API. Crie um para começar.",
+      "action": "Adicionar conta de serviço",
+      "actionDesc": "Crie uma conta de serviço de API"
+    },
+    "noInvitations": {
+      "title": "Sem convites pendentes",
+      "description": "Os convites que você enviou ou recebeu aparecerão aqui."
+    },
+    "filtered": {
+      "title": "Nenhum {substantivo} encontrado",
+      "description": "Nenhum {substantivo} corresponde aos seus filtros ou pesquisas atuais. Tente ajustá-los ou limpá-los.",
+      "action": "Filtros claros",
+      "actionDesc": "Redefina todos os filtros e pesquise",
+      "fallbackNoun": "resultados"
+    },
+    "nouns": {
+      "logs": "troncos",
+      "dashboards": "painéis",
+      "pipelines": "oleodutos",
+      "functions": "funções",
+      "streams": "córregos",
+      "alerts": "alertas",
+      "incidents": "incidentes",
+      "traces": "rastros",
+      "searches": "pesquisa",
+      "users": "usuários",
+      "reports": "notícias",
+      "queries": "consultas",
+      "serviceAccounts": "contas de serviço",
+      "invitations": "convites"
+    },
+    "noDashboardsInFolder": {
+      "title": "Não há painéis nesta pasta",
+      "description": "Essa pasta está vazia. Adicione um painel aqui ou mova um de outra pasta.",
+      "action": "Novo painel",
+      "actionDesc": "Crie um painel nesta pasta",
+      "import": "Painel de importação",
+      "importDesc": "Carregar um arquivo JSON do painel",
+      "templates": "Navegue pelos modelos",
+      "templatesDesc": "Comece a partir de um painel da comunidade"
+    },
+    "noGroups": {
+      "title": "Ainda não há grupos",
+      "description": "Os grupos permitem gerenciar permissões para vários usuários ao mesmo tempo. Crie um para começar.",
+      "action": "Novo grupo",
+      "actionDesc": "Criar um grupo de usuários"
+    },
+    "noRoles": {
+      "title": "Ainda não há funções",
+      "description": "As funções definem quais ações os usuários podem realizar. Crie uma função personalizada para controlar o acesso.",
+      "action": "Novo papel",
+      "actionDesc": "Definir uma função de acesso personalizada"
+    },
+    "noAnomalyConfigs": {
+      "title": "Nenhuma detecção de anomalia configurada",
+      "description": "Configure a detecção de anomalias para identificar automaticamente padrões incomuns em seus dados.",
+      "action": "Nova configuração",
+      "actionDesc": "Configurar a detecção de anomalias"
+    },
+    "noApiLimits": {
+      "title": "Nenhum limite de API configurado",
+      "description": "Os limites da API controlam a quantidade de dados que cada organização pode ingerir e consultar por janela de tempo."
+    },
+    "noRoleLimits": {
+      "title": "Nenhum limite de função configurado",
+      "description": "Os limites de função definem as cotas de ingestão e consulta aplicadas a funções individuais em uma organização."
+    },
+    "noIngestionTokens": {
+      "title": "Ainda não há tokens de ingestão",
+      "description": "Os tokens de ingestão autenticam as fontes de dados ao enviar registros, métricas e rastreamentos.",
+      "action": "Novo token",
+      "actionDesc": "Gere um token de ingestão"
+    },
+    "noOrganizations": {
+      "title": "Ainda não há organizações",
+      "description": "As organizações agrupam seus usuários e dados. Crie um para começar."
+    },
+    "noAlertDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Os destinos definem para onde as notificações de alerta são enviadas: Slack, e-mail, webhooks e muito mais.",
+      "action": "Novo destino",
+      "actionDesc": "Conectar um canal de notificação"
+    },
+    "noAlertTemplates": {
+      "title": "Ainda não há modelos",
+      "description": "Os modelos definem o formato das mensagens de notificação de alerta.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de notificação"
+    },
+    "noEnrichmentTables": {
+      "title": "Ainda não há tabelas de enriquecimento",
+      "description": "As tabelas de enriquecimento permitem que você anexe contexto adicional aos seus dados de registro no momento da consulta.",
+      "action": "Mesa nova",
+      "actionDesc": "Crie uma tabela de enriquecimento"
+    },
+    "noCipherKeys": {
+      "title": "Ainda não há chaves cifradas",
+      "description": "As chaves cifradas são usadas para criptografar campos confidenciais em seus fluxos de dados.",
+      "action": "Nova chave",
+      "actionDesc": "Gere uma chave cifrada"
+    },
+    "noAiToolsets": {
+      "title": "Ainda não há conjuntos de ferramentas de IA",
+      "description": "Os conjuntos de ferramentas de IA conectam sua organização a recursos externos de IA.",
+      "action": "Novo conjunto de ferramentas",
+      "actionDesc": "Adicionar um conjunto de ferramentas de IA"
+    },
+    "noLlmProviders": {
+      "title": "Nenhum provedor de LLM configurado",
+      "description": "Conecte um provedor de modelos de idiomas para habilitar recursos baseados em IA.",
+      "action": "Adicionar provedor",
+      "actionDesc": "Configurar um provedor LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Nenhum serviço descoberto",
+      "description": "Os serviços aparecerão aqui automaticamente quando os rastreamentos começarem a chegar."
+    },
+    "noNodes": {
+      "title": "Não há nós disponíveis",
+      "description": "Os nós do cluster aparecerão aqui assim que forem registrados."
+    },
+    "noSourceMaps": {
+      "title": "Nenhum mapa de origem carregado",
+      "description": "Faça upload de mapas de origem para permitir rastreamentos de pilha legíveis em seus relatórios de erros de RUM.",
+      "action": "Carregar",
+      "actionDesc": "Carregar um arquivo de mapa de origem"
+    },
+    "noBackfillJobs": {
+      "title": "Sem trabalhos de preenchimento",
+      "description": "Os trabalhos de preenchimento reprocessam dados históricos por meio de um pipeline. Execute um para começar."
+    },
+    "noSearchJobs": {
+      "title": "Nenhum trabalho de pesquisa agendado",
+      "description": "As pesquisas de longa duração que você agendar aparecerão aqui, onde você poderá acompanhar seu status e explorar os resultados assim que terminarem."
+    },
+    "noPipelineDestinations": {
+      "title": "Ainda não há destinos",
+      "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota.",
+      "action": "Novo destino",
+      "actionDesc": "Conecte um destino de pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Ainda não há atividade de LLM",
+      "description": "Instrumente seus serviços com as convenções semânticas do OpenTelemetry Gen-AI e ingira pelo menos um rastreamento para preencher esse painel.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Capture os atributos gen_ai_* em seus traços"
+    },
+    "noLLMSessions": {
+      "title": "Ainda não há sessões de LLM",
+      "description": "As sessões são agrupadas por gen_ai_conversation_id. Instrumente seus serviços para que cada conversa marque seus rastros, e as sessões apareçam aqui.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Expansões de tags com gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ainda não há marcadores",
+      "description": "Os pontuadores classificam as respostas do LLM de acordo com suas configurações de pontuação — comece com um juiz do LLM ou importe uma da biblioteca.",
+      "action": "Criar marcador",
+      "actionDesc": "Defina um juiz de LLM ou pontuador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Ainda não há trabalhos de avaliação",
+      "description": "Pontuadores do cronograma de trabalhos em relação a um stream do LLM. Crie um para começar a avaliar as conversas em uma cadência.",
+      "action": "Crie um trabalho de avaliação",
+      "actionDesc": "Escolha uma transmissão, marcadores e cadência"
+    },
+    "noScoreConfigs": {
+      "title": "Ainda não há configurações de pontuação",
+      "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
+      "action": "Criar configuração de pontuação",
+      "actionDesc": "Defina a forma da pontuação+faixa saudável"
+    },
+    "noEvalTemplates": {
+      "title": "Ainda não há modelos de avaliação",
+      "description": "Os modelos de avaliação definem critérios de pontuação reutilizáveis para avaliações de LLM.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de avaliação"
+    },
+    "noPipelineHistory": {
+      "title": "Ainda não há histórico de oleodutos",
+      "description": "O histórico de execução do pipeline aparecerá aqui quando seus pipelines forem executados."
+    }
+  },
   "onlineEvals": {
     "title": "Avaliações",
     "description": "Configure provedores de LLM, definições de pontuação, pontuadores e trabalhos de avaliação ao vivo.",
@@ -4413,6 +4699,21 @@
     "empty": {
       "title": "Ainda não há fornecedores de LLM",
       "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
+    }
+  },
+  "aiObservability": {
+    "title": "Observabilidade do LLM",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Avalie"
+    },
+    "nav": {
+      "overview": "Visão geral",
+      "sessions": "Sessões",
+      "quality": "Qualidade",
+      "evalJobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação"
     }
   }
 }

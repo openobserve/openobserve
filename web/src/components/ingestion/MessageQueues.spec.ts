@@ -153,9 +153,7 @@ describe("MessageQueues.vue", () => {
   it("should initialize reactive refs with correct default values", () => {
     wrapper = createWrapper();
     expect(wrapper.vm.tabs).toBe("");
-    expect(wrapper.vm.tabsFilter).toBe("");
     expect(wrapper.vm.ingestTabType).toBe("rabbitmq");
-    expect(wrapper.vm.splitterModel).toBe(270);
   });
 
   // Test 5: Store integration works correctly
@@ -248,81 +246,7 @@ describe("MessageQueues.vue", () => {
     ];
     
     // Access messageQueueTabs via the setup return values
-    expect(wrapper.vm.filteredList).toHaveLength(3);
-  });
-
-  // Test 10: filteredList computed property filters correctly
-  it("should filter tabs based on tabsFilter value", async () => {
-    wrapper = createWrapper();
-    
-    // Initially all tabs should be visible
-    expect(wrapper.vm.filteredList).toHaveLength(3);
-    
-    // Set filter to "Rabbit" - matches "RabbitMQ"
-    wrapper.vm.tabsFilter = "Rabbit";
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("rabbitmq");
-  });
-
-  // Test 11: filteredList is case insensitive
-  it("should filter tabs case insensitively", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.tabsFilter = "kafka"; // lowercase should match "Kafka"
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("kafka");
-  });
-
-  // Test 12: filteredList returns empty array when no matches
-  it("should return empty array when no tabs match filter", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.tabsFilter = "nonexistent";
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(0);
-  });
-
-  // Test 13: filteredList returns all tabs when filter is empty
-  it("should return all tabs when filter is empty", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.tabsFilter = "";
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(3);
-  });
-
-  // Test 14: filteredList partial matching works
-  it("should filter tabs with partial matching", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.tabsFilter = "AT"; // Should match "NATS"
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("nats");
-  });
-
-  // Test 15: tabsFilter reactivity
-  it("should update filteredList when tabsFilter changes", async () => {
-    wrapper = createWrapper();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(3);
-    
-    wrapper.vm.tabsFilter = "Kafka"; // Match "Kafka" label
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    
-    wrapper.vm.tabsFilter = "";
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(3);
+    expect(wrapper.vm.messageQueueTabs).toHaveLength(3);
   });
 
   // Test 16: ingestTabType default value
@@ -391,16 +315,6 @@ describe("MessageQueues.vue", () => {
     expect(typeof wrapper.vm.verifyOrganizationStatus).toBe("function");
   });
 
-  // Test 25: splitterModel reactivity
-  it("should allow splitterModel to be modified", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.splitterModel = 300;
-    await nextTick();
-    
-    expect(wrapper.vm.splitterModel).toBe(300);
-  });
-
   // Test 26: tabs ref reactivity
   it("should allow tabs ref to be modified", async () => {
     wrapper = createWrapper();
@@ -409,22 +323,6 @@ describe("MessageQueues.vue", () => {
     await nextTick();
     
     expect(wrapper.vm.tabs).toBe("test-tabs");
-  });
-
-  // Test 27: Multiple filter scenarios
-  it("should handle multiple filter scenarios correctly", async () => {
-    wrapper = createWrapper();
-    
-    // Test filtering with 'Kafka' - should match kafka only  
-    wrapper.vm.tabsFilter = "Kafka";
-    await nextTick();
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("kafka");
-    
-    // Test filtering with 'a' - should match RabbitMQ, Kafka, and NATS (all contain 'a' or 'A')
-    wrapper.vm.tabsFilter = "a";
-    await nextTick();
-    expect(wrapper.vm.filteredList).toHaveLength(3);
   });
 
   // Test 28: Component name validation
@@ -452,37 +350,6 @@ describe("MessageQueues.vue", () => {
         org_identifier: "query-test-org",
       },
     });
-  });
-
-  // Test 31: Filter with whitespace - whitespace is significant in includes()
-  it("should handle filter with whitespace correctly", async () => {
-    wrapper = createWrapper();
-    
-    // Since includes() doesn't trim, " RabbitMQ " won't match "RabbitMQ"
-    // Let's test a substring that exists: "bit" from "RabbitMQ"
-    wrapper.vm.tabsFilter = "bit"; 
-    await nextTick();
-    
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("rabbitmq");
-  });
-
-  // Test 32: Multiple rapid filter changes
-  it("should handle rapid filter changes correctly", async () => {
-    wrapper = createWrapper();
-    
-    wrapper.vm.tabsFilter = "K"; // Should match "Kafka"
-    await nextTick();
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    
-    wrapper.vm.tabsFilter = "Ka"; // Should still match "Kafka"
-    await nextTick();
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    
-    wrapper.vm.tabsFilter = "Kaf"; // Should still match "Kafka"
-    await nextTick();
-    expect(wrapper.vm.filteredList).toHaveLength(1);
-    expect(wrapper.vm.filteredList[0].name).toBe("kafka");
   });
 
   // Test 33: Store state consistency

@@ -34,7 +34,6 @@ use tokio::sync::mpsc;
 
 use crate::service::db;
 
-pub mod bloom_build;
 pub mod deleted;
 pub mod dump;
 pub mod flatten;

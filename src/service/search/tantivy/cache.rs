@@ -36,8 +36,7 @@ pub enum CacheEntry {
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
-    TopN(Vec<(String, u64)>),                // simple top n optimization
-    TopNMulti(Vec<(Vec<String>, u64)>),      // two-field top n optimization
+    TopN(Vec<(Vec<String>, u64)>),           // group by top n optimization (1..=4 fields)
     Distinct(HashSet<String>),               // simple distinct optimization
 }
 
@@ -60,7 +59,6 @@ impl From<CacheEntry> for TantivyResult {
                 TantivyResult::MultiHistogram(multi_histogram)
             }
             CacheEntry::TopN(top_n) => TantivyResult::TopN(top_n),
-            CacheEntry::TopNMulti(top_n) => TantivyResult::TopNMulti(top_n),
             CacheEntry::Distinct(distinct) => TantivyResult::Distinct(distinct),
         }
     }
@@ -91,13 +89,6 @@ impl CacheEntry {
                     + std::mem::size_of::<Vec<(i64, String, u64)>>()
             }
             CacheEntry::TopN(top_n) => {
-                top_n
-                    .iter()
-                    .map(|(s, _)| s.capacity() + std::mem::size_of::<u64>())
-                    .sum::<usize>()
-                    + std::mem::size_of::<Vec<(String, u64)>>()
-            }
-            CacheEntry::TopNMulti(top_n) => {
                 top_n
                     .iter()
                     .map(|(keys, _)| {
@@ -217,9 +208,9 @@ mod tests {
 
     fn create_test_top_n_result() -> CacheEntry {
         CacheEntry::TopN(vec![
-            ("key1".to_string(), 100),
-            ("key2".to_string(), 200),
-            ("key3".to_string(), 300),
+            (vec!["key1".to_string()], 100),
+            (vec!["key2".to_string()], 200),
+            (vec!["key3".to_string(), "sub1".to_string()], 300),
         ])
     }
 
@@ -448,7 +439,7 @@ mod tests {
 
         if let Some(TantivyResult::TopN(top_n)) = cache.get("topn_key") {
             assert_eq!(top_n.len(), 3);
-            assert_eq!(top_n[0].0, "key1");
+            assert_eq!(top_n[0].0, vec!["key1".to_string()]);
             assert_eq!(top_n[0].1, 100);
         } else {
             panic!("Expected TopN result");

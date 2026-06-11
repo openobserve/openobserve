@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0"
+          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -78,14 +78,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
+          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
           <div
-            v-if="isLoading"
-            :key="store.state.selectedOrganization?.identifier"
-            class="o2-content-scroll tw:flex-1 tw:overflow-y-auto"
+            class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="store.state.theme === 'dark' ? 'tw:border tw:border-border-default' : ''"
           >
-            <router-view v-slot="{ Component }">
-              <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
-            </router-view>
+            <div
+              v-if="isLoading"
+              :key="store.state.selectedOrganization?.identifier"
+              class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
+            >
+              <router-view v-slot="{ Component }">
+                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+              </router-view>
+            </div>
           </div>
         </main>
 
@@ -404,6 +410,12 @@ export default defineComponent({
         display: store.state?.currentuser?.role == "admin" ? true : false,
         name: "iam",
       },
+      {
+        title: t("menu.settings"),
+        icon: "settings",
+        link: "/settings",
+        name: "settings",
+      },
     ]);
 
     const langList = [
@@ -560,12 +572,12 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the Evaluations menu entry based on the live config
+    // Insert / remove the AI Observability menu entry based on the live config
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
-    const updateOnlineEvalsMenu = () => {
+    const updateAIObservabilityMenu = () => {
       const existingIndex = linksList.value.findIndex(
-        (link: any) => link.name === "onlineEvals",
+        (link: any) => link.name === "aiObservability",
       );
 
       if (isOnlineEvalsEnabled.value) {
@@ -575,10 +587,10 @@ export default defineComponent({
         );
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
         linksList.value.splice(insertAt, 0, {
-          title: t("menu.evals"),
-          icon: "check-circle-outline",
-          link: "/online-evals",
-          name: "onlineEvals",
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
+          link: "/ai",
+          name: "aiObservability",
         });
       } else if (existingIndex !== -1) {
         linksList.value.splice(existingIndex, 1);
@@ -587,12 +599,12 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
-      updateOnlineEvalsMenu();
+      updateAIObservabilityMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus

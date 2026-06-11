@@ -152,7 +152,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .collect::<Vec<_>>()
     };
 
-    let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
+    let pipelines = super::pipeline::list_user_pipelines(org_id, None)
+        .await
+        .unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
             .iter()

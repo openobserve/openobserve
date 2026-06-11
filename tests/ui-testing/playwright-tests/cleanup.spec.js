@@ -372,6 +372,13 @@ test.describe("Pre-Test Cleanup", () => {
       screenshotDir
     );
 
+    // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
+    await pm.apiCleanup.cleanupModelPricingModels([
+      'mp_',                                // all test models created by model-pricing.spec.js
+      'E2E Pricing Verifier ',              // cost-verification models (Journeys 12/13)
+      /^.+\s\(Copy\)$/                      // cloned built-in models (source=org, name ends with " (Copy)")
+    ]);
+
     testLogger.info('Pre-test cleanup completed successfully');
   });
 });

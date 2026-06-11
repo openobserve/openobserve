@@ -430,7 +430,8 @@ describe("ModelPricingList.vue", () => {
     it("should render the list header when not showing the import page", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find('[data-test="model-pricing-list-title"]').exists()).toBe(true);
+      // Title now lives in the standard AppPageHeader (row 1).
+      expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 
     it("should hide the list view when import page is shown", async () => {
@@ -438,7 +439,7 @@ describe("ModelPricingList.vue", () => {
       await flushPromises();
       wrapper.vm.showImportModelPricingPage = true;
       await nextTick();
-      expect(wrapper.find('[data-test="model-pricing-list-title"]').exists()).toBe(false);
+      expect(wrapper.find(".app-page-header").exists()).toBe(false);
     });
 
     it("should render the ODrawer side panel closed by default", async () => {

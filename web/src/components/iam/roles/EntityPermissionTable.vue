@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #empty>
-        <NoData />
+        <NoData :filtered="!!searchKey" @action="emits('update:searchKey', '')" />
       </template>
     </OTable>
   </div>
@@ -53,6 +53,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import type { Entity } from "@/ts/interfaces";
 import { watch } from "vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   resource: {
@@ -69,7 +70,7 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission"]);
+const emits = defineEmits(["updated:permission", "update:searchKey"]);
 
 const { t } = useI18n();
 
@@ -89,7 +90,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: "",
     accessorKey: "expand",
     cell: (info: any) => info.getValue(),
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { align: "center", compactPadding: true },
@@ -99,6 +100,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("iam.entityName"),
     accessorKey: "name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {

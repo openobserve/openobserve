@@ -36,7 +36,7 @@ use itertools::Itertools;
 use tracing::Instrument;
 
 pub use super::calc_target_partitions;
-pub use crate::service::search::tantivy::{get_tantivy_directory, tantivy_search};
+pub use crate::service::search::tantivy::tantivy_search;
 use crate::service::{
     file_list,
     search::{

@@ -255,10 +255,13 @@ describe('OTabs', () => {
 
   // --- Inner padding for focus-ring spacing (horizontal) ---
 
-  it('applies horizontal scroll-container vertical padding for focus spacing', () => {
+  it('applies horizontal scroll-container top padding only (underline sits flush at the bottom)', () => {
     const wrapper = mountTabs()
-    // The scroll container (parent of TabsList) carries py-[3px]
-    expect(wrapper.html()).toContain('tw:py-[3px]')
+    // Top-only padding keeps focus-ring spacing above the tabs while letting the
+    // active underline sit flush at the bottom edge — so it lands exactly on any
+    // border-b divider placed directly under the tabs (no -mb hacks needed).
+    expect(wrapper.html()).toContain('tw:pt-0.75')
+    expect(wrapper.html()).not.toContain('tw:py-[3px]')
   })
 
   it('applies horizontal tablist horizontal padding for focus spacing', () => {

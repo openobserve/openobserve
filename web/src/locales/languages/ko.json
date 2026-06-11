@@ -405,6 +405,12 @@
     "noData": "사용 가능한 데이터 없음",
     "functionEditorLabel": "함수 에디터",
     "loadingStream": "스트림 로드 중...",
+    "askAIPlaceholderRotation": {
+      "one": "지난 한 시간 동안 발생한 오류를 보여주세요...",
+      "two": "5초 이상 걸리는 느린 쿼리 찾기...",
+      "three": "서비스별로 그룹화된 5xx 응답 수 계산...",
+      "four": "레벨 = '오류'인 필터 로그..."
+    },
     "hideHistogram": "히스토그램 숨기기",
     "disableQuickMode": "퀵 모드 비활성화",
     "menuGroupSetOnce": "한 번 설정",
@@ -415,7 +421,8 @@
     "menuGroupSchedule": "스케줄",
     "menuGroupInspect": "검사",
     "validSql": "유효한 SQL",
-    "invalidSql": "잘못된 쿼리"
+    "invalidSql": "잘못된 쿼리",
+    "menuGroupExplain": "설명하다"
   },
   "menu": {
     "home": "홈",
@@ -449,7 +456,8 @@
     "language": "언어",
     "actions": "액션",
     "incidents": "인시던트",
-    "evals": "평가"
+    "evals": "평가",
+    "aiObservability": "AI 옵저버빌리티"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -958,7 +966,8 @@
     "subscription_type": "계획 유형",
     "proceed_subscription": "구독으로 이동",
     "subscription_plan": "서브스크립션 플랜",
-    "makeBilledMember": "이 조직을 {org} 의 결제 회원으로 설정"
+    "makeBilledMember": "이 조직을 {org} 의 결제 회원으로 설정",
+    "manage": "관리"
   },
   "template": {
     "header": "템플릿",
@@ -1200,7 +1209,8 @@
     "tokenRotateError": "토큰 회전에 실패했습니다.",
     "tokenDeleteError": "토큰을 삭제하지 못했습니다.",
     "noTokensFound": "통합 토큰을 찾을 수 없습니다.",
-    "createdBy": "만든 사람"
+    "createdBy": "만든 사람",
+    "orgLevelSummary": "통합 엔드포인트를 위한 조직 수준 토큰."
   },
   "dashboard": {
     "selectField": "필드",
@@ -1780,7 +1790,8 @@
     "noDataAvailable": "사용 가능한 데이터 없음",
     "tabAiAssistant": "O2 AI 어시스턴트",
     "tabOverview": "개요",
-    "tabUsage": "사용량"
+    "tabUsage": "사용량",
+    "subtitle": "옵저버빌리티 워크스페이스 한 눈에 보기"
   },
   "billing": {
     "header": "사용 및 청구",
@@ -2952,7 +2963,10 @@
     "evaluationTemplate": "평가 템플릿",
     "evaluationTemplateHelp": "LLM 심사위원의 기준과 차원을 정의하는 평가 템플릿을 선택합니다.",
     "noTemplatesFound": "평가 템플릿을 찾을 수 없습니다.평가 템플릿 페이지에서 새로 생성하십시오.",
-    "evalTemplatesRefreshed": "평가 템플릿이 성공적으로 새로 고쳐졌습니다."
+    "evalTemplatesRefreshed": "평가 템플릿이 성공적으로 새로 고쳐졌습니다.",
+    "subtitle": "이동 중 데이터 변환, 강화 및 라우팅",
+    "selectStream": "스트림 선택...",
+    "queryEditorPlaceholder": "스트림을 선택하거나 여기에 SQL 쿼리를 작성하십시오..."
   },
   "reports": {
     "header": "보고서",
@@ -3229,7 +3243,8 @@
     "confirmRejectMsg": "{org} 가입 초대를 정말로 거부하시겠습니까?",
     "expired": "만료",
     "expiresToday": "오늘 만료",
-    "daysLeft": "{일} 일 남음"
+    "daysLeft": "{일} 일 남음",
+    "search": "초대장 검색"
   },
   "serviceAccounts": {
     "header": "서비스 계정",
@@ -4086,6 +4101,277 @@
       "three": "K8s 노드 상태를 위한 대시보드 구축..."
     }
   },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "데이터를 찾을 수 없습니다",
+      "description": "현재 필터 또는 시간 범위와 일치하는 항목이 없습니다.검색 범위를 넓히거나, 시간 범위를 넓히거나, 필터를 지워 보세요.",
+      "action": "필터 지우기",
+      "actionDesc": "적용된 모든 필터 초기화"
+    },
+    "noLogs": {
+      "title": "이 범위에는 로그가 없습니다.",
+      "description": "선택한 스트림 및 시간 범위에 대한 로그를 찾지 못했습니다.시간 범위를 더 넓히거나 다른 스트림을 사용해 보세요.",
+      "action": "시간 범위 확대",
+      "actionDesc": "더 긴 기간에 걸친 검색"
+    },
+    "noDashboards": {
+      "title": "첫 대시보드 만들기",
+      "description": "대시보드는 지표, 로그 및 추적을 하나의 뷰로 제공합니다.하나를 만들어 시작하세요.",
+      "action": "새 대시보드",
+      "actionDesc": "빈 캔버스에서 시작",
+      "import": "대시보드 가져오기",
+      "importDesc": "대시보드 JSON 파일 업로드",
+      "templates": "템플릿 찾아보기",
+      "templatesDesc": "커뮤니티 대시보드에서 시작"
+    },
+    "noPipelines": {
+      "title": "첫 번째 파이프라인 생성",
+      "description": "파이프라인은 데이터가 도착하는 대로 데이터를 변환하고 라우팅합니다.하나를 설정하여 스트림 구성을 시작하세요.",
+      "action": "새 파이프라인",
+      "actionDesc": "처음부터 흐름 만들기",
+      "import": "임포트 파이프라인",
+      "importDesc": "파이프라인 정의 업로드"
+    },
+    "noFunctions": {
+      "title": "첫 번째 함수 만들기",
+      "description": "함수는 수집 또는 쿼리 시 데이터를 보강하고 재구성합니다.시작하려면 하나를 추가하세요.",
+      "action": "새 함수",
+      "actionDesc": "새 VRL 함수 작성"
+    },
+    "noStreams": {
+      "title": "첫 번째 데이터를 기다리는 중",
+      "description": "아직 데이터가 도착하지 않았습니다.소스를 연결하면 스트림이 여기에 자동으로 표시됩니다.",
+      "action": "인제스트 설정",
+      "actionDesc": "데이터 소스 연결"
+    },
+    "noAlerts": {
+      "title": "첫 번째 알림 만들기",
+      "description": "경고는 데이터가 임계값을 초과하는 순간을 알려줍니다.하나를 정의하여 모니터링을 시작하세요.",
+      "action": "새 알림",
+      "actionDesc": "모니터링할 조건 정의"
+    },
+    "noIncidents": {
+      "title": "활성 인시던트 없음",
+      "description": "당신은 모두 사로잡혔습니다. 지금 당장 주의를 기울일 필요는 없습니다.트리거된 인시던트가 여기에 표시됩니다."
+    },
+    "loadError": {
+      "title": "뭔가 잘못됐어",
+      "description": "이 데이터를 로드할 수 없습니다.보통은 일시적입니다. 잠시 후 다시 시도해 보세요.",
+      "action": "재시도",
+      "actionDesc": "데이터를 다시 로드해 보십시오."
+    },
+    "noData": {
+      "title": "여긴 아직 아무것도 없어",
+      "description": "지금은 표시할 데이터가 없습니다."
+    },
+    "noTraces": {
+      "title": "흔적을 찾을 수 없음",
+      "description": "선택한 서비스 및 시간 범위와 일치하는 추적이 없습니다.더 넓은 시간 범위 또는 다른 서비스를 사용해 보십시오."
+    },
+    "noSearchHistory": {
+      "title": "아직 검색 기록이 없습니다",
+      "description": "실행한 검색이 여기에 나열되므로 다시 방문하여 다시 실행할 수 있습니다."
+    },
+    "noUsers": {
+      "title": "아직 사용자 없음",
+      "description": "팀원을 초대하여 이 조직에서 협업하세요.",
+      "action": "사용자 추가",
+      "actionDesc": "이메일로 팀원 초대하기"
+    },
+    "noReports": {
+      "title": "아직 보고서 없음",
+      "description": "보고서를 예약하여 대시보드가 수신함으로 전달되도록 하세요.",
+      "action": "새 보고서",
+      "actionDesc": "대시보드 전송 예약"
+    },
+    "noQueries": {
+      "title": "실행 중인 쿼리 없음",
+      "description": "현재 활성 쿼리가 없습니다.장기 실행 쿼리는 실행 중에 여기에 표시됩니다."
+    },
+    "noServiceAccounts": {
+      "title": "아직 서비스 계정 없음",
+      "description": "서비스 계정을 사용하면 애플리케이션이 API를 통해 인증할 수 있습니다.계정을 만들어 시작하세요.",
+      "action": "서비스 계정 추가",
+      "actionDesc": "API 서비스 계정 생성"
+    },
+    "noInvitations": {
+      "title": "보류 중인 초대장 없음",
+      "description": "보내거나 받은 초대장이 여기에 표시됩니다."
+    },
+    "filtered": {
+      "title": "{명사} 를 찾을 수 없습니다.",
+      "description": "현재 필터 또는 검색과 일치하는 {noun} 이 (가) 없습니다.조정하거나 지워 보세요.",
+      "action": "필터 지우기",
+      "actionDesc": "모든 필터 재설정 및 검색",
+      "fallbackNoun": "결과"
+    },
+    "nouns": {
+      "logs": "로그",
+      "dashboards": "대시보드",
+      "pipelines": "파이프라인",
+      "functions": "기능",
+      "streams": "시냇물",
+      "alerts": "민첩한",
+      "incidents": "사건",
+      "traces": "추적",
+      "searches": "검색을 수행합니다",
+      "users": "사용자",
+      "reports": "보고서",
+      "queries": "의문",
+      "serviceAccounts": "서비스 계정",
+      "invitations": "초대장"
+    },
+    "noDashboardsInFolder": {
+      "title": "이 폴더에는 대시보드가 없습니다.",
+      "description": "이 폴더는 비어 있습니다.여기에 대시보드를 추가하거나 다른 폴더에서 대시보드를 이동합니다.",
+      "action": "새 대시보드",
+      "actionDesc": "이 폴더에 대시보드 만들기",
+      "import": "대시보드 가져오기",
+      "importDesc": "대시보드 JSON 파일 업로드",
+      "templates": "템플릿 찾아보기",
+      "templatesDesc": "커뮤니티 대시보드에서 시작"
+    },
+    "noGroups": {
+      "title": "아직 그룹이 없습니다",
+      "description": "그룹을 사용하면 여러 사용자의 권한을 한 번에 관리할 수 있습니다.시작하려면 하나를 생성하세요.",
+      "action": "새 그룹",
+      "actionDesc": "사용자 그룹 생성"
+    },
+    "noRoles": {
+      "title": "아직 역할 없음",
+      "description": "역할은 사용자가 수행할 수 있는 작업을 정의합니다.사용자 지정 역할을 생성하여 액세스를 제어하세요.",
+      "action": "새 역할",
+      "actionDesc": "사용자 지정 액세스 역할 정의"
+    },
+    "noAnomalyConfigs": {
+      "title": "예외 항목 탐지가 구성되지 않았습니다.",
+      "description": "변칙 탐지를 설정하여 데이터의 특이한 패턴을 자동으로 식별합니다.",
+      "action": "새 구성",
+      "actionDesc": "이상 탐지 구성"
+    },
+    "noApiLimits": {
+      "title": "API 제한이 구성되지 않음",
+      "description": "API 제한은 각 조직이 시간대별로 수집하고 쿼리할 수 있는 데이터의 양을 제어합니다."
+    },
+    "noRoleLimits": {
+      "title": "역할 제한이 구성되지 않음",
+      "description": "역할 제한은 조직 내 개별 역할에 적용되는 수집 및 쿼리 할당량을 정의합니다."
+    },
+    "noIngestionTokens": {
+      "title": "아직 통합 토큰이 없습니다.",
+      "description": "통합 토큰은 로그, 지표 및 추적을 전송할 때 데이터 소스를 인증합니다.",
+      "action": "새 토큰",
+      "actionDesc": "통합 토큰 생성"
+    },
+    "noOrganizations": {
+      "title": "아직 조직 없음",
+      "description": "조직은 사용자와 데이터를 함께 그룹화합니다.하나를 만들어 시작하세요."
+    },
+    "noAlertDestinations": {
+      "title": "아직 목적지가 없습니다",
+      "description": "목적지는 Slack, 이메일, 웹후크 등 경고 알림이 전송되는 위치를 정의합니다.",
+      "action": "새 목적지",
+      "actionDesc": "알림 채널 연결"
+    },
+    "noAlertTemplates": {
+      "title": "아직 템플릿이 없습니다",
+      "description": "템플릿은 경고 알림 메시지의 형식을 정의합니다.",
+      "action": "새 템플릿",
+      "actionDesc": "알림 템플릿 만들기"
+    },
+    "noEnrichmentTables": {
+      "title": "인리치먼트 테이블이 아직 없습니다",
+      "description": "강화 테이블을 사용하면 쿼리 시 로그 데이터에 추가 컨텍스트를 추가할 수 있습니다.",
+      "action": "새 테이블",
+      "actionDesc": "강화 테이블 만들기"
+    },
+    "noCipherKeys": {
+      "title": "아직 암호 키가 없습니다.",
+      "description": "암호 키는 데이터 스트림의 민감한 필드를 암호화하는 데 사용됩니다.",
+      "action": "새 키",
+      "actionDesc": "암호 키 생성"
+    },
+    "noAiToolsets": {
+      "title": "아직 AI 툴셋이 없습니다.",
+      "description": "AI 툴셋은 조직을 외부 AI 기능에 연결합니다.",
+      "action": "새 도구 세트",
+      "actionDesc": "AI 툴셋 추가"
+    },
+    "noLlmProviders": {
+      "title": "LLM 공급자가 구성되지 않았습니다.",
+      "description": "언어 모델 공급자를 연결하여 AI 기반 기능을 활성화합니다.",
+      "action": "제공자 추가",
+      "actionDesc": "LLM 공급자 구성"
+    },
+    "noDiscoveredServices": {
+      "title": "검색된 서비스 없음",
+      "description": "추적이 도착하기 시작하면 서비스가 자동으로 여기에 표시됩니다."
+    },
+    "noNodes": {
+      "title": "사용 가능한 노드 없음",
+      "description": "클러스터 노드가 등록되면 여기에 나타납니다."
+    },
+    "noSourceMaps": {
+      "title": "소스 맵이 업로드되지 않았습니다.",
+      "description": "소스 맵을 업로드하여 RUM 오류 보고서에서 읽을 수 있는 스택 트레이스를 활성화하세요.",
+      "action": "업로드",
+      "actionDesc": "소스 맵 파일 업로드"
+    },
+    "noBackfillJobs": {
+      "title": "백필 작업 없음",
+      "description": "백필 작업은 파이프라인을 통해 과거 데이터를 재처리합니다.시작하려면 하나를 실행하세요."
+    },
+    "noSearchJobs": {
+      "title": "예약된 검색 작업 없음",
+      "description": "예약한 장기 실행 검색이 여기에 표시되며, 검색 상태를 추적하고 검색이 완료되면 결과를 탐색할 수 있습니다."
+    },
+    "noPipelineDestinations": {
+      "title": "아직 목적지가 없습니다",
+      "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
+      "action": "새 목적지",
+      "actionDesc": "파이프라인 대상 연결"
+    },
+    "noLLMInsights": {
+      "title": "LLM 활동이 아직 없습니다",
+      "description": "OpenTelemetry Gen-AI 시맨틱 규칙으로 서비스를 계측하고 최소 하나의 트레이스를 수집하여 이 대시보드를 채웁니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "트레이스에서 gen_ai_* 어트리뷰트를 캡처하세요"
+    },
+    "noLLMSessions": {
+      "title": "LLM 세션이 아직 없습니다",
+      "description": "세션은 gen_ai_conversation_id별로 그룹화됩니다. 각 대화에 트레이스에 태그를 지정하도록 서비스를 계측하면 세션이 여기에 표시됩니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "gen_ai_conversation_id가 포함된 태그 범위"
+    },
+    "noScorers": {
+      "title": "아직 득점자 없음",
+      "description": "채점자는 점수 구성을 기준으로 LLM 응답을 채점합니다. LLM 심사위원으로 시작하거나 라이브러리에서 가져올 수 있습니다.",
+      "action": "채점자 생성",
+      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의"
+    },
+    "noEvalJobs": {
+      "title": "아직 평가 작업이 없습니다",
+      "description": "작업은 LLM 스트림을 기준으로 채점자를 스케줄링합니다.하나씩 생성하여 단계별로 대화를 채점할 수 있습니다.",
+      "action": "평가 작업 생성",
+      "actionDesc": "스트림 선택+득점자+케이던스"
+    },
+    "noScoreConfigs": {
+      "title": "점수 구성이 아직 없습니다",
+      "description": "점수 구성은 채점자가 생성하는 스키마 (숫자, 불리언 또는 범주형) 를 정의합니다.하나를 추가하여 채점을 시작하세요.",
+      "action": "점수 구성 생성",
+      "actionDesc": "점수 모양+정상 범위 정의"
+    },
+    "noEvalTemplates": {
+      "title": "평가 템플릿이 아직 없습니다.",
+      "description": "평가 템플릿은 LLM 평가를 위한 재사용 가능한 채점 기준을 정의합니다.",
+      "action": "새 템플릿",
+      "actionDesc": "평가 템플릿 생성"
+    },
+    "noPipelineHistory": {
+      "title": "아직 파이프라인 기록이 없습니다.",
+      "description": "파이프라인이 실행되면 파이프라인 실행 기록이 여기에 표시됩니다."
+    }
+  },
   "onlineEvals": {
     "title": "평가",
     "description": "LLM 제공자, 점수 정의, 채점자 및 실시간 평가 작업을 구성합니다.",
@@ -4426,6 +4712,21 @@
     "empty": {
       "title": "LLM 공급자가 아직 없습니다",
       "description": "LLM 제공자는 LLM 판사 채점자가 호출하는 언어 모델에 대한 연결 세부 정보 (엔드포인트+자격 증명) 를 저장합니다.하나를 추가하여 심사 기반 평가 실행을 시작하세요."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM 옵저버빌리티",
+    "sections": {
+      "monitor": "모니터",
+      "evaluate": "평가"
+    },
+    "nav": {
+      "overview": "개요",
+      "sessions": "세션",
+      "quality": "품질",
+      "evalJobs": "평가 작업",
+      "scorers": "득점자",
+      "scoreConfigs": "스코어 구성"
     }
   }
 }

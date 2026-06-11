@@ -41,7 +41,6 @@ pub mod sql;
 pub mod ssrf_guard;
 pub mod str;
 pub mod sysinfo;
-pub mod tantivy;
 pub mod time;
 pub mod took_watcher;
 pub mod util;

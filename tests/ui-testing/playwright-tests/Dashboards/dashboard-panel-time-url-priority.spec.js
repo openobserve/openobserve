@@ -43,10 +43,11 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Wait for initial pt-period URL param to land before interacting — ensures
     // panelsInitializing guard in RenderDashboardCharts has cleared (500ms timeout).
+    // Use 20 s in CI — panel data fetches can re-arm the guard under load.
     await page.waitForFunction(
       (pid) => window.location.href.includes(`pt-period.${pid}`),
       panelId,
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     // Step 2: Change Panel time to "Last 6d" and Apply
@@ -60,9 +61,13 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const currentURL = page.url();
     const newPage = await page.context().newPage();
     await newPage.goto(currentURL);
-    await newPage.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    await newPage.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Step 5: Verify Panel shows "Last 6d" in new tab
+    // Wait explicitly for the picker to be visible before reading its text —
+    // networkidle alone is not enough on a loaded server; the panel may still
+    // be rendering its time picker element when networkidle fires.
+    await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).waitFor({ state: "visible", timeout: 20000 });
     const pickerText = await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).textContent();
     expect(pickerText).toContain("6");
 
@@ -98,10 +103,11 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     const panelBId = panelIds[1];
 
     // Wait for URL to be populated with panel time params before asserting
+    // Use 20 s in CI — panel data fetches can re-arm the panelsInitializing guard.
     await page.waitForFunction(
       (ids) => ids.every(pid => window.location.href.includes(`pt-period.${pid}`)),
       [panelAId, panelBId],
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     // Step 2: Verify initial URL contains both panel times

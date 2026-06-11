@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="date-time-button"
           ref="datetimeBtn"
           data-cy="date-time-button"
-          variant="outline"
+          :variant="variant"
           class="date-time-button"
           :class="{
             [selectedType + 'type']: !disableRelative,
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:end-date="selectedDate.to = $event"
                 />
               </div>
-              <div class="notePara">* You can choose multiple date</div>
+              <div class="notePara">{{ t("common.datetimeMessage") }}</div>
               <OSeparator v-if="!disableRelative" class="tw:my-2" />
 
               <table v-if="!hideRelativeTime" class="tw:px-3 startEndTime">
@@ -359,6 +359,10 @@ export default defineComponent({
     menuAlign: {
       type: String,
       default: "end",
+    },
+    variant: {
+      type: String,
+      default: "outline",
     },
   },
 

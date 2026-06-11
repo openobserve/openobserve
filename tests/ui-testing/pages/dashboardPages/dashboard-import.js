@@ -354,10 +354,18 @@ export default class DashboardImport {
   }
 
   async deleteFolderByName(folderName) {
+    // Navigate to the dashboards root to ensure FolderList is fully rendered
+    // and the folder sidebar tabs are visible before looking for the target folder.
+    const orgName = process.env["ORGNAME"];
+    await this.page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${orgName}`
+    );
+    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
     const folderTab = this.page.locator(
       `[data-test="dashboard-folder-tab-name-${folderName}"]`
     );
-    await folderTab.waitFor({ state: "visible", timeout: 10000 });
+    await folderTab.waitFor({ state: "visible", timeout: 20000 });
     await folderTab.hover();
     await folderTab.locator('[data-test="dashboard-more-icon"]').click();
     await this.page

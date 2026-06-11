@@ -79,6 +79,7 @@ const OTableStub = {
   emits: ["update:selected-ids"],
   template: `
     <div data-test="o-table-stub">
+      <slot name="toolbar" />
       <slot name="empty" />
       <slot name="actions" />
       <slot name="bottom" :totalRows="data ? data.length : 0" />
@@ -126,6 +127,7 @@ function mountComponent() {
         AddDestination: { template: '<div data-test="add-destination-stub" />' },
         ImportDestination: { template: '<div data-test="import-destination-stub" />' },
         NoData: { template: '<div data-test="no-data-stub" />' },
+        OEmptyState: { template: '<div data-test="o-empty-state-stub" />' },
         OBadge: { template: '<span data-test="o-badge-stub"><slot /></span>' },
         OIcon: { template: '<span data-test="o-icon-stub" />' },
         OButton: {
@@ -180,7 +182,7 @@ describe("AlertsDestinationList", () => {
     it("renders the list title", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      const title = wrapper.find('[data-test="alert-destinations-list-title"]');
+      const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
 
@@ -431,8 +433,8 @@ describe("AlertsDestinationList", () => {
       (destinationService.list as any).mockResolvedValue({ data: [] });
       wrapper = mountComponent();
       await flushPromises();
-      // NoData is rendered inside OTable's empty slot which our stub exposes
-      expect(wrapper.find('[data-test="no-data-stub"]').exists()).toBe(true);
+      // OEmptyState is rendered inside OTable's empty slot which our stub exposes
+      expect(wrapper.find('[data-test="o-empty-state-stub"]').exists()).toBe(true);
     });
   });
 

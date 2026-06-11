@@ -261,7 +261,7 @@ export class AlertBulkOperations {
 
         // Verify the source folder is now empty by checking for "No data available"
         // This is the expected state after moving ALL alerts from a folder
-        await expect(this.page.getByText(this.locators.noDataAvailableText)).toBeVisible({ timeout: 15000 });
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible({ timeout: 15000 });
 
         testLogger.info('Successfully moved alerts to folder', { targetFolderName });
     }
@@ -338,13 +338,13 @@ export class AlertBulkOperations {
         }
 
         try {
-            const noData = await this.page.getByText('No data available').isVisible({ timeout: 1000 });
+            const noData = await this.page.locator('[data-test="o2-empty-state"]').isVisible({ timeout: 1000 });
             if (noData) {
                 testLogger.debug('No alerts found in folder');
                 return 0;
             }
         } catch (e) {
-            // Neither pagination nor "No data available" found
+            // Neither pagination nor empty state found
         }
 
         return 0;

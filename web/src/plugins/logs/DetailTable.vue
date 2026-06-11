@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Single Tab Row -->
     <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="tw:flex tw:items-center tw:gap-2 tw:-mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -232,10 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre tw:flex-1"
+                    class="table-pre tw:flex-1 tw:min-w-0"
                     :class="
                       !shouldWrapValues
-                        ? 'tw:whitespace-nowrap'
+                        ? 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis'
                         : 'tw:whitespace-pre-wrap'
                     "
                   ><ChunkedContent

@@ -62,9 +62,8 @@ describe("Alert List", async () => {
   });
 
   it("Should render alerts title", () => {
-    expect(
-      wrapper.find('[data-test="alert-templates-list-title"]').text()
-    ).toBe("Templates");
+    // Title now lives in the standard AppPageHeader (row 1).
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Templates");
   });
 
   it("Should reder table with templates", () => {
@@ -82,7 +81,8 @@ describe("Alert List", async () => {
     // Index 0 is the checkbox column, so actual columns start at index 1
     expect(tableData[1].text()).toBe("#");
     expect(tableData[2].text()).toContain("Name");
-    expect(tableData[3].text()).toContain("Actions");
+    // Action column headers are rendered empty by OTable for isAction columns
+    expect(tableData[3].exists()).toBe(true);
   });
 
   it("Should display table row data", async () => {

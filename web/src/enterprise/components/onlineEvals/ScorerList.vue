@@ -1,127 +1,23 @@
 <template>
   <EvalListShell
     data-test="scorer"
-    :title="t('onlineEvals.scorer.listTitle')"
-    :search="search"
-    :search-placeholder="t('onlineEvals.scorer.searchPlaceholder')"
-    :add-label="t('onlineEvals.scorer.newButton')"
-    :show-empty="showEmptyState"
-    @update:search="$emit('update:search', $event)"
-    @create="$emit('create')"
+    :show-empty="showNoProvidersState"
   >
+    <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
+         scorers (the most common type) can't be created without one, so we
+         surface a dedicated provider-onboarding card outside the OTable
+         flow. Reuses the shared `no-llm-providers` preset (same illustration
+         + "Add provider" action) but overrides the copy with scorer-specific
+         context, so it matches the empty-state language used elsewhere in
+         the app instead of the bespoke EvalEmptyState card. -->
     <template #empty>
-      <EvalEmptyState
-        v-if="showNoProvidersState"
-        data-test="scorer-no-providers-state"
-        icon="hub"
+      <OEmptyState
+        size="hero"
+        preset="no-llm-providers"
         :title="t('onlineEvals.scorer.noProviders.title')"
         :description="t('onlineEvals.scorer.noProviders.description')"
-        :chips="[
-          { icon: 'smart-toy', label: t('onlineEvals.scorer.noProviders.chipRequired') },
-        ]"
-        :cta-label="t('onlineEvals.scorer.noProviders.cta')"
-        cta-data-test="scorer-empty-add-provider-btn"
-        @create="$emit('add-provider')"
-      />
-      <EvalEmptyState
-        v-else
-        data-test="scorer-empty-state"
-        icon="rule"
-        :title="t('onlineEvals.scorer.empty.title')"
-        :description="t('onlineEvals.scorer.empty.description')"
-        :chips="[
-          { icon: 'smart-toy', label: t('onlineEvals.scorer.empty.chipLlmJudge') },
-          { icon: 'cloud', label: t('onlineEvals.scorer.empty.chipRemote') },
-        ]"
-        :cta-label="t('onlineEvals.scorer.newButton')"
-        cta-data-test="scorer-empty-create-btn"
-        @create="$emit('create')"
-      >
-        <template #secondary>
-          <ODropdown side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="md"
-                data-test="scorer-empty-import"
-                icon-right="expand-more"
-              >
-                {{ t("onlineEvals.scorer.import.button") }}
-              </OButton>
-            </template>
-            <ODropdownItem
-              @select="$emit('import-custom')"
-              data-test="scorer-empty-import-custom"
-            >
-              <div class="tw:flex tw:flex-col">
-                <span>{{ t("onlineEvals.scorer.import.customLabel") }}</span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-                  {{ t("onlineEvals.scorer.import.customSubtitle") }}
-                </span>
-              </div>
-            </ODropdownItem>
-            <ODropdownItem
-              @select="$emit('open-library')"
-              data-test="scorer-empty-import-library"
-            >
-              <div class="tw:flex tw:flex-col">
-                <span>{{ t("onlineEvals.scorer.import.libraryLabel") }}</span>
-                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-                  {{ t("onlineEvals.scorer.import.librarySubtitle") }}
-                </span>
-              </div>
-            </ODropdownItem>
-          </ODropdown>
-        </template>
-      </EvalEmptyState>
-    </template>
-
-    <template #actions>
-      <ODropdown side="bottom" align="end">
-        <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm"
-            class="tw:ml-2"
-            data-test="scorer-import"
-            icon-right="expand-more"
-          >
-            {{ t("onlineEvals.scorer.import.button") }}
-          </OButton>
-        </template>
-        <ODropdownItem
-          @select="$emit('import-custom')"
-          data-test="scorer-import-custom"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scorer.import.customLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scorer.import.customSubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-        <ODropdownItem
-          @select="$emit('open-library')"
-          data-test="scorer-import-library"
-        >
-          <div class="tw:flex tw:flex-col">
-            <span>{{ t("onlineEvals.scorer.import.libraryLabel") }}</span>
-            <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
-              {{ t("onlineEvals.scorer.import.librarySubtitle") }}
-            </span>
-          </div>
-        </ODropdownItem>
-      </ODropdown>
-    </template>
-
-    <template #filter>
-      <OSelect
-        v-model="typeFilter"
-        :options="typeOptions"
-        :placeholder="t('onlineEvals.scorer.allTypes')"
-        size="md"
-        class="tw:ml-2 tw:w-[150px]"
-        data-test="scorer-list-type-filter"
+        data-test="scorer-no-providers-state"
+        @action="(id) => id === 'create' && $emit('add-provider')"
       />
     </template>
 
@@ -139,10 +35,43 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #toolbar>
+          <OSearchInput
+            :model-value="search"
+            class="tw:flex-1 tw:min-w-0"
+            :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
+            data-test="scorer-list-search-input"
+            clearable
+            @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OSelect
+            v-model="typeFilter"
+            :options="typeOptions"
+            :placeholder="t('onlineEvals.scorer.allTypes')"
+            size="md"
+            width="sm"
+            class="tw:shrink-0"
+            data-test="scorer-list-type-filter"
+          />
+        </template>
+
+        <template #empty>
+          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+            <OEmptyState
+              size="hero"
+              preset="no-scorers"
+              :filtered="hasFilters"
+              data-test="scorer-empty-state"
+              @action="onEmptyAction"
+            />
+          </div>
+        </template>
+
         <template #bottom="{ totalRows }">
           <span class="o2-table-footer-title tw:text-primary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
@@ -221,8 +150,9 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type {
   EvalJob,
   Provider,
@@ -231,7 +161,6 @@ import type {
   ScorerType,
 } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
@@ -289,6 +218,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.name"),
     accessorKey: "name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {
@@ -296,7 +226,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.type"),
     accessorFn: (row: Scorer) => scorerTypeOf(row),
     sortable: true,
-    size: 160,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -304,7 +234,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.produces"),
     accessorFn: (row: Scorer) => producesLabel(row),
     sortable: true,
-    size: 180,
+    size: COL.template,
     meta: { align: "left" },
   },
   {
@@ -312,7 +242,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.version"),
     accessorKey: "version",
     sortable: true,
-    size: 100,
+    size: COL.version,
     meta: { align: "left" },
   },
   {
@@ -320,14 +250,14 @@ const columns = computed(() => [
     header: t("onlineEvals.scorer.columns.usedBy"),
     accessorFn: (row: Scorer) => usedByCount(row),
     sortable: true,
-    size: 130,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
     id: "lastRun",
     header: t("onlineEvals.scorer.columns.lastRun"),
     sortable: false,
-    size: 120,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -348,21 +278,35 @@ const filteredRows = computed(() =>
 
 const numberedRows = useNumberedRows(filteredRows);
 
-const showEmptyState = computed(
+// When the org has no providers AND no scorers yet, surface a dedicated
+// provider-onboarding screen instead of the standard empty state. LLM Judge
+// scorers (the most common type) can't be created without a provider, so
+// nudging the user there first avoids a dead-end. This case routes through
+// EvalListShell's #empty slot (full card) so the OTable doesn't render.
+const showNoProvidersState = computed(
   () =>
     !props.loading &&
     props.allScorers.length === 0 &&
     !props.search &&
-    !typeFilter.value,
+    !typeFilter.value &&
+    props.providers.length === 0,
 );
 
-// When the org has no providers AND no scorers yet, surface a dedicated
-// provider-onboarding screen instead of the standard empty state. LLM Judge
-// scorers (the most common type) can't be created without a provider, so
-// nudging the user there first avoids a dead-end.
-const showNoProvidersState = computed(
-  () => showEmptyState.value && props.providers.length === 0,
+// For everything else the OTable always renders (so the search + type
+// filter widgets stay visible). OEmptyState lives inside the table's
+// #empty slot and switches between the first-run and "Clear filters"
+// variants via `:filtered`.
+const hasFilters = computed(
+  () => !!props.search?.trim() || !!typeFilter.value,
 );
+
+function onEmptyAction(id?: string) {
+  if (id === "create") emit("create");
+  else if (id === "clear-filters") {
+    emit("update:search", "");
+    typeFilter.value = null;
+  }
+}
 
 function scorerTypeLabel(type: ScorerType) {
   if (type === "remote") return t("onlineEvals.scorer.badgeRemote");

@@ -479,7 +479,7 @@ defineExpose({ scrollToTop });
   &__field-content {
     display: flex;
     align-items: center;
-    gap: 0.5rem; // breathing room between drag handle, type icon, and field name
+    gap: 0.25rem; // breathing room between drag handle, type icon, and field name
     min-width: 0;
     flex: 1;
   }
@@ -560,7 +560,6 @@ defineExpose({ scrollToTop });
   &__expansion {
     width: 100%;
     padding: 0.25rem 0 0.375rem;
-    background-color: var(--color-field-list-expansion-bg);
     border: 1px solid var(--color-field-list-expansion-border);
     border-top: none;
     border-radius: 0 0 0.1875rem 0.1875rem;

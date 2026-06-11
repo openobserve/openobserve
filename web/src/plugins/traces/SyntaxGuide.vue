@@ -17,13 +17,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODropdown side="bottom" align="start">
     <template #trigger>
+      <!-- Menu-item style: full-width, left-aligned, badge icon -->
       <OButton
+        v-if="menuItem"
+        data-cy="syntax-guide-button"
+        variant="ghost"
+        size="sm"
+        class="tw:w-full! tw:justify-start! tw:px-3! tw:py-1.5! tw:h-auto! tw:rounded-md! tw:gap-2! tw:font-normal!"
+      >
+        <template #icon-left>
+          <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:rounded-md tw:bg-[var(--o2-section-header-bg)] tw:text-[var(--o2-text-secondary)] tw:shrink-0">
+            <OIcon name="help" size="sm" />
+          </span>
+        </template>
+        {{ t('search.syntaxGuideLabel') }}
+      </OButton>
+      <!-- Default: compact toolbar button -->
+      <OButton
+        v-else
         data-cy="syntax-guide-button"
         variant="outline"
         size="icon-xs"
-        :class="[
-          sqlmode ? 'sql-mode' : 'normal-mode',
-        ]"
+        :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
       >
         <OIcon name="help" size="sm" />
         <OTooltip :content="t('search.syntaxGuideLabel')" />
@@ -156,10 +171,8 @@ export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
   components: { OButton, OTooltip, OIcon, ODropdown },
   props: {
-    sqlmode: {
-      type: Boolean,
-      default: false,
-    },
+    sqlmode: { type: Boolean, default: false },
+    menuItem: { type: Boolean, default: false },
   },
   setup() {
     const store = useStore();

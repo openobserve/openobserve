@@ -30,11 +30,8 @@ use config::{
         stream::{FileKey, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
-    utils::{
-        inverted_index::to_tantivy_name,
-        size::bytes_to_human_readable,
-        tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
-    },
+    tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
+    utils::{inverted_index::to_tantivy_name, size::bytes_to_human_readable},
 };
 use futures::{StreamExt, stream};
 use hashbrown::HashMap;
@@ -43,8 +40,9 @@ use itertools::Itertools;
 use roaring::RoaringBitmap;
 pub use search::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult};
 use tantivy::{
-    Directory, Term,
+    Directory, ReloadPolicy, Term,
     query::{BooleanQuery, Occur, Query, RangeQuery},
+    schema::Field,
 };
 use tantivy_utils::puffin_directory::{
     PROP_ROW_GROUP_SIZE,
@@ -194,7 +192,7 @@ pub async fn tantivy_search(
 
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
+        let semaphore = Arc::new(Semaphore::new(target_partitions));
         for file in file_group {
             let trace_id = query.trace_id.to_string();
             let index_condition_clone = index_condition.clone();
@@ -293,10 +291,6 @@ pub async fn tantivy_search(
                             tantivy_result_builder.add_top_n(top_n);
                             file_list_map.remove(&file_name);
                         }
-                        TantivyResult::TopNMulti(top_n) => {
-                            tantivy_result_builder.add_top_n_multi(top_n);
-                            file_list_map.remove(&file_name);
-                        }
                         TantivyResult::Distinct(distinct) => {
                             tantivy_result_builder.add_distinct(distinct);
                             file_list_map.remove(&file_name);
@@ -355,7 +349,6 @@ pub async fn tantivy_search(
 }
 
 pub async fn get_tantivy_directory(
-    _trace_id: &str,
     file_account: &str,
     file_name: &str,
     file_size: i64,
@@ -407,13 +400,7 @@ async fn search_tantivy_index(
     log::debug!("[trace_id {trace_id}] init cache for tantivy file: {ttv_file_name}");
 
     let puffin_dir = Arc::new(
-        get_tantivy_directory(
-            trace_id,
-            &file_account,
-            &ttv_file_name,
-            parquet_file.meta.index_size,
-        )
-        .await?,
+        get_tantivy_directory(&file_account, &ttv_file_name, parquet_file.meta.index_size).await?,
     );
     // Read the row group size that the writer used when this tantivy index was
     // built. Old .ttv files predate this property — None falls back to the
@@ -431,7 +418,7 @@ async fn search_tantivy_index(
         .register(O2_TOKENIZER, o2_tokenizer_build(CollectType::Search));
     let reader = index
         .reader_builder()
-        .reload_policy(tantivy::ReloadPolicy::Manual)
+        .reload_policy(ReloadPolicy::Manual)
         .num_warming_threads(0)
         .try_into()?;
     let tantivy_index = Arc::new(index);
@@ -477,8 +464,7 @@ async fn search_tantivy_index(
         .collect::<HashSet<_>>();
 
     // warm up the terms in the query
-    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
-        HashMap::new();
+    let mut warm_terms: HashMap<Field, HashMap<Term, bool>> = HashMap::new();
     query.query_terms(&mut |term, need_position| {
         let field = term.field();
         let entry = warm_terms.entry(field).or_default();
@@ -495,10 +481,7 @@ async fn search_tantivy_index(
                 need_fast_field.insert(TIMESTAMP_COL_NAME.to_string());
                 need_fast_field.insert(name.clone());
             }
-            IndexOptimizeMode::SimpleTopN(field, ..) => {
-                need_fast_field.insert(field.clone());
-            }
-            IndexOptimizeMode::SimpleTopNMulti(fields, ..) => {
+            IndexOptimizeMode::SimpleTopN(fields, ..) => {
                 for field in fields {
                     need_fast_field.insert(field.clone());
                 }
@@ -565,11 +548,14 @@ async fn search_tantivy_index(
                 &breakdown_field,
             )
         }
-        Some(IndexOptimizeMode::SimpleTopN(field, limit, ascend)) => {
-            TantivyResult::handle_simple_top_n(&searcher, query, &field, limit, ascend)
-        }
-        Some(IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend)) => {
-            TantivyResult::handle_simple_top_n_multi(&searcher, query, &fields, limit, ascend)
+        Some(IndexOptimizeMode::SimpleTopN(fields, limit, ascend)) => {
+            // files indexed before a field was added to index_fields lack its column
+            if let Some(field) = fields.iter().find(|f| tantivy_schema.get_field(f).is_err()) {
+                log::warn!("[trace_id {trace_id_clone}] search->tantivy: {field} not index in tantivy file: {ttv_file_name}");
+                Ok(TantivyResult::TopN(vec![]))
+            } else {
+                TantivyResult::handle_simple_top_n(&searcher, query, &fields, limit, ascend)
+            }
         }
         Some(IndexOptimizeMode::SimpleDistinct(field, limit, ascend)) => {
             if tantivy_schema.get_field(&field).is_err() {
@@ -591,7 +577,6 @@ async fn search_tantivy_index(
             TantivyResult::MultiHistogram(multi_histogram)
         }
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
-        TantivyResult::TopNMulti(top_n) => TantivyResult::TopNMulti(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
@@ -621,7 +606,7 @@ async fn search_tantivy_index(
                 ));
             }
             percent = row_ids_percent;
-            let max_doc_id = *row_ids.iter().max().unwrap_or(&0) as i64;
+            let max_doc_id = row_ids.iter().copied().max().unwrap_or(0) as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {max_doc_id} is out of range, records {}",
@@ -689,7 +674,6 @@ fn get_cache_entry(tantivy_result: TantivyResult, percent: f64, parquet_rows: us
             CacheEntry::MultiHistogram(multi_histogram)
         }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
-        TantivyResult::TopNMulti(top_n) => CacheEntry::TopNMulti(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
         TantivyResult::RowIds(_) => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")

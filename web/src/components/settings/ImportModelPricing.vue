@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('modelPricing.importTitle')"
     test-prefix="model-pricing"
     :is-importing="isImporting"
-    container-class="o2-custom-bg"
+    container-class=""
     container-style="height: calc(100vh - 50px);"
     :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 306px)',
-      outputContainer: 'calc(100vh - 128px)',
+      urlEditor: 'calc(100vh - 285px)',
+      fileEditor: 'calc(100vh - 282px)',
+      outputContainer: 'calc(100vh - 110px)',
       errorReport: 'calc(100vh - 128px)',
     }"
     :tabs="allTabs"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 400px;">
+      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
           class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('modelPricing.errorValidations') }}
         </div>
         <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="tw:mr-4 tw:mt-4" />
         <div class="error-report-container">
           <!-- Model Pricing Errors Section -->
           <div

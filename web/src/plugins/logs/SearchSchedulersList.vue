@@ -1,29 +1,13 @@
 ﻿<template>
-  <div
-   class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-1"
-  >
-    <div v-if="!showSearchResults" class="tw:h-full">
-       <div class="tw:flex tw:justify-between tw:items-center tw:h-[68px] card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:items-center tw:py-2 tw:pl-3">
-          <div
-            data-test="search-scheduler-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer"
-            style="
-              border: 1.5px solid;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-            "
-            title="Go Back"
-            @click="closeSearchHistory"
-          >
-            <OIcon name="arrow-back-ios-new" size="xs" />
-          </div>
-          <div class="tw:text-xl tw:font-semibold tw:font-[600]" data-test="search-scheduler-title">
-            {{ t('search_scheduler_job.title') }}
-          </div>
-        </div>
-        <div class="tw:flex tw:items-center tw:py-2 tw:pr-3">
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+    <div v-if="!showSearchResults" class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
+      <AppPageHeader
+        :title="t('search_scheduler_job.title')"
+        icon="schedule"
+        :back="{ onClick: closeSearchHistory }"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #actions>
           <div>
             <OButton
               variant="primary"
@@ -36,12 +20,11 @@
               {{ t('search_scheduler_job.get_jobs') }}
             </OButton>
           </div>
-        </div>
-      </div>
-
-   <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-      <div class=" tw:h-[calc(100vh - var(--navbar-height) - 95px)] card-container">
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
           <OTable
+            :frame="false"
             data-test="search-scheduler-table"
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
@@ -51,9 +34,9 @@
             expansion="single"
             :expand-on-row-click="true"
             v-model:expanded-ids="expandedIds"
-            style="height: calc(100vh - var(--navbar-height) - 95px); overflow-y: auto;"
             @update:expanded-ids="onExpandedIdsChange"
             :show-global-filter="false"
+            :default-columns="false"
           >
             <template #cell-status="{ row }">
               <div class="status-cell">
@@ -211,8 +194,8 @@
               </div>
             </template>
             <template #empty>
-              <div class="tw:flex tw:mx-auto">
-                <NoData />
+              <div v-if="!isLoading" class="tw:flex tw:w-full">
+                <OEmptyState size="hero" preset="no-search-jobs" />
               </div>
             </template>
           </OTable>
@@ -231,11 +214,10 @@
           v-model="confirmCancel"
         />
       </div>
-      </div>
     </div>
   </div>
 
-  <!-- Show NoData component if there's no data to display -->
+  <!-- Empty state is rendered via OEmptyState in the table #empty slot -->
 </template>
 <script lang="ts">
 
@@ -261,13 +243,14 @@ import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
 import { formatDate } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
@@ -275,6 +258,7 @@ import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -283,7 +267,7 @@ export default defineComponent({
   name: "SearchSchedulersList",
   components: {
     DateTime,
-    NoData,
+    OEmptyState,
     OTable,
     TenstackTable,
     ConfirmDialog,
@@ -295,6 +279,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OIcon,
+    AppPageHeader,
 },
   props: {
     isClicked: {
@@ -360,11 +345,11 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: 200, meta: { align: "left" } },
-        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: 200, meta: { align: "left" } },
-        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: 200, meta: { align: "left" } },
-        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: 100, meta: { align: "left" } },
-        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: 200, meta: { align: "left" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
+        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
+        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: COL.duration, meta: { align: "left" } },
+        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: COL.status, meta: { align: "left" } },
         { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
       ];
     };
@@ -684,7 +669,7 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
-        if (value == true && !isLoading.value) {
+        if (value && !isLoading.value) {
           fetchSearchHistory();
         }
       },

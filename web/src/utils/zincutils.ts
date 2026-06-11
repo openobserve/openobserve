@@ -520,6 +520,15 @@ export const convertToTitleCase = (str: string) => {
     .join(" ");
 };
 
+/**
+ * Truncate text to a maximum length, appending an ellipsis when cut.
+ * The returned string never exceeds maxLength characters (ellipsis included).
+ */
+export const truncateText = (text: string, maxLength: number): string => {
+  if (!text || text.length <= maxLength) return text;
+  return `${text.slice(0, Math.max(maxLength - 1, 0))}…`;
+};
+
 export const verifyOrganizationStatus = (Organizations: any, Router: any) => {
   // for (const org of Organizations) {
   //   if (org.status == "pending-subscription") {

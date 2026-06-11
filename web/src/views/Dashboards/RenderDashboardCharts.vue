@@ -18,8 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="card-container"
-    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
+    class="tw:bg-surface-base"
+    :class="[
+      frame ? 'tw:border tw:border-border-default tw:rounded-xl' : '',
+      store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto',
+    ]"
   >
     <div class="tw:px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
@@ -137,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else ref="gridStackContainer" class="grid-stack">
+        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -392,6 +395,13 @@ export default defineComponent({
     simplifiedPanelView: {
       type: Boolean,
       default: false,
+    },
+    /** Draws the component's own bordered card. Set false when embedded inside
+     *  an already-bordered container (e.g. the dashboard view page card) to
+     *  avoid a double border. */
+    frame: {
+      type: Boolean,
+      default: true,
     },
   },
 
@@ -1010,6 +1020,18 @@ export default defineComponent({
         await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
+    );
+
+    watch(
+      () => panels.value.length,
+      async (newLen, oldLen) => {
+        // When panels are added to a previously-empty tab the grid-stack element
+        // is freshly mounted (v-else-if), so GridStack must be re-initialized.
+        if (newLen > 0 && oldLen === 0) {
+          await nextTick();
+          await refreshGridStack();
+        }
+      },
     );
 
     // Initialize GridStack when component is mounted
