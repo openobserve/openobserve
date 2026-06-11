@@ -338,6 +338,7 @@ describe("SearchResult", () => {
         "run-query",
         "widen-range",
         "remove-filter",
+        "error-only-toggled",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
