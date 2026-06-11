@@ -47,12 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
               </span>
-              <a
-                class="tw:cursor-pointer tw:text-xs tw:underline"
+              <OButton
+                variant="outline"
+                size="xs"
                 :class="filterApplied ? 'text-primary' : ''"
                 @click="clearAll()"
-                >{{ t("nodes.clear_all") }}</a
-              >
+              >{{ t("nodes.clear_all") }}</OButton>
             </div>
           </div>
 
