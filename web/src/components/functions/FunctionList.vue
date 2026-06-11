@@ -19,38 +19,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="function-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]">
-              {{ t("function.header") }}
-            </div>
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OSearchInput
-                data-test="functions-list-search-input"
-                v-model="filterQuery"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('function.search')"
-              />
-              <OButton
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                data-test="function-list-add-function-btn"
-                @click="showAddUpdateFn({})"
-              >
-                {{ t(`function.add`) }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('function.header')"
+        icon="function"
+        :subtitle="'Reusable VRL functions applied in pipelines'"
+        tabs-below
+        class="tw:shrink-0 tw:px-4"
+      >
+        <template #tabs>
+          <PipelineSectionTabs />
+        </template>
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm"
+            data-test="function-list-add-function-btn"
+            @click="showAddUpdateFn({})"
+          >
+            {{ t(`function.add`) }}
+          </OButton>
+        </template>
+      </AppPageHeader>
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <div class="card-container tw:h-full">
           <OTable
+            :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
@@ -61,11 +58,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
             :show-global-filter="false"
+            :default-columns="false"
             width="100%"
             class="tw:w-full tw:h-full"
           >
+              <template #toolbar>
+                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <OSearchInput
+                    data-test="functions-list-search-input"
+                    v-model="filterQuery"
+                    class="tw:flex-1"
+                    :placeholder="t('function.search')"
+                  />
+                </div>
+              </template>
               <template #empty>
-                <NoData />
+                <OEmptyState
+                  size="hero"
+                  preset="no-functions"
+                  :filtered="!!filterQuery"
+                  @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn({}))"
+                />
               </template>
 
               <template #cell-name="{ row, value }">
@@ -124,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
     </div>
-    <div v-else>
+    <div v-else class="tw:flex-1 tw:min-h-0">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
@@ -196,6 +209,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
 import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
@@ -204,15 +218,18 @@ import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "functionList",
   components: {
+    OEmptyState,
+    AppPageHeader,
+    PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
     NoData,
@@ -252,7 +269,7 @@ export default defineComponent({
         header: "#",
         accessorKey: "#",
         sortable: false,
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {

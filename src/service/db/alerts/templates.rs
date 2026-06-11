@@ -165,9 +165,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, TemplateError> {
             .into_iter()
             .filter_map(|(k, template)| {
                 let is_org_template = k.starts_with(&format!("{org_id}/"));
-                // do not return default org's template for cloud version
-                let is_default_template =
-                    !cfg!(feature = "cloud") && k.starts_with(&format!("{DEFAULT_ORG}/"));
+                let is_default_template = k.starts_with(&format!("{DEFAULT_ORG}/"));
                 (is_org_template || is_default_template).then_some(template)
             })
             .sorted_by(|a, b| a.name.cmp(&b.name))

@@ -569,6 +569,9 @@ test.describe("Cross-Linking testcases", () => {
         await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType("table");
         await pm.chartTypeSelector.selectStream(STREAM_NAME);
+        // Remove the auto-seeded histogram(_timestamp) x so kubernetes_container_name
+        // is the first column — the cross-link drilldown clicks the first cell.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
         await pm.dashboardPanelActions.addPanelName("CrossLink Table Panel");
         await pm.dashboardPanelActions.savePanel();
@@ -1414,6 +1417,9 @@ test.describe("Cross-Linking testcases", () => {
         await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType("table");
         await pm.chartTypeSelector.selectStream(STREAM_NAME);
+        // Remove the auto-seeded histogram(_timestamp) x so kubernetes_container_name
+        // is the first column — the cross-link drilldown clicks the first cell.
+        await pm.chartTypeSelector.removeField("x_axis_1", "x");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
         await pm.dashboardPanelActions.addPanelName("Org CrossLink Table Panel");
         await pm.dashboardPanelActions.savePanel();

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -40,13 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="20"
       sorting="client"
       filter-mode="client"
+      :default-columns="false"
       :show-global-filter="false"
       class="tw:h-full"
     >
       <!-- Status column -->
       <template #cell-status="{ row }">
         <div class="tw:flex tw:items-center tw:gap-2">
-          <OBadge :variant="statusColor(row)" data-test="anomaly-detection-status-badge">
+          <OBadge :variant="statusColor(row)" dot data-test="anomaly-detection-status-badge">
             {{ statusLabel(row) }}
             <OSpinner
               v-if="row.status === 'training'"
@@ -149,9 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty state -->
       <template #empty>
-        <div class="tw:w-full tw:text-center tw:py-12 tw:text-gray-400">
-          {{ t("alerts.noDestinations") }}
-        </div>
+        <OEmptyState size="hero" preset="no-anomaly-configs" hide-action />
       </template>
     </OTable>
 
@@ -248,13 +247,15 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "AnomalyDetectionList",
-  components: { OBadge, OButton, ODialog, OIcon, OSpinner, OTable, OTooltip },
+  components: { OBadge, OButton, ODialog, OEmptyState, OIcon, OSpinner, OTable, OTooltip },
 
   props: {
     org_identifier: {
@@ -283,16 +284,16 @@ export default defineComponent({
     const cancellingId = ref<string | null>(null);
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: 50, meta: { align: "left" } },
-      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, meta: { align: "left" } },
-      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, meta: { align: "left" } },
-      { id: "status", header: "Status", accessorKey: "status", sortable: true, meta: { align: "left" } },
-      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, meta: { align: "left" } },
-      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, meta: { align: "left" } },
-      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, meta: { align: "left" } },
-      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, meta: { align: "left" } },
-      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, meta: { align: "left" } },
-      { id: "actions", header: t("alerts.actions"), accessorKey: "actions", size: 140, meta: { align: "center" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
+      { id: "name", header: t("alerts.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
+      { id: "stream", header: "Stream", accessorKey: "stream_name", sortable: true, size: COL.streamName, meta: { align: "left" } },
+      { id: "status", header: "Status", accessorKey: "status", sortable: true, size: COL.status, meta: { align: "left" } },
+      { id: "detection_window", header: "Look back window", accessorKey: "detection_window_seconds", sortable: true, size: COL.duration, meta: { align: "left" } },
+      { id: "check_every", header: t("alerts.frequency"), accessorKey: "schedule_interval", sortable: true, size: COL.frequency, meta: { align: "left" } },
+      { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_detection_run", sortable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_anomaly_detected_at", header: t("alerts.lastSatisfied"), accessorKey: "last_anomaly_detected_at", sortable: true, size: COL.date, meta: { align: "left" } },
+      { id: "last_trained_at", header: "Last Trained At", accessorKey: "training_completed_at", sortable: true, size: COL.date, meta: { align: "left" } },
+      { id: "actions", header: t("alerts.actions"), isAction: true, size: 140, meta: { align: "center" } },
     ];
 
     const displayConfigs = computed(() =>

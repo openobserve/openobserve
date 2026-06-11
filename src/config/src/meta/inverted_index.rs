@@ -24,6 +24,8 @@ pub enum IndexOptimizeMode {
     SimpleHistogram(i64, u64, usize),
     SimpleMultiHistogram(i64, i64, u64, String),
     SimpleTopN(String, usize, bool),
+    /// Two-field GROUP BY with count(*): (field1, field2, limit, ascend)
+    SimpleTopNMulti(Vec<String>, usize, bool),
     SimpleDistinct(String, usize, bool),
 }
 
@@ -40,6 +42,10 @@ impl IndexOptimizeMode {
             }
             IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
                 format!("t(f{field},l:{limit},a:{ascend})")
+            }
+            IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend) => {
+                let fields_str = fields.join(",");
+                format!("tm(f:{fields_str},l:{limit},a:{ascend})")
             }
             IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
                 format!("d(f:{field},l:{limit},a:{ascend})")
@@ -70,6 +76,13 @@ impl std::fmt::Display for IndexOptimizeMode {
             IndexOptimizeMode::SimpleTopN(field, limit, ascend) => {
                 write!(f, "topn(field: {field}, limit: {limit}, ascend: {ascend})")
             }
+            IndexOptimizeMode::SimpleTopNMulti(fields, limit, ascend) => {
+                let fields_str = fields.join(", ");
+                write!(
+                    f,
+                    "topn_multi(fields: [{fields_str}], limit: {limit}, ascend: {ascend})"
+                )
+            }
             IndexOptimizeMode::SimpleDistinct(field, limit, ascend) => {
                 write!(
                     f,
@@ -89,6 +102,9 @@ impl From<cluster_rpc::IdxOptimizeMode> for IndexOptimizeMode {
             Some(cluster_rpc::idx_optimize_mode::Mode::SimpleDistinct(select)) => {
                 IndexOptimizeMode::SimpleDistinct(select.field, select.limit as usize, select.asc)
             }
+            Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(select)) => {
+                IndexOptimizeMode::SimpleTopNMulti(select.fields, select.limit as usize, select.asc)
+            }
             None => panic!("Invalid IndexOptimizeMode"),
         }
     }
@@ -106,6 +122,17 @@ impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
                     },
                 )),
             },
+            IndexOptimizeMode::SimpleTopNMulti(fields, limit, asc) => {
+                cluster_rpc::IdxOptimizeMode {
+                    mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleTopnMulti(
+                        cluster_rpc::SimpleTopNMulti {
+                            fields,
+                            limit: limit as u32,
+                            asc,
+                        },
+                    )),
+                }
+            }
             IndexOptimizeMode::SimpleDistinct(field, limit, asc) => cluster_rpc::IdxOptimizeMode {
                 mode: Some(cluster_rpc::idx_optimize_mode::Mode::SimpleDistinct(
                     cluster_rpc::SimpleDistinct {

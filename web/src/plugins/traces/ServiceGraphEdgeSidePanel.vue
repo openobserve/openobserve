@@ -1007,7 +1007,7 @@ export default defineComponent({
 
         .traffic-value {
           font-size: 16px;
-          font-weight: 800;
+          font-weight: 700;
           letter-spacing: -0.02em;
           line-height: 1;
         }

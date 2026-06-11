@@ -17,74 +17,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
-    <!-- Header bar -->
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]"
+    <!-- Standard section header: title + section tabs + actions. -->
+    <AppPageHeader
+      :title="t('evalTemplate.header')"
+      icon="fact-check"
+      :subtitle="'Reusable scoring templates for LLM evaluations'"
+      tabs-below
+      class="tw:shrink-0 tw:px-4"
+    >
+      <template #title>
+        <span data-test="eval-template-list-title">{{ t("evalTemplate.header") }}</span>
+      </template>
+      <template #tabs>
+        <PipelineSectionTabs />
+      </template>
+      <template #actions>
+        <OButton
+          data-test="eval-template-list-refresh-btn"
+          variant="outline"
+          size="sm"
+          @click="loadTemplates"
         >
-          <div
-            class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-            data-test="eval-template-list-title"
-          >
-            {{ t("evalTemplate.header") }}
-          </div>
-
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-            <!-- Search input -->
-            <OSearchInput
-              data-test="eval-template-list-search-input"
-              v-model="filterQuery"
-              class="tw:ml-2 tw:w-[200px]"
-              :placeholder="t('evalTemplate.search')"
-            />
-
-            <!-- Refresh button -->
-            <OButton
-              data-test="eval-template-list-refresh-btn"
-              variant="outline"
-              size="sm"
-              class="tw:ml-2"
-              @click="loadTemplates"
-            >
-              {{ t('common.refresh') }}
-            </OButton>
-
-            <!-- Add button -->
-            <OButton
-              data-test="eval-template-list-add-btn"
-              variant="primary"
-              size="sm"
-              class="tw:ml-2"
-              @click="goToCreate"
-            >
-              {{ t('evalTemplate.newTemplate') }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+          {{ t('common.refresh') }}
+        </OButton>
+        <OButton
+          data-test="eval-template-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="goToCreate"
+        >
+          {{ t('evalTemplate.newTemplate') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
 
     <!-- Table area -->
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
         <OTable
+          :frame="false"
           data-test="eval-template-list-table"
           :data="rows"
           :columns="columns"
           row-key="id"
           :loading="isLoading"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
           :show-global-filter="false"
+          filter-mode="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
           selection="multiple"
           v-model:selected-ids="selectedIds"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="pipelines-evaluation-templates"
           width="100%"
           class="tw:w-full tw:h-full"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                data-test="eval-template-list-search-input"
+                v-model="filterQuery"
+                class="tw:flex-1"
+                :placeholder="t('evalTemplate.search')"
+              />
+            </div>
+          </template>
           <!-- Version column -->
           <template #cell-version="{ row }">
             <span class="eval-version-badge">v{{ row.version }}</span>
@@ -116,7 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Empty state -->
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-eval-templates"
+              :filtered="!!filterQuery"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : goToCreate())
+              "
+            />
           </template>
 
           <!-- Pagination footer -->
@@ -172,11 +181,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { evalTemplateService } from "@/services/eval-template.service";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Template {
@@ -211,13 +223,20 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.name"),
     accessorKey: "name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    resizable: true,
+    hideable: true,
+    size: COL.name,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "response_type",
     header: t("evalTemplate.responseType"),
     accessorKey: "response_type",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -225,6 +244,9 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.version,
     meta: { align: "center" },
   },
   {
@@ -232,6 +254,9 @@ const columns = ref<OTableColumnDef<Template>[]>([
     header: t("common.updated_at"),
     accessorKey: "updated_at",
     sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.updatedAt,
     meta: {
       align: "left",
       format: (val: number) =>
@@ -387,7 +412,7 @@ onBeforeMount(async () => {
   align-items: center;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   border: 1px solid var(--o2-border-color, rgba(0, 0, 0, 0.15));
   color: var(--q-color-text);

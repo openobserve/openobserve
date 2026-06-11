@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       :data="error.events || []"
       :columns="columns || []"
+      :default-columns="false"
       row-key="index"
       pagination="none"
       :show-global-filter="false"
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OTable from "@/lib/core/Table/OTable.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { ref } from "vue";
 import ErrorEventDescription from "@/components/rum/errorTracking/view/ErrorEventDescription.vue";
 import { formatDate } from "@/utils/date";
@@ -72,6 +74,7 @@ const columns = ref<OTableColumnDef[]>([
     header: t("rum.category"),
     accessorFn: (row: any) => getErrorCategory(row),
     sortable: true,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -80,13 +83,14 @@ const columns = ref<OTableColumnDef[]>([
     accessorKey: "description",
     cell: " ",
     sortable: true,
-    size: 200,
-    meta: { align: "left", cellClass: "description-column" },
+    size: COL.description,
+    meta: { align: "left", cellClass: "description-column", autoWidth: true },
   },
   {
     id: "level",
     header: t("rum.level"),
     accessorFn: (row: any) => (row["type"] === "error" ? "error" : "info"),
+    size: COL.status,
     meta: { align: "left", cellClass: "error-level" },
   },
   {
@@ -94,6 +98,7 @@ const columns = ref<OTableColumnDef[]>([
     header: t("rum.timestamp"),
     accessorFn: (row: any) => getFormattedDate(row["_timestamp"] / 1000),
     sortable: true,
+    size: COL.date,
     meta: { align: "left" },
   },
 ]);

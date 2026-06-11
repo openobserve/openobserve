@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         data-cy="syntax-guide-button"
         data-test="metrics-syntax-guide-button"
-        variant="ghost"
-        size="sm-action"
-        class="syntax-guide-button"
+        variant="outline"
+        size="sm-toolbar"
         :class="sqlmode ? 'sql-mode' : 'normal-mode'"
       >
         <OIcon name="help" size="sm" />
@@ -166,24 +165,6 @@ export default defineComponent({
 }
 .q-btn:before {
   border: 0px solid #d5d5d5;
-}
-
-.syntax-guide-button {
-  cursor: pointer;
-  text-transform: capitalize;
-  padding: 5px 5px;
-  height: 30px;
-  font-weight: 600;
-  border: 1px solid rgba(89, 96, 178, 0.3);
-}
-
-.normal-mode {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.sql-mode {
-  background-color: rgba(89, 96, 178, 0.8);
-  color: #ffffff;
 }
 
 .syntax-guide-title {

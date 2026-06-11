@@ -79,6 +79,7 @@ pub(crate) mod sql;
 pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
+pub(crate) mod tantivy;
 pub(crate) mod utils;
 pub(crate) mod work_group;
 

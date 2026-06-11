@@ -19,59 +19,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="enrichment-tables-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
     <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
-      <div class="tw:shrink-0">
-        <div class="card-container tw:mb-[0.625rem]">
-          <div class="tw:flex tw:justify-between tw:items-center tw:py-3 tw:px-4 tw:h-[68px]">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="enrichment-tables-list-title">
-              {{ t("function.enrichmentTables") }}
-            </div>
-            <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center">
-              <OToggleGroup
-                :model-value="selectedFilter"
-                @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
-                class="tw:mr-2"
-                data-test="enrichment-tables-list-tabs"
-              >
-                <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                  {{ t("function.filterAll") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
-                  <template #icon-left><OIcon name="upload" size="sm" /></template>
-                  {{ t("function.filterFile") }}
-                </OToggleGroupItem>
-                <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
-                  <template #icon-left><OIcon name="link" size="sm" /></template>
-                  {{ t("function.filterUrl") }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-
-              <OSearchInput
-                data-test="enrichment-tables-search-input"
-                v-model="filterQuery"
-                class="tw:ml-2 tw:w-[200px]"
-                :placeholder="t('function.searchEnrichmentTable')"
-              />
-              <OButton
-                data-test="enrichment-tables-add-btn"
-                class="tw:ml-2"
-                variant="primary"
-                size="sm"
-                @click="showAddUpdateFn(null)"
-              >
-                {{ t(`function.addEnrichmentTable`) }}
-              </OButton>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+      <!-- Standard section header: title + actions only. Type filter + search
+           moved into the table's own toolbar below. -->
+      <AppPageHeader
+        :title="t('function.enrichmentTables')"
+        icon="dataset"
+        :subtitle="'Lookup tables that enrich ingested data'"
+        tabs-below
+        class="tw:shrink-0 tw:px-4"
+      >
+        <template #tabs>
+          <PipelineSectionTabs />
+        </template>
+        <template #actions>
+          <OButton
+            data-test="enrichment-tables-add-btn"
+            variant="primary"
+            size="sm"
+            @click="showAddUpdateFn(null)"
+          >
+            {{ t(`function.addEnrichmentTable`) }}
+          </OButton>
+        </template>
+      </AppPageHeader>
+      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
         <div class="card-container tw:h-full">
             <OTable
               ref="qTable"
+              :frame="false"
               data-test="enrichment-tables-list-table"
               :data="visibleRows"
               :columns="columns"
@@ -83,14 +61,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               sorting="client"
               filter-mode="client"
               :show-global-filter="false"
+              :default-columns="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="pipelines-enrichment-tables"
               selection="multiple"
               :selected-ids="selectedEnrichmentTableIds"
               @update:selected-ids="handleSelectedIdsUpdate"
               width="100%"
               class="tw:w-full tw:h-full"
             >
+              <!-- Toolbar: type filter + search -->
+              <template #toolbar>
+                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                  <OToggleGroup
+                    :model-value="selectedFilter"
+                    @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
+                    data-test="enrichment-tables-list-tabs"
+                  >
+                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                      <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                      {{ t("function.filterAll") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                      <template #icon-left><OIcon name="upload" size="sm" /></template>
+                      {{ t("function.filterFile") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                      <template #icon-left><OIcon name="link" size="sm" /></template>
+                      {{ t("function.filterUrl") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                  <OSearchInput
+                    data-test="enrichment-tables-search-input"
+                    v-model="filterQuery"
+                    class="tw:ml-auto tw:w-64"
+                    :placeholder="t('function.searchEnrichmentTable')"
+                  />
+                </div>
+              </template>
               <template #empty>
-                <NoData />
+                <OEmptyState
+                  size="hero"
+                  preset="no-enrichment-tables"
+                  :filtered="!!filterQuery"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? (filterQuery = '')
+                        : showAddUpdateFn(null)
+                  "
+                />
               </template>
               <template #cell-type="{ row }">
                 <div
@@ -298,6 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OBadge
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
+                    dot
                     :variant="job.status === 'completed' ? 'success' : job.status === 'failed' ? 'error' : job.status === 'processing' ? 'primary' : 'default'"
                   >
                     {{ job.status }}
@@ -330,7 +352,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -350,17 +372,22 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
+    AppPageHeader,
+    PipelineSectionTabs,
     AddEnrichmentTable,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     EnrichmentSchema,
     OToggleGroup,
@@ -400,12 +427,12 @@ export default defineComponent({
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: 67, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, meta: { align: "left", autoWidth: true } },
-      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
-      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: 150 },
-      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: 150 },
-      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: 150 },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
+      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
+      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.count },
+      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
+      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
       { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
     ];
 

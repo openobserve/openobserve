@@ -17,7 +17,7 @@
 
     <div class="ev-empty__desc">{{ description }}</div>
 
-    <div v-if="chips.length" class="ev-empty__chips">
+    <div v-if="chips && chips.length" class="ev-empty__chips">
       <span
         v-for="(chip, idx) in chips"
         :key="idx"
@@ -29,15 +29,22 @@
       </span>
     </div>
 
-    <OButton
-      :data-test="ctaDataTest"
-      variant="primary"
-      size="md"
-      class="ev-empty__btn"
-      @click="$emit('create')"
-    >
-      {{ ctaLabel }}
-    </OButton>
+    <!-- Actions row is rendered only when there's something to show
+         (either a primary CTA or a secondary slot). Pure informational
+         empty states (e.g. "no data in window") pass neither. -->
+    <div v-if="ctaLabel || $slots.secondary" class="ev-empty__actions">
+      <OButton
+        v-if="ctaLabel"
+        :data-test="ctaDataTest"
+        variant="primary"
+        size="md"
+        class="ev-empty__btn"
+        @click="$emit('create')"
+      >
+        {{ ctaLabel }}
+      </OButton>
+      <slot name="secondary" />
+    </div>
   </div>
 </template>
 
@@ -57,9 +64,10 @@ defineProps<{
   icon: string;
   title: string;
   description: string;
-  chips: EmptyStateChip[];
-  ctaLabel: string;
-  ctaDataTest: string;
+  chips?: EmptyStateChip[];
+  /** Omit to render an informational empty state with no CTA. */
+  ctaLabel?: string;
+  ctaDataTest?: string;
 }>();
 
 defineEmits<{ (e: "create"): void }>();
@@ -154,6 +162,12 @@ const isDark = computed(() => store.state.theme === "dark");
       background: rgba(255, 255, 255, 0.06);
       border-color: rgba(255, 255, 255, 0.1);
     }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   &__btn {

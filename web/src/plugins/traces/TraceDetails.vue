@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container tw:border-b tw:border-border-default">
         <!-- New Modern Header -->
         <header
-          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)] tw:pl-1"
         >
           <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
@@ -217,6 +217,7 @@ size="xs"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
+              class="tw:mr-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -234,11 +235,11 @@ size="xs"
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.25rem]"
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.325rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
-              @update:model-value="activeTab = $event as string"
+              @update:model-value="updateActiveTab"
             >
               <OToggleGroupItem value="waterfall" size="sm">
                 <template #icon-left
@@ -701,26 +702,38 @@ size="xs"
               </div>
             </div>
 
-            <!-- Map View Placeholder -->
+            <!-- Map View with Pattern/Span Toggle -->
             <div
               v-if="activeTab === 'map'"
               style="
                 display: flex;
                 flex: 1;
                 min-height: 0;
-                align-items: center;
-                justify-content: center;
+                flex-direction: column;
               "
+              class="tw:w-full tw:h-full"
             >
+              <!-- Chart Container -->
               <div
-                style="text-align: center"
-                class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                style="
+                  display: flex;
+                  flex: 1;
+                  min-height: 0;
+                  align-items: center;
+                  justify-content: center;
+                "
               >
-                <ChartRenderer
-                  data-test="trace-details-service-map-chart"
-                  :data="traceServiceMap"
-                  class="trace-chart-height tw:h-full! tw:w-full!"
-                />
+                <div
+                  style="text-align: center"
+                  class="tw:w-full tw:h-full tw:p-[0.625rem]"
+                >
+                  <ChartRenderer
+                    ref="chartRendererRef"
+                    data-test="trace-details-service-map-chart"
+                    :data="traceServiceMapChartOptions"
+                    class="trace-chart-height tw:h-full! tw:w-full!"
+                  />
+                </div>
               </div>
             </div>
 
@@ -794,6 +807,7 @@ import {
   onBeforeMount,
   nextTick,
   computed,
+  provide,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -820,6 +834,10 @@ import {
 import { getAllSpanColors } from "@/utils/traces/traceColors";
 import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
+import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
+import { useTracePatternTree } from "@/composables/useTracePatternTree";
+import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
+import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
 import {
   SPAN_KIND_MAP,
   SPAN_KIND_UNSPECIFIED,
@@ -858,6 +876,17 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import {
+  useServiceCorrelation,
+  type KeyFieldsConfig,
+} from "@/composables/useServiceCorrelation";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
@@ -977,6 +1006,10 @@ export default defineComponent({
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
   setup(props, { emit }) {
+    const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
+    provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
+
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
     const activeTab = ref("waterfall");
@@ -990,6 +1023,8 @@ export default defineComponent({
       navigateToCorrelatedLogs,
     } = useTraces();
 
+    const { loadKeyFields } = useServiceCorrelation();
+
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -998,6 +1033,13 @@ export default defineComponent({
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
     const { getStreams, getStream } = useStreams();
+
+    // Chart renderer ref for tooltip integration
+    const chartRendererRef = ref<any>(null);
+
+    // Tooltip lifecycle management
+    let tooltipCleanup: (() => void) | null = null;
+    let pendingTooltipSetup: ReturnType<typeof setTimeout> | null = null;
 
     // AI copilot context provider for trace details page
     const setupContextProvider = () => {
@@ -1012,6 +1054,47 @@ export default defineComponent({
     };
 
     const traceServiceMap: any = ref({});
+
+    // Pattern View - new functionality
+    const consolidatedPatterns = ref(new Map());
+    const isDarkMode = computed(() => store.state.theme === 'dark');
+
+    // Set up pattern tree composable and visualization engine
+    const { generateEChartsOptions } = createTreeVisualizationEngine();
+    const {
+      treeData: patternTreeData,
+      getNodeLabel: getPatternNodeLabel,
+      getNodeTooltip: getPatternNodeTooltip,
+      getNodeErrorRate: getPatternNodeErrorRate
+    } = useTracePatternTree(consolidatedPatterns, isDarkMode);
+
+    // Computed chart options that switches between pattern and span views
+    const traceServiceMapChartOptions = computed(() => {
+        // Pattern view - use new pattern-based visualization
+        const chartOptions = generateEChartsOptions(
+          {
+            treeData: patternTreeData.value,
+            getNodeLabel: getPatternNodeLabel,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate,
+            getNodeServiceColor: (node: any) =>
+              searchObj.meta.serviceColors[node.name]
+          },
+          {
+            layoutType: 'horizontal',
+            isDarkMode: isDarkMode.value,
+            nodeSize: 'fixed'
+          }
+        );
+
+        // Wrap in the format expected by ChartRenderer
+        return {
+          options: chartOptions,
+          notMerge: true,
+          lazyUpdate: true
+        };
+    });
+
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -1448,6 +1531,40 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const updateActiveTab = (tab: string) => {
+      activeTab.value = tab;
+      if(tab === 'map') {
+        setupTooltips();
+      }
+    }
+
+    const setupTooltips = async () => {
+      // Cleanup existing tooltips
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+
+      await nextTick();
+      // 300ms delay matches Service Graph tooltip setup timing
+      pendingTooltipSetup = setTimeout(() => {
+        pendingTooltipSetup = null;
+        const chart = chartRendererRef.value?.chart;
+        if (chart) {
+          const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+          tooltipCleanup = setupTraceNodeTooltips(chart, {
+            treeData: patternTreeData.value,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate
+          }, isDarkMode.value);
+        }
+      }, 300);
+    }
+    
     const backgroundStyle = computed(() => {
       return {
         background: store.state.theme === "dark" ? "#181a1b" : "#ffffff",
@@ -1557,8 +1674,12 @@ export default defineComponent({
       await getTraceMeta();
     };
 
-    onMounted(() => {
+    onMounted(async () => {
       setupContextProvider();
+
+      const keyFields: KeyFieldsConfig = await loadKeyFields();
+      serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
+
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         updateSelectedSpan(params.span_id as string);
@@ -1571,6 +1692,16 @@ export default defineComponent({
 
     onUnmounted(() => {
       cleanupContextProvider();
+
+      // Tooltip cleanup
+      if (pendingTooltipSetup) {
+        clearTimeout(pendingTooltipSetup);
+        pendingTooltipSetup = null;
+      }
+      if (tooltipCleanup) {
+        tooltipCleanup();
+        tooltipCleanup = null;
+      }
     });
 
     // watch(
@@ -1936,7 +2067,7 @@ export default defineComponent({
 
         const span = formattedSpanMap[spanList.value[i].span_id];
 
-        span.style.color = searchObj.meta.serviceColors[span.serviceName];
+        span.style.color = getOrSetServiceColor(span.resolvedIdentity);
 
         span.style.backgroundColor = adjustOpacity(span.style.color, 0.2);
 
@@ -1968,8 +2099,9 @@ export default defineComponent({
       traceTree.value[0].lowestStartTime =
         convertTimeFromNsToUs(lowestStartTime);
       traceTree.value[0].highestEndTime = convertTimeFromNsToUs(highestEndTime);
-      traceTree.value[0].style.color =
-        searchObj.meta.serviceColors[traceTree.value[0].serviceName];
+      traceTree.value[0].style.color = getOrSetServiceColor(
+        traceTree.value[0].resolvedIdentity,
+      );
 
       traceTree.value.forEach((span: any) => {
         addSpansPositions(span, 0);
@@ -1986,6 +2118,8 @@ export default defineComponent({
       buildServiceTree();
       flatSpans.value = useTraceProcessing(
         treeForFlameGraph as any,
+        spanMap as any,
+        serviceDetectionConfig,
       ).flatSpans.value;
 
       // After the tree is built, scroll the pre-selected span into view (e.g.
@@ -2063,15 +2197,16 @@ export default defineComponent({
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        if (serviceName !== span.serviceName) {
+        const serviceIdentity = span.resolvedIdentity || span.serviceName || 'unknown';
+        if (serviceName !== serviceIdentity) {
           const children: any[] = [];
           currentColumn.push({
-            name: `${span.serviceName} \n (${span.durationMs}ms)`,
+            name: `${serviceIdentity} \n (${span.durationMs}ms)`,
             parent: serviceName,
             duration: span.durationMs,
             children: children,
             itemStyle: {
-              color: searchObj.meta.serviceColors[span.serviceName],
+              color: getOrSetServiceColor(span.resolvedIdentity),
             },
             emphasis: {
               disabled: true,
@@ -2079,7 +2214,7 @@ export default defineComponent({
           });
           if (span.spans && span.spans.length) {
             span.spans.forEach((_span: any) =>
-              getService(_span, children, span.serviceName, depth + 1, height),
+              getService(_span, children, serviceIdentity, depth + 1, height),
             );
           } else {
             if (maxDepth < depth) maxDepth = depth;
@@ -2100,6 +2235,12 @@ export default defineComponent({
       traceTree.value.forEach((span: any) => {
         getService(span, serviceTree, "", 1, 1);
       });
+
+      // Build consolidated patterns for pattern view
+      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
+      // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
+      // Pattern consolidation completed successfully
 
       traceServiceMap.value = convertTraceServiceMapData(
         cloneDeep(serviceTree),
@@ -2166,6 +2307,7 @@ export default defineComponent({
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
+        resolvedIdentity: resolveSpanIdentity(span),
       };
     };
 
@@ -2700,6 +2842,8 @@ export default defineComponent({
       traceChart,
       updateChart,
       traceServiceMap,
+      traceServiceMapChartOptions,
+      chartRendererRef,
       activeVisual,
       traceVisuals,
       getImageURL,
@@ -2800,6 +2944,7 @@ export default defineComponent({
       fetchEvalPipeline,
       fetchEvalData,
       formatLargeNumber,
+      updateActiveTab
     };
   },
 });
@@ -2832,7 +2977,6 @@ $traceChartCollapseHeight: 42px;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding: 0.325rem 0.625rem;
   box-sizing: border-box;
 }
 .histogram-container-full {
@@ -3014,8 +3158,7 @@ html:has(.trace-details) {
   }
 
   .trace-combined-header-wrapper {
-    padding: 0.375rem;
-    margin-bottom: 0.625rem;
+    padding: 0.2rem 0rem;
     flex-shrink: 0;
   }
 

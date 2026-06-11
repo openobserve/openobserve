@@ -11,6 +11,7 @@ import DashboardVariablesScoped from "./dashboardPages/dashboard-variables-scope
 import ChartTypeSelector from "./dashboardPages/dashboard-chart";
 import DashboardSqlAutocomplete from "./dashboardPages/dashboard-sql-autocomplete";
 import DashboardPromQLEditor from "./dashboardPages/dashboard-promql-editor";
+import DashboardMultiSQL from "./dashboardPages/dashboard-multi-sql";
 import DashboardMaxQueryRange from "./dashboardPages/dashboard-max-query-range";
 import DashboardDrilldownPage from "./dashboardPages/dashboard-drilldown";
 import DashboardLegendsCopy from "./dashboardPages/dashboard-legends-copy";
@@ -62,6 +63,8 @@ import { ThemePage } from "./generalPages/themePage.js";
 import { LanguagePage } from "./generalPages/languagePage.js";
 import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
+import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -101,6 +104,7 @@ class PageManager {
     this.chartTypeSelector = new ChartTypeSelector(page);
     this.dashboardSqlAutocomplete = new DashboardSqlAutocomplete(page);
     this.dashboardPromQLEditor = new DashboardPromQLEditor(page);
+    this.dashboardMultiSQL = new DashboardMultiSQL(page);
     this.dashboardMaxQueryRange = new DashboardMaxQueryRange(page);
     this.dashboardDrilldown = new DashboardDrilldownPage(page);
     this.dashboardLegendsCopy = new DashboardLegendsCopy(page);
@@ -155,6 +159,8 @@ class PageManager {
     this.languagePage = new LanguagePage(page);
     this.correlationSettingsPage = new CorrelationSettingsPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
+    this.modelPricingPage = new ModelPricingPage(page);
+    this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.schemaPage = new SchemaPage(page);
     this.schemaLoadPage = new SchemaLoadPage(page);
 

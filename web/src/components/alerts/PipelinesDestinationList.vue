@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,21 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showDestinationEditor" class="tw:flex tw:flex-col tw:h-full">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('pipeline_destinations.header')"
+        icon="person-pin-circle"
+        :subtitle="'External targets for pipeline output'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="alert-destinations-list-title"
-        >
-          {{ t("pipeline_destinations.header") }}
-        </div>
-        <div class="tw:flex tw:justify-end tw:gap-2">
-          <OSearchInput
-            v-model="filterQuery"
-            class="tw:ml-auto"
-            :placeholder="t('pipeline_destinations.search')"
-          />
+        <template #actions>
           <OButton
             data-test="pipeline-destination-list-add-btn"
             variant="primary"
@@ -39,10 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="editDestination(null)"
             >{{ t(`alert_destinations.add`) }}</OButton
           >
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
+        :frame="false"
         data-test="alert-destinations-list-table"
         :data="visibleRows"
         :columns="columns"
@@ -56,11 +50,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :footer-title="t('pipeline_destinations.header')"
         sorting="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-pipeline-destinations"
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <template #toolbar>
+          <OSearchInput
+            v-model="filterQuery"
+            class="tw:flex-1"
+            :placeholder="t('pipeline_destinations.search')"
+          />
+        </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-pipeline-destinations"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
         </template>
 
         <template #cell-destination_type="{ row }">
@@ -152,7 +162,6 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
@@ -167,9 +176,12 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -186,8 +198,9 @@ const formatOutputFormat = (val: any): string => {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    AppPageHeader,
     PipelineDestinationEditor,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     OButton,
     OIcon,
@@ -204,7 +217,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -212,13 +225,19 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "destination_type",
         header: "Destination Type",
         accessorKey: "destination_type_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 150,
         meta: { align: "left" },
       },
@@ -226,6 +245,9 @@ export default defineComponent({
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
+        resizable: true,
+        hideable: true,
+        size: COL.url,
         meta: { align: "left" },
       },
       {
@@ -233,6 +255,8 @@ export default defineComponent({
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 120,
         meta: { align: "left" },
       },
@@ -241,6 +265,8 @@ export default defineComponent({
         header: "Output Format",
         accessorKey: "output_format",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 140,
         meta: { align: "left" },
       },

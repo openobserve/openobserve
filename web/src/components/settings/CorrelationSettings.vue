@@ -16,17 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
-    <!-- Sticky header: title + tabs -->
-    <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]">
-      <div class="tw:px-3 tw:py-3">
-        <div class="general-page-title">
-          {{ t("settings.correlation.title") }}
-        </div>
-        <div class="general-page-subtitle">
-          {{ t("settings.correlation.subtitle") }}
-        </div>
-      </div>
-      <div class="tw:px-4 tw:flex tw:justify-start">
+    <!-- Sticky tabs band (section title is provided full-width by the shell). -->
+    <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]" data-test="correlation-settings-tabs">
+      <div class="tw:px-4 tw:pt-3 tw:flex tw:justify-start">
         <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
           <OTab
             name="services"
@@ -355,14 +347,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.general-page-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.5rem;
-}
-.general-page-subtitle {
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-}
+/* .general-page-title / .general-page-subtitle removed — section title now
+   renders via the standard AppPageHeader. */
 </style>

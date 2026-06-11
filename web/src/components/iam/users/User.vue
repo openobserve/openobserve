@@ -18,53 +18,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
+    <!-- Standard page header: title + actions only. The user search moved into
+         the table's own toolbar (built-in global filter) per the layout system. -->
+    <AppPageHeader
+      :title="t('iam.basicUsers')"
+      :subtitle="'People with access to this organization'"
+      icon="person"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="user-title-text"
+      <template #actions>
+        <member-invitation
+          v-if="config.isCloud == 'true'"
+          :key="currentUserRole"
+          v-model:currentrole="currentUserRole"
+          @invite-sent="handleInviteSent"
+        />
+        <OButton
+          v-else
+          variant="primary"
+          size="sm"
+          @click="addRoutePush({})"
+          data-test="add-basic-user"
         >
-          {{ t("iam.basicUsers") }}
-        </div>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-          <OSearchInput
-              v-model="filterQuery"
-              style="width: 12.5rem"
-              :placeholder="t('user.search')"
-              data-test="iam-users-search-input"
-            />
-          <div v-if="config.isCloud == 'true'">
-            <member-invitation
-              :key="currentUserRole"
-              v-model:currentrole="currentUserRole"
-              @invite-sent="handleInviteSent"
-            />
-          </div>
-          <div class="tw:w-1/2" v-else>
-            <OButton
-              variant="primary"
-              size="sm"
-              class="tw:!h-8"
-              @click="addRoutePush({})"
-              data-test="add-basic-user"
-            >
-              {{ t('user.add') }}
-            </OButton>
-          </div>
-        </div>
-        </div>
-    </div>
+          {{ t('user.add') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
     <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
         <OTable
           :key="tableKey"
+          :frame="false"
           :data="rows"
           :columns="columns"
           row-key="email"
           :loading="loading"
           :selected-ids="selectedUserIds"
-          :global-filter="filterQuery"
+          v-model:global-filter="filterQuery"
+          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -74,11 +65,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
-          :show-global-filter="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('user.search')"
+                data-test="user-list-search-input"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-users"
+              :filtered="!!filterQuery"
+              @action="
+                (id) =>
+                  id === 'clear-filters' ? (filterQuery = '') : addRoutePush({})
+              "
+            />
           </template>
 
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
@@ -134,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="cancel" size="sm" />
             </OButton>
             <OButton
-              v-if="row.enableEdit && row.status != 'pending'"
+              v-if="row.enableEdit && row.status != 'pending' && config.isCloud == 'false'"
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
@@ -171,12 +182,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <add-user
       v-model:open="showAddUserDialog"
+      v-if="config.isCloud == 'false'"
       v-model="selectedUser"
       :isUpdated="isUpdated"
       :userRole="currentUserRole"
       :roles="options"
       :customRoles="customRoles"
-      :isCloud="config.isCloud == 'true'"
       @updated="addMember"
     />
 
@@ -224,7 +235,7 @@ import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -243,7 +254,8 @@ import {
   maskText,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -252,10 +264,12 @@ import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
+    AppPageHeader,
     OTable,
     UpdateUserRole,
     AddUser,
@@ -264,8 +278,8 @@ export default defineComponent({
     OBadge,
     OIcon,
     ODialog,
+    OEmptyState,
     OSearchInput,
-    NoData,
   },
   emits: [
     "updated:fields",
@@ -362,7 +376,7 @@ export default defineComponent({
           id: "#",
           header: "#",
           accessorFn: (row: any) => row["#"],
-          size: 40,
+          size: TABLE_INDEX_COL_SIZE,
           minSize: 32,
           maxSize: 50,
           meta: { compactPadding: true, align: "left" },
@@ -372,23 +386,31 @@ export default defineComponent({
           header: t("user.email"),
           accessorKey: "email",
           sortable: true,
-          meta: { align: "left", autoWidth: true },
+          resizable: true,
+          hideable: true,
+          size: COL.email,
+          minSize: 200,
+          meta: { align: "left", flex: true },
         },
         {
           id: "first_name",
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
-          size: 150,
-          meta: { align: "left" },
+          resizable: true,
+          hideable: true,
+          size: COL.firstName,
+          meta: { align: "left", isName: true },
         },
         {
           id: "last_name",
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
-          size: 150,
-          meta: { align: "left" },
+          resizable: true,
+          hideable: true,
+          size: COL.lastName,
+          meta: { align: "left", isName: true },
         },
       ];
 
@@ -399,7 +421,9 @@ export default defineComponent({
           header: "Auth",
           accessorKey: "auth_type",
           sortable: true,
-          size: 120,
+          resizable: true,
+          hideable: true,
+          size: COL.authType,
           meta: { align: "left" },
         });
       }
@@ -410,7 +434,9 @@ export default defineComponent({
         header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
-        size: 220,
+        resizable: true,
+        hideable: true,
+        size: COL.role,
         meta: { align: "left" },
       });
 
@@ -752,12 +778,6 @@ export default defineComponent({
       // Allow editing for root users only if the current user is root
       if (user.role?.toLowerCase() === "root") {
         return store.state.userInfo.email === user.email;
-      }
-      // Cloud: cannot edit self (same as delete behavior)
-      if (config.isCloud == "true") {
-        return (
-          store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-        );
       }
       // Allow editing for all other users
       return true;

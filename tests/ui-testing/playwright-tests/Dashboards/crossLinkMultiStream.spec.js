@@ -261,6 +261,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await bothSchemasPromise;
 
         // Step 4: Expand a log row
+        // expandFirstLogRow waits up to 30 s for the first row to appear —
+        // UNION ALL queries can be slow to render rows in CI.
         await pm.crossLinkPage.expandFirstLogRow();
 
         // Step 5 & 6: Poll until BOTH cross-links appear (backend merges from both streams).
@@ -336,6 +338,9 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.dashboardCreate.addPanel();
         await pm.chartTypeSelector.selectChartType("table");
         await pm.chartTypeSelector.selectStream(STREAM_A);
+        // Add Panel auto-seeds y_axis_1 = count(_timestamp); remove it to keep
+        // the original single-column table shape (x-axis only).
+        await pm.chartTypeSelector.removeField("y_axis_1", "y");
         await pm.chartTypeSelector.searchAndAddField("kubernetes_container_name", "x");
         await pm.dashboardPanelActions.addPanelName("CrossLink Single Stream Panel");
         await pm.dashboardPanelActions.applyDashboardBtn();

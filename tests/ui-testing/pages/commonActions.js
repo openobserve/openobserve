@@ -21,7 +21,7 @@ export class CommonActions {
         
         // Navigation locators
         this.alertsMenuItem = '[data-test="menu-link-\\/alerts-item"]';
-        this.settingsMenuItem = '[data-test="menu-link-settings-item"]';
+        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.homeMenuItem = '[data-test="menu-link-\\/-item"]';
     }
 
@@ -260,12 +260,12 @@ export class CommonActions {
     async flipStreaming() {
         await this.dismissBlockingOverlays();
         try {
-            await this.page.locator('[data-test="menu-link-settings-item"]').click();
+            await this.page.locator('[data-test="menu-link-/settings-item"]').click();
         } catch {
             await this.page.reload().catch(() => {});
             await this.page.waitForTimeout(300);
             await this.dismissBlockingOverlays();
-            await this.page.locator('[data-test="menu-link-settings-item"]').click();
+            await this.page.locator('[data-test="menu-link-/settings-item"]').click();
         }
         const isOn = await this.getStreamingState();
         await this.page.locator('[data-test="general-settings-enable-streaming"] div').nth(2).click();

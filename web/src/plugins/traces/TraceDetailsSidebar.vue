@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
       data-test="trace-details-sidebar-header"
-      :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"
@@ -789,7 +788,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -847,7 +846,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -876,7 +875,7 @@ import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
@@ -929,6 +928,12 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
+import {
+  TRACE_SERVICE_DETECTION_KEY,
+  useSpanServiceDetection,
+} from "@/utils/traces/useSpanServiceDetection";
+import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 export default defineComponent({
   name: "TraceDetailsSidebar",
@@ -1003,6 +1008,8 @@ export default defineComponent({
     "update:activeTab",
   ],
   setup(props, { emit }) {
+    const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
+    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
@@ -1984,7 +1991,9 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         store.state.theme === "dark",
-        searchObj.meta.serviceColors?.[props.span?.service_name] ?? "#9e9e9e",
+        props.span
+          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
+          : "#9e9e9e",
       ),
     );
 

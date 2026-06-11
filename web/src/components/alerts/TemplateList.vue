@@ -17,42 +17,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <AppPageHeader
+        :title="t('alert_templates.header')"
+        icon="description"
+        :subtitle="'Reusable alert message templates'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-        <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-templates-list-title">
-            {{ t("alert_templates.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v: any) => { activeTab = v; }"
-              data-test="template-list-tabs"
-              class="tw:mr-2"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alert_templates.filterAll") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
-                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-                {{ t("alert_templates.filterPrebuilt") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
-                <template #icon-left><OIcon name="settings" size="sm" /></template>
-                {{ t("alert_templates.filterCustom") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OSearchInput
-              data-test="template-list-search-input"
-              v-model="filterQuery"
-              class="tw:ml-auto"
-              :placeholder="t('template.search')"
-            />
+        <template #actions>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v: any) => { activeTab = v; }"
+            data-test="template-list-tabs"
+            class="tw:mr-2"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("alert_templates.filterAll") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+              {{ t("alert_templates.filterPrebuilt") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+              <template #icon-left><OIcon name="settings" size="sm" /></template>
+              {{ t("alert_templates.filterCustom") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
           <OButton
             variant="outline"
             size="sm-action"
-            class="tw:ml-2"
             @click="importTemplate"
             data-test="template-import"
             >{{ t(`dashboard.import`) }}</OButton
@@ -61,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="template-list-add-btn"
             variant="primary"
             size="sm"
-            class="tw:ml-2"
             @click="editTemplate(null)"
             >{{ t(`alert_templates.add`) }}</OButton
           >
-        </div>
-      </div>
-      <div class="tw:flex-1 tw:min-h-0">
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
+        :frame="false"
         data-test="alert-templates-list-table"
         :data="visibleRows"
         :columns="columns"
@@ -87,8 +81,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <template #toolbar>
+          <OSearchInput
+            v-model="filterQuery"
+            class="tw:flex-1"
+            :placeholder="t('template.search')"
+          />
+        </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-alert-templates"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
         </template>
         <template #cell-name="{ row }">
           <div class="tw:flex tw:items-center tw:gap-2">
@@ -123,7 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tw:ml-1"
             variant="ghost"
             size="icon-sm"
-            :title="t('alert_templates.edit')"
+            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
+            :disabled="row.isPrebuilt"
             @click="editTemplate(row)"
             data-row-action="edit"
           >
@@ -157,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary tw:font-medium">
+          <span class="tw:text-xs tw:text-text-primary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton
@@ -213,7 +221,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
@@ -226,11 +234,13 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -246,7 +256,7 @@ const columns: OTableColumnDef[] = [
     id: "#",
     header: "#",
     accessorKey: "#",
-    size: 67,
+    size: TABLE_INDEX_COL_SIZE,
     meta: { align: "left" },
   },
   {

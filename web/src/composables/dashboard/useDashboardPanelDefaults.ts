@@ -129,6 +129,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       {
         query: "",
         vrlFunctionQuery: "",
+        vrlFunctionFieldList: [],
         customQuery: false,
         joins: [],
         fields: {
@@ -156,6 +157,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
         },
         config: {
           promql_legend: "",
+          query_label: "",
           step_value: null,
           layer_type: "scatter",
           weight_fixed: 1,
@@ -179,6 +181,10 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     hiddenQueries: [],
   },
   meta: {
+    queryFields: {} as Record<
+      number,
+      { customQueryFields: any[]; vrlFunctionFieldList: any[] }
+    >,
     parsedQuery: "",
     dragAndDrop: {
       dragging: false,

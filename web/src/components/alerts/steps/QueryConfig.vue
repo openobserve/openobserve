@@ -610,10 +610,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai="!streamName"
                       :keywords="autoCompleteKeywords"
                       :suggestions="autoCompleteSuggestions"
-                      @focus="queryEditorPlaceholderFlag = false"
+                      @focus="onQueryEditorFocus"
                       @blur="onBlurInlineSqlEditor"
                       @update:query="handleInlineQueryUpdate"
                     />
+                  </div>
+                  <div
+                    v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
+                    class="query-editor-placeholder-overlay"
+                  >
+                    <span class="query-editor-placeholder-typewriter">{{ inlineEditorPlaceholder }}</span>
                   </div>
                 </div>
               </div>
@@ -663,6 +669,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @blur="onBlurInlineVrlEditor"
                       @update:query="(v) => { vrlFunctionContent = v; handleVrlFunctionUpdate(v); }"
                     />
+                    <div
+                      v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -900,6 +912,9 @@ import sql from "highlight.js/lib/languages/sql";
 hljs.registerLanguage("sql", sql);
 
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1047,6 +1062,19 @@ export default defineComponent({
     const filtersSectionRef = ref<HTMLElement | null>(null);
     const inlineQueryEditorRef = ref<any>(null);
 
+    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+      useSqlEditorDiagnostics({
+        queryEditorRef: inlineQueryEditorRef,
+        sqlMode: computed(() => localTab.value === 'sql'),
+        query: computed(() => localSqlQuery.value ?? ""),
+        streamName: computed(() => props.streamName),
+      });
+
+    const onQueryEditorFocus = () => {
+      queryEditorPlaceholderFlag.value = false;
+      _sqlOnFocus();
+    };
+
     // ── Inline editor autocomplete ──────────────────────────────────────────
     const {
       autoCompleteData,
@@ -1074,6 +1102,7 @@ export default defineComponent({
     // Called on every keystroke in the inline SQL/PromQL editor — updates
     // the query and feeds autocomplete context (same pattern as QueryEditorDialog)
     const handleInlineQueryUpdate = (newQuery: string) => {
+      _sqlOnQueryChange();
       if (localTab.value === 'sql') {
         updateSqlQuery(newQuery);
       } else {
@@ -1099,13 +1128,31 @@ export default defineComponent({
     // Placeholder flags for inline editors (show image when empty + not focused)
     const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
-    const onBlurInlineSqlEditor = () => {
+    // ─── Typewriter placeholder for the inline query editor ──────────
+    const streamFieldsForPlaceholder = computed(() =>
+      (props.columns as any[]).map((c: any) => ({
+        name: typeof c === 'string' ? c : (c.value ?? c.label ?? ''),
+        dataType: typeof c === 'string' ? '' : (c.type ?? ''),
+      }))
+    );
+    const noStreamForPlaceholder = computed(() => !props.streamName);
+    const isSqlModeForPlaceholder = computed(() => localTab.value === 'sql');
+    const { placeholder: inlineEditorPlaceholder } = useQueryPlaceholder(
+      streamFieldsForPlaceholder,
+      ref({}),
+      isSqlModeForPlaceholder,
+      noStreamForPlaceholder,
+      { noStreamText: t('pipeline.queryEditorPlaceholder') },
+    );
+
+    const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value = localTab.value === 'sql'
         ? localSqlQuery.value === ''
         : localPromqlQuery.value === '';
-      // Validate SQL on blur (same chain as QueryEditorDialog)
       if (localTab.value === 'sql') {
+        await _sqlOnBlur();
         emit("validate-sql");
       }
     };
@@ -2246,6 +2293,8 @@ export default defineComponent({
       getImageURL,
       queryEditorPlaceholderFlag,
       vrlEditorPlaceholderFlag,
+      vrlPlaceholder,
+      onQueryEditorFocus,
       onBlurInlineSqlEditor,
       onBlurInlineVrlEditor,
       inlineStatusState,
@@ -2253,6 +2302,7 @@ export default defineComponent({
       autoCompleteKeywords,
       autoCompleteSuggestions,
       handleInlineQueryUpdate,
+      inlineEditorPlaceholder,
       // Field error state (for inline :error/:error-message)
       triggerThresholdError,
       conditionValueError,
@@ -2265,6 +2315,33 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
+}
+
 .step-query-config {
   width: 100%;
   min-width: 0;

@@ -20,6 +20,10 @@ import store from '@/test/unit/helpers/store'
 import OtelConfig from './OtelConfig.vue'
 
 
+vi.mock('@/aws-exports', () => ({
+  default: { isCloud: 'false', isEnterprise: 'false' },
+}))
+
 // Mock the zincutils functions
 vi.mock('@/utils/zincutils', () => ({
   getIngestionURL: vi.fn(),

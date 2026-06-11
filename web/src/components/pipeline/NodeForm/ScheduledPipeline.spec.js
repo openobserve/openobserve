@@ -137,6 +137,18 @@ describe("ScheduledPipeline Component", () => {
           'DateTime': true,
           'FieldList': true,
           'QueryEditor': true,
+          // UnifiedQueryEditor is the internal name used in ScheduledPipeline.vue
+          // It needs getCursorIndex and triggerAutoComplete so updateQueryValue doesn't throw
+          'UnifiedQueryEditor': {
+            template: '<div data-test="scheduled-pipeline-sql-editor" />',
+            methods: {
+              getCursorIndex: () => -1,
+              getValue: () => '',
+              setValue: () => {},
+              replaceRange: () => {},
+              triggerAutoComplete: () => {},
+            },
+          },
           'TenstackTable': true,
           'PreviewPromqlQuery': true,
           'O2AIChat': true,
@@ -187,6 +199,17 @@ describe("ScheduledPipeline Component", () => {
     };
 
     wrapper.vm.cronJobError = "";
+
+    // Set up a mock editor ref so updateQueryValue does not throw when
+    // accessing getCursorIndex / triggerAutoComplete on the stubbed component.
+    wrapper.vm.pipelineEditorRef = {
+      getCursorIndex: vi.fn().mockReturnValue(-1),
+      getValue: vi.fn().mockReturnValue(""),
+      setValue: vi.fn(),
+      replaceRange: vi.fn(),
+      triggerAutoComplete: vi.fn(),
+    };
+
     await flushPromises();
   });
 

@@ -30,17 +30,13 @@ export const usePanelAggregation = ({
 
     switch (dashboardPanelData.data.type) {
       case "heatmap":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          itemY.functionName = null;
-          // take first arg
-          itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            itemY.functionName = null;
+            // take first arg
+            itemY.args = itemY?.args?.length ? [itemY?.args?.[0]] : [];
+          });
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -60,11 +56,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -82,21 +73,17 @@ export const usePanelAggregation = ({
       case "h-bar":
       case "stacked":
       case "h-stacked":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -117,33 +104,24 @@ export const usePanelAggregation = ({
             }
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
           getDefaultCustomChartText();
         break;
       case "table":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
         // Keep breakdown fields — they are used for pivot table mode
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -153,11 +131,6 @@ export const usePanelAggregation = ({
           query.fields.target = null;
           query.fields.value = null;
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -170,24 +143,18 @@ export const usePanelAggregation = ({
       case "pie":
       case "donut":
       case "gauge":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -207,11 +174,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -222,24 +184,18 @@ export const usePanelAggregation = ({
         ].config.time_shift = [];
         break;
       case "metric":
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.forEach((itemY: any) => {
-          if (itemY.functionName === null && !itemY.isDerived) {
-            itemY.functionName = "count";
-            // take first arg
-            itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
-          }
-        });
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z = [];
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown = [];
         // we have multiple queries for geomap, so if we are moving away, we need to reset
         // the values of lat, lng and weight in all the queries
         dashboardPanelData.data.queries?.forEach((query: any) => {
+          query.fields.y.forEach((itemY: any) => {
+            if (itemY.functionName === null && !itemY.isDerived) {
+              itemY.functionName = "count";
+              // take first arg
+              itemY.args = itemY.args.length ? [itemY?.args?.[0]] : [];
+            }
+          });
+          query.fields.z = [];
+          query.fields.breakdown = [];
           query.fields.latitude = null;
           query.fields.longitude = null;
           query.fields.weight = null;
@@ -256,11 +212,6 @@ export const usePanelAggregation = ({
             query.fields.y = [query.fields.y[0]];
           }
         });
-        if (dashboardPanelData.data.queryType === "sql") {
-          dashboardPanelData.layout.currentQueryIndex = 0;
-          dashboardPanelData.data.queries =
-            dashboardPanelData.data.queries.slice(0, 1);
-        }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
         dashboardPanelData.data.customChartContent =
@@ -316,6 +267,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[
@@ -345,6 +302,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[
@@ -375,6 +338,12 @@ export const usePanelAggregation = ({
           ].fields.stream_type;
 
         dashboardPanelData.data.queries = getDefaultQueries();
+        // These chart types reset to a single default query, so the active
+        // query index must return to the first query — otherwise a previously
+        // selected non-zero tab (multi-query layout) now points past the end of
+        // the queries array and downstream reads of queries[currentQueryIndex]
+        // would crash.
+        dashboardPanelData.layout.currentQueryIndex = 0;
 
         // Restore the preserved stream and stream_type
         dashboardPanelData.data.queries[
@@ -383,6 +352,13 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type = customChartCurrentStreamType;
+
+        // Custom charts always use a hand-written (custom) query — the default
+        // query from getDefaultQueries() is in builder mode, which would leave
+        // the query editor read-only. Switch it to custom mode.
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].customQuery = true;
 
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";

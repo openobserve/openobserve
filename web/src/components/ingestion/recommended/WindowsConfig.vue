@@ -1,6 +1,6 @@
 <template>
-  <div class="tw:p-3">
-    <div class="tw:text-base tw:font-medium tw:pl-1 tw:mt-3">
+  <div class="tw:p-3 tw:pt-1">
+    <div class="tw:text-base tw:font-medium tw:pl-1">
       Run the powershell terminal as administrator and execute the following
       command:
     </div>

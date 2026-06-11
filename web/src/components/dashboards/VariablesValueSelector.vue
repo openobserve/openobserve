@@ -873,7 +873,8 @@ export default defineComponent({
             ? [SELECT_ALL_VALUE]
             : SELECT_ALL_VALUE;
         } else if (item.type === "custom") {
-          // For custom type variables, set first option as default if no initial value
+          // For custom type variables, honor the per-option default (the "Default"
+          // checkbox in variable settings, stored as `option.selected`) if no initial value
           if (
             initialValue !== null &&
             initialValue !== undefined &&
@@ -882,10 +883,24 @@ export default defineComponent({
             // Use initial value if it exists
             variableData.value = initialValue;
           } else if (variableData.options && variableData.options.length > 0) {
-            // Set first option as default value
-            variableData.value = item.multiSelect
-              ? [variableData.options[0].value]
-              : variableData.options[0].value;
+            // Collect options explicitly marked as default
+            const defaultOptionValues = variableData.options
+              .filter((option: any) => option.selected)
+              .map((option: any) => option.value);
+
+            if (item.multiSelect) {
+              // Use all default-marked options, fall back to first option
+              variableData.value =
+                defaultOptionValues.length > 0
+                  ? defaultOptionValues
+                  : [variableData.options[0].value];
+            } else {
+              // Use the default-marked option, fall back to first option
+              variableData.value =
+                defaultOptionValues.length > 0
+                  ? defaultOptionValues[0]
+                  : variableData.options[0].value;
+            }
           } else {
             // No options available, set to null/empty array
             variableData.value = item.multiSelect ? [] : null;

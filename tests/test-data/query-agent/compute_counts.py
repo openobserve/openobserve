@@ -467,20 +467,34 @@ def main():
                 skipped += 1
                 continue
 
+            # Preserve manually-set metadata from the old expected block
+            # (compute_results only returns columns+results+results_mode)
+            old_expected = q.get("expected", {})
+
             new_expected = compute_results(con, q, is_histogram=is_histogram)
             if new_expected is None:
                 skipped += 1
                 continue
 
+            # Merge preserved keys from old expected into new expected
+            _PRESERVE_KEYS = ("skip_sqllogictest", "skip_row_count",
+                              "skip_column_check", "note", "assertions",
+                              "row_count")
+            for key in _PRESERVE_KEYS:
+                if key in old_expected:
+                    new_expected[key] = old_expected[key]
+
             # Auto-mark OO-specific array function queries for skip_sqllogictest
-            _, has_oo = translate_oo_to_duckdb(q["sql"])
-            if has_oo:
-                new_expected["skip_sqllogictest"] = True
-                if q["id"] not in _SKIP_SQLLOGICTEST:
-                    _SKIP_SQLLOGICTEST.add(q["id"])
+            # (only if not already manually set)
+            if "skip_sqllogictest" not in new_expected:
+                _, has_oo = translate_oo_to_duckdb(q["sql"])
+                if has_oo:
+                    new_expected["skip_sqllogictest"] = True
+                    if q["id"] not in _SKIP_SQLLOGICTEST:
+                        _SKIP_SQLLOGICTEST.add(q["id"])
 
             # Mark known-divergent queries for skip-sqllogictest fallback
-            if q["id"] in _SKIP_SQLLOGICTEST:
+            if q["id"] in _SKIP_SQLLOGICTEST and "skip_sqllogictest" not in new_expected:
                 new_expected["skip_sqllogictest"] = True
 
             # Skip per-column existence check for queries where OO returns

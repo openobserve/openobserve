@@ -12,8 +12,8 @@ export class UserPage {
         this.iamPageMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
         this.iamUsersTab = page.locator('[data-test="iam-users-tab"]');
         this.iamPage = page.locator('[data-test="iam-page"]');
-        // NoData empty-state cell rendered inside the OTable empty slot.
-        this.noDataMessage = page.locator('[data-test="no-data-message"]');
+        // Empty-state rendered inside the OTable empty slot.
+        this.noDataMessage = page.locator('[data-test="o2-empty-state"]');
 
         // ===========================================================
         // Add / edit user form (drawer rendered by AddUser.vue)
@@ -44,7 +44,7 @@ export class UserPage {
         // ===========================================================
         // List view — search input (OInput wrapper / inner field)
         // ===========================================================
-        this.iamUsersSearchInput = page.locator('[data-test="iam-users-search-input-field"]');
+        this.iamUsersSearchInput = page.locator('[data-test="user-list-search-input-field"]');
 
         // ===========================================================
         // Feedback surfaces — OToast and OInput inline error
@@ -255,9 +255,7 @@ export class UserPage {
     }
 
     async verifyUserNotExists() {
-
-        await expect(this.iamPage).toContainText('No data available');
-
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible();
     }
 
     async verifyUserExists(email) {

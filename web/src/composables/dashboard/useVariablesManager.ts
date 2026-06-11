@@ -106,12 +106,23 @@ const expandVariablesForScopes = (
       }
     }
 
-    // For custom type variables, select first option as default
+    // For custom type variables, honor the per-option default (the "Default"
+    // checkbox in variable settings, stored as `option.selected`); fall back to
+    // the first option only when none is marked as default.
     if (variable.type === "custom") {
       const options = (variable as any).options;
       if (options && options.length > 0) {
-        return variable.multiSelect
-          ? [options[0].value]
+        const defaultOptionValues = options
+          .filter((option: any) => option.selected)
+          .map((option: any) => option.value);
+
+        if (variable.multiSelect) {
+          return defaultOptionValues.length > 0
+            ? defaultOptionValues
+            : [options[0].value];
+        }
+        return defaultOptionValues.length > 0
+          ? defaultOptionValues[0]
           : options[0].value;
       }
     }

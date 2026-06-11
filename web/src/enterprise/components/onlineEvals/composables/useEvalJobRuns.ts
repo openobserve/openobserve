@@ -177,7 +177,11 @@ export function useEvalJobRuns(
       "  COUNT(*) AS total_runs,",
       "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success_runs,",
       "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failure_runs,",
-      "  AVG(attributes_latency_ms) AS avg_latency_ms",
+      // `attributes_latency_ms` is auto-inferred as Utf8 when the SDK
+      // emits the value as a JSON string. AVG requires a numeric input,
+      // so TRY_CAST to Double — unparseable values become NULL and AVG
+      // silently skips them.
+      "  AVG(TRY_CAST(attributes_latency_ms AS DOUBLE)) AS avg_latency_ms",
       'FROM "_evaluator"',
       `WHERE CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
     ].join("\n");

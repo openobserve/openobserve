@@ -16,13 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:flex-col tw:pb-[0.625rem] tw:h-full" data-test="edit-role-page">
+    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
+    <AppPageHeader
+      :title="editingRole"
+      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="tw:shrink-0"
     >
     <div class="card-container tw:py-2 tw:flex tw:flex-col">
-          <span style="font-size: 18px;" class="tw:px-3 tw:mb-2">{{ editingRole }}</span>
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -149,14 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
-            style="scrollbar-gutter: stable;"
+            class="el-border-radius tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
           >
-            <div
-              v-if="isFetchingInitialRoles"
-              data-test="edit-role-page-loading-spinner"
-              class="tw:flex tw:items-center tw:justify-center tw:py-8"
-            />
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -169,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @updated:permission="handlePermissionChange"
                 @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
+                @update:filter="onClearFilter"
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -305,6 +305,7 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
@@ -1348,6 +1349,12 @@ const filterRowsByResourceName = (
 const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
+};
+
+const onClearFilter = () => {
+  filter.value.value = "";
+  filter.value.resource = "";
+  onResourceChange();
 };
 
 function filterResources(rows: any, terms: any) {

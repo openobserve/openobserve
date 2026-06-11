@@ -15,31 +15,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center tw:h-[68px]">
-        <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="invitation-title-text">
-          {{ t("invitation.pendingInvitations") }}
-        </div>
-        <div class="tw:h-[36px]" />
-      </div>
-    </div>
-
-    <div class="tw:w-full tw:h-full tw:flex-1 tw:min-h-0">
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+    <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
+    <AppPageHeader
+      :title="t('invitation.pendingInvitations')"
+      :subtitle="'Pending and sent member invitations'"
+      icon="mail"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
         <OTable
           :data="invitations"
           :columns="columns"
           row-key="token"
           :loading="loading"
+          v-model:global-filter="filterQuery"
+          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           sorting="client"
+          filter-mode="client"
           :default-columns="false"
-          :show-global-filter="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-invitations-list"
         >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('invitation.search')"
+                data-test="invitation-list-search-input"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
           <template #empty>
-            <NoData />
+            <OEmptyState
+              size="hero"
+              preset="no-invitations"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
           </template>
           <template #cell-actions="{ row }">
             <div class="tw:flex tw:items-center tw:gap-2">
@@ -102,21 +121,26 @@ import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "InvitationList",
   components: {
-    NoData,
+    AppPageHeader,
+    OEmptyState,
     OButton,
     ODialog,
     OTable,
+    OSearchInput,
   },
   props: {
     userEmail: {
@@ -129,6 +153,7 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18n();
     const invitations = ref([]);
+    const filterQuery = ref("");
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
     const selectedInvitation = ref(null);
@@ -138,7 +163,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 48,
+        size: TABLE_INDEX_COL_SIZE,
         minSize: 40,
         maxSize: 64,
         meta: { align: "center", compactPadding: true },
@@ -148,13 +173,20 @@ export default defineComponent({
         header: t("invitation.organizationName"),
         accessorKey: "org_name",
         sortable: true,
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "role",
         header: t("invitation.role"),
         accessorKey: "role",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.role,
         meta: { align: "left" },
       },
       {
@@ -162,6 +194,9 @@ export default defineComponent({
         header: t("invitation.invitedBy"),
         accessorKey: "inviter_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
@@ -169,6 +204,9 @@ export default defineComponent({
         header: t("invitation.expiry"),
         accessorKey: "expiry",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.duration,
         meta: { align: "left" },
       },
       {
@@ -343,6 +381,7 @@ export default defineComponent({
       t,
       store,
       invitations,
+      filterQuery,
       columns,
       resultTotal,
       loading,

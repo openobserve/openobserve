@@ -1,133 +1,199 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createRouter, createWebHistory } from 'vue-router';
-import { createI18n } from 'vue-i18n';
-import Functions from './Functions.vue';
+// Copyright 2026 OpenObserve Inc.
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
+import { createI18n } from "vue-i18n";
+import Functions from "./Functions.vue";
 
-// Mock the router-view component
-const MockRouterView = {
-  name: 'RouterView',
-  template: '<div class="mock-router-view"><slot v-bind="{ Component: MockComponent }" /></div>',
-  setup() {
-    const MockComponent = {
-      name: 'MockComponent',
-      template: '<div class="mock-component">Mock Component Content</div>',
-    };
-    return { MockComponent };
+// Mock heavy child components that are not under test
+vi.mock("@/components/common/AppPageHeader.vue", () => ({
+  default: {
+    name: "AppPageHeader",
+    template:
+      '<div class="app-page-header" data-test="app-page-header"><slot name="tabs" /><slot name="title-trail" /><slot name="actions" /></div>',
+    props: ["title", "subtitle", "icon", "back", "tabsBelow"],
   },
-};
+}));
+
+vi.mock("@/components/pipeline/PipelineSectionTabs.vue", () => ({
+  default: {
+    name: "PipelineSectionTabs",
+    template: '<div class="pipeline-section-tabs" />',
+  },
+}));
 
 
-describe('Functions.vue', () => {
+vi.mock("@/plugins/pipelines/useDnD", () => ({
+  pipelineObj: {
+    currentSelectedPipeline: { name: "" },
+    pipelineNameError: false,
+    pipelineNameErrorMessage: "",
+  },
+}));
+
+vi.mock("@/aws-exports", () => ({
+  default: {
+    isEnterprise: "false",
+    isCloud: "false",
+  },
+}));
+
+vi.mock("@/lib/core/Button/OButton.vue", () => ({
+  default: {
+    name: "OButton",
+    template:
+      '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+    props: ["variant", "size", "iconLeft", "disabled"],
+    emits: ["click"],
+  },
+}));
+
+vi.mock("@/lib/overlay/Dropdown/ODropdown.vue", () => ({
+  default: {
+    name: "ODropdown",
+    template: '<div class="o-dropdown"><slot name="trigger" /><slot /></div>',
+    props: ["align"],
+  },
+}));
+
+vi.mock("@/lib/overlay/Dropdown/ODropdownItem.vue", () => ({
+  default: {
+    name: "ODropdownItem",
+    template:
+      '<div :data-test="$attrs[\'data-test\']" @click="$emit(\'select\')"><slot /></div>',
+    emits: ["select"],
+  },
+}));
+
+vi.mock("@/lib/forms/Input/OInput.vue", () => ({
+  default: {
+    name: "OInput",
+    template: '<input :data-test="$attrs[\'data-test\']" />',
+    props: ["modelValue", "placeholder", "error", "errorMessage"],
+  },
+}));
+
+describe("Functions.vue", () => {
   let wrapper: any;
   let store: any;
   let router: any;
   let i18n: any;
 
-  const createWrapper = async (storeConfig = {}, routeConfig = {}) => {
-    // Create store with default configuration
+  const createWrapper = async (storeStateOverride = {}, routeName = "pipelines") => {
     store = createStore({
       state: {
         selectedOrganization: {
-          identifier: 'test-org-id',
-          name: 'Test Organization',
+          identifier: "test-org-id",
+          name: "Test Organization",
         },
         zoConfig: {
-          custom_hide_menus: '',
+          custom_hide_menus: "",
         },
-        ...storeConfig,
+        ...storeStateOverride,
       },
       getters: {},
       mutations: {},
       actions: {},
     });
 
-    // Create i18n instance
     i18n = createI18n({
       legacy: false,
-      locale: 'en',
-      fallbackLocale: 'en',
+      locale: "en",
+      fallbackLocale: "en",
       globalInjection: true,
       messages: {
         en: {
           function: {
-            streamPipeline: 'Stream Pipeline',
-            header: 'Functions',
-            enrichmentTables: 'Enrichment Tables',
+            streamPipeline: "Stream Pipeline",
+            header: "Functions",
+            enrichmentTables: "Enrichment Tables",
+          },
+          menu: { pipeline: "Pipeline" },
+          pipeline: {
+            subtitle: "Manage pipelines",
+            addPipeline: "Add Pipeline",
+            history: "History",
+            import: "Import",
+            backfill: "Backfill",
+            evalTemplates: "Eval Templates",
+            pipelineName: "Pipeline Name",
           },
         },
       },
     });
 
-    // Create router with default routes
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
-        { path: '/pipelines', name: 'pipelines', component: { template: '<div>Pipelines</div>' } },
-        { path: '/functions', name: 'functionList', component: { template: '<div>Functions</div>' } },
-        { path: '/enrichment', name: 'enrichmentTables', component: { template: '<div>Enrichment</div>' } },
-        { path: '/pipeline', name: 'pipeline', component: { template: '<div>Pipeline</div>' } },
+        {
+          path: "/",
+          name: "home",
+          component: { template: "<div>Home</div>" },
+        },
+        {
+          path: "/pipelines",
+          name: "pipelines",
+          component: { template: "<div>Pipelines</div>" },
+        },
+        {
+          path: "/pipeline",
+          name: "pipeline",
+          component: { template: "<div>Pipeline</div>" },
+        },
+        {
+          path: "/functions",
+          name: "functionList",
+          component: { template: "<div>Functions</div>" },
+        },
+        {
+          path: "/enrichment",
+          name: "enrichmentTables",
+          component: { template: "<div>Enrichment</div>" },
+        },
+        {
+          path: "/pipeline/editor",
+          name: "pipelineEditor",
+          component: { template: "<div>Editor</div>" },
+        },
+        {
+          path: "/pipeline/create",
+          name: "createPipeline",
+          component: { template: "<div>Create</div>" },
+        },
+        {
+          path: "/pipeline/import",
+          name: "importPipeline",
+          component: { template: "<div>Import</div>" },
+        },
+        {
+          path: "/pipeline/history",
+          name: "pipelineHistory",
+          component: { template: "<div>History</div>" },
+        },
+        {
+          path: "/pipeline/backfill",
+          name: "pipelineBackfill",
+          component: { template: "<div>Backfill</div>" },
+        },
+        {
+          path: "/eval",
+          name: "evalTemplates",
+          component: { template: "<div>Eval</div>" },
+        },
       ],
     });
 
-    // Set initial route
-    const initialRoute = {
-      name: 'functionList',
-      query: { org_identifier: 'test-org-id' },
-      ...routeConfig,
-    };
-    await router.push(initialRoute);
+    await router.push({ name: routeName, query: { org_identifier: "test-org-id" } });
 
     return mount(Functions, {
       global: {
-        plugins: [
-          store,
-          router,
-          i18n, ],
+        plugins: [store, router, i18n],
         stubs: {
-                    'q-btn': {
-            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
-            emits: ['click'],
+          RouterView: {
+            name: "RouterView",
+            template: '<div class="mock-router-view" />',
           },
-          'q-splitter': {
-            template: '<div class="q-splitter"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-            props: ['modelValue', 'unit', 'limits'],
-          },
-          'q-tabs': {
-            template: '<div class="q-tabs" :class="$attrs.class"><slot /></div>',
-            props: ['modelValue', 'indicatorColor', 'inlineLabel', 'vertical'],
-          },
-          'q-route-tab': {
-            template: '<div class="q-route-tab" :class="{ active: name === activeTab }">{{ label }}</div>',
-            props: ['name', 'to', 'label', 'contentClass'],
-            inject: {
-              activeTab: {
-                default: 'functions',
-              },
-            },
-          },
-          OTabs: {
-            template: '<div class="o-tabs" :class="$attrs.class"><slot /></div>',
-            props: ['modelValue', 'orientation'],
-            emits: ['update:modelValue'],
-          },
-          ORouteTab: {
-            template: '<div class="o-route-tab">{{ label }}</div>',
-            props: ['name', 'to', 'label', 'icon'],
-          },
-          OButton: {
-            name: 'OButton',
-            template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot name="icon-left" /><slot /></button>',
-            props: ['variant', 'size', 'disabled', 'class'],
-            emits: ['click'],
-          },
-          OTab: {
-            template: '<div class="o-tab">{{ label }}</div>',
-            props: ['name', 'label', 'icon'],
-          },
-          'RouterView': MockRouterView,
         },
       },
     });
@@ -135,8 +201,6 @@ describe('Functions.vue', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set window width above compact breakpoint (1440px) so isCompactSidebar is false
-    Object.defineProperty(window, 'innerWidth', { value: 1920, writable: true });
   });
 
   afterEach(() => {
@@ -145,323 +209,236 @@ describe('Functions.vue', () => {
     }
   });
 
-  describe('Component Initialization', () => {
-    it('should render the component with default configuration', async () => {
+  describe("Component Initialization", () => {
+    it("should render the component without errors", async () => {
       wrapper = await createWrapper();
-
-      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
-      // Verify a known tab renders — functions-page data-test doesn't exist on this component
-      expect(wrapper.find('[data-test="stream-pipelines-tab"]').exists()).toBe(true);
-      // The tabs now use 'card-container' class instead of 'functions-tabs'
-      expect(wrapper.find('.card-container').exists()).toBe(true);
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it('should initialize with correct default values', async () => {
-      wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).splitterModel).toBe(220);
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      // The test router navigates to 'functionList', which maps to 'functions' via routeToFunctionsTab
-      expect((wrapper.vm as any).activeTab).toBe('functions');
+    it("should initialize activeTab based on current route", async () => {
+      wrapper = await createWrapper({}, "functionList");
+      expect((wrapper.vm as any).activeTab).toBe("functions");
     });
 
-    it('should render the collapse/expand button', async () => {
+    it("should initialize activeTab to streamPipelines for pipelines route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      expect((wrapper.vm as any).activeTab).toBe("streamPipelines");
+    });
+
+    it("should expose store on the component instance", async () => {
       wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      expect(collapseBtn.exists()).toBe(true);
+      expect((wrapper.vm as any).store).toBeDefined();
     });
   });
 
-  describe('Sidebar Functionality', () => {
-    it('should show sidebar by default', async () => {
-      wrapper = await createWrapper();
-
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      // The tabs now use 'card-container' class instead of 'functions-tabs'
-      expect(wrapper.find('.card-container').exists()).toBe(true);
+  describe("Header visibility", () => {
+    it("should show AppPageHeader when on pipelines route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.exists()).toBe(true);
     });
 
-    it('should collapse sidebar when collapse button is clicked', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      expect((wrapper.vm as any).splitterModel).toBe(220);
-      
-      await collapseBtn.trigger('click');
-      
-      expect((wrapper.vm as any).showSidebar).toBe(false);
-      expect((wrapper.vm as any).splitterModel).toBe(0);
+    it("should not show AppPageHeader when on functionList route", async () => {
+      wrapper = await createWrapper({}, "functionList");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.exists()).toBe(false);
     });
 
-    it('should expand sidebar when expand button is clicked after collapse', async () => {
-      wrapper = await createWrapper();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // First collapse
-      await collapseBtn.trigger('click');
-      expect((wrapper.vm as any).showSidebar).toBe(false);
-      
-      // Then expand
-      await collapseBtn.trigger('click');
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      expect((wrapper.vm as any).splitterModel).toBe(220); // Should restore to last position
-    });
-
-    it('should remember last splitter position when collapsing and expanding', async () => {
-      wrapper = await createWrapper();
-      
-      // Change splitter position
-      (wrapper.vm as any).splitterModel = 250;
-      await wrapper.vm.$nextTick();
-      
-      const collapseBtn = wrapper.find('[data-test="logs-search-field-list-collapse-btn"]');
-      
-      // Collapse
-      await collapseBtn.trigger('click');
-      expect((wrapper.vm as any).splitterModel).toBe(0);
-      
-      // Expand - should restore to 250
-      await collapseBtn.trigger('click');
-      expect((wrapper.vm as any).splitterModel).toBe(250);
+    it("should show header on detail view routes like pipelineEditor", async () => {
+      wrapper = await createWrapper({}, "pipelineEditor");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.exists()).toBe(true);
     });
   });
 
-  describe('Tab Navigation', () => {
-    it('should render all tabs when pipelines are not hidden', async () => {
-      wrapper = await createWrapper();
-      
-      const streamPipelineTab = wrapper.find('[data-test="stream-pipelines-tab"]');
-      const functionTab = wrapper.find('[data-test="function-stream-tab"]');
-      const enrichmentTab = wrapper.find('[data-test="function-enrichment-table-tab"]');
-      
-      expect(streamPipelineTab.exists()).toBe(true);
-      expect(functionTab.exists()).toBe(true);
-      expect(enrichmentTab.exists()).toBe(true);
+  describe("Pipeline actions buttons", () => {
+    it("should show add pipeline button on pipelines route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      const addBtn = wrapper.find('[data-test="pipeline-list-add-pipeline-btn"]');
+      expect(addBtn.exists()).toBe(true);
     });
 
-    it('should hide pipelines tab when configured in zoConfig', async () => {
-      wrapper = await createWrapper({
-        zoConfig: {
-          custom_hide_menus: 'pipelines',
+    it("should show history button on pipelines route when window is wide", async () => {
+      Object.defineProperty(window, "innerWidth", { value: 1920, writable: true });
+      wrapper = await createWrapper({}, "pipelines");
+      const historyBtn = wrapper.find('[data-test="pipeline-list-history-btn"]');
+      expect(historyBtn.exists()).toBe(true);
+    });
+
+    it("should not show pipeline actions on functionList route", async () => {
+      wrapper = await createWrapper({}, "functionList");
+      const addBtn = wrapper.find('[data-test="pipeline-list-add-pipeline-btn"]');
+      expect(addBtn.exists()).toBe(false);
+    });
+  });
+
+  describe("Route Handling", () => {
+    it("should redirect from pipeline route to pipelines on mount", async () => {
+      // The component calls redirectRoute in onBeforeMount; router.replace happens during mount
+      const replaceSpy = vi.fn();
+      // We verify indirectly: starting on 'pipeline' route triggers replace to 'pipelines'
+      // Because router.replace is called during mount we set up spy before createWrapper
+      router = createRouter({
+        history: createWebHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+          { path: "/pipeline", name: "pipeline", component: { template: "<div />" } },
+          { path: "/functions", name: "functionList", component: { template: "<div />" } },
+          { path: "/enrichment", name: "enrichmentTables", component: { template: "<div />" } },
+          { path: "/pipeline/editor", name: "pipelineEditor", component: { template: "<div />" } },
+          { path: "/pipeline/create", name: "createPipeline", component: { template: "<div />" } },
+          { path: "/pipeline/import", name: "importPipeline", component: { template: "<div />" } },
+          { path: "/pipeline/history", name: "pipelineHistory", component: { template: "<div />" } },
+          { path: "/pipeline/backfill", name: "pipelineBackfill", component: { template: "<div />" } },
+          { path: "/eval", name: "evalTemplates", component: { template: "<div />" } },
+        ],
+      });
+      await router.push({ name: "pipeline", query: { org_identifier: "test-org-id" } });
+      vi.spyOn(router, "replace").mockImplementation(replaceSpy);
+
+      wrapper = mount(Functions, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { RouterView: { name: "RouterView", template: '<div class="mock-router-view" />' } },
         },
       });
-      
-      const streamPipelineTab = wrapper.find('[data-test="stream-pipelines-tab"]');
-      const functionTab = wrapper.find('[data-test="function-stream-tab"]');
-      
-      expect(streamPipelineTab.exists()).toBe(false);
-      expect(functionTab.exists()).toBe(true);
-    });
 
-    it('should render correct tab labels', async () => {
-      wrapper = await createWrapper();
-      
-      const streamPipelineTab = wrapper.find('[data-test="stream-pipelines-tab"]');
-      const functionTab = wrapper.find('[data-test="function-stream-tab"]');
-      const enrichmentTab = wrapper.find('[data-test="function-enrichment-table-tab"]');
-      
-      expect(streamPipelineTab.text()).toBe('Stream Pipeline');
-      expect(functionTab.text()).toBe('Functions');
-      expect(enrichmentTab.text()).toBe('Enrichment Tables');
+      expect(replaceSpy).toHaveBeenCalledWith({
+        name: "pipelines",
+        query: { org_identifier: "test-org-id" },
+      });
     });
   });
 
-  describe('Route Handling', () => {
-    it('should redirect from pipeline route to pipelines', async () => {
-      // Create wrapper with pipeline route - this should trigger the redirect in onBeforeMount
-      wrapper = await createWrapper({}, { name: 'pipeline' });
-      
-      const routerReplaceSpy = vi.spyOn(router, 'replace');
-      
-      // Call redirectRoute manually to test the redirect logic
-      (wrapper.vm as any).redirectRoute();
-      
-      expect(routerReplaceSpy).toHaveBeenCalledWith({
-        name: 'pipelines',
-        query: {
-          org_identifier: 'test-org-id',
-        },
-      });
-    });
-
-    it('should collapse sidebar when navigating to add function', async () => {
+  describe("Event Handling", () => {
+    it("should emit sendToAiChat event when sendToAiChat method is called", async () => {
       wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      
-      // Simulate route change to add function
-      await router.push({
-        name: 'functionList',
-        query: { action: 'add', org_identifier: 'test-org-id' },
-      });
-      
-      await wrapper.vm.$nextTick();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(false);
-    });
 
-    it('should call router.back() when route name is pipeline', async () => {
-      // First create wrapper with a normal route
-      wrapper = await createWrapper();
-      
-      const routerBackSpy = vi.spyOn(router, 'back').mockImplementation(() => {});
-      
-      // Then navigate to pipeline route to trigger the watcher
-      await router.push({ name: 'pipeline' });
-      await wrapper.vm.$nextTick();
-      
-      expect(routerBackSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe('Event Handling', () => {
-    it('should emit sendToAiChat event when sendToAiChat method is called', async () => {
-      wrapper = await createWrapper();
-      
-      const testValue = { message: 'test message' };
+      const testValue = { message: "test message" };
       (wrapper.vm as any).sendToAiChat(testValue);
 
-      expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')?.[0]).toEqual([testValue, false]); // includes append parameter
+      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue, false]);
+    });
+
+    it("should emit sendToAiChat with append=true when second arg is true", async () => {
+      wrapper = await createWrapper();
+
+      const testValue = { message: "test" };
+      (wrapper.vm as any).sendToAiChat(testValue, true);
+
+      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue, true]);
     });
   });
 
-  describe('RouterView Integration', () => {
-    it('should render RouterView component', async () => {
+  describe("Computed Properties", () => {
+    it("should compute routeName from current route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      expect((wrapper.vm as any).routeName).toBe("pipelines");
+    });
+
+    it("should compute showPipelineActions as true on pipelines route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      expect((wrapper.vm as any).showPipelineActions).toBe(true);
+    });
+
+    it("should compute showPipelineActions as false on functionList route", async () => {
+      wrapper = await createWrapper({}, "functionList");
+      expect((wrapper.vm as any).showPipelineActions).toBe(false);
+    });
+
+    it("should compute isDetailView as true for pipelineEditor", async () => {
+      wrapper = await createWrapper({}, "pipelineEditor");
+      expect((wrapper.vm as any).isDetailView).toBe(true);
+    });
+
+    it("should compute isDetailView as false for pipelines", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      expect((wrapper.vm as any).isDetailView).toBe(false);
+    });
+
+    it("should compute pipelineSections excluding hidden pipelines", async () => {
+      wrapper = await createWrapper(
+        { zoConfig: { custom_hide_menus: "pipelines" } },
+        "pipelines",
+      );
+      const sections = (wrapper.vm as any).pipelineSections;
+      const streamPipelinesSection = sections.find(
+        (s: any) => s.key === "streamPipelines",
+      );
+      expect(streamPipelinesSection?.visible).toBe(false);
+    });
+
+    it("should compute pipelineSections with streamPipelines present when not hidden", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      const sections = (wrapper.vm as any).pipelineSections;
+      const streamPipelinesSection = sections.find(
+        (s: any) => s.key === "streamPipelines",
+      );
+      // When not hidden, visible is not explicitly set to false
+      expect(streamPipelinesSection).toBeDefined();
+      expect(streamPipelinesSection?.to?.name).toBe("pipelines");
+    });
+  });
+
+  describe("Store Integration", () => {
+    it("should access store state correctly", async () => {
       wrapper = await createWrapper();
-      
-      const routerView = wrapper.findComponent(MockRouterView);
+      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe(
+        "test-org-id",
+      );
+    });
+
+    it("should handle missing organization identifier gracefully", async () => {
+      wrapper = await createWrapper({
+        selectedOrganization: { identifier: "", name: "Test" },
+      });
+      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe("");
+    });
+
+    it("should handle undefined zoConfig without errors", async () => {
+      wrapper = await createWrapper({ zoConfig: undefined });
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("RouterView Integration", () => {
+    it("should render RouterView", async () => {
+      wrapper = await createWrapper();
+      const routerView = wrapper.find(".mock-router-view");
       expect(routerView.exists()).toBe(true);
     });
-
-    it('should pass sendToAiChat event to child components', async () => {
-      wrapper = await createWrapper();
-      
-      // Find the mock component inside RouterView
-      const mockComponent = wrapper.find('.mock-component');
-      expect(mockComponent.exists()).toBe(true);
-    });
   });
 
+  describe("Active tab update on route change", () => {
+    it("should update activeTab when route changes to enrichmentTables", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      expect((wrapper.vm as any).activeTab).toBe("streamPipelines");
 
-  describe('Data Properties', () => {
-    it('should initialize templates as empty array', async () => {
-      wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).templates).toEqual([]);
-    });
-
-    it('should initialize functionAssociatedStreams as empty array', async () => {
-      wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).functionAssociatedStreams).toEqual([]);
-    });
-  });
-
-  describe('Store Integration', () => {
-    it('should access store state correctly', async () => {
-      wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe('test-org-id');
-      expect((wrapper.vm as any).store.state.selectedOrganization.name).toBe('Test Organization');
-    });
-
-    it('should handle different zoConfig values', async () => {
-      wrapper = await createWrapper({
-        zoConfig: {
-          custom_hide_menus: 'pipelines,other',
-        },
-      });
-      
-      const streamPipelineTab = wrapper.find('[data-test="stream-pipelines-tab"]');
-      expect(streamPipelineTab.exists()).toBe(false);
-    });
-
-    it('should handle undefined zoConfig', async () => {
-      wrapper = await createWrapper({
-        zoConfig: undefined,
-      });
-      
-      const streamPipelineTab = wrapper.find('[data-test="stream-pipelines-tab"]');
-      expect(streamPipelineTab.exists()).toBe(true);
-    });
-  });
-
-  describe('Component Cleanup', () => {
-    it('should not have memory leaks after unmount', async () => {
-      wrapper = await createWrapper();
-      const componentInstance = wrapper.vm;
-      
-      wrapper.unmount();
-      
-      // Verify component is properly cleaned up
-      expect(componentInstance).toBeDefined();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle missing organization identifier', async () => {
-      wrapper = await createWrapper({
-        selectedOrganization: {
-          identifier: '',
-          name: 'Test Organization',
-        },
-      });
-      
-      expect((wrapper.vm as any).store.state.selectedOrganization.identifier).toBe('');
-    });
-
-    it('should handle splitter model edge values', async () => {
-      wrapper = await createWrapper();
-      
-      // Test minimum value
-      (wrapper.vm as any).splitterModel = 0;
+      await router.push({ name: "enrichmentTables", query: { org_identifier: "test-org-id" } });
       await wrapper.vm.$nextTick();
-      expect((wrapper.vm as any).splitterModel).toBe(0);
-      
-      // Test maximum value
-      (wrapper.vm as any).splitterModel = 300;
-      await wrapper.vm.$nextTick();
-      expect((wrapper.vm as any).splitterModel).toBe(300);
+
+      expect((wrapper.vm as any).activeTab).toBe("enrichmentTables");
     });
 
+    it("should call router.replace when route watcher fires on pipeline route", async () => {
+      wrapper = await createWrapper({}, "pipelines");
+      const routerReplaceSpy = vi.spyOn(router, "replace").mockImplementation(vi.fn());
+
+      await router.push({ name: "pipeline" });
+      await wrapper.vm.$nextTick();
+
+      expect(routerReplaceSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "pipelines" }),
+      );
+    });
   });
 
-  describe('Computed Properties and Watchers', () => {
-    it('should handle route change to functionList with add action', async () => {
+  describe("Component Cleanup", () => {
+    it("should unmount without errors", async () => {
       wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      
-      // Navigate to functionList with add action
-      await router.push({
-        name: 'functionList',
-        query: { action: 'add', org_identifier: 'test-org-id' },
-      });
-      
-      await wrapper.vm.$nextTick();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(false);
-    });
-
-    it('should not collapse sidebar for functionList without add action', async () => {
-      wrapper = await createWrapper();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(true);
-      
-      // Navigate to functionList without add action
-      await router.push({
-        name: 'functionList',
-        query: { org_identifier: 'test-org-id' },
-      });
-      
-      await wrapper.vm.$nextTick();
-      
-      expect((wrapper.vm as any).showSidebar).toBe(true);
+      expect(() => wrapper.unmount()).not.toThrow();
     });
   });
 });

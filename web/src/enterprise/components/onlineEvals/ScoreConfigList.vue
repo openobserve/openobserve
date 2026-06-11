@@ -1,43 +1,12 @@
 <template>
   <EvalListShell
     data-test="score-config"
-    :title="t('onlineEvals.scoreConfig.listTitle')"
-    :search="search"
-    :search-placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
-    :add-label="t('onlineEvals.scoreConfig.newButton')"
-    :show-empty="showEmptyState"
-    @update:search="$emit('update:search', $event)"
-    @create="$emit('create')"
+    :show-empty="false"
   >
-    <template #empty>
-      <EvalEmptyState
-        data-test="score-config-empty-state"
-        icon="fact-check"
-        :title="t('onlineEvals.scoreConfig.empty.title')"
-        :description="t('onlineEvals.scoreConfig.empty.description')"
-        :chips="[
-          { icon: 'data-array', label: t('onlineEvals.scoreConfig.empty.chipTypes') },
-          { icon: 'favorite', label: t('onlineEvals.scoreConfig.empty.chipThreshold') },
-        ]"
-        :cta-label="t('onlineEvals.scoreConfig.newButton')"
-        cta-data-test="score-config-empty-create-btn"
-        @create="$emit('create')"
-      />
-    </template>
-
-    <template #filter>
-      <OSelect
-        v-model="typeFilter"
-        :options="typeOptions"
-        :placeholder="t('onlineEvals.scoreConfig.allTypes')"
-        size="md"
-        class="tw:ml-2 tw:w-[140px]"
-        data-test="score-config-list-type-filter"
-      />
-    </template>
-
     <template #table>
       <OTable
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="score-config-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -48,10 +17,43 @@
         :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
+        :default-columns="false"
         width="100%"
         class="tw:w-full tw:h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
+        <template #toolbar>
+          <OSearchInput
+            :model-value="search"
+            class="tw:flex-1 tw:min-w-0"
+            :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
+            data-test="score-config-list-search-input"
+            clearable
+            @update:model-value="$emit('update:search', $event as string)"
+          />
+          <OSelect
+            v-model="typeFilter"
+            :options="typeOptions"
+            :placeholder="t('onlineEvals.scoreConfig.allTypes')"
+            size="md"
+            width="sm"
+            class="tw:shrink-0"
+            data-test="score-config-list-type-filter"
+          />
+        </template>
+
+        <template #empty>
+          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+            <OEmptyState
+              size="hero"
+              preset="no-score-configs"
+              :filtered="hasFilters"
+              data-test="score-config-empty-state"
+              @action="onEmptyAction"
+            />
+          </div>
+        </template>
+
         <template #cell-type="{ row }">
           <span class="sc-dtype-chip" :class="`sc-dtype-chip--${dataTypeOf(row)}`">
             {{ dataTypeOf(row) }}
@@ -81,6 +83,23 @@
           {{ formatDateShort(rowCreated(row)) }}
         </template>
 
+        <template #bottom="{ totalRows }">
+          <span class="o2-table-footer-title tw:text-primary">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline"
+            size="sm"
+            class="tw:ml-3"
+            icon-left="download"
+            data-test="score-config-bulk-export-btn"
+            @click="handleBulkExport"
+          >
+            {{ t("onlineEvals.scoreConfig.export.bulkButton") }} ({{ selectedIds.length }})
+          </OButton>
+        </template>
+
         <template #cell-actions="{ row }">
           <div class="tw:flex tw:items-center actions-container">
             <OButton
@@ -91,6 +110,14 @@
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
               @click.stop="$emit('edit', row)"
+            />
+            <OButton
+              :data-test="`score-config-list-${row.name}-export-btn`"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('onlineEvals.actions.export')"
+              icon-left="download"
+              @click.stop="$emit('export', row)"
             />
             <OButton
               :data-test="`score-config-list-${row.name}-delete-btn`"
@@ -114,10 +141,12 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
 import { useNumberedRows } from "./composables/useNumberedRows";
 
@@ -125,21 +154,36 @@ type DataType = "numeric" | "categorical" | "boolean";
 
 const props = defineProps<{
   rows: ScoreConfig[];
+  allScoreConfigs: ScoreConfig[];
   scorers: Scorer[];
   search: string;
   loading?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:search", value: string): void;
   (e: "create"): void;
   (e: "edit", row: ScoreConfig): void;
   (e: "view", row: ScoreConfig): void;
   (e: "delete", row: ScoreConfig): void;
+  (e: "imported"): void;
+  (e: "import-custom"): void;
+  (e: "open-library"): void;
+  (e: "export", row: ScoreConfig): void;
+  (e: "export-bulk", ids: string[]): void;
 }>();
 
 const { t } = useI18n();
 const typeFilter = ref<DataType | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkExport() {
+  // Snapshot the ids before clearing so the parent receives a stable array
+  // and the table immediately reflects deselection.
+  const ids = [...selectedIds.value];
+  selectedIds.value = [];
+  emit("export-bulk", ids);
+}
 
 const typeOptions = computed(() => [
   { label: t("onlineEvals.scoreConfig.allTypes"), value: null },
@@ -162,15 +206,15 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.name"),
     accessorKey: "name",
     sortable: true,
-    size: "auto",
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "type",
     header: t("onlineEvals.scoreConfig.columns.type"),
     accessorFn: (row: ScoreConfig) => dataTypeOf(row),
     sortable: true,
-    size: 120,
+    size: COL.type,
     meta: { align: "left" },
   },
   {
@@ -178,6 +222,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.rangeValues"),
     accessorFn: (row: ScoreConfig) => rangeOrValues(row),
     sortable: false,
+    size: COL.description,
     meta: { align: "left" },
   },
   {
@@ -193,7 +238,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.activeVersion"),
     accessorKey: "version",
     sortable: true,
-    size: 140,
+    size: COL.version,
     meta: { align: "left" },
   },
   {
@@ -201,7 +246,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.usedBy"),
     accessorFn: (row: ScoreConfig) => usedByCount(row),
     sortable: true,
-    size: 160,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -209,7 +254,7 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.created"),
     accessorFn: (row: ScoreConfig) => rowCreated(row),
     sortable: true,
-    size: 180,
+    size: COL.createdAt,
     meta: { align: "left" },
   },
   {
@@ -217,8 +262,8 @@ const columns = computed(() => [
     header: t("onlineEvals.scoreConfig.columns.actions"),
     sortable: false,
     isAction: true,
-    size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    size: 140,
+    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
   },
 ]);
 
@@ -230,13 +275,21 @@ const filteredRows = computed(() =>
 
 const numberedRows = useNumberedRows(filteredRows);
 
-const showEmptyState = computed(
-  () =>
-    !props.loading &&
-    props.rows.length === 0 &&
-    !props.search &&
-    !typeFilter.value,
+// Drives OEmptyState's `:filtered` — true whenever the user has narrowed
+// the list (search or type filter). The filtered case auto-renders the
+// "No score configs match these filters" + Clear-filters card; the
+// first-run case shows the preset's "Create score config" CTA.
+const hasFilters = computed(
+  () => !!props.search?.trim() || !!typeFilter.value,
 );
+
+function onEmptyAction(id?: string) {
+  if (id === "create") emit("create");
+  else if (id === "clear-filters") {
+    emit("update:search", "");
+    typeFilter.value = null;
+  }
+}
 
 function rowCreated(row: ScoreConfig) {
   return Number(

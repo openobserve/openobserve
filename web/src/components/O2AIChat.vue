@@ -1400,6 +1400,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -2462,8 +2463,12 @@ export default defineComponent({
                         ? rawError
                         : JSON.stringify(rawError, null, 2);
 
-                    let errorMessage = `Error: ${errorText}`;
-                    if (data.suggestion) {
+                    // Check if this is an authorization/access error
+                    const authErr = isAuthError(errorText, data.error_type);
+                    let errorMessage = authErr
+                      ? UNAUTHORIZED_MESSAGE
+                      : `Error: ${errorText}`;
+                    if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
 
@@ -2757,12 +2762,24 @@ export default defineComponent({
                     }
 
                     // Add inline error block
+                    const rawErrorMessage =
+                      data.message || data.error || "An error occurred";
+                    const authErr = isAuthError(
+                      rawErrorMessage,
+                      data.error_type,
+                    );
                     const errorBlock: ContentBlock = {
                       type: "error",
-                      message: data.message || "An error occurred",
+                      message: authErr
+                        ? UNAUTHORIZED_MESSAGE
+                        : rawErrorMessage,
                       errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                      recoverable: data.recoverable ?? undefined,
+                      suggestion: authErr
+                        ? undefined
+                        : data.suggestion || undefined,
+                      recoverable: authErr
+                        ? false
+                        : data.recoverable ?? undefined,
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
@@ -2982,8 +2999,12 @@ export default defineComponent({
                       ? rawError
                       : JSON.stringify(rawError, null, 2);
 
-                  let errorMessage = `Error: ${errorText}`;
-                  if (data.suggestion) {
+                  // Check if this is an authorization/access error
+                  const authErr = isAuthError(errorText, data.error_type);
+                  let errorMessage = authErr
+                    ? UNAUTHORIZED_MESSAGE
+                    : `Error: ${errorText}`;
+                  if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
 
@@ -3150,12 +3171,24 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
+                  const rawErrorMessage =
+                    data.message || data.error || "An error occurred";
+                  const authErr = isAuthError(
+                    rawErrorMessage,
+                    data.error_type,
+                  );
                   const errorBlock: ContentBlock = {
                     type: "error",
-                    message: data.message || "An error occurred",
+                    message: authErr
+                      ? UNAUTHORIZED_MESSAGE
+                      : rawErrorMessage,
                     errorType: data.error_type || undefined,
-                    suggestion: data.suggestion || undefined,
-                    recoverable: data.recoverable ?? undefined,
+                    suggestion: authErr
+                      ? undefined
+                      : data.suggestion || undefined,
+                    recoverable: authErr
+                      ? false
+                      : data.recoverable ?? undefined,
                   };
                   let lastMessage = msgs[msgs.length - 1];
                   if (lastMessage && lastMessage.role === "assistant") {
@@ -4218,7 +4251,7 @@ export default defineComponent({
         let errorMessage: string;
         if (error.status === 403) {
           errorMessage =
-            "Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.";
+            UNAUTHORIZED_MESSAGE;
         } else if (error.message && error.message !== "No response body") {
           errorMessage = error.message;
         } else {

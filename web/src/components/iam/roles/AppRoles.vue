@@ -16,46 +16,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]">
-        <div
-          data-test="iam-roles-section-title"
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
+    <!-- Standard page header: title + actions only. Search moved into the
+         table's own toolbar (built-in global filter). -->
+    <AppPageHeader
+      :title="t('iam.roles')"
+      icon="shield"
+      :subtitle="'Define permissions and access policies'"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #actions>
+        <OButton
+          data-test="alert-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          @click="addRole"
         >
-          {{ t("iam.roles") }}
-        </div>
-        <div class="tw:flex tw:items-center tw:justify-end tw:gap-3">
-          <div data-test="iam-roles-search-input">
-            <OSearchInput
-              v-model="filterQuery"
-              class="tw:w-48"
-              :placeholder="t('iam.searchRole')"
-            />
-          </div>
-          <OButton
-            data-test="alert-list-add-alert-btn"
-            variant="primary"
-            size="sm"
-            class="tw:!h-8"
-            @click="addRole"
-          >
-            {{ t('iam.addRole') }}
-          </OButton>
-        </div>
+          {{ t('iam.addRole') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
+        <RoleTable
+          data-test="iam-roles-table-section"
+          :data="rows"
+          :loading="loading"
+          v-model:global-filter="filterQuery"
+          :selected-ids="selectedRoleNames"
+          @update:selected-ids="onSelectionChange"
+          @edit="editRole"
+          @delete="showConfirmDialog"
+          @bulk-delete="openBulkDeleteDialog"
+        />
       </div>
-    </div>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <RoleTable
-        data-test="iam-roles-table-section"
-        :data="rows"
-        :loading="loading"
-        :global-filter="filterQuery"
-        :selected-ids="selectedRoleNames"
-        @update:selected-ids="onSelectionChange"
-        @edit="editRole"
-        @delete="showConfirmDialog"
-        @bulk-delete="openBulkDeleteDialog"
-      />
     </div>
   </div>
   <AddRole
@@ -82,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,56 +18,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
 
     <div v-if="!showDestinationEditor && !showImportDestination" class="tw:flex tw:flex-col tw:h-full">
-      <div class="tw:flex-shrink-0">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end tw:gap-2 tw:items-center">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v; }"
-              data-test="destination-list-tabs"
-              class="tw:mr-2"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alert_destinations.filterAll") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-                <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-                {{ t("alert_destinations.filterPrebuilt") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-                <template #icon-left><OIcon name="settings" size="sm" /></template>
-                {{ t("alert_destinations.filterCustom") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="tw:h-[36px] tw:w-[200px]"
-              :placeholder="t('alert_destinations.search')"
-            />
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="importDestination"
-              data-test="destination-import"
-            >{{ t(`dashboard.import`) }}</OButton>
-            <OButton
-              data-test="alert-destination-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              :disabled="!templates.length"
-              @click="editDestination(null)"
-            >{{ t(`alert_destinations.add`) }}</OButton>
-          </div>
-        </div>
-      </div>
+      <AppPageHeader
+        :title="t('alert_destinations.header')"
+        icon="location-on"
+        subtitle="Where triggered alerts are delivered"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template #title>
+          <span data-test="alert-destinations-list-title">{{
+            t("alert_destinations.header")
+          }}</span>
+        </template>
+        <template #actions>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="(v) => { activeTab = v; }"
+            data-test="destination-list-tabs"
+          >
+            <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+              {{ t("alert_destinations.filterAll") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+              {{ t("alert_destinations.filterPrebuilt") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+              <template #icon-left><OIcon name="settings" size="sm" /></template>
+              {{ t("alert_destinations.filterCustom") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OButton
+            variant="outline"
+            size="sm"
+            @click="importDestination"
+            data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton>
+          <OButton
+            data-test="alert-destination-list-add-alert-btn"
+            variant="primary"
+            size="sm"
+            :disabled="!templates.length"
+            @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton>
+        </template>
+      </AppPageHeader>
       <div class="tw:flex-1 tw:min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -83,9 +78,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-alert-destinations"
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              data-test="destination-list-search-input"
+              class="tw:flex-1"
+              :placeholder="t('alert_destinations.search')"
+            />
+          </template>
+
           <template #bottom="{ totalRows }">
             <span class="o2-table-footer-title tw:text-primary">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
@@ -105,27 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <div
-              v-if="!templates.length"
-              class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
-            >
-              <div style="width: 600px" class="tw:mt-6">
-                <div class="tw:text-base tw:font-medium">
-                  It looks like you haven't created any Templates yet. To create
-                  an Alert, you'll need to have at least one Destination and one
-                  Template in place
-                </div>
-                <OButton
-                  variant="primary"
-                  size="sm"
-                  class="tw:mt-3"
-                  @click="routeTo('alertTemplates')"
-                >Create Template</OButton>
-              </div>
-            </div>
-            <template v-else>
-              <NoData />
-            </template>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-destinations"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
           </template>
 
           <template #cell-template="{ row }">
@@ -261,7 +254,7 @@ import {
 } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
@@ -284,10 +277,12 @@ import OBadge from '@/lib/core/Badge/OBadge.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcutScope } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -298,7 +293,7 @@ export default defineComponent({
   components: {
     OIcon,
     AddDestination,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     ImportDestination,
     OButton,
@@ -308,6 +303,7 @@ export default defineComponent({
     OTable,
     OToggleGroup,
     OToggleGroupItem,
+    AppPageHeader,
   },
   setup() {
     const store = useStore();
@@ -323,7 +319,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -331,21 +327,29 @@ export default defineComponent({
         header: t("alert_destinations.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "type",
         header: "Type",
         accessorKey: "type",
         sortable: true,
-        size: 180,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
         id: "url",
         header: t("alert_destinations.url"),
         accessorKey: "url",
-        size: 200,
+        resizable: true,
+        hideable: true,
+        size: COL.url,
         meta: { align: "left" },
       },
       {
@@ -353,7 +357,9 @@ export default defineComponent({
         header: t("alert_destinations.template"),
         accessorKey: "template",
         sortable: true,
-        size: 280,
+        resizable: true,
+        hideable: true,
+        size: COL.template,
         meta: { align: "left" },
       },
       {
@@ -361,7 +367,9 @@ export default defineComponent({
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
-        size: 150,
+        resizable: true,
+        hideable: true,
+        size: COL.method,
         meta: { align: "left" },
       },
       {

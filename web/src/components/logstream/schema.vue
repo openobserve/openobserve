@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="indexData.name"
               :class="[
-                'tw:font-bold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-semibold tw:mr-4 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -348,7 +348,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Cross-Linking Tab -->
                       <OTab
-                        v-if="store.state.zoConfig?.enable_cross_linking"
+                        v-if="
+                          isCrossLinkingEnabledForStream(
+                            store.state.zoConfig,
+                            indexData.stream_type,
+                          )
+                        "
                         name="crossLinking"
                         icon="link"
                         :label="t('crossLinks.header')"
@@ -507,12 +512,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row-key="name"
                       selection="multiple"
                       :selected-ids="selectedSchemaIds"
+                      :is-row-selectable="isSchemaRowSelectable"
                       @update:selected-ids="handleSchemaSelectedIdsUpdate"
                       @selection-change="handleSchemaSelectionChange"
                       pagination="client"
                       :page-size="selectedPerPage"
                       :page-size-options="perPageOptionsList"
                       :show-global-filter="false"
+                      :default-columns="false"
                       dense
                       class="o2-schema-table"
                       :style="{ height: '100%', width: '100%' }"
@@ -521,12 +528,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="tw:flex tw:items-center">
                           <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
-                            <OTooltip
-                              v-if="row.name.length > 30"
-                              class="tw:text-[12px]"
-                            >
-                              {{ row.name }}
-                            </OTooltip>
                           </span>
                           <span
                             v-if="isEnvQuickModeField(row.name)"
@@ -759,6 +760,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :page-size="selectedPerPage"
                         :page-size-options="perPageOptionsList"
                         :show-global-filter="false"
+                        :default-columns="false"
                         dense
                         :class="
                           store.state.theme == 'dark'
@@ -1021,6 +1023,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -1041,6 +1044,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 
 const defaultValue: any = () => {
   return {
@@ -1219,6 +1223,15 @@ export default defineComponent({
         );
       },
     });
+
+    // The _timestamp and allFields rows are never part of the selection (they
+    // are filtered out below). Tell the table they are non-selectable so the
+    // header "Select All" toggle only considers real rows — otherwise it can
+    // never reach a fully-selected state and stays stuck in select-only mode,
+    // breaking deselect-all.
+    const isSchemaRowSelectable = (row: any) =>
+      row.name !== store.state.zoConfig.timestamp_column &&
+      row.name !== allFieldsName.value;
 
     const handleSchemaSelectedIdsUpdate = (ids: string[]) => {
       selectedSchemaIds.value = ids;
@@ -2004,12 +2017,14 @@ export default defineComponent({
         header: t("logStream.propertyName"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "settings",
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
+        size: COL.method,
         meta: { align: "left" },
       },
       {
@@ -2017,6 +2032,7 @@ export default defineComponent({
         header: t("logStream.propertyType"),
         accessorKey: "type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -2024,6 +2040,7 @@ export default defineComponent({
         header: t("logStream.indexType"),
         accessorKey: "index_type",
         sortable: false,
+        size: 220,
         meta: { align: "left" },
       },
       // Only show patterns column for enterprise builds
@@ -2034,6 +2051,7 @@ export default defineComponent({
               header: t("logStream.regexPatterns"),
               accessorKey: "patterns",
               sortable: false,
+              size: COL.template,
               meta: { align: "left" },
             },
           ]
@@ -2046,13 +2064,15 @@ export default defineComponent({
         header: t("logStream.extendedStartDate"),
         accessorKey: "start",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.date,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "end",
         header: t("logStream.extendedEndDate"),
         accessorKey: "end",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
     ];
@@ -2646,6 +2666,7 @@ export default defineComponent({
       dateChangeValue,
       isCloud,
       indexData,
+      isCrossLinkingEnabledForStream,
       getSchema,
       onSubmit,
       updateSettingsForm,
@@ -2701,6 +2722,7 @@ export default defineComponent({
       perPageOptionsList,
       filteredSchemaData,
       selectedSchemaIds,
+      isSchemaRowSelectable,
       handleSchemaSelectedIdsUpdate,
       handleSchemaSelectionChange,
       selectedDateIds,

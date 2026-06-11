@@ -70,7 +70,7 @@ const isDestructiveIcon = computed<boolean>(() =>
       :alt="label || ''"
       class="tw:size-full tw:object-contain"
     />
-    <!-- Registry icon -->
+    <!-- Registry icon (Material Symbols, regular weight — the main-branch look). -->
     <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" />
     <slot />
   </span>

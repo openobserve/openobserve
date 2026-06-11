@@ -97,7 +97,6 @@ describe("Custom Component", () => {
     });
 
     it("should initialize with correct data", () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
       expect(wrapper.vm.currentUserEmail).toBeDefined();
       expect(wrapper.vm.tabs).toBeDefined();
       expect(typeof wrapper.vm.copyToClipboardFn).toBe("function");
@@ -852,20 +851,13 @@ describe("Custom Component", () => {
   describe("Reactive Data", () => {
     it("should update tabs reactively", async () => {
       expect(wrapper.vm.tabs).toBe("ingestLogs");
-      
+
+      // Use a non-"custom" route so the onUpdated hook does not reset the tab.
+      mockRouter.currentRoute.value.name = "ingestMetrics";
       wrapper.vm.tabs = "ingestMetrics";
       await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.tabs).toBe("ingestMetrics");
-    });
 
-    it("should have reactive splitterModel", async () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
-      
-      wrapper.vm.splitterModel = 300;
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.splitterModel).toBe(300);
+      expect(wrapper.vm.tabs).toBe("ingestMetrics");
     });
 
     it("should have reactive currentOrgIdentifier", () => {

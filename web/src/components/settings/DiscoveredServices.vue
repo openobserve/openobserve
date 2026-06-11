@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Grouped Services Table -->
-      <div class="tw:w-full tw:h-full">
+      <div class="tw:h-full tw:-mx-4">
         <div class="tw:h-[calc(100vh-21.25rem)]">
           <OTable
             :data="refreshing ? [] : filteredGroups"
@@ -170,6 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             sorting="client"
             filter-mode="client"
             :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-discovered-services"
             :show-global-filter="false"
             expansion="multi"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
@@ -180,6 +183,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:expanded-ids="syncExpansion"
             @row-click="handleRowClick"
           >
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-discovered-services"
+                :filtered="!!searchQuery"
+                :hide-action="!searchQuery"
+                @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              />
+            </template>
             <template #cell-service_name="{ row }">
               <div v-if="row.__type === 'group'" class="tw:flex tw:items-center tw:gap-2">
                 <span class="tw:font-semibold">{{ row.service_name }}</span>
@@ -504,6 +516,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -626,12 +639,17 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.serviceName"),
     accessorKey: "service_name",
     sortable: true,
-    meta: { align: "left", autoWidth: true },
+    resizable: true,
+    hideable: true,
+    minSize: 160,
+    meta: { align: "left", flex: true },
   },
   {
     id: "telemetry",
     header: t("settings.correlation.telemetryCoverage"),
     accessorKey: "telemetry",
+    resizable: true,
+    hideable: true,
     size: 260,
     meta: { align: "left" },
   },
@@ -640,6 +658,8 @@ const columns: OTableColumnDef[] = [
     header: t("settings.correlation.lastSeen"),
     accessorKey: "lastSeen",
     sortable: true,
+    resizable: true,
+    hideable: true,
     size: 120,
     meta: { align: "left" },
   },

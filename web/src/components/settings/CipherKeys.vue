@@ -18,33 +18,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
     <div v-if="!showAddDialog" class="tw:flex tw:flex-col tw:h-full">
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px] tw:flex-shrink-0"
+      <!-- Standard section header: title + actions only. Search moved into the
+           table's own toolbar below. -->
+      <AppPageHeader
+        :title="t('cipherKey.header')"
+        icon="key"
+        :subtitle="'Encryption keys for sensitive fields'"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-              data-test="cipher-keys-list-title"
-            >
-              {{ t("cipherKey.header") }}
-            </div>
-            <div class="col-auto tw:flex">
-              <OSearchInput
-                v-model="filterQuery"
-                class="tw:ml-auto no-border o2-search-input"
-                :placeholder="t('cipherKey.search')"
-              />
-              <OButton
-                variant="primary"
-                size="sm"
-                class="tw:ml-2"
-                @click="addCipherKey"
-                data-test="cipher-keys-add-btn"
-              >
-                {{ t(`cipherKey.add`) }}
-              </OButton>
-            </div>
-          </div>
-      <div class="tw:flex-1 tw:min-h-0">
+        <template #actions>
+          <OButton
+            variant="primary"
+            size="sm"
+            @click="addCipherKey"
+            data-test="cipher-keys-add-btn"
+          >
+            {{ t(`cipherKey.add`) }}
+          </OButton>
+        </template>
+      </AppPageHeader>
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
+        :frame="false"
         :data="visibleRows"
         :columns="columns"
         row-key="name"
@@ -58,10 +53,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-cipher-keys"
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
-        <template #empty><NoData /></template>
+        <template #toolbar>
+          <OSearchInput
+            v-model="filterQuery"
+            class="tw:flex-1"
+            :placeholder="t('cipherKey.search')"
+          />
+        </template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-cipher-keys"
+            :filtered="!!filterQuery"
+            :hide-action="!filterQuery"
+            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+          />
+        </template>
         <template #cell-actions="{ row }">
           <OButton
             :data-test="`cipherkey-list-${row.name}-update`"
@@ -132,7 +145,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
@@ -144,11 +157,14 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    NoData,
+    AppPageHeader,
+    OEmptyState,
     AddCipherKey,
     ConfirmDialog,
     OButton,
@@ -168,7 +184,7 @@ export default defineComponent({
         id: "#",
         header: "#",
         accessorKey: "#",
-        size: 67,
+        size: TABLE_INDEX_COL_SIZE,
         meta: { align: "left" },
       },
       {
@@ -176,14 +192,20 @@ export default defineComponent({
         header: t("cipherKey.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left", autoWidth: true },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "store_type",
         header: t("cipherKey.storeType"),
         accessorKey: "store_type",
         sortable: true,
-        size: 150,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -191,7 +213,9 @@ export default defineComponent({
         header: t("cipherKey.mechanismType"),
         accessorKey: "mechanism_type",
         sortable: true,
-        size: 150,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {

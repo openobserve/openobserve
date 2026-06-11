@@ -20,12 +20,28 @@ export interface OTabsProps {
   dense?: boolean
   /** Adds a bottom border matching the design-system border color token. Default: false */
   bordered?: boolean
+  /**
+   * Enables drag-to-reorder. OTabs only reports the intended move via the
+   * `reorder` event (by tab `name`); the parent owns the tab list/order and is
+   * responsible for applying it. Default: false
+   */
+  reorderable?: boolean
 }
 
 export interface OTabsEmits {
   (e: 'update:modelValue', value: string | number): void
   /** Fired after the active tab changes (same value as update:modelValue) */
   (e: 'change', value: string | number): void
+  /**
+   * Fired when a tab is dropped onto another (reorderable mode). `from` is the
+   * dragged tab's name, `to` is the drop-target tab's name, and `before`
+   * indicates the drop side (true = insert before the target, false = after) as
+   * determined by the pointer position. The parent moves `from` accordingly.
+   */
+  (
+    e: 'reorder',
+    payload: { from: string | number; to: string | number; before: boolean },
+  ): void
 }
 
 export interface OTabsSlots {
@@ -43,6 +59,14 @@ export interface TabsContext {
   isVertical: boolean
   /** Whether the tab bar is in dense mode */
   dense: boolean
+  /** Whether tabs can be dragged to reorder (sets draggable on each tab) */
+  reorderable: boolean
+  /** Name of the tab currently being dragged (null when not dragging) */
+  draggingName: string | number | null
+  /** Name of the tab the pointer is hovering as a drop target (null = none) */
+  dropTargetName: string | number | null
+  /** Drop side for the current drop target: true = before, false = after */
+  dropBefore: boolean
 }
 
 /** Symbol key used for provide / inject */

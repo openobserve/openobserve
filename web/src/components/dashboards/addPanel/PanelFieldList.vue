@@ -1,9 +1,18 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:p-1.5! tw:flex tw:flex-col">
-    <div class="tw:ml-1 tw:my-2 tw:text-base tw:font-bold tw:flex-shrink-0">
-      {{ t("panel.fields") }}
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel tw:border-r tw:border-border-default">
+    <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:my-3">
+      <span class="tw:text-base tw:font-bold">{{ t("panel.fields") }}</span>
+      <OButton
+        variant="outline"
+        size="icon-xs-sq"
+        class="tw:rotate-90"
+        icon-left="unfold-less"
+        :title="t('panel.collapseFields')"
+        data-test="panel-field-list-collapse-btn"
+        @click="emit('collapse')"
+      />
     </div>
     <OFieldList
       ref="fieldListRef"
@@ -15,7 +24,7 @@
       :page-size-options="[250]"
       :show-pagination="true"
       :current-page="currentPage"
-      row-key="name"
+      row-key="_uid"
       :draggable="!hideAllFieldsSelection && !promqlMode"
       :drag-enabled-fn="isRowDragEnabled"
       :sort-fn="sortFieldsFn"
@@ -465,6 +474,7 @@ const { t } = useI18n();
 const { getStreams, getStream } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
+const emit = defineEmits<{ collapse: [] }>();
 
 const {
   dashboardPanelData,
@@ -680,7 +690,19 @@ watch(
         .fields.stream_type === dashboardPanelData.meta.stream.streamResultsType
     ) {
       try {
-        if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
+        // On stream change in PromQL mode, reset the query to `${stream}{}`.
+        // Metrics: custom + builder. Add Panel: PromQL custom only (builder
+        // regenerates via DashboardQueryBuilder; SQL is excluded — promql-only block).
+        const promqlQuery =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
+        const shouldResetPromqlQuery =
+          promqlMode.value &&
+          (dashboardPanelDataPageKey === "metrics" ||
+            (dashboardPanelDataPageKey === "dashboard" &&
+              promqlQuery?.customQuery));
+        if (shouldResetPromqlQuery) {
           let parsedQuery = null;
           try {
             parsedQuery = parsePromQlQuery(
@@ -850,6 +872,18 @@ const flattenGroupedFields = computed(() => {
         });
       });
     }
+  });
+
+  // Field names can legitimately repeat across stream groups (joins,
+  // multi-stream, or custom/function fields overlapping schema fields), so
+  // keying the list by `name` produces DUPLICATE Vue keys. Duplicate keys
+  // corrupt list patching on update — most visibly, the search filter appears
+  // to stop working after the field set grows (e.g. after switching query
+  // tabs). Give every row a guaranteed-unique key (index-prefixed) instead.
+  flattenedFields.forEach((row: any, i: number) => {
+    row._uid = `${i}:${
+      row.isGroup ? "g:" + row.groupName : (row.stream ?? "") + ":" + row.name
+    }`;
   });
 
   return flattenedFields;

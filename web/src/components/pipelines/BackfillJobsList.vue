@@ -17,78 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="backfill-jobs-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
   >
-    <!-- Header -->
-    <div class="tw:shrink-0">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:h-[68px]"
-        >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              @click="goBack"
-              data-test="backfill-jobs-back-btn"
-              icon-left="chevron-left"
-            />
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">
-              Backfill Jobs
-            </div>
-          </div>
-          <div class="tw:flex tw:ml-auto tw:ps-2 tw:items-center tw:gap-2">
-            <!-- Filters -->
-            <OSelect
-              v-model="filters.status"
-              :options="allStatusOptions"
-              placeholder="Status"
-              clearable
-              searchable
-              class="tw:w-[150px]"
-              data-test="status-filter"
-            />
-            <OSelect
-              v-model="filters.pipelineId"
-              :options="allPipelineOptions"
-              labelKey="label"
-              valueKey="value"
-              placeholder="Pipeline"
-              clearable
-              searchable
-              class="tw:w-[250px]"
-              data-test="pipeline-filter"
-            />
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="clearFilters"
-              data-test="clear-filters-btn"
-            >
-              Clear Filters
-            </OButton>
-            <OButton
-              variant="ghost-muted"
-              size="icon-sm"
-              @click="refreshJobs"
-              :disabled="loading"
-              data-test="refresh-btn"
-              icon-left="refresh"
-            >
-              <OTooltip content="Refresh" side="top" />
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
+         next to the "Pipelines › Backfill Jobs" breadcrumb.
+         `defer` (Vue 3.5+) waits for the target to be rendered in the same
+         tick — needed because #o2-page-actions is created by the parent shell
+         (Functions.vue) which may not have fully rendered when this component
+         mounts on initial page load. -->
+    <Teleport to="#o2-page-actions" defer>
+      <OSelect
+        v-model="filters.status"
+        :options="allStatusOptions"
+        placeholder="Status"
+        clearable
+        searchable
+        class="tw:w-[150px]"
+        data-test="status-filter"
+      />
+      <OSelect
+        v-model="filters.pipelineId"
+        :options="allPipelineOptions"
+        labelKey="label"
+        valueKey="value"
+        placeholder="Pipeline"
+        clearable
+        searchable
+        class="tw:w-[250px]"
+        data-test="pipeline-filter"
+      />
+      <OButton
+        variant="outline"
+        size="sm"
+        @click="clearFilters"
+        data-test="clear-filters-btn"
+      >
+        Clear Filters
+      </OButton>
+      <OButton
+        variant="ghost-muted"
+        size="icon-sm"
+        @click="refreshJobs"
+        :disabled="loading"
+        data-test="refresh-btn"
+        icon-left="refresh"
+      >
+        <OTooltip content="Refresh" side="top" />
+      </OButton>
+    </Teleport>
 
     <!-- Jobs Table -->
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <div class="card-container tw:h-full">
           <OTable
             ref="qTableRef"
+            :frame="false"
             :data="filteredJobs"
             :columns="columns"
+            :default-columns="false"
             row-key="job_id"
             :loading="loading"
             pagination="client"
@@ -103,7 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Empty State -->
             <template #empty>
-              <NoData />
+              <OEmptyState
+                size="hero"
+                preset="no-backfill-jobs"
+                :filtered="!!(filters.status || filters.pipelineId)"
+                :hide-action="!(filters.status || filters.pipelineId)"
+                @action="(id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))"
+              />
             </template>
 
             <!-- Bottom footer -->
@@ -304,7 +296,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
 import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
@@ -315,15 +306,15 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import BackfillJobDetails from "./BackfillJobDetails.vue";
 import EditBackfillJobDialog from "./EditBackfillJobDialog.vue";
-import NoData from "../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const router = useRouter();
 const store = useStore();
 
 // Refs
@@ -357,11 +348,11 @@ const selectedPerPage = ref(10);
 const perPageOptionsList = [10, 20, 50, 100];
 
 const columns: OTableColumnDef[] = [
-  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, meta: { align: "left" } },
-  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, meta: { align: "left" } },
-  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, meta: { align: "left" } },
+  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
+  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
+  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: COL.description, meta: { align: "left" } },
+  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
+  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
   { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
 ];
 
@@ -462,10 +453,6 @@ const clearFilters = () => {
 
 const refreshJobs = () => {
   loadJobs();
-};
-
-const goBack = () => {
-  router.back();
 };
 
 const viewJob = (job: BackfillJob) => {

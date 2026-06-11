@@ -21,27 +21,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="tw:mb-2 stepper-header tw:w-full tw:flex tw:h-full">
       <div
         :class="store.state.isAiChatEnabled ? 'tw:w-[75%]' : 'tw:w-[100%]'"
-        style="height: 100% !important"
+        style="height: 100% !important; display: flex;"
       >
+        <!-- Collapsed field list bar (shown when hidden) -->
+        <div
+          v-if="collapseFields"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer"
+          style="width: 50px; height: 100%"
+          data-test="scheduled-pipeline-field-list-collapsed-bar"
+          @click="collapseFieldList"
+        >
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90" />
+          <div class="field-list-collapsed-title">{{ t("pipeline.buildQuery") }}</div>
+        </div>
+
         <OSplitter
           v-model="splitterModel"
-          style="width: 100%"
+          :style="{ width: collapseFields ? 'calc(100% - 50px)' : '100%' }"
           class="o2-custom-splitter"
         >
           <template #before>
-            <OSplitter
-              v-model="sideBarSplitterModel"
-              style="width: 100%; height: calc(100vh - 90px) !important"
-              class="tw:h-full"
-              horizontal
+            <div style="display: flex; flex-direction: column; height: 100%;">
+            <!-- Left panel header with collapse button -->
+            <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:px-2 tw:py-1.5 tw:border-b tw:border-border-default tw:bg-surface-panel">
+              <span class="tw:font-semibold tw:text-sm">{{ t("pipeline.buildQuery") }}</span>
+              <OButton
+                variant="outline"
+                size="icon-xs-sq"
+                class="tw:rotate-90"
+                icon-left="unfold-less"
+                :title="t('search.collapseFields')"
+                data-test="scheduled-pipeline-collapse-btn"
+                @click="collapseFieldList"
+              />
+            </div>
+            <div class="tw:pl-2 tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+            <div
+              style="width: 100%; overflow-y: auto;"
+              class="tw:flex-1 tw:min-h-0"
             >
-              <template #before>
-                <!-- fieldlist section — flex column so FieldList fills remaining height -->
+                <!-- fieldlist section -->
                 <div
                   style="
                     display: flex;
                     flex-direction: column;
-                    height: 100%;
                     overflow: hidden;
                   "
                 >
@@ -54,14 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="query"
                       v-model:is-expanded="expandState.buildQuery"
                       :label="t('pipeline.buildQuery')"
-                      class="tw:mt-1"
                     />
                   </span>
                   <div
                     v-show="expandState.buildQuery"
                     style="
-                      flex: 1;
-                      min-height: 0;
                       display: flex;
                       flex-direction: column;
                       padding-top: 8px;
@@ -83,6 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         :label="t('alerts.stream_name')"
+                        :placeholder="t('pipeline.selectStream')"
+                        :loading="streamsLoading"
                         class="tw:my-1 no-case tw:w-full"
                         data-test="scheduled-pipeline-stream-name-select"
                         @update:model-value="getStreamFields"
@@ -90,9 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
 
-                    <!-- FieldList grows to fill remaining height and scrolls internally -->
+                    <!-- FieldList scrolls within a capped height -->
                     <div
-                      style="flex: 1; min-height: 0; overflow: hidden"
+                      style="max-height: 40vh; overflow-y: auto;"
                       class="pipeline-field-list-wrapper"
                     >
                       <GroupedFieldList
@@ -190,8 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </template>
-              <template #after>
                 <span
                   @click.stop="
                     expandState.setVariables = !expandState.setVariables
@@ -207,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-show="expandState.setVariables"
-                  class="tw:flex tw:flex-col tw:pl-2 tw:pr-2 tw:pt-4 tw:h-full tw:overflow-y-auto"
+                  class="tw:flex tw:flex-col tw:pt-2"
                 >
                   <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
                     <div
@@ -793,26 +813,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                   ></div>
                 </div>
-              </template>
-            </OSplitter>
+            </div>
+            </div>
+            </div>
           </template>
           <template #separator>
-            <OButton
-              data-test="logs-search-field-list-collapse-btn"
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
-              :title="
-                collapseFields
-                  ? t('search.collapseFields')
-                  : t('search.openFields')
-              "
-              @click="collapseFieldList"
-              :icon-left="collapseFields ? 'chevron-right' : 'chevron-left'"
-            />
+            <div class="splitter-vertical splitter-enabled"></div>
           </template>
           <template #after>
-            <div class="tw:w-full tw:flex tw:flex-col" style="height: 100%">
+            <div class="tw:w-full tw:flex tw:flex-col tw:border-l tw:border-border-default" style="height: 100%">
               <div
                 class="tw:flex-1 tw:overflow-auto"
                 style="height: calc(100vh - 200px) !important; width: 100%"
@@ -827,25 +836,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t('pipeline.sqlQuery')
                           : t('pipeline.promqlQuery')
                       "
-                      class="tw:mt-1"
                     />
                   </span>
-                  <UnifiedQueryEditor
-                    v-show="expandState.query"
-                    data-test="scheduled-pipeline-sql-editor"
-                    ref="pipelineEditorRef"
-                    :languages="tab === 'promql' ? ['promql'] : ['sql']"
-                    :default-language="tab === 'promql' ? 'promql' : 'sql'"
-                    :query="query"
-                    :disable-ai="!selectedStreamName"
-                    :disable-ai-reason="t('search.selectStreamForAI')"
-                    @update:query="updateQueryValue"
-                    @run-query="runQuery"
-                    editor-height="calc(100vh - 190px)"
-                  />
-                </div>
+                  <div class="tw:relative">
+                    <UnifiedQueryEditor
+                      v-show="expandState.query"
+                      data-test="scheduled-pipeline-sql-editor"
+                      ref="pipelineEditorRef"
+                      :languages="tab === 'promql' ? ['promql'] : ['sql']"
+                      :default-language="tab === 'promql' ? 'promql' : 'sql'"
+                      :query="query"
+                      :keywords="effectiveKeywords"
+                      :suggestions="effectiveSuggestions"
+                      :disable-ai="!selectedStreamName"
+                      :disable-ai-reason="t('search.selectStreamForAI')"
+                      @update:query="updateQueryValue"
+                      @run-query="runQuery"
+                      @focus="() => { queryEditorPlaceholderFlag = false; _sqlOnFocus(); }"
+                      @blur="onBlurQueryEditor"
+                      editor-height="calc(100vh - 190px)"
+                    />
+                    <div
+                      v-if="!query && queryEditorPlaceholderFlag && expandState.query"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+                    </div>
+                  </div>
 
-                <div>
+                  <div>
                   <span @click.stop="expandState.output = !expandState.output">
                     <FullViewContainer
                       name="output"
@@ -921,6 +940,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :dateTime="dateTime"
                     />
                   </div>
+                </div>
                 </div>
               </div>
 
@@ -1072,7 +1092,10 @@ import config from "../../../aws-exports";
 
 import useAiChat from "@/composables/useAiChat";
 import { onBeforeUnmount } from "vue";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
+import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1219,6 +1242,13 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
+
+const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
+  useSqlEditorDiagnostics({
+    queryEditorRef: pipelineEditorRef,
+    sqlMode: computed(() => tab.value === "sql"),
+    query: computed(() => query.value ?? ""),
+  });
 const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
@@ -1233,6 +1263,10 @@ const streamFields: any = ref([]);
 const previewPromqlQueryRef: any = ref(null);
 const isHovered = ref(false);
 const loading = ref(false);
+const streamsLoading = ref(false);
+// Flag to prevent the "stream changed → generate default query" watch from
+// firing when the stream name is updated programmatically from the SQL text.
+const isSyncingStreamFromQuery = ref(false);
 
 const aiChatInputContext = ref("");
 const aiChatAppendMode = ref(true);
@@ -1249,6 +1283,27 @@ const {
   cancelFieldStream,
   resetFieldValues,
 } = useFieldValuesStream();
+
+// ─── Query editor typewriter placeholder ─────────────────────────────
+const isSqlMode = computed(() => tab.value === "sql");
+const noStream = computed(() => !selectedStreamName.value);
+const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+  streamFields,
+  fieldValues,
+  isSqlMode,
+  noStream,
+  { noStreamText: t("pipeline.queryEditorPlaceholder") },
+);
+
+// ─── Auto-suggestions (same composable as logs page) ─────────────────
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+  updateStreamKeywords,
+} = useSqlSuggestions();
 
 const PERCENTILE_LABELS = [
   { key: "p25", label: "P25" },
@@ -1343,12 +1398,15 @@ watch(
   },
 );
 
-// Watch for stream name changes and auto-generate query
+// Watch for stream name changes and auto-generate query.
+// Skipped when the name change originated from parsing the SQL the user typed
+// (isSyncingStreamFromQuery = true) to avoid overwriting their edits.
 watch(
   () => selectedStreamName.value,
   (newStreamName, oldStreamName) => {
+    if (isSyncingStreamFromQuery.value) return;
     if (newStreamName && oldStreamName && oldStreamName !== newStreamName) {
-      // Stream changed: Generate default query for the new stream
+      // Stream changed via dropdown: generate a default query for the new stream
       if (tab.value === "sql") {
         query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
@@ -1357,7 +1415,7 @@ watch(
         updateQueryValue(query.value);
       }
     } else if (!oldStreamName && newStreamName) {
-      // Initial stream selection: Generate default query
+      // Initial stream selection: generate default query only when editor is empty
       if (tab.value === "sql" && !query.value.trim()) {
         query.value = `SELECT max(_timestamp) as _timestamp, count(_timestamp) as total_events\nFROM "${newStreamName}"\nGROUP BY histogram(_timestamp)`;
         updateQueryValue(query.value);
@@ -1367,6 +1425,15 @@ watch(
       }
     }
   },
+);
+
+// Keep auto-suggest field keywords in sync with the loaded stream fields
+watch(
+  () => streamFields.value,
+  (fields) => {
+    if (fields?.length) updateFieldKeywords(fields);
+  },
+  { immediate: true, deep: false },
 );
 
 watch(
@@ -1641,13 +1708,45 @@ const removeField = (field: any) => {
 };
 
 const updateQueryValue = (value: string) => {
+  _sqlOnQueryChange();
   query.value = value;
 
   if (tab.value === "sql") emits("update:sql", value);
   if (tab.value === "promql") emits("update:promql", value);
 
   emits("input:update", "query", value);
+
+  // Feed auto-suggest with the current query and context
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = pipelineEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.popup.open = pipelineEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = selectedStreamType.value;
+  autoCompleteData.value.streamName = selectedStreamName.value;
+  getSuggestions();
+
+  // Sync stream name from SQL as user types
+  if (tab.value === "sql") debouncedSyncStreamFromQuery(value);
 };
+
+// Debounced helper: read the FROM stream name from the SQL query the user is
+// typing and sync it to the stream-name dropdown WITHOUT triggering the
+// "stream changed → regenerate default query" watch.
+const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
+  if (!sql || !parser) return;
+  try {
+    const parsed = parser.parse(sql);
+    const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
+    if (fromStream && fromStream !== selectedStreamName.value) {
+      isSyncingStreamFromQuery.value = true;
+      selectedStreamName.value = fromStream;
+      await getStreamFields();
+      isSyncingStreamFromQuery.value = false;
+    }
+  } catch {
+    // ignore parse errors while user is mid-typing
+  }
+}, 600);
 
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
@@ -1867,8 +1966,9 @@ const filterFunctionOptions = (val: string, update: any) => {
   });
 };
 
-const onBlurQueryEditor = debounce(() => {
+const onBlurQueryEditor = debounce(async () => {
   queryEditorPlaceholderFlag.value = true;
+  await _sqlOnBlur();
   emits("validate-sql");
 }, 10);
 
@@ -2246,7 +2346,7 @@ const filterStreams = (val: string, update: any) => {
       // Only fetch if we haven't loaded this stream type yet
       if (
         !loadedStreamTypes.value.has(selectedStreamType.value) &&
-        !loading.value
+        !streamsLoading.value
       ) {
         getStreamList();
       }
@@ -2266,8 +2366,8 @@ const filterStreams = (val: string, update: any) => {
 
 // Modify getStreamList to store the full list
 async function getStreamList() {
-  if (loading.value) return;
-  loading.value = true;
+  if (streamsLoading.value) return;
+  streamsLoading.value = true;
 
   try {
     const res: any = await getStreams(selectedStreamType.value, false);
@@ -2277,6 +2377,8 @@ async function getStreamList() {
       label: stream.name,
       value: stream.name,
     }));
+    // Update stream keywords for auto-suggest FROM clause
+    updateStreamKeywords(streams.value.map((s: any) => ({ name: s.name })));
     // Mark this stream type as loaded
     loadedStreamTypes.value.add(selectedStreamType.value);
   } catch (err) {
@@ -2284,19 +2386,18 @@ async function getStreamList() {
     streams.value = [];
     filteredStreams.value = [];
   } finally {
-    loading.value = false;
+    streamsLoading.value = false;
   }
 }
 
-// Clear loaded streams when stream type changes
+// Reload streams whenever the stream type changes
 watch(
   () => selectedStreamType.value,
   () => {
     streams.value = [];
     filteredStreams.value = [];
-    if (!loadedStreamTypes.value.has(selectedStreamType.value)) {
-      getStreamList();
-    }
+    loadedStreamTypes.value.delete(selectedStreamType.value);
+    getStreamList();
   },
 );
 
@@ -2691,6 +2792,9 @@ defineExpose({
   sendToAiChat,
   aiChatInputContext,
   aiChatAppendMode,
+  effectiveKeywords,
+  effectiveSuggestions,
+  streamsLoading,
 });
 </script>
 
@@ -2706,6 +2810,62 @@ defineExpose({
 
 .scheduled-pipeline-footer {
   border-top: 1px solid var(--o2-border-color);
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.body--dark .query-editor-placeholder-overlay {
+  .query-editor-placeholder-typewriter {
+    color: #718096;
+  }
+}
+
+// Collapsed sidebar bar (mirrors PanelEditor pattern)
+.field-list-sidebar-header-collapsed {
+  cursor: pointer;
+  width: 50px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.field-list-collapsed-icon {
+  margin-top: 10px;
+  font-size: 20px;
+}
+
+.field-list-collapsed-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-weight: bold;
+  font-size: 12px;
 }
 </style>
 <style lang="scss">
@@ -2760,8 +2920,7 @@ defineExpose({
       width: 100%;
     }
     .query-editor-container {
-      width: 97% !important;
-      border: 1px solid $border-color;
+      width: 100% !important;
     }
 
     .q-btn {

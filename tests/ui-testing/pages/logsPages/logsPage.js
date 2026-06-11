@@ -1812,7 +1812,7 @@ export class LogsPage {
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                await expect(searchResult).toContainText('1 to 10', { timeout: 10000 });
                 return;
             } catch (e) {
                 if (attempt < 3) {
@@ -1821,7 +1821,7 @@ export class LogsPage {
             }
         }
         // Final attempt — let it throw
-        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
+        await expect(searchResult).toContainText('1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
@@ -1829,13 +1829,13 @@ export class LogsPage {
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
-                expectedPattern = 'Showing 11 to 20 out of';
+                expectedPattern = '11 to 20 out of';
                 break;
             case '3':
-                expectedPattern = 'Showing 21 to 30 out of';
+                expectedPattern = '21 to 30 out of';
                 break;
             case '4':
-                expectedPattern = 'Showing 31 to';
+                expectedPattern = '31 to';
                 break;
             default:
                 expectedPattern = expectedText;
@@ -4290,8 +4290,10 @@ export class LogsPage {
     }
 
     async isQueryEditorExpanded() {
-        const container = this.page.locator(this.queryEditorContainer);
-        return await container.locator(this.expandOnFocusClass).count() > 0;
+        // editor-fullscreen is added to the container itself, not a child element.
+        // Use a combined selector (.query-editor-container.editor-fullscreen) instead of
+        // container.locator('.editor-fullscreen') which would search descendants only.
+        return await this.page.locator(`${this.queryEditorContainer}${this.expandOnFocusClass}`).count() > 0;
     }
 
     async toggleQueryEditorFullScreen() {
@@ -4389,7 +4391,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('button[data-test="function-stream-tab"]').click();
+        return await this.page.locator('[data-test="pipeline-section-tab-functions"]').click();
     }
 
     async clickSearchFunctionInput() {
@@ -4843,7 +4845,7 @@ export class LogsPage {
     async expectPaginationRowCountVisible(timeout = 10000) {
         const title = this.page.locator(this.paginationRowCountTitle);
         await expect(title).toBeVisible({ timeout });
-        await expect(title).toHaveText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/, { timeout });
+        await expect(title).toHaveText(/[1-9][\d,]* to \d+ out of [1-9][\d,]*/, { timeout });
     }
 
     /**
@@ -6505,22 +6507,27 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isDimensionSidebarVisible() {
-        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
     }
 
     /**
      * Toggle dimension selector sidebar via collapse button
      */
     async toggleDimensionSidebar() {
-        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const sidebar = this.page.locator(this.dimensionSelectorSidebar);
-            const wasVisible = await sidebar.isVisible().catch(() => false);
+        const sidebar = this.page.locator(this.dimensionSelectorSidebar);
+        const sidebarVisible = await sidebar.isVisible().catch(() => false);
+        if (sidebarVisible) {
+            // Sidebar is open — click the collapse btn inside it
+            const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
             await btn.click();
-            // Wait for the sidebar visibility state to flip (deterministic transition)
-            await sidebar.waitFor({ state: wasVisible ? 'hidden' : 'visible', timeout: 5000 }).catch(() => {});
-            testLogger.info('Toggled Dimension Selector sidebar');
+            await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        } else {
+            // Sidebar is collapsed — click the collapsed bar to expand
+            const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
+            await collapsedBar.click();
+            await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         }
+        testLogger.info('Toggled Dimension Selector sidebar');
     }
 
     /**
@@ -7592,10 +7599,11 @@ export class LogsPage {
      * Histogram toggle is now directly visible in the toolbar (moved out of utilities menu)
      */
     async enableHistogram() {
-        // If histogram canvas is already visible, nothing to do.
-        const canvas = this.page.locator(this.barChartCanvas);
-        const alreadyVisible = await canvas.isVisible({ timeout: 2000 }).catch(() => false);
-        if (alreadyVisible) {
+        // Use button checked-state detection, not canvas visibility.
+        // Canvas is absent before the first query runs, so visibility check
+        // would incorrectly toggle histogram OFF when it is already ON.
+        const isOn = await this.logsQueryPage.isHistogramOn();
+        if (isOn) {
             testLogger.info('Histogram already enabled');
             return;
         }
@@ -9040,7 +9048,63 @@ export class LogsPage {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         }
 
+        // Phase 3: When in SQL mode on the Build tab, the chart-type-selected signal (Phase 2)
+        // can fire before makeAutoSQLQuery() has finished populating the query editor. Wait
+        // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
+        // non-empty content — this confirms that onBuildQueryGenerated() has been called and
+        // queries[0].query is ready for any Auto→Custom mode switch.
+        try {
+            await this.page.waitForFunction(
+                (editorSelector) => {
+                    const host = document.querySelector(editorSelector);
+                    if (!host) return true; // editor absent — skip
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
+                    }
+                    return false; // editor found but value not yet set
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout: 10000, polling: 500 }
+            );
+            testLogger.info('Build tab query editor populated');
+        } catch (error) {
+            // Phase 3 is best-effort — editor may legitimately be empty (SQL mode OFF, empty query)
+            testLogger.warn('Build tab query editor did not populate within 10s, proceeding');
+        }
+
         return true;
+    }
+
+    /**
+     * Wait for the search-bar query editor to contain non-empty content.
+     * Use this after switching to Build tab in SQL mode to ensure makeAutoSQLQuery()
+     * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
+     * Fails the test if the editor stays empty beyond the timeout.
+     */
+    async expectQueryEditorPopulated(timeout = 30000) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const domNode = ed.getDomNode?.();
+                    if (domNode && host.contains(domNode)) {
+                        const val = ed.getValue();
+                        return val && val.trim().length > 0;
+                    }
+                }
+                return false;
+            },
+            '[data-test="logs-search-bar-query-editor"]',
+            { timeout, polling: 500 }
+        );
+        testLogger.info('Query editor populated');
     }
 
     /**

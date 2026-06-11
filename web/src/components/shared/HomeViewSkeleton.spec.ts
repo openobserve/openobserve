@@ -251,8 +251,10 @@ describe("HomeViewSkeleton", () => {
       },
     });
 
-    const cardContainer = wrapper.find(".card-container");
-    expect(cardContainer.exists()).toBe(true);
+    // The skeleton intentionally has NO outer card-container border: it must
+    // match the loaded UsageTab content (which is borderless), otherwise a
+    // border flashes only while loading and disappears once data arrives.
+    expect(wrapper.find(".card-container").exists()).toBe(false);
 
     const chartsContainer = wrapper.find(".charts-main-container");
     expect(chartsContainer.exists()).toBe(true);

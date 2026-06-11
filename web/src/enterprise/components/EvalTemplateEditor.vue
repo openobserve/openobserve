@@ -17,24 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="eval-template-editor-page"
-    class="tw:flex tw:flex-col tw:pr-[0.625rem]"
+    class="tw:flex tw:flex-col tw:px-2.5"
     style="height: calc(100vh - var(--navbar-height) - 14px)"
   >
-    <!-- Header bar -->
-    <div class="card-container tw:mb-2 tw:shrink-0">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
-        <OButton
-          data-test="eval-template-editor-back-btn"
-          icon-left="chevron-left"
-          variant="outline"
-          size="icon-xs-sq"
-          @click="cancel"
-        />
-        <span class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="eval-template-editor-title">
-          {{ isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate") }}
-        </span>
-      </div>
-    </div>
+    <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
+    <AppPageHeader
+      :title="isEdit ? t('evalTemplate.editTemplate') : t('evalTemplate.createTemplate')"
+      :back="{
+        label: t('pipeline.evalTemplates'),
+        onClick: cancel,
+        dataTest: 'eval-template-editor-back-btn',
+      }"
+      class="tw:-mx-2.5 tw:px-4 tw:border-b tw:border-border-default tw:mb-2 tw:shrink-0"
+    >
+      <template #title>
+        <span data-test="eval-template-editor-title">{{
+          isEdit ? t("evalTemplate.editTemplate") : t("evalTemplate.createTemplate")
+        }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Form content -->
     <div class="card-container tw:flex-1 tw:min-h-0 tw:mb-2 tw:flex tw:flex-col" style="padding: 1rem">
@@ -161,6 +162,7 @@ import OTextarea from '@/lib/forms/Input/OTextarea.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 

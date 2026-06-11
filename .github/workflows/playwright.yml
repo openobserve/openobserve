@@ -40,9 +40,12 @@ env:
   ZO_CREATE_ORG_THROUGH_INGESTION: true
   ZO_UTF8_VIEW_ENABLED: false
   ZO_ENABLE_CROSS_LINKING: true
+  # Timechart (visualize) tab is hidden by default; enable it so visualize E2E tests can reach it.
+  ZO_TIMECHART_ENABLED: true
   # Allow alert destinations to target localhost so the test validation stream
   # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
   ZO_SSRF_ALLOW_LOOPBACK: true
+  ZO_MODEL_PRICING_ENABLED: true
   UPLOAD_TO_TESTDINO: ${{ vars.UPLOAD_TO_TESTDINO || 'false' }}
 
 jobs:
@@ -174,6 +177,8 @@ jobs:
                 "ingestionTokens.spec.js",
                 "landingPage.spec.js",
                 "languageTranslation.spec.js",
+                "model-pricing.spec.js",
+                "edition-features.spec.js",
               ]
           - testfolder: "Logs-Builder-Basic"
             browser: "chrome"
@@ -245,6 +250,7 @@ jobs:
                 "dashboard-sql-autocomplete.spec.js",
                 "dashboard-share-link.spec.js",
                 "crossLinking.spec.js",
+                "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
@@ -1012,12 +1018,40 @@ jobs:
             mv playwright-results/report.json.tmp playwright-results/report.json
           fi
 
-          # Filter report to only include failed tests for TestDino upload
+          # Filter report to only include failed tests for TestDino upload.
+          # Retries with identical status+error are stripped to the final attempt only,
+          # reducing quota usage. Retries with differing status or error are kept in full.
           node -e "
           const fs = require('fs');
           const report = JSON.parse(fs.readFileSync('playwright-results/report.json', 'utf8'));
+          let strippedRetries = 0; // accumulated once per test via single-visit tree traversal
+          function getErrorFingerprint(r) {
+            // First line of error.message is stable across retries (stack/timing in later lines varies).
+            // Distinguish no-error-object (safe to strip on status alone) from error-without-message
+            // (unknown content — treat as unique so we never falsely deduplicate).
+            if (r.error?.message) return r.error.message.split('\n')[0].trim();
+            return r.status + ':' + (r.error ? 'error-no-msg' : 'no-error');
+          }
           function filterSuite(s) {
-            const specs = (s.specs||[]).filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'));
+            const specs = (s.specs||[])
+              .filter(sp=>sp.tests&&sp.tests.some(t=>t.status==='unexpected'))
+              .map(sp=>({
+                ...sp,
+                tests: sp.tests.map(t=>{
+                  const results = t.results||[];
+                  if (!results.length) return {...t};
+                  const first = results[0];
+                  const allIdentical = results.length === 1 || results.every(r=>
+                    r.status === first.status &&
+                    getErrorFingerprint(r) === getErrorFingerprint(first)
+                  );
+                  if (allIdentical && results.length > 1) strippedRetries += results.length - 1;
+                  return {
+                    ...t,
+                    results: allIdentical ? [results[results.length-1]] : results
+                  };
+                })
+              }));
             const suites = (s.suites||[]).map(filterSuite).filter(sub=>(sub.specs&&sub.specs.length)||(sub.suites&&sub.suites.length));
             return {...s,specs,suites};
           }
@@ -1028,7 +1062,7 @@ jobs:
           };
           fs.writeFileSync('playwright-results/report-failures-only.json',JSON.stringify(filtered));
           const total=(report.stats.expected||0)+(report.stats.unexpected||0)+(report.stats.skipped||0)+(report.stats.flaky||0);
-          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino');
+          console.log('Uploading '+(report.stats.unexpected||0)+' failed tests out of '+total+' total to TestDino (stripped '+strippedRetries+' identical retry results)');
           "
           echo "::notice::Report filtered to failures only"
 

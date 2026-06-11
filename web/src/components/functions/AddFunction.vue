@@ -15,25 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:flex-col tw:min-h-0">
-    <div class="card-container tw:mb-[0.8rem] tw:shrink-0">
-      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
-          <FunctionsToolbar
-            v-model:name="formData.name"
-            v-model:trans-type="formData.transType"
-            ref="functionsToolbarRef"
-            :disable-name="beingUpdated"
-            :transform-type-options="transformTypeOptions"
-            @test="onTestFunction"
-            @save="onSubmit"
-            @back="closeAddFunction"
-            @cancel="cancelAddFunction"
-            @open:chat="openChat"
-            :is-add-function-component="isAddFunctionComponent"
-            class="tw:pr-4"
-          />
-      </div>
-    </div>
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+    <FunctionsToolbar
+      v-model:name="formData.name"
+      v-model:trans-type="formData.transType"
+      ref="functionsToolbarRef"
+      :disable-name="beingUpdated"
+      :transform-type-options="transformTypeOptions"
+      @test="onTestFunction"
+      @save="onSubmit"
+      @back="closeAddFunction"
+      @cancel="cancelAddFunction"
+      @open:chat="openChat"
+      :is-add-function-component="isAddFunctionComponent"
+      class="tw:shrink-0 tw:px-2 tw:border-b tw:border-border-default"
+    />
 
     <div class="tw:flex tw:flex-1 tw:min-h-0">
       <div
@@ -49,19 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[30, 100]"
           class="tw:overflow-hidden tw:w-full"
           :horizontal="false"
+          separator-class="tw:w-[0.0625rem] tw:bg-[var(--o2-border-color)]"
         >
           <template v-slot:before>
-            <div class="tw:px-3 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
+            <div class="tw:px-2 tw:pt-2 tw:pb-3 card-container tw:h-full tw:flex tw:flex-col tw:min-h-0">
               <div class="add-function-name-input tw:pb-2 o2-input tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
                   <FullViewContainer
                     name="function"
                     v-model:is-expanded="expandState.functions"
                     :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
-                    class="tw-mt-1"
+                    min-header-height="2.125rem"
                   />
                   <div
                     v-show="expandState.functions"
-                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:rounded-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
+                    class="tw:border tw:solid tw:border-[var(--o2-border-color)] tw:mb-[0.375rem] tw:relative tw:flex-1 tw:min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -77,6 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('function.enterFunctionPrompt')"
                       editor-height="100%"
+                      @focus="functionEditorPlaceholderFlag = false"
+                      @blur="functionEditorPlaceholderFlag = true"
                       @update:query="handleFunctionUpdate"
                       @language-change="handleLanguageChange"
                       @toggle-nlp-mode="handleToggleNlpMode"
@@ -84,6 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-end="handleGenerationEnd"
                       @generation-success="handleGenerationSuccess"
                     />
+                    <div
+                      v-if="!formData.function && functionEditorPlaceholderFlag"
+                      class="query-editor-placeholder-overlay"
+                    >
+                      <span class="query-editor-placeholder-typewriter">{{
+                        formData.transType === '1' ? jsPlaceholder : vrlPlaceholder
+                      }}</span>
+                    </div>
                   </div>
                   <div class="tw:text-sm tw:font-medium">
                     <div v-if="vrlFunctionError">
@@ -112,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="tw:px-3 tw:pt-2 tw:pb-3 tw:h-max tw:ml-2 card-container">
+            <div class="tw:px-2 tw:pt-2 tw:pb-3 tw:h-full tw:overflow-y-auto card-container">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="formData"
@@ -175,6 +182,7 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 const defaultValue: any = () => {
   return {
@@ -234,6 +242,9 @@ export default defineComponent({
     const indexOptions = ref([]);
     const { t } = useI18n();
     const editorRef: any = ref(null);
+    const functionEditorPlaceholderFlag = ref(true);
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
+    const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
@@ -584,6 +595,9 @@ export default defineComponent({
       compilationErr,
       indexOptions,
       editorRef,
+      functionEditorPlaceholderFlag,
+      vrlPlaceholder,
+      jsPlaceholder,
       editorobj,
       prefixCode,
       suffixCode,
@@ -700,6 +714,33 @@ export default defineComponent({
 
 .ai-chat-with-offset {
   --ai-chat-offset: 75px;
+}
+
+.query-editor-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0.1875rem 0.5rem 0 2.15rem;
+  pointer-events: none;
+  z-index: 1;
+  user-select: none;
+
+  .query-editor-placeholder-typewriter {
+    font-family: monospace;
+    font-size: var(--text-base);
+    line-height: 1.3125rem;
+    color: #a0aec0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+:global(.body--dark) .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
+  color: #718096;
 }
 </style>
 <style>

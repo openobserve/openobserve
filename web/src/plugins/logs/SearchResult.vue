@@ -31,9 +31,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="tw:flex tw:items-center tw:py-0.5 tw:shrink-0 result-bar">
+      <div class="tw:flex tw:items-center tw:h-[2.25rem] tw:shrink-0 result-bar tw:bg-surface-panel">
+        <!-- Field panel toggle — same style as add-panel config sidebar -->
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          class="tw:ml-1.5 tw:shrink-0"
+          data-test="logs-search-field-list-collapse-btn"
+          @click="toggleFieldList"
+        >
+          <OIcon
+            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            size="sm"
+          />
+          <OTooltip
+            :content="searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'"
+            side="bottom"
+          />
+        </OButton>
         <div
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-4 tw:bg-amber-500 text-white tw:rounded"
+          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 tw:bg-amber-500 text-white tw:rounded"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -43,16 +60,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-4 warning tw:flex tw:items-center tw:gap-1"
+          class="tw:flex-1 tw:min-w-0 tw:text-left tw:pl-2 warning tw:flex tw:items-center tw:flex-wrap tw:gap-1.5"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
         >
-          <span class="tw:truncate tw:min-w-0">{{
-            searchObj.meta.logsVisualizeToggle === "patterns"
-              ? patternSummaryText
-              : noOfRecordsTitle
-          }}</span>
+          <!-- Logs mode: structured chips -->
+          <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
+            <template v-if="recordsChips">
+              <!-- Grey: neutral result count -->
+              <OBadge
+                variant="default"
+                data-test="logs-result-records-chip"
+                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+              >{{ recordsChips.records }}</OBadge>
+              <!-- Blue: time taken highlights query performance -->
+              <OBadge
+                variant="default"
+                data-test="logs-result-time-chip"
+                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
+              >{{ recordsChips.time }}</OBadge>
+              <!-- Amber: resource/cost awareness -->
+              <OBadge
+                v-if="recordsChips.scan"
+                variant="default"
+                data-test="logs-result-scan-chip"
+                class="tw:rounded! tw:bg-[var(--o2-status-warning-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-warning-text)]!"
+              >{{ recordsChips.scan }}</OBadge>
+            </template>
+            <span v-else class="tw:truncate tw:min-w-0">{{ noOfRecordsTitle }}</span>
+          </template>
+          <!-- Patterns mode: structured chips -->
+          <template v-else>
+            <template v-if="patternChips">
+              <!-- Grey: event count -->
+              <OBadge
+                variant="default"
+                data-test="logs-result-events-chip"
+                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+              >{{ patternChips.events }} events</OBadge>
+              <!-- Grey: pattern count -->
+              <OBadge
+                variant="default"
+                data-test="logs-result-patterns-chip"
+                class="tw:rounded! tw:bg-[var(--o2-tag-grey-1)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-text-4)]!"
+              >{{ patternChips.patterns }} patterns</OBadge>
+              <!-- Blue: time taken highlights query performance -->
+              <OBadge
+                variant="default"
+                data-test="logs-result-pattern-time-chip"
+                class="tw:rounded! tw:bg-[var(--o2-status-info-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]! tw:text-[var(--o2-status-info-text)]!"
+              >{{ patternChips.time }} ms</OBadge>
+            </template>
+            <span v-else class="tw:truncate tw:min-w-0">{{ patternSummaryText }}</span>
+          </template>
           <span v-if="searchObj.loadingCounter" class="tw:shrink-0">
             <OSpinner size="xs" class="search-spinner" />
           </span>
@@ -126,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
             <!-- Refresh in bordered wrapper -->
-            <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6">
+            <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6 tw:overflow-hidden">
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -643,6 +704,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -677,6 +739,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    OBadge,
   },
   emits: [
     "update:scroll",
@@ -909,6 +972,45 @@ export default defineComponent({
         logsAnalyzed,
         totalTime: totalTimeMs,
       });
+    });
+
+    // Parses the histogram title string into structured chip data for logs mode.
+    // Format: "Showing X to Y out of Z events in T ms. (Scan Size: S MB)"
+    const recordsChips = computed(() => {
+      const title = noOfRecordsTitle.value;
+      if (!title) return null;
+
+      const eventsInIdx = title.indexOf(" events in ");
+      if (eventsInIdx === -1) return null;
+
+      const records = title.substring("Showing ".length, eventsInIdx + " events".length);
+      const afterEvents = title.substring(eventsInIdx + " events in ".length);
+
+      const msIdx = afterEvents.indexOf(" ms.");
+      const time = msIdx !== -1 ? afterEvents.substring(0, msIdx) + " ms" : afterEvents;
+
+      const parenMatch = afterEvents.match(/\((.+?)\)/);
+      const scan = parenMatch ? parenMatch[1] : null;
+
+      return { records, time, scan };
+    });
+
+    // Derives structured chip data for patterns mode from raw stats.
+    const patternChips = computed(() => {
+      const stats = patternsState.value?.patterns?.statistics;
+      if (!stats) return null;
+
+      const patternsFound = stats.total_patterns_found || 0;
+      const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
+      const totalEventsStr = totalEvents ? totalEvents.toLocaleString() : "0";
+      const totalTimeMs =
+        (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
+
+      return {
+        events: totalEventsStr,
+        patterns: patternsFound,
+        time: totalTimeMs,
+      };
     });
     const scrollPosition = ref(0);
     const rowsPerPageOptions = [10, 25, 50, 100];
@@ -1242,6 +1344,13 @@ export default defineComponent({
           plotChart.value = convertLogData(xData, yData, chartParams);
         }
       }
+    };
+
+    const toggleFieldList = () => {
+      searchObj.meta.showFields = !searchObj.meta.showFields;
+      nextTick(() => {
+        if (searchObj.meta.showHistogram) reDrawChart();
+      });
     };
 
     const changeMaxRecordToReturn = (val: any) => {
@@ -1794,6 +1903,7 @@ export default defineComponent({
       navigateRowDetail,
       totalHeight,
       reDrawChart,
+      toggleFieldList,
       expandLog,
       getImageURL,
       addFieldToTable,
@@ -1804,6 +1914,8 @@ export default defineComponent({
       useLocalWrapContent,
       noOfRecordsTitle,
       patternSummaryText,
+      recordsChips,
+      patternChips,
       scrollPosition,
       rowsPerPageOptions,
       pageNumberInput,

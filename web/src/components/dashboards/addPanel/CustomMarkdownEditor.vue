@@ -51,13 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-custom-markdown-editor-splitter-separator"
             class="splitter-vertical splitter-enabled"
           ></div>
-          <div
-            class="tw:absolute! tw:bg-button-primary tw:text-button-primary-foreground tw:flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
-            style="top: 10px; left: 50%; transform: translateX(-50%); z-index: 100"
-            data-test="dashboard-markdown-editor-drag-indicator"
-          >
-            <OIcon name="drag-indicator" size="xs" />
-          </div>
         </template>
         <template #after>
           <markdown-renderer
@@ -75,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineAsyncComponent, defineComponent, ref } from "vue";
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
@@ -84,7 +76,6 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     MarkdownRenderer,
-    OIcon,
     OSplitter,
   },
   name: "CustomMarkdownEditor",
@@ -145,12 +136,11 @@ export default defineComponent({
 }
 .splitter-enabled {
   background-color: var(--o2-border, #e5e7eb);
-  transition: 0.3s;
-  transition-delay: 0.2s;
+  transition: background-color 0.3s;
 }
 
 .splitter-enabled:hover {
-  background-color: var(--o2-primary, orange);
+  background-color: orange;
 }
 
 :deep(.query-editor-splitter .q-splitter__separator) {

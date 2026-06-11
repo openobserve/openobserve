@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="10"
             :page-size-options="[10, 20, 50, 100]"
+            :default-columns="false"
             :fill-height="true"
             data-test="org-group-members-table"
           >
@@ -215,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="10"
             :page-size-options="[10, 20, 50, 100]"
+            :default-columns="false"
             class="tw:h-full"
             data-test="org-group-invites-table"
           >
@@ -350,6 +352,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 
@@ -558,24 +561,28 @@ export default defineComponent({
         id: "org_name",
         header: t("billing.billingGroup.orgColumn"),
         accessorFn: (row: BillingGroupInvite) => row.inviter_org_name || "-",
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "org_id",
         header: t("billing.billingGroup.orgIdColumn"),
         accessorKey: "inviter_org_id",
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
         id: "inviter_id",
         header: t("billing.billingGroup.invitedBy"),
         accessorKey: "inviter_id",
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
         id: "date",
         header: t("billing.billingGroup.dateColumn"),
         accessorFn: (row: BillingGroupInvite) => formatDate(row.created_at),
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -599,36 +606,42 @@ export default defineComponent({
         id: "org_id",
         header: t("billing.billingGroup.childOrgIdColumn"),
         accessorKey: "org_id",
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
         id: "org_name",
         header: t("billing.billingGroup.childOrgNameColumn"),
         accessorFn: (row: SuperRow) => row.org_name || "-",
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "status",
         header: t("billing.status"),
         accessorKey: "status",
+        size: COL.status,
         meta: { align: "left" },
       },
       {
         id: "invited_by",
         header: t("billing.billingGroup.invitedBy"),
         accessorKey: "invited_by",
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
         id: "accepted_by",
         header: t("billing.billingGroup.acceptedBy"),
         accessorKey: "accepted_by",
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
         id: "date",
         header: t("billing.billingGroup.dateColumn"),
         accessorFn: (row: SuperRow) => formatDate(row.date),
+        size: COL.date,
         meta: { align: "left" },
       },
     ]);
@@ -883,7 +896,7 @@ export default defineComponent({
   }
   &__headline {
     font-size: 2.4rem;
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.6px;
     margin-bottom: 16px;

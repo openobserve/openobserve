@@ -15,95 +15,107 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="min-height: inherit;">
-    <div>
-      <!-- Header bar -->
-      <div class="card-container tw:mb-[0.625rem]">
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <div
-            class="tw:font-[600] tw:flex tw:items-center tw:gap-2 tw:w-full"
-            data-test="ingestion-tokens-title-text"
-          >
-            {{ t("ingestion.tokenManagementTitle") }}
+  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+    <!-- Standard section header: title + description + Create action. -->
+    <AppPageHeader
+      icon="key"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    >
+      <template #title>
+        <span class="tw:inline-flex tw:items-center tw:gap-1.5">
+          <span data-test="ingestion-tokens-title-text">{{ t('ingestion.tokenManagementTitle') }}</span>
+          <!-- Full explanation lives in this info tooltip; the subtitle below is a
+               truncated preview so neither overruns the Create action button. -->
+          
             <OIcon
               name="info-outline"
               size="sm"
-              class="tw:cursor-pointer"
-            >
-              <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="400px" />
-            </OIcon>
-          </div>
-          <div class="tw:w-full tw:flex tw:justify-end">
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="add-ingestion-token"
-              @click="showCreateForm = true"
-            >
-              {{ t('ingestion.createTokenBtn') }}
-            </OButton>
-          </div>
-        </div>
-      </div>
+              class="tw:text-text-secondary tw:cursor-help"
+              data-test="ingestion-tokens-info-icon"
+            />
+            <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px"/>
+        
+        </span>
+      </template>
+      <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
+      <template #subtitle>
+        <span class="tw:truncate tw:min-w-0 tw:leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
+      </template>
+      <template #actions>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          data-test="add-ingestion-token"
+          @click="showCreateForm = true"
+        >
+          {{ t('ingestion.createTokenBtn') }}
+        </OButton>
+      </template>
+    </AppPageHeader>
 
-      <div>
-        <div class="tw:w-full tw:h-full">
-          <div
-            class="card-container"
-            style="height: calc(100vh - var(--navbar-height) - 92px)"
-          >
-            <OTable
-              :data="tokens"
-              :columns="columns"
-              row-key="name"
-              :loading="loading"
-              :sticky-header="true"
-              :max-height="'calc(100vh - var(--navbar-height) - 92px)'"
-            >
-              <template #empty>
-                <div class="tw:text-center tw:py-8">
-                  <OIcon
-                    name="key"
-                    size="xl"
-                  />
-                  <div class="tw:mt-2 tw:text-gray-500">
-                    {{ t("ingestion.noTokensFound") }}
-                  </div>
-                </div>
-              </template>
+    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container tw:h-full">
+        <OTable
+          :frame="false"
+          :data="tokens"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          v-model:global-filter="filterQuery"
+          :show-global-filter="false"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-ingestion-tokens"
+          filter-mode="client"
+        >
+          <template #toolbar>
+            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('ingestion.searchToken', 'Search tokens')"
+                class="tw:flex-1"
+              />
+            </div>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-ingestion-tokens"
+              :filtered="!!filterQuery"
+              :hide-action="!filterQuery"
+              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            />
+          </template>
 
-              <template #cell-name="{ row }">
-                <span class="tw:font-medium">{{ row.name }}</span>
-              </template>
+          <template #cell-name="{ row }">
+            <span class="tw:font-medium">{{ row.name }}</span>
+          </template>
 
-              <template #cell-token="{ row }">
-                <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
-                  <code
-                    class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
-                    style="background: rgba(0,0,0,0.06);"
-                  >{{ row.token }}</code>
-                  <OButton
-                    variant="ghost"
-                    size="icon-sm"
-                    icon-left="content-copy"
-                    class="tw:shrink-0"
-                    :title="t('ingestion.copyTokenBtn')"
-                    @click="copyToken(row.token)"
-                  />
-                </div>
-              </template>
+          <template #cell-token="{ row }">
+            <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-full">
+              <code
+                class="tw:font-mono tw:px-2 tw:py-1 tw:rounded tw:text-sm tw:truncate tw:max-w-[280px] tw:inline-block"
+                style="background: rgba(0,0,0,0.06);"
+              >{{ row.token }}</code>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="content-copy"
+                class="tw:shrink-0"
+                :title="t('ingestion.copyTokenBtn')"
+                @click="copyToken(row.token)"
+              />
+            </div>
+          </template>
 
-              <template #cell-created_by="{ row }">
-                <span class="tw:text-gray-500">{{ row.created_by }}</span>
-              </template>
+          <template #cell-created_by="{ row }">
+            <span class="tw:text-gray-500">{{ row.created_by }}</span>
+          </template>
 
               <template #cell-actions="{ row }">
                 <OButton
                   :data-test="`ingestion-token-${row.name}-toggle`"
-                  :data-row-action="row.enabled ? 'pause' : 'resume'"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-sm"
@@ -179,17 +191,17 @@ import { ref, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
-import { useShortcutScope } from "@/lib/vue-shortcut-manager";
-import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 
 interface Token {
   name: string;
@@ -203,13 +215,14 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { OButton, OIcon, OTooltip, ODialog, OInput, OTable },
+  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OInput, OTable },
   setup() {
     const store = useStore();
     const { t } = useI18n();
 
     const tokens = ref<Token[]>([]);
     const loading = ref(false);
+    const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
     const newTokenName = ref("");
@@ -222,19 +235,29 @@ export default defineComponent({
         header: t("ingestion.tokenNameLabel"),
         accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!', flex: true },
       },
       {
         id: "token",
         header: t("serviceAccounts.token"),
         accessorKey: "token",
         sortable: false,
+        resizable: true,
+        hideable: true,
+        size: COL.token,
       },
       {
         id: "created_by",
         header: t("ingestion.createdBy"),
         accessorKey: "created_by",
         sortable: true,
-        size: 200,
+        resizable: true,
+        hideable: true,
+        size: COL.owner,
       },
       {
         id: "actions",
@@ -352,6 +375,7 @@ export default defineComponent({
       t,
       tokens,
       loading,
+      filterQuery,
       columns,
       showCreateForm,
       showRevealedDialog,
