@@ -15,3 +15,4 @@
 
 pub mod contains_query;
 pub mod ids_collector;
+pub mod topn_collector;

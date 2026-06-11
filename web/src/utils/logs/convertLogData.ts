@@ -32,7 +32,7 @@ export const convertLogData = (
       left: "20",
       right: "20",
       top: "5",
-      bottom: "0",
+      bottom: "5",
     },
     tooltip: {
       show: true,

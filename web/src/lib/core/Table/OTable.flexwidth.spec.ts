@@ -69,26 +69,26 @@ describe("OTable flex column width", () => {
     expect(tableWidth(wrapper)).toBe(-1);
 
     // Resize freezes the flex column at its current fill width. With no layout,
-    // the arithmetic fallback = container − nonFlex (1000 − 268) = 732 is pinned
+    // the arithmetic fallback = container − nonFlex (1000 − 272) = 728 is pinned
     // into columnSizing. Then widen Type to 400 (TanStack preserves name).
     st.freezeFlexColumns();
     st.columnSizing = { ...st.columnSizing, type: 400 };
     await flushPromises();
 
-    // Now explicit width: Name HOLDS at 732, table grows to 1300 (scroll),
+    // Now explicit width: Name HOLDS at 728, table grows to 1300 (scroll),
     // # stays 44, and w-full is dropped.
     expect(isWFull(wrapper)).toBe(false);
-    expect(colVar(wrapper, "name")).toBe(732);
+    expect(colVar(wrapper, "name")).toBe(728);
     expect(tableWidth(wrapper)).toBe(1300);
     expect(colVar(wrapper, "#")).toBe(44);
 
     // DECREASE Type to 50 (below its original 100). Name must NOT grow to
-    // absorb the freed space — it stays frozen at 732. Real columns sum to 950
+    // absorb the freed space — it stays frozen at 728. Real columns sum to 950
     // (< container) so the invisible spacer absorbs the 50px (its var) and the
     // table stays at the container width (1000) → actions flush-right.
     st.columnSizing = { ...st.columnSizing, type: 50 };
     await flushPromises();
-    expect(colVar(wrapper, "name")).toBe(732);
+    expect(colVar(wrapper, "name")).toBe(728);
     expect(colVar(wrapper, "#")).toBe(44);
     expect(colVar(wrapper, "__spacer__")).toBe(50);
     expect(tableWidth(wrapper)).toBe(1000);
@@ -115,9 +115,9 @@ describe("OTable flex column width", () => {
     (wrapper.vm.$ as any).setupState.containerWidth = 1000;
     await flushPromises();
 
-    // The flex (name) column fills explicitly (container 1000 − nonFlex 268).
+    // The flex (name) column fills explicitly (container 1000 − nonFlex 272).
     expect(thHasExplicitWidth(wrapper, "name")).toBe(true);
-    expect(headerVar(wrapper, "name")).toBe(732);
+    expect(headerVar(wrapper, "name")).toBe(728);
     // The invisible spacer must be 0 in the fill state — no trailing gap.
     expect(headerVar(wrapper, "--spacer--")).toBe(0);
   });
