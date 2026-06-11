@@ -3282,7 +3282,10 @@
       "expandRangeDescAbsolute": "Passa a un intervallo di tempo relativo più ampio",
       "removeFilter": "Rimuovi un filtro",
       "selectedRange": "la gamma selezionata"
-    }
+    },
+    "showAll": "Mostra tutto",
+    "filterByErrors": "Filtra per errori",
+    "clearErrorFilter": "Cancella filtro errori"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",

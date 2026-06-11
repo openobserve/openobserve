@@ -3271,7 +3271,10 @@
       "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
       "removeFilter": "Einen Filter entfernen",
       "selectedRange": "der gewählte Bereich"
-    }
+    },
+    "showAll": "Zeige alles",
+    "filterByErrors": "Nach Fehlern filtern",
+    "clearErrorFilter": "Fehlerfilter löschen"
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",
