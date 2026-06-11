@@ -442,6 +442,98 @@ describe("VariablesValueSelector", () => {
       expect(testVariable.value).toEqual(["value1", "value2"]);
     });
 
+    it("should select the option marked as default (selected) for single-select custom variables", async () => {
+      // Regression: previously the first option was always used on initial load,
+      // ignoring the per-option "Default" checkbox (option.selected).
+      const customConfig = {
+        list: [
+          {
+            name: "custom_stream",
+            type: "custom",
+            multiSelect: false,
+            options: [
+              { label: "e2e_automate", value: "e2e_automate", selected: false },
+              { label: "default", value: "default", selected: true },
+            ],
+          },
+        ],
+      };
+
+      wrapper = createWrapper({
+        variablesConfig: customConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const testVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "custom_stream",
+      );
+
+      // Should pick the default-marked option ("default"), not the first option
+      expect(testVariable.value).toBe("default");
+    });
+
+    it("should select the options marked as default (selected) for multiSelect custom variables", async () => {
+      const customConfig = {
+        list: [
+          {
+            name: "custom_multi",
+            type: "custom",
+            multiSelect: true,
+            options: [
+              { label: "one", value: "one", selected: false },
+              { label: "two", value: "two", selected: true },
+              { label: "three", value: "three", selected: true },
+            ],
+          },
+        ],
+      };
+
+      wrapper = createWrapper({
+        variablesConfig: customConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const testVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "custom_multi",
+      );
+
+      // Should pick all default-marked options, not just the first
+      expect(testVariable.value).toEqual(["two", "three"]);
+    });
+
+    it("should fall back to first option for custom variables when none are marked default", async () => {
+      const customConfig = {
+        list: [
+          {
+            name: "custom_no_default",
+            type: "custom",
+            multiSelect: false,
+            options: [
+              { label: "alpha", value: "alpha", selected: false },
+              { label: "beta", value: "beta", selected: false },
+            ],
+          },
+        ],
+      };
+
+      wrapper = createWrapper({
+        variablesConfig: customConfig,
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const testVariable = vm.variablesData.values.find(
+        (v: any) => v.name === "custom_no_default",
+      );
+
+      expect(testVariable.value).toBe("alpha");
+    });
+
     it("should handle SELECT_ALL value for multiSelect variables", async () => {
       const customConfig = {
         list: [

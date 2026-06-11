@@ -409,7 +409,7 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups;
-      const generalGroup = groups.find((g: any) => g.label === "GENERAL");
+      const generalGroup = groups.find((g: any) => g.label === "General");
       expect(generalGroup).toBeDefined();
       const keys = generalGroup.items.map((i: any) => i.key);
       expect(keys).toContain("general");
@@ -421,7 +421,7 @@ describe("SettingsIndex.vue", () => {
       wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups;
       const destGroup = groups.find(
-        (g: any) => g.label === "DESTINATIONS & TEMPLATES",
+        (g: any) => g.label === "Destinations & Templates",
       );
       expect(destGroup).toBeDefined();
       const keys = destGroup.items.map((i: any) => i.key);

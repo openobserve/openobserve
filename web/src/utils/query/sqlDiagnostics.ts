@@ -16,12 +16,18 @@
 /**
  * SQL diagnostics — contextual error messages for the Monaco editor.
  *
- * Approach (inspired by dt-sql-parser / monaco-sql-languages):
- *   Instead of scanning the text before the error cursor, we classify errors
- *   purely by the `expected` token set and `found` value that the PEG parser
- *   gives us. Each error type has a unique fingerprint in the `expected` set
- *   (e.g. only `[BY]` expected → incomplete ORDER/GROUP), so we can produce
- *   precise messages without any backward text analysis.
+ * Suppression model (allow-list, not deny-list):
+ *   validateSql returns an error ONLY when buildContextualSqlMessage produces a
+ *   positively-classified message — i.e. one that names the specific problem.
+ *   Unrecognised error shapes (MSG.generic, MSG.incompleteExpr from an unknown
+ *   fingerprint) are treated as parser-limitation false positives and suppressed.
+ *   This means every gap between the client PEG grammar and the DataFusion backend
+ *   defaults to "silent" rather than "wrong squiggle".
+ *
+ * Classification approach (inspired by dt-sql-parser / monaco-sql-languages):
+ *   Errors are classified by the `expected` token set and `found` value from the
+ *   PEG parser, supplemented by a backward context scanner for nested constructs
+ *   (CASE, COALESCE, OVER, CTE, subquery). No forward regex on user text.
  *
  * Template system (same pattern as dt-sql-parser i18n):
  *   buildContextualSqlMessage() returns a string. The message templates are
@@ -64,6 +70,11 @@ const MSG = {
   incompleteOpenParen:  "Unclosed parenthesis — expected an expression or closing )",
   incompleteExpr:       "Unexpected end of query — the expression is incomplete",
 
+  // UNION / JOIN / DISTINCT
+  incompleteUnion:      "Incomplete UNION — expected SELECT after UNION or UNION ALL",
+  incompleteJoinOn:     "Incomplete JOIN — expected a condition after ON",
+  incompleteDistinct:   "Incomplete SELECT — expected column names after DISTINCT",
+
   // Unexpected token
   missingWhere:     (col: string) => `Missing WHERE keyword — did you mean: … FROM … WHERE ${col} = …?`,
   missingOperator:  (word: string) => `Missing operator before '${word}' — did you forget AND or OR?`,
@@ -73,6 +84,134 @@ const MSG = {
   unexpectedComma:  (line: number, col: number) => `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
   generic:          (ch: string, line: number, col: number) => `Unexpected '${ch}' at line ${line}, column ${col}`,
 } as const;
+
+// ─── Backward context scanner ─────────────────────────────────────────────────
+
+/**
+ * Walk backward through `sql[0..offset]` tracking open constructs and return
+ * a label for the innermost unclosed SQL construct at the cursor.
+ *
+ * Returned labels (used by buildContextualSqlMessage):
+ *   "CASE_WHEN"   — inside CASE … WHEN … (no THEN yet)
+ *   "CASE_THEN"   — inside CASE … THEN … (waiting for next WHEN/ELSE/END)
+ *   "CASE_ELSE"   — inside CASE … ELSE … (waiting for END)
+ *   "CASE"        — CASE with nothing after it yet
+ *   "COALESCE"    — inside COALESCE(…,  (trailing comma, needs another arg)
+ *   "OVER"        — inside OVER (… window spec not closed
+ *   "PARTITION"   — after PARTITION BY inside OVER
+ *   "CTE"         — inside WITH name AS (…
+ *   "SUBQUERY"    — inside FROM (… or (SELECT …
+ *   ""            — unknown / no specific construct found
+ */
+function innermostConstruct(sql: string, offset: number): string {
+  const text = sql.substring(0, offset).trimEnd();
+  const tokens: string[] = [];
+
+  // Tokenise: extract words and single-char punctuation, skip string literals
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    // Skip quoted strings/identifiers. Handles both backslash-escape (\')
+    // and SQL-standard doubled-quote escape ('').
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const q = ch;
+      i++;
+      while (i < text.length) {
+        if (text[i] === "\\") { i += 2; continue; }
+        if (text[i] === q) {
+          i++;
+          if (text[i] === q) { i++; continue; } // doubled-quote escape: '' or ""
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    // Skip block comments
+    if (text[i] === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+    // Skip line comments
+    if (text[i] === "-" && text[i + 1] === "-") {
+      while (i < text.length && text[i] !== "\n") i++;
+      continue;
+    }
+    // Word token
+    if (/[a-zA-Z_$]/.test(ch)) {
+      let j = i;
+      while (j < text.length && /[a-zA-Z0-9_$]/.test(text[j])) j++;
+      tokens.push(text.slice(i, j).toUpperCase());
+      i = j;
+      continue;
+    }
+    // Punctuation we care about
+    if (ch === "(" || ch === ")" || ch === ",") {
+      tokens.push(ch);
+    }
+    i++;
+  }
+
+  // Walk the token list forward, maintaining a stack of open constructs.
+  // Each stack frame: { kind: string }
+  type Frame = { kind: string };
+  const stack: Frame[] = [];
+
+  for (let t = 0; t < tokens.length; t++) {
+    const tok = tokens[t];
+    const prev = tokens[t - 1] ?? "";
+    const prev2 = tokens[t - 2] ?? "";
+
+    if (tok === "CASE") {
+      stack.push({ kind: "CASE" });
+    } else if (tok === "END") {
+      // close innermost CASE frame
+      for (let s = stack.length - 1; s >= 0; s--) {
+        if (stack[s].kind.startsWith("CASE")) { stack.splice(s, 1); break; }
+      }
+    } else if (tok === "WHEN") {
+      // Update the innermost CASE frame to CASE_WHEN
+      for (let s = stack.length - 1; s >= 0; s--) {
+        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_WHEN"; break; }
+      }
+    } else if (tok === "THEN") {
+      for (let s = stack.length - 1; s >= 0; s--) {
+        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_THEN"; break; }
+      }
+    } else if (tok === "ELSE") {
+      for (let s = stack.length - 1; s >= 0; s--) {
+        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_ELSE"; break; }
+      }
+    } else if (tok === "(") {
+      // Determine what kind of paren this is from the token before it
+      const funcName = prev.replace(/^\(*/, "");
+      if (funcName === "OVER") {
+        stack.push({ kind: "OVER" });
+      } else if (prev === "AS" && prev2 !== "CAST" && prev2 !== "TRY_CAST") {
+        // WITH cte AS (
+        stack.push({ kind: "CTE" });
+      } else if (funcName === "COALESCE" || funcName === "NULLIF" || funcName === "IIF") {
+        stack.push({ kind: funcName });
+      } else if (funcName === "FROM" || prev === "") {
+        stack.push({ kind: "SUBQUERY" });
+      } else {
+        stack.push({ kind: "PAREN" });
+      }
+    } else if (tok === ")") {
+      if (stack.length > 0) stack.pop();
+    } else if (tok === "PARTITION") {
+      // Mark the innermost OVER frame
+      for (let s = stack.length - 1; s >= 0; s--) {
+        if (stack[s].kind === "OVER") { stack[s].kind = "PARTITION"; break; }
+      }
+    }
+  }
+
+  // The innermost open frame is the last element
+  return stack.length > 0 ? stack[stack.length - 1].kind : "";
+}
 
 // ─── Expected-set classifier ──────────────────────────────────────────────────
 
@@ -93,17 +232,16 @@ function has(set: Set<string>, ...keys: string[]): boolean {
 
 /**
  * Convert a PEG SyntaxError from @openobserve/node-sql-parser into a
- * human-readable diagnostic message.
+ * human-readable diagnostic message, or null if the error shape is
+ * unrecognised (i.e. likely a parser-grammar gap rather than a user mistake).
  *
- * Classification is driven entirely by `err.expected` and `err.found` —
- * no backward text scanning. This mirrors the dt-sql-parser approach of
- * using the parser's own token-set output rather than heuristic regex.
+ * Returning null signals to validateSql that this error should be suppressed —
+ * the allow-list model: only show errors for positively classified fingerprints.
  *
- * @param sql  The full SQL string that was parsed (used only to extract the
- *             full word at the error offset for display purposes).
+ * @param sql  The full SQL string that was parsed.
  * @param err  The SyntaxError thrown by node-sql-parser.
  */
-export function buildContextualSqlMessage(sql: string, err: any): string {
+export function buildContextualSqlMessage(sql: string, err: any): string | null {
   const loc = err?.location?.start;
   if (!loc) return err?.message?.split("\n")[0] ?? "SQL syntax error";
 
@@ -120,6 +258,56 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
     const stripped = raw.replace(/^\(*/, "").toUpperCase();
     return stripped || (raw.startsWith("(") ? "(" : "");
   };
+
+  // ── EOF after OVER ( — expSize is moderate (PARTITION/ORDER/ROWS in expected) ─
+  if (found === null && has(exp, "PARTITION", "ORDER", "ROWS") && !has(exp, "AND", "OR", "WHERE")) {
+    if (has(exp, "PARTITION")) return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+  }
+
+  // ── EOF inside nested constructs (CASE/COALESCE/OVER/subquery/CTE) ──────────
+  // expSize > 50 + found===null is the PEG signature for "gave up inside a
+  // deeply nested expression". Use the backward scanner to name the construct.
+  if (found === null && expSize > 50) {
+    const construct = innermostConstruct(sql, offset);
+    switch (construct) {
+      case "CASE_WHEN":
+        return "Incomplete CASE — expected THEN after the WHEN condition";
+      case "CASE_THEN":
+        return "Incomplete CASE — expected another WHEN, ELSE, or END";
+      case "CASE_ELSE":
+        return "Incomplete CASE — expected END to close the CASE expression";
+      case "CASE":
+        return "Incomplete CASE — expected WHEN after CASE";
+      case "COALESCE":
+        return "Incomplete COALESCE — expected another argument or closing )";
+      case "NULLIF":
+        return "Incomplete NULLIF — expected a second argument, e.g. NULLIF(expr, 0)";
+      case "IIF":
+        return "Incomplete IIF — expected condition, true-value, and false-value";
+      case "PARTITION":
+        return "Incomplete PARTITION BY — expected a column name or expression";
+      case "OVER":
+        return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+      case "CTE":
+        return "Incomplete CTE — expected ) to close the WITH expression";
+      case "SUBQUERY":
+        return "Incomplete subquery — expected SELECT or closing )";
+      default: {
+        // construct is "" or "PAREN" — scanner found no unclosed named construct.
+        // Fall back to lastWord for keywords that produce large expSizes.
+        const lw = lastWord();
+        if (lw === "ON")       return MSG.incompleteJoinOn;
+        if (lw === "DISTINCT") return MSG.incompleteDistinct;
+        if (lw === "AND") {
+          // Could be BETWEEN x AND <eof> — check for BETWEEN in the token stream
+          const prev = sql.substring(0, offset).trimEnd().toUpperCase();
+          if (/\bBETWEEN\b/.test(prev)) return MSG.incompleteBetween;
+          return MSG.incompleteAnd;
+        }
+        // Fall through to the existing EOF checks
+      }
+    }
+  }
 
   // ── EOF errors (found === null) ─────────────────────────────────────────────
   if (found === null) {
@@ -169,7 +357,8 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
     // LIKE/ILIKE: expected contains quoted-string tokens but not AND/OR
     if (!has(exp, "AND", "OR") && has(exp, "NULL", "TRUE", "FALSE") && !has(exp, "SELECT")) {
       const lw = lastWord();
-      if (["LIKE", "ILIKE", "RLIKE", "NOT"].includes(lw)) return MSG.incompleteLike;
+      if (lw === "NOT") return MSG.incompleteNot;
+      if (["LIKE", "ILIKE", "RLIKE"].includes(lw)) return MSG.incompleteLike;
       if (["=", "!=", "<>", "<", ">", "<=", ">="].includes(lw)) return MSG.incompleteComparison(lw);
       if (lw === "IS")      return MSG.incompleteIs;
       if (lw === "BETWEEN") return MSG.incompleteBetween;
@@ -179,6 +368,19 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
     if (!has(exp, "AND", "OR", "NOT", "NULL", "TRUE", "FALSE", "SELECT") && has(exp, "(")) {
       const lw = lastWord();
       if (lw === "IN" || lw === "NOT") return MSG.incompleteIn;
+    }
+
+    // UNION / UNION ALL incomplete: expected contains ALL, DISTINCT, SELECT but no AND/OR
+    if (has(exp, "ALL", "SELECT") && !has(exp, "AND", "OR", "WHERE", "HAVING")) {
+      const lw = lastWord();
+      if (lw === "UNION" || lw === "ALL") return MSG.incompleteUnion;
+    }
+
+    // JOIN ON incomplete: lastWord is ON and expSize is large (expression expected)
+    {
+      const lw = lastWord();
+      if (lw === "ON") return MSG.incompleteJoinOn;
+      if (lw === "DISTINCT") return MSG.incompleteDistinct;
     }
 
     // FROM incomplete
@@ -192,7 +394,8 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
       return MSG.incompleteSelect;
     }
 
-    return MSG.incompleteExpr;
+    // Unrecognised EOF shape — suppress rather than show a misleading message
+    return null;
   }
 
   // ── Unexpected token errors (found !== null) ────────────────────────────────
@@ -204,9 +407,23 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
 
   // found "=" or an identifier/operator with WHERE in expected → missing WHERE keyword
   // Covers: "FROM t col = val" (found="=") and "FROM t col IS NULL" (found="I" for IS)
+  // Guard: only fire when the token BEFORE the error looks like a column identifier
+  // AND the token AT the error is an operator or starts a comparison keyword (IS/IN/LIKE).
+  // This prevents misfiring on valid DataFusion-only syntax (AT TIME ZONE, EXCEPT, etc.)
+  // that the client grammar doesn't recognise but that appear at clause boundaries.
   if (has(exp, "WHERE", "HAVING", "LIMIT") && !has(exp, "AND", "OR")) {
-    const colName = (sql.substring(0, offset).trimEnd().split(/\s+/).pop() ?? wordAtError).replace(/^\(*/, "");
-    return MSG.missingWhere(colName);
+    const tokenBefore = sql.substring(0, offset).trimEnd().split(/\s+/).pop() ?? "";
+    // Token before must be a bare identifier (column name or alias), not a
+    // closing paren/quote/function call which would indicate a grammar gap.
+    const isBareIdent = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(tokenBefore);
+    const atErrorStr = sql.substring(offset);
+    const atErrorIsOperator =
+      /^[=<>!]/.test(found) ||
+      /^(IS|NOT|IN|LIKE|ILIKE|RLIKE|BETWEEN)\b/i.test(atErrorStr);
+    if (isBareIdent && atErrorIsOperator) {
+      return MSG.missingWhere(tokenBefore);
+    }
+    // Not a recognisable missing-WHERE pattern — fall through to suppression
   }
 
   // found identifier, AND/OR operators in expected → missing AND/OR between conditions
@@ -228,8 +445,95 @@ export function buildContextualSqlMessage(sql: string, err: any): string {
   // found ","
   if (found === ",") return MSG.unexpectedComma(loc.line, loc.column);
 
-  // Generic fallback
-  return MSG.generic(found, loc.line, loc.column);
+  // Unrecognised unexpected-token shape — suppress to avoid false positives
+  return null;
+}
+
+// ─── Parser-limitation guards ─────────────────────────────────────────────────
+
+/**
+ * Check if a PEG SyntaxError is a parser limitation rather than a real
+ * user mistake.  The client parser doesn't support every construct the
+ * OpenObserve backend accepts (e.g. PERCENT_RANK() OVER, CUME_DIST() OVER,
+ * POSITION(str IN str), EXCEPT, GROUPING SETS, or array literals).
+ *
+ * When this returns true the caller should treat the SQL as valid — the
+ * backend will parse it correctly.
+ *
+ * @param err  The SyntaxError thrown by node-sql-parser.
+ * @param sql  The SQL that was parsed (optional; tightens Guard 3).
+ */
+export function isParserLimitation(err: any, sql?: string): boolean {
+  // Guard 1: found is a whitespace character (never a real user error)
+  if (err?.found != null && /^\s$/.test(err.found)) return true;
+
+  const expLits = new Set(
+    (err?.expected ?? [])
+      .filter((e: any) => e.type === "literal")
+      .map((e: any) => e.text?.toUpperCase()),
+  );
+  const expSize: number = err?.expected?.length ?? 0;
+
+  // Guard 2: found is a letter AND expected contains both ")" and "AND"/"OR"
+  // with a very large candidate set (parser gave up inside a complex expression)
+  if (
+    err?.found != null &&
+    /^[a-zA-Z]$/.test(err.found) &&
+    expLits.has(")") &&
+    (expLits.has("AND") || expLits.has("OR")) &&
+    expSize > 150
+  )
+    return true;
+
+  // Guard 3: POSITION(str IN str) syntax — parser doesn't support it.
+  // found=")" with small expected set. Tightened: only suppress when the text
+  // before the error position actually contains "POSITION(" so we don't
+  // accidentally suppress real unclosed-paren user errors.
+  if (
+    err?.found === ")" &&
+    !expLits.has(")") &&
+    !expLits.has("AND") &&
+    !expLits.has("OR") &&
+    expSize < 50
+  ) {
+    if (!sql) return true; // no SQL available — apply original heuristic
+    const offset: number = err?.location?.start?.offset ?? sql.length;
+    if (/\bPOSITION\s*\(/i.test(sql.substring(0, offset))) return true;
+  }
+
+  // Guard 4: found "(" inside a window function clause where ORDER/ROWS
+  // are expected. The parser cannot handle complex window function arguments
+  // like SUM(COUNT(*)) OVER (...) or NTILE(N) OVER (PARTITION BY COALESCE(...) ...).
+  if (
+    err?.found === "(" &&
+    expLits.has("ORDER") &&
+    expLits.has("ROWS") &&
+    !expLits.has("AND") &&
+    !expLits.has("OR")
+  )
+    return true;
+
+  // Guard 5: Known DataFusion constructs the client PEG grammar doesn't support.
+  //   • EXCEPT / EXCEPT ALL (found is first letter of "SELECT" after EXCEPT)
+  //   • GROUPING SETS       (found is first letter of "SETS")
+  //   • Array literals      (found is "[")
+  //   • AT TIME ZONE        (found is "T" of "TIME"; WHERE is in expected because
+  //                          the parser expected end-of-query clause keywords)
+  // Fingerprint: found is a single letter or "[" with no AND/OR/closing-paren
+  // in the literal set, and the text before the error matches the construct.
+  if (err?.found != null && !expLits.has("AND") && !expLits.has("OR") && !expLits.has(")")) {
+    const offset: number = err?.location?.start?.offset ?? (sql?.length ?? 0);
+    const textBefore = sql ? sql.substring(0, offset).trimEnd().toUpperCase() : "";
+    if (
+      err.found === "[" ||
+      /\bEXCEPT\s*$/.test(textBefore) ||
+      /\bGROUPING\s*$/.test(textBefore) ||
+      /\bAT(\s+(TIME\s*)?)?$/.test(textBefore)
+    )
+      return true;
+  }
+
+  return false;
 }
 
 // ─── Async validator ──────────────────────────────────────────────────────────
@@ -245,16 +549,20 @@ async function getParser(): Promise<any> {
 
 /**
  * Run a client-side syntax check on a SQL string.
- * Returns `null` if valid, or an `SqlErrorRange` with a contextual message.
+ * Returns `null` if valid (or the error is unclassified / a parser-grammar gap),
+ * or an `SqlErrorRange` with a contextual message for a positively identified error.
  *
  * @param sql         Full SQL to validate.
- * @param colOffset   Subtract this from the error column so the squiggle
- *                    points into the user's filter text rather than a
- *                    constructed SQL prefix. Pass 0 for SQL mode.
+ * @param lineOffset  Add this to the error line number (for multi-line constructed SQL
+ *                    where the user's filter starts on a line > 1).
+ * @param colOffset   Subtract this from the error column on line 1 of the constructed
+ *                    SQL, so the squiggle points into the user's filter text rather
+ *                    than a constructed SQL prefix. Only applied when error is on
+ *                    line 1 (errors on later lines don't include the prefix column).
  */
 export async function validateSql(
   sql: string,
-  _lineOffset = 0,
+  lineOffset = 0,
   colOffset = 0,
 ): Promise<SqlErrorRange | null> {
   const parser = await getParser();
@@ -262,24 +570,22 @@ export async function validateSql(
     parser.astify(sql);
     return null;
   } catch (err: any) {
-    // Parser-limitation guard: the client parser doesn't support every construct
-    // the OpenObserve backend accepts (e.g. PERCENT_RANK() OVER, CUME_DIST() OVER,
-    // or complex window function clauses). Two signatures indicate a parser gap
-    // rather than a user mistake — suppress to avoid false positives:
-    //   1. found is a whitespace character (never a real user error)
-    //   2. found is a letter AND expected contains both ")" and "AND"/"OR" with a
-    //      very large candidate set (parser gave up inside a complex expression)
-    if (err?.found != null && /^\s$/.test(err.found)) return null;
-    const _expLits = new Set((err?.expected ?? []).filter((e: any) => e.type === "literal").map((e: any) => e.text?.toUpperCase()));
-    const _expSize = err?.expected?.length ?? 0;
-    if (err?.found != null && /^[a-zA-Z]$/.test(err.found) && _expLits.has(")") && (_expLits.has("AND") || _expLits.has("OR")) && _expSize > 150) return null;
-    // POSITION(str IN str) syntax — parser doesn't support it, found=")" with small expected set
-    if (err?.found === ")" && !_expLits.has(")") && !_expLits.has("AND") && !_expLits.has("OR") && _expSize < 50) return null;
+    // Suppress known parser-grammar gaps — DataFusion accepts these even though
+    // the client PEG grammar rejects them.
+    if (isParserLimitation(err, sql)) return null;
 
     const loc = err?.location?.start;
-    const line = Math.max(1, (loc?.line ?? 1));
-    const col = Math.max(1, (loc?.column ?? 1) - colOffset);
+    const errLine: number = loc?.line ?? 1;
+    const line = Math.max(1, errLine + lineOffset);
+    // colOffset only applies when the error is on line 1 of the constructed SQL;
+    // errors on subsequent lines don't carry the prefix width in their column.
+    const rawCol: number = loc?.column ?? 1;
+    const col = Math.max(1, errLine === 1 ? rawCol - colOffset : rawCol);
+
     const msg = buildContextualSqlMessage(sql, err);
+    // null means unrecognised error shape — suppress rather than show a wrong message
+    if (msg === null) return null;
+
     return { startLine: line, endLine: line, column: col, error: msg };
   }
 }
@@ -305,9 +611,18 @@ export async function rangesFromSqlParserDetail(
     const range = await validateSql(originalSql);
     // Client parser found a real syntax error — use its contextual message
     if (range) return [range];
-    // Client parser accepted the SQL — the server error is semantic (unknown column,
-    // type mismatch, etc.) not a parse error we can point to. Don't show a squiggle.
-    return [];
+    // Client parser returned null for one of two reasons:
+    //   (a) It accepted the SQL (semantic error on server side — unknown column, etc.)
+    //       → Don't show a squiggle; the error isn't locatable client-side.
+    //   (b) It hit a parser-limitation or unclassified fingerprint and suppressed.
+    //       → Fall through and use the server-reported position with a cleaned message,
+    //         because the server told us there IS a real parse error at a known location.
+    // Distinguish: re-parse and check if it throws at all.
+    const parser = await getParser();
+    let clientThrows = false;
+    try { parser.astify(originalSql); } catch { clientThrows = true; }
+    if (!clientThrows) return []; // case (a): client accepted — semantic error only
+    // case (b): client rejected but suppressed — use server position + cleaned message
   }
 
   const msg = detail

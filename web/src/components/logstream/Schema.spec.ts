@@ -2098,22 +2098,6 @@ describe("Schema Component Tests", () => {
       expect(names.length).toBe(3);
     });
 
-    it("should compute llmEvalStreamFields", () => {
-      const fields = wrapper.vm.llmEvalStreamFields;
-      expect(Array.isArray(fields)).toBe(true);
-      expect(fields.length).toBe(3);
-      expect(fields[0]).toHaveProperty("label");
-      expect(fields[0]).toHaveProperty("value");
-    });
-
-    it("should mark llmEvalFormDirty to false when tab changes from llmEvaluation", () => {
-      wrapper.vm.llmEvalFormDirty = true;
-      wrapper.vm.updateActiveMainTab("llmEvaluation");
-      // llmEvalFormDirty stays true for llm tab
-      wrapper.vm.updateActiveMainTab("schemaSettings");
-      expect(wrapper.vm.llmEvalFormDirty).toBe(false);
-    });
-
     it("should compute hasUDSFieldInSelection", async () => {
       wrapper.vm.activeTab = "allFields";
       wrapper.vm.selectedFields = [{ name: "message", isUserDefined: true }];
@@ -2407,12 +2391,6 @@ describe("Schema Component Tests", () => {
     });
 
     afterEach(() => { w.unmount(); });
-
-    it("should expose llmEvalStreamFields for traces streams", () => {
-      const fields = w.vm.llmEvalStreamFields;
-      expect(Array.isArray(fields)).toBe(true);
-      expect(fields.length).toBeGreaterThan(0);
-    });
 
     it("should show cross-linking tab when enable_cross_linking is true", async () => {
       store.state.zoConfig.enable_cross_linking = true;

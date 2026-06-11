@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </OCardSection>
 
-      <OCardSection class="tw:pt-0 scroll-content-predefined-themes">
+      <OCardSection class="tw:py-2 tw:px-2 scroll-content-predefined-themes">
         <OTabPanels v-model="activeTab" animated>
           <!-- Light Mode Themes -->
           <OTabPanel name="light">

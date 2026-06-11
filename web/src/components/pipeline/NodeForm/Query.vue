@@ -84,44 +84,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         { 'fullscreen-mode': isFullscreenMode },
       ]"
     >
-    <div class="stream-routing-container tw:px-3">
-      <div>
-        <div class="tw:w-full">
-          <scheduled-pipeline
-            ref="scheduledPipelineRef"
-            :columns="filteredColumns"
-            :conditions="[]"
-            :alertData="streamRoute"
-            :disableThreshold="true"
-            :disableVrlFunction="true"
-            :isValidSqlQuery="isValidSqlQuery"
-            :disableQueryTypeSelection="true"
-            :expandedLogs="expandedLogs"
-            :validatingSqlQuery="validatingSqlQuery"
-            v-model:trigger="streamRoute.trigger_condition"
-            v-model:sql="streamRoute.query_condition.sql"
-            v-model:promql="streamRoute.query_condition.promql"
-            v-model:delay="streamRoute.delay"
-            v-model:promql_condition="
-              streamRoute.query_condition.promql_condition
-            "
-            v-model:query_type="streamRoute.query_condition.type"
-            v-model:aggregation="streamRoute.query_condition.aggregation"
-            v-model:stream_type="streamRoute.stream_type"
-            v-model:isAggregationEnabled="isAggregationEnabled"
-            v-model:streamType="streamRoute.stream_type"
-            @validate-sql="validateSqlQuery"
-            @submit:form="saveQueryData"
-            @cancel:form="openCancelDialog"
-            @delete:node="openDeleteDialog"
-            @update:fullscreen="updateFullscreenMode"
-            @update:stream_type="updateStreamType"
-            @expandLog="toggleExpandLog"
-            @update:delay="updateDelay"
-            class="tw:mt-2"
-          />
-        </div>
-      </div>
+    <div class="stream-routing-container">
+      <scheduled-pipeline
+        ref="scheduledPipelineRef"
+        :columns="filteredColumns"
+        :conditions="[]"
+        :alertData="streamRoute"
+        :disableThreshold="true"
+        :disableVrlFunction="true"
+        :isValidSqlQuery="isValidSqlQuery"
+        :disableQueryTypeSelection="true"
+        :expandedLogs="expandedLogs"
+        :validatingSqlQuery="validatingSqlQuery"
+        v-model:trigger="streamRoute.trigger_condition"
+        v-model:sql="streamRoute.query_condition.sql"
+        v-model:promql="streamRoute.query_condition.promql"
+        v-model:delay="streamRoute.delay"
+        v-model:promql_condition="
+          streamRoute.query_condition.promql_condition
+        "
+        v-model:query_type="streamRoute.query_condition.type"
+        v-model:aggregation="streamRoute.query_condition.aggregation"
+        v-model:stream_type="streamRoute.stream_type"
+        v-model:isAggregationEnabled="isAggregationEnabled"
+        v-model:streamType="streamRoute.stream_type"
+        @validate-sql="validateSqlQuery"
+        @submit:form="saveQueryData"
+        @cancel:form="openCancelDialog"
+        @delete:node="openDeleteDialog"
+        @update:fullscreen="updateFullscreenMode"
+        @update:stream_type="updateStreamType"
+        @expandLog="toggleExpandLog"
+        @update:delay="updateDelay"
+      />
     </div>
     </div>
   </ODrawer>
@@ -685,14 +680,14 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
 }
 .stream-routing-container {
   width: 100%;
+  height: 100%;
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
 
 .stream-routing-section {
-  min-height: 100%;
+  height: 100%;
   width: 100% !important;
-  padding-left: 1rem;
 }
 
 /* ── AI button — mirrors MainLayout.vue ─────────────────────────── */

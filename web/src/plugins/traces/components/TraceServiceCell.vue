@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
@@ -50,6 +51,8 @@ const props = defineProps<{
   item: Record<string, any>;
   dataTest?: string;
 }>();
+
+const store = useStore();
 
 const { getOrSetServiceColor } = useTraces();
 
@@ -60,7 +63,7 @@ const rootColor = computed(
 const serviceIconUrl = computed(() =>
   getServiceIconDataUrl(
     props.item.service_name,
-    document.documentElement.classList.contains("dark"),
+    store.state.theme === "dark",
     rootColor.value,
   ),
 );

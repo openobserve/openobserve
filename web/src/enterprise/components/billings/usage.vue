@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="usage-data-to-display tw:flex tw:items-end ">
-               {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }}
+               {{ usageData.ingestion }} {{ usageDataType.toUpperCase() }} {{ usageCost.ingestion ? '| $ '+ usageCost.ingestion : '' }}
             </div>
             </div>
                 </div>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.search }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.search }} {{ usageDataType.toUpperCase() }} {{ usageCost.search ? '| $ '+ usageCost.search : '' }}
                 </div>
                 </div>
                 </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.functions }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.functions }} {{ usageDataType.toUpperCase() }} {{ usageCost.functions ? '| $ '+ usageCost.functions : '' }}
                 </div>
                 </div>
                 </div>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                 </div>
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.ai_credits }} Credits
+                {{ usageData.ai_credits }} Credits {{ usageCost.ai_credits ? '| $ '+ usageCost.ai_credits : '' }}
                 </div>
                 </div>
                 </div>
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.pipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.pipeline ? '| $ '+ usageCost.pipeline : '' }}
                 </div>
                 </div>
                 </div>
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.remotepipeline }} {{ usageDataType.toUpperCase() }} {{ usageCost.remotepipeline ? '| $ '+ usageCost.remotepipeline : '' }}
                 </div>
                 </div>
                 </div>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Bottom Section (40%) -->
                 <div class="usage-data-to-display tw:flex tw:items-end ">
-                {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }}
+                {{ usageData.dataretention }} {{ usageDataType.toUpperCase() }} {{ usageCost.dataretention ? '| $ '+ usageCost.dataretention : '' }}
                 </div>
                 </div>
                 </div>
@@ -289,6 +289,15 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         dataretention: "0.00",
         ai_credits: "0.00"
       });
+      const usageCost = ref<any>({
+        ingestion: null,
+        search: null,
+        functions: null,
+        pipeline: null,
+        remotepipeline: null,
+        dataretention: null,
+        ai_credits: null
+      });
       let chartData: any = ref({});
       // The member-org selector lives in Billing.vue (rendered beside this
       // component) and shares the current selection via this injected reactive.
@@ -328,6 +337,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         )
           .then((res) => {
             dataLoading.value = false;
+            // reset the data
+            for(const key of Object.keys(usageData.value)){
+                usageData.value[key] = "0.00";
+                usageCost.value[key] = null;
+            }
             res.data.data.forEach((item: any) => {
               const numericValue = parseFloat(item.value);
               // Map API event names to usageData keys
@@ -343,6 +357,11 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
               const key = eventKeyMap[item.event.toLowerCase()];
               if (key) {
                 usageData.value[key] = numericValue.toFixed(2);
+                if(item.cost){
+                    usageCost.value[key] = item.cost.toFixed(2);
+                }else{
+                    usageCost.value[key] = null;
+                }
               }
             });
             startTime.value = res.data.start_time;
@@ -963,6 +982,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
         searchIcon,
         functionsIcon,
         usageData,
+        usageCost,
         getUsage,
         router,
         pipelineIcon,
@@ -1054,4 +1074,3 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
     color: var(--o2-text-heading);
   }
   </style>
-  

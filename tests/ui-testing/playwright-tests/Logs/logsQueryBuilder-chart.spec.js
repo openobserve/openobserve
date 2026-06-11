@@ -161,6 +161,12 @@ test.describe("Logs Query Builder - Tab Navigation", () => {
         await pm.logsPage.clickLogsToggle();
         await page.waitForLoadState('domcontentloaded');
 
+        // Monaco editor is reinitialised after the Build→Logs tab switch; poll the
+        // model for the preserved query before reading. Without this, the 500ms
+        // wait inside clickLogsToggle races against Monaco mounting and
+        // getQueryEditorText returns "" (CI flake on logsQueryBuilder-chart:165).
+        await pm.logsPage.waitForQueryEditorValue('e2e_automate');
+
         const queryText = await pm.logsPage.getQueryEditorText();
         expect(queryText.toLowerCase()).toContain('e2e_automate');
         expect(queryText.trim().length).toBeGreaterThan(0);

@@ -62,30 +62,32 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-vi.mock("@/components/TenstackTable.vue", () => ({
+// The component now renders sessions through the design-system OTable
+// (props: `data`/`columns`/`loading`, emits `row-click`, cell slots receive
+// `{ row }`). The mock mirrors just that contract.
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "TenstackTable",
-    props: ["rows", "columns", "loading", "rowHeight"],
-    emits: ["click:dataRow"],
+    name: "OTable",
+    props: ["data", "columns", "loading", "rowKey"],
+    emits: ["row-click"],
     template: `
-      <div class="tenstack-table-mock">
-        <slot v-if="loading" name="loading" />
-        <slot v-else-if="!rows || rows.length === 0" name="empty" />
+      <div class="otable-mock">
+        <div v-if="loading" data-test="sessions-list-loading" class="otable-loading" />
         <template v-else>
           <div
-            v-for="row in rows"
+            v-for="row in data"
             :key="row.sessionId"
             class="table-row"
             :data-session-id="row.sessionId"
-            @click="$emit('click:dataRow', row)"
+            @click="$emit('row-click', row)"
           >
-            <slot name="cell-sessionId" :item="row">{{ row.sessionId }}</slot>
-            <slot name="cell-firstSeenNanos" :item="row">{{ row.firstSeenNanos }}</slot>
-            <slot name="cell-turns" :item="row">{{ row.turns }}</slot>
-            <slot name="cell-durationNanos" :item="row">{{ row.durationNanos }}</slot>
-            <slot name="cell-tokens" :item="row">{{ row.inputTokens }} → {{ row.outputTokens }} (Σ {{ row.tokens }})</slot>
-            <slot name="cell-cost" :item="row">{{ row.cost }}</slot>
-            <slot name="cell-status" :item="row">{{ row.status }}</slot>
+            <slot name="cell-sessionId" :row="row">{{ row.sessionId }}</slot>
+            <slot name="cell-firstSeenNanos" :row="row">{{ row.firstSeenNanos }}</slot>
+            <slot name="cell-turns" :row="row">{{ row.turns }}</slot>
+            <slot name="cell-durationNanos" :row="row">{{ row.durationNanos }}</slot>
+            <slot name="cell-tokens" :row="row">{{ row.inputTokens }} → {{ row.outputTokens }} (Σ {{ row.tokens }})</slot>
+            <slot name="cell-cost" :row="row">{{ row.cost }}</slot>
+            <slot name="cell-status" :row="row">{{ row.status }}</slot>
           </div>
         </template>
       </div>
@@ -177,12 +179,13 @@ async function mountComponent(props = defaultProps) {
 // ---------------------------------------------------------------------------
 
 describe("SessionsList — no LLM streams", () => {
-  it("shows 'no streams found' message when streamsLoaded and availableStreams is empty", async () => {
+  it("shows the empty state when streamsLoaded and availableStreams is empty", async () => {
     mockGetStreams.mockResolvedValue({ list: [] });
     const wrapper = await mountComponent();
 
-    const text = wrapper.text();
-    expect(text).toContain("traces.sessionsList.noStreamsFound");
+    // "No LLM streams" and "no sessions in the window" now collapse into the
+    // single consolidated OEmptyState branch.
+    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(true);
   });
 });
 
@@ -215,13 +218,13 @@ describe("SessionsList — error state", () => {
 });
 
 describe("SessionsList — empty sessions", () => {
-  it("shows 'no sessions found' when hasLoadedOnce=true, not loading, sessions=[]", async () => {
+  it("shows the empty state when hasLoadedOnce=true, not loading, sessions=[]", async () => {
     mockHasLoadedOnce.value = true;
     mockLoading.value = false;
     mockSessions.value = [];
 
     const wrapper = await mountComponent();
-    expect(wrapper.text()).toContain("traces.sessionsList.noSessionsFound");
+    expect(wrapper.find("[data-test='sessions-empty']").exists()).toBe(true);
   });
 });
 

@@ -143,38 +143,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon name="search" size="sm" />
                         </template>
                         <template #icon-right>
-                          <div
-                            role="radiogroup"
-                            aria-label="Search scope"
-                            class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
+                          <OToggleGroup
+                            :model-value="searchAcrossFolders ? 'all' : 'this'"
+                            type="single"
+                            class="tw:self-center tw:mr-1"
+                            @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                           >
-                            <button
-                              type="button"
-                              role="radio"
-                              :aria-checked="!searchAcrossFolders"
-                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                              :class="!searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                            <OToggleGroupItem
+                              value="this"
+                              size="xs"
+                              icon-left="folder-outline"
                               data-test="alert-list-search-scope-current"
                               title="Search only this folder"
-                              @click="searchAcrossFolders = false"
-                            >
-                              <OIcon name="folder-outline" size="xs" />
-                              <span class="tw:whitespace-nowrap">This folder</span>
-                            </button>
-                            <button
-                              type="button"
-                              role="radio"
-                              :aria-checked="searchAcrossFolders"
-                              class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                              :class="searchAcrossFolders ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm' : 'tw:text-text-secondary tw:hover:text-text-primary'"
+                            >This folder</OToggleGroupItem>
+                            <OToggleGroupItem
+                              value="all"
+                              size="xs"
+                              icon-left="search"
                               data-test="alert-list-search-across-folders-toggle"
                               title="Search across all folders"
-                              @click="searchAcrossFolders = true"
-                            >
-                              <OIcon name="search" size="xs" />
-                              <span class="tw:whitespace-nowrap">All folders</span>
-                            </button>
-                          </div>
+                            >All folders</OToggleGroupItem>
+                          </OToggleGroup>
                         </template>
                       </OInput>
                     </div>

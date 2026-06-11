@@ -242,7 +242,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ActionScriptList {
   "#": string | number;
@@ -340,13 +340,15 @@ export default defineComponent({
         header: t("alerts.name"),
         accessorKey: "name",
         sortable: true,
-        meta: { align: "left" },
+        size: COL.name,
+        meta: { align: "left", autoWidth: true },
       },
       {
         id: "created_by",
         header: t("alerts.createdBy"),
         accessorKey: "created_by",
         sortable: true,
+        size: COL.owner,
         meta: { align: "center" },
       },
       {
@@ -354,6 +356,7 @@ export default defineComponent({
         header: t("alerts.createdAt"),
         accessorKey: "created_at",
         sortable: true,
+        size: COL.createdAt,
         meta: { align: "left" },
       },
       {
@@ -361,6 +364,7 @@ export default defineComponent({
         header: t("actions.type"),
         accessorKey: "execution_details_type",
         sortable: true,
+        size: COL.type,
         meta: { align: "left" },
       },
       {
@@ -368,6 +372,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -375,6 +380,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
+        size: COL.date,
         meta: { align: "left" },
       },
       {
@@ -382,6 +388,7 @@ export default defineComponent({
         header: t("alerts.status"),
         accessorKey: "status",
         sortable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {

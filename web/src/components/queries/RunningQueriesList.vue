@@ -30,11 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="settings-query-management"
       :show-global-filter="false"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <OEmptyState size="hero" preset="no-queries" hide-action />
+        <OEmptyState
+          size="hero"
+          preset="no-queries"
+          :filtered="filtered"
+          :hide-action="!filtered"
+          @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+        />
       </template>
       <template #cell-actions="{ row }">
         <OButton
@@ -63,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #bottom>
         <OButton
+          v-if="selectedRowsModel?.length"
           data-test="qm-multiple-cancel-query-btn"
           variant="outline-destructive"
           size="sm-action"
-          :disabled="selectedRowsModel?.length === 0"
           @click="handleMultiQueryCancel"
         >
           {{ t('queries.cancelQuery') }}
@@ -110,12 +119,17 @@ export default defineComponent({
       type: Array,
       required: false,
     },
+    filtered: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "update:selectedRows",
     "delete:queries",
     "delete:query",
     "show:schema",
+    "clear:filters",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -137,14 +151,20 @@ export default defineComponent({
         header: t("user.email"),
         accessorKey: "user_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.email,
-        meta: { align: "left" , autoWidth: true },
+        minSize: 160,
+        meta: { align: "left" , flex: true },
       },
       {
         id: "org_id",
         header: t("organization.id"),
         accessorKey: "org_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
@@ -152,7 +172,9 @@ export default defineComponent({
         header: t("queries.searchType"),
         accessorKey: "search_type",
         sortable: true,
-        size: COL.type,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -160,7 +182,9 @@ export default defineComponent({
         header: t("queries.querySource"),
         accessorKey: "query_source",
         sortable: true,
-        size: COL.type,
+        resizable: true,
+        hideable: true,
+        size: 140,
         meta: { align: "left" },
       },
       {
@@ -168,7 +192,9 @@ export default defineComponent({
         header: t("queries.duration"),
         accessorKey: "duration",
         sortable: true,
-        size: COL.duration,
+        resizable: true,
+        hideable: true,
+        size: 150,
         meta: { align: "left" },
       },
       {
@@ -176,7 +202,9 @@ export default defineComponent({
         header: t("queries.queryRange"),
         accessorKey: "queryRange",
         sortable: true,
-        size: COL.duration,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -184,7 +212,9 @@ export default defineComponent({
         header: t("queries.queryType"),
         accessorKey: "work_group",
         sortable: true,
-        size: COL.type,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -192,6 +222,8 @@ export default defineComponent({
         header: t("queries.status"),
         accessorKey: "status",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.status,
         meta: { align: "left" },
       },
@@ -200,7 +232,9 @@ export default defineComponent({
         header: t("alerts.streamType"),
         accessorKey: "stream_type",
         sortable: true,
-        size: COL.streamType,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod bloom_builder;
 mod parallel;
 mod reader;
 mod sequential;
@@ -341,6 +340,7 @@ pub(super) mod tests {
         let mut writer = config::utils::parquet::new_parquet_writer(
             &mut buffer,
             &schema,
+            &[],
             &file_meta,
             false,
             None,

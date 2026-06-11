@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
 
           <OToggleGroupItem
+            v-if="store.state.zoConfig.timechart_enabled"
             data-test="logs-visualize-toggle"
             :disabled="isVisualizeDisabled"
             :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
@@ -463,6 +464,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               <span data-test="search-inspect-label">Search Inspect</span>
+            </ODropdownItem>
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
+
+          <ODropdownGroup
+            v-if="searchObj.meta.sqlMode"
+            :label="t('search.menuGroupExplain')"
+          >
+            <ODropdownItem
+              data-test="logs-search-bar-explain-query-menu-btn"
+              :disabled="
+                !searchObj.data.query || searchObj.data.query.trim() === ''
+              "
+              @select="openExplainDialog"
+            >
+              <template #icon-left>
+                <span class="more-menu-icon-badge">
+                  <OIcon name="lightbulb" size="sm" />
+                </span>
+              </template>
+              {{ t('search.explainQuery') }}
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
@@ -1409,6 +1432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="localSavedViews.length > 0 ? 'tw:border-r tw:border-[var(--o2-border-color)]' : ''"
               :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
+              <div style="max-height: 486px; min-height: 280px; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1417,7 +1441,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :global-filter="searchObj.data.savedViewFilterFields"
                 :page-size="rowsPerPage"
                 :page-size-options="[10, 20, 50]"
-                :style="{ minHeight: '420px', height: '420px' }"
                 class="saved-view-table full-height o2-table-hide-header"
               >
                 <template #top>
@@ -1511,12 +1534,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
+              </div>
             </div>
 
             <div
               class="tw:flex tw:flex-col tw:w-[40%] tw:ml-0 tw:pl-3"
               v-if="localSavedViews.length > 0"
             >
+              <div style="max-height: 480px; min-height: 280px; display: flex; flex-direction: column;">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -1581,6 +1606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
+              </div>
             </div>
           </div>
       </div>
@@ -2036,7 +2062,7 @@ export default defineComponent({
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
-        height: `${Math.round(window.innerHeight * 0.6)}px`,
+        height: `${Math.round(window.innerHeight * 0.75)}px !important`,
         zIndex: 50,
       };
     });
@@ -2180,8 +2206,10 @@ export default defineComponent({
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
       { value: 'logs',      icon: 'search',   label: t('common.search'),          disabled: false },
-      { value: 'visualize', icon: 'timeline', label: t('search.visualize'),
-        disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 },
+      ...(store.state.zoConfig.timechart_enabled
+        ? [{ value: 'visualize', icon: 'timeline', label: t('search.visualize'),
+            disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 }]
+        : []),
       { value: 'build',     icon: 'build',    label: t('search.buildQuery'),      disabled: false },
       ...(config.isEnterprise === 'true'
         ? [{ value: 'patterns', icon: 'layers', label: t('search.showPatternsLabel'), disabled: false }]
@@ -2694,7 +2722,8 @@ export default defineComponent({
       if (
         searchObj.loading == false &&
         store.state.zoConfig.query_on_stream_selection == false &&
-        searchObj.meta.logsVisualizeToggle === "logs"
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0
       ) {
         searchObj.loading = true;
         searchObj.runQuery = true;
@@ -4134,8 +4163,8 @@ export default defineComponent({
           return;
         }
         localSavedView[row.view_id] = JSON.parse(JSON.stringify(row));
-        favoriteViews.value.push(row.view_id);
-        localSavedViews.value.push(row);
+        favoriteViews.value = [...favoriteViews.value, row.view_id];
+        localSavedViews.value = [...localSavedViews.value, row];
 
         // moveItemsToTop(localSavedView, favoriteViews.value);
 
@@ -5276,7 +5305,7 @@ export default defineComponent({
   top: 0;
   margin-right: 0.25rem;
   min-width: 10rem;
-  background-color: var(--o2-card-bg);
+  background-color: var(--color-dropdown-bg);
   border: 0.063rem solid var(--o2-border-color);
   border-radius: 0.375rem;
   box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
@@ -5284,7 +5313,7 @@ export default defineComponent({
   z-index: 9999;
 
   body.body--dark & {
-    background-color: var(--o2-card-bg);
+    background-color: var(--color-dropdown-bg);
     border-color: var(--o2-border-color);
     box-shadow: 0 0.5rem 1.5rem var(--o2-hover-shadow);
   }
@@ -5549,6 +5578,11 @@ html.dark .file-type label,
 // Remove pagination top separator
 .saved-view-table :deep(.tw\:border-t) {
   border-top: none;
+}
+
+// Hide the redundant total-count chip on the left — "of N" on the right already shows it
+.saved-view-table :deep([data-test="o2-table-pagination-bottom"] .o2-table-footer-title) {
+  display: none;
 }
 
 // VRL disabled warning background — theme-aware via CSS cascade

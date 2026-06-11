@@ -61,6 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               sorting="client"
               filter-mode="client"
               :show-global-filter="false"
+              :default-columns="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="pipelines-enrichment-tables"
               selection="multiple"
               :selected-ids="selectedEnrichmentTableIds"
               @update:selected-ids="handleSelectedIdsUpdate"
@@ -101,8 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="hero"
                   preset="no-enrichment-tables"
                   :filtered="!!filterQuery"
-                  :hide-action="!filterQuery"
-                  @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? (filterQuery = '')
+                        : showAddUpdateFn(null)
+                  "
                 />
               </template>
               <template #cell-type="{ row }">
@@ -416,11 +424,11 @@ export default defineComponent({
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, size: COL.name, meta: { align: "left", autoWidth: true } },
-      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, meta: { align: "left" }, size: 150 },
-      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, meta: { align: "left" }, size: COL.count },
-      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
-      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
+      { id: "name", header: t("function.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
+      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
+      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.count },
+      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
+      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "left", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
       { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
     ];
 

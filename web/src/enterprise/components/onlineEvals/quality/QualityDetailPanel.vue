@@ -1,13 +1,8 @@
 <template>
   <section class="qdp" data-test="quality-detail-panel">
-    <header class="qdp__head">
-      <div class="qdp__title-row">
-        <h3 class="qdp__title">{{ config.name }}</h3>
-        <span class="qdp__type" :class="`qdp__type--${dataType}`">{{ shortType(dataType) }}</span>
-        <span class="qdp__version">v{{ config.version }}</span>
-      </div>
-      <p v-if="config.description" class="qdp__desc">{{ config.description }}</p>
-    </header>
+    <!-- Title row + type badge + version + description moved up into the
+         ODrawer header (QualityPage) so the panel content starts straight
+         from the KPI tiles without a duplicated identification block. -->
 
     <div v-if="kpis.length === 0 && isLoading" class="qdp__loading">
       <OSpinner size="sm" />
@@ -231,13 +226,6 @@ const healthyCategories = computed<string[]>(() => {
   return ht?.healthy_categories || ht?.healthyCategories || [];
 });
 
-function shortType(type: string): string {
-  if (type === "numeric") return "Num";
-  if (type === "categorical") return "Cat";
-  if (type === "boolean") return "Bool";
-  return "—";
-}
-
 function kpiTitle(kpi: DetailKpi): string {
   const key = kpi.titleKey ?? kpi.id;
   return t(`onlineEvals.quality.detail.kpis.${key}`);
@@ -263,69 +251,13 @@ function formatKpi(kpi: DetailKpi): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 0;
+  // The panel now renders inside an ODrawer body whose own padding is
+  // intentionally minimal, so the content sat flush against the drawer
+  // edges. Add comfortable horizontal + vertical padding so titles,
+  // KPI cards, and charts breathe inside the panel.
+  padding: 16px 20px 24px;
   min-height: 0;
   overflow: auto;
-}
-
-.qdp__head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.qdp__title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.qdp__title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  color: var(--color-text-primary, currentColor);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.qdp__type {
-  display: inline-flex;
-  padding: 0 4px;
-  border-radius: 2px;
-  font: 700 8px/1.4 inherit;
-  letter-spacing: 0.02em;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qdp__type--numeric {
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.qdp__type--categorical {
-  background: color-mix(in srgb, #9333ea 14%, transparent);
-  color: #7c3aed;
-}
-
-.qdp__type--boolean {
-  background: color-mix(in srgb, #16a34a 14%, transparent);
-  color: #15803d;
-}
-
-.qdp__version {
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-variant-numeric: tabular-nums;
-}
-
-.qdp__desc {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 
 .qdp__loading,

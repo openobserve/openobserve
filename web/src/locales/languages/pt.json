@@ -423,7 +423,8 @@
     "menuGroupSchedule": "Cronograma",
     "menuGroupInspect": "Inspecionar",
     "validSql": "SQL válido",
-    "invalidSql": "Consulta inválida"
+    "invalidSql": "Consulta inválida",
+    "menuGroupExplain": "Explique"
   },
   "menu": {
     "home": "Início",
@@ -457,7 +458,8 @@
     "language": "Idioma",
     "actions": "Ações",
     "incidents": "Incidentes",
-    "evals": "Evals"
+    "evals": "Evals",
+    "aiObservability": "Observabilidade da IA"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -1209,7 +1211,8 @@
     "tokenRotateError": "Falha ao girar o token.",
     "tokenDeleteError": "Falha ao excluir o token.",
     "noTokensFound": "Nenhum token de ingestão foi encontrado.",
-    "createdBy": "Criado por"
+    "createdBy": "Criado por",
+    "orgLevelSummary": "Tokens de nível organizacional para endpoints de ingestão."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -3270,7 +3273,8 @@
     "confirmRejectMsg": "Tem certeza de que deseja rejeitar o convite para entrar em {org}?",
     "expired": "Expirado",
     "expiresToday": "Expira hoje",
-    "daysLeft": "{dias} dias restantes"
+    "daysLeft": "{dias} dias restantes",
+    "search": "Pesquisar convites"
   },
   "serviceAccounts": {
     "header": "Contas de serviço",
@@ -4356,6 +4360,46 @@
       "description": "Alvos externos para saída do pipeline — endpoints HTTP e destinos de gravação remota.",
       "action": "Novo destino",
       "actionDesc": "Conecte um destino de pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Ainda não há atividade de LLM",
+      "description": "Instrumente seus serviços com as convenções semânticas do OpenTelemetry Gen-AI e ingira pelo menos um rastreamento para preencher esse painel.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Capture os atributos gen_ai_* em seus traços"
+    },
+    "noLLMSessions": {
+      "title": "Ainda não há sessões de LLM",
+      "description": "As sessões são agrupadas por gen_ai_conversation_id. Instrumente seus serviços para que cada conversa marque seus rastros, e as sessões apareçam aqui.",
+      "action": "Instrumento com OpenTelemetry",
+      "actionDesc": "Expansões de tags com gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ainda não há marcadores",
+      "description": "Os pontuadores classificam as respostas do LLM de acordo com suas configurações de pontuação — comece com um juiz do LLM ou importe uma da biblioteca.",
+      "action": "Criar marcador",
+      "actionDesc": "Defina um juiz de LLM ou pontuador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Ainda não há trabalhos de avaliação",
+      "description": "Pontuadores do cronograma de trabalhos em relação a um stream do LLM. Crie um para começar a avaliar as conversas em uma cadência.",
+      "action": "Crie um trabalho de avaliação",
+      "actionDesc": "Escolha uma transmissão, marcadores e cadência"
+    },
+    "noScoreConfigs": {
+      "title": "Ainda não há configurações de pontuação",
+      "description": "As configurações de pontuação definem o esquema que os pontuadores produzem — numérico, booleano ou categórico. Adicione um para começar a pontuar.",
+      "action": "Criar configuração de pontuação",
+      "actionDesc": "Defina a forma da pontuação+faixa saudável"
+    },
+    "noEvalTemplates": {
+      "title": "Ainda não há modelos de avaliação",
+      "description": "Os modelos de avaliação definem critérios de pontuação reutilizáveis para avaliações de LLM.",
+      "action": "Novo modelo",
+      "actionDesc": "Crie um modelo de avaliação"
+    },
+    "noPipelineHistory": {
+      "title": "Ainda não há histórico de oleodutos",
+      "description": "O histórico de execução do pipeline aparecerá aqui quando seus pipelines forem executados."
     }
   },
   "onlineEvals": {
@@ -4698,6 +4742,21 @@
     "empty": {
       "title": "Ainda não há fornecedores de LLM",
       "description": "Os provedores de LLM armazenam os detalhes da conexão (endpoint + credenciais) dos modelos de linguagem que seus avaliadores do LLM Judge chamam. Adicione um para começar a fazer avaliações baseadas em juízes."
+    }
+  },
+  "aiObservability": {
+    "title": "Observabilidade do LLM",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Avalie"
+    },
+    "nav": {
+      "overview": "Visão geral",
+      "sessions": "Sessões",
+      "quality": "Qualidade",
+      "evalJobs": "Empregos de avaliação",
+      "scorers": "Marcadores",
+      "scoreConfigs": "Configurações de pontuação"
     }
   }
 }

@@ -144,6 +144,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
@@ -211,6 +212,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("quota.moduleName"),
     accessorKey: "display_name",
     sortable: true,
+    size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
   {

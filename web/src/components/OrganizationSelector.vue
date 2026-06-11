@@ -30,8 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useRouter } from "vue-router";
-import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -58,21 +56,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const router = useRouter();
-const store = useStore();
 
 const open = ref(false);
 const searchQuery = ref("");
-
-const navigateToOrganizations = () => {
-  open.value = false;
-  router.push({
-    name: "organizations",
-    query: {
-      org_identifier: store.state.selectedOrganization?.identifier,
-    },
-  });
-};
 
 // Matches both the display name and the identifier.
 const filtered = computed<OrgOption[]>(() => {
@@ -86,7 +72,10 @@ const filtered = computed<OrgOption[]>(() => {
 });
 
 // ── Virtualization ──────────────────────────────────────────────
-const ROW_HEIGHT = 48;
+// One line per org: the name, with the id inline beside it only when it
+// differs from the name (an id equal to the name is redundant). Rows are a
+// uniform single line, so a fixed height is enough.
+const ROW_HEIGHT = 36;
 const scrollRef = ref<HTMLElement | null>(null);
 
 const virtualizer = useVirtualizer(
@@ -248,41 +237,25 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
       <div
         data-test="organization-menu-list"
-        class="tw:flex tw:flex-col tw:w-90 tw:max-w-[92vw]"
+        class="tw:flex tw:flex-col tw:w-80 tw:max-w-[92vw]"
       >
-        <!-- Header: title + count (inline) + manage button -->
+        <!-- Header: title + count -->
         <div
           class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:px-3 tw:pt-2 tw:pb-1.5"
         >
-          <div class="tw:flex tw:items-center tw:gap-1.5">
-            <span
-              class="tw:text-[11px] tw:font-semibold tw:uppercase tw:tracking-wider tw:text-text-secondary"
-            >
-              {{ t("organization.header") }}
-            </span>
-            <span
-              data-test="organization-menu-count"
-              class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:leading-none tw:px-2 tw:py-1 tw:rounded-full tw:bg-select-item-hover-bg tw:text-text-secondary"
-            >
-              {{
-                searchQuery
-                  ? `${filtered.length} of ${organizations.length}`
-                  : organizations.length
-              }}
-            </span>
-          </div>
-          <OButton
-            variant="outline"
-            size="xs"
-            data-test="organization-menu-manage-btn"
-            class="tw:text-text-secondary tw:border-text-secondary/30"
-            @click="navigateToOrganizations"
+          <span class="tw:text-[13px] tw:font-semibold tw:text-text-primary">
+            {{ t("organization.header") }}
+          </span>
+          <span
+            data-test="organization-menu-count"
+            class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:leading-none tw:px-2 tw:py-1 tw:rounded-full tw:bg-select-item-hover-bg tw:text-text-secondary"
           >
-            <template #icon-left>
-              <OIcon name="settings" size="xs" />
-            </template>
-            {{ t("organization.manage") }}
-          </OButton>
+            {{
+              searchQuery
+                ? `${filtered.length} of ${organizations.length}`
+                : organizations.length
+            }}
+          </span>
         </div>
 
         <!-- Search: ↑/↓ move highlight, Enter selects, Esc closes -->
@@ -325,16 +298,20 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               @click="select(row.org)"
               @mousemove="highlightedIndex = row.index"
             >
-              <div
-                class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:flex-1 tw:gap-0.5"
-              >
+              <!-- Name with the id inline beside it. The id shows only when it
+                   differs from the name (an equal id is just a redundant echo).
+                   The name takes priority and is never truncated (it only clips
+                   if it alone exceeds the whole row); the id yields, truncating
+                   to whatever space is left. -->
+              <div class="tw:flex tw:items-baseline tw:gap-2 tw:min-w-0 tw:flex-1">
                 <span
-                  class="tw:text-[13px] tw:font-medium tw:leading-tight tw:truncate"
+                  class="tw:flex-none tw:max-w-full tw:min-w-0 tw:truncate tw:text-[13px] tw:font-medium tw:leading-tight"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
-                  class="tw:text-[11px] tw:font-mono tw:leading-tight tw:truncate tw:text-text-secondary"
+                  v-if="row.org.identifier && row.org.identifier !== row.org.label"
+                  class="tw:shrink tw:min-w-0 tw:truncate tw:text-[11px] tw:font-mono tw:leading-tight tw:text-text-secondary"
                 >
                   {{ row.org.identifier }}
                 </span>

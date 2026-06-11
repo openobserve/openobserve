@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:h-16 tw:ps-3 tw:pe-3.5 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow,transform] tw:duration-150 tw:outline-none tw:hover:-translate-y-0.5 tw:hover:shadow-md tw:hover:border-primary-400 tw:hover:bg-tabs-hover-bg tw:focus-visible:ring-[0.125rem] tw:focus-visible:ring-primary-500/40"
+    class="tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:h-16 tw:ps-3 tw:pe-3.5 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow,transform] tw:duration-150 tw:outline-none tw:hover:shadow-md tw:hover:border-primary-400 tw:hover:bg-tabs-hover-bg tw:focus-visible:ring-[0.125rem] tw:focus-visible:ring-primary-500/40"
   >
     <span
       class="tw:relative tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-colors tw:group-hover:bg-primary-600 tw:group-hover:text-white"

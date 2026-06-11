@@ -372,54 +372,11 @@ const isVirtual = computed(() => props.virtualScroll && displayRows.value.length
 // slot), so after each render we measure the rendered action cells and pin the
 // column's CSS size var to the widest content. These vars override the nominal
 // sizes computed in useTableCore.
+// Per-column CSS size-var overrides. The actions column is NO LONGER measured
+// from the DOM at runtime (it's sized deterministically from its icon count in
+// useTableCore, so the skeleton and loaded table match) — this stays empty for
+// now but is kept as the override channel the table style/sums read from.
 const measuredColumnSizeVars = ref<Record<string, string>>({});
-
-function measureActionColumns() {
-  const root = scrollContainerRef.value;
-  if (!root) return;
-  const actionCols = effectiveColumns.value.filter(
-    (c) => c.isAction === true || c.id === "actions",
-  );
-  if (!actionCols.length) {
-    if (Object.keys(measuredColumnSizeVars.value).length) {
-      measuredColumnSizeVars.value = {};
-    }
-    return;
-  }
-  const next: Record<string, string> = {};
-  for (const col of actionCols) {
-    const safeId = col.id.replace(/[^a-zA-Z0-9]/g, "-");
-    const cells = root.querySelectorAll<HTMLElement>(
-      `td[data-test="o2-table-cell-${col.id}"]`,
-    );
-    if (!cells.length) continue;
-    let contentMax = 0;
-    let padX = 16; // fallback: tw:px-2 (8px each side)
-    cells.forEach((cell, i) => {
-      if (i === 0) {
-        const cs = getComputedStyle(cell);
-        padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-      }
-      // The slot wrapper is inline-flex (natural content width) even when the
-      // td is momentarily narrower, so its rect is the true content width.
-      const wrapper = cell.firstElementChild as HTMLElement | null;
-      const w = wrapper
-        ? wrapper.getBoundingClientRect().width
-        : cell.getBoundingClientRect().width;
-      if (w > contentMax) contentMax = w;
-    });
-    if (contentMax > 0) {
-      const total = `${Math.ceil(contentMax + padX) + 1}px`;
-      next[`--header-${safeId}-size`] = total;
-      next[`--col-${col.id}-size`] = total;
-    }
-  }
-  const cur = measuredColumnSizeVars.value;
-  const changed =
-    Object.keys(next).length !== Object.keys(cur).length ||
-    Object.keys(next).some((k) => next[k] !== cur[k]);
-  if (changed) measuredColumnSizeVars.value = next;
-}
 
 // ── Flex-fill measurement ───────────────────────────────────────
 // While filling (not frozen), the flex column's width = the container's
@@ -446,12 +403,14 @@ function measureFlexFill() {
       if (skip.has(th.getAttribute("data-test") || "")) return;
       nonFlexSum += th.getBoundingClientRect().width;
     });
-  const available = cw - nonFlexSum;
+  // Floor the leftover so the flex column can NEVER be a sub-pixel wider than the
+  // exact remaining space — that rounding is what shows as a 1-2px scrollbar.
+  const available = Math.max(0, Math.floor(cw - nonFlexSum));
   const per = Math.max(Math.floor(available / ids.length), 0);
   const next: Record<string, number> = {};
   ids.forEach((id, i) => {
     const w = i === ids.length - 1 ? available - per * (ids.length - 1) : per;
-    next[id] = Math.max(Math.round(w), colMinSize(id));
+    next[id] = Math.max(w, colMinSize(id));
   });
   const cur = measuredFlexFill.value;
   const changed =
@@ -460,14 +419,9 @@ function measureFlexFill() {
 }
 
 function scheduleMeasureActions() {
-  nextTick(() =>
-    requestAnimationFrame(() => {
-      measureActionColumns();
-      // Re-measure flex on the next frame so the actions column's new width is
-      // already painted before we subtract it.
-      requestAnimationFrame(measureFlexFill);
-    }),
-  );
+  // The actions column is sized deterministically (no DOM measurement), so only
+  // the flex fill needs measuring. Do it after the DOM settles.
+  nextTick(() => requestAnimationFrame(measureFlexFill));
 }
 
 onMounted(scheduleMeasureActions);
@@ -527,6 +481,33 @@ const useComputedWidth = computed(
     flexColIds.value.length > 0,
 );
 
+// True when the table has a filler column (flex or autoWidth) that absorbs the
+// leftover width — i.e. it's designed to exactly fit its container and should
+// never need a horizontal scrollbar in the fill state.
+const hasFillColumn = computed(() =>
+  table
+    .getVisibleLeafColumns()
+    .some((c) => {
+      const m = c.columnDef.meta as any;
+      return m?.flex || m?.autoWidth;
+    }),
+);
+
+// Suppress the horizontal scrollbar for fill tables that aren't intentionally
+// scrolling (sub-pixel rounding otherwise shows a 1-2px scrollbar). Keep it for
+// horizontal-scroll tables and frozen flex tables ONLY when the columns
+// genuinely exceed the container (a column was resized wider) — when the spacer
+// is still absorbing the leftover the table fits, so a stray 1-2px scrollbar
+// from rounding must stay hidden.
+const allowHorizontalScroll = computed(() => {
+  if (props.horizontalScroll) return true;
+  if (!hasFillColumn.value) return true;
+  if (useComputedWidth.value && frozen.value) {
+    return realSum() > containerWidth.value + 1;
+  }
+  return false;
+});
+
 const SPACER_ID = "__spacer__";
 
 function sizeVarKeys(id: string): [string, string] {
@@ -559,6 +540,10 @@ watch(
     () => frozen.value,
     () => measuredColumnSizeVars.value,
     () => containerWidth.value,
+    // Re-measure when columns are hidden/shown from the picker — otherwise the
+    // flex fill is stale and `table-fixed` redistributes the freed width to the
+    // rigid columns (the `#` column visibly grows).
+    () => internalColumnVisibility.value,
   ],
   scheduleMeasureActions,
   { flush: "post" },
@@ -875,7 +860,7 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      :class="['tw:flex tw:flex-col tw:overflow-auto tw:min-h-0 tw:relative', props.fillHeight ? 'tw:flex-1' : '']"
+      :class="['tw:flex tw:flex-col tw:overflow-y-auto tw:min-h-0 tw:relative', allowHorizontalScroll ? 'tw:overflow-x-auto' : 'tw:overflow-x-hidden', props.fillHeight ? 'tw:flex-1' : '']"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'

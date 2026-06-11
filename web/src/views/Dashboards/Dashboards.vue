@@ -137,48 +137,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
                     </template>
-                    <!-- Search scope: inline segmented control (both options visible, one click) -->
                     <template #icon-right>
-                      <div
-                        role="radiogroup"
-                        aria-label="Search scope"
-                        class="tw:flex tw:items-center tw:gap-0.5 tw:self-center tw:mr-1 tw:p-0.5 tw:rounded-lg tw:bg-surface-subtle"
+                      <OToggleGroup
+                        :model-value="searchAcrossFolders ? 'all' : 'this'"
+                        type="single"
+                        class="tw:self-center tw:mr-1"
+                        @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
-                        <button
-                          type="button"
-                          role="radio"
-                          :aria-checked="!searchAcrossFolders"
-                          class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                          :class="
-                            !searchAcrossFolders
-                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary'
-                          "
+                        <OToggleGroupItem
+                          value="this"
+                          size="xs"
+                          icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           title="Search only this folder"
-                          @click="searchAcrossFolders = false"
-                        >
-                          <OIcon name="folder-outline" size="xs" />
-                          <span class="tw:whitespace-nowrap">This folder</span>
-                        </button>
-                        <button
-                          type="button"
-                          role="radio"
-                          :aria-checked="searchAcrossFolders"
-                          class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:cursor-pointer tw:transition-colors tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500/30"
-                          :class="
-                            searchAcrossFolders
-                              ? 'tw:bg-surface-base tw:text-text-primary tw:shadow-sm'
-                              : 'tw:text-text-secondary tw:hover:text-text-primary'
-                          "
+                        >This folder</OToggleGroupItem>
+                        <OToggleGroupItem
+                          value="all"
+                          size="xs"
+                          icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           title="Search across all folders"
-                          @click="searchAcrossFolders = true"
-                        >
-                          <OIcon name="search" size="xs" />
-                          <span class="tw:whitespace-nowrap">All folders</span>
-                        </button>
-                      </div>
+                        >All folders</OToggleGroupItem>
+                      </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
@@ -198,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span
-                class="tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary"
                 :data-test="`dashboard-name-cell-${value}`"
                 :title="value"
                 >{{ value }}</span
@@ -213,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-description="{ value }">
               <span
-                class="tw:text-text-primary text-truncate tw:block"
+                class="tw:text-text-primary"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -228,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ ownerInitials(value) }}</span
                 >
                 <span
-                  class="tw:text-text-primary text-truncate"
+                  class="tw:text-text-primary tw:truncate tw:flex-1 tw:min-w-0"
                   :title="value"
                   >{{ value }}</span
                 >
@@ -455,6 +435,8 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 // @ts-nocheck
 import {
   computed,
@@ -474,7 +456,7 @@ import { useI18n } from "vue-i18n";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -534,6 +516,8 @@ export default defineComponent({
     AddFolder,
     MoveDashboardToAnotherFolder,
     FolderList,
+    OToggleGroup,
+    OToggleGroupItem,
   },
   setup() {
     const store = useStore();
@@ -609,7 +593,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          meta: { align: "left" },
+          size: COL.name,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         // {
         //   id: "identifier",
@@ -627,6 +613,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.description,
           meta: { align: "left" },
         },
         {
@@ -636,6 +623,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.owner,
           meta: { align: "left" },
         },
         {
@@ -645,6 +633,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.date,
           meta: { align: "left" },
         },
         {
@@ -665,6 +654,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          size: COL.folder,
           meta: { align: "left" },
         });
       }

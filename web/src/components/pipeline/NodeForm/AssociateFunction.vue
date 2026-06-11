@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-function-node-routing-section"
+      class="tw:flex tw:flex-col tw:h-full"
       :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
     >
 
@@ -46,9 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4"
+      class="stream-routing-container tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
     >
-      <div class="tw:flex tw:items-center tw:gap-3">
+      <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -61,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-4">
+      <div class="tw:flex tw:flex-col tw:gap-4" :class="[!createNewFunction ? 'tw:px-3' : 'tw:flex-1 tw:min-h-0']">
         <div
           v-if="!createNewFunction"
           class="tw:w-full"
@@ -112,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
         </div>
 
-        <div v-if="createNewFunction" class="pipeline-add-function tw:w-[95vw]">
+        <div v-if="createNewFunction" class="pipeline-add-function tw:w-full tw:flex-1 tw:min-h-0">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"

@@ -190,6 +190,13 @@ impl Partition {
                     records: file_meta.records as usize,
                 };
                 // write into parquet buf
+                let bloom_filter_fields =
+                    if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
+                        let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
+                        infra::schema::get_stream_setting_bloom_filter_fields(&settings)
+                    } else {
+                        vec![]
+                    };
                 let batches = data
                     .iter()
                     .map(|r| {
@@ -208,8 +215,14 @@ impl Partition {
                 } else {
                     None
                 };
-                let mut writer =
-                    new_parquet_writer(&mut buf_parquet, &schema, &file_meta, true, compression);
+                let mut writer = new_parquet_writer(
+                    &mut buf_parquet,
+                    &schema,
+                    &bloom_filter_fields,
+                    &file_meta,
+                    true,
+                    compression,
+                );
 
                 writer
                     .write(&batches)

@@ -2874,7 +2874,7 @@ export default defineComponent({
 .config-search-wrapper {
   padding: 4px 4px;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   background-color: var(--o2-card-bg-solid);
   border-bottom: 1px solid var(--o2-border-color);
 }
