@@ -3241,7 +3241,39 @@
     "openInFullView": "In volledige weergave openen",
     "serviceMap": "Servicekaart",
     "patternView": "Patroonweergave",
-    "spanView": "Spanweergave"
+    "spanView": "Spanweergave",
+    "noData": {
+      "title": "Begin met het verzenden van sporen naar OpenObserve",
+      "description": "Er zijn nog geen tracestreams gevonden in deze organisatie. Instrument uw diensten en sporen verschijnen hier automatisch.",
+      "otlp": "Traces verzenden via OTLP",
+      "otlpDesc": "Jaeger, Zipkin en elke SDK die compatibel is met OpenTelemetry",
+      "otelCollector": "Verzamelaar/agent van Hotel",
+      "otelCollectorDesc": "Leid alle telemetriesignalen door de Otel Collector",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Vraag AI om tracering in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een traceerstream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt filteren op service, duur, bereikstatus en meer zodra de resultaten zijn geladen.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk beschikbare tracestreams in deze organisatie",
+      "queryGuide": "Lees de traces-gids",
+      "queryGuideDesc": "Servicegrafiek, spanfiltering, RED-statistieken en meer",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen sporen gevonden",
+      "descNoFilters": "Er zijn geen sporen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten of een filter te verwijderen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "selectedRange": "het geselecteerde bereik"
+    }
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",

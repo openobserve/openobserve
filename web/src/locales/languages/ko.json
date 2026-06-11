@@ -3241,7 +3241,39 @@
     "openInFullView": "전체 화면으로 열기",
     "serviceMap": "서비스 맵",
     "patternView": "패턴 뷰",
-    "spanView": "스팬 뷰"
+    "spanView": "스팬 뷰",
+    "noData": {
+      "title": "오픈옵저브에 트레이스 전송 시작",
+      "description": "이 조직에서는 아직 트레이스 스트림을 찾을 수 없습니다.인스트루먼트 서비스 및 트레이스가 여기에 자동으로 표시됩니다.",
+      "otlp": "OTLP를 통해 트레이스 전송",
+      "otlpDesc": "예거, 짚킨 및 기타 오픈텔레메트리 호환 SDK",
+      "otelCollector": "호텔 콜렉터/에이전트",
+      "otelCollectorDesc": "호텔 컬렉터를 통해 모든 텔레메트리 신호를 라우팅합니다.",
+      "or": "또는:",
+      "kubernetes": "쿠버네티스",
+      "python": "파이썬",
+      "java": "자바",
+      "nodejs": "Node.js",
+      "askAi": "AI에게 추적 설정 요청"
+    },
+    "noStream": {
+      "title": "스트림을 선택하여 탐색을 시작하세요",
+      "description": "트레이스 스트림을 선택한 다음 <strong>쿼리 실행을</strong> 누릅니다.결과가 로드되면 서비스, 기간, 범위 상태 등을 기준으로 필터링할 수 있습니다.",
+      "selectStream": "스트림 선택",
+      "selectStreamDesc": "이 조직에서 사용 가능한 트레이스 스트림 찾아보기",
+      "queryGuide": "트레이스 가이드 읽기",
+      "queryGuideDesc": "서비스 그래프, 스팬 필터링, RED 메트릭 등",
+      "recent": "최근:"
+    },
+    "noEvents": {
+      "title": "흔적을 찾을 수 없음",
+      "descNoFilters": "{range} 에서 흔적을 찾을 수 없습니다.결과를 로드할 시간 범위를 넓혀 보십시오.",
+      "descWithFilters": "선택한 창에서 <strong>이 쿼리와</strong> 일치하는 항목이 없습니다.시간 범위를 넓히거나 필터를 제거해 보세요.",
+      "expandRange": "시간 범위 확대",
+      "expandRangeDescAbsolute": "더 넓은 상대 시간 범위로 전환",
+      "removeFilter": "필터 제거",
+      "selectedRange": "선택한 범위"
+    }
   },
   "invitation": {
     "pendingInvitations": "보류 중인 초대",

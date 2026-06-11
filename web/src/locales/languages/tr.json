@@ -3241,7 +3241,39 @@
     "openInFullView": "Tam görünümde aç",
     "serviceMap": "Servis Haritası",
     "patternView": "Desen Görünümü",
-    "spanView": "Açıklık Görünümü"
+    "spanView": "Açıklık Görünümü",
+    "noData": {
+      "title": "OpenObservere'e iz göndermeye başlayın",
+      "description": "Bu organizasyonda henüz iz akışı bulunamadı. Hizmetleriniz ve izleriniz burada otomatik olarak görünecektir.",
+      "otlp": "İzleri OTLP ile gönderin",
+      "otlpDesc": "Jaeger, Zipkin ve herhangi bir OpenTelemetry uyumlu SDK",
+      "otelCollector": "Otel Toplayıcı/Temsilci",
+      "otelCollectorDesc": "Tüm telemetri sinyallerini oTel Collector üzerinden yönlendirin",
+      "or": "Veya:",
+      "kubernetes": "Kubernetes",
+      "python": "piton",
+      "java": "Java",
+      "nodejs": "Node.js dosyası",
+      "askAi": "Yapay zekadan izleme ayarlamasını isteyin"
+    },
+    "noStream": {
+      "title": "Keşfetmeye başlamak için bir yayın seçin",
+      "description": "Bir izleme akışı seçin, ardından Sorguyu <strong>çalıştır'a</strong> basın. Sonuçlar yüklendikten sonra hizmet, süre, aralık durumu ve daha fazlasına göre filtreleyebilirsiniz.",
+      "selectStream": "Bir akış seçin",
+      "selectStreamDesc": "Bu kuruluştaki kullanılabilir izleme akışlarına göz atın",
+      "queryGuide": "İzler kılavuzunu okuyun",
+      "queryGuideDesc": "Hizmet grafiği, aralık filtreleme, RED metrikleri ve daha fazlası",
+      "recent": "En son:"
+    },
+    "noEvents": {
+      "title": "İz bulunamadı",
+      "descNoFilters": "{range} içinde hiçbir iz bulunamadı. Sonuçları yüklemek için zaman aralığını genişletmeyi deneyin.",
+      "descWithFilters": "Seçilen pencerede <strong>bu sorguy</strong> la eşleşen hiçbir şey yok. Zaman aralığını genişletmeyi veya bir filtreyi kaldırmayı deneyin.",
+      "expandRange": "Zaman aralığını genişletin",
+      "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
+      "removeFilter": "Filtreyi kaldırma",
+      "selectedRange": "Seçilen aralık"
+    }
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
