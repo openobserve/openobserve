@@ -284,7 +284,8 @@ export default defineComponent({
         headerResizeObserver.observe(sectionHeaderRef.value);
       }
     });
-
+    
+    //Before unmount
     onBeforeUnmount(() => {
       headerResizeObserver?.disconnect();
     });
