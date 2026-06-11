@@ -372,54 +372,11 @@ const isVirtual = computed(() => props.virtualScroll && displayRows.value.length
 // slot), so after each render we measure the rendered action cells and pin the
 // column's CSS size var to the widest content. These vars override the nominal
 // sizes computed in useTableCore.
+// Per-column CSS size-var overrides. The actions column is NO LONGER measured
+// from the DOM at runtime (it's sized deterministically from its icon count in
+// useTableCore, so the skeleton and loaded table match) — this stays empty for
+// now but is kept as the override channel the table style/sums read from.
 const measuredColumnSizeVars = ref<Record<string, string>>({});
-
-function measureActionColumns() {
-  const root = scrollContainerRef.value;
-  if (!root) return;
-  const actionCols = effectiveColumns.value.filter(
-    (c) => c.isAction === true || c.id === "actions",
-  );
-  if (!actionCols.length) {
-    if (Object.keys(measuredColumnSizeVars.value).length) {
-      measuredColumnSizeVars.value = {};
-    }
-    return;
-  }
-  const next: Record<string, string> = {};
-  for (const col of actionCols) {
-    const safeId = col.id.replace(/[^a-zA-Z0-9]/g, "-");
-    const cells = root.querySelectorAll<HTMLElement>(
-      `td[data-test="o2-table-cell-${col.id}"]`,
-    );
-    if (!cells.length) continue;
-    let contentMax = 0;
-    let padX = 16; // fallback: tw:px-2 (8px each side)
-    cells.forEach((cell, i) => {
-      if (i === 0) {
-        const cs = getComputedStyle(cell);
-        padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
-      }
-      // The slot wrapper is inline-flex (natural content width) even when the
-      // td is momentarily narrower, so its rect is the true content width.
-      const wrapper = cell.firstElementChild as HTMLElement | null;
-      const w = wrapper
-        ? wrapper.getBoundingClientRect().width
-        : cell.getBoundingClientRect().width;
-      if (w > contentMax) contentMax = w;
-    });
-    if (contentMax > 0) {
-      const total = `${Math.ceil(contentMax + padX) + 1}px`;
-      next[`--header-${safeId}-size`] = total;
-      next[`--col-${col.id}-size`] = total;
-    }
-  }
-  const cur = measuredColumnSizeVars.value;
-  const changed =
-    Object.keys(next).length !== Object.keys(cur).length ||
-    Object.keys(next).some((k) => next[k] !== cur[k]);
-  if (changed) measuredColumnSizeVars.value = next;
-}
 
 // ── Flex-fill measurement ───────────────────────────────────────
 // While filling (not frozen), the flex column's width = the container's
@@ -462,14 +419,9 @@ function measureFlexFill() {
 }
 
 function scheduleMeasureActions() {
-  nextTick(() =>
-    requestAnimationFrame(() => {
-      measureActionColumns();
-      // Re-measure flex on the next frame so the actions column's new width is
-      // already painted before we subtract it.
-      requestAnimationFrame(measureFlexFill);
-    }),
-  );
+  // The actions column is sized deterministically (no DOM measurement), so only
+  // the flex fill needs measuring. Do it after the DOM settles.
+  nextTick(() => requestAnimationFrame(measureFlexFill));
 }
 
 onMounted(scheduleMeasureActions);

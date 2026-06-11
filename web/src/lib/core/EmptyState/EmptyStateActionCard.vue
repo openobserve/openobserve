@@ -32,9 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <span class="tw:relative tw:flex-1 tw:min-w-0">
-      <span class="tw:block tw:text-sm tw:font-semibold tw:truncate tw:text-text-primary">{{
-        label
-      }}</span>
+      <span
+        :title="label"
+        class="tw:block tw:text-sm tw:font-semibold tw:text-text-primary tw:wrap-break-word"
+        >{{ label }}</span
+      >
       <span
         v-if="sublabel"
         class="tw:block tw:text-xs tw:text-text-secondary tw:leading-snug"
