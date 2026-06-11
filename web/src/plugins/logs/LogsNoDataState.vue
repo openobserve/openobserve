@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="go('curl')"
       >
         <span class="nd-card__icon">
-          <OIcon name="terminal" size="md" />
+          <OIcon name="search" size="md" />
         </span>
         <span class="nd-card__body">
           <span class="nd-card__label">{{ t("logs.noData.curl") }}</span>
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="go('ingestLogs')"
       >
         <span class="nd-card__icon nd-card__icon--teal">
-          <OIcon name="shuffle" size="md" />
+          <OIcon name="alt-route" size="md" />
         </span>
         <span class="nd-card__body">
           <span class="nd-card__label">{{ t("logs.noData.shippers") }}</span>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="go('ingestLogsFromOtel')"
       >
         <span class="nd-card__icon nd-card__icon--amber">
-          <OIcon name="cable" size="md" />
+          <OIcon name="hub" size="md" />
         </span>
         <span class="nd-card__body">
           <span class="nd-card__label">{{ t("logs.noData.otel") }}</span>
