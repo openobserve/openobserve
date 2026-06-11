@@ -87,8 +87,14 @@ pub struct TopNCollector<K: OrdKey> {
 }
 
 impl<K: OrdKey> TopNCollector<K> {
-    pub fn new(fields: Vec<String>, k: usize, ascend: bool) -> Self {
+    pub fn new(fields: Vec<String>, limit: usize, ascend: bool) -> Self {
         debug_assert!(!fields.is_empty() && fields.len() <= K::CAPACITY);
+        // over-fetch beyond the query limit for cross-file merge accuracy
+        let k = if fields.len() == 1 {
+            (limit * 4).max(1000)
+        } else {
+            (limit * 2).max(1000)
+        };
         let max_groups = crate::get_config().limit.inverted_index_topn_max_group_num;
         Self {
             fields,
@@ -98,6 +104,12 @@ impl<K: OrdKey> TopNCollector<K> {
             dense_limit: DENSE_GROUP_SPACE_LIMIT,
             _key: std::marker::PhantomData,
         }
+    }
+
+    #[cfg(test)]
+    fn with_k(mut self, k: usize) -> Self {
+        self.k = k;
+        self
     }
 
     #[cfg(test)]
@@ -528,7 +540,8 @@ mod tests {
                     searcher
                         .search(
                             &AllQuery,
-                            &TopNCollector::<u64>::new(fields, k, ascend)
+                            &TopNCollector::<u64>::new(fields, 10, ascend)
+                                .with_k(k)
                                 .with_max_groups(max_groups)
                                 .with_dense_limit(dense_limit),
                         )
@@ -537,7 +550,8 @@ mod tests {
                     searcher
                         .search(
                             &AllQuery,
-                            &TopNCollector::<u128>::new(fields, k, ascend)
+                            &TopNCollector::<u128>::new(fields, 10, ascend)
+                                .with_k(k)
                                 .with_max_groups(max_groups)
                                 .with_dense_limit(dense_limit),
                         )

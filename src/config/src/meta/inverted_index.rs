@@ -21,14 +21,6 @@ pub const UNKNOWN_NAME: &str = "__o2__unknown__field__";
 /// Four 32-bit term ordinals pack into one u128 key in the tantivy collector.
 pub const MAX_SIMPLE_TOPN_FIELDS: usize = 4;
 
-pub fn simple_topn_over_fetch_size(num_fields: usize, limit: usize) -> usize {
-    if num_fields <= 1 {
-        (limit * 4).max(1000)
-    } else {
-        (limit * 2).max(1000)
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum IndexOptimizeMode {
     SimpleSelect(usize, bool),

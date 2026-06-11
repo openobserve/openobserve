@@ -19,7 +19,7 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         bitvec::BitVec,
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS, simple_topn_over_fetch_size},
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     },
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
@@ -261,14 +261,12 @@ impl TantivyResult {
             );
         }
 
-        let k = simple_topn_over_fetch_size(fields.len(), limit);
-
         // one or two ordinals pack into a u64 key; three or four need a u128
         let results = if fields.len() <= 2 {
-            let collector = TopNCollector::<u64>::new(fields.to_vec(), k, ascend);
+            let collector = TopNCollector::<u64>::new(fields.to_vec(), limit, ascend);
             searcher.search(&query, &collector)?
         } else {
-            let collector = TopNCollector::<u128>::new(fields.to_vec(), k, ascend);
+            let collector = TopNCollector::<u128>::new(fields.to_vec(), limit, ascend);
             searcher.search(&query, &collector)?
         };
 
