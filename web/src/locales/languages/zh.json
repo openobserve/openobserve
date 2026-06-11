@@ -525,7 +525,18 @@
     "seekToMoment": "在会议中寻求这一刻",
     "timeInSession": "会话时间",
     "route": "路线",
-    "duration": "持续时间"
+    "duration": "持续时间",
+    "emptyState": {
+      "title": "使用真实用户监控监控您的用户",
+      "description": "RUM 跟踪真实的用户交互——页面加载、错误、API 调用和会话重播——因此您可以确切地了解用户对应用程序的体验。",
+      "webApp": "对 Web 应用程序进行检测",
+      "webAppDesc": "将 OpenObserve RUM SDK 添加到任何 Jav",
+      "sessionReplay": "启用会话重播",
+      "sessionReplayDesc": "记录和重播用户会话以调试 UX 问题",
+      "learnMore": "了解更多：",
+      "quickImpl": "快速实施指南",
+      "blogPost": "前端监控基础知识"
+    }
   },
   "about": {
     "name": "OpenObserve",
@@ -1791,7 +1802,23 @@
     "tabAiAssistant": "O2 AI 助手",
     "tabOverview": "概述",
     "tabUsage": "用法",
-    "subtitle": "您的可观测性工作空间一览"
+    "subtitle": "您的可观测性工作空间一览",
+    "noDataState": {
+      "title": "尚未摄取任何数据",
+      "description": "该组织尚未收到任何数据，因此没有什么可绘制的。一旦事件开始流动，您的<strong>摄取量、存储空间和查询使用</strong>量将自动显示在此处。",
+      "logs": "发送日志",
+      "logsDesc": "Curl、Filebeat、Fluentbit、Vector 等",
+      "traces": "发送痕迹",
+      "tracesDesc": "OTLP/Jaeger/Zipkin 分布式跟踪",
+      "metrics": "发送指标",
+      "metricsDesc": "Prometheus、oTel Collector、Telegraf 等",
+      "or": "或者：",
+      "otel": "打开遥测",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "人工智能集成",
+      "shippers": "原木托运人"
+    }
   },
   "billing": {
     "header": "用量和账单",
@@ -3216,7 +3243,39 @@
     "openInFullView": "以全视图打开",
     "serviceMap": "服务地图",
     "patternView": "图案视图",
-    "spanView": "跨度视图"
+    "spanView": "跨度视图",
+    "noData": {
+      "title": "开始向 OpenObserve 发送跟踪",
+      "description": "该组织中尚未找到任何追踪流。仪器您的服务和跟踪将自动显示在此处。",
+      "otlp": "通过 OTLP 发送跟踪",
+      "otlpDesc": "Jaeger、Zipkin 和任何与 OpenTelemetry 兼容的 SDK",
+      "otelCollector": "oTel 收藏家/代理人",
+      "otelCollectorDesc": "通过 oTel Collector 路由所有遥测信号",
+      "or": "或者：",
+      "kubernetes": "Kubernetes",
+      "python": "巨蟒蛇",
+      "java": "爪哇",
+      "nodejs": "Node.js",
+      "askAi": "让 AI 设置追踪"
+    },
+    "noStream": {
+      "title": "选择直播开始探索",
+      "description": "选择跟踪流，然后按<strong>运行查询</strong>。加载结果后，您可以按服务、持续时间、跨度状态等进行筛选。",
+      "selectStream": "选择一个直播",
+      "selectStreamDesc": "浏览该组织中可用的追踪流",
+      "queryGuide": "阅读追踪指南",
+      "queryGuideDesc": "服务图、跨度过滤、RED 指标等",
+      "recent": "最近："
+    },
+    "noEvents": {
+      "title": "未发现任何痕迹",
+      "descNoFilters": "在 {range} 中未发现任何痕迹。尝试扩大加载结果的时间范围。",
+      "descWithFilters": "在所选窗口中，没有与<strong>该查询</strong>相匹配的内容。尝试扩大时间范围或移除过滤器。",
+      "expandRange": "扩大时间范围",
+      "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
+      "removeFilter": "移除过滤器",
+      "selectedRange": "所选范围"
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
@@ -3977,7 +4036,13 @@
     "elevatedErrorRate": "错误率升高",
     "reqPerSec": "req/s",
     "allClear": "全部清除",
-    "allClearDesc": "在所选时间窗口内没有活跃的异常、事件或降级的服务。"
+    "allClearDesc": "在所选时间窗口内没有活跃的异常、事件或降级的服务。",
+    "emptyActionAlerts": "查看警报规则",
+    "emptyActionAlertsDesc": "查看已配置的警报和阈值",
+    "emptyActionLogs": "浏览日志",
+    "emptyActionLogsDesc": "搜索和筛选您的日志流",
+    "emptyActionTraces": "探索踪迹",
+    "emptyActionTracesDesc": "检查分布式跟踪和服务延迟"
   },
   "chatHistory": {
     "title": "聊天",
@@ -4361,6 +4426,14 @@
     "noPipelineHistory": {
       "title": "尚无管道历史记录",
       "description": "管道运行后，管道执行历史记录将显示在此处。"
+    },
+    "noStreamSelected": {
+      "title": "选择直播开始",
+      "description": "从左侧的下拉列表中选择一个直播，然后按 “运行查询” 来浏览您的日志。您还可以应用其他筛选条件并调整日期范围。"
+    },
+    "noQueryApplied": {
+      "title": "运行查询以查看日志",
+      "description": "调整您的过滤器并单击 “运行查询” 以加载此直播的事件。"
     }
   },
   "onlineEvals": {
@@ -4718,6 +4791,45 @@
       "evalJobs": "评估职位",
       "scorers": "记分员",
       "scoreConfigs": "分数配置"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "开始向 OpenObserve 发送数据",
+      "description": "该组织中尚无数据，因此没有数据流可供探索。发送您的第一条日志，它们会自动显示在此处——选择您想要的开始方式。",
+      "curl": "通过 Curl/HTTP API 发送",
+      "curlDesc": "最快的方法——粘贴一个命令，日志就会开始流动",
+      "shippers": "使用日志传送器",
+      "shippersDesc": "Filebeat、Fluentbit、Fluentd、Vector、SysLogng 等",
+      "otel": "打开遥测",
+      "otelDesc": "从供应商中立的 OTLP 中提取日志、跟踪和指标",
+      "or": "或者：",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux的",
+      "windows": "Windows",
+      "askAi": "让 AI 设置摄取"
+    },
+    "noStream": {
+      "title": "选择直播开始探索",
+      "description": "选择一个直播，然后按<strong>运行查询</strong>。结果出来后，您可以使用过滤器、VRL 函数和自定义时间范围进行优化。",
+      "selectStream": "选择一个直播",
+      "selectStreamDesc": "浏览日志、跟踪、指标和 RUM 流",
+      "queryGuide": "阅读查询指南",
+      "queryGuideDesc": "过滤器、SQL 模式、VRL 和保存的视图",
+      "recent": "最近："
+    },
+    "noEvents": {
+      "title": "未找到任何活动",
+      "descNoFilters": "在 {range} 中未找到任何事件。尝试扩大加载结果的时间范围。",
+      "descWithFilters": "在所选窗口中，没有与<strong>该查询</strong>相匹配的内容。尝试扩大时间范围、放松筛选条件或重置查询。",
+      "expandRange": "扩大时间范围",
+      "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
+      "removeFilter": "移除过滤器",
+      "removeFilterDescSql": "您已将 SQL 条件应用于此查询",
+      "openHistory": "打开搜索记录",
+      "askAi": "让 AI 修复我的查询",
+      "selectedRange": "所选范围"
     }
   }
 }

@@ -162,6 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
+          @widen-range="(p) => $emit('widen-range', p)"
+          @remove-filter="$emit('remove-filter')"
         />
       </div>
     </div>
@@ -215,6 +217,8 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
+    "widen-range",
+    "remove-filter",
   ],
   methods: {
     closeColumn(col: any) {

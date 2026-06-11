@@ -43,8 +43,25 @@ export class LogsQueryPage {
   }
 
   async clickErrorMessage() {
-    await expect(this.page.locator(this.errorMessage)).toBeVisible({ timeout: 30000 });
-    await this.page.locator(this.errorMessage).click();
+    // Try selectors in priority order:
+    //   logs-search-no-events-found-text — new LogsNoEventsState (0 results, no error)
+    //   logs-search-error-message        — actual query error path
+    //   logs-search-result-not-found-text — legacy "Result not found" fallback
+    const candidates = [
+      this.page.locator('[data-test="logs-search-no-events-found-text"]'),
+      this.page.locator(this.errorMessage),
+      this.page.locator('[data-test="logs-search-result-not-found-text"]'),
+    ];
+    for (const locator of candidates) {
+      try {
+        await locator.waitFor({ state: 'visible', timeout: 10000 });
+        await locator.click({ force: true });
+        return;
+      } catch (e) {
+        continue;
+      }
+    }
+    throw new Error('No error/no-results message found — checked: logs-search-no-events-found-text, logs-search-error-message, logs-search-result-not-found-text');
   }
 
   async clickResetFilters() {
