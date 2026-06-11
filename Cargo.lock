@@ -2264,7 +2264,6 @@ dependencies = [
  "axum",
  "axum-client-ip",
  "base64 0.22.1",
- "bitvec",
  "byteorder",
  "bytes",
  "chromiumoxide",
