@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             tree
             tree-column-id="index"
+            :default-columns="false"
             style="width: 100%;"
             class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
             data-test="inspector-events-table"
@@ -365,6 +366,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -460,7 +462,7 @@ export default defineComponent({
         header: "Role",
         accessorKey: "search_role",
         meta: { align: "left" },
-        size: 100,
+        size: COL.role,
       },
       {
         id: "component",
@@ -473,7 +475,8 @@ export default defineComponent({
         id: "desc",
         header: "Description",
         accessorKey: "desc",
-        meta: { align: "left" },
+        meta: { align: "left", autoWidth: true },
+        size: COL.description,
       },
     ]);
 

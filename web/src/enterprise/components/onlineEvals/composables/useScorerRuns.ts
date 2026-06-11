@@ -163,7 +163,9 @@ export function useScorerRuns(
       "  COUNT(*) AS total_runs,",
       "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success_runs,",
       "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failure_runs,",
-      "  AVG(attributes_latency_ms) AS avg_latency_ms",
+      // Same Utf8 column problem as the evaluator latency on the Quality
+      // page — TRY_CAST so AVG can swallow the string-typed values.
+      "  AVG(TRY_CAST(attributes_latency_ms AS DOUBLE)) AS avg_latency_ms",
       'FROM "_evaluator"',
       `WHERE CAST(attributes_scorer_id AS VARCHAR) = '${escapeSqlString(id)}'`,
     ].join("\n");

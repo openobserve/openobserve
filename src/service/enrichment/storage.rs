@@ -179,6 +179,7 @@ pub mod remote {
             record_batch_ext::convert_json_to_record_batch,
         },
     };
+    use infra::schema::get_stream_setting_bloom_filter_fields;
 
     use super::*;
 
@@ -260,10 +261,18 @@ pub mod remote {
             ..Default::default()
         };
 
+        let stream_settings =
+            infra::schema::get_settings(org_id, table_name, StreamType::EnrichmentTables).await;
+        let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
         let data: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
         let data = convert_json_to_record_batch(schema.schema(), &data)?;
-        let data =
-            write_recordbatch_to_parquet(schema.schema().clone(), &[data], &file_meta).await?;
+        let data = write_recordbatch_to_parquet(
+            schema.schema().clone(),
+            &[data],
+            &bloom_filter_fields,
+            &file_meta,
+        )
+        .await?;
 
         file_meta.compressed_size = data.len() as i64;
 
@@ -300,10 +309,18 @@ pub mod remote {
             ..Default::default()
         };
 
+        let stream_settings =
+            infra::schema::get_settings(org_id, table_name, StreamType::EnrichmentTables).await;
+        let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&stream_settings);
         let data: Vec<_> = data.iter().map(|row| Arc::new(row.clone())).collect();
         let data = convert_json_to_record_batch(schema.schema(), &data)?;
-        let data =
-            write_recordbatch_to_parquet(schema.schema().clone(), &[data], &file_meta).await?;
+        let data = write_recordbatch_to_parquet(
+            schema.schema().clone(),
+            &[data],
+            &bloom_filter_fields,
+            &file_meta,
+        )
+        .await?;
         file_meta.compressed_size = data.len() as i64;
         upload_to_remote(org_id, table_name, file_meta, &data, created_at).await?;
         Ok(())
@@ -393,7 +410,8 @@ pub mod local {
             ..Default::default()
         };
 
-        let parquet_data = write_recordbatch_to_parquet(schema.clone(), &data, &file_meta).await?;
+        let parquet_data =
+            write_recordbatch_to_parquet(schema.clone(), &data, &[], &file_meta).await?;
 
         // Write parquet data to file
         tokio::fs::write(&file_path, parquet_data)

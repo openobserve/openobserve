@@ -421,7 +421,8 @@
     "menuGroupSchedule": "スケジュール",
     "menuGroupInspect": "検査",
     "validSql": "有効な SQL",
-    "invalidSql": "クエリが無効です"
+    "invalidSql": "クエリが無効です",
+    "menuGroupExplain": "説明してください"
   },
   "menu": {
     "home": "ホーム",
@@ -455,7 +456,8 @@
     "language": "言語",
     "actions": "アクション",
     "incidents": "インシデント",
-    "evals": "評価"
+    "evals": "評価",
+    "aiObservability": "AI オブザーバビリティ"
   },
   "rum": {
     "title": "リアルユーザーモニタリング",
@@ -1224,7 +1226,8 @@
     "tokenRotateError": "トークンをローテーションできませんでした。",
     "tokenDeleteError": "トークンを削除できませんでした。",
     "noTokensFound": "取り込みトークンが見つかりません。",
-    "createdBy": "作成者"
+    "createdBy": "作成者",
+    "orgLevelSummary": "インジェストエンドポイント用の組織レベルのトークン。"
   },
   "dashboard": {
     "selectField": "フィールド",
@@ -3336,7 +3339,8 @@
     "confirmRejectMsg": "{org} への招待を拒否してもよろしいですか？",
     "expired": "期限切れ",
     "expiresToday": "本日期限切れ",
-    "daysLeft": "残り {日} 日"
+    "daysLeft": "残り {日} 日",
+    "search": "招待状を検索"
   },
   "regex_patterns": {
     "title": "機密データの編集",
@@ -4313,6 +4317,46 @@
       "description": "パイプライン出力の外部ターゲット — HTTP エンドポイントとリモート書き込みターゲット。",
       "action": "新しい目的地",
       "actionDesc": "パイプラインデスティネーションの接続"
+    },
+    "noLLMInsights": {
+      "title": "LLM アクティビティはまだありません",
+      "description": "OpenTelemetry Gen-AI セマンティック規約を使用してサービスをインストルメントし、少なくとも 1 つのトレースを取り込んでこのダッシュボードに入力してください。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "トレースの gen_ai_* 属性をキャプチャ"
+    },
+    "noLLMSessions": {
+      "title": "LLM セッションはまだありません",
+      "description": "セッションは gen_ai_conversation_id でグループ化されます。各会話がトレースにタグ付けされるようにサービスをインストルメントすると、セッションがここに表示されます。",
+      "action": "オープンテレメトリー搭載機器",
+      "actionDesc": "gen_ai_conversation_id でスパンにタグを付ける"
+    },
+    "noScorers": {
+      "title": "スコアラーはまだいません",
+      "description": "スコア担当者は、LLM回答をスコア設定に照らして採点します。LLMジャッジから始めるか、ライブラリからLLMジャッジをインポートします。",
+      "action": "スコアラーを作成",
+      "actionDesc": "LLMジャッジまたはリモートスコアラーの定義"
+    },
+    "noEvalJobs": {
+      "title": "評価用の仕事はまだありません",
+      "description": "ジョブは LLM ストリームに対してスコアラーをスケジュールします。スコアを作成すると、定期的に会話の採点を開始できます。",
+      "action": "評価ジョブの作成",
+      "actionDesc": "ストリームを選択 + スコアラー + ケイデンス"
+    },
+    "noScoreConfigs": {
+      "title": "スコア設定はまだありません",
+      "description": "スコア構成は、スコアラーが生成するスキーマ（数値、ブール値、またはカテゴリ）を定義します。1 つ追加してスコアリングを開始します。",
+      "action": "スコア設定を作成",
+      "actionDesc": "スコアシェイプ+ヘルシーレンジを定義"
+    },
+    "noEvalTemplates": {
+      "title": "評価テンプレートはまだありません",
+      "description": "評価テンプレートは、LLM評価のための再利用可能な採点基準を定義します。",
+      "action": "新しいテンプレート",
+      "actionDesc": "評価テンプレートを作成する"
+    },
+    "noPipelineHistory": {
+      "title": "パイプライン履歴はまだありません",
+      "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
     }
   },
   "onlineEvals": {
@@ -4655,6 +4699,21 @@
     "empty": {
       "title": "LLM プロバイダーはまだありません",
       "description": "LLMプロバイダーは、LLMジャッジスコアラーが呼び出す言語モデルの接続詳細（エンドポイント+認証情報）を保存します。これを追加すると、ジャッジベースの評価を開始できます。"
+    }
+  },
+  "aiObservability": {
+    "title": "LLM オブザーバビリティ",
+    "sections": {
+      "monitor": "モニター",
+      "evaluate": "評価する"
+    },
+    "nav": {
+      "overview": "概要",
+      "sessions": "セッション",
+      "quality": "クオリティ",
+      "evalJobs": "評価ジョブ",
+      "scorers": "スコアラー",
+      "scoreConfigs": "スコア構成"
     }
   }
 }

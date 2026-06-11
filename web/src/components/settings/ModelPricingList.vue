@@ -102,6 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-model-pricing"
         :show-global-filter="false"
         tree
         tree-column-id="name"
@@ -176,27 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
             <div class="o2-table-cell-content">{{ row.name }}</div>
-            <OTooltip
-              v-if="row.name.length > 30"
-              side="top"
-              align="center"
-              :content="row.name"
-            />
           </div>
         </template>
         <template #cell-match_pattern="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
             <code
-              class="tw:text-xs tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-full pattern-code"
+              class="tw:text-xs tw:block tw:max-w-full pattern-code"
               :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
-            <OTooltip
-              v-if="row.match_pattern && row.match_pattern.length > 40"
-              side="top"
-              align="center"
-              :content="row.match_pattern"
-            />
             <OIcon
               v-if="isChildRow(row)"
               name="warning-amber"
@@ -587,22 +578,28 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     minSize: 180,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "match_pattern",
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "pricing",
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "actions",

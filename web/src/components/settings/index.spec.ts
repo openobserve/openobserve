@@ -277,7 +277,7 @@ describe("SettingsIndex", () => {
     it("should contain a GENERAL group", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
-      const generalGroup = groups.find((g: any) => g.label === "GENERAL");
+      const generalGroup = groups.find((g: any) => g.label === "General");
       expect(generalGroup).toBeDefined();
     });
 
@@ -285,7 +285,7 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
       const destGroup = groups.find(
-        (g: any) => g.label === "DESTINATIONS & TEMPLATES",
+        (g: any) => g.label === "Destinations & Templates",
       );
       expect(destGroup).toBeDefined();
     });

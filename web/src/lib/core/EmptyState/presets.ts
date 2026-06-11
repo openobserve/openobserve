@@ -427,6 +427,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-eval-templates": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noEvalTemplates.title",
+    descriptionKey: "emptyState.noEvalTemplates.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEvalTemplates.action",
+        descriptionKey: "emptyState.noEvalTemplates.actionDesc",
+      },
+    ],
+  },
   "no-enrichment-tables": {
     illustration: "box",
     variant: "create",
@@ -515,6 +529,96 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+
+  // LLM Insights dashboard — single empty-state shape (used for all three
+  // "no data" cases: no LLM streams in the org, the active stream has no
+  // gen_ai_* fields, or the window came up empty). Filtered branch is
+  // intentionally not used (the page exposes no filter UI to clear).
+  "no-llm-insights": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noLLMInsights.title",
+    descriptionKey: "emptyState.noLLMInsights.description",
+    actions: [
+      {
+        id: "instrument",
+        icon: "auto-awesome",
+        titleKey: "emptyState.noLLMInsights.action",
+        descriptionKey: "emptyState.noLLMInsights.actionDesc",
+      },
+    ],
+  },
+
+  // LLM Sessions list — sibling of `no-llm-insights`. Same three "no data"
+  // cases (no LLM streams in the org, the active stream has no
+  // gen_ai_conversation_id, or the window returned no sessions). No
+  // filtered branch — the page only has time + stream + page-size knobs.
+  "no-llm-sessions": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noLLMSessions.title",
+    descriptionKey: "emptyState.noLLMSessions.description",
+    actions: [
+      {
+        id: "instrument",
+        icon: "auto-awesome",
+        titleKey: "emptyState.noLLMSessions.action",
+        descriptionKey: "emptyState.noLLMSessions.actionDesc",
+      },
+    ],
+  },
+
+  // Evaluate-tab list presets. Each list has real search/filter widgets in
+  // its toolbar, so `:filtered` is wired up — clicking "Clear filters" in
+  // the filtered state resets the list's search + dropdown.
+  "no-scorers": {
+    illustration: "constellation",
+    variant: "create",
+    titleKey: "emptyState.noScorers.title",
+    descriptionKey: "emptyState.noScorers.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noScorers.action",
+        descriptionKey: "emptyState.noScorers.actionDesc",
+      },
+    ],
+  },
+  "no-eval-jobs": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noEvalJobs.title",
+    descriptionKey: "emptyState.noEvalJobs.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noEvalJobs.action",
+        descriptionKey: "emptyState.noEvalJobs.actionDesc",
+      },
+    ],
+  },
+  "no-score-configs": {
+    illustration: "board",
+    variant: "create",
+    titleKey: "emptyState.noScoreConfigs.title",
+    descriptionKey: "emptyState.noScoreConfigs.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noScoreConfigs.action",
+        descriptionKey: "emptyState.noScoreConfigs.actionDesc",
+      },
+    ],
+  },
+  "no-pipeline-history": {
+    illustration: "history",
+    variant: "neutral",
+    titleKey: "emptyState.noPipelineHistory.title",
+    descriptionKey: "emptyState.noPipelineHistory.description",
+  },
 } satisfies Record<string, EmptyStatePreset>;
 
 export type EmptyStatePresetName = keyof typeof emptyStatePresets;
@@ -548,10 +652,15 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alert-destinations": "emptyState.nouns.alertDestinations",
   "no-pipeline-destinations": "emptyState.nouns.pipelineDestinations",
   "no-alert-templates": "emptyState.nouns.alertTemplates",
+  "no-eval-templates": "emptyState.nouns.evalTemplates",
   "no-enrichment-tables": "emptyState.nouns.enrichmentTables",
   "no-cipher-keys": "emptyState.nouns.cipherKeys",
   "no-ai-toolsets": "emptyState.nouns.aiToolsets",
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-scorers": "emptyState.nouns.scorers",
+  "no-eval-jobs": "emptyState.nouns.evalJobs",
+  "no-score-configs": "emptyState.nouns.scoreConfigs",
+  "no-pipeline-history": "emptyState.nouns.pipelineHistory",
 };

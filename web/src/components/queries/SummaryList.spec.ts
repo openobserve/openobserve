@@ -202,7 +202,8 @@ describe("SummaryList.vue", () => {
       "cancel:hideform",
       "filter:queries",
       "update:selectedRows",
-      "delete:queries"
+      "delete:queries",
+      "clear:filters"
     ];
     expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
   });

@@ -9,7 +9,7 @@
             <span
               v-if="row.name"
               :class="[
-                'tw:font-bold tw:px-2 tw:py-1 tw:rounded-md tw:max-w-xs tw:truncate tw:inline-block',
+                'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
                 store.state.theme === 'dark'
                   ? 'tw:text-blue-400 tw:bg-blue-900/50'
                   : 'tw:text-blue-600 tw:bg-blue-50',
@@ -245,13 +245,6 @@
               data-test="eval-job-detail-runs-refresh"
               @click="refreshRuns"
             />
-            <span class="jd__runs-meta">
-              {{ t("onlineEvals.job.detail.runs.showingPrefix") }}
-              <strong>{{ runs.length }}</strong>
-              {{ t("onlineEvals.job.detail.runs.showingOf") }}
-              <strong>{{ formatCount(kpis.totalRuns) }}</strong>
-              {{ t("onlineEvals.job.detail.runs.showingSuffix") }}
-            </span>
           </div>
 
           <OTable
@@ -286,10 +279,7 @@
               </div>
             </template>
             <template #cell-scoreDisplay="{ row }">
-              <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+              <span class="jd-mono">{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
               <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -406,10 +396,7 @@
                 </div>
               </template>
               <template #cell-scoreDisplay="{ row }">
-                <span
-                class="jd-mono tw:truncate tw:inline-block tw:max-w-full tw:align-bottom"
-                :title="row.scoreDisplay"
-              >{{ row.scoreDisplay }}</span>
+                <span class="jd-mono">{{ row.scoreDisplay }}</span>
               </template>
               <template #cell-latencyMs="{ row }">
                 <span class="jd-mono">{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
@@ -710,7 +697,7 @@ const updatedAt = computed<number | null>(() => {
 });
 
 // — Tabs — no badge counts on Runs / Failures (the KPI strip already shows
-// these numbers at the top of every tab).
+// these numbers at the top of every tab in eval job list).
 const tabs = computed(() => [
   {
     id: "configuration" as TabId,
@@ -1075,9 +1062,8 @@ function relativeTime(timestampMs: number): string {
 .jd-kpi--bad  { background: color-mix(in srgb, var(--o2-status-error-text, #c62828) 4%, var(--color-card-bg)); }
 
 .jd-kpi__title {
-  font: 700 10px/1.4 var(--o2-font);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font: 600 11px/1.4 var(--o2-font);
+  letter-spacing: 0.01em;
   color: var(--color-text-secondary, var(--o2-text-secondary));
 }
 

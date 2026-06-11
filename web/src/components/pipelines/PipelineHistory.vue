@@ -59,16 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-xs-sq"
-        @click="manualSearch"
-        data-test="pipeline-history-manual-search-btn"
-        :disabled="loading"
-        icon-left="search"
-      >
-        <OTooltip :content="t('common.search') || 'Search'" side="top" />
-      </OButton>
-      <OButton
-        variant="ghost"
-        size="icon-xs-sq"
         @click="refreshData"
         data-test="pipeline-history-refresh-btn"
         :loading="loading"
@@ -86,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :data="rows"
           :columns="columns"
+          :default-columns="false"
           row-key="id"
           width="100%"
           class="tw:w-full tw:h-full"
@@ -201,7 +192,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #empty>
-            <no-data />
+            <OEmptyState
+              size="hero"
+              preset="no-pipeline-history"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && clearSearch()"
+            />
           </template>
 
           <template #bottom="{ totalRows }">
@@ -476,9 +473,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -539,7 +536,8 @@ const columns = ref([
     header: "Pipeline Name",
     accessorKey: "pipeline_name",
     sortable: true,
-    meta: { align: "left" as const },
+    size: COL.name,
+    meta: { align: "left" as const, autoWidth: true },
   },
   {
     id: "is_realtime",
@@ -682,12 +680,6 @@ const onPipelineSelected = (val: any) => {
 const clearSearch = () => {
   searchQuery.value = "";
   selectedPipeline.value = undefined;
-  pagination.value.page = 1;
-  fetchPipelineHistory();
-};
-
-const manualSearch = () => {
-  searchQuery.value = (selectedPipeline.value as any) ?? "";
   pagination.value.page = 1;
   fetchPipelineHistory();
 };

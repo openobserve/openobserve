@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
-  import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+  import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
   
   // show selected users in the table
   // Add is_selected to the user object
@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: t("iam.serviceAccountsName"),
       accessorKey: "email",
       sortable: true,
+      size: COL.email,
       meta: { align: "left" , autoWidth: true },
     },
   ];

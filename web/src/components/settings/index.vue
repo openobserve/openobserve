@@ -208,12 +208,12 @@ export default defineComponent({
 
     // Order the section groups appear in (hub + switcher).
     const settingsGroupOrder = [
-      "GENERAL",
-      "ACCESS & SECURITY",
-      "DESTINATIONS & TEMPLATES",
-      "DATA & AI",
-      "OPERATIONS",
-      "ACCOUNT",
+      "General",
+      "Access & Security",
+      "Destinations & Templates",
+      "Data & AI",
+      "Operations",
+      "Account",
     ];
 
     // Every section, with its group + a one-line description for the hub cards.
@@ -232,7 +232,7 @@ export default defineComponent({
           icon: "settings",
           to: `/settings/general?org_identifier=${org}`,
           dataTest: "general-settings-tab",
-          group: "GENERAL",
+          group: "General",
         },
         {
           key: "organization",
@@ -241,7 +241,7 @@ export default defineComponent({
           icon: "business",
           to: `/settings/organization?org_identifier=${org}`,
           dataTest: "organization-settings-tab",
-          group: "GENERAL",
+          group: "General",
         },
         {
           key: "cipher-keys",
@@ -251,7 +251,7 @@ export default defineComponent({
           to: { name: "cipherKeys", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "management-cipher-key-tab",
-          group: "ACCESS & SECURITY",
+          group: "Access & Security",
         },
         {
           key: "regex_patterns",
@@ -261,7 +261,7 @@ export default defineComponent({
           to: { name: "regexPatterns", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "regex-patterns-tab",
-          group: "ACCESS & SECURITY",
+          group: "Access & Security",
         },
         {
           key: "domain_management",
@@ -271,7 +271,7 @@ export default defineComponent({
           to: { name: "domainManagement", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "domain-management-tab",
-          group: "ACCESS & SECURITY",
+          group: "Access & Security",
         },
         {
           key: "alert_destinations",
@@ -280,7 +280,7 @@ export default defineComponent({
           icon: "location-on",
           to: { name: "alertDestinations", query: { org_identifier: org } },
           dataTest: "alert-destinations-tab",
-          group: "DESTINATIONS & TEMPLATES",
+          group: "Destinations & Templates",
         },
         {
           key: "pipeline_destinations",
@@ -290,7 +290,7 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
-          group: "DESTINATIONS & TEMPLATES",
+          group: "Destinations & Templates",
         },
         {
           key: "templates",
@@ -299,7 +299,7 @@ export default defineComponent({
           icon: "description",
           to: { name: "alertTemplates", query: { org_identifier: org } },
           dataTest: "alert-templates-tab",
-          group: "DESTINATIONS & TEMPLATES",
+          group: "Destinations & Templates",
         },
         {
           key: "storageSettings",
@@ -313,7 +313,7 @@ export default defineComponent({
               store.state.organizationData.organizationSettings
                 .org_storage_enabled === true),
           dataTest: "storage-settings-tab",
-          group: "DATA & AI",
+          group: "Data & AI",
         },
         {
           key: "model_pricing",
@@ -323,7 +323,7 @@ export default defineComponent({
           to: { name: "modelPricing", query: { org_identifier: org } },
           visible: !!z.model_pricing_enabled,
           dataTest: "model-pricing-tab",
-          group: "DATA & AI",
+          group: "Data & AI",
         },
         {
           key: "correlation_settings",
@@ -333,7 +333,7 @@ export default defineComponent({
           to: { name: "correlationSettings", query: { org_identifier: org } },
           visible: isEnt && z.service_streams_enabled !== false,
           dataTest: "correlation-settings-tab",
-          group: "DATA & AI",
+          group: "Data & AI",
         },
         {
           key: "llm_providers",
@@ -343,7 +343,7 @@ export default defineComponent({
           to: { name: "llmProviders", query: { org_identifier: org } },
           visible: !!z.online_evals_enabled,
           dataTest: "llm-providers-tab",
-          group: "DATA & AI",
+          group: "Data & AI",
         },
         {
           key: "queryManagement",
@@ -353,7 +353,7 @@ export default defineComponent({
           to: `/settings/query_management?org_identifier=${org}`,
           visible: isEnt && meta,
           dataTest: "query-management-tab",
-          group: "OPERATIONS",
+          group: "Operations",
         },
         {
           key: "nodes",
@@ -363,7 +363,7 @@ export default defineComponent({
           to: { name: "nodes", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "nodes-tab",
-          group: "OPERATIONS",
+          group: "Operations",
         },
         {
           key: "license",
@@ -373,7 +373,7 @@ export default defineComponent({
           to: { name: "license", query: { org_identifier: org } },
           visible: isEnt && meta,
           dataTest: "license-tab",
-          group: "ACCOUNT",
+          group: "Account",
         },
         {
           key: "organization_management",
@@ -383,7 +383,7 @@ export default defineComponent({
           to: { name: "orgnizationManagement", query: { org_identifier: org } },
           visible: isCloud && meta,
           dataTest: "organization-management-tab",
-          group: "ACCOUNT",
+          group: "Account",
         },
       ];
       return items;

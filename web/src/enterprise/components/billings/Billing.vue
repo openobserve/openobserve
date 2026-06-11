@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:pt-1" style="min-height: inherit;" >
+  <div class="tw:rounded-md tw:p-0 tw:pt-1 tw:overflow-hidden tw:h-full tw:flex tw:flex-col">
     <!-- Standard page header: title + icon. Usage date / data-type controls live
          in the toolbar row below. -->
     <AppPageHeader
       :title="headerBasedOnRoute()"
       icon="paid"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default tw:mb-2"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
       <template #actions>
         <div v-if="isOrgGroupRoute" class="tw:flex tw:items-center tw:gap-2">
@@ -38,39 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </AppPageHeader>
-    <div
-      v-if="isUsageRoute"
-      class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
-    >
-      <div class="custom-usage-date-select">
-          <OSelect
-            v-model="usageDate"
-            :options="options"
-            labelKey="label"
-            valueKey="value"
-            @update:model-value="selectUsageDate"
-            class="tw:p-0 tw:mx-0 tw:h-[40px] tw:mt-1"
-          >
-          <template v-slot:prepend>
-            <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
-          </template>
-          </OSelect>
-        </div>
-        <div class="tw:flex tw:items-center ">
-          <div class="app-tabs-container tw:h-[36px] ">
-              <AppTabs class=" tabs-selection-container"  :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
-
-          </div>
-        </div>
-    </div>
     <OSplitter
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
+      before-class="tw:border-r tw:border-border-default"
+      class="tw:flex-1 tw:min-h-0"
     >
       <template v-slot:before>
-        <div class="tw:w-full tw:pl-[0.625rem] tw:pb-[0.625rem] ">
-          <div class="card-container" style="min-height: calc(100vh - var(--navbar-height) - 87px);">
+        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pt-2 tw:pb-[0.625rem]">
+          <div class="card-container tw:h-full">
             <OTabs
               v-model="billingtab"
               orientation="vertical"
@@ -139,21 +116,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:gap-[0.625rem]">
+        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:pt-2">
           <div
-            v-if="isUsageRoute && billingMembers.length > 0"
-            class="tw:w-[260px] tw:shrink-0"
-            style="height: calc(100vh - var(--navbar-height) - 87px);"
-            data-test="usage-member-list"
+            v-if="isUsageRoute"
+            class="tw:flex tw:gap-2 tw:items-center tw:justify-end card-container tw:shrink-0 tw:mb-2 tw:ml-2 tw:mr-3 tw:px-3 tw:py-2"
           >
-            <UsageMemberList
-              v-model="usageMember.selected"
-              :members="billingMembers"
-            />
+            <div class="custom-usage-date-select">
+              <OSelect
+                v-model="usageDate"
+                :options="options"
+                labelKey="label"
+                valueKey="value"
+                @update:model-value="selectUsageDate"
+                class="tw:p-0 tw:mx-0 tw:h-[40px] tw:mt-1"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="schedule" size="xs" class="tw:mr-2 tw:mt-1" @click.stop.prevent />
+                </template>
+              </OSelect>
+            </div>
+            <div class="tw:flex tw:items-center">
+              <div class="app-tabs-container tw:h-[36px]">
+                <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+              </div>
+            </div>
           </div>
-          <div class="card-container tw:pb-3 tw:flex-1 tw:min-w-0"  style="height: calc(100vh - var(--navbar-height) - 87px);">
-
-            <router-view title=""> </router-view>
+          <div class="tw:flex-1 tw:min-h-0 tw:pr-[0.625rem] tw:pb-[0.625rem] tw:flex tw:gap-[0.625rem]">
+            <div
+              v-if="isUsageRoute && billingMembers.length > 0"
+              class="tw:w-[260px] tw:shrink-0 tw:h-full"
+              data-test="usage-member-list"
+            >
+              <UsageMemberList
+                v-model="usageMember.selected"
+                :members="billingMembers"
+              />
+            </div>
+            <div class="card-container tw:pb-3 tw:flex-1 tw:min-w-0 tw:h-full">
+              <router-view title=""> </router-view>
+            </div>
           </div>
         </div>
       </template>
@@ -246,6 +247,7 @@ export default defineComponent({
     const options = computed(()=>{
       return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value ?
         [
+          {label: "Previous Cycle", value: "-1cycle"},
           {label: "Current Cycle", value: "1cycle"},
           {label: "30 Days", value: "30days"},
           {label: "60 Days", value: "60days"},

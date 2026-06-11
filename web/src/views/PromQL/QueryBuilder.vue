@@ -37,7 +37,7 @@
       <!-- Generated Query Display -->
       <OCardSection>
         <div class="tw:text-base tw:font-medium tw:mb-2">Generated PromQL Query:</div>
-        <OCard class="tw:bg-gray-50">
+        <OCard class="tw:bg-surface-panel">
           <OCardSection>
             <pre class="query-output">{{ generatedQuery || "No query built yet" }}</pre>
           </OCardSection>
@@ -76,7 +76,7 @@
       <!-- Query Result Preview -->
       <OCardSection v-if="queryResult">
         <div class="tw:text-base tw:font-medium tw:mb-2">Query Result Preview:</div>
-        <OCard class="tw:bg-gray-50">
+        <OCard class="tw:bg-surface-panel">
           <OCardSection>
             <pre class="result-output">{{ queryResult }}</pre>
           </OCardSection>

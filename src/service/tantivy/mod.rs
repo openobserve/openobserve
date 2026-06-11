@@ -340,6 +340,7 @@ pub(super) mod tests {
         let mut writer = config::utils::parquet::new_parquet_writer(
             &mut buffer,
             &schema,
+            &[],
             &file_meta,
             false,
             None,

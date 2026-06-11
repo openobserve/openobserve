@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
+  <div class="tw:rounded-md tw:p-0"
   >
     <AppPageHeader
       :back="{

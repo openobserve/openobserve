@@ -26,13 +26,24 @@
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
       </div>
+      <!-- Always render the delta row even when prev is missing — keeps
+           every card the same height. The body switches to a neutral
+           "no prior data" hint instead of hiding the row, so the user
+           can tell the comparison is *unavailable* (recent column /
+           short history) rather than zero. -->
       <div
-        v-if="delta != null"
+        v-if="kpi.value != null"
         class="kpi-trend tw:text-[0.65rem] tw:font-medium tw:flex tw:items-center tw:gap-[0.25rem]"
-        :class="`kpi-trend--${trendSentiment}`"
+        :class="`kpi-trend--${delta != null ? trendSentiment : 'neutral'}`"
       >
-        <span class="kpi-trend-arrow">{{ trendArrow }}</span>
-        <span>{{ deltaText }} vs prev</span>
+        <template v-if="delta != null">
+          <span class="kpi-trend-arrow">{{ trendArrow }}</span>
+          <span>{{ deltaText }} vs prev</span>
+        </template>
+        <template v-else>
+          <span class="kpi-trend-arrow">–</span>
+          <span>no prior data</span>
+        </template>
       </div>
     </div>
     <KpiSparkline
@@ -90,7 +101,10 @@ const bigNumber = computed(() => {
   const v = props.kpi.value;
   if (v == null) return "—";
   if (props.kpi.format === "percent") return v.toFixed(1);
-  if (props.kpi.format === "currency") return v.toFixed(2);
+  // Currency: prefix the symbol on the main number itself — `unitLabel`
+  // stays empty so we don't end up with "$98.97 $". Mirrors how the
+  // delta line formats currency (`$${abs.toFixed(2)}`).
+  if (props.kpi.format === "currency") return `$${v.toFixed(2)}`;
   if (props.kpi.format === "seconds") return v.toFixed(1);
   if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;

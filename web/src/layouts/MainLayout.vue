@@ -78,8 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (no border). All pages render inside this. -->
-          <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]">
+          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <div
+            class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="store.state.theme === 'dark' ? 'tw:border tw:border-border-default' : ''"
+          >
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
@@ -569,12 +572,12 @@ export default defineComponent({
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
-    // Insert / remove the Evaluations menu entry based on the live config
+    // Insert / remove the AI Observability menu entry based on the live config
     // flag. Position: directly after Traces. Idempotent — safe to call from
     // multiple lifecycle hooks.
-    const updateOnlineEvalsMenu = () => {
+    const updateAIObservabilityMenu = () => {
       const existingIndex = linksList.value.findIndex(
-        (link: any) => link.name === "onlineEvals",
+        (link: any) => link.name === "aiObservability",
       );
 
       if (isOnlineEvalsEnabled.value) {
@@ -584,10 +587,10 @@ export default defineComponent({
         );
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
         linksList.value.splice(insertAt, 0, {
-          title: t("menu.evals"),
-          icon: "check-circle-outline",
-          link: "/online-evals",
-          name: "onlineEvals",
+          title: t("menu.aiObservability"),
+          icon: "auto-awesome",
+          link: "/ai",
+          name: "aiObservability",
         });
       } else if (existingIndex !== -1) {
         linksList.value.splice(existingIndex, 1);
@@ -596,12 +599,12 @@ export default defineComponent({
 
     // If `/config` resolves after this component mounted (or if the flag
     // ever flips at runtime), keep the menu in sync.
-    watch(isOnlineEvalsEnabled, () => updateOnlineEvalsMenu(), { immediate: false });
+    watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
-      updateOnlineEvalsMenu();
+      updateAIObservabilityMenu();
 
       const disableMenus = new Set(
         store.state.zoConfig?.custom_hide_menus

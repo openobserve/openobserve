@@ -57,6 +57,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const { t } = useI18n();
@@ -75,6 +76,7 @@ const columns: OTableColumnDef[] = [
     header: t("billing.amount"),
     accessorKey: "amount",
     sortable: true,
+    size: COL.price,
     meta: { align: "left" },
   },
   {
@@ -82,6 +84,7 @@ const columns: OTableColumnDef[] = [
     header: t("billing.amountPaid"),
     accessorKey: "paid",
     sortable: true,
+    size: COL.price,
     meta: { align: "left" },
   },
   {
@@ -89,6 +92,7 @@ const columns: OTableColumnDef[] = [
     header: t("billing.invoiceStartDate"),
     accessorKey: "start_date",
     sortable: true,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -96,6 +100,7 @@ const columns: OTableColumnDef[] = [
     header: t("billing.invoiceEndDate"),
     accessorKey: "end_date",
     sortable: true,
+    size: COL.date,
     meta: { align: "left" },
   },
   {
@@ -103,6 +108,7 @@ const columns: OTableColumnDef[] = [
     header: t("billing.status"),
     accessorKey: "status",
     sortable: true,
+    size: COL.status,
     meta: { align: "left" },
   },
   {

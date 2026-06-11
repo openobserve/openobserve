@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="events-container relative-position tw:h-full tw:flex tw:flex-col">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:my-1! tw:mx-2!" />
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:mt-2! tw:mx-2!" />
     <template v-if="activeTab === 'tags'">
       <div
         data-test="event-metadata"
-        class="tw:flex tw:p-2 event-metadata tw:px-[0.375rem]"
+        class="tw:flex tw:p-2 event-metadata tw:px-3"
       >
         <div class="tw:w-full tw:flex tw:flex-col">
           <div class="tw:w-full tw:pb-2 tw:text-xs">
@@ -79,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <OSeparator class="tw:mt-2" />
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
+      <OSeparator class="tw:my-2" />
+      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mt-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
+            class="tw:mb-1 tw:px-2 event-container tw:py-2 tw:cursor-pointer tw:rounded"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >

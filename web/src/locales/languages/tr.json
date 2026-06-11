@@ -421,7 +421,8 @@
     "menuGroupSchedule": "Çizelge",
     "menuGroupInspect": "İnceleyin",
     "validSql": "Geçerli SQL",
-    "invalidSql": "Geçersiz sorgu"
+    "invalidSql": "Geçersiz sorgu",
+    "menuGroupExplain": "Açıklamak"
   },
   "menu": {
     "home": "Ana Sayfa",
@@ -455,7 +456,8 @@
     "language": "Dil",
     "actions": "Eylemler",
     "incidents": "Olaylar",
-    "evals": "Evalar"
+    "evals": "Evalar",
+    "aiObservability": "Yapay Zeka Gözlemlenebilirliği"
   },
   "rum": {
     "title": "Gerçek Kullanıcı İzleme",
@@ -1207,7 +1209,8 @@
     "tokenRotateError": "Belirteç döndürülemedi.",
     "tokenDeleteError": "Belirteç silinemedi.",
     "noTokensFound": "Yutma belirteci bulunamadı.",
-    "createdBy": "Tarafından oluşturuldu"
+    "createdBy": "Tarafından oluşturuldu",
+    "orgLevelSummary": "Alım uç noktaları için kuruluş düzeyinde belirteçler."
   },
   "dashboard": {
     "selectField": "Tarla",
@@ -3240,7 +3243,8 @@
     "confirmRejectMsg": "{org} katılma davetini reddetmek istediğinizden emin misiniz?",
     "expired": "Süresi doldu",
     "expiresToday": "Bugün Sona Eriyor",
-    "daysLeft": "{gün} gün kaldı"
+    "daysLeft": "{gün} gün kaldı",
+    "search": "Davetiyeleri Ara"
   },
   "serviceAccounts": {
     "header": "Hizmet Hesapları",
@@ -4326,6 +4330,46 @@
       "description": "Boru hattı çıktısı için harici hedefler - HTTP uç noktaları ve uzaktan yazma hedefleri.",
       "action": "Yeni hedef",
       "actionDesc": "Bir boru hattı hedefini bağlama"
+    },
+    "noLLMInsights": {
+      "title": "Henüz LLM etkinliği yok",
+      "description": "Hizmetlerinizi OpenTelemetry Gen-AI semantik kurallarıyla düzenleyin ve bu gösterge tablosunu doldurmak için en az bir iz alın.",
+      "action": "OpenTelemetry ile Enstrüman",
+      "actionDesc": "İzlerinizdeki gen_ai_* özelliklerini yakalayın"
+    },
+    "noLLMSessions": {
+      "title": "Henüz LLM oturumu yok",
+      "description": "Oturumlar gen_ai_conversation_id olarak gruplandırılır. Hizmetlerinizi düzenleyin, böylece her konuşma izlerini etiketler ve oturumlar burada görünür.",
+      "action": "OpenTelemetry ile Enstrüman",
+      "actionDesc": "gen_ai_conversation_id ile gen_ai_conversation_id ile etiketleme alanları"
+    },
+    "noScorers": {
+      "title": "Henüz golcü yok",
+      "description": "Puanlar, LLM yanıtlarını puan yapılandırmalarınıza göre derecelendirir - bir LLM jüri ile başlayın veya kütüphaneden bir tane içe aktarın.",
+      "action": "Golcü oluştur",
+      "actionDesc": "Bir LLM hakimi veya uzaktan golcü tanımlayın"
+    },
+    "noEvalJobs": {
+      "title": "Henüz değerlendirme işi yok",
+      "description": "Bir LLM akışına karşı işler skorları programlar. Bir kadans üzerinde konuşmalara not vermeye başlamak için bir tane oluşturun.",
+      "action": "Eval işi oluştur",
+      "actionDesc": "Bir akış seçin + puanlar + kadans"
+    },
+    "noScoreConfigs": {
+      "title": "Henüz puan yapılandırması yok",
+      "description": "Puan yapılandırmaları, şema puanlarının ürettiklerini tanımlar - sayısal, boole veya kategorik. Puanlamaya başlamak için bir tane ekleyin.",
+      "action": "Puan yapılandırması oluştur",
+      "actionDesc": "Skor şeklini+sağlıklı aralığı tanımlayın"
+    },
+    "noEvalTemplates": {
+      "title": "Henüz değerlendirme şablonu yok",
+      "description": "Değerlendirme şablonları, LLM değerlendirmeleri için yeniden kullanılabilir puanlama kriterlerini tanımlar.",
+      "action": "Yeni şablon",
+      "actionDesc": "Değerlendirme şablonu oluşturma"
+    },
+    "noPipelineHistory": {
+      "title": "Henüz boru hattı geçmişi yok",
+      "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
     }
   },
   "onlineEvals": {
@@ -4668,6 +4712,21 @@
     "empty": {
       "title": "Henüz LLM Sağlayıcısı Yok",
       "description": "LLM Sağlayıcıları, LLM Judge puanlarının aradığı dil modelleri için bağlantı ayrıntılarını (uç nokta + kimlik bilgileri) depolar. Yargıç tabanlı değerlendirmeleri yürütmeye başlamak için bir tane ekleyin."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM Gözlemlenebilirlik",
+    "sections": {
+      "monitor": "Monitör",
+      "evaluate": "Değerlendirmek"
+    },
+    "nav": {
+      "overview": "Genel Bakış",
+      "sessions": "Oturumlar",
+      "quality": "KALİTE",
+      "evalJobs": "Eval İş İlanları",
+      "scorers": "Gol Sahipleri",
+      "scoreConfigs": "Puan Yapılandırmaları"
     }
   }
 }

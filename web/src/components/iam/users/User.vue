@@ -65,6 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -378,14 +381,19 @@ export default defineComponent({
           header: t("user.email"),
           accessorKey: "email",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: COL.email,
-          meta: { align: "left", autoWidth: true },
+          minSize: 200,
+          meta: { align: "left", flex: true },
         },
         {
           id: "first_name",
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: COL.firstName,
           meta: { align: "left", isName: true },
         },
@@ -394,6 +402,8 @@ export default defineComponent({
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: COL.lastName,
           meta: { align: "left", isName: true },
         },
@@ -406,6 +416,8 @@ export default defineComponent({
           header: "Auth",
           accessorKey: "auth_type",
           sortable: true,
+          resizable: true,
+          hideable: true,
           size: COL.authType,
           meta: { align: "left" },
         });
@@ -417,6 +429,8 @@ export default defineComponent({
         header: isEnterpriseOrCloud ? "Roles" : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: COL.role,
         meta: { align: "left" },
       });

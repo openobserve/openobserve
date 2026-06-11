@@ -192,7 +192,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
@@ -231,12 +231,18 @@ export default defineComponent({
         id: "title",
         header: t("alerts.incidents.title_field"),
         accessorKey: "title",
-        meta: { align: "left" },
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
         id: "severity",
         header: t("alerts.incidents.severity"),
         accessorKey: "severity",
+        resizable: true,
+        hideable: true,
         size: 100,
         meta: { align: "left" },
       },
@@ -244,6 +250,8 @@ export default defineComponent({
         id: "status",
         header: t("alerts.incidents.status"),
         accessorKey: "status",
+        resizable: true,
+        hideable: true,
         size: 120,
         meta: { align: "left" },
       },
@@ -251,6 +259,8 @@ export default defineComponent({
         id: "dimensions",
         header: "Dimensions",
         accessorKey: "group_values",
+        resizable: true,
+        hideable: true,
         size: 400,
         meta: { align: "left" },
       },
@@ -258,6 +268,8 @@ export default defineComponent({
         id: "alert_count",
         header: t("alerts.incidents.alertCount"),
         accessorKey: "alert_count",
+        resizable: true,
+        hideable: true,
         size: 80,
         meta: { align: "center" },
       },
@@ -266,6 +278,8 @@ export default defineComponent({
         header: t("alerts.incidents.lastAlertAt"),
         accessorKey: "last_alert_at",
         sortable: true,
+        resizable: true,
+        hideable: true,
         size: 180,
         meta: { align: "left" },
       },
@@ -666,14 +680,9 @@ body.body--dark {
 }
 
 .badge-more {
-  background: #e5e7eb;
-  color: #6b7280;
+  background: var(--color-surface-panel);
+  color: var(--o2-text-secondary);
   font-weight: 500;
-}
-
-body.body--dark .badge-more {
-  background: #4b5563;
-  color: #d1d5db;
 }
 
 /* Color scheme matching schema.scss type badges */

@@ -422,10 +422,10 @@ describe("useRumSpanBuilder", () => {
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
       await fetchRumEventsForTrace("trace-abc", 5_000_000, 10_000_000);
 
-      // First call uses ±10s buffer around the trace window
+      // All queries use ±60s buffer around the trace window
       const firstCall = vi.mocked(searchService.search).mock.calls[0][0];
-      expect(firstCall.query.query.start_time).toBe(5_000_000 - 10_000_000);
-      expect(firstCall.query.query.end_time).toBe(10_000_000 + 10_000_000);
+      expect(firstCall.query.query.start_time).toBe(5_000_000 - 60_000_000);
+      expect(firstCall.query.query.end_time).toBe(10_000_000 + 60_000_000);
     });
 
     it("should skip fetchActionEvents when parsed action_id array is empty", async () => {

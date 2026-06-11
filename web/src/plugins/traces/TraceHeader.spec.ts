@@ -244,7 +244,7 @@ describe("TraceHeader", () => {
   describe("Theme support", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-gray-100");
+      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
       expect(headerContainer.classes()).toContain("trace-header-container");
     });
 
@@ -280,7 +280,7 @@ describe("TraceHeader", () => {
       });
 
       const headerContainer = darkWrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:bg-gray-700");
+      expect(headerContainer.classes()).toContain("tw:bg-surface-panel");
       expect(headerContainer.classes()).toContain("trace-header-container");
 
       darkWrapper.unmount();

@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @row-click="handleRowClick"
                   @scroll-end="handleScrollEnd"
                   :show-global-filter="false"
+                  :default-columns="false"
                 >
                   <template #empty>
                     <NoData />
@@ -180,6 +181,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
@@ -379,6 +381,7 @@ const tableColumns = [
     header: t("rum.timeSpent"),
     accessorFn: (row: any) => formatDuration(row["time_spent"]),
     sortable: true,
+    size: COL.duration,
     meta: { align: "left" },
   },
   {
@@ -386,6 +389,7 @@ const tableColumns = [
     header: t("rum.errorCount"),
     accessorKey: "error_count",
     sortable: true,
+    size: COL.count,
     meta: { align: "left" },
   },
   {
@@ -393,6 +397,7 @@ const tableColumns = [
     header: t("rum.frustrationCount"),
     accessorFn: (row: any) => row["frustration_count"] || 0,
     sortable: true,
+    size: COL.count,
     meta: { align: "left" },
   },
   {

@@ -421,7 +421,8 @@
     "menuGroupSchedule": "스케줄",
     "menuGroupInspect": "검사",
     "validSql": "유효한 SQL",
-    "invalidSql": "잘못된 쿼리"
+    "invalidSql": "잘못된 쿼리",
+    "menuGroupExplain": "설명하다"
   },
   "menu": {
     "home": "홈",
@@ -455,7 +456,8 @@
     "language": "언어",
     "actions": "액션",
     "incidents": "인시던트",
-    "evals": "평가"
+    "evals": "평가",
+    "aiObservability": "AI 옵저버빌리티"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -1207,7 +1209,8 @@
     "tokenRotateError": "토큰 회전에 실패했습니다.",
     "tokenDeleteError": "토큰을 삭제하지 못했습니다.",
     "noTokensFound": "통합 토큰을 찾을 수 없습니다.",
-    "createdBy": "만든 사람"
+    "createdBy": "만든 사람",
+    "orgLevelSummary": "통합 엔드포인트를 위한 조직 수준 토큰."
   },
   "dashboard": {
     "selectField": "필드",
@@ -3240,7 +3243,8 @@
     "confirmRejectMsg": "{org} 가입 초대를 정말로 거부하시겠습니까?",
     "expired": "만료",
     "expiresToday": "오늘 만료",
-    "daysLeft": "{일} 일 남음"
+    "daysLeft": "{일} 일 남음",
+    "search": "초대장 검색"
   },
   "serviceAccounts": {
     "header": "서비스 계정",
@@ -4326,6 +4330,46 @@
       "description": "파이프라인 출력을 위한 외부 대상 — HTTP 엔드포인트 및 원격 쓰기 대상",
       "action": "새 목적지",
       "actionDesc": "파이프라인 대상 연결"
+    },
+    "noLLMInsights": {
+      "title": "LLM 활동이 아직 없습니다",
+      "description": "OpenTelemetry Gen-AI 시맨틱 규칙으로 서비스를 계측하고 최소 하나의 트레이스를 수집하여 이 대시보드를 채웁니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "트레이스에서 gen_ai_* 어트리뷰트를 캡처하세요"
+    },
+    "noLLMSessions": {
+      "title": "LLM 세션이 아직 없습니다",
+      "description": "세션은 gen_ai_conversation_id별로 그룹화됩니다. 각 대화에 트레이스에 태그를 지정하도록 서비스를 계측하면 세션이 여기에 표시됩니다.",
+      "action": "오픈 텔레메트리 기능이 있는 기기",
+      "actionDesc": "gen_ai_conversation_id가 포함된 태그 범위"
+    },
+    "noScorers": {
+      "title": "아직 득점자 없음",
+      "description": "채점자는 점수 구성을 기준으로 LLM 응답을 채점합니다. LLM 심사위원으로 시작하거나 라이브러리에서 가져올 수 있습니다.",
+      "action": "채점자 생성",
+      "actionDesc": "LLM 심사위원 또는 원격 채점자 정의"
+    },
+    "noEvalJobs": {
+      "title": "아직 평가 작업이 없습니다",
+      "description": "작업은 LLM 스트림을 기준으로 채점자를 스케줄링합니다.하나씩 생성하여 단계별로 대화를 채점할 수 있습니다.",
+      "action": "평가 작업 생성",
+      "actionDesc": "스트림 선택+득점자+케이던스"
+    },
+    "noScoreConfigs": {
+      "title": "점수 구성이 아직 없습니다",
+      "description": "점수 구성은 채점자가 생성하는 스키마 (숫자, 불리언 또는 범주형) 를 정의합니다.하나를 추가하여 채점을 시작하세요.",
+      "action": "점수 구성 생성",
+      "actionDesc": "점수 모양+정상 범위 정의"
+    },
+    "noEvalTemplates": {
+      "title": "평가 템플릿이 아직 없습니다.",
+      "description": "평가 템플릿은 LLM 평가를 위한 재사용 가능한 채점 기준을 정의합니다.",
+      "action": "새 템플릿",
+      "actionDesc": "평가 템플릿 생성"
+    },
+    "noPipelineHistory": {
+      "title": "아직 파이프라인 기록이 없습니다.",
+      "description": "파이프라인이 실행되면 파이프라인 실행 기록이 여기에 표시됩니다."
     }
   },
   "onlineEvals": {
@@ -4668,6 +4712,21 @@
     "empty": {
       "title": "LLM 공급자가 아직 없습니다",
       "description": "LLM 제공자는 LLM 판사 채점자가 호출하는 언어 모델에 대한 연결 세부 정보 (엔드포인트+자격 증명) 를 저장합니다.하나를 추가하여 심사 기반 평가 실행을 시작하세요."
+    }
+  },
+  "aiObservability": {
+    "title": "LLM 옵저버빌리티",
+    "sections": {
+      "monitor": "모니터",
+      "evaluate": "평가"
+    },
+    "nav": {
+      "overview": "개요",
+      "sessions": "세션",
+      "quality": "품질",
+      "evalJobs": "평가 작업",
+      "scorers": "득점자",
+      "scoreConfigs": "스코어 구성"
     }
   }
 }

@@ -15,8 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Page wrapper is intentionally chrome-less: KPI tiles and trend
+       panels each carry their own `card-container`. Wrapping them in
+       another card-container would render same-bg-on-same-bg and the
+       inner cards would visually disappear (no border contrast). -->
   <div
-    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)] card-container tw:px-[0.625rem]"
+    class="llm-insights-dashboard tw:h-full tw:flex tw:flex-col tw:px-[0.625rem]"
   >
     <!-- Toolbar: stream selector — hidden when no streams are available -->
     <div
@@ -38,74 +42,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Streams list loaded but no LLM streams exist for this org. -->
-    <div
-      v-if="streamsLoaded && availableStreams.length === 0"
-      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
-    >
-      <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        No LLM streams found
-      </div>
-      <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
-      >
-        LLM Insights aggregates spans from traces streams that capture
-        <code>gen_ai_*</code> attributes. Either no traces stream has been
-        marked as an LLM stream, or no spans have been ingested yet. Instrument
-        your service with the OpenTelemetry Gen-AI semantic conventions and
-        ingest at least one trace to populate this dashboard.
-      </div>
-    </div>
-
     <!-- Skeleton shown only while a real request is in flight -->
-    <LLMInsightsSkeleton v-else-if="!streamsLoaded || loading" class="tw:flex-1" />
+    <LLMInsightsSkeleton v-if="!streamsLoaded || loading" class="tw:flex-1" />
 
-    <!-- Stream has no LLM (gen_ai_*) fields → friendly empty state -->
-    <div
-      v-else-if="streamHasNoLLMFields"
-      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
-    >
-      <OIcon name="auto-awesome" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        No LLM data in <b>{{ activeStream }}</b>
-      </div>
-      <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[28rem]"
-      >
-        This stream doesn't have any LLM (<code>gen_ai_*</code>) fields. Pick a
-        different stream above, or instrument your service with the OpenTelemetry
-        Gen-AI semantic conventions to populate this dashboard.
-      </div>
-    </div>
-
-    <!-- Generic error state -->
-    <div
+    <!-- Generic error state — kept separate because a failed request is a
+         different signal from "no data yet". Once we have a result we fall
+         through to the consolidated empty / dashboard branches below. -->
+    <EvalEmptyState
       v-else-if="error && hasLoadedOnce"
-      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
-    >
-      <OIcon name="error-outline" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base tw:mb-2">Failed to load LLM Insights</div>
-      <div class="tw:text-sm tw:text-gray-500 tw:mb-3">{{ error }}</div>
-      <OButton
-        variant="outline"
-        size="sm"
-        data-test="llm-insights-retry-btn"
-        @click="loadInsights()"
-      >
-        Retry
-      </OButton>
-    </div>
+      data-test="llm-insights-empty-error"
+      icon="error-outline"
+      title="Failed to load LLM Insights"
+      :description="error || ''"
+      cta-label="Retry"
+      cta-data-test="llm-insights-retry-btn"
+      @create="loadInsights()"
+    />
 
-    <!-- Empty state — streams exist but no data in this time window -->
+    <!-- Consolidated empty state — single OEmptyState covers all three
+         "no data" shapes (no LLM streams in the org, the active stream has
+         no gen_ai_* fields, or the time window returned nothing). The page
+         doesn't expose a search/filter widget, so we never set `:filtered`
+         — both the first-run and the "no data right now" cases land on
+         the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
-      v-else-if="hasLoadedOnce && !hasData"
-      class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center"
+      v-else-if="isEmpty"
+      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center"
+      data-test="llm-insights-empty"
     >
-      <OIcon name="info" class="tw:mb-3" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base tw:text-[var(--o2-text-muted)]">
-        No LLM data found for the selected time range
-      </div>
+      <OEmptyState
+        size="hero"
+        preset="no-llm-insights"
+        @action="onEmptyAction"
+      />
     </div>
 
     <!-- Dashboard content — scrollable panel area -->
@@ -192,7 +161,8 @@ import KpiSparkline from "./KpiSparkline.vue";
 import LLMTrendPanel from "./LLMTrendPanel.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
@@ -286,6 +256,33 @@ const streamHasNoLLMFields = computed(() => {
   const msg = String(error.value);
   return /No field named\s+gen_ai_/i.test(msg);
 });
+
+// Drives the consolidated OEmptyState branch in the template. True for any
+// shape of "no LLM data right now": no LLM streams in the org, the active
+// stream has no gen_ai_* fields, or the load completed and the KPI rollup
+// came back empty. The dashboard's KPI tiles + trend panels render only
+// when this is false — so we never show "0" tiles next to empty charts.
+const isEmpty = computed<boolean>(
+  () =>
+    streamsLoaded.value &&
+    (availableStreams.value.length === 0 ||
+      streamHasNoLLMFields.value ||
+      (hasLoadedOnce.value && !hasData.value)),
+);
+
+// The empty-state action card emits its `id` here. `instrument` routes to
+// the in-app AI integrations page (OpenTelemetry / Gen-AI guides) — the
+// closest thing we have to a "set this up" landing surface and keeps the
+// user inside the product instead of bouncing to docs.
+function onEmptyAction(id?: string) {
+  if (id !== "instrument") return;
+  router.push({
+    name: "ai-integrations",
+    query: {
+      org_identifier: store.state.selectedOrganization?.identifier,
+    },
+  });
+}
 
 interface KpiCard {
   label: string;
@@ -413,8 +410,12 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// Page wrapper stays transparent so each inner card-container (KPI tiles
+// + trend panels) stands out against the surrounding page bg. The
+// previous solid-card-bg here matched the inner card-container bg and
+// erased every border / shadow.
 .llm-insights-dashboard {
-  background: var(--o2-card-bg-solid);
+  background: transparent;
 }
 
 .kpi-card {
