@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
-      <Teleport to="#o2-page-actions">
+      <Teleport defer to="#o2-page-actions">
         <OButton
           variant="outline"
           size="icon-sm"
@@ -574,14 +574,19 @@ onBeforeRouteLeave((to, from, next) => {
     (from.path === "/pipeline/pipelines/add" &&
       pipelineObj.currentSelectedPipeline.nodes.length)
   ) {
-    const confirmMessage = t("pipeline.unsavedMessage");
-    if (window.confirm(confirmMessage)) {
-      // User confirmed, allow navigation
-      next();
-    } else {
-      // User canceled, prevent navigation
-      next(false);
-    }
+    // Cancel this navigation; show a Vue dialog instead of window.confirm
+    // (browsers often suppress window.confirm during navigation events).
+    next(false);
+    const destination = to.fullPath;
+    confirmDialogMeta.value.show = true;
+    confirmDialogMeta.value.title = t("common.cancelChanges");
+    confirmDialogMeta.value.message = t("pipeline.cancelChangesConfirm");
+    confirmDialogMeta.value.onConfirm = () => {
+      resetConfirmDialog();
+      resetPipelineData();
+      forceSkipBeforeUnloadListener = true;
+      router.push(destination);
+    };
   } else {
     // No unsaved changes or not leaving the edit route, allow navigation
     next();
