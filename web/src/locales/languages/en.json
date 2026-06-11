@@ -2995,7 +2995,7 @@
       "correlatedBySemanticGroups": "Dimensions",
       "correlatedByAlertId": "Alert ID",
       "filterByStatus": "Filter by status",
-      "allStatuses": "All Statuses",
+      "allStatuses": "All",
       "loading": "Loading incidents...",
       "errorLoading": "Failed to load incidents",
       "statusUpdated": "Incident status updated",
