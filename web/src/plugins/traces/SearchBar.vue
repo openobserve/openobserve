@@ -777,19 +777,6 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
-
-      // Live mode: auto-trigger search on a real time-range change.
-      // The DateTime component also fires `on:date-change` once on its own
-      // mount with the current value (no actual change). The `prev`
-      // comparison above filters out that mount-time replay so a tab
-      // switch that remounts the picker doesn't fire a redundant search.
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        datetimeChanged
-      ) {
-        emit("searchdata");
-      }
     };
 
     const toggleLiveMode = () => {
