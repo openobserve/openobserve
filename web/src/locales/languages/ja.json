@@ -3233,7 +3233,10 @@
     "openInFullView": "フルビューで開く",
     "serviceMap": "サービスマップ",
     "patternView": "パターンビュー",
-    "spanView": "スパンビュー"
+    "spanView": "スパンビュー",
+    "showAll": "[すべて表示]",
+    "filterByErrors": "エラーで絞り込む",
+    "clearErrorFilter": "エラーフィルターをクリア"
   },
   "actions": {
     "testAction": "アクションをテスト",

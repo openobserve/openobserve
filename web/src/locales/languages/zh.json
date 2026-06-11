@@ -3216,7 +3216,10 @@
     "openInFullView": "以全视图打开",
     "serviceMap": "服务地图",
     "patternView": "图案视图",
-    "spanView": "跨度视图"
+    "spanView": "跨度视图",
+    "showAll": "显示全部",
+    "filterByErrors": "按错误筛选",
+    "clearErrorFilter": "清除错误过滤器"
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",
