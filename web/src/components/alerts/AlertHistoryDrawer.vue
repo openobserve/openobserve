@@ -876,7 +876,7 @@ watch(
   border-color: #e5e7eb;
 }
 .code-block-header-dark {
-  background: #1f2937;
+  background: var(--color-surface-panel);
   border-color: #374151;
 }
 

@@ -263,7 +263,7 @@ function handleClick() {
         />
       </span>
       <div class="tw:flex-1 tw:min-w-0">
-        <div v-if="$slots.default" :class="slotAlignClass">
+        <div v-if="$slots.default" :class="[slotAlignClass, ...defaultTextClass]">
           <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
           <slot v-else />
         </div>
@@ -284,7 +284,7 @@ function handleClick() {
     </div>
 
     <template v-else>
-      <div v-if="$slots.default" :class="slotAlignClass">
+      <div v-if="$slots.default" :class="[slotAlignClass, ...defaultTextClass]">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
         <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
         <slot v-else />

@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="stat-tile">
             <div
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              :class="store.state.theme === 'dark' ? 'tw:bg-surface-base tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
             >
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="stat-tile">
             <div
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              :class="store.state.theme === 'dark' ? 'tw:bg-surface-base tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
             >
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="stat-tile">
             <div
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              :class="store.state.theme === 'dark' ? 'tw:bg-surface-base tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
             >
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="stat-tile">
             <div
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              :class="store.state.theme === 'dark' ? 'tw:bg-surface-base tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
             >
               <div class="tw:flex tw:justify-between tw:items-start">
                 <div
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:items-center tw:justify-center tw:transition-all"
               :class="[
-                store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
+                store.state.theme === 'dark' ? 'tw:bg-surface-base tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
                 hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer hover:tw:border-primary hover:tw:shadow-lg'
               ]"
               @click="!hasNoData && (showSqlDialog = true)"
@@ -797,7 +797,7 @@ export default defineComponent({
 }
 
 .sql-query-container--dark {
-  background-color: #1e1e1e;
+  background-color: var(--color-surface-base);
 }
 
 .sql-query {

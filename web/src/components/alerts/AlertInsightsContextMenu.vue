@@ -216,7 +216,7 @@ onUnmounted(() => {
     color: #666;
 
     .dark-theme & {
-      background: #1e1e1e;
+      background: var(--color-surface-panel);
       color: #aaa;
     }
   }

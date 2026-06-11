@@ -612,10 +612,10 @@ export default defineComponent({
   }
 
   .trace-dag-flow {
-    background-color: #1e1e1e !important;
+    background-color: var(--color-surface-base) !important;
 
     .vue-flow__background {
-      background-color: #1e1e1e !important;
+      background-color: var(--color-surface-base) !important;
     }
 
     .vue-flow__node-custom {

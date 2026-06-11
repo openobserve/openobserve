@@ -84,7 +84,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title tw:text-text-secondary">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton

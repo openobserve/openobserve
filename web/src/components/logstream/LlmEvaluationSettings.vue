@@ -641,7 +641,7 @@ export default defineComponent({
 
     &--dark {
       border-color: #374151;
-      background-color: #181a1b;
+      background-color: var(--color-surface-base);
     }
   }
 

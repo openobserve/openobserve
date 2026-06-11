@@ -823,7 +823,7 @@ defineExpose({
           :value="globalFilterLocal"
           type="text"
           :placeholder="props.globalFilterPlaceholder"
-          class="tw:pl-7 tw:pr-2 tw:py-1 tw:text-sm tw:bg-transparent tw:border-none tw:text-primary tw:placeholder-text-disabled tw:outline-none tw:w-full"
+          class="tw:pl-7 tw:pr-2 tw:py-1 tw:text-sm tw:bg-transparent tw:border-none tw:text-text-primary tw:placeholder-text-disabled tw:outline-none tw:w-full"
           data-test="o2-table-global-filter-input"
           @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
         />

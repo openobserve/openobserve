@@ -1360,7 +1360,7 @@
 }
 
 .context-menu-dark {
-  background-color: #1a1a1a;
+  background-color: var(--color-surface-panel);
   border: 1px solid #4a5568;
   .context-menu-item {
     color: #e2e8f0;

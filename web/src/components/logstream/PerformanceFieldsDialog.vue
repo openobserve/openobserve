@@ -141,8 +141,8 @@ export default defineComponent({
 }
 
 .bordered-scroll-area-dark {
-  border-color: #3a3a3a;
-  background-color: #1e1e1e;
+  border-color: var(--color-border-default);
+  background-color: var(--color-surface-base);
 }
 
 .performance-fields-container {

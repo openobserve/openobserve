@@ -293,7 +293,7 @@ q-btn {
 
 /* Dark mode styles */
 .body--dark .edge-help-notification {
-  background: #181a1b;
+  background: var(--color-surface-base);
   color: #f3f4f6;
   border: 1px solid #374151;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);

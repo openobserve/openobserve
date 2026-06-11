@@ -92,7 +92,7 @@ td {
 
 .q-table--dark .thead-sticky tr > *,
 .q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
+  background: var(--color-surface-panel);
 }
 
 .table-cell {

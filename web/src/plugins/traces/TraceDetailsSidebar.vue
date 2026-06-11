@@ -2721,10 +2721,10 @@ body.body--dark {
 
   // Dark mode fullscreen
   .io-container-dark:fullscreen {
-    background: #1e1e1e; // Dark background for dark mode
+    background: var(--color-surface-base);
 
     .io-section .section-label {
-      background: #1e1e1e;
+      background: var(--color-surface-base);
       color: #e0e0e0; // Ensure text is visible in dark mode
     }
   }
@@ -2872,7 +2872,7 @@ body.body--dark {
 .body--dark {
   .trace-detail-tab-table {
     th {
-      background-color: #424242 !important;
+      background-color: var(--color-surface-panel) !important;
     }
   }
 }

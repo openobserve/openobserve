@@ -55,7 +55,7 @@ export function useStickyColumns(props: any, store: any) {
       position: "sticky",
       left: `${leftOffset}px`,
       "z-index": 2,
-      "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+      "background-color": store.state.theme === "dark" ? "var(--color-surface-base)" : "#fff",
       "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
     };
   };
@@ -71,7 +71,7 @@ export function useStickyColumns(props: any, store: any) {
     styleElement.setAttribute("data-sticky-styles", "true");
 
     const columns = (props.columns || []) as any[];
-    const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
+    const bgColor = store.state.theme === "dark" ? "var(--color-surface-base)" : "#fff";
     let css = "";
 
     const stickyColTotals = !!props.stickyColTotals;

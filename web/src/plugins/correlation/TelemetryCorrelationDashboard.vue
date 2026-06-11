@@ -3083,21 +3083,21 @@ body.body--dark .metric-splitter-separator {
 // Dark mode support
 body.body--dark {
   .trace-header-bg {
-    background: #1e1e1e;
+    background: var(--color-surface-base);
   }
   .correlation-dashboard-embedded {
-    background: #1e1e1e !important;
+    background: var(--color-surface-base) !important;
 
     .correlation-header {
-      background: #1e1e1e !important;
+      background: var(--color-surface-base) !important;
     }
   }
 
   .correlation-dashboard-card {
-    background: #1e1e1e !important;
+    background: var(--color-surface-base) !important;
 
     .correlation-header {
-      background: #1e1e1e !important;
+      background: var(--color-surface-base) !important;
     }
   }
 

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="tw:absolute tw:left-3 tw:top-0 tw:bottom-0 tw:w-0.5"
           :style="{
-            backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#e5e7eb',
+            backgroundColor: store.state.theme === 'dark' ? 'var(--color-surface-panel)' : '#e5e7eb',
             marginTop: '12px',
             marginBottom: '12px'
           }"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getUserId(event) !== 'System'"
                     class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
+                      backgroundColor: store.state.theme === 'dark' ? 'var(--color-surface-base)' : '#ffffff',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#f6f8fa',
+                      backgroundColor: store.state.theme === 'dark' ? 'var(--color-surface-panel)' : '#f6f8fa',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:w-6 tw:h-6 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:z-10 tw:relative"
                     :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
+                      backgroundColor: store.state.theme === 'dark' ? 'var(--color-surface-base)' : '#ffffff',
                       border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
                     }"
                   >
@@ -225,14 +225,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="tw:rounded-lg tw:overflow-hidden tw:shadow-sm hover:tw:shadow-md tw:transition-shadow"
                     :style="store.state.theme === 'dark'
-                      ? { backgroundColor: '#181a1b', border: '1px solid #3f4447' }
+                      ? { backgroundColor: 'var(--color-surface-base)', border: '1px solid var(--color-border-default)' }
                       : { backgroundColor: '#ffffff', border: '1px solid #d1d5db' }"
                   >
                     <!-- Header -->
                     <div
                       class="tw:px-4 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b"
                       :style="store.state.theme === 'dark'
-                        ? { backgroundColor: '#0f1011', borderBottomColor: '#3f4447' }
+                        ? { backgroundColor: 'var(--color-surface-chrome)', borderBottomColor: 'var(--color-border-default)' }
                         : { backgroundColor: '#f9fafb', borderBottomColor: '#e5e7eb' }"
                     >
                       <span class="tw:font-semibold tw:text-sm"

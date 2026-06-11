@@ -2946,7 +2946,7 @@ export default defineComponent({
 }
 
 .tile-content-dark {
-  background-color: #1e1e1e;
+  background-color: var(--color-surface-base);
   transition: all 0.2s ease;
 }
 

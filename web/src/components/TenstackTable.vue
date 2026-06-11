@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? tableRowSize + 'px'
                     : table.getTotalSize() + 'px',
               minWidth: '100%',
-              background: store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+              background: store.state.theme === 'dark' ? 'var(--color-surface-panel)' : '#E0E0E0',
             }"
             tag="tr"
             @start="(event) => handleDragStart(event)"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="tw:font-bold"
               :style="{
                 background:
-                  store.state.theme === 'dark' ? '#565656' : '#E0E0E0',
+                  store.state.theme === 'dark' ? 'var(--color-surface-panel)' : '#E0E0E0',
                 opacity: 0.7,
               }"
             >
@@ -1478,7 +1478,7 @@ const getStickyTotalColumnStyle = (col: any) => {
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "min-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     "max-width": `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    "background-color": store.state.theme === "dark" ? "#565656" : "#E0E0E0",
+    "background-color": store.state.theme === "dark" ? "var(--color-surface-panel)" : "#E0E0E0",
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",

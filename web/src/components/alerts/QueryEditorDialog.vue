@@ -1179,7 +1179,7 @@ const getBtnLogo = computed(() => {
   }
   &--dark {
     border-bottom: 1px solid #2d3748;
-    background-color: #1a1a1a;
+    background-color: var(--color-surface-base);
   }
 }
 
@@ -1319,7 +1319,7 @@ const getBtnLogo = computed(() => {
 }
 
 .dark-mode-chat-container {
-  background-color: #1f2937;
+  background-color: var(--color-surface-panel);
 }
 
 .light-mode-chat-container {
@@ -1540,7 +1540,7 @@ const getBtnLogo = computed(() => {
   }
   &--dark {
     border: 1px solid #2d3748;
-    background-color: #1a1a1a;
+    background-color: var(--color-surface-base);
   }
 }
 // ───────────────────────────────────────────────────────────────────────────

@@ -2443,7 +2443,7 @@ export default defineComponent({
   }
 
   &.dark-mode-preview {
-    background-color: #181a1b;
+    background-color: var(--color-surface-base);
     border: 1px solid #343434;
 
     .preview-header {
@@ -2583,13 +2583,13 @@ export default defineComponent({
 
 // Override Quasar tooltip background for SQL preview
 :global(.sql-preview-tooltip) {
-  background: #1e1e1e !important;
+  background: var(--color-surface-base) !important;
   padding: 0 !important;
   border-radius: 6px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 
   .hljs {
-    background: #1e1e1e !important;
+    background: var(--color-surface-base) !important;
     border-radius: 6px;
   }
 }
@@ -2609,7 +2609,7 @@ export default defineComponent({
 
 .dark-mode {
   .no-output-before-run-query {
-    background-color: #1a1a1a;
+    background-color: var(--color-surface-base);
   }
 }
 
@@ -2704,7 +2704,7 @@ export default defineComponent({
 }
 
 .dark-mode-chat-container {
-  background-color: #1f2937;
+  background-color: var(--color-surface-panel);
   border-left: 1px solid #374151;
 }
 

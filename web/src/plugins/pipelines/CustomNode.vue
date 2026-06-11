@@ -1342,11 +1342,11 @@ function getIcon(data, ioType) {
 // Dark mode support
 .body--dark {
   .function-details-card {
-    background-color: #1e1e1e;
+    background-color: var(--color-surface-base);
     color: #ffffff;
 
     .q-card-section {
-      background-color: #1e1e1e;
+      background-color: var(--color-surface-base);
     }
   }
 

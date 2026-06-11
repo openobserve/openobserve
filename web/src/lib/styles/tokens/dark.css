@@ -43,15 +43,18 @@
        Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
        ═══════════════════════════════════════════════════════════ */
 
-    /* Surfaces — the model: BLACK page/content, NEUTRAL-GREY raised panels.
-       base + chrome share one near-black so the whole app reads black;
-       folder rails / cards / dialogs lift on a neutral slate (kept low on blue
-       so the org's blue theme accents pop instead of the whole UI reading blue). */
-    --d-chrome:    #0E0F11;  /* top bar + left rail + gutter behind the card   */
-    --d-base:      #0E0F11;  /* MAIN: content card + table canvas (black)       */
-    --d-well:      #17181A;  /* recessed wells, segmented-control track         */
-    --d-panel:     #282A2E;  /* raised: folder/sub rails, cards, dialogs        */
-    --d-overlay:   #313338;  /* menus, inputs, table-header, dialog header      */
+    /* Surfaces — the model: BLACK page/content, BLUE-TINTED raised panels.
+       base + chrome are deep black so the content canvas reads as black;
+       folder rails / cards / dialogs lift on a blue-navy tint so they read
+       as clearly distinct from both the black base and neutral overlays.
+       The color-mix picks up the org's primary hue automatically. */
+    --d-chrome:    #0B0C10;  /* top bar + left rail + gutter behind the card   */
+    --d-base:      #0E0F14;  /* MAIN: content card + table canvas (tinted blackish, cool undertone) */
+    --d-well:      #14151C;  /* recessed wells, segmented-control track         */
+    --d-panel:     color-mix(in srgb, var(--color-primary-900) 20%, #13151E);
+                             /* raised: folder/sub rails, cards, dialogs (dark navy) */
+    --d-overlay:   color-mix(in srgb, var(--color-primary-900) 10%, #20232D);
+                             /* menus, inputs, table-header, dialog header      */
 
     /* Borders & dividers — MUST read clearly against every surface above */
     --d-divider:       #3C3E44;  /* subtle: row & section separators            */
@@ -68,7 +71,7 @@
                              the dashboard-folder hover (theme-tinted, not grey) */
     --d-selected:  color-mix(in srgb, var(--color-primary-500) 30%, var(--d-panel));
                              /* selected row — teal-tinted (brand signal)       */
-    --d-zebra:     #181A1E;  /* striped-row bg — a quiet lift above black base   */
+    --d-zebra:     #121319;  /* striped-row bg — a quiet lift above tinted-black base */
 
     /* --- Text (mapped to the foundation) --- */
     --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */

@@ -1012,8 +1012,8 @@ function formatTime(ns: number): string {
   }
 
   .thread-bubble--assistant {
-    background: #1a1a1a;
-    border-color: #333333;
+    background: var(--color-surface-panel);
+    border-color: var(--color-border-default);
     color: #e2e2e2;
     box-shadow: 0 1px 2px rgba(255, 255, 255, 0.08);
   }

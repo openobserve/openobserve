@@ -165,7 +165,7 @@
 }
 
 .schema-index-select-dropdown-dark{
-  background-color: #2B2D30 !important;
+  background-color: var(--color-surface-panel) !important;
   border-radius: 4px !important;
   border: 1px solid #4E5157 !important;
 }
@@ -173,7 +173,7 @@
 .schema-index-select-dropdown-dark.q-field--focused .q-field__control {
   outline: 2px solid #575FC5 !important;
   box-shadow: none !important;
-  background-color: #2B2D30 !important;
+  background-color: var(--color-surface-panel) !important;
   border-radius: 4px !important;
 }
 
@@ -206,7 +206,7 @@
 
 .o2-schema-table-header-sticky-dark{
   thead {
-    background-color: #181A1B;
+    background-color: var(--color-surface-base);
   }
 }
 
@@ -280,7 +280,7 @@
 }
 
 .tile-content-dark{
-  background-color: #181a1b;
+  background-color: var(--color-surface-base);
 }
 
 .tile-content-light{

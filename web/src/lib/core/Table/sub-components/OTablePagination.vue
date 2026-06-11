@@ -67,7 +67,7 @@ const pageSizeSelectOptions = computed(() =>
       <slot v-else-if="slots.actions" name="actions" />
       <span
         v-else
-        class="o2-table-footer-title tw:text-primary"
+        class="o2-table-footer-title tw:text-text-secondary"
       >
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>
@@ -83,13 +83,13 @@ const pageSizeSelectOptions = computed(() =>
       />
       <span
         v-else
-        class="tw:text-primary tw:text-xs tw:whitespace-nowrap"
+        class="tw:text-text-secondary tw:text-xs tw:whitespace-nowrap"
         data-test="o2-table-pagination-info"
       >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
       </span>
       <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" v-if="pageSizeOptions.length > 0" />
-      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-primary tw:text-xs">
+      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-text-secondary tw:text-xs">
         <span class="tw:whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"

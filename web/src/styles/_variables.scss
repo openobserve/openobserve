@@ -599,9 +599,10 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-toggle-track-bg: var(--o2-dark-theme-color);
   --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
 
-  --o2-card-bg: #1f2223;
+  --o2-card-bg: var(--color-surface-base);
+  --o2-bg-card-dark: var(--color-surface-base);
 
-  --o2-card-bg-solid: #1f2223;
+  --o2-card-bg-solid: var(--color-surface-base);
 
 
   --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
@@ -617,9 +618,9 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-menu-color: #FFFFFF;
 
   --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
-  --o2-sticky-col-header-bg: #565656;
+  --o2-sticky-col-header-bg: var(--color-surface-panel);
 
-  --o2-table-actions-bg: #1f2223;
+  --o2-table-actions-bg: var(--color-surface-base);
 
   // Log table surface tokens
   --o2-log-table-row-bg: #21242c;

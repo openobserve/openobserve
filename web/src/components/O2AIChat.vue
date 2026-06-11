@@ -6261,7 +6261,7 @@ export default defineComponent({
 
     .dark-mode .generated-code-block {
       code {
-        background-color: #181a1b;
+        background-color: var(--color-surface-base);
         border: 0.5px solid #e1e1e124;
         border-top: none;
       }
@@ -6310,8 +6310,8 @@ export default defineComponent({
     }
 
     &.assistant {
-      background: #1a1a1a;
-      border: 1px solid #333333;
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-default);
       border-radius: 12px;
       color: #e2e2e2;
       margin-left: 0;
@@ -6733,9 +6733,9 @@ export default defineComponent({
     }
 
     .dark-mode & {
-      background: #1a1a1a;
+      background: var(--color-surface-base);
       color: #a0aec0;
-      border: 1px solid #333;
+      border: 1px solid var(--color-border-default);
     }
   }
 

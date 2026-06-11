@@ -717,7 +717,7 @@ export default defineComponent({
   z-index: 9999;
 
   body.body--dark & {
-    background-color: #1f2937;
+    background-color: var(--color-surface-panel);
     border-color: rgba(255, 255, 255, 0.12);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   }

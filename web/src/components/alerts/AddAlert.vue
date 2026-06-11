@@ -901,7 +901,7 @@ body.body--dark .query-mode-tabs {
     border: 1px solid #d4d4d4;
   }
   .dark-mode .q-text-area-input > div > div {
-    background-color: #181a1b !important;
+    background-color: var(--color-surface-base) !important;
     border: 1px solid black !important;
   }
 
@@ -910,7 +910,7 @@ body.body--dark .query-mode-tabs {
     border: 1px solid #e0e0e0 !important;
   }
   .dark-mode-row-template > div > div {
-    background-color: #181a1b !important;
+    background-color: var(--color-surface-base) !important;
     border: 1px solid black !important;
   }
   .light-mode-row-template > div > div {
@@ -934,13 +934,13 @@ body.body--dark .query-mode-tabs {
   border-top: 1px solid #d4d4d4;
 }
 .input-box-bg-dark .q-field__control {
-  background-color: #181a1b !important;
+  background-color: var(--color-surface-base) !important;
 }
 .input-box-bg-light .q-field__control {
   background-color: #ffffff !important;
 }
 .input-border-dark .q-field__control {
-  border: 1px solid #181a1b !important;
+  border: 1px solid var(--color-surface-base) !important;
 }
 .input-border-light .q-field__control {
   border: 1px solid #d4d4d4 !important;

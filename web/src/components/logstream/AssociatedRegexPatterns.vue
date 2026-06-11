@@ -291,7 +291,7 @@
                     class="tw:p-2 tw:rounded tw:font-mono tw:text-[11px] tw:break-all"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-[#1A1A1A]'
+                        ? 'tw:bg-surface-base'
                         : 'tw:bg-[#FFFFFF]'
                     "
                   >
@@ -1083,7 +1083,7 @@ export default defineComponent({
   }
 }
 .dark-mode-regex-test-string-input .q-field__control {
-  background-color: #181a1b !important;
+  background-color: var(--color-surface-base) !important;
   border-top: 1px solid #666666 !important;
   border-left: 1px solid #666666 !important;
   border-right: 1px solid #666666 !important;
@@ -1103,7 +1103,7 @@ export default defineComponent({
   background-color: #1f1f1f !important;
 }
 .dark-mode-regex-no-output {
-  background-color: #181a1b !important;
+  background-color: var(--color-surface-base) !important;
   border-left: 2px solid #212121 !important;
   border-right: 2px solid #212121 !important;
   border-bottom: 2px solid #212121 !important;

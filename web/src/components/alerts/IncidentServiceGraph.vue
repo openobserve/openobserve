@@ -406,7 +406,7 @@ export default defineComponent({
       const options = {
         tooltip: {
           trigger: "item",
-          backgroundColor: isDarkMode.value ? "#1f2937" : "#ffffff",
+          backgroundColor: isDarkMode.value ? "var(--color-surface-panel)" : "#ffffff",
           borderColor: isDarkMode.value ? "#374151" : "#e5e7eb",
           textStyle: {
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
@@ -521,7 +521,7 @@ export default defineComponent({
 html.dark .graph-legend,
 body.body--dark .graph-legend {
   color: #e5e7eb;
-  background-color: #1f2937;
+  background-color: var(--color-surface-panel);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow:
     0 10px 20px rgba(0, 0, 0, 0.6),
@@ -587,7 +587,7 @@ body.body--dark .graph-legend__divider {
 
 /* Dark mode */
 .body--dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  background: var(--color-surface-panel);
   border: 1px solid #374151;
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.3),

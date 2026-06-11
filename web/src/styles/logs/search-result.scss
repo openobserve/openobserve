@@ -148,14 +148,14 @@
 
 .q-table--dark .thead-sticky tr > *,
 .q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
+  background: var(--color-surface-panel);
 }
 
 .q-table--dark .table-header {
   // text-transform: capitalize;
 
   .table-head-chip {
-    background-color: #565656;
+    background-color: var(--color-surface-panel);
   }
 }
 
@@ -193,7 +193,7 @@
     pointer-events: none;
 
     &.field_overlay_dark {
-      background-color: #181a1b;
+      background-color: var(--color-surface-panel);
     }
 
     .q-icon,
@@ -226,7 +226,7 @@
     pointer-events: none;
 
     &.field_overlay_dark {
-      background-color: #565656;
+      background-color: var(--color-surface-panel);
     }
 
     .q-icon {
