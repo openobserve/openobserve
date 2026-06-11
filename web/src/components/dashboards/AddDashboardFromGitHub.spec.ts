@@ -926,40 +926,40 @@ describe("AddDashboardFromGitHub Component", () => {
     });
   });
 
-  describe("Add Folder ODrawer (nested)", () => {
-    it("should not render the AddFolder drawer by default", async () => {
+  describe("Add Folder ODialog (nested)", () => {
+    it("should not render the AddFolder dialog as open by default", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
 
-      // There is only the outer ODrawer (gallery) when showAddFolderDialog is false.
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      expect(drawers).toHaveLength(2); // outer + nested AddFolder drawer always mounted
-      // The nested drawer's open state should be false.
-      const nested = drawers[1];
-      expect(nested.props("open")).toBe(false);
+      // The Add Folder button uses an ODialog (not a second ODrawer).
+      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
+      expect(dialogs.length).toBeGreaterThanOrEqual(1);
+      // The nested add-folder dialog should be closed by default.
+      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      expect(addFolderDialog.exists()).toBe(true);
+      expect(addFolderDialog.props("open")).toBe(false);
     });
 
-    it("should open the AddFolder drawer when showAddFolderDialog is true", async () => {
+    it("should open the AddFolder dialog when showAddFolderDialog is true", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
       wrapper.vm.showAddFolderDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      const nested = drawers[1];
-      expect(nested.props("open")).toBe(true);
+      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      expect(addFolderDialog.exists()).toBe(true);
+      expect(addFolderDialog.props("open")).toBe(true);
     });
 
-    it("should close the AddFolder drawer when its close event is emitted", async () => {
+    it("should close the AddFolder dialog when its close event is emitted", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
       wrapper.vm.showAddFolderDialog = true;
       await wrapper.vm.$nextTick();
 
-      const drawers = wrapper.findAllComponents({ name: "ODrawer" });
-      const nested = drawers[1];
-      // The nested ODrawer uses v-model:open, so closing it emits update:open with false.
-      await nested.vm.$emit("update:open", false);
+      const addFolderDialog = wrapper.findComponent('[data-test="add-dashboard-github-add-folder-dialog"]');
+      // The ODialog uses v-model:open, so closing it emits update:open with false.
+      await addFolderDialog.vm.$emit("update:open", false);
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);

@@ -68,6 +68,9 @@ pub struct ScanStats {
     /// unit: bytes
     #[prost(int64, tag = "12")]
     pub peak_memory_usage: i64,
+    /// unit: ms
+    #[prost(int64, tag = "13")]
+    pub wait_in_queue: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -3354,7 +3357,7 @@ pub struct SuperClusterInfo {
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct IdxOptimizeMode {
-    #[prost(oneof = "idx_optimize_mode::Mode", tags = "4, 5, 6")]
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "4, 5")]
     pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
 }
 /// Nested message and enum types in `IdxOptimizeMode`.
@@ -3365,21 +3368,10 @@ pub mod idx_optimize_mode {
         SimpleTopn(super::SimpleTopN),
         #[prost(message, tag = "5")]
         SimpleDistinct(super::SimpleDistinct),
-        #[prost(message, tag = "6")]
-        SimpleTopnMulti(super::SimpleTopNMulti),
     }
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SimpleTopN {
-    #[prost(string, tag = "1")]
-    pub field: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "2")]
-    pub limit: u32,
-    #[prost(bool, tag = "3")]
-    pub asc: bool,
-}
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct SimpleTopNMulti {
     #[prost(string, repeated, tag = "1")]
     pub fields: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(uint32, tag = "2")]
