@@ -911,8 +911,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("DateTime Handling", () => {
     it("should restore datetime from URL params", async () => {
-      const startTime = "1755853746625720";
-      const endTime = "1755853746725720";
+      const startTime = 1755853746625720;
+      const endTime = 1755853746725720;
 
       routerCurrentRouteSpy.mockReturnValue({
         value: {
