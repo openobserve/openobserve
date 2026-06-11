@@ -630,7 +630,9 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     it("should show no stream selected message when no stream is selected", async () => {
-      mockSearchObj.data.stream.streamLists = [];
+      mockSearchObj.data.stream.streamLists = [
+        { label: "default", value: "default" },
+      ];
       mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
 
       wrapper = mount(Index, {
