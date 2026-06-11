@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
@@ -32,6 +29,7 @@ use datafusion::{
     },
     sql::TableReference,
 };
+use hashbrown::HashSet;
 use parking_lot::Mutex;
 
 mod count;
@@ -340,10 +338,6 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    };
 
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
