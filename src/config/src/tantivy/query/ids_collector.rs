@@ -65,6 +65,10 @@ impl Collector for SingleSegmentDocIdCollector {
     }
 
     fn merge_fruits(&self, mut segment_fruits: Vec<Vec<DocId>>) -> tantivy::Result<Vec<DocId>> {
+        debug_assert!(
+            segment_fruits.len() <= 1,
+            "SingleSegmentDocIdCollector used on multi-segment index"
+        );
         Ok(segment_fruits.pop().unwrap_or_default())
     }
 }
