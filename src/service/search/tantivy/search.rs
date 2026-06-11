@@ -242,11 +242,6 @@ impl TantivyResult {
         Ok(Self::MultiHistogram(results))
     }
 
-    /// Handle GROUP BY with count(*) over 1..=4 indexed fields using the flat
-    /// [`TopNCollector`]. DataFusion re-aggregates the per-file partials and applies the
-    /// final ORDER BY + LIMIT: the merged result is exact when every file's distinct group
-    /// count fits within `max_groups`, and approximate beyond that (see
-    /// `ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM`).
     pub fn handle_simple_top_n(
         searcher: &Searcher,
         query: Box<dyn Query>,
