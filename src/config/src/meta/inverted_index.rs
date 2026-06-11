@@ -32,14 +32,12 @@ pub enum IndexOptimizeMode {
 }
 
 impl IndexOptimizeMode {
-    /// Stream fields whose index data this optimize mode reads from the tantivy file,
-    /// besides the fields of the index condition.
+    /// Stream fields whose index data besides the fields of the index condition.
     pub fn referenced_fields(&self) -> Vec<String> {
         match self {
-            IndexOptimizeMode::SimpleTopN(field, ..)
-            | IndexOptimizeMode::SimpleDistinct(field, ..) => vec![field.clone()],
+            IndexOptimizeMode::SimpleTopN(fields, ..) => fields.clone(),
+            IndexOptimizeMode::SimpleDistinct(field, ..) => vec![field.clone()],
             IndexOptimizeMode::SimpleMultiHistogram(.., field) => vec![field.clone()],
-            IndexOptimizeMode::SimpleTopNMulti(fields, ..) => fields.clone(),
             IndexOptimizeMode::SimpleSelect(..)
             | IndexOptimizeMode::SimpleCount
             | IndexOptimizeMode::SimpleHistogram(..) => vec![],
@@ -165,18 +163,18 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            IndexOptimizeMode::SimpleTopN("svc".to_string(), 10, true).referenced_fields(),
+            IndexOptimizeMode::SimpleTopN(vec!["svc".to_string()], 10, true).referenced_fields(),
             vec!["svc".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN(vec!["a".to_string(), "b".to_string()], 10, true)
+                .referenced_fields(),
+            vec!["a".to_string(), "b".to_string()]
         );
         assert_eq!(
             IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string())
                 .referenced_fields(),
             vec!["level".to_string()]
-        );
-        assert_eq!(
-            IndexOptimizeMode::SimpleTopNMulti(vec!["a".to_string(), "b".to_string()], 10, true)
-                .referenced_fields(),
-            vec!["a".to_string(), "b".to_string()]
         );
         assert_eq!(
             IndexOptimizeMode::SimpleDistinct("uid".to_string(), 10, true).referenced_fields(),

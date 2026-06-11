@@ -448,7 +448,7 @@ pub fn get_stream_setting_index_updated_at_for_fields(
         .iter()
         .map(|f| {
             settings
-                .index_updated_at_by_field
+                .index_fields_updated_at
                 .get(f)
                 .copied()
                 .unwrap_or(default_updated_at)
@@ -1162,7 +1162,7 @@ mod tests {
         let mut settings = StreamSettings::default();
         settings.index_updated_at = 5_000;
         settings
-            .index_updated_at_by_field
+            .index_fields_updated_at
             .insert("trace_id".to_string(), 9_000);
         let settings = Some(settings);
 

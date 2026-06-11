@@ -729,9 +729,7 @@ pub async fn update_stream_settings(
         let mut added = false;
         for field in new_settings.full_text_search_keys.add.iter() {
             if !settings.full_text_search_keys.contains(field) {
-                settings
-                    .index_updated_at_by_field
-                    .insert(field.clone(), now);
+                settings.index_fields_updated_at.insert(field.clone(), now);
                 added = true;
             }
         }
@@ -754,9 +752,7 @@ pub async fn update_stream_settings(
         let mut added = false;
         for field in new_settings.index_fields.add.iter() {
             if !settings.index_fields.contains(field) {
-                settings
-                    .index_updated_at_by_field
-                    .insert(field.clone(), now);
+                settings.index_fields_updated_at.insert(field.clone(), now);
                 added = true;
             }
         }
@@ -1334,7 +1330,7 @@ pub async fn update_fields_type(
 ///    walking the tantivy term dict, so a bloom field that isn't in `index_fields` would silently
 ///    produce no `.bf`; auto-folding here keeps the stored shape consistent with the runtime
 ///    invariant.
-/// 3. **Prune `index_updated_at_by_field`** to fields still present in `full_text_search_keys` or
+/// 3. **Prune `index_fields_updated_at`** to fields still present in `full_text_search_keys` or
 ///    `index_fields`, so removed fields don't leave stale timestamps behind (a later re-add must
 ///    stamp a fresh time, because files written in the gap lack that field's index).
 ///
@@ -1372,16 +1368,14 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
     if !missing_index.is_empty() {
         let now = now_micros();
         for field in missing_index.iter() {
-            settings
-                .index_updated_at_by_field
-                .insert(field.clone(), now);
+            settings.index_fields_updated_at.insert(field.clone(), now);
         }
         settings.index_fields.extend(missing_index);
         settings.index_updated_at = now;
     }
 
     // 3. prune per-field timestamps of fields no longer indexed
-    if !settings.index_updated_at_by_field.is_empty() {
+    if !settings.index_fields_updated_at.is_empty() {
         let indexed: HashSet<String> = settings
             .full_text_search_keys
             .iter()
@@ -1389,7 +1383,7 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
             .cloned()
             .collect();
         settings
-            .index_updated_at_by_field
+            .index_fields_updated_at
             .retain(|field, _| indexed.contains(field));
     }
 }
@@ -1420,17 +1414,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_stream_settings_index_updated_at_by_field() {
+    fn test_normalize_stream_settings_index_fields_updated_at() {
         let mut settings = StreamSettings {
             index_fields: vec!["a".to_string()],
             bloom_filter_fields: vec!["b".to_string()],
             ..Default::default()
         };
         settings
-            .index_updated_at_by_field
+            .index_fields_updated_at
             .insert("a".to_string(), 100);
         settings
-            .index_updated_at_by_field
+            .index_fields_updated_at
             .insert("removed".to_string(), 200);
 
         normalize_stream_settings(&mut settings);
@@ -1439,15 +1433,15 @@ mod tests {
         assert!(settings.index_fields.contains(&"b".to_string()));
         assert!(
             settings
-                .index_updated_at_by_field
+                .index_fields_updated_at
                 .get("b")
                 .is_some_and(|v| *v > 0)
         );
         assert!(settings.index_updated_at > 0);
         // entry of a field no longer indexed is pruned
-        assert!(!settings.index_updated_at_by_field.contains_key("removed"));
+        assert!(!settings.index_fields_updated_at.contains_key("removed"));
         // entry of a still-indexed field is preserved
-        assert_eq!(settings.index_updated_at_by_field.get("a"), Some(&100));
+        assert_eq!(settings.index_fields_updated_at.get("a"), Some(&100));
     }
 
     #[test]
