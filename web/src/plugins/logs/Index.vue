@@ -198,11 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false
                       "
                     >
-                      <LogsNoStreamState
-                        :org-id="store.state.selectedOrganization.identifier"
+                      <OEmptyState
+                        preset="no-stream-selected"
+                        size="hero"
                         data-test="logs-search-no-stream-selected-text"
-                        @select-stream="onSelectStream"
-                        @pick-stream="onPickStream"
                       />
                     </div>
                     <div
@@ -469,7 +468,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
-import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import {
   saveLogsStream,
@@ -504,7 +502,6 @@ export default defineComponent({
     OSplitter,
     OEmptyState,
     LogsNoEventsState,
-    LogsNoStreamState,
     LogsNoDataState,
 },
   mixins: [MainLayoutCloudMixin],
@@ -1553,19 +1550,6 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
-    };
-
-    const onSelectStream = () => {
-      // Focus the stream selector trigger so the user can immediately pick a stream.
-      const trigger = document.querySelector<HTMLElement>(
-        '[data-test="log-search-index-list-select-stream"] button',
-      );
-      trigger?.click();
-    };
-
-    const onPickStream = (stream: string) => {
-      searchObj.data.stream.selectedStream = [stream];
-      searchObj.runQuery = true;
     };
 
     const isAiEnabled = computed(
@@ -3238,8 +3222,6 @@ export default defineComponent({
       showSearchHistory,
       showSearchHistoryfn,
       isAiEnabled,
-      onSelectStream,
-      onPickStream,
       onWidenRange,
       onRemoveFilter,
       onAskAiFixQuery,
