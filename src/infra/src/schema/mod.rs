@@ -30,6 +30,7 @@ use config::{
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
+use hashbrown::HashSet;
 use serde::Serialize;
 
 use crate::{
@@ -422,6 +423,38 @@ pub fn get_stream_setting_index_updated_at(
         }
         None => created_at,
     }
+}
+
+/// Effective index cutoff for a query that only touches the given index fields.
+///
+/// Each field uses its per-field add time when recorded, otherwise the stream-level
+/// `index_updated_at` (which itself falls back to stream created_at). A query that
+/// references no index fields (e.g. a histogram or count without filters) returns 0:
+/// its tantivy result only depends on data every `.ttv` file has, so no file needs to
+/// be excluded by index settings changes.
+pub fn get_stream_setting_index_updated_at_for_fields(
+    settings: &Option<StreamSettings>,
+    created_at: Option<i64>,
+    fields: &HashSet<String>,
+) -> i64 {
+    if fields.is_empty() {
+        return 0;
+    }
+    let default_updated_at = get_stream_setting_index_updated_at(settings, created_at);
+    let Some(settings) = settings else {
+        return default_updated_at;
+    };
+    fields
+        .iter()
+        .map(|f| {
+            settings
+                .index_updated_at_by_field
+                .get(f)
+                .copied()
+                .unwrap_or(default_updated_at)
+        })
+        .max()
+        .unwrap_or(default_updated_at)
 }
 
 pub async fn merge(
@@ -1120,6 +1153,47 @@ mod tests {
         let mut settings = StreamSettings::default();
         settings.index_updated_at = 0;
         let result = get_stream_setting_index_updated_at(&Some(settings), Some(created_at));
+        assert_eq!(result, created_at);
+    }
+
+    #[test]
+    fn test_get_stream_setting_index_updated_at_for_fields() {
+        let created_at = 1_000;
+        let mut settings = StreamSettings::default();
+        settings.index_updated_at = 5_000;
+        settings
+            .index_updated_at_by_field
+            .insert("trace_id".to_string(), 9_000);
+        let settings = Some(settings);
+
+        // no referenced fields -> no cutoff
+        let fields = HashSet::new();
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 0);
+
+        // a field with its own entry uses it
+        let fields = HashSet::from_iter(["trace_id".to_string()]);
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 9_000);
+
+        // a field without an entry falls back to the stream-level value
+        let fields = HashSet::from_iter(["level".to_string()]);
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 5_000);
+
+        // multiple fields use the max
+        let fields = HashSet::from_iter(["trace_id".to_string(), "level".to_string()]);
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&settings, Some(created_at), &fields);
+        assert_eq!(result, 9_000);
+
+        // None settings falls back to created_at
+        let fields = HashSet::from_iter(["trace_id".to_string()]);
+        let result =
+            get_stream_setting_index_updated_at_for_fields(&None, Some(created_at), &fields);
         assert_eq!(result, created_at);
     }
 

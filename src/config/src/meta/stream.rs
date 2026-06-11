@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
+use std::{cmp::max, collections::BTreeMap, fmt::Display, str::FromStr, sync::Arc};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
@@ -973,6 +973,10 @@ pub struct StreamSettings {
     pub cross_links: Vec<CrossLink>,
     #[serde(default)]
     pub index_updated_at: i64,
+    // when each field was added to fts keys / index_fields (microseconds);
+    // a field without an entry falls back to `index_updated_at`
+    #[serde(default)]
+    pub index_updated_at_by_field: BTreeMap<String, i64>,
 }
 
 impl Default for StreamSettings {
@@ -990,6 +994,7 @@ impl Default for StreamSettings {
             approx_partition: false,
             distinct_value_fields: Vec::new(),
             index_updated_at: 0,
+            index_updated_at_by_field: BTreeMap::new(),
             extended_retention_days: Vec::new(),
             index_original_data: false,
             index_all_values: false,
@@ -1022,6 +1027,11 @@ impl Serialize for StreamSettings {
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
         state.serialize_field("index_updated_at", &self.index_updated_at)?;
+        if !self.index_updated_at_by_field.is_empty() {
+            state.serialize_field("index_updated_at_by_field", &self.index_updated_at_by_field)?;
+        } else {
+            state.skip_field("index_updated_at_by_field")?;
+        }
         state.serialize_field("extended_retention_days", &self.extended_retention_days)?;
         state.serialize_field("index_original_data", &self.index_original_data)?;
         state.serialize_field("index_all_values", &self.index_all_values)?;
@@ -1162,6 +1172,18 @@ impl From<&str> for StreamSettings {
             .and_then(Value::as_i64)
             .unwrap_or_default();
 
+        let mut index_updated_at_by_field = BTreeMap::new();
+        if let Some(value) = settings
+            .get("index_updated_at_by_field")
+            .and_then(Value::as_object)
+        {
+            for (k, v) in value {
+                if let Some(ts) = v.as_i64() {
+                    index_updated_at_by_field.insert(k.clone(), ts);
+                }
+            }
+        }
+
         let mut extended_retention_days = vec![];
         if let Some(values) = settings
             .get("extended_retention_days")
@@ -1224,6 +1246,7 @@ impl From<&str> for StreamSettings {
             approx_partition,
             distinct_value_fields,
             index_updated_at,
+            index_updated_at_by_field,
             extended_retention_days,
             index_original_data,
             index_all_values,
@@ -1246,6 +1269,11 @@ impl MemorySize for StreamSettings {
             + self.defined_schema_fields.mem_size()
             + self.distinct_value_fields.mem_size()
             + self.extended_retention_days.mem_size()
+            + self
+                .index_updated_at_by_field
+                .iter()
+                .map(|(k, v)| k.mem_size() + v.mem_size())
+                .sum::<usize>()
     }
 }
 
@@ -1374,6 +1402,31 @@ impl From<&str> for FileListBookKeepMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_stream_settings_index_updated_at_by_field() {
+        // legacy payload without the map deserializes to an empty map
+        let settings = StreamSettings::from(r#"{"index_updated_at": 100}"#);
+        assert_eq!(settings.index_updated_at, 100);
+        assert!(settings.index_updated_at_by_field.is_empty());
+
+        // the map survives a serialize -> parse round trip
+        let mut settings = StreamSettings::default();
+        settings.index_updated_at = 100;
+        settings
+            .index_updated_at_by_field
+            .insert("trace_id".to_string(), 200);
+        let payload = json::to_string(&settings).unwrap();
+        let parsed = StreamSettings::from(payload.as_str());
+        assert_eq!(
+            parsed.index_updated_at_by_field,
+            settings.index_updated_at_by_field
+        );
+
+        // an empty map is skipped during serialization
+        let payload = json::to_string(&StreamSettings::default()).unwrap();
+        assert!(!payload.contains("index_updated_at_by_field"));
+    }
 
     #[tokio::test]
     async fn test_get_file_meta() {

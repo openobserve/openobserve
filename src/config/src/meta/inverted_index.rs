@@ -30,6 +30,20 @@ pub enum IndexOptimizeMode {
 }
 
 impl IndexOptimizeMode {
+    /// Stream fields whose index data this optimize mode reads from the tantivy file,
+    /// besides the fields of the index condition.
+    pub fn referenced_fields(&self) -> Vec<String> {
+        match self {
+            IndexOptimizeMode::SimpleTopN(field, ..)
+            | IndexOptimizeMode::SimpleDistinct(field, ..) => vec![field.clone()],
+            IndexOptimizeMode::SimpleMultiHistogram(.., field) => vec![field.clone()],
+            IndexOptimizeMode::SimpleTopNMulti(fields, ..) => fields.clone(),
+            IndexOptimizeMode::SimpleSelect(..)
+            | IndexOptimizeMode::SimpleCount
+            | IndexOptimizeMode::SimpleHistogram(..) => vec![],
+        }
+    }
+
     pub fn to_rule_string(&self) -> String {
         match self {
             IndexOptimizeMode::SimpleSelect(limit, ascend) => format!("s(l:{limit},a:{ascend})"),
@@ -150,6 +164,43 @@ impl From<IndexOptimizeMode> for cluster_rpc::IdxOptimizeMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_referenced_fields() {
+        assert!(
+            IndexOptimizeMode::SimpleCount
+                .referenced_fields()
+                .is_empty()
+        );
+        assert!(
+            IndexOptimizeMode::SimpleHistogram(0, 10, 5)
+                .referenced_fields()
+                .is_empty()
+        );
+        assert!(
+            IndexOptimizeMode::SimpleSelect(10, true)
+                .referenced_fields()
+                .is_empty()
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopN("svc".to_string(), 10, true).referenced_fields(),
+            vec!["svc".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleMultiHistogram(0, 1000, 10, "level".to_string())
+                .referenced_fields(),
+            vec!["level".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleTopNMulti(vec!["a".to_string(), "b".to_string()], 10, true)
+                .referenced_fields(),
+            vec!["a".to_string(), "b".to_string()]
+        );
+        assert_eq!(
+            IndexOptimizeMode::SimpleDistinct("uid".to_string(), 10, true).referenced_fields(),
+            vec!["uid".to_string()]
+        );
+    }
 
     #[test]
     fn test_to_rule_string_all_variants() {

@@ -44,7 +44,7 @@ use infra::{
     errors::{Error, ErrorCodes},
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, get_stream_setting_index_updated_at,
+        get_stream_setting_index_fields, get_stream_setting_index_updated_at_for_fields,
         unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
@@ -165,8 +165,6 @@ pub async fn search(
         .into_iter()
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
-    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
-
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
         .index_info
@@ -200,6 +198,24 @@ pub async fn search(
     )?;
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
+
+    // the index cutoff only depends on the fields the query actually reads from the
+    // index, so a query that references none of them (e.g. a histogram without filters)
+    // can use the index of every file regardless of index settings changes
+    let index_updated_at = {
+        let mut index_used_fields = index_condition
+            .as_ref()
+            .map(|v| v.get_schema_fields(&fst_fields))
+            .unwrap_or_default();
+        if let Some(rule) = idx_optimize_rule.as_ref() {
+            index_used_fields.extend(rule.referenced_fields());
+        }
+        get_stream_setting_index_updated_at_for_fields(
+            &stream_settings,
+            stream_created_at,
+            &index_used_fields,
+        )
+    };
 
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
