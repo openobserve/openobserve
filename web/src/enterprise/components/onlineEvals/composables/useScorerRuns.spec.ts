@@ -185,6 +185,28 @@ describe("useScorerRuns — runs hits (lazy)", () => {
     // The synthesised id is enough to key the row in the OTable.
     expect(runs.value[0].id).toBe("12345-tgt-1");
   });
+
+  it("maps target agent identity fields", async () => {
+    mockExecuteQuery.mockResolvedValueOnce([{ total_runs: 1, success_runs: 1 }]);
+    mockExecuteQuery.mockResolvedValueOnce([
+      {
+        span_id: "s1",
+        attributes_target_agent_name: "agent-a",
+        attributes_target_agent_id: "agent-1",
+        attributes_status: "success",
+      },
+    ]);
+
+    const { runs } = useScorerRuns(
+      ref<string | null>("scorer-1"),
+      ref(DEFAULT_WINDOW),
+      ref(true),
+    );
+    await flushAsync();
+
+    expect(runs.value[0].targetAgentName).toBe("agent-a");
+    expect(runs.value[0].targetAgentId).toBe("agent-1");
+  });
 });
 
 describe("useScorerRuns — score / status parsing", () => {

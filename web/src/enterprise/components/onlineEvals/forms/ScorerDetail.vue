@@ -236,6 +236,14 @@
             </template>
             <template #cell-target="{ row }">
               <div class="sd-target-cell">
+                <div v-if="row.targetAgentName" class="sd-target-cell__line">
+                  <span class="sd-target-cell__label">Agent</span>
+                  <span class="sd-mono sd-target-cell__id" :title="row.targetAgentName">{{ row.targetAgentName }}</span>
+                </div>
+                <div v-if="row.targetAgentId" class="sd-target-cell__line">
+                  <span class="sd-target-cell__label">Agent ID</span>
+                  <span class="sd-mono sd-target-cell__id" :title="row.targetAgentId">{{ row.targetAgentId }}</span>
+                </div>
                 <div v-if="row.targetSpanId" class="sd-target-cell__line">
                   <span class="sd-target-cell__label">{{ t("onlineEvals.scorer.detail.runs.spanLabel") }}</span>
                   <span class="sd-mono sd-target-cell__id" :title="row.targetSpanId">{{ row.targetSpanId }}</span>

@@ -42,6 +42,9 @@ impl From<ProviderError> for Response {
             ),
             ProviderError::NotFound => MetaHttpResponse::not_found("Provider not found"),
             ProviderError::InvalidConfig(err) => MetaHttpResponse::bad_request(err),
+            ProviderError::ProviderInUse(scorers) => MetaHttpResponse::conflict(format!(
+                "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
+            )),
         }
     }
 }
@@ -292,6 +295,7 @@ mod tests {
                 ProviderError::InvalidConfig("bad endpoint".to_string()),
                 400,
             ),
+            (ProviderError::ProviderInUse("judge".to_string()), 409),
         ];
         for (err, expected) in cases {
             let resp: Response = err.into();

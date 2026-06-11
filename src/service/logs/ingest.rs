@@ -293,6 +293,24 @@ pub async fn ingest(
     if !executable_pipelines.is_empty() {
         let records_count = pipeline_inputs.len();
         for exec_pl in &executable_pipelines {
+            if exec_pl.contains_llm_evaluation_node() {
+                let exec_pl = exec_pl.clone();
+                let org_id = org_id.to_string();
+                let stream_name = stream_name.clone();
+                let records = pipeline_inputs.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = exec_pl
+                        .process_batch(&org_id, records, Some(stream_name.clone()))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] evaluation pipeline for stream {org_id}/{stream_name}: Batch execution error: {e}.",
+                        );
+                    }
+                });
+                continue;
+            }
+
             match exec_pl
                 .process_batch(org_id, pipeline_inputs.clone(), Some(stream_name.clone()))
                 .await
@@ -449,9 +467,18 @@ pub async fn ingest(
         // When only evaluation pipelines exist for this stream (no user pipeline
         // is responsible for writing to the source stream), preserve original
         // records by writing them back to the source stream.
-        let has_user_pipeline = executable_pipelines
+        let has_user_pipeline = executable_pipelines.iter().any(|p| {
+            p.kind == config::meta::pipeline::PipelineKind::User
+                && !p.contains_llm_evaluation_node()
+        });
+        let has_evaluation_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.contains_llm_evaluation_node());
+        log::debug!(
+            "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
+            executable_pipelines.len(),
+            json_data_by_stream.contains_key(&stream_name)
+        );
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(
