@@ -252,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
+                      @error-only-toggled="onErrorOnlyToggled"
                     />
                   </div>
                 </div>

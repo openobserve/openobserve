@@ -62,8 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
+          :clickable="true"
+          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
+          :class="!searchObj.meta.showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          @click="toggleErrorOnly"
+        >
+          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
+          <OTooltip
+            :content="searchObj.meta.showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            side="bottom"
+          />
+          <template #trailing>
+            <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
+          </template>
+        </OBadge>
 
         <div class="tw:flex-1" />
 
@@ -215,8 +227,14 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
+    "error-only-toggled",
   ],
   methods: {
+    toggleErrorOnly() {
+      const newVal = !this.searchObj.meta.showErrorOnly;
+      this.searchObj.meta.showErrorOnly = newVal;
+      this.$emit("error-only-toggled", newVal);
+    },
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
