@@ -3568,7 +3568,9 @@
     "timeRangeLabel": "Intervallo di tempo:",
     "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
     "insightsButtonLabel": "Approfondimenti",
-    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca"
+    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca",
+    "inspectBtnLabel": "Ispezionare",
+    "analyzeBtnLabel": "Approfondimenti"
   },
   "errorInsights": {
     "title": "Approfondimenti",

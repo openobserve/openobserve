@@ -3555,7 +3555,9 @@
     "timeRangeLabel": "Intervalo de tiempo:",
     "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
     "insightsButtonLabel": "Perspectivas",
-    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda"
+    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda",
+    "inspectBtnLabel": "Inspeccionar",
+    "analyzeBtnLabel": "Perspectivas"
   },
   "errorInsights": {
     "title": "Perspectivas",

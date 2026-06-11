@@ -3557,7 +3557,9 @@
     "timeRangeLabel": "Intervalo de tempo:",
     "analyzeTooltipTraces": "Analise as dimensões do rastreamento para padrões de taxa, latência e erro",
     "insightsButtonLabel": "Percepções",
-    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa"
+    "searchInspectionsLabel": "Inspecione os detalhes da execução do trabalho de pesquisa",
+    "inspectBtnLabel": "Inspecionar",
+    "analyzeBtnLabel": "Percepções"
   },
   "errorInsights": {
     "title": "Percepções",
