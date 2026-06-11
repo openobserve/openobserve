@@ -256,8 +256,11 @@ impl TantivyResult {
             );
         }
 
-        // one or two ordinals pack into a u64 key; three or four need a u128
-        let results = if fields.len() <= 2 {
+        // a single ordinal fits a u32 key, two pack into a u64, three or four need a u128
+        let results = if fields.len() == 1 {
+            let collector = TopNCollector::<u32>::new(fields.to_vec(), limit, ascend);
+            searcher.search(&query, &collector)?
+        } else if fields.len() == 2 {
             let collector = TopNCollector::<u64>::new(fields.to_vec(), limit, ascend);
             searcher.search(&query, &collector)?
         } else {

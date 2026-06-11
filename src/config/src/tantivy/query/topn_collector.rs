@@ -17,7 +17,7 @@ use hashbrown::HashMap;
 use tantivy::{
     DocId, Score, SegmentOrdinal, SegmentReader,
     collector::{Collector, SegmentCollector},
-    columnar::StrColumn,
+    columnar::{Cardinality, StrColumn},
 };
 
 use crate::meta::inverted_index::MAX_SIMPLE_TOPN_FIELDS;
@@ -31,6 +31,20 @@ pub trait OrdKey: Copy + Eq + Ord + std::hash::Hash + Send + Sync + 'static {
 
     fn pack(ords: &[u64]) -> Self;
     fn unpack(self, idx: usize) -> u64;
+}
+
+impl OrdKey for u32 {
+    const CAPACITY: usize = 1;
+
+    fn pack(ords: &[u64]) -> Self {
+        debug_assert!(ords.len() == 1 && ords[0] <= u32::MAX as u64);
+        ords[0] as u32
+    }
+
+    fn unpack(self, idx: usize) -> u64 {
+        debug_assert_eq!(idx, 0);
+        self as u64
+    }
 }
 
 impl OrdKey for u64 {
@@ -71,7 +85,7 @@ impl OrdKey for u128 {
 /// This replaces tantivy's nested `TermsAggregation`, which materializes a string per group
 /// and over-fetches exponentially in the field count.
 ///
-/// `K` selects the packed key width: `u64` for 1..=2 fields, `u128` for 3..=4 fields.
+/// `K` selects the packed key width: `u32` for a single field, `u64` for two, `u128` for 3..=4.
 pub struct TopNCollector<K: OrdKey> {
     fields: Vec<String>,
     /// groups kept per file when truncating (over-fetch for cross-file accuracy)
@@ -125,19 +139,22 @@ impl<K: OrdKey> TopNCollector<K> {
     }
 }
 
-/// Above this many cells (8 bytes each = 32MB) the dense counting array gives way to a hash map.
-const DENSE_GROUP_SPACE_LIMIT: usize = 4_000_000;
+/// Above this many cells (4 bytes each = 32MB) the dense counting array gives way to a hash map.
+const DENSE_GROUP_SPACE_LIMIT: usize = 8_000_000;
 
 /// Per-segment group counters: a flat array indexed by the mixed-radix ordinal when the
 /// product of the fields' dictionary sizes is small (one add per doc, no hashing), otherwise
 /// a hash map keyed by the packed ordinals.
+///
+/// Counts are `u32` — a group's count is bounded by the segment's doc count, and `DocId` is
+/// u32 — which halves the cache footprint of both representations; `harvest` widens to u64.
 enum GroupCounts<K> {
     /// counts indexed by `ord0 + dims0*(ord1 + dims1*(ord2 + ..))`
     Dense {
-        counts: Vec<u64>,
+        counts: Vec<u32>,
         dims: [usize; MAX_SIMPLE_TOPN_FIELDS],
     },
-    Sparse(HashMap<K, u64>),
+    Sparse(HashMap<K, u32>),
 }
 
 impl<K: OrdKey> GroupCounts<K> {
@@ -261,35 +278,52 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
         };
         let num_fields = cols.len();
         for (buf, col) in ord_bufs.iter_mut().zip(cols.iter()) {
-            // first_vals only writes present slots, so reset the buffer to None first
-            buf.clear();
+            // first_vals only writes present slots, so reset stale values to None first —
+            // unless the column is Full cardinality and writes every slot anyway
+            if col.ords().get_cardinality() != Cardinality::Full {
+                buf.clear();
+            }
             buf.resize(docs.len(), None);
             col.ords().first_vals(docs, buf);
         }
+        // `K::CAPACITY == 1` is const per monomorphization: for the single-field key the
+        // ordinal is the dense index / packed key itself, so the field loops compile away
         match counts {
             GroupCounts::Dense { counts, dims } => {
-                'doc: for d in 0..docs.len() {
-                    let mut index = 0usize;
-                    for i in (0..num_fields).rev() {
-                        match ord_bufs[i][d] {
-                            Some(ord) => index = index * dims[i] + ord as usize,
-                            None => continue 'doc,
-                        }
+                if K::CAPACITY == 1 {
+                    for ord in ord_bufs[0].iter().flatten() {
+                        counts[*ord as usize] += 1;
                     }
-                    counts[index] += 1;
+                } else {
+                    'doc: for d in 0..docs.len() {
+                        let mut index = 0usize;
+                        for i in (0..num_fields).rev() {
+                            match ord_bufs[i][d] {
+                                Some(ord) => index = index * dims[i] + ord as usize,
+                                None => continue 'doc,
+                            }
+                        }
+                        counts[index] += 1;
+                    }
                 }
             }
             GroupCounts::Sparse(counts) => {
-                let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
-                'doc: for d in 0..docs.len() {
-                    for i in 0..num_fields {
-                        match ord_bufs[i][d] {
-                            Some(ord) => ords[i] = ord,
-                            None => continue 'doc,
-                        }
+                if K::CAPACITY == 1 {
+                    for ord in ord_bufs[0].iter().flatten() {
+                        *counts.entry(K::pack(&[*ord])).or_insert(0) += 1;
                     }
-                    let key = K::pack(&ords[..num_fields]);
-                    *counts.entry(key).or_insert(0) += 1;
+                } else {
+                    let mut ords = [0u64; MAX_SIMPLE_TOPN_FIELDS];
+                    'doc: for d in 0..docs.len() {
+                        for i in 0..num_fields {
+                            match ord_bufs[i][d] {
+                                Some(ord) => ords[i] = ord,
+                                None => continue 'doc,
+                            }
+                        }
+                        let key = K::pack(&ords[..num_fields]);
+                        *counts.entry(key).or_insert(0) += 1;
+                    }
                 }
             }
         }
@@ -311,7 +345,7 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
         // Within max_groups distinct groups, return all of them (this segment's contribution
         // is exact); beyond that keep only the top-K on cheap integer ordinals BEFORE
         // touching the term dictionary — the merged result becomes approximate.
-        let top: Vec<(K, u64)> = match counts {
+        let top: Vec<(K, u32)> = match counts {
             GroupCounts::Dense { counts, dims } => {
                 let unpack_index = |index: usize| {
                     let mut rest = index;
@@ -323,7 +357,7 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
                     K::pack(&ords[..cols.len()])
                 };
                 let groups = counts.iter().filter(|count| **count > 0).count();
-                let entries: Vec<(usize, u64)> = if groups <= max_groups {
+                let entries: Vec<(usize, u32)> = if groups <= max_groups {
                     counts
                         .iter()
                         .enumerate()
@@ -373,7 +407,7 @@ impl<K: OrdKey> SegmentCollector for TopNSegmentCollector<K> {
                     None => continue 'next_group,
                 }
             }
-            out.push((row, count));
+            out.push((row, count as u64));
         }
         out
     }
@@ -408,14 +442,14 @@ fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String> {
 /// ordering contract as [`truncate_top_k`]. A bounded max-heap of the worst kept entry makes
 /// the scan O(n): indexes arrive in ascending order, so once the heap is full tied candidates
 /// lose to what is already kept and are rejected in O(1).
-fn select_top_k_dense(counts: &[u64], k: usize, ascend: bool) -> Vec<(usize, u64)> {
+fn select_top_k_dense(counts: &[u32], k: usize, ascend: bool) -> Vec<(usize, u32)> {
     use std::collections::BinaryHeap;
     if k == 0 {
         return Vec::new();
     }
     // flip counts for descending so both orders keep the K smallest (key, index) entries
-    let sort_key = |count: u64| if ascend { count } else { !count };
-    let mut heap: BinaryHeap<(u64, usize)> = BinaryHeap::with_capacity(k + 1);
+    let sort_key = |count: u32| if ascend { count } else { !count };
+    let mut heap: BinaryHeap<(u32, usize)> = BinaryHeap::with_capacity(k + 1);
     for (index, &count) in counts.iter().enumerate() {
         if count == 0 {
             continue;
@@ -438,7 +472,7 @@ fn select_top_k_dense(counts: &[u64], k: usize, ascend: bool) -> Vec<(usize, u64
 /// Keep the top-K entries by count, in place: the K smallest when `ascend`, the K largest
 /// otherwise. Count ties break toward the smaller key, which keeps survivors clustered by
 /// ordinal for cheaper resolution (SQL leaves tie order unspecified).
-fn truncate_top_k<K: Ord>(items: &mut Vec<(K, u64)>, k: usize, ascend: bool) {
+fn truncate_top_k<K: Ord>(items: &mut Vec<(K, u32)>, k: usize, ascend: bool) {
     if k == 0 {
         items.clear();
         return;
@@ -466,6 +500,12 @@ mod tests {
 
     #[test]
     fn test_ord_key_pack_unpack() {
+        let key = u32::pack(&[7]);
+        assert_eq!(key.unpack(0), 7);
+
+        let key = u32::pack(&[u32::MAX as u64]);
+        assert_eq!(key.unpack(0), u32::MAX as u64);
+
         let key = u64::pack(&[7]);
         assert_eq!(key.unpack(0), 7);
 
@@ -519,31 +559,34 @@ mod tests {
         let searcher = index.reader().unwrap().searcher();
         let row = |strs: &[&str], count: u64| (strs.iter().map(|s| s.to_string()).collect(), count);
 
+        fn run<K: OrdKey>(
+            searcher: &tantivy::Searcher,
+            fields: &[&str],
+            k: usize,
+            max_groups: usize,
+            ascend: bool,
+            dense_limit: usize,
+        ) -> Vec<(Vec<String>, u64)> {
+            let fields: Vec<String> = fields.iter().map(|s| s.to_string()).collect();
+            searcher
+                .search(
+                    &AllQuery,
+                    &TopNCollector::<K>::new(fields, 10, ascend)
+                        .with_k(k)
+                        .with_max_groups(max_groups)
+                        .with_dense_limit(dense_limit),
+                )
+                .unwrap()
+        }
+
         // dense_limit usize::MAX forces the dense counting array, 0 forces the hash map;
         // both must produce identical results
         for dense_limit in [usize::MAX, 0] {
             let search = |fields: &[&str], k: usize, max_groups: usize, ascend: bool| {
-                let fields: Vec<String> = fields.iter().map(|s| s.to_string()).collect();
-                let mut res = if fields.len() <= 2 {
-                    searcher
-                        .search(
-                            &AllQuery,
-                            &TopNCollector::<u64>::new(fields, 10, ascend)
-                                .with_k(k)
-                                .with_max_groups(max_groups)
-                                .with_dense_limit(dense_limit),
-                        )
-                        .unwrap()
-                } else {
-                    searcher
-                        .search(
-                            &AllQuery,
-                            &TopNCollector::<u128>::new(fields, 10, ascend)
-                                .with_k(k)
-                                .with_max_groups(max_groups)
-                                .with_dense_limit(dense_limit),
-                        )
-                        .unwrap()
+                let mut res = match fields.len() {
+                    1 => run::<u32>(&searcher, fields, k, max_groups, ascend, dense_limit),
+                    2 => run::<u64>(&searcher, fields, k, max_groups, ascend, dense_limit),
+                    _ => run::<u128>(&searcher, fields, k, max_groups, ascend, dense_limit),
                 };
                 res.sort_by(|a, b| {
                     if ascend {
@@ -555,11 +598,17 @@ mod tests {
                 res
             };
 
-            // single field via the u64 key (doc with missing f1 still counts for f0)
+            // single field via the u32 key (doc with missing f1 still counts for f0)
             assert_eq!(
                 search(&["f0"], 10, 10, false),
                 vec![row(&["a"], 5), row(&["b"], 1), row(&["c"], 1)]
             );
+
+            // a single field through the wider u64 key takes the generic (non-specialized)
+            // counting path and must agree
+            let mut res = run::<u64>(&searcher, &["f0"], 10, 10, false, dense_limit);
+            res.sort_unstable();
+            assert_eq!(res, vec![row(&["a"], 5), row(&["b"], 1), row(&["c"], 1)]);
 
             // two fields, counts merged across segments, missing-field doc excluded
             assert_eq!(
@@ -596,10 +645,10 @@ mod tests {
     #[test]
     fn test_select_top_k_dense_matches_truncate_top_k() {
         // counts indexed by ordinal, with zeros (absent groups) and ties
-        let counts: Vec<u64> = vec![3, 0, 1, 5, 1, 0, 5, 2, 1, 3];
+        let counts: Vec<u32> = vec![3, 0, 1, 5, 1, 0, 5, 2, 1, 3];
         for ascend in [false, true] {
             for k in [1, 2, 3, 5, 20] {
-                let mut expected: Vec<(usize, u64)> = counts
+                let mut expected: Vec<(usize, u32)> = counts
                     .iter()
                     .enumerate()
                     .filter(|(_, c)| **c > 0)
@@ -618,19 +667,19 @@ mod tests {
 
     #[test]
     fn test_truncate_top_k() {
-        let mk = || vec![("a", 5u64), ("b", 1), ("c", 9), ("d", 3), ("e", 7)];
+        let mk = || vec![("a", 5u32), ("b", 1), ("c", 9), ("d", 3), ("e", 7)];
 
         // keep K largest counts (ORDER BY count DESC)
         let mut desc = mk();
         truncate_top_k(&mut desc, 2, false);
-        let mut got: Vec<u64> = desc.iter().map(|(_, c)| *c).collect();
+        let mut got: Vec<u32> = desc.iter().map(|(_, c)| *c).collect();
         got.sort_unstable();
         assert_eq!(got, vec![7, 9]);
 
         // keep K smallest counts (ORDER BY count ASC)
         let mut asc = mk();
         truncate_top_k(&mut asc, 2, true);
-        let mut got: Vec<u64> = asc.iter().map(|(_, c)| *c).collect();
+        let mut got: Vec<u32> = asc.iter().map(|(_, c)| *c).collect();
         got.sort_unstable();
         assert_eq!(got, vec![1, 3]);
 
