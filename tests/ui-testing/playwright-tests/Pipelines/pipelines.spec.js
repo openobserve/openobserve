@@ -416,14 +416,12 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.enterStreamName("e2e_automate");
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.clickDashboardsMenu();
-    page.once('dialog', async (dialog) => {
-      testLogger.debug('Dialog message', { message: dialog.message() });
-      await dialog.accept();
-    });
 
-    // Click on the dashboards menu link
+    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
+    // ConfirmDialog instead of window.confirm (native dialog). Accept it.
     await pipelinePage.clickDashboardsMenu();
+    await pipelinePage.discardChangesOkBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.discardChangesOkBtn.click();
 
     // Assert the page navigates to the desired URL containing "dashboards"
     await page.waitForURL(/dashboards/);
@@ -447,14 +445,12 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.enterStreamName("e2e_automate");
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await pipelinePage.clickDashboardsMenu();
-    page.once('dialog', async (dialog) => {
-      testLogger.debug('Dialog message', { message: dialog.message() });
-      await dialog.dismiss();
-    });
 
-    // Click on the dashboards menu link
+    // Click the dashboards menu — onBeforeRouteLeave fires and shows a Vue
+    // ConfirmDialog instead of window.confirm (native dialog). Dismiss it.
     await pipelinePage.clickDashboardsMenu();
+    await pipelinePage.discardChangesCancelBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await pipelinePage.discardChangesCancelBtn.click();
 
     // Assert page url to have pipeline
     await expect(page).toHaveURL(/pipeline/);
