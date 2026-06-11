@@ -2791,7 +2791,26 @@
     "usageStreamEnabledLabel": "Activer le flux d'utilisation",
     "aiToolsets": "Ensembles d'outils d'IA",
     "llmModelPricing": "Tarification du modèle LLM",
-    "ingestionTokens": "Jetons d'ingestion"
+    "ingestionTokens": "Jetons d'ingestion",
+    "genAiAgentMapping": {
+      "tabLabel": "Cartographie des agents GenAI",
+      "title": "Cartographie des agents GenAI",
+      "description": "Configurez les attributs de télémétrie de secours utilisés pour normaliser l'identité des agents pour les traces et les évaluations LLM.",
+      "howItWorksTitle": "Comment fonctionne la cartographie",
+      "howItWorksDescription": "OpenObserve d'abord les attributs standard gen_ai.agent.name et gen_ai.agent.id. Ces listes ne sont vérifiées que lorsque les attributs standard sont manquants ou vides. Ajoutez un attribut de télémétrie entrant par ligne.",
+      "agentNameFields": "Champs de secours relatifs au nom de l'agent",
+      "agentNameHelp": "Attributs entrants à utiliser comme solutions de secours pour gen_ai.agent.name.",
+      "agentIdFields": "Champs de secours relatifs à l'ID de l'agent",
+      "agentIdHelp": "Attributs entrants à utiliser comme solutions de secours pour gen_ai.agent.id.",
+      "fieldsPlaceholder": "nom de l'agent\nllm.agent.name",
+      "applyDefaults": "Appliquer les valeurs par défaut",
+      "resetToEmpty": "Réinitialiser à vide",
+      "defaultsSource": "Les valeurs par défaut sont chargées depuis openobserve/sdr_patterns et peuvent être modifiées avant d'être enregistrées pour cette organisation.",
+      "saved": "Le mappage des agents GenAI a été enregistré avec succès",
+      "loadFailed": "Impossible de charger le mappage de l'agent GenAI",
+      "saveFailed": "Impossible d'enregistrer le mappage de l'agent GenAI",
+      "defaultsLoadFailed": "Impossible de charger les paramètres de mappage de l'agent GenAI par défaut"
+    }
   },
   "iam": {
     "users": "Les utilisateurs",
