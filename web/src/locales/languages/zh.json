@@ -3232,7 +3232,39 @@
     "openInFullView": "以全视图打开",
     "serviceMap": "服务地图",
     "patternView": "图案视图",
-    "spanView": "跨度视图"
+    "spanView": "跨度视图",
+    "noData": {
+      "title": "开始向 OpenObserve 发送跟踪",
+      "description": "该组织中尚未找到任何追踪流。仪器您的服务和跟踪将自动显示在此处。",
+      "otlp": "通过 OTLP 发送跟踪",
+      "otlpDesc": "Jaeger、Zipkin 和任何与 OpenTelemetry 兼容的 SDK",
+      "otelCollector": "oTel 收藏家/代理人",
+      "otelCollectorDesc": "通过 oTel Collector 路由所有遥测信号",
+      "or": "或者：",
+      "kubernetes": "Kubernetes",
+      "python": "巨蟒蛇",
+      "java": "爪哇",
+      "nodejs": "Node.js",
+      "askAi": "让 AI 设置追踪"
+    },
+    "noStream": {
+      "title": "选择直播开始探索",
+      "description": "选择跟踪流，然后按<strong>运行查询</strong>。加载结果后，您可以按服务、持续时间、跨度状态等进行筛选。",
+      "selectStream": "选择一个直播",
+      "selectStreamDesc": "浏览该组织中可用的追踪流",
+      "queryGuide": "阅读追踪指南",
+      "queryGuideDesc": "服务图、跨度过滤、RED 指标等",
+      "recent": "最近："
+    },
+    "noEvents": {
+      "title": "未发现任何痕迹",
+      "descNoFilters": "在 {range} 中未发现任何痕迹。尝试扩大加载结果的时间范围。",
+      "descWithFilters": "在所选窗口中，没有与<strong>该查询</strong>相匹配的内容。尝试扩大时间范围或移除过滤器。",
+      "expandRange": "扩大时间范围",
+      "expandRangeDescAbsolute": "切换到更宽的相对时间范围",
+      "removeFilter": "移除过滤器",
+      "selectedRange": "所选范围"
+    }
   },
   "invitation": {
     "pendingInvitations": "待处理的邀请",

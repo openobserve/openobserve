@@ -3228,7 +3228,39 @@
     "openInFullView": "Ouvrir en plein écran",
     "serviceMap": "Carte des services",
     "patternView": "Affichage du motif",
-    "spanView": "Vue sur Span"
+    "spanView": "Vue sur Span",
+    "noData": {
+      "title": "Commencez à envoyer des traces à OpenObserve",
+      "description": "Aucun flux de trace n'a encore été trouvé dans cette organisation. Instruisez vos services et les traces apparaîtront automatiquement ici.",
+      "otlp": "Envoyer des traces via OTLP",
+      "otlpDesc": "Jaeger, Zipkin et tout autre SDK compatible avec OpenTelemetry",
+      "otelCollector": "Collectionneur ou agent d'hôtels",
+      "otelCollectorDesc": "Acheminez tous les signaux de télémétrie via l'OTel Collector",
+      "or": "Ou :",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Demandez à l'IA de configurer le traçage"
+    },
+    "noStream": {
+      "title": "Choisissez un stream pour commencer à explorer",
+      "description": "Choisissez un flux de trace, puis appuyez sur <strong>Exécuter la requête</strong>. Vous pouvez filtrer par service, durée, statut de la période, etc. une fois les résultats chargés.",
+      "selectStream": "Sélectionnez un flux",
+      "selectStreamDesc": "Parcourir les flux de traces disponibles dans cette organisation",
+      "queryGuide": "Lisez le guide des traces",
+      "queryGuideDesc": "Graphique de service, filtrage des intervalles, métriques RED, etc.",
+      "recent": "Récent :"
+    },
+    "noEvents": {
+      "title": "Aucune trace trouvée",
+      "descNoFilters": "Aucune trace n'a été trouvée dans {range}. Essayez d'élargir la plage de temps pour charger les résultats.",
+      "descWithFilters": "Rien ne correspond à <strong>cette requête</strong> dans la fenêtre sélectionnée. Essayez d'élargir la plage horaire ou de supprimer un filtre.",
+      "expandRange": "Élargir la plage horaire",
+      "expandRangeDescAbsolute": "Passez à une plage de temps relative plus large",
+      "removeFilter": "Supprimer un filtre",
+      "selectedRange": "la gamme sélectionnée"
+    }
   },
   "invitation": {
     "pendingInvitations": "Invitations en attente",

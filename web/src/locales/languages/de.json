@@ -3228,7 +3228,39 @@
     "openInFullView": "In Vollansicht öffnen",
     "serviceMap": "Karte des Service",
     "patternView": "Musteransicht",
-    "spanView": "Span-Ansicht"
+    "spanView": "Span-Ansicht",
+    "noData": {
+      "title": "Beginne mit dem Senden von Traces an OpenObserve",
+      "description": "In dieser Organisation wurden noch keine Trace-Streams gefunden. Instrument Ihre Dienste und Traces werden hier automatisch angezeigt.",
+      "otlp": "Traces über OTLP senden",
+      "otlpDesc": "Jaeger, Zipkin und jedes OpenTelemetry-kompatible SDK",
+      "otelCollector": "Hotelsammler//Agent",
+      "otelCollectorDesc": "Leitet alle Telemetriesignale durch den OTEL Collector",
+      "or": "Oder:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Bitten Sie die KI, das Tracing einzurichten"
+    },
+    "noStream": {
+      "title": "Wähle einen Stream aus, um mit der Erkundung zu beginnen",
+      "description": "Wählen Sie einen Trace-Stream aus und drücken Sie dann <strong>auf Abfrage ausführen</strong>. Sobald die Ergebnisse geladen sind, können Sie nach Service, Dauer, Span-Status und mehr filtern.",
+      "selectStream": "Wähle einen Stream",
+      "selectStreamDesc": "Verfügbare Trace-Streams in dieser Organisation durchsuchen",
+      "queryGuide": "Lesen Sie den Trace-Leitfaden",
+      "queryGuideDesc": "Servicegeschrift, Spanenfilterung, RED-Metriken und mehr",
+      "recent": "Kürzlich:"
+    },
+    "noEvents": {
+      "title": "Keine Spuren gefunden",
+      "descNoFilters": "In {range} wurden keine Spuren gefunden. Versuchen Sie, den Zeitraum zu erweitern, um die Ergebnisse zu laden.",
+      "descWithFilters": "Im ausgewählten Fenster stimmte nichts mit <strong>dieser Abfrage</strong> überein. Versuchen Sie, den Zeitraum zu erweitern oder einen Filter zu entfernen.",
+      "expandRange": "Erweitern Sie den Zeitbereich",
+      "expandRangeDescAbsolute": "Wechseln Sie zu einem breiteren relativen Zeitbereich",
+      "removeFilter": "Einen Filter entfernen",
+      "selectedRange": "der gewählte Bereich"
+    }
   },
   "invitation": {
     "pendingInvitations": "Ausstehende Einladungen",

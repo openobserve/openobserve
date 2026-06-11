@@ -3228,7 +3228,39 @@
     "openInFullView": "Abrir à vista completa",
     "serviceMap": "Mapa de serviços",
     "patternView": "Visualização de padrões",
-    "spanView": "Vista da Espanha"
+    "spanView": "Vista da Espanha",
+    "noData": {
+      "title": "Comece a enviar rastreamentos para o OpenObserve",
+      "description": "Ainda não foram encontrados fluxos de rastreamento nesta organização. Instrumente seus serviços e os rastros aparecerão aqui automaticamente.",
+      "otlp": "Enviar rastreamentos via OTLP",
+      "otlpDesc": "Jaeger, Zipkin e qualquer SDK compatível com OpenTelemetry",
+      "otelCollector": "Colecionador/Agente de hotéis",
+      "otelCollectorDesc": "Encaminhe todos os sinais de telemetria através do Otel Collector",
+      "or": "Ou:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Peça à IA para configurar o rastreamento"
+    },
+    "noStream": {
+      "title": "Escolha um stream para começar a explorar",
+      "description": "Escolha um stream de rastreamento e pressione <strong>Executar consulta</strong>. Você pode filtrar por serviço, duração, status da extensão e muito mais quando os resultados forem carregados.",
+      "selectStream": "Selecione um stream",
+      "selectStreamDesc": "Navegue pelos fluxos de rastreamento disponíveis nesta organização",
+      "queryGuide": "Leia o guia de rastreamentos",
+      "queryGuideDesc": "Gráfico de serviço, filtragem de abrangência, métricas RED e muito mais",
+      "recent": "Recente:"
+    },
+    "noEvents": {
+      "title": "Nenhum vestígio encontrado",
+      "descNoFilters": "Nenhum traço foi encontrado em {range}. Tente ampliar o intervalo de tempo para carregar os resultados.",
+      "descWithFilters": "Nada correspondeu a <strong>essa consulta</strong> na janela selecionada. Tente ampliar o intervalo de tempo ou remover um filtro.",
+      "expandRange": "Expandir o intervalo de tempo",
+      "expandRangeDescAbsolute": "Mudar para um intervalo de tempo relativo mais amplo",
+      "removeFilter": "Remover um filtro",
+      "selectedRange": "o intervalo selecionado"
+    }
   },
   "invitation": {
     "pendingInvitations": "Convites pendentes",
