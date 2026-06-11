@@ -638,7 +638,7 @@ describe("SearchBar", () => {
 
   // -------------------------------------------------------------------------
   describe("error-only toggle", () => {
-    it("should render the error-only toggle", async () => {
+    it("should not render the error-only toggle in SearchBar (moved to SearchResult)", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
@@ -646,7 +646,7 @@ describe("SearchBar", () => {
         wrapper
           .find('[data-test="traces-search-bar-error-only-toggle-btn"]')
           .exists(),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it("should emit error-only-toggled with true when onErrorOnlyToggle(true) is called", async () => {
