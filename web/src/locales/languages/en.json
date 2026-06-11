@@ -12,6 +12,15 @@
       "action": "Widen time range",
       "actionDesc": "Search across a longer period"
     },
+    "noStreamSelected": {
+      "title": "Select a stream to get started",
+      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to explore your logs. You can also apply additional filters and adjust the date range."
+    },
+    "noQueryApplied": {
+      "title": "Run a query to see logs",
+      "description": "Adjust your filters and click 'Run query' to load events for this stream."
+    },
+
     "noDashboards": {
       "title": "Create your first dashboard",
       "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
@@ -5251,6 +5260,20 @@
     "empty": {
       "title": "No LLM Providers Yet",
       "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
+    }
+  },
+  "logs": {
+    "noEvents": {
+      "title": "No events found",
+      "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range, easing a filter, or resetting the query.",
+      "expandRange": "Expand the time range",
+      "expandRangeDescAbsolute": "Switch to a wider relative time range",
+      "removeFilter": "Remove a filter",
+      "removeFilterDescSql": "You have SQL conditions applied to this query",
+      "openHistory": "Open search history",
+      "askAi": "Ask AI to fix my query",
+      "selectedRange": "the selected range"
     }
   }
 }
