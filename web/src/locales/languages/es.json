@@ -1791,7 +1791,23 @@
     "tabAiAssistant": "Asistente O2 AI",
     "tabOverview": "Visión general",
     "tabUsage": "Uso",
-    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo"
+    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo",
+    "noDataState": {
+      "title": "Aún no se han ingerido datos",
+      "description": "Esta organización no ha recibido ningún dato, por lo que no hay nada que registrar. Una vez que los eventos empiecen a fluir, el <strong>volumen de ingesta, el almacenamiento y el uso de las consultas</strong> aparecerán aquí automáticamente.",
+      "logs": "Enviar registros",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector y más",
+      "traces": "Enviar trazas",
+      "tracesDesc": "Rastreo distribuido de OTLP/Jaeger/Zipkin",
+      "metrics": "Enviar métricas",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf y más",
+      "or": "O:",
+      "otel": "Telemetría abierta",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Integraciones de IA",
+      "shippers": "Transportistas de troncos"
+    }
   },
   "billing": {
     "header": "Uso y facturación",
@@ -3971,7 +3987,13 @@
     "elevatedErrorRate": "Tasa de error elevada",
     "reqPerSec": "solicitud/s",
     "allClear": "Todo despejado",
-    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada."
+    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada.",
+    "emptyActionAlerts": "Ver reglas de alertas",
+    "emptyActionAlertsDesc": "Revise las alertas y los umbrales configurados",
+    "emptyActionLogs": "Explore los registros",
+    "emptyActionLogsDesc": "Busque y filtre sus flujos de registro",
+    "emptyActionTraces": "Explora las huellas",
+    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio"
   },
   "chatHistory": {
     "title": "Charlas",
@@ -4355,6 +4377,14 @@
     "noPipelineHistory": {
       "title": "Aún no hay historial de oleoductos",
       "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
+    },
+    "noStreamSelected": {
+      "title": "Selecciona una transmisión para empezar",
+      "description": "Elige una transmisión en el menú desplegable de la izquierda y, a continuación, pulsa «Ejecutar consulta» para explorar tus registros. También puedes aplicar filtros adicionales y ajustar el intervalo de fechas."
+    },
+    "noQueryApplied": {
+      "title": "Ejecute una consulta para ver los registros",
+      "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión."
     }
   },
   "onlineEvals": {
@@ -4712,6 +4742,45 @@
       "evalJobs": "Empleos en Eval",
       "scorers": "Goleadores",
       "scoreConfigs": "Configuraciones de puntuación"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Comience a enviar datos a OpenObserve",
+      "description": "Aún no hay datos en esta organización, por lo que no hay transmisiones que explorar. Envía tus primeros registros y se mostrarán aquí automáticamente. Elige cómo quieres empezar.",
+      "curl": "Enviar a través de la API Curl/HTTP",
+      "curlDesc": "La forma más rápida: pega un comando y los registros comienzan a fluir",
+      "shippers": "Utilice un transportista de troncos",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysloGng y más",
+      "otel": "Telemetría abierta",
+      "otelDesc": "Ingestión de OTLP independiente del proveedor para registros, seguimientos y métricas",
+      "or": "O:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "escaparates",
+      "askAi": "Pídele a la IA que configure la ingestión"
+    },
+    "noStream": {
+      "title": "Elige un arroyo para empezar a explorar",
+      "description": "Elige una transmisión y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
+      "selectStream": "Selecciona una transmisión",
+      "selectStreamDesc": "Explore registros, seguimientos, métricas y flujos de RUM",
+      "queryGuide": "Lea la guía de consultas",
+      "queryGuideDesc": "Filtros, modo SQL, VRL y vistas guardadas",
+      "recent": "Reciente:"
+    },
+    "noEvents": {
+      "title": "No se ha encontrado ningún evento",
+      "descNoFilters": "No se encontró ningún evento en {range}. Intenta ampliar el intervalo de tiempo para cargar los resultados.",
+      "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo, suavizar un filtro o restablecer la consulta.",
+      "expandRange": "Amplíe el rango de tiempo",
+      "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+      "removeFilter": "Eliminar un filtro",
+      "removeFilterDescSql": "Tiene condiciones SQL aplicadas a esta consulta",
+      "openHistory": "Abrir historial de búsqueda",
+      "askAi": "Pedir a la IA que corrija mi consulta",
+      "selectedRange": "el rango seleccionado"
     }
   }
 }

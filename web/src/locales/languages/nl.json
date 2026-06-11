@@ -1791,7 +1791,23 @@
     "tabAiAssistant": "O2 AI-assistent",
     "tabOverview": "Overzicht",
     "tabUsage": "Gebruik",
-    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag"
+    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag",
+    "noDataState": {
+      "title": "Nog geen gegevens opgenomen",
+      "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>opnamevolume, opslag en querygebruik</strong> weergegeven.",
+      "logs": "Logboeken verzenden",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector en meer",
+      "traces": "Sporen verzenden",
+      "tracesDesc": "OTLP/Jaeger/Zipkin gedistribueerde tracering",
+      "metrics": "Statistieken verzenden",
+      "metricsDesc": "Prometheus, Totel Collector, Telegraaf en meer",
+      "or": "Of:",
+      "otel": "OpenTelemetrie",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI-integraties",
+      "shippers": "Verzenders van logboeken"
+    }
   },
   "billing": {
     "header": "Gebruik en facturering",
@@ -3986,7 +4002,13 @@
     "elevatedErrorRate": "Verhoogd foutenpercentage",
     "reqPerSec": "requise/s",
     "allClear": "Alles duidelijk",
-    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster."
+    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster.",
+    "emptyActionAlerts": "Waarschuwingsregels bekijken",
+    "emptyActionAlertsDesc": "Bekijk de geconfigureerde waarschuwingen en drempels",
+    "emptyActionLogs": "Logboeken bekijken",
+    "emptyActionLogsDesc": "Zoek en filter je logstreams",
+    "emptyActionTraces": "Sporen ontdekken",
+    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4370,6 +4392,14 @@
     "noPipelineHistory": {
       "title": "Nog geen geschiedenis van de pijplijn",
       "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
+    },
+    "noStreamSelected": {
+      "title": "Selecteer een stream om aan de slag te gaan",
+      "description": "Kies een stream in de keuzelijst aan de linkerkant en druk vervolgens op 'Query uitvoeren' om je logboeken te bekijken. U kunt ook extra filters toepassen en het datumbereik aanpassen."
+    },
+    "noQueryApplied": {
+      "title": "Voer een query uit om logboeken te bekijken",
+      "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
     }
   },
   "onlineEvals": {
@@ -4727,6 +4757,45 @@
       "evalJobs": "Vacatures bij Eval",
       "scorers": "Scorers",
       "scoreConfigs": "Score-configuraties"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Begin met het verzenden van gegevens naar OpenObserve",
+      "description": "Er zijn nog geen gegevens in deze organisatie, dus er zijn geen streams om te verkennen. Stuur je eerste logboeken en ze worden hier automatisch weergegeven. Kies hoe je wilt beginnen.",
+      "curl": "Verzenden via Curl/HTTP API",
+      "curlDesc": "Snelste manier: plak één opdracht en de logboeken beginnen te stromen",
+      "shippers": "Gebruik een logboekverzender",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogging en meer",
+      "otel": "OpenTelemetrie",
+      "otelDesc": "Leveranciersonafhankelijke OTLP-opname voor logboeken, sporen en statistieken",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Ramen",
+      "askAi": "Vraag AI om de opname in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk logboeken, traceringen, statistieken en RUM-streams",
+      "queryGuide": "Lees de handleiding voor zoekopdrachten",
+      "queryGuideDesc": "Filters, SQL-modus, VRL en opgeslagen weergaven",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen evenementen gevonden",
+      "descNoFilters": "Er zijn geen evenementen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten, een filter te vereenvoudigen of de query opnieuw in te stellen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "removeFilterDescSql": "Er zijn SQL-voorwaarden toegepast op deze query",
+      "openHistory": "Zoekgeschiedenis openen",
+      "askAi": "Vraag AI om mijn vraag op te lossen",
+      "selectedRange": "het geselecteerde bereik"
     }
   }
 }

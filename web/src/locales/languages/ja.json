@@ -1808,7 +1808,23 @@
     "tabAiAssistant": "O2 人工知能アシスタント",
     "tabOverview": "概要",
     "tabUsage": "使い方",
-    "subtitle": "一目でわかるオブザーバビリティワークスペース"
+    "subtitle": "一目でわかるオブザーバビリティワークスペース",
+    "noDataState": {
+      "title": "データはまだ取り込まれていません",
+      "description": "この組織はまだデータを受け取っていないため、グラフ化するものはありません。イベントが流れ始めると、<strong>取り込み量、ストレージ、クエリ使用量が自動的にここに表示されます</strong>。",
+      "logs": "ログを送信",
+      "logsDesc": "カール、ファイルビート、フルーエントビット、ベクターなど",
+      "traces": "トレースを送信",
+      "tracesDesc": "OTLP/Jaeger/Zipkin ディストリビューティッド・トレーシング",
+      "metrics": "指標を送信",
+      "metricsDesc": "プロメテウス、ホテルコレクター、テレグラフなど",
+      "or": "または:",
+      "otel": "オープンテレメトリ",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI インテグレーション",
+      "shippers": "ログシッパー"
+    }
   },
   "billing": {
     "header": "使用状況と請求",
@@ -3973,7 +3989,13 @@
     "elevatedErrorRate": "エラー率の上昇",
     "reqPerSec": "要求/秒",
     "allClear": "すべてクリア",
-    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。"
+    "allClearDesc": "選択した時間枠には、アクティブな異常、インシデント、または低下したサービスはありません。",
+    "emptyActionAlerts": "アラートルールを表示する",
+    "emptyActionAlertsDesc": "設定したアラートと閾値を確認",
+    "emptyActionLogs": "ログを見る",
+    "emptyActionLogsDesc": "ログストリームの検索とフィルタリング",
+    "emptyActionTraces": "トレースを調べる",
+    "emptyActionTracesDesc": "分散型トレースとサービスレイテンシーの検査"
   },
   "chatHistory": {
     "title": "チャット",
@@ -4357,6 +4379,14 @@
     "noPipelineHistory": {
       "title": "パイプライン履歴はまだありません",
       "description": "パイプラインが実行されると、パイプライン実行履歴がここに表示されます。"
+    },
+    "noStreamSelected": {
+      "title": "ストリームを選択して始めましょう",
+      "description": "左側のドロップダウンからストリームを選択し、[クエリを実行] を押してログを調べます。また、追加のフィルターを適用したり、日付範囲を調整したりすることもできます。"
+    },
+    "noQueryApplied": {
+      "title": "クエリを実行してログを確認する",
+      "description": "フィルターを調整し、[クエリを実行] をクリックしてこのストリームのイベントをロードします。"
     }
   },
   "onlineEvals": {
@@ -4714,6 +4744,45 @@
       "evalJobs": "評価ジョブ",
       "scorers": "スコアラー",
       "scoreConfigs": "スコア構成"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "オープンオブザーブ (OpenObserve) へのデータ送信",
+      "description": "この組織にはまだデータがないため、調べるべきストリームはありません。最初のログを送信すると、自動的にここに表示されます。開始方法を選択してください。",
+      "curl": "Curl/HTTP API 経由で送信",
+      "curlDesc": "一番手っ取り早い方法 — コマンドを1つ貼り付けるとログが流れ始める",
+      "shippers": "ログシッパーを使う",
+      "shippersDesc": "ファイルビート、フルーエントビット、フルーエント、ベクター、システムログなど",
+      "otel": "オープンテレメトリ",
+      "otelDesc": "ログ、トレース、メトリクスのベンダーに依存しないOTLPインジェスト",
+      "or": "または:",
+      "kubernetes": "クベルネテス",
+      "aws": "AWS/CloudWatch",
+      "linux": "リナックス",
+      "windows": "Windows",
+      "askAi": "AIにインジェストの設定を依頼"
+    },
+    "noStream": {
+      "title": "ストリームを選んで探索を始めましょう",
+      "description": "ストリームを選択し、[<strong>クエリの実行</strong>] を押します。結果が出たら、フィルター、VRL 関数、カスタム時間範囲を使用して絞り込むことができます。",
+      "selectStream": "ストリームを選択する",
+      "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを閲覧",
+      "queryGuide": "クエリガイドを読む",
+      "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
+      "recent": "最近:"
+    },
+    "noEvents": {
+      "title": "イベントが見つかりません",
+      "descNoFilters": "{range} にはイベントが見つかりませんでした。結果を読み込むには、時間範囲を広げてみてください。",
+      "descWithFilters": "選択したウィンドウには、<strong>このクエリと一致するものはありません</strong>。時間範囲を広げるか、フィルターを緩めるか、クエリをリセットしてみてください。",
+      "expandRange": "時間範囲を広げる",
+      "expandRangeDescAbsolute": "より広い相対時間範囲に切り替える",
+      "removeFilter": "フィルターを削除する",
+      "removeFilterDescSql": "このクエリには SQL 条件が適用されています",
+      "openHistory": "検索履歴を開く",
+      "askAi": "AI にクエリの修正を依頼する",
+      "selectedRange": "選択した範囲"
     }
   }
 }
