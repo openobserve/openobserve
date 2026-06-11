@@ -133,8 +133,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div class="tw:h-full tw:pb-[0.625rem]">
-                  <div
+                  <!-- No trace streams in org yet -->
+                  <TracesNoDataState
                     v-if="
+                      !searchObj.loadingStream &&
+                      searchObj.data.stream.streamLists.length === 0 &&
+                      !searchObj.loading
+                    "
+                    :ai-enabled="isAiEnabled"
+                    data-test="traces-no-streams-in-org-text"
+                    @ask-ai="onAskAiTracing"
+                  />
+                  <div
+                    v-else-if="
                       searchObj.data.errorMsg !== '' &&
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
@@ -215,29 +226,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="tw:pt-[1rem]"
                     />
                   </div>
-                  <div
-                    v-else-if="!isStreamSelected"
-                    class="card-container tw:h-full"
-                  >
-                    <div
-                      data-test="logs-search-no-stream-selected-text"
-                      class="tw:text-center tw:mx-[10%] tw:py-[40px] tw:mt-0 tw:text-[20px]"
-                    >
-                      <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                      {{ t("search.noStreamSelectedMessage") }}
-                    </div>
+                  <div v-else-if="!isStreamSelected">
+                    <TracesNoStreamState
+                      :org-id="store.state.selectedOrganization?.identifier"
+                      data-test="traces-no-stream-selected-text"
+                      @select-stream="onSelectTracesStream"
+                      @pick-stream="onPickTracesStream"
+                    />
                   </div>
                   <div
-                    data-test="traces-search-not-started-text"
                     v-else-if="
                       isStreamSelected &&
                       !searchObj.searchApplied &&
                       !searchObj.data.queryResults?.hits?.length
                     "
-                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
                   >
-                    <OIcon name="info" size="md" />
-                    {{ t("search.applySearch") }}
+                    <OEmptyState
+                      preset="no-query-applied"
+                      size="hero"
+                      data-test="traces-search-not-started-text"
+                    />
                   </div>
                   <div
                     v-else
@@ -252,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @shareLink="copyTracesUrl"
                       @metrics:filters-updated="onMetricsFiltersUpdated"
                       @run-query="searchData"
+                      @widen-range="onWidenTracesRange"
                     />
                   </div>
                 </div>
@@ -330,6 +339,9 @@ import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
+import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1725,6 +1737,38 @@ const onFiltersReset = () => {
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
+
+const onWidenTracesRange = (period: string) => {
+  searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
+  searchObj.data.datetime.relativeTimePeriod = period;
+  searchObj.data.datetime.type = "relative";
+  searchObj.runQuery = true;
+};
+
+const onSelectTracesStream = () => {
+  const trigger = document.querySelector<HTMLElement>(
+    '[data-test="log-search-index-list-select-stream"] button',
+  );
+  trigger?.click();
+};
+
+const onPickTracesStream = (streamName: string) => {
+  const match = searchObj.data.stream.streamLists.find(
+    (s: any) => s.value === streamName || s.label === streamName,
+  );
+  if (match) {
+    searchObj.data.stream.selectedStream = match;
+    searchObj.runQuery = true;
+  }
+};
+
+const isAiEnabled = computed(
+  () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+);
+
+const onAskAiTracing = () => {
+  router.push({ name: "ingestion", query: { org_identifier: store.state.selectedOrganization?.identifier } });
+};
 
 /**
  * Extracts a plain column name from a DataFusion SQL AST column node.
