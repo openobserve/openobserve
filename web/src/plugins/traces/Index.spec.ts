@@ -2990,4 +2990,211 @@ describe("Index.vue (Main Traces Page)", () => {
       };
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Stream Change Confirmation Dialog
+  // ---------------------------------------------------------------------------
+  describe("Stream Change Confirmation Dialog", () => {
+    function mountIndexStubbed() {
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": {
+              name: "service-graph",
+              template: "<div />",
+              emits: ["request:stream-change"],
+            },
+            "services-catalog": {
+              name: "services-catalog",
+              template: "<div />",
+              emits: ["request:stream-change"],
+            },
+            ODialog: true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    beforeEach(() => {
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.meta.searchMode = "service-graph";
+    });
+
+    it("should apply stream change immediately when editorValue is empty", async () => {
+      mockSearchObj.data.editorValue = "";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "old-stream",
+        value: "old-stream",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("new-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("new-stream");
+      expect(mockSearchObj.data.stream.selectedStream.label).toBe("new-stream");
+    });
+
+    it("should apply stream change immediately when editorValue is only whitespace", async () => {
+      mockSearchObj.data.editorValue = "   ";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "old-stream",
+        value: "old-stream",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("new-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("new-stream");
+    });
+
+    it("should show confirmation dialog when editorValue has content", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'test'";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      wrapper.vm.onChildStreamChangeRequest("other-stream");
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("other-stream");
+    });
+
+    it("should not change selectedStream when dialog is shown instead of applying immediately", async () => {
+      // Use a stream name present in mockStreamList so loadStreamLists does not
+      // clear it during mount — the assertion checks the stream stays unchanged.
+      mockSearchObj.data.editorValue = "duration >= 1000";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Ensure stream is still "default" after mount before triggering request
+      // (it can be re-set by loadStreamLists when it finds a match)
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+        },
+        { timeout: 2000 },
+      );
+
+      wrapper.vm.onChildStreamChangeRequest("requested-stream");
+      await flushPromises();
+
+      // Dialog was shown — selectedStream must NOT have been changed
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+
+    it("should update selectedStream, clear editorValue, and hide dialog when applyStreamChange is called", async () => {
+      mockSearchObj.data.editorValue = "service_name = 'svc'";
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Simulate dialog being shown with a pending stream
+      wrapper.vm.streamChangeDialog.show = true;
+      wrapper.vm.streamChangeDialog.pendingStream = "target-stream";
+
+      await wrapper.vm.applyStreamChange("target-stream");
+      await flushPromises();
+
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe(
+        "target-stream",
+      );
+      expect(mockSearchObj.data.stream.selectedStream.label).toBe(
+        "target-stream",
+      );
+      expect(mockSearchObj.data.editorValue).toBe("");
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+    });
+
+    it("should close dialog and leave stream unchanged when secondary button sets show to false", async () => {
+      // Use a stream name present in mockStreamList so loadStreamLists keeps it.
+      mockSearchObj.data.editorValue = "service_name = 'svc'";
+      mockSearchObj.data.stream.selectedStream = {
+        label: "default",
+        value: "default",
+      };
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      // Wait until mount resolves and selectedStream remains "default".
+      await vi.waitFor(
+        () => {
+          expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+        },
+        { timeout: 2000 },
+      );
+
+      // Open dialog as if primary button was not clicked
+      wrapper.vm.streamChangeDialog.show = true;
+      wrapper.vm.streamChangeDialog.pendingStream = "other-stream";
+
+      // Secondary button handler — just closes the dialog
+      wrapper.vm.streamChangeDialog.show = false;
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      // Stream must remain unchanged — the cancel did not apply the pending change
+      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+    });
+
+    it("should trigger onChildStreamChangeRequest when service-graph emits request:stream-change", async () => {
+      mockSearchObj.data.editorValue = "duration >= 500";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
+      expect(serviceGraphEl.exists()).toBe(true);
+
+      await serviceGraphEl.vm.$emit("request:stream-change", "graph-stream");
+      await flushPromises();
+
+      // Non-empty editorValue → dialog must be shown
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("graph-stream");
+    });
+
+    it("should trigger onChildStreamChangeRequest when services-catalog emits request:stream-change", async () => {
+      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+      mockSearchObj.meta.searchMode = "services-catalog";
+
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+
+      const servicesCatalogEl = wrapper.findComponent({
+        name: "services-catalog",
+      });
+      expect(servicesCatalogEl.exists()).toBe(true);
+
+      await servicesCatalogEl.vm.$emit(
+        "request:stream-change",
+        "catalog-stream",
+      );
+      await flushPromises();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
+    });
+  });
 });
