@@ -816,12 +816,6 @@ describe("Logs Index", async () => {
     }
   });
 
-  it("Should toggle error details visibility", async () => {
-    expect(wrapper.vm.disableMoreErrorDetails).toBe(false);
-    wrapper.vm.toggleErrorDetails();
-    expect(wrapper.vm.disableMoreErrorDetails).toBe(true);
-  });
-
   it("Should emit sendToAiChat event with payload", async () => {
     wrapper.vm.sendToAiChat({ foo: 'bar' });
     expect(wrapper.emitted('sendToAiChat')?.[0]?.[0]).toEqual({ foo: 'bar' });

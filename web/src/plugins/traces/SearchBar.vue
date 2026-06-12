@@ -103,22 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('traces.RedMetrics')" />
           </div>
 
-          <!-- Error Only Toggle -->
-          <div
-            class="toolbar-toggle-container element-box-shadow"
-            data-test="traces-toolbar-toggle-container"
-          >
-            <OSwitch
-              data-test="traces-search-bar-error-only-toggle-btn"
-              v-model="searchObj.meta.showErrorOnly"
-              class="o2-toggle-button-xs tw:flex tw:items-center tw:justify-center tw:pr-1"
-              size="lg"
-              @update:model-value="onErrorOnlyToggle"
-            />
-            <OIcon v-if="shouldHideToggleText" name="error" size="sm" class="tw:shrink-0 tw:text-[var(--o2-status-error)]" />
-            <span v-else class="tw:text-sm tw:font-medium tw:whitespace-nowrap">{{ t('traces.showErrorOnly') }}</span>
-            <OTooltip v-if="shouldHideToggleText" :content="t('traces.showErrorOnly')" />
-          </div>
         </template>
 
         <!-- More menu: Syntax Guide — always last.
