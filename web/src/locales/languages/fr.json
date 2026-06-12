@@ -457,7 +457,7 @@
     "actions": "Actions",
     "incidents": "Incidents",
     "evals": "Evals",
-"keyboardShortcuts": "Raccourcis clavier",
+    "keyboardShortcuts": "Raccourcis clavier",
     "aiObservability": "Observabilité de l'IA"
   },
   "rum": {

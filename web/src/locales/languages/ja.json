@@ -457,7 +457,7 @@
     "actions": "アクション",
     "incidents": "インシデント",
     "evals": "評価",
-"keyboardShortcuts": "キーボードショートカット",
+    "keyboardShortcuts": "キーボードショートカット",
     "aiObservability": "AI オブザーバビリティ"
   },
   "rum": {

@@ -457,7 +457,7 @@
     "actions": "액션",
     "incidents": "인시던트",
     "evals": "평가",
-"keyboardShortcuts": "키보드 단축키",
+    "keyboardShortcuts": "키보드 단축키",
     "aiObservability": "AI 옵저버빌리티"
   },
   "rum": {

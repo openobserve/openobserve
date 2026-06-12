@@ -457,7 +457,7 @@
     "actions": "操作",
     "incidents": "事件",
     "evals": "Evals",
-"keyboardShortcuts": "键盘快捷键",
+    "keyboardShortcuts": "键盘快捷键",
     "aiObservability": "AI 可观测性"
   },
   "rum": {
