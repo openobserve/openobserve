@@ -199,11 +199,13 @@ test.describe(
 
         test.describe.configure({ mode: 'serial' });
 
+        let nodeOpened = false;
+
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            nodeOpened = await pm.pipelinesFormValidation.openFirstLlmEvalNode();
         });
 
         // ── Test: empty name => error or save disabled ────────────────────────
@@ -212,9 +214,7 @@ test.describe(
             'should show name error or disable save when LLM Evaluation node name is empty',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // LLM Evaluation node editor requires an existing pipeline node context.
-                // This test is skipped until a live pipeline with an LLM Evaluation node is available.
-                test.skip(true, 'requires existing pipeline with LLM Evaluation node – run against live environment');
+                test.skip(!nodeOpened, 'No pipeline with LLM Evaluation node found in this environment');
 
                 await pm.pipelinesFormValidation.clearLlmEvalName();
                 await page.keyboard.press('Tab');
@@ -234,8 +234,7 @@ test.describe(
             'should show sampling rate input when enable sampling toggle is activated',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // LLM Evaluation node editor requires an existing pipeline node context.
-                test.skip(true, 'requires existing pipeline with LLM Evaluation node – run against live environment');
+                test.skip(!nodeOpened, 'No pipeline with LLM Evaluation node found in this environment');
 
                 await pm.pipelinesFormValidation.clickLlmEvalEnableSamplingToggle();
 
@@ -258,11 +257,13 @@ test.describe(
 
         test.describe.configure({ mode: 'serial' });
 
+        let nodeOpened = false;
+
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            nodeOpened = await pm.pipelinesFormValidation.openFirstAssociateFunctionNode();
         });
 
         // ── Test: open drawer without selecting function => error or save disabled
@@ -271,8 +272,7 @@ test.describe(
             'should show function-required error or disable save when no function is selected in Associate Function drawer',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // Associate Function drawer requires an existing pipeline node context.
-                test.skip(true, 'requires existing pipeline with Associate Function node – run against live environment');
+                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
 
                 // Verify drawer is visible
                 await expect(
@@ -300,8 +300,7 @@ test.describe(
             'should change form mode when create-function toggle is activated',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // Associate Function drawer requires an existing pipeline node context.
-                test.skip(true, 'requires existing pipeline with Associate Function node – run against live environment');
+                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
 
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
@@ -391,36 +390,32 @@ test.describe(
         // ── Test: invalid URL => URL error ────────────────────────────────────
 
         test(
-            'should show URL error when destination URL is invalid',
+            'should show URL error when destination URL has a trailing slash',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
                 await pm.pipelinesFormValidation.navigateToAddDestination();
 
+                // Step 1: select HTTP destination type
                 const typeCard = pm.pipelinesFormValidation.getDestinationTypeCardHttpLocator();
-                if (await typeCard.isVisible({ timeout: 5000 })) {
-                    await typeCard.click();
-                }
+                await typeCard.waitFor({ state: 'visible', timeout: 10000 });
+                await typeCard.click();
 
-                // Fill a valid name but invalid URL
+                // Advance to step 2 via the Continue button
+                const continueBtn = pm.pipelinesFormValidation.getStep1ContinueBtnLocator();
+                await continueBtn.waitFor({ state: 'visible', timeout: 5000 });
+                await continueBtn.click();
+
+                // Step 2: fill name and a URL with a trailing slash to trigger validation
                 const nameField = pm.pipelinesFormValidation.getAddDestinationNameFieldLocator();
-                if (await nameField.isVisible({ timeout: 5000 })) {
-                    await pm.pipelinesFormValidation.fillAddDestinationName('test_fv_dest_001');
-                }
+                await nameField.waitFor({ state: 'visible', timeout: 8000 });
+                await pm.pipelinesFormValidation.fillAddDestinationName('test_fv_dest_001');
 
-                const urlField = pm.pipelinesFormValidation.getAddDestinationUrlFieldLocator();
-                if (await urlField.isVisible({ timeout: 5000 })) {
-                    await pm.pipelinesFormValidation.fillAddDestinationUrl('not-a-valid-url');
-                    await page.keyboard.press('Tab');
+                await pm.pipelinesFormValidation.fillAddDestinationUrl('http://example.com/');
+                await page.keyboard.press('Tab');
 
-                    const urlErrorVisible = await pm.pipelinesFormValidation
-                        .getAddDestinationUrlErrorLocator()
-                        .isVisible({ timeout: 3000 })
-                        .catch(() => false);
-
-                    expect(urlErrorVisible).toBe(true);
-                } else {
-                    test.skip(true, 'URL input not visible – step 2 not reached; requires valid step 1 submission');
-                }
+                await expect(
+                    pm.pipelinesFormValidation.getAddDestinationUrlErrorLocator()
+                ).toBeVisible({ timeout: 5000 });
             }
         );
 
@@ -460,11 +455,13 @@ test.describe(
 
         test.describe.configure({ mode: 'serial' });
 
+        let dialogOpened = false;
+
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            dialogOpened = await pm.pipelinesFormValidation.openFirstEditBackfillJob();
         });
 
         // ── Test: open edit dialog => chunk period input visible ──────────────
@@ -473,8 +470,7 @@ test.describe(
             'should show chunk period input when Edit Backfill Job dialog is open',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // Edit Backfill Job dialog requires an existing backfill job.
-                test.skip(true, 'requires existing backfill job – run against live environment with existing scheduled pipeline backfill data');
+                test.skip(!dialogOpened, 'No existing backfill jobs found in this environment');
 
                 await expect(
                     pm.pipelinesFormValidation.getEditBackfillJobDialogLocator()
@@ -492,8 +488,7 @@ test.describe(
             'should show chunk period error when chunk period is cleared in Edit Backfill Job dialog',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // Edit Backfill Job dialog requires an existing backfill job.
-                test.skip(true, 'requires existing backfill job – run against live environment with existing scheduled pipeline backfill data');
+                test.skip(!dialogOpened, 'No existing backfill jobs found in this environment');
 
                 await expect(
                     pm.pipelinesFormValidation.getEditBackfillJobDialogLocator()
@@ -560,35 +555,19 @@ test.describe(
             }
         );
 
-        // ── Test 3: save without selecting stream type => error or name disabled
+        // ── Test 3: stream name select is disabled until stream type is selected ─
 
-        test.skip(
-            'should show an error or disable the stream name select when save is attempted without selecting a stream type',
+        test(
+            'should disable the stream name select when no stream type has been selected',
+            { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                // This test requires confirming the exact data-test attribute on the
-                // save/OK button inside Stream.vue and the validation error selector.
-                // Skip until the component audit confirms those selectors.
                 const drawer = pm.pipelinesFormValidation.getStreamNodeDrawerLocator();
                 await drawer.waitFor({ state: 'visible', timeout: 10000 });
 
-                // Attempt to save via the drawer primary button (if it exists)
-                const saveBtn = drawer.locator('[data-test="o-drawer-primary-btn"]');
-                const saveBtnVisible = await saveBtn.isVisible({ timeout: 3000 }).catch(() => false);
-
-                if (saveBtnVisible) {
-                    await saveBtn.click();
-
-                    // Check if stream name select is disabled when type not selected
-                    const nameSelect = pm.pipelinesFormValidation.getStreamNodeNameSelectLocator();
-                    const nameDisabled = await nameSelect.isDisabled({ timeout: 2000 }).catch(() => false);
-
-                    expect(nameDisabled).toBe(true);
-                } else {
-                    // No save button visible — verify name select is disabled by default
-                    const nameSelect = pm.pipelinesFormValidation.getStreamNodeNameSelectLocator();
-                    const nameDisabled = await nameSelect.isDisabled({ timeout: 2000 }).catch(() => true);
-                    expect(nameDisabled).toBe(true);
-                }
+                // Without selecting a type, the name select should be disabled
+                const nameSelect = pm.pipelinesFormValidation.getStreamNodeNameSelectLocator();
+                const nameDisabled = await nameSelect.isDisabled({ timeout: 2000 }).catch(() => true);
+                expect(nameDisabled).toBe(true);
             }
         );
     }
