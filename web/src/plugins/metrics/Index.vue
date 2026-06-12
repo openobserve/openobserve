@@ -308,8 +308,6 @@ export default defineComponent({
       dashboardPanelData.layout.currentQueryIndex = 0;
     };
 
-    // share URL: freeze a relative period into absolute from/to (mirrors the
-    // dashboardShareURL behaviour) so a shared link reproduces the exact window.
     // Share URL: snapshot the CURRENT editor state (whole panel + time +
     // refresh) into a fresh /metrics link, independent of whether the browser
     // URL has been synced yet — so Share works even before the first Run. A

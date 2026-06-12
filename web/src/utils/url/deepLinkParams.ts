@@ -42,6 +42,12 @@ export interface ParamApplyCtx {
 export interface ParamDescriptor<T = any> {
   /** URL param name, e.g. "chart_type" | "stream_name". */
   key: string;
+  /**
+   * Legacy/alternative URL keys also accepted on READ (apply + auto-run gate),
+   * but NEVER emitted on build — `key` stays the canonical param. E.g.
+   * `stream_name` accepts the legacy `stream` that logs/alerts/incidents emit.
+   */
+  aliases?: string[];
   /** panel-level (applied once) | per-query (indexed: bare ≡ .0, then .1, .2 …). */
   scope: ParamScope;
   /** URL string -> value (default: identity). */
@@ -81,6 +87,9 @@ export interface ApplyOptions {
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Every URL key a descriptor accepts on read: its canonical key + aliases. */
+const keysOf = (d: ParamDescriptor): string[] => [d.key, ...(d.aliases ?? [])];
+
 const decodeValue = (d: ParamDescriptor, raw: any) =>
   d.decode ? d.decode(String(raw)) : raw;
 
@@ -116,11 +125,13 @@ export const parseQueryIndices = (
 ): number[] => {
   const indices = new Set<number>();
   for (const d of perQueryDescriptors) {
-    if (query[d.key] != null || query[`${d.key}.0`] != null) indices.add(0);
-    const re = new RegExp(`^${escapeRegExp(d.key)}\\.(\\d+)$`);
-    for (const k of Object.keys(query)) {
-      const m = k.match(re);
-      if (m) indices.add(parseInt(m[1], 10));
+    for (const key of keysOf(d)) {
+      if (query[key] != null || query[`${key}.0`] != null) indices.add(0);
+      const re = new RegExp(`^${escapeRegExp(key)}\\.(\\d+)$`);
+      for (const k of Object.keys(query)) {
+        const m = k.match(re);
+        if (m) indices.add(parseInt(m[1], 10));
+      }
     }
   }
   return Array.from(indices).sort((a, b) => a - b);
@@ -131,11 +142,13 @@ export const hasAnyDeepLinkParam = (
   query: Record<string, any>,
   registry: ParamDescriptor[],
 ): boolean =>
-  registry.some((d) => {
-    if (query[d.key] != null) return true;
-    if (d.scope === "panel") return false;
-    return Object.keys(query).some((k) => k.startsWith(`${d.key}.`));
-  });
+  registry.some((d) =>
+    keysOf(d).some((key) => {
+      if (query[key] != null) return true;
+      if (d.scope === "panel") return false;
+      return Object.keys(query).some((k) => k.startsWith(`${key}.`));
+    }),
+  );
 
 /**
  * Emit every registry param onto `url.searchParams` from a build-intent.
@@ -189,10 +202,11 @@ export const applyOverridesFromRegistry = (
   const panelDescriptors = registry.filter((d) => d.scope === "panel");
   const perQueryDescriptors = registry.filter((d) => d.scope === "perQuery");
 
-  // Panel-level overrides (applied once).
+  // Panel-level overrides (applied once). First matching key/alias wins.
   for (const d of panelDescriptors) {
-    const raw = query[d.key];
-    if (raw != null) d.apply(state, decodeValue(d, raw), { panelData: state });
+    const key = keysOf(d).find((k) => query[k] != null);
+    if (key != null)
+      d.apply(state, decodeValue(d, query[key]), { panelData: state });
   }
 
   // Per-query overrides (indexed).
@@ -212,7 +226,12 @@ export const applyOverridesFromRegistry = (
         queries.push(slot); // append at next position
       }
       for (const d of perQueryDescriptors) {
-        const raw = readIndexed(query, d.key, i); // read by the literal url index
+        // read by the literal url index, trying the canonical key then aliases
+        let raw: any;
+        for (const key of keysOf(d)) {
+          raw = readIndexed(query, key, i);
+          if (raw !== undefined) break;
+        }
         if (raw != null)
           d.apply(slot, decodeValue(d, raw), { index: target, panelData: state });
       }

@@ -214,6 +214,33 @@ describe("metricsUrlState · applyDeepLinkOverrides (integration)", () => {
     expect(dpd.data.queries[1].query).toBe("rate(mem[5m])");
   });
 
+  it("accepts the legacy `stream` alias (real alerts/logs/incidents deep-link)", () => {
+    const dpd = getDefaultDashboardPanelData(store);
+    // a real alerts -> metrics link uses `stream` (NOT stream_name) + base64 query
+    applyDeepLinkOverrides(
+      {
+        stream_type: "metrics",
+        stream: "container_cpu_usage",
+        query: b64EncodeUnicode(
+          '(container_cpu_usage{k8s_namespace_name="dev"}) >= 0.5',
+        ) as string,
+      },
+      dpd,
+    );
+    expect(dpd.data.queries[0].fields.stream).toBe("container_cpu_usage");
+    expect(dpd.data.queries[0].fields.stream_type).toBe("metrics");
+    expect(dpd.data.queries[0].query).toBe(
+      '(container_cpu_usage{k8s_namespace_name="dev"}) >= 0.5',
+    );
+    expect(dpd.data.queries[0].customQuery).toBe(true);
+  });
+
+  it("prefers canonical `stream_name` over the legacy `stream` alias when both present", () => {
+    const dpd = getDefaultDashboardPanelData(store);
+    applyDeepLinkOverrides({ stream_name: "canonical", stream: "legacy" }, dpd);
+    expect(dpd.data.queries[0].fields.stream).toBe("canonical");
+  });
+
   it("compacts a leading gap when there is no metrics_data base", () => {
     const dpd = getDefaultDashboardPanelData(store);
     applyDeepLinkOverrides(

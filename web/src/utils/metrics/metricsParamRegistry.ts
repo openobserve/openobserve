@@ -91,6 +91,8 @@ export const METRICS_PARAMS: ParamDescriptor[] = [
   },
   {
     key: "stream_name",
+    // legacy alias: logs/alerts/incidents deep-links emit `stream`
+    aliases: ["stream"],
     scope: "perQuery",
     apply: (slot, value) => {
       if (!slot.fields) slot.fields = {};
