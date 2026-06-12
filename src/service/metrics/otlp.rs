@@ -102,7 +102,15 @@ pub async fn otlp_json(
     body: Bytes,
     user: crate::common::meta::ingestion::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
-    let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
+    let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[METRICS:OTLP] Invalid json: {e}");
+            return Ok(MetaHttpResponse::bad_request(format!("Invalid json: {e}")));
+        }
+    };
+    super::otlp_json_compat::normalize(&mut body_json);
+    let request = match serde_json::from_value::<ExportMetricsServiceRequest>(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[METRICS:OTLP] Invalid json: {e}");
@@ -269,7 +277,17 @@ pub async fn handle_otlp_request(
                             process_summary(&rec, summary, metadata, &mut prom_meta)
                         }
                     },
-                    None => vec![],
+                    None => {
+                        // a flattened oneof that fails to deserialize turns into
+                        // None instead of an error, so surface it here
+                        log::warn!(
+                            "[METRICS:OTLP] metric {metric_name} has no data points (unsupported or undecodable metric type), skipping"
+                        );
+                        partial_success.rejected_data_points += 1;
+                        partial_success.error_message =
+                            format!("metric {metric_name} has no data points");
+                        vec![]
+                    }
                 };
 
                 // update schema metadata
@@ -1006,9 +1024,11 @@ fn format_response(
             partial_success.rejected_data_points,
             partial_success.error_message
         );
-        partial_success.error_message =
-            "Some data points were rejected due to exceeding the allowed retention period"
-                .to_string();
+        if partial_success.error_message.is_empty() {
+            partial_success.error_message =
+                "Some data points were rejected due to exceeding the allowed retention period"
+                    .to_string();
+        }
         ExportMetricsServiceResponse {
             partial_success: Some(partial_success),
         }
@@ -1889,6 +1909,7 @@ mod tests {
                     value: Some(AnyValue {
                         value: Some(any_value::Value::StringValue("test-service".to_string())),
                     }),
+                    ..Default::default()
                 }],
                 time_unix_nano: 1640995200000000000,
                 value: Some(exemplar::Value::AsDouble(42.0)),
@@ -1953,18 +1974,21 @@ mod tests {
                         value: Some(AnyValue {
                             value: Some(any_value::Value::StringValue("web".to_string())),
                         }),
+                        ..Default::default()
                     },
                     KeyValue {
                         key: "version".to_string(),
                         value: Some(AnyValue {
                             value: Some(any_value::Value::StringValue("1.0.0".to_string())),
                         }),
+                        ..Default::default()
                     },
                     KeyValue {
                         key: "count".to_string(),
                         value: Some(AnyValue {
                             value: Some(any_value::Value::IntValue(100)),
                         }),
+                        ..Default::default()
                     },
                 ],
                 time_unix_nano: 1640995200000000000,

@@ -227,8 +227,7 @@ describe("RealUserMonitoring.vue", () => {
 
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Discover Real User Monitoring");
-      expect(wrapper.text()).toContain("Get Started");
+      expect(wrapper.text()).toContain("Monitor your users with Real User Monitoring");
     });
 
     it("should navigate to frontend monitoring on get started click", async () => {
@@ -592,8 +591,8 @@ describe("RealUserMonitoring.vue", () => {
 
       await flushPromises();
 
-      // Should show get started screen when streams fail to load
-      expect(wrapper.text()).toContain("Discover Real User Monitoring");
+      // Should show empty state when streams fail to load
+      expect(wrapper.text()).toContain("Monitor your users with Real User Monitoring");
     });
   });
 });

@@ -578,6 +578,8 @@ pub struct SearchPartitionRequest {
     pub histogram_interval: i64,
     #[serde(default)]
     pub sampling_ratio: Option<f64>,
+    #[serde(default)]
+    pub search_type: Option<SearchEventType>,
 }
 
 impl SearchPartitionRequest {
@@ -612,6 +614,7 @@ impl From<&Request> for SearchPartitionRequest {
             streaming_output: req.query.streaming_output,
             histogram_interval: req.query.histogram_interval,
             sampling_ratio: req.query.sampling_ratio,
+            search_type: req.search_type,
         }
     }
 }
@@ -874,6 +877,7 @@ pub struct ScanStats {
     pub file_list_took: i64,
     pub aggs_cache_ratio: i64,
     pub peak_memory_usage: i64,
+    pub wait_in_queue: i64,
 }
 
 impl ScanStats {
@@ -900,6 +904,7 @@ impl ScanStats {
             std::cmp::min(self.aggs_cache_ratio, other.aggs_cache_ratio)
         };
         self.peak_memory_usage = std::cmp::max(self.peak_memory_usage, other.peak_memory_usage);
+        self.wait_in_queue = std::cmp::max(self.wait_in_queue, other.wait_in_queue);
     }
 
     pub fn format_to_mb(&mut self) {
@@ -947,6 +952,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
             peak_memory_usage: req.peak_memory_usage,
+            wait_in_queue: req.wait_in_queue,
         }
     }
 }
@@ -966,6 +972,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             file_list_took: req.file_list_took,
             aggs_cache_ratio: req.aggs_cache_ratio,
             peak_memory_usage: req.peak_memory_usage,
+            wait_in_queue: req.wait_in_queue,
         }
     }
 }
@@ -2202,6 +2209,7 @@ mod tests {
             streaming_output: false,
             histogram_interval: 0,
             sampling_ratio: None,
+            search_type: None,
         };
 
         req.decode().unwrap();
@@ -2337,6 +2345,7 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
 
         let stats2 = ScanStats {
@@ -2352,6 +2361,7 @@ mod tests {
             file_list_took: 40,
             aggs_cache_ratio: 90,
             peak_memory_usage: 2048000,
+            wait_in_queue: 0,
         };
 
         stats1.add(&stats2);
@@ -2530,6 +2540,7 @@ mod tests {
             file_list_took: 30,
             aggs_cache_ratio: 80,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
 
         // Test conversion to cluster_rpc::ScanStats

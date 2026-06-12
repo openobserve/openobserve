@@ -266,16 +266,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="98"
         :show-close="false"
       >
-        <ViewPanel
-          :folderId="folderId"
-          :dashboardId="dashboardData.dashboardId"
-          :panelId="viewPanelId"
-          :selectedDateForViewPanel="viewPanelSelectedDate"
-          :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
-          :searchType="searchType"
-          @close-panel="() => (showViewPanel = false)"
-          @update:initial-variable-values="updateInitialVariableValues"
-        />
+        <!-- Explicit height wrapper: fills the dialog body's available space
+             (90vh − body padding) so ViewPanel can use height:100% and
+             flex:1 works all the way down without causing a body scrollbar. -->
+        <div class="view-panel-height-wrapper">
+          <ViewPanel
+            :folderId="folderId"
+            :dashboardId="dashboardData.dashboardId"
+            :panelId="viewPanelId"
+            :selectedDateForViewPanel="viewPanelSelectedDate"
+            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+            :searchType="searchType"
+            @close-panel="() => (showViewPanel = false)"
+            @update:initial-variable-values="updateInitialVariableValues"
+          />
+        </div>
       </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
@@ -1684,6 +1689,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Fills the ODialog body's available space (dialog max-h:90vh minus body padding)
+// so ViewPanel can use height:100% and flex:1 chains work without a scrollbar.
+.view-panel-height-wrapper {
+  height: calc(90vh - var(--spacing-dialog-content-py) * 2);
+  margin: calc(-1 * var(--spacing-dialog-content-py)) calc(-1 * var(--spacing-dialog-content-px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -1725,6 +1740,13 @@ export default defineComponent({
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
+
+    /* The visible panel outline lives on the content child; in dark mode pull
+       it onto the design token (clean solid edge) instead of the bright
+       #c2c2c27a gray, which reads too light against the dark canvas. */
+    .grid-stack-item-content {
+      border-color: var(--color-border-default);
+    }
   }
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;

@@ -1565,7 +1565,6 @@ pub async fn search_partition(
         stream_type,
         &req,
         false,
-        true,
         true, // allow streamings aggs cache for http search partition handler
     )
     .instrument(http_span)

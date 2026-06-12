@@ -527,7 +527,18 @@
     "seekToMoment": "Oturumda bu anı arayın",
     "timeInSession": "Oturum Saati",
     "route": "Güzergah",
-    "duration": "Süre"
+    "duration": "Süre",
+    "emptyState": {
+      "title": "Gerçek Kullanıcı İzleme ile kullanıcılarınızı izleyin",
+      "description": "RUM, gerçek kullanıcı etkileşimlerini (sayfa yükleri, hatalar, API çağrıları ve oturum tekrarları) izler, böylece kullanıcıların uygulamanızı tam olarak nasıl deneyimlediğini görebilirsiniz.",
+      "webApp": "Bir web uygulaması düzenleyin",
+      "webAppDesc": "OpenObserve RUM SDK'yı herhangi bir JavaScript uygulamasına ekleyin",
+      "sessionReplay": "Oturum Tekrarını Etkinleştir",
+      "sessionReplayDesc": "UX sorunlarında hata ayıklamak için kullanıcı oturumlarını kaydedin ve tekrarlayın",
+      "learnMore": "Daha fazla bilgi edinin:",
+      "quickImpl": "Hızlı uygulama kılavuzu",
+      "blogPost": "Ön uç izleme temelleri"
+    }
   },
   "about": {
     "name": "Açık Gözlem",
@@ -1834,7 +1845,23 @@
     "tabAiAssistant": "O2 AI Asistanı",
     "tabOverview": "Genel Bakış",
     "tabUsage": "Kullanımı",
-    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız"
+    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız",
+    "noDataState": {
+      "title": "Henüz veri alınmadı",
+      "description": "Bu kuruluş herhangi bir veri almadı, bu yüzden çizeleyecek bir şey yok. Olaylar akmaya başladığında, alım <strong>hacminiz, depolama ve sorgu kullanım</strong> ınız burada otomatik olarak görünecektir.",
+      "logs": "Günlükleri gönder",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector ve daha fazlası",
+      "traces": "İzleri gönder",
+      "tracesDesc": "OTLP/Jaeger/Zipkin dağıtılmış izleme",
+      "metrics": "Metrik gönder",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf ve daha fazlası",
+      "or": "Veya:",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Yapay zeka entegrasyonları",
+      "shippers": "Kütük göndericileri"
+    }
   },
   "billing": {
     "header": "Kullanım ve Faturalandırma",
@@ -3268,7 +3295,42 @@
     "openInFullView": "Tam görünümde aç",
     "serviceMap": "Servis Haritası",
     "patternView": "Desen Görünümü",
-    "spanView": "Açıklık Görünümü"
+    "spanView": "Açıklık Görünümü",
+    "noData": {
+      "title": "OpenObservere'e iz göndermeye başlayın",
+      "description": "Bu organizasyonda henüz iz akışı bulunamadı. Hizmetleriniz ve izleriniz burada otomatik olarak görünecektir.",
+      "otlp": "İzleri OTLP ile gönderin",
+      "otlpDesc": "Jaeger, Zipkin ve herhangi bir OpenTelemetry uyumlu SDK",
+      "otelCollector": "Otel Toplayıcı/Temsilci",
+      "otelCollectorDesc": "Tüm telemetri sinyallerini oTel Collector üzerinden yönlendirin",
+      "or": "Veya:",
+      "kubernetes": "Kubernetes",
+      "python": "piton",
+      "java": "Java",
+      "nodejs": "Node.js dosyası",
+      "askAi": "Yapay zekadan izleme ayarlamasını isteyin"
+    },
+    "noStream": {
+      "title": "Keşfetmeye başlamak için bir yayın seçin",
+      "description": "Bir izleme akışı seçin, ardından Sorguyu <strong>çalıştır'a</strong> basın. Sonuçlar yüklendikten sonra hizmet, süre, aralık durumu ve daha fazlasına göre filtreleyebilirsiniz.",
+      "selectStream": "Bir akış seçin",
+      "selectStreamDesc": "Bu kuruluştaki kullanılabilir izleme akışlarına göz atın",
+      "queryGuide": "İzler kılavuzunu okuyun",
+      "queryGuideDesc": "Hizmet grafiği, aralık filtreleme, RED metrikleri ve daha fazlası",
+      "recent": "En son:"
+    },
+    "noEvents": {
+      "title": "İz bulunamadı",
+      "descNoFilters": "{range} içinde hiçbir iz bulunamadı. Sonuçları yüklemek için zaman aralığını genişletmeyi deneyin.",
+      "descWithFilters": "Seçilen pencerede <strong>bu sorguy</strong> la eşleşen hiçbir şey yok. Zaman aralığını genişletmeyi veya bir filtreyi kaldırmayı deneyin.",
+      "expandRange": "Zaman aralığını genişletin",
+      "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
+      "removeFilter": "Filtreyi kaldırma",
+      "selectedRange": "Seçilen aralık"
+    },
+    "showAll": "Tümünü Göster",
+    "filterByErrors": "Hatalara göre filtrele",
+    "clearErrorFilter": "Hata filtresini temizle"
   },
   "invitation": {
     "pendingInvitations": "Bekleyen Davetiyeler",
@@ -3551,7 +3613,9 @@
     "timeRangeLabel": "Zaman Aralığı:",
     "analyzeTooltipTraces": "Hız, gecikme süresi ve hata kalıpları için izleme boyutlarını analiz edin",
     "insightsButtonLabel": "İçgörüler",
-    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin"
+    "searchInspectionsLabel": "Arama işi yürütme ayrıntılarını inceleyin",
+    "inspectBtnLabel": "İnceleyin",
+    "analyzeBtnLabel": "İçgörüler"
   },
   "errorInsights": {
     "title": "İçgörüler",
@@ -4029,7 +4093,13 @@
     "elevatedErrorRate": "Yükseltilmiş hata oranı",
     "reqPerSec": "istek/s",
     "allClear": "Hepsi temiz",
-    "allClearDesc": "Seçilen zaman aralığında etkin anormallikler, olaylar veya bozulmuş hizmetler yok."
+    "allClearDesc": "Seçilen zaman aralığında etkin anormallikler, olaylar veya bozulmuş hizmetler yok.",
+    "emptyActionAlerts": "Uyarı kurallarını görüntüle",
+    "emptyActionAlertsDesc": "Yapılandırılmış uyarıları ve eşikleri gözden geçirin",
+    "emptyActionLogs": "Günlükleri keşfedin",
+    "emptyActionLogsDesc": "Günlük akışlarınızı arayın ve filtreleyin",
+    "emptyActionTraces": "İzleri keşfedin",
+    "emptyActionTracesDesc": "Dağıtılmış izleri ve servis gecikmesini denetleyin"
   },
   "chatHistory": {
     "title": "Sohbetler",
@@ -4413,6 +4483,14 @@
     "noPipelineHistory": {
       "title": "Henüz boru hattı geçmişi yok",
       "description": "Boru hatlarınız çalıştıktan sonra boru hattı yürütme geçmişi burada görünecektir."
+    },
+    "noStreamSelected": {
+      "title": "Başlamak için bir yayın seçin",
+      "description": "Soldaki açılır menüden bir akış seçin, ardından günlüklerinizi keşfetmek için 'Sorguyu çalıştır'a basın. Ayrıca ek filtreler uygulayabilir ve tarih aralığını ayarlayabilirsiniz."
+    },
+    "noQueryApplied": {
+      "title": "Günlükleri görmek için bir sorgu çalıştırın",
+      "description": "Filtrelerinizi ayarlayın ve bu akış için olayları yüklemek için “Sorgu çalıştır\"ı tıklayın."
     }
   },
   "onlineEvals": {
@@ -4771,5 +4849,111 @@
       "scorers": "Gol Sahipleri",
       "scoreConfigs": "Puan Yapılandırmaları"
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "OpenObservere'ye veri göndermeye başlayın",
+      "description": "Bu organizasyonda henüz veri yok, bu yüzden keşfedilecek akış yok. İlk günlüklerinizi gönderin ve burada otomatik olarak görünecekler - nasıl başlamak istediğinizi seçin.",
+      "curl": "Curl/HTTP API ile gönder",
+      "curlDesc": "En hızlı yol - bir komut yapıştırın ve günlükler akmaya başlar",
+      "shippers": "Bir günlük göndericisi kullanın",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng ve daha fazlası",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Günlükler, izler ve ölçümler için satıcıdan bağımsız OTLP alımı",
+      "or": "Veya:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "AI'dan alımı ayarlamasını isteyin"
+    },
+    "noStream": {
+      "title": "Keşfetmeye başlamak için bir yayın seçin",
+      "description": "Bir akış seçin, ardından Sorguyu <strong>çalıştır'a</strong> basın. Sonuçlar geldiğinde filtreler, bir VRL işlevi ve özel bir zaman aralığı ile hassaslaştırabilirsiniz.",
+      "selectStream": "Bir akış seçin",
+      "selectStreamDesc": "Günlüklere, izlere, metriklere ve RUM akışlarına göz atın",
+      "queryGuide": "Sorgu kılavuzunu okuyun",
+      "queryGuideDesc": "Filtreler, SQL modu, VRL ve kaydedilmiş görünümler",
+      "recent": "En son:"
+    },
+    "noEvents": {
+      "title": "Etkinlik bulunamadı",
+      "descNoFilters": "{range} 'de hiçbir olay bulunamadı. Sonuçları yüklemek için zaman aralığını genişletmeyi deneyin.",
+      "descWithFilters": "Seçilen pencerede <strong>bu sorguy</strong> la eşleşen hiçbir şey yok. Zaman aralığını genişletmeyi, filtreyi kolaylaştırmayı veya sorguyu sıfırlamayı deneyin.",
+      "expandRange": "Zaman aralığını genişletin",
+      "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
+      "removeFilter": "Filtreyi kaldırma",
+      "removeFilterDescSql": "Bu sorguya uygulanan SQL koşullarınız var",
+      "openHistory": "Arama geçmişini aç",
+      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
+      "selectedRange": "Seçilen aralık"
+    },
+    "error": {
+      "sqlError": "SQL sözdizimi hatası",
+      "sqlErrorDesc": "Sorgunuzda bir sözdizimi hatası var. Vurgulanan hatalar için sorgu düzenleyicisini inceleyin.",
+      "streamNotFound": "Akış bulunamadı",
+      "streamNotFoundDesc": "Seçilen akış mevcut değil veya kaldırıldı.",
+      "ftsNotConfigured": "Tam metin arama yapılandırılmadı",
+      "ftsNotConfiguredDesc": "Bu akışın tam metin arama alanı yoktur. Anahtar kelime aramayı etkinleştirmek için birini yapılandırın.",
+      "fieldNotFound": "Alan bulunamadı",
+      "fieldNotFoundDesc": "Sorgunuz bu akışta bulunmayan bir veya daha fazla alana başvurur.",
+      "functionNotDefined": "Fonksiyon tanımlanmadı",
+      "functionNotDefinedDesc": "Sorgunuz tanımlanmamış bir VRL işlevini çağırır.",
+      "dataUnavailable": "Veri dosyaları kullanılamıyor",
+      "dataUnavailableDesc": "Bu zaman aralığı için bazı veri dosyalarına erişilemez. Farklı bir zaman penceresi deneyin.",
+      "dataTypeMismatch": "Veri türü uyumsuzluğu",
+      "dataTypeMismatchDesc": "Sorgunuzdaki bir alan uyumsuz bir veri türüyle kullanılır.",
+      "executionError": "Sorgu yürütme başarısız oldu",
+      "executionErrorDesc": "Sorgunuzu yürütürken bir hata oluştu.",
+      "serverError": "Sunucu hatası",
+      "serverErrorDesc": "Sunucuda dahili bir hata oluştu.",
+      "generic": "Arama hatası",
+      "genericDesc": "Arama olayları alınırken bir hata oluştu.",
+      "configureStream": "Akışı yapılandırma",
+      "configureStreamDesc": "Akış ayarlarında tam metin arama alanı ekleme",
+      "fixQuery": "Sorguyu düzeltin",
+      "fixQueryDesc": "Editördeki sorguyu gözden geçirin ve düzeltin",
+      "expandRange": "Farklı bir zaman aralığı deneyin",
+      "expandRangeDesc": "Erişilebilir veriler farklı bir zaman aralığında olabilir",
+      "copyError": "Hata ayrıntılarını kopyala",
+      "traceId": "İzleme kimliği:",
+      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
+      "showDetail": "Ayrıntıları göster",
+      "hideDetail": "Ayrıntıları gizle"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL sözdizimi hatası",
+    "sqlErrorDesc": "Sorgunuzda bir sözdizimi hatası var. Vurgulanan hatalar için düzenleyiciyi inceleyin.",
+    "streamNotFound": "Akış bulunamadı",
+    "streamNotFoundDesc": "Seçilen akış mevcut değil veya kaldırıldı.",
+    "ftsNotConfigured": "Tam metin arama yapılandırılmadı",
+    "ftsNotConfiguredDesc": "Bu akışın tam metin arama alanı yoktur. Anahtar kelime aramayı etkinleştirmek için birini yapılandırın.",
+    "fieldNotFound": "Alan bulunamadı",
+    "fieldNotFoundDesc": "Sorgunuz bu akışta bulunmayan bir veya daha fazla alana başvurur.",
+    "functionNotDefined": "Fonksiyon tanımlanmadı",
+    "functionNotDefinedDesc": "Sorgunuz tanımlanmamış bir VRL işlevini çağırır.",
+    "dataUnavailable": "Veri dosyaları kullanılamıyor",
+    "dataUnavailableDesc": "Bu zaman aralığı için bazı veri dosyalarına erişilemez. Farklı bir zaman penceresi deneyin.",
+    "dataTypeMismatch": "Veri türü uyumsuzluğu",
+    "dataTypeMismatchDesc": "Sorgunuzdaki bir alan uyumsuz bir veri türüyle kullanılır.",
+    "executionError": "Sorgu yürütme başarısız oldu",
+    "executionErrorDesc": "Sorgunuzu yürütürken bir hata oluştu.",
+    "serverError": "Sunucu hatası",
+    "serverErrorDesc": "Sunucuda dahili bir hata oluştu.",
+    "generic": "Sorgu hatası",
+    "genericDesc": "Sorgunuz işlenirken bir hata oluştu.",
+    "configureResource": "Akışı yapılandırma",
+    "configureResourceDesc": "Akış ayarlarında tam metin arama alanı ekleme",
+    "fixQuery": "Sorguyu düzeltin",
+    "fixQueryDesc": "Editördeki sorguyu gözden geçirin ve düzeltin",
+    "expandRange": "Farklı bir zaman aralığı deneyin",
+    "expandRangeDesc": "Erişilebilir veriler farklı bir zaman aralığında olabilir",
+    "copyError": "Hata ayrıntılarını kopyala",
+    "copied": "Kopyalandı!",
+    "traceId": "İzleme kimliği:",
+    "askAi": "AI'dan sorgumu düzeltmesini isteyin",
+    "showDetail": "Ayrıntıları göster",
+    "hideDetail": "Ayrıntıları gizle"
   }
 }

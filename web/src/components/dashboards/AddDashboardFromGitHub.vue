@@ -138,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Add Folder Dialog -->
-    <ODrawer
+    <ODialog
       v-model:open="showAddFolderDialog"
-      size="lg"
+      size="sm"
       title="Add New Folder"
       primary-button-label="Save"
       secondary-button-label="Cancel"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="showAddFolderDialog = false"
         :edit-mode="false"
       />
-    </ODrawer>
+    </ODialog>
   </ODrawer>
 </template>
 
