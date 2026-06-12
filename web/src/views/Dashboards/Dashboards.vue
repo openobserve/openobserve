@@ -204,10 +204,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="tw:flex tw:items-center tw:gap-2 tw:min-w-0"
               >
                 <span
-                  class="tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:font-semibold tw:tracking-[0.02em]"
-                  >{{ ownerInitials(value) }}</span
-                >
-                <span
                   class="tw:text-text-primary tw:truncate tw:flex-1 tw:min-w-0"
                   :title="value"
                   >{{ value }}</span
@@ -453,8 +449,8 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
+import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -944,7 +940,7 @@ export default defineComponent({
       owner: folderInfo ? board.dashboard.owner : board.owner,
       created: formatDate(
         folderInfo ? board.dashboard.created : board.created,
-        "MMM D, YYYY",
+        "YYYY-MM-DDTHH:mm:ss",
       ),
       actions: "true",
     });

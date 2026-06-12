@@ -94,105 +94,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="
+                        !searchObj.loadingStream &&
+                        searchObj.data.stream.streamLists.length == 0 &&
+                        searchObj.loading == false
+                      "
+                    >
+                      <LogsNoDataState
+                        :ai-enabled="isAiEnabled"
+                        data-test="logs-search-no-streams-in-org-text"
+                        @ask-ai="onAskAiFixQuery"
+                      />
+                    </div>
+                    <div
+                      v-else-if="
                         searchObj.data.filterErrMsg !== '' &&
                         searchObj.loading == false
                       "
-                      class="tw:justify-center"
+                      data-test="logs-search-filter-error-message"
                     >
-                      <h5 class="tw:text-center">
-                        <OIcon
-                          name="warning" style="width: 10rem; height: 10rem;" /><br />
-                        <div
-                          data-test="logs-search-filter-error-message"
-                          style="white-space: pre-line"
-                        >
-                          {{ searchObj.data.filterErrMsg }}
-                        </div>
-                      </h5>
+                      <LogsErrorState
+                        :error-code="0"
+                        :error-msg="searchObj.data.filterErrMsg"
+                        :ai-enabled="isAiEnabled"
+                        @ask-ai="onAskAiFixQuery"
+                        @fix-query="onFixQuery"
+                        @configure-stream="onConfigureStream"
+                        @widen-range="onWidenRange"
+                      />
                     </div>
                     <div
                       v-else-if="
                         searchObj.data.errorMsg !== '' &&
                         searchObj.loading == false
                       "
-                      class="tw:justify-center"
+                      data-test="logs-search-error-state"
                     >
-                      <h5 class="tw:text-center tw:m-0 tw:pt-[2rem]">
-                        <div
-                          data-test="logs-search-result-not-found-text"
-                          class="tw:pt-4"
-                          v-if="
-                            searchObj.data.errorCode == 0 &&
-                            searchObj.data.errorMsg == ''
-                          "
-                        >
-                          Result not found.
-                          <OButton
-                            v-if="
-                              searchObj.data.errorMsg != '' ||
-                              searchObj?.data?.functionError != ''
-                            "
-                            @click="toggleErrorDetails"
-                            variant="outline"
-                            size="sm-action"
-                            data-test="logs-page-result-error-details-btn-result-not-found"
-                            >{{ t("search.functionErrorBtnLabel") }}</OButton
-                          >
-                        </div>
-                        <div
-                          data-test="logs-search-error-message"
-                          class="tw:pt-4"
-                          v-else
-                        >
-                          Error occurred while retrieving search events.
-                          <OButton
-                            v-if="
-                              searchObj.data.errorMsg != '' ||
-                              searchObj?.data?.functionError != ''
-                            "
-                            @click="toggleErrorDetails"
-                            variant="outline"
-                            size="sm-action"
-                            style="font-size: 0.875rem"
-                            data-test="logs-page-result-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
-                          >
-                        </div>
-                        <div
-                          data-test="logs-search-error-20003"
-                          v-if="parseInt(searchObj.data.errorCode) == 20003"
-                        >
-                          <OButton
-                            variant="primary"
-                            size="sm-action"
-                            as="RouterLink"
-                            :to="
-                              '/streams?dialog=' +
-                              searchObj.data.stream.selectedStream.label
-                            "
-                            >Click here</OButton
-                          >
-                          to configure a full text search field to the stream.
-                        </div>
-                        <span class="tw:text-sm">{{
-                          searchObj.data.additionalErrorMsg
-                        }}</span>
-                      </h5>
+                      <LogsErrorState
+                        :error-code="parseInt(searchObj.data.errorCode) || 0"
+                        :error-msg="searchObj.data.errorMsg"
+                        :error-detail="searchObj.data.errorDetail"
+                        :ai-enabled="isAiEnabled"
+                        :stream-name="searchObj.data.stream.selectedStream[0]"
+                        @ask-ai="onAskAiFixQuery"
+                        @fix-query="onFixQuery"
+                        @configure-stream="onConfigureStream"
+                        @widen-range="onWidenRange"
+                      />
                     </div>
                     <div
                       v-else-if="
                         searchObj.data.stream.selectedStream.length == 0 &&
                         searchObj.loading == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
+                      <LogsNoStreamState
+                        :org-id="store.state.selectedOrganization.identifier"
                         data-test="logs-search-no-stream-selected-text"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.noStreamSelectedMessage") }}
-                      </div>
+                        @select-stream="onSelectStream"
+                        @pick-stream="onPickStream"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -202,26 +162,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
-                      class="tw:flex tw:justify-center"
+                      data-test="logs-search-no-events-found-text"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.noRecordFound") }}
-                        <OButton
-                          v-if="
-                            searchObj.data.errorMsg != '' ||
-                            searchObj?.data?.functionError != ''
-                          "
-                          @click="toggleErrorDetails"
-                          variant="outline"
-                          size="sm-action"
-                          data-test="logs-page-result-error-details-btn-norecord"
-                          >{{ t("search.functionErrorBtnLabel") }}</OButton
-                        ><br />
-                      </div>
+                      <LogsNoEventsState
+                        :sql-mode="searchObj.meta.sqlMode"
+                        :query="searchObj.data.query"
+                        :editor-value="searchObj.data.editorValue"
+                        :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
+                        :date-type="searchObj.data.datetime.type || 'relative'"
+                        :ai-enabled="isAiEnabled"
+                        @widen-range="onWidenRange"
+                        @remove-filter="onRemoveFilter"
+                        @open-history="showSearchHistoryfn"
+                        @ask-ai="onAskAiFixQuery"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -231,15 +185,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.applySearch") }}
-                      </div>
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="logs-search-apply-search-text"
+                      />
                     </div>
                     <div
                       v-else-if="
@@ -248,15 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.searchApplied == false &&
                         searchObj.loading == false
                       "
-                      class="tw:flex tw:justify-center"
                     >
-                      <div
-                        data-test="logs-search-error-message"
-                        class="tw:text-center tw:w-5/6 tw:mx-0 tw:mt-none! tw:pt-[2rem] tw:text-[20px] tw:font-medium"
-                      >
-                        <OIcon name="info" size="md" class="tw:align-middle tw:mr-1" />
-                        {{ t("search.applySearch") }}
-                      </div>
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="logs-search-patterns-apply-search-text"
+                      />
                     </div>
                     <div
                       v-else
@@ -273,23 +221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
                       />
-                    </div>
-                    <div class="tw:text-center tw:w-5/6 tw:mx-auto">
-                      <h5 class="tw:my-none">
-                        <span v-if="disableMoreErrorDetails">
-                          <SanitizedHtmlRenderer
-                            data-test="logs-search-detail-error-message"
-                            :htmlContent="searchObj?.data?.errorMsg"
-                          />
-                          <div class="error-display__message">
-                            {{ searchObj?.data?.errorDetail }}
-                          </div>
-                          <SanitizedHtmlRenderer
-                            data-test="logs-search-detail-function-error-message"
-                            :htmlContent="searchObj?.data?.functionError"
-                          />
-                        </span>
-                      </h5>
                     </div>
                   </div>
                 </div>
@@ -422,7 +353,6 @@ import {
   addSpacesToOperators,
 } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -468,6 +398,10 @@ import IndexList from "@/plugins/logs/IndexList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
+import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
+import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import {
   saveLogsStream,
   restoreLogsStream,
@@ -489,7 +423,6 @@ export default defineComponent({
     SearchSchedulersList: defineAsyncComponent(
       () => import("@/plugins/logs/SearchSchedulersList.vue"),
     ),
-    SanitizedHtmlRenderer,
     VisualizeLogsQuery: defineAsyncComponent(
       () => import("@/plugins/logs/VisualizeLogsQuery.vue"),
     ),
@@ -501,6 +434,10 @@ export default defineComponent({
     ),
     OIcon,
     OSplitter,
+    OEmptyState,
+    LogsNoEventsState,
+    LogsNoDataState,
+    LogsErrorState,
 },
   mixins: [MainLayoutCloudMixin],
   emits: ["sendToAiChat"],
@@ -623,15 +560,11 @@ export default defineComponent({
         }
       }
     },
-    toggleErrorDetails() {
-      this.disableMoreErrorDetails = !this.disableMoreErrorDetails;
-    },
   },
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
-    const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
     const {
       searchObj,
@@ -1548,6 +1481,67 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
+    };
+
+    const onSelectStream = () => {
+      // Focus the stream selector trigger so the user can immediately pick a stream.
+      const trigger = document.querySelector<HTMLElement>(
+        '[data-test="log-search-index-list-select-stream"] button',
+      );
+      trigger?.click();
+    };
+
+    const onPickStream = (stream: string) => {
+      searchObj.data.stream.selectedStream = [stream];
+      searchObj.runQuery = true;
+    };
+
+    const isAiEnabled = computed(
+      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    );
+
+    const onWidenRange = (period: string) => {
+      searchBarRef.value?.dateTimeRef?.setRelativeTime(period);
+      searchObj.data.datetime.relativeTimePeriod = period;
+      searchObj.data.datetime.type = "relative";
+      searchObj.runQuery = true;
+    };
+
+    const onRemoveFilter = () => {
+      searchObj.data.query = "";
+      searchObj.data.editorValue = "";
+      searchBarRef.value?.updateQuery?.();
+      searchObj.runQuery = true;
+    };
+
+    const onAskAiFixQuery = () => {
+      const queryContext = searchObj.meta.sqlMode
+        ? searchObj.data.editorValue
+        : searchObj.data.query;
+      const errorContext = searchObj.data.errorMsg
+        ? (() => {
+            const el = document.createElement("div");
+            el.innerHTML = searchObj.data.errorMsg;
+            const text = (el.textContent ?? "").trim();
+            return text ? ` Error: ${text}.` : "";
+          })()
+        : "";
+      emit(
+        "sendToAiChat",
+        `My logs query failed.${errorContext} Query: ${queryContext || "(none)"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me fix it?`,
+        false,
+      );
+    };
+
+    const onFixQuery = () => {
+      searchBarRef.value?.focusEditor?.();
+    };
+
+    const onConfigureStream = () => {
+      const stream = searchObj.data.stream.selectedStream?.[0];
+      if (stream) {
+        router.push(`/streams?dialog=${stream}`);
+      }
     };
 
     const redirectBackToLogs = () => {
@@ -3244,6 +3238,14 @@ export default defineComponent({
       onAutoIntervalTrigger,
       showSearchHistory,
       showSearchHistoryfn,
+      isAiEnabled,
+      onSelectStream,
+      onPickStream,
+      onWidenRange,
+      onRemoveFilter,
+      onAskAiFixQuery,
+      onFixQuery,
+      onConfigureStream,
       redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
@@ -3255,7 +3257,6 @@ export default defineComponent({
       visualizeChartData,
       handleChartApiError,
       visualizeErrorData,
-      disableMoreErrorDetails,
       closeSearchHistoryfn,
       resetHistogramWithError,
       fnParsedSQL,

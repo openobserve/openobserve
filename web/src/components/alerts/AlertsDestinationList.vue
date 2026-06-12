@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:flex-1 tw:min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"

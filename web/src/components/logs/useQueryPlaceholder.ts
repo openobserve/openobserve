@@ -27,6 +27,8 @@ interface Options {
   initialDelayMs?: number;
   /** Override the text shown when no stream is selected. Default: "Select a stream first". */
   noStreamText?: string;
+  /** When true, all example queries containing match_all() are omitted (e.g. traces page). */
+  excludeMatchAll?: boolean;
 }
 
 const SYSTEM_FIELDS = new Set([
@@ -127,7 +129,7 @@ export function useQueryPlaceholder(
 
     const strVal = (field: StreamField): string => {
       const vals = fv[field.name]?.values ?? [];
-      return vals[0]?.key ?? "error";
+      return vals[0]?.key ?? "value";
     };
 
     const keyFields = [...interesting, ...others.filter((x) => !x.ftsKey)].slice(0, 4);
@@ -144,8 +146,10 @@ export function useQueryPlaceholder(
         result.push(base);
         if (kf1) result.push(`${base} AND ${fieldExprSql(kf1)}`);
         if (kf1) result.push(`${base} OR ${fieldExprSql(kf1)}`);
-        if (ff0) result.push(`SELECT * FROM stream WHERE match_all('${ftsVal(ff0)}')`);
-        if (ff0 && kf1) result.push(`SELECT * FROM stream WHERE ${fieldExprSql(kf0)} AND match_all('${ftsVal(ff0)}')`);
+        if (!options.excludeMatchAll) {
+          if (ff0) result.push(`SELECT * FROM stream WHERE match_all('${ftsVal(ff0)}')`);
+          if (ff0 && kf1) result.push(`SELECT * FROM stream WHERE ${fieldExprSql(kf0)} AND match_all('${ftsVal(ff0)}')`);
+        }
       }
       return result;
     }
@@ -180,6 +184,9 @@ export function useQueryPlaceholder(
       result.push(`${fieldExpr(kf0)} AND match_all('${term}*')`);
     }
 
+    // 7a. standalone str_match — no match_all, shown on all pages including traces
+    if (sf0) result.push(`str_match(${sf0.name}, '${strVal(sf0)}')`);
+
     // 8. fuzzy_match combined with raw filter
     if (sf0 && kf0 && sf0.name !== kf0.name) {
       result.push(`${fieldExpr(kf0)} AND fuzzy_match(${sf0.name}, '${strVal(sf0)}', 1)`);
@@ -190,7 +197,10 @@ export function useQueryPlaceholder(
     // 9. Raw filter OR match_all postfix
     if (kf0) result.push(`${fieldExpr(kf0)} OR match_all('*${term}')`);
 
-    return result.slice(0, 9);
+    const filtered = options.excludeMatchAll
+      ? result.filter((q) => !q.includes("match_all"))
+      : result;
+    return filtered.slice(0, 9);
   });
 
   async function loop(): Promise<void> {

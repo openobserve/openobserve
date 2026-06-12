@@ -725,10 +725,15 @@ pub async fn update_stream_settings(
             .retain(|f| !new_settings.full_text_search_keys.remove.contains(f));
     }
     if !new_settings.full_text_search_keys.add.is_empty() {
+        let now = now_micros();
+        for field in new_settings.full_text_search_keys.add.iter() {
+            if !settings.full_text_search_keys.contains(field) {
+                settings.index_fields_updated_at.insert(field.clone(), now);
+            }
+        }
         settings
             .full_text_search_keys
             .extend(new_settings.full_text_search_keys.add);
-        settings.index_updated_at = now_micros();
     }
 
     // index_fields: remove first, then add
@@ -738,8 +743,13 @@ pub async fn update_stream_settings(
             .retain(|f| !new_settings.index_fields.remove.contains(f));
     }
     if !new_settings.index_fields.add.is_empty() {
+        let now = now_micros();
+        for field in new_settings.index_fields.add.iter() {
+            if !settings.index_fields.contains(field) {
+                settings.index_fields_updated_at.insert(field.clone(), now);
+            }
+        }
         settings.index_fields.extend(new_settings.index_fields.add);
-        settings.index_updated_at = now_micros();
     }
 
     // bloom_filter_fields: remove first, then add
@@ -1299,16 +1309,20 @@ pub async fn update_fields_type(
 }
 
 /// Make `settings` internally consistent before validation / persistence.
-/// Two normalizations, both in-place:
+/// Three normalizations, all in-place:
 ///
 /// 1. **Dedup** each of `full_text_search_keys`, `index_fields`, `bloom_filter_fields`, and
 ///    `partition_keys`, preserving first-occurrence order. Matches the silent dedup the update path
 ///    has always done on `.add` lists, so a user re-adding the same field is a no-op rather than an
 ///    error.
 /// 2. **Enforce `bloom ⊆ index`** by folding any bloom-only field into `index_fields` (and bumping
-///    `index_updated_at` if anything was added). Bloom is built by walking the tantivy term dict,
-///    so a bloom field that isn't in `index_fields` would silently produce no `.bf`; auto-folding
-///    here keeps the stored shape consistent with the runtime invariant.
+///    `index_updated_at` plus the per-field timestamps if anything was added). Bloom is built by
+///    walking the tantivy term dict, so a bloom field that isn't in `index_fields` would silently
+///    produce no `.bf`; auto-folding here keeps the stored shape consistent with the runtime
+///    invariant.
+/// 3. **Prune `index_fields_updated_at`** to fields still present in `full_text_search_keys` or
+///    `index_fields`, so removed fields don't leave stale timestamps behind (a later re-add must
+///    stamp a fresh time, because files written in the gap lack that field's index).
 ///
 /// Called by [`save_stream_settings`] just before [`validate_stream_settings`],
 /// and by [`validate_update_pre_flight`] on its simulated state so both paths
@@ -1342,8 +1356,24 @@ fn normalize_stream_settings(settings: &mut StreamSettings) {
         .cloned()
         .collect();
     if !missing_index.is_empty() {
+        let now = now_micros();
+        for field in missing_index.iter() {
+            settings.index_fields_updated_at.insert(field.clone(), now);
+        }
         settings.index_fields.extend(missing_index);
-        settings.index_updated_at = now_micros();
+    }
+
+    // 3. prune per-field timestamps of fields no longer indexed
+    if !settings.index_fields_updated_at.is_empty() {
+        let indexed: HashSet<String> = settings
+            .full_text_search_keys
+            .iter()
+            .chain(settings.index_fields.iter())
+            .cloned()
+            .collect();
+        settings
+            .index_fields_updated_at
+            .retain(|field, _| indexed.contains(field));
     }
 }
 
@@ -1371,6 +1401,36 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field};
 
     use super::*;
+
+    #[test]
+    fn test_normalize_stream_settings_index_fields_updated_at() {
+        let mut settings = StreamSettings {
+            index_fields: vec!["a".to_string()],
+            bloom_filter_fields: vec!["b".to_string()],
+            ..Default::default()
+        };
+        settings
+            .index_fields_updated_at
+            .insert("a".to_string(), 100);
+        settings
+            .index_fields_updated_at
+            .insert("removed".to_string(), 200);
+
+        normalize_stream_settings(&mut settings);
+
+        // bloom-only field folded into index_fields and stamped
+        assert!(settings.index_fields.contains(&"b".to_string()));
+        assert!(
+            settings
+                .index_fields_updated_at
+                .get("b")
+                .is_some_and(|v| *v > 0)
+        );
+        // entry of a field no longer indexed is pruned
+        assert!(!settings.index_fields_updated_at.contains_key("removed"));
+        // entry of a still-indexed field is preserved
+        assert_eq!(settings.index_fields_updated_at.get("a"), Some(&100));
+    }
 
     #[test]
     fn test_stream_res() {

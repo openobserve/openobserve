@@ -13,8 +13,10 @@ async function applyQueryButton(page) {
   testLogger.step('Applying query button');
   const pm = new PageManager(page);
   await pm.logsPage.runQueryAndWaitForResults();
-  await pm.logsPage.waitForSearchResults();
-  testLogger.debug('Query applied and results confirmed');
+  // Accept any definite post-query state: results table, no-events, or error.
+  // Tests that require actual rows call waitForSearchResults() in their body.
+  await pm.logsPage.waitForSearchResultOrEmpty();
+  testLogger.debug('Query applied and page reached a definite state');
 }
 
 

@@ -233,7 +233,7 @@ describe("UsageTab", () => {
       wrapper = mountUsageTab();
       await flushPromises();
 
-      expect(wrapper.find(".home-no-data-panel").exists()).toBe(true);
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(true);
     });
 
     it("should show the noData message text in empty state", async () => {
@@ -244,11 +244,11 @@ describe("UsageTab", () => {
       wrapper = mountUsageTab();
       await flushPromises();
 
-      const panel = wrapper.find(".home-no-data-panel");
+      const panel = wrapper.find('[data-test="home-usage-tab-no-data"]');
       expect(panel.exists()).toBe(true);
-      expect(panel.text()).toContain("No Data Ingested");
+      expect(panel.text()).toContain("No data ingested yet");
       expect(panel.text()).toContain(
-        "It appears you have not ingested any data",
+        "This organization hasn't received any data",
       );
     });
   });

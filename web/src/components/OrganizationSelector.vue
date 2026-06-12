@@ -237,7 +237,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
 
       <div
         data-test="organization-menu-list"
-        class="tw:flex tw:flex-col tw:w-80 tw:max-w-[92vw]"
+        class="tw:flex tw:flex-col tw:w-94 tw:max-w-[98vw]"
       >
         <!-- Header: title + count -->
         <div

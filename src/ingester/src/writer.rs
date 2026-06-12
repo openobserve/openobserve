@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     path::PathBuf,
     sync::{
         Arc, LazyLock as Lazy,
@@ -30,6 +29,7 @@ use config::{
     stats::MemorySize,
     utils::hash::{Sum64, gxhash},
 };
+use hashbrown::HashSet;
 use infra::runtime::WAL_RUNTIME;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
