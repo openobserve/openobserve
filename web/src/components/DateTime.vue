@@ -635,6 +635,8 @@ export default defineComponent({
     };
 
     const setAbsoluteTime = (startTime, endTime) => {
+      // Parent-invoked setter — the resulting auto-apply emit is programmatic.
+      markProgrammaticDateChange();
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
         selectedDate.value.from = dateString;
@@ -670,7 +672,24 @@ export default defineComponent({
     }
 
     const refresh = () => {
+      // Parent-invoked (e.g. on tab re-activation / auto-refresh) — programmatic.
+      markProgrammaticDateChange();
       saveDate();
+    };
+
+    // Distinguishes genuine user-driven date changes from programmatic ones
+    // (parent-invoked setters, mount replay). Stamped onto each `on:date-change`
+    // payload as `userChangedValue` so consumers (e.g. traces live-mode auto-run)
+    // can ignore programmatic changes instead of relying on value-diff heuristics.
+    let isUserInitiated = true;
+    const markProgrammaticDateChange = () => {
+      isUserInitiated = false;
+      // Reset after the current flush. Default ('pre') watchers — including the
+      // deep selectedDate/selectedTime watcher that drives auto-apply — run before
+      // nextTick callbacks, so the watch-triggered saveDate still reads `false`.
+      nextTick(() => {
+        isUserInitiated = true;
+      });
     };
 
     const saveDate = (dateType) => {
@@ -681,6 +700,7 @@ export default defineComponent({
       // }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
+      date["userChangedValue"] = isUserInitiated;
       // date["relativeTimePeriod"] = "";
       if (store.state.savedViewFlag == false) {
         emit("on:date-change", date);
@@ -702,6 +722,8 @@ export default defineComponent({
     }
 
     const setCustomDate = (dateType, dateobj) => {
+      // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
+      markProgrammaticDateChange();
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
 
