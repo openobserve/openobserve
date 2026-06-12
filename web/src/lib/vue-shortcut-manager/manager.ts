@@ -239,10 +239,46 @@ export class ShortcutManager {
     );
   }
 
+  /**
+   * Returns true when a text-input element has keyboard focus.
+   * Single-letter shortcuts (no modifier keys) must not fire while the user
+   * is typing — the check lives here so preventDefault() is never called
+   * before we decide to skip the shortcut.
+   */
+  private static isInputFocused(): boolean {
+    const el = document.activeElement;
+    if (!el || el === document.body) return false;
+    const tag = el.tagName.toLowerCase();
+    return (
+      ["input", "textarea", "select"].includes(tag) ||
+      (el as HTMLElement).isContentEditable
+    );
+  }
+
+  /**
+   * Returns true when the shortcut key string contains at least one modifier
+   * (ctrl, meta, alt, shift). Pure single-letter keys have no modifier.
+   */
+  private static hasModifier(key: string): boolean {
+    return (
+      key.startsWith("ctrl+") ||
+      key.startsWith("meta+") ||
+      key.startsWith("alt+") ||
+      key.startsWith("shift+")
+    );
+  }
+
   private triggerShortcut(
     shortcut: RegisteredShortcut,
     e: KeyboardEvent,
   ): void {
+    // Guard: never intercept single-letter shortcuts while the user is typing
+    // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
+    // ⌘+Enter, etc.) are always allowed through regardless of focus.
+    if (!ShortcutManager.hasModifier(shortcut.key) && ShortcutManager.isInputFocused()) {
+      return;
+    }
+
     if (shortcut.whenFocused !== undefined && shortcut.whenFocused !== null) {
       const isRef =
         shortcut.whenFocused !== null &&

@@ -71,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.edit')"
@@ -80,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('common.delete')"
@@ -155,6 +157,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const showAddGroup = ref(false);
@@ -356,6 +360,31 @@ const bulkDeleteUserGroups = async () => {
     confirmBulkDelete.value = false;
   }
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("iam-groups");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "iam-groups",
+    description: "shortcuts.actions.iamGroupsAdd",
+    handler: () => { if (!isInputFocused()) addGroup(); },
+  },
+  {
+    key: "r",
+    scope: "iam-groups",
+    description: "shortcuts.actions.iamGroupsRefresh",
+    handler: () => { if (!isInputFocused()) setupGroups(); },
+  },
+  {
+    key: "/",
+    scope: "iam-groups",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="iam-groups-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 
 </script>
 

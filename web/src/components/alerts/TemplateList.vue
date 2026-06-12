@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             @click.stop="exportTemplate(row)"
             data-test="destination-export"
+            data-row-action="export"
           >
             <OIcon name="download" size="sm" />
           </OButton>
@@ -132,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
             :disabled="row.isPrebuilt"
             @click="editTemplate(row)"
+            data-row-action="edit"
           >
             <OIcon name="edit" size="sm" />
           </OButton>
@@ -142,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-sm"
             :title="t('alert_templates.clone')"
             @click="cloneTemplate(row)"
+            data-row-action="duplicate"
           >
             <OIcon name="content-copy" size="sm" />
           </OButton>
@@ -153,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
             :disabled="row.isPrebuilt"
             @click="conformDeleteDestination(row)"
+            data-row-action="delete"
           >
             <OIcon name="delete" size="sm" />
           </OButton>
@@ -234,6 +238,8 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
@@ -590,6 +596,31 @@ const bulkDeleteTemplates = () => {
       }
     });
 };
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("alert-templates");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "alert-templates",
+    description: "shortcuts.actions.alertTemplatesAdd",
+    handler: () => { if (!isInputFocused()) editTemplate(null); },
+  },
+  {
+    key: "r",
+    scope: "alert-templates",
+    description: "shortcuts.actions.alertTemplatesRefresh",
+    handler: () => { if (!isInputFocused()) getTemplates(); },
+  },
+  {
+    key: "/",
+    scope: "alert-templates",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="template-list-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
+
 </script>
 <style lang="scss" scoped>
 // Badge style copied from ModelPricingList.vue so the "Prebuilt" / "Default"

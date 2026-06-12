@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -186,6 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     v-else
                     :data-test="`report-list-${row.name}-pause-start-report`"
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -196,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Edit -->
                   <OButton
                     :data-test="`report-list-${row.name}-edit-report`"
+                    data-row-action="edit"
                     icon-left="edit"
                     variant="ghost"
                     size="icon-sm"
@@ -216,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Delete -->
                   <OButton
                     :data-test="`report-list-${row.name}-delete-report`"
+                    data-row-action="delete"
                     icon-left="delete"
                     variant="ghost-destructive"
                     size="icon-sm"
@@ -764,6 +767,31 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   invalidateFolderCache(toFolder);
   await loadReports(activeFolderId.value);
 };
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcutScope("reports");
+useShortcutsWithMac([
+  {
+    key: "n",
+    scope: "reports",
+    description: "shortcuts.actions.reportsAdd",
+    handler: () => { if (!isInputFocused()) createNewReport(); },
+  },
+  {
+    key: "r",
+    scope: "reports",
+    description: "shortcuts.actions.reportsRefresh",
+    handler: () => { if (!isInputFocused()) loadReports(activeFolderId.value); },
+  },
+  {
+    key: "/",
+    scope: "reports",
+    description: "shortcuts.actions.focusSearch",
+    handler: () => {
+      (document.querySelector('[data-test="report-list-search-input"] input') as HTMLInputElement)?.focus();
+    },
+  },
+]);
 </script>
 
 

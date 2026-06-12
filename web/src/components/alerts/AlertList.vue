@@ -312,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <OButton
                       v-else
+                      :data-row-action="row.enabled ? 'pause' : 'resume'"
                       :data-test="`alert-list-${row.name}-pause-start-alert`"
                       class="tw:ml-1"
                       :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
@@ -325,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="toggleAlertState(row)"
                     />
                     <OButton
+                      data-row-action="edit"
                       :data-test="`alert-list-${row.name}-update-alert`"
                       variant="ghost"
                       size="icon-sm"
@@ -333,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop="editAlert(row)"
                     />
                     <OButton
+                      data-row-action="duplicate"
                       :title="t('alerts.clone')"
                       variant="ghost"
                       size="icon-sm"
@@ -721,6 +724,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 // import alertList from "./alerts";
 
@@ -2617,6 +2622,38 @@ export default defineComponent({
 
       confirmBulkDelete.value = false;
     };
+
+    // ── Keyboard shortcuts ──────────────────────────────────────────────
+    useShortcutScope("alerts");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "alerts",
+        description: "Create new alert",
+        handler: () => {
+          if (isInputFocused()) return;
+          addAlert();
+        },
+      },
+      {
+        key: "i",
+        scope: "alerts",
+        description: "shortcuts.actions.alertsImport",
+        handler: () => {
+          if (isInputFocused()) return;
+          importAlert();
+        },
+      },
+      {
+        key: "r",
+        scope: "alerts",
+        description: "Refresh alert list",
+        handler: () => {
+          if (isInputFocused()) return;
+          refreshAlerts();
+        },
+      },
+    ]);
 
     return {
       t,

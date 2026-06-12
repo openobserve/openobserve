@@ -199,7 +199,6 @@ import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "RunningQueries",
@@ -792,6 +791,17 @@ export default defineComponent({
       selectedSearchType.value = row.search_type_label;
       filterQuery.value = row.user_id;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("running-queries");
+    useShortcutsWithMac([
+      {
+        key: "r",
+        scope: "running-queries",
+        description: "shortcuts.actions.runningQueriesRefresh",
+        handler: () => { if (!isInputFocused()) refreshData(); },
+      },
+    ]);
 
     return {
       t,

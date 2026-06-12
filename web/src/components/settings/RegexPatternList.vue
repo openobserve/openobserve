@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
           <OButton
             :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
+            data-row-action="export"
             variant="ghost"
             size="icon-sm"
             title="Export Regex Pattern"
@@ -93,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
+            data-row-action="edit"
             variant="ghost"
             size="icon-sm"
             :title="t('regex_patterns.edit')"
@@ -101,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
+            data-row-action="delete"
             variant="ghost-destructive"
             size="icon-sm"
             :title="t('regex_patterns.delete')"

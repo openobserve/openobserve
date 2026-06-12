@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`delete-basic-user-${row.email}`"
+              data-row-action="delete"
               @click="confirmDeleteAction(row)"
             >
               <OIcon name="delete" size="sm" />
@@ -138,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`revoke-invite-${row.email}`"
+              data-row-action="delete"
               @click="confirmRevokeAction(row)"
             >
               <OIcon name="cancel" size="sm" />
@@ -148,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :data-test="`edit-basic-user-${row.email}`"
+              data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
@@ -169,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         </div>
     </div>
-    
+
     <update-user-role
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
@@ -259,6 +262,8 @@ import usePermissions from "@/composables/iam/usePermissions";
 import { computed, nextTick } from "vue";
 import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
@@ -610,7 +615,7 @@ export default defineComponent({
               const invitedMembers: any = await getInvitedMembers();
               users = [...res.data.data, ...invitedMembers];
             }
-            
+
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
@@ -1200,10 +1205,36 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
+
         selectedUsers.value = onlyEnabledSelected;
       }
     });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("iam-users");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "iam-users",
+        description: "shortcuts.actions.iamUsersAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        key: "r",
+        scope: "iam-users",
+        description: "shortcuts.actions.iamUsersRefresh",
+        handler: () => { if (!isInputFocused()) getOrgMembers(); },
+      },
+      {
+        key: "/",
+        scope: "iam-users",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="iam-users-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       router,

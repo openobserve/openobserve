@@ -359,6 +359,17 @@ export default defineComponent({
       fetchTokens();
     });
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("ingestion-tokens");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "ingestion-tokens",
+        description: "shortcuts.actions.ingestionTokensAdd",
+        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+      },
+    ]);
+
     return {
       store,
       t,

@@ -242,6 +242,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
@@ -1718,6 +1720,29 @@ export default defineComponent({
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("panel-editor");
+    useShortcutsWithMac([
+      {
+        key: "ctrl+enter",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorRun",
+        handler: () => runQuery(false),
+      },
+      {
+        key: "ctrl+s",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorSave",
+        handler: () => savePanelData.execute(),
+      },
+      {
+        key: "alt+left",
+        scope: "panel-editor",
+        description: "shortcuts.actions.panelEditorBack",
+        handler: () => goBack(),
+      },
+    ]);
 
     // Breadcrumb root crumb → dashboards list (module root).
     const goToDashboardList = () => {

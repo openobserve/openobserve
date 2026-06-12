@@ -1,198 +1,184 @@
+// Copyright 2026 OpenObserve Inc.
 <template>
-  <div v-if="visible" :style="styles.overlay">
-    <div :style="styles.backdrop" @click="visible = false" />
-    <div :style="styles.modal">
-      <div :style="styles.header">
-        <h2 :style="styles.title">Keyboard Shortcuts</h2>
-        <button :style="styles.closeBtn" @click="visible = false">✕</button>
-      </div>
+  <ODialog
+    v-model:open="open"
+    :title="t('shortcuts.title')"
+    size="xl"
+    data-test="shortcut-cheatsheet-dialog"
+  >
+    <!-- Search + platform label row -->
+    <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
+      <OSearchInput
+        v-model="search"
+        :placeholder="t('shortcuts.search')"
+        class="tw:flex-1"
+        data-test="shortcut-cheatsheet-search"
+      />
+      <span
+        style="font-size: 11px; white-space: nowrap"
+        class="tw:text-[var(--o2-text-secondary)]"
+      >
+        {{ isMac ? t("shortcuts.mac") : t("shortcuts.windowsLinux") }}
+      </span>
+    </div>
 
-      <div v-if="groupedShortcuts.length === 0" :style="styles.empty">
-        No shortcuts registered.
-      </div>
+    <!-- No results -->
+    <div
+      v-if="filteredRegistry.length === 0"
+      class="tw:text-center tw:py-8 tw:text-[13px] tw:text-[var(--o2-text-secondary)]"
+      data-test="shortcut-cheatsheet-no-results"
+    >
+      {{ t("shortcuts.noResults") }}
+    </div>
 
-      <div v-for="group in groupedShortcuts" :key="group.scope">
-        <h3 :style="styles.scopeTitle">{{ group.scope }}</h3>
-        <ul :style="styles.list">
-          <li v-for="s in group.shortcuts" :key="s.id" :style="styles.item">
-            <div :style="styles.itemLeft">
-              <span :style="styles.desc">{{ s.description ?? s.key }}</span>
-              <div :style="styles.badges">
-                <span
-                  v-if="s.scope && s.scope !== 'global'"
-                  :style="styles.badgeScope"
-                >
-                  {{ s.scope }}
-                </span>
-                <span v-if="s.whenFocused" :style="styles.badgeFocus">
-                  focused
-                </span>
-              </div>
+    <!-- Shortcut groups — 2-column grid -->
+    <div class="tw:grid tw:grid-cols-2 tw:gap-4 tw:items-start">
+      <div
+        v-for="group in filteredRegistry"
+        :key="group.pageKey"
+        class="tw:rounded-lg tw:border tw:border-[var(--o2-border)] tw:overflow-hidden"
+      >
+        <!-- Section header -->
+        <div
+          class="tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-widest tw:px-3 tw:py-2 tw:border-b tw:border-[var(--o2-border)] tw:bg-[var(--o2-primary-background)]"
+          style="color: var(--o2-primary-color)"
+        >
+          {{ t(group.pageKey) }}
+        </div>
+
+        <!-- Shortcut rows -->
+        <ul class="tw:list-none tw:p-0 tw:m-0">
+          <li
+            v-for="s in group.shortcuts"
+            :key="s.descriptionKey"
+            class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1.5 tw:border-b tw:border-[var(--o2-border)] last:tw:border-b-0 tw:gap-3 tw:hover:bg-[var(--o2-primary-background)] tw:transition-colors"
+          >
+            <span class="tw:text-[12px] tw:text-[var(--o2-text-primary)]">
+              {{ t(s.descriptionKey) }}
+            </span>
+            <div class="tw:flex tw:gap-1 tw:shrink-0">
+              <kbd
+                v-for="part in formatKey(s.key)"
+                :key="part"
+                class="tw:bg-[var(--o2-card-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:px-1.5 tw:py-0.5 tw:font-mono tw:text-[11px] tw:text-[var(--o2-text-secondary)] tw:whitespace-nowrap tw:shadow-sm"
+                >{{ part }}</kbd
+              >
             </div>
-
-            <!-- Right: key combo -->
-            <kbd :style="styles.kbd">{{ formatKey(s.key) }}</kbd>
           </li>
         </ul>
       </div>
     </div>
-  </div>
+
+    <!-- Sticky footer -->
+    <template #footer>
+      <div
+        class="tw:text-[11px] tw:text-center tw:text-[var(--o2-text-secondary)]"
+      >
+        {{ t("shortcuts.toggleHint") }}
+        <kbd
+          class="tw:bg-[var(--o2-primary-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:px-1.5 tw:py-0.5 tw:font-mono tw:text-[11px] tw:mx-0.5"
+          >⇧</kbd
+        >
+        <kbd
+          class="tw:bg-[var(--o2-primary-background)] tw:border tw:border-[var(--o2-border)] tw:rounded tw:px-1.5 tw:py-0.5 tw:font-mono tw:text-[11px] tw:mx-0.5"
+          >?</kbd
+        >
+      </div>
+    </template>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useShortcutList, useShortcut } from "./composables";
+import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import { useShortcut } from "./composables";
+import { SHORTCUT_REGISTRY } from "./shortcutRegistry";
 
-const props = withDefaults(defineProps<{ toggleKey?: string }>(), {
-  toggleKey: "shift+?",
+const props = withDefaults(
+  defineProps<{
+    open?: boolean;
+    toggleKey?: string;
+  }>(),
+  {
+    open: false,
+    toggleKey: "shift+?",
+  },
+);
+
+const emit = defineEmits<{
+  "update:open": [value: boolean];
+}>();
+
+const { t } = useI18n();
+
+const open = computed({
+  get: () => props.open,
+  set: (val) => emit("update:open", val),
 });
 
-const visible = ref(false);
-const { shortcuts } = useShortcutList();
+const search = ref("");
+
+// Clear search when dialog closes
+watch(open, (val) => {
+  if (!val) search.value = "";
+});
+
+const filteredRegistry = computed(() => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) return SHORTCUT_REGISTRY;
+  return SHORTCUT_REGISTRY.flatMap((group) => {
+    const shortcuts = group.shortcuts.filter(
+      (s) =>
+        t(s.descriptionKey).toLowerCase().includes(q) ||
+        s.key.toLowerCase().includes(q),
+    );
+    return shortcuts.length ? [{ ...group, shortcuts }] : [];
+  });
+});
 
 useShortcut(
   props.toggleKey,
   () => {
-    visible.value = !visible.value;
+    open.value = !open.value;
   },
-  { description: "Show keyboard shortcuts", scope: "global" },
+  { description: "shortcuts.actions.openCheatsheet", scope: "global" },
 );
 
-const groupedShortcuts = computed(() => {
-  const map = new Map<string, typeof shortcuts.value>();
-  shortcuts.value.forEach((s) => {
-    const scope = s.scope ?? "global";
-    if (!map.has(scope)) map.set(scope, []);
-    map.get(scope)!.push(s);
-  });
-  return Array.from(map.entries()).map(([scope, list]) => ({
-    scope,
-    shortcuts: list,
-  }));
-});
+const isMac = computed(
+  () =>
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform),
+);
 
-function formatKey(key: string): string {
-  return key
-    .split("+")
-    .map((k) => {
-      const symbols: Record<string, string> = {
-        ctrl: "⌃",
-        shift: "⇧",
-        alt: "⌥",
-        meta: "⌘",
-        up: "↑",
-        down: "↓",
-        left: "←",
-        right: "→",
-        enter: "↵",
-        escape: "Esc",
-        backspace: "⌫",
-        space: "Space",
-        tab: "⇥",
-        delete: "⌦",
-        home: "Home",
-        end: "End",
-        pageup: "PgUp",
-        pagedown: "PgDn",
-      };
-      return symbols[k] ?? k.toUpperCase();
-    })
-    .join(" ");
-}
-
-const styles = {
-  overlay: { position: "fixed" as const, inset: "0", zIndex: "9999" },
-  backdrop: {
-    position: "fixed" as const,
-    inset: "0",
-    background: "rgba(0,0,0,0.5)",
-  },
-  modal: {
-    position: "fixed" as const,
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    background: "#fff",
-    borderRadius: "12px",
-    padding: "24px",
-    minWidth: "360px",
-    maxWidth: "520px",
-    maxHeight: "70vh",
-    overflowY: "auto" as const,
-    zIndex: "10000",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-    fontFamily: "system-ui, -apple-system, sans-serif",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "16px",
-  },
-  title: { fontSize: "18px", fontWeight: "600", margin: "0", color: "#111" },
-  closeBtn: {
-    background: "none",
-    border: "none",
-    fontSize: "16px",
-    cursor: "pointer",
-    color: "#666",
-    padding: "4px 8px",
-    borderRadius: "4px",
-  },
-  scopeTitle: {
-    fontSize: "11px",
-    textTransform: "uppercase" as const,
-    letterSpacing: "0.08em",
-    color: "#999",
-    margin: "16px 0 8px",
-    fontWeight: "600",
-  },
-  list: { listStyle: "none", padding: "0", margin: "0" },
-  item: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 0",
-    borderBottom: "1px solid #f0f0f0",
-    fontSize: "14px",
-    gap: "12px",
-  },
-  itemLeft: { display: "flex", flexDirection: "column" as const, gap: "4px" },
-  desc: { color: "#333" },
-  badges: { display: "flex", gap: "6px" },
-  badgeScope: {
-    fontSize: "10px",
-    background: "#eff6ff",
-    color: "#3b82f6",
-    border: "1px solid #bfdbfe",
-    borderRadius: "4px",
-    padding: "1px 6px",
-    fontWeight: "500",
-  },
-  badgeFocus: {
-    fontSize: "10px",
-    background: "#f0fdf4",
-    color: "#16a34a",
-    border: "1px solid #bbf7d0",
-    borderRadius: "4px",
-    padding: "1px 6px",
-    fontWeight: "500",
-  },
-  kbd: {
-    background: "#f4f4f4",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    padding: "2px 8px",
-    fontFamily: "monospace",
-    fontSize: "12px",
-    color: "#555",
-    whiteSpace: "nowrap" as const,
-  },
-  empty: {
-    color: "#999",
-    textAlign: "center" as const,
-    padding: "24px 0",
-    fontSize: "14px",
-  },
+const KEY_SYMBOLS: Record<string, string> = {
+  ctrl: "Ctrl",
+  shift: "⇧",
+  alt: "Alt",
+  meta: "⌘",
+  up: "↑",
+  down: "↓",
+  left: "←",
+  right: "→",
+  enter: "↵",
+  escape: "Esc",
+  backspace: "⌫",
+  delete: "Del",
+  space: "Space",
+  tab: "⇥",
+  home: "Home",
+  end: "End",
+  pageup: "PgUp",
+  pagedown: "PgDn",
 };
+
+function formatKey(key: string): string[] {
+  return key.split("+").map((k) => {
+    if (k === "ctrl" && isMac.value) return "⌘";
+    if (k === "alt" && isMac.value) return "⌥";
+    if ((k === "delete" || k === "del") && isMac.value) return "⌫";
+    return KEY_SYMBOLS[k] ?? k.toUpperCase();
+  });
+}
 </script>

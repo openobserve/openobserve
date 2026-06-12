@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   size: "md",
   showClose: true,
   width: undefined,
+  maxHeight: undefined,
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -167,10 +168,13 @@ const sizeClasses = computed(() => {
 
 const isFullSize = computed(() => props.size === "full");
 
-// Inline style for explicit width override (number 1-100 → vw)
-const contentStyle = computed(() =>
-  props.width != null ? { width: `${props.width}vw` } : undefined,
-);
+// Inline style for explicit width/maxHeight override
+const contentStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (props.width != null) style.width = `${props.width}vw`;
+  if (props.maxHeight != null) style.maxHeight = `${props.maxHeight}vh`;
+  return Object.keys(style).length ? style : undefined;
+});
 
 // ── Validation reset on cancel-path close ───────────────────────────────────
 /** Reset Quasar q-field validation for every field in the body slot so that

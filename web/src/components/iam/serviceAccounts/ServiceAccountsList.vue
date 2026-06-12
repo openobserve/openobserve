@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-edit"
+                  data-row-action="edit"
                   :title="t('serviceAccounts.update')"
                   variant="ghost"
                   size="icon-sm"
@@ -131,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   data-test="service-accounts-delete"
+                  data-row-action="delete"
                   :title="t('serviceAccounts.delete')"
                   variant="ghost"
                   size="icon-sm"
@@ -281,6 +283,8 @@ import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OBadge, OSearchInput },
@@ -674,6 +678,31 @@ export default defineComponent({
     };
 
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("iam-service-accounts");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.iamServiceAccountsAdd",
+        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+      },
+      {
+        key: "r",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.iamServiceAccountsRefresh",
+        handler: () => { if (!isInputFocused()) getServiceAccountsUsers(); },
+      },
+      {
+        key: "/",
+        scope: "iam-service-accounts",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="iam-service-accounts-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       router,

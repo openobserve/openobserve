@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
               <OButton
                 data-test="destination-export"
+                data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
                 title="Export Destination"
@@ -183,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
+                data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.edit')"
@@ -192,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"
@@ -277,6 +280,8 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcutScope } from "@/lib/vue-shortcut-manager";
+import { isInputFocused, useShortcutsWithMac } from "@/utils/keyboardShortcuts";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
@@ -759,10 +764,36 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
+
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
 
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcutScope("alert-destinations");
+    useShortcutsWithMac([
+      {
+        key: "n",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.alertDestinationsAdd",
+        handler: () => { if (!isInputFocused()) editDestination(null); },
+      },
+      {
+        key: "r",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.alertDestinationsRefresh",
+        handler: () => { if (!isInputFocused()) getDestinations(); },
+      },
+      {
+        key: "/",
+        scope: "alert-destinations",
+        description: "shortcuts.actions.focusSearch",
+        handler: () => {
+          (document.querySelector('[data-test="destination-list-search-input"] input') as HTMLInputElement)?.focus();
+        },
+      },
+    ]);
     return {
       t,
       showDestinationEditor,
