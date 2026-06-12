@@ -3595,23 +3595,33 @@ export class LogsPage {
      * @returns {Promise<string>} The error dialog text
      */
     async getDetailedErrorDialogText() {
-        // Try to click the error details button if visible
-        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        // The QueryErrorState redesign splits the backend message across two
+        // elements: the summary line (data-test="error-detail-summary",
+        // always visible) carries the first sentence — which is where the
+        // offending field/function name lives (e.g. "No field named X.") —
+        // while the remainder ("Valid fields are …") is tucked behind the
+        // expand toggle in the detail body (data-test="error-detail-body").
+        // Reading only the detail body misses the field name, so we expand the
+        // panel (best effort) and return the WHOLE error container text — the
+        // summary line plus the detail body — to assert against the full message.
+
+        // Expand the collapsible detail panel if a toggle is present.
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn).first();
         if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await detailsBtn.click();
             await this.page.waitForTimeout(500);
         }
 
-        // Try to get text from detailed error message first
-        const detailedError = this.page.locator(this.searchDetailErrorMessage);
-        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await detailedError.textContent();
-        }
-
-        // Fall back to the main error message
-        const errorMsg = this.page.locator(this.errorMessage);
-        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await errorMsg.textContent();
+        // Prefer the full error-state container so both the summary line (which
+        // holds the field name) and the expanded detail body are captured in a
+        // single string. Fall back to the detail body only if the container is
+        // unavailable.
+        for (const selector of [this.errorMessage, this.searchDetailErrorMessage]) {
+            const locator = this.page.locator(selector).first();
+            if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const text = (await locator.textContent()) || '';
+                if (text.trim()) return text;
+            }
         }
 
         // Return empty string if no error message found
