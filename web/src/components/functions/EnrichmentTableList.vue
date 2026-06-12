@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span v-if="row.urlJobs.length > 1" class="tw:text-gray-400"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
-                      <OIcon name="check-circle" size="sm">
+                      <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive)">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
