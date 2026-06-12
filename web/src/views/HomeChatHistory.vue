@@ -324,7 +324,7 @@ function formatTime(ts: string): string {
   background: var(--o2-selected-color, rgba(57, 126, 246, 0.12)) !important;
 
   .hch-item-title {
-    color: var(--o2-primary-color, #397ef6);
+    color: var(--o2-text-body);
     font-weight: 500;
   }
 }
@@ -348,11 +348,12 @@ function formatTime(ts: string): string {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--o2-text-body);
 }
 
 .hch-item-time {
   font-size: 0.6875em;
-  opacity: 0.45;
+  color: var(--o2-text-caption);
   margin-top: 0.0625em;
 }
 
