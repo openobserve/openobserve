@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
         <OSelect
-          v-model="streamFilter"
+          :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -400,6 +400,7 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
 
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
+  "request:stream-change": [stream: string];
 }>();
 
 // p99 > 1 second triggers the orange highlight
@@ -728,10 +729,7 @@ const loadAvailableStreams = async () => {
 };
 
 const onStreamFilterChange = (stream: string) => {
-  streamFilter.value = stream;
-  localStorage.setItem("servicesCatalog_streamFilter", stream);
-  hasInferColumns.value = null; // re-check schema for new stream
-  loadServicesCatalog();
+  emit("request:stream-change", stream);
 };
 
 async function loadServicesCatalog() {
@@ -877,6 +875,19 @@ ORDER BY total_requests DESC`;
 
 // Expose for parent ref access
 defineExpose({ loadServicesCatalog, streamFilter });
+
+// Keep streamFilter in sync when Traces/Spans tab changes the global stream
+watch(
+  () => searchObj.data.stream.selectedStream.value,
+  (newStream) => {
+    if (newStream && newStream !== streamFilter.value) {
+      streamFilter.value = newStream;
+      localStorage.setItem("servicesCatalog_streamFilter", newStream);
+      hasInferColumns.value = null;
+      loadServicesCatalog();
+    }
+  },
+);
 
 watch(
   () => [
