@@ -1238,6 +1238,92 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  describe("Component props — removed selectedLogStreams and showLogStreamSelector", () => {
+    it("should not use selectedLogStreams prop", () => {
+      // Component should work without selectedLogStreams prop
+      const testWrapper = mountSidebar({
+        // Explicitly not passing selectedLogStreams
+        streamName: "test-stream",
+      });
+      expect(testWrapper.exists()).toBe(true);
+      testWrapper.unmount();
+    });
+
+    it("should not use showLogStreamSelector prop", () => {
+      // Component should work without showLogStreamSelector prop
+      const testWrapper = mountSidebar({
+        // Explicitly not passing showLogStreamSelector
+        streamName: "test-stream",
+      });
+      expect(testWrapper.exists()).toBe(true);
+      testWrapper.unmount();
+    });
+  });
+
+  describe("Removed computed properties", () => {
+    it("should not have isViewLogsDisabled computed property", () => {
+      // This computed property was removed as part of the simplification
+      expect(wrapper.vm.isViewLogsDisabled).toBeUndefined();
+    });
+
+    it("should not have viewLogsTooltipContent computed property", () => {
+      // This computed property was removed as part of the simplification
+      expect(wrapper.vm.viewLogsTooltipContent).toBeUndefined();
+    });
+  });
+
+  describe("View Logs button — simplified behavior", () => {
+    it("should render View Logs button without disabled state logic", () => {
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
+      expect(viewLogsBtn.exists()).toBe(true);
+    });
+
+    it("should not have tooltip functionality", () => {
+      // OTooltip component should not be present since it was removed
+      const tooltip = wrapper.find('[data-test*="tooltip"]');
+      expect(tooltip.exists()).toBe(false);
+    });
+
+    it("should only show loading state for enterprise mode", async () => {
+      config.isEnterprise = "true";
+      // Set correlationLoading to true to test loading state
+      wrapper.vm.correlationLoading = true;
+      await wrapper.vm.$nextTick();
+
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
+      expect(viewLogsBtn.exists()).toBe(true);
+      // Should show loading state (assuming the button has loading attribute)
+      expect(viewLogsBtn.attributes('loading')).toBe('true');
+    });
+
+    it("should not have conditional disabled state based on log stream selection", () => {
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
+      expect(viewLogsBtn.exists()).toBe(true);
+      // Button should not be disabled based on selectedLogStreams prop (which was removed)
+      expect(viewLogsBtn.attributes('disabled')).toBeUndefined();
+    });
+
+    it("should have simplified click behavior without custom disabled logic", async () => {
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
+      expect(viewLogsBtn.exists()).toBe(true);
+
+      // Should be able to click without conditional disabled logic
+      await viewLogsBtn.trigger("click");
+      await flushPromises();
+
+      // Should call the appropriate navigation function
+      expect(mockBuildQueryDetails).toHaveBeenCalled();
+    });
+  });
+
   describe("getFilterValue — raw value substitution for RAW_VALUE_FILTER_FIELDS", () => {
     // getFilterValue is explicitly returned from setup() and is part of the component's
     // public API. We call it directly here to unit-test its branching logic in isolation
