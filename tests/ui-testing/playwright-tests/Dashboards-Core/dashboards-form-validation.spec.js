@@ -961,3 +961,168 @@ test.describe("Dashboard AddAnnotation form validation", () => {
         testLogger.info('AddAnnotation dialog closed after Cancel');
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ConfigPanel (panel editor right sidebar) form validation
+// Creates a dashboard + panel in beforeEach, then opens the ConfigPanel.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard ConfigPanel form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName  = 'e2e_fv_config_panel_001';
+    const panelName = 'e2e_fv_cfg_panel_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        // Navigate to dashboards list
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            // After create, dashboard is open — add a panel
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+            await pm.dashboardCreate.addPanelSmart();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+        }
+
+        // Open ConfigPanel via the panel configs helper
+        await pm.dashboardPanelConfigs.openConfigPanel();
+
+        // Wait for the description field to confirm ConfigPanel is visible
+        await pm.dashboardsFormValidation.getConfigPanelDescriptionLocator().waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('ConfigPanel opened');
+    });
+
+    test("should show error when decimals value exceeds 100", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-CP-001: Decimals value > 100 shows error');
+
+        await pm.dashboardsFormValidation.getConfigPanelDecimalsLocator().waitFor({ state: 'visible', timeout: 10000 });
+        const field = pm.dashboardsFormValidation.getConfigPanelDecimalsFieldLocator();
+        await field.fill('101');
+        await field.blur();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toContainText('Decimals must be between 0 and 100');
+        testLogger.info('Decimals > 100 error shown correctly');
+    });
+
+    test("should show error when decimals value is negative", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-CP-002: Negative decimals value shows error');
+
+        await pm.dashboardsFormValidation.getConfigPanelDecimalsLocator().waitFor({ state: 'visible', timeout: 10000 });
+        const field = pm.dashboardsFormValidation.getConfigPanelDecimalsFieldLocator();
+        await field.fill('-1');
+        await field.blur();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toContainText('Decimals must be between 0 and 100');
+        testLogger.info('Negative decimals error shown correctly');
+    });
+
+    test("should clear decimals error when corrected to valid value", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-CP-003: Decimals error clears on valid value');
+
+        await pm.dashboardsFormValidation.getConfigPanelDecimalsLocator().waitFor({ state: 'visible', timeout: 10000 });
+        const field = pm.dashboardsFormValidation.getConfigPanelDecimalsFieldLocator();
+        await field.fill('200');
+        await field.blur();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).toBeVisible();
+        await field.fill('2');
+        await field.blur();
+        await expect(pm.dashboardsFormValidation.getConfigPanelDecimalsErrorLocator()).not.toBeVisible();
+        testLogger.info('Decimals error clears on valid value');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BuildFieldPopUp form validation
+// Opens when a user clicks on a y-axis field chip in the panel editor.
+// Tests are skipped until the y-axis field chip data-test selector is confirmed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard BuildFieldPopUp form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName = 'e2e_fv_build_field_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        // Navigate to dashboards list
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Open panel editor and add a y-axis field so the chip is rendered
+        await pm.dashboardCreate.addPanelSmart();
+        await pm.chartTypeSelector.selectChartType('bar');
+        await pm.chartTypeSelector.selectStreamType('logs');
+        await pm.chartTypeSelector.selectStream('e2e_automate');
+        await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+        testLogger.info('Panel editor open with y-axis field added');
+    });
+
+    test("should open BuildFieldPopUp container when a y-axis field chip is clicked", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        test.skip(true, 'requires identifying the y-axis field chip selector — unskip once chip data-test is known');
+
+        testLogger.info('TC-BF-001: BuildFieldPopUp container opens on y-axis chip click');
+
+        // Click the y-axis field chip (selector TBD once chip data-test is confirmed)
+        // await page.locator('[data-test="dashboard-y-item-chip"]').first().click();
+
+        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await expect(pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator()).toBeVisible();
+        testLogger.info('BuildFieldPopUp container visible after chip click');
+    });
+
+    test("should render label input inside BuildFieldPopUp", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        test.skip(true, 'requires identifying the y-axis field chip selector — unskip once chip data-test is known');
+
+        testLogger.info('TC-BF-002: BuildFieldPopUp label input is present');
+
+        // Click the y-axis field chip (selector TBD once chip data-test is confirmed)
+        // await page.locator('[data-test="dashboard-y-item-chip"]').first().click();
+
+        await pm.dashboardsFormValidation.getBuildFieldPopupContainerLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await expect(pm.dashboardsFormValidation.getBuildFieldLabelInputLocator()).toBeVisible();
+        testLogger.info('BuildFieldPopUp label input rendered correctly');
+    });
+});

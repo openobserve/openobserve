@@ -99,6 +99,24 @@ export class AlertsFormValidationPage {
     // Wizard "Next" button (step 1 → step 2)
     this.alertWizardNextBtn = '[data-test="alert-wizard-next-btn"]';
 
+    // ── AlertSettings (step 3 of alert wizard) ───────────────────────────────
+    this.alertSettingsSilenceDuration = '[data-test="alert-settings-silence-duration-input-field"]';
+    this.alertSettingsSilenceError    = '[data-test="alert-settings-silence-duration-input-error"]';
+    this.alertDestinationsSelect      = '[data-test="alert-destinations-select-popover"]';
+    this.alertRefreshDestinationsBtn  = '[data-test="alert-settings-refresh-destinations-btn"]';
+
+    // ── QueryConfig (step 2 of alert wizard) ─────────────────────────────────
+    this.queryModeCustomTab           = '[data-test="query-mode-custom"]';
+    this.queryModeSqlTab              = '[data-test="query-mode-sql"]';
+    this.queryModePromqlTab           = '[data-test="query-mode-promql"]';
+    this.alertTriggerOperatorSelect   = '[data-test="alert-trigger-operator-select"]';
+    this.alertTriggerThresholdInput   = '[data-test="alert-trigger-threshold-input-field"]';
+    this.alertTriggerThresholdError   = '[data-test="alert-trigger-threshold-input-error"]';
+
+    // ── Alert wizard step 1 stream selectors ─────────────────────────────────
+    this.wizardStreamTypeDropdown     = '[data-test="add-alert-stream-type-select-dropdown"]';
+    this.wizardStreamNameDropdown     = '[data-test="add-alert-stream-name-select-dropdown"]';
+
     // ── FilterCondition — condition row elements ──────────────────────────────
     // AND/OR toggle button
     this.filterConditionToggleOperatorBtn = '[data-test="alert-conditions-toggle-operator-btn"]';
@@ -298,6 +316,24 @@ export class AlertsFormValidationPage {
   getAlertImportJsonBtnLocator()      { return this.page.locator(this.alertImportJsonBtn); }
   getDestImportJsonBtnLocator()       { return this.page.locator(this.destImportJsonBtn); }
 
+  // ── AlertSettings locator getters ────────────────────────────────────────
+  getAlertSettingsSilenceDurationLocator() { return this.page.locator(this.alertSettingsSilenceDuration); }
+  getAlertSettingsSilenceErrorLocator()    { return this.page.locator(this.alertSettingsSilenceError); }
+  getAlertDestinationsSelectLocator()      { return this.page.locator(this.alertDestinationsSelect); }
+  getAlertRefreshDestinationsBtnLocator()  { return this.page.locator(this.alertRefreshDestinationsBtn); }
+
+  // ── QueryConfig locator getters ───────────────────────────────────────────
+  getQueryModeCustomTabLocator()           { return this.page.locator(this.queryModeCustomTab); }
+  getQueryModeSqlTabLocator()              { return this.page.locator(this.queryModeSqlTab); }
+  getQueryModePromqlTabLocator()           { return this.page.locator(this.queryModePromqlTab); }
+  getAlertTriggerOperatorSelectLocator()   { return this.page.locator(this.alertTriggerOperatorSelect); }
+  getAlertTriggerThresholdInputLocator()   { return this.page.locator(this.alertTriggerThresholdInput); }
+  getAlertTriggerThresholdErrorLocator()   { return this.page.locator(this.alertTriggerThresholdError); }
+
+  // ── Alert wizard step 1 stream selector getters ───────────────────────────
+  getWizardStreamTypeDropdownLocator()     { return this.page.locator(this.wizardStreamTypeDropdown); }
+  getWizardStreamNameDropdownLocator()     { return this.page.locator(this.wizardStreamNameDropdown); }
+
   // ── FilterCondition locator getters ───────────────────────────────────────
   getFilterConditionToggleOperatorBtnLocator() { return this.page.locator(this.filterConditionToggleOperatorBtn); }
   getFilterConditionColumnPopoverLocator()     { return this.page.locator(this.filterConditionColumnPopover); }
@@ -335,6 +371,18 @@ export class AlertsFormValidationPage {
     testLogger.info('Clicking FilterCondition AND/OR toggle button');
     await this.page.locator(this.filterConditionToggleOperatorBtn).waitFor({ state: 'visible', timeout: 10000 });
     await this.page.locator(this.filterConditionToggleOperatorBtn).click();
+  }
+
+  async selectWizardStreamType(typeLabel) {
+    testLogger.info('Selecting alert wizard stream type: ' + typeLabel);
+    await this.page.locator(this.wizardStreamTypeDropdown).click();
+    await this.page.getByRole('option', { name: typeLabel, exact: true }).click();
+  }
+
+  async selectWizardStreamName(streamName) {
+    testLogger.info('Selecting alert wizard stream name: ' + streamName);
+    await this.page.locator(this.wizardStreamNameDropdown).click();
+    await this.page.getByRole('option', { name: streamName, exact: true }).click();
   }
 
   /**

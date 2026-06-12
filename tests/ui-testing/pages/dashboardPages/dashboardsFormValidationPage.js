@@ -138,6 +138,19 @@ export class DashboardsFormValidationPage {
         this.conditionCondition0    = '[data-test="dashboard-add-condition-condition-0"]';
         this.conditionValue         = '[data-test="dashboard-add-condition-value"]';
         this.conditionRemove        = '[data-test="dashboard-add-condition-remove"]';
+
+        // ── ConfigPanel (panel editor right sidebar) ──────────────────────────
+        this.configPanelDescription  = '[data-test="dashboard-config-description"]';
+        this.configPanelYAxisMin     = '[data-test="dashboard-config-y_axis_min"]';
+        this.configPanelYAxisMax     = '[data-test="dashboard-config-y_axis_max"]';
+        this.configPanelDecimals      = '[data-test="dashboard-config-decimals"]';
+        this.configPanelDecimalsField = '[data-test="dashboard-config-decimals-field"]';
+        this.configPanelDecimalsError = '[data-test="dashboard-config-decimals-error"]';
+        this.configPanelLimit        = '[data-test="dashboard-config-limit"]';
+
+        // ── BuildFieldPopUp ───────────────────────────────────────────────────
+        this.buildFieldPopupContainer = '[data-test="dashboard-build-field-popup-container"]';
+        this.buildFieldLabelInput     = '[data-test="dashboard-x-item-input-field"]';
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -496,4 +509,19 @@ export class DashboardsFormValidationPage {
     getConditionRemoveLocator() {
         return this.page.locator(this.conditionRemove);
     }
+
+    // ── ConfigPanel helpers ───────────────────────────────────────────────────
+
+    getConfigPanelDescriptionLocator() { return this.page.locator(this.configPanelDescription); }
+    getConfigPanelYAxisMinLocator()     { return this.page.locator(this.configPanelYAxisMin); }
+    getConfigPanelYAxisMaxLocator()     { return this.page.locator(this.configPanelYAxisMax); }
+    getConfigPanelDecimalsLocator()      { return this.page.locator(this.configPanelDecimals); }
+    getConfigPanelDecimalsFieldLocator() { return this.page.locator(this.configPanelDecimalsField); }
+    getConfigPanelDecimalsErrorLocator() { return this.page.locator(this.configPanelDecimalsError); }
+    getConfigPanelLimitLocator()         { return this.page.locator(this.configPanelLimit); }
+
+    // ── BuildFieldPopUp helpers ───────────────────────────────────────────────
+
+    getBuildFieldPopupContainerLocator(){ return this.page.locator(this.buildFieldPopupContainer); }
+    getBuildFieldLabelInputLocator()    { return this.page.locator(this.buildFieldLabelInput); }
 }
