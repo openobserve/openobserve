@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashSet,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use config::tantivy::tokenizer::o2_collect_search_tokens;
@@ -41,6 +38,7 @@ use datafusion::{
         projection::ProjectionExec,
     },
 };
+use hashbrown::HashSet;
 use parking_lot::Mutex;
 
 use crate::service::search::{
@@ -315,7 +313,7 @@ fn is_expr_valid_for_index(expr: &Arc<dyn PhysicalExpr>, index_fields: &HashSet<
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, sync::Arc};
+    use std::sync::Arc;
 
     use arrow::array::{Int64Array, RecordBatch, StringArray};
     use arrow_schema::{DataType, Field, FieldRef, Schema};

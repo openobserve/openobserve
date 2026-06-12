@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :horizontal="false"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full">
+            <div class="tw:w-full tw:h-full tw:border-r tw:border-border-default">
               <!-- Tabs Section -->
               <div class="card-container tw:py-2 tw:px-2 tw:mb-[0.625rem]">
                 <div class="app-tabs-container tw:h-[36px] tw:w-fit">

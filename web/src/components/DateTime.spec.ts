@@ -205,9 +205,41 @@ describe("DateTime Component", () => {
       
       wrapper.vm.saveDate("relative");
       await wrapper.vm.$nextTick();
-      
+
       // Should emit date change
       expect(wrapper.emitted("on:date-change")).toBeTruthy();
+    });
+
+    it("should stamp userChangedValue=true on a direct (user-initiated) saveDate", async () => {
+      wrapper = createWrapper();
+      // Let the mount-time programmatic flag reset back to user-initiated.
+      await wrapper.vm.$nextTick();
+      store.state.savedViewFlag = false;
+
+      wrapper.vm.saveDate("relative");
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("on:date-change");
+      expect(events).toBeTruthy();
+      const lastPayload = events[events.length - 1][0];
+      expect(lastPayload.userChangedValue).toBe(true);
+    });
+
+    it("should stamp userChangedValue=false when a programmatic setter precedes the emit", async () => {
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+      store.state.savedViewFlag = false;
+
+      // setAbsoluteTime marks the change programmatic; the immediately-following
+      // saveDate runs before the nextTick reset, so it must be tagged false.
+      wrapper.vm.setAbsoluteTime(Date.now() * 1000 - 3_600_000_000, Date.now() * 1000);
+      wrapper.vm.saveDate("absolute");
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("on:date-change");
+      expect(events).toBeTruthy();
+      const lastPayload = events[events.length - 1][0];
+      expect(lastPayload.userChangedValue).toBe(false);
     });
 
     it("should test setCustomDate function", () => {

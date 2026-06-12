@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
@@ -39,12 +39,12 @@ use datafusion::{
     },
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
         get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
-        get_stream_setting_index_fields, get_stream_setting_index_updated_at,
+        get_stream_setting_index_fields, get_stream_setting_index_updated_at_for_fields,
         unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
@@ -165,8 +165,6 @@ pub async fn search(
         .into_iter()
         .filter(|v| latest_schema_map.contains_key(v))
         .collect_vec();
-    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
-
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
         .index_info
@@ -200,6 +198,20 @@ pub async fn search(
     )?;
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
+
+    // the index cutoff only depends on the fields the query actually reads from the index
+    // and we don't check the FTS fields here on purpose
+    let index_updated_at = {
+        let index_used_fields = idx_optimize_rule
+            .as_ref()
+            .map(|rule| rule.referenced_fields())
+            .unwrap_or_default();
+        get_stream_setting_index_updated_at_for_fields(
+            &stream_settings,
+            stream_created_at,
+            &index_used_fields,
+        )
+    };
 
     let query_params = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),

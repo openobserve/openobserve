@@ -216,15 +216,20 @@ class UnflattenedPage {
 
     /**
      * Open the log detail drawer for the row at index `rowIndex` (0-based, as
-     * rendered by the virtualized table).  Expands the row via its expand
-     * button and then opens the source column to render the JSON detail.
+     * rendered by the virtualized table).  Clicks the source cell to trigger
+     * the row's click handler, which opens the side detail drawer.
+     *
+     * Do NOT click the expand button first.  Clicking the expand button inserts
+     * a new virtual row at rowIndex+1 in the TenstackTable, which shifts all
+     * subsequent row indices by 1.  After row 0 is expanded,
+     * log-table-column-1-_timestamp no longer exists (index 1 is the inline
+     * expanded-content row), so findRowWithO2Id breaks after the first row and
+     * never scans the rest of the table.
      */
     async openLogRowDetail(rowIndex) {
-        const expandBtn = this.page.locator(
-            `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
-        );
-        await expandBtn.waitFor({ state: 'visible', timeout: 15000 });
-        await expandBtn.click();
+        // Clicking the source <td> bubbles up to the <tr> @click handler
+        // (handleDataRowClick → emits click:dataRow → openLogDetails in
+        // SearchResult.vue), which opens the side detail drawer.
         const sourceCell = this.page.locator(`[data-test="log-table-column-${rowIndex}-source"]`);
         await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
         await sourceCell.click();
