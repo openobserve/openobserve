@@ -98,10 +98,7 @@ impl Telemetry {
         // replicates segment::HttpClient::send, which is pinned to an older
         // reqwest than the workspace and cannot take our client
         let res = TELEMETRY_CLIENT
-            .post(format!(
-                "{}/v1/track",
-                get_config().common.telemetry_url
-            ))
+            .post(format!("{}/v1/track", get_config().common.telemetry_url))
             .basic_auth(get_instance_id(), Some(""))
             .json(&Message::from(track_event))
             .send()

@@ -26,10 +26,10 @@
 //! Gaps in 0.32, each covered by a function here:
 //! - `NumberDataPoint`/`Exemplar` reject string-encoded `asInt` values
 //! - `aggregationTemporality` rejects enum names
-//! - `ExponentialHistogramDataPoint`, `Buckets`, `ValueAtQuantile` and
-//!   `Exemplar` lack `serde(default)`, rejecting omitted zero/empty fields
-//! - `Exemplar`'s value oneof is not flattened, so a spec-form top-level
-//!   `asInt`/`asDouble` key is ignored
+//! - `ExponentialHistogramDataPoint`, `Buckets`, `ValueAtQuantile` and `Exemplar` lack
+//!   `serde(default)`, rejecting omitted zero/empty fields
+//! - `Exemplar`'s value oneof is not flattened, so a spec-form top-level `asInt`/`asDouble` key is
+//!   ignored
 
 use config::utils::json;
 
@@ -37,7 +37,10 @@ use config::utils::json;
 /// Lenient by design: unrecognized shapes are left untouched and surface as
 /// deserialization errors (HTTP 400) later.
 pub fn normalize(body: &mut json::Value) {
-    let resource_metrics = match body.get_mut("resourceMetrics").and_then(|v| v.as_array_mut()) {
+    let resource_metrics = match body
+        .get_mut("resourceMetrics")
+        .and_then(|v| v.as_array_mut())
+    {
         Some(v) => v,
         None => return,
     };
@@ -50,7 +53,10 @@ pub fn normalize(body: &mut json::Value) {
             None => continue,
         };
         for scope_metric in scope_metrics {
-            if let Some(metrics) = scope_metric.get_mut("metrics").and_then(|v| v.as_array_mut()) {
+            if let Some(metrics) = scope_metric
+                .get_mut("metrics")
+                .and_then(|v| v.as_array_mut())
+            {
                 for metric in metrics {
                     normalize_metric(metric);
                 }
