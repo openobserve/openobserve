@@ -446,4 +446,108 @@ export class PipelinesFormValidationPage {
         const field = this.page.locator(this.editChunkPeriodField);
         await field.fill('');
     }
+
+    // ── Environment-detection helpers (for conditional skips) ─────────────────
+
+    /**
+     * Tries every edit-pipeline button in the list, opens the pipeline editor,
+     * and looks for an LLM Evaluation canvas node.  If found, clicks the node
+     * to open its form section and returns true.  Returns false if no such node
+     * is found across all listed pipelines.
+     */
+    async openFirstLlmEvalNode() {
+        testLogger.info('Searching for a pipeline with an LLM Evaluation node');
+        await this.navigateToPipelines();
+        const editBtns = this.page.locator('[data-test$="-update-pipeline"]');
+        const count = await editBtns.count();
+        for (let i = 0; i < count; i++) {
+            await this.navigateToPipelines();
+            const btns = this.page.locator('[data-test$="-update-pipeline"]');
+            await btns.nth(i).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            const llmNode = this.page.locator('[data-test$="-llm-evaluation-node"]').first();
+            if (await llmNode.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await llmNode.click();
+                const nameField = this.page.locator(this.llmEvalNameField);
+                if (await nameField.isVisible({ timeout: 5000 }).catch(() => false)) {
+                    testLogger.info('LLM Evaluation node opened successfully');
+                    return true;
+                }
+            }
+        }
+        testLogger.warn('No pipeline with LLM Evaluation node found');
+        return false;
+    }
+
+    /**
+     * Tries every edit-pipeline button in the list, opens the editor, and looks
+     * for an Associate Function drawer.  If found, returns true.
+     */
+    async openFirstAssociateFunctionNode() {
+        testLogger.info('Searching for a pipeline with an Associate Function node');
+        await this.navigateToPipelines();
+        const editBtns = this.page.locator('[data-test$="-update-pipeline"]');
+        const count = await editBtns.count();
+        for (let i = 0; i < count; i++) {
+            await this.navigateToPipelines();
+            const btns = this.page.locator('[data-test$="-update-pipeline"]');
+            await btns.nth(i).click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            // Function nodes have a click target on the node header area
+            const funcNode = this.page.locator('[data-test$="-function-node"]').first();
+            if (await funcNode.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await funcNode.click();
+                const drawer = this.page.locator(this.associateFunctionDrawer);
+                if (await drawer.isVisible({ timeout: 5000 }).catch(() => false)) {
+                    testLogger.info('Associate Function drawer opened successfully');
+                    return true;
+                }
+            }
+        }
+        testLogger.warn('No pipeline with Associate Function node found');
+        return false;
+    }
+
+    /**
+     * Navigates to the backfill jobs list and clicks the Edit button on the
+     * first job found.  Returns true if the Edit Backfill Job dialog is visible.
+     */
+    async openFirstEditBackfillJob() {
+        testLogger.info('Navigating to backfill jobs list');
+        await this.navigateToPipelines();
+        // The backfill button is enterprise-only — check visibility
+        const backfillBtn = this.page.locator('[data-test="pipeline-list-backfill-btn"]');
+        if (!(await backfillBtn.isVisible({ timeout: 5000 }).catch(() => false))) {
+            // Try overflow menu
+            const overflowBtn = this.page.locator('[data-test="pipeline-list-overflow-menu-btn"]');
+            if (await overflowBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                await overflowBtn.click();
+                const menuBackfillBtn = this.page.locator('[data-test="pipeline-list-menu-backfill-btn"]');
+                if (!(await menuBackfillBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
+                    testLogger.warn('Backfill button not found – not enterprise?');
+                    return false;
+                }
+                await menuBackfillBtn.click();
+            } else {
+                testLogger.warn('Backfill button not accessible');
+                return false;
+            }
+        } else {
+            await backfillBtn.click();
+        }
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        const editBtn = this.page.locator('[data-test="edit-job-btn"]').first();
+        if (!(await editBtn.isVisible({ timeout: 8000 }).catch(() => false))) {
+            testLogger.warn('No backfill jobs found in list');
+            return false;
+        }
+        await editBtn.click();
+        const dialog = this.page.locator(this.editBackfillJobDialog);
+        if (!(await dialog.isVisible({ timeout: 5000 }).catch(() => false))) {
+            testLogger.warn('Edit Backfill Job dialog did not open');
+            return false;
+        }
+        testLogger.info('Edit Backfill Job dialog opened successfully');
+        return true;
+    }
 }
