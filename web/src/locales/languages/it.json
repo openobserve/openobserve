@@ -845,7 +845,10 @@
     "feature_correlation_management": "Gestione delle correlazioni",
     "feature_log_patterns": "Schemi di registro",
     "environment_type": "Tipo di ambiente",
-    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati."
+    "license_allows_unlimited_ingestion": "La licenza attuale consente l'inserimento illimitato dei dati.",
+    "refresh_license_limits": "Aggiorna i limiti delle licenze",
+    "license_refresh_success": "L'aggiornamento del limite di licenza è stato attivato correttamente",
+    "failed_to_refresh_license": "Aggiornamento dei limiti di licenza non riuscito"
   },
   "login": {
     "userid": "ID utente",
