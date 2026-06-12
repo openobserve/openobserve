@@ -32,7 +32,7 @@ use hashbrown::HashSet;
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,
-    utils::{get_column_name, is_column},
+    utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
 
 #[rustfmt::skip]
@@ -84,7 +84,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
             // Check if the AggregateExec matches SimpleHistogram pattern
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
+                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
                 // Check group by field
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
@@ -222,7 +222,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
             // Exactly 2 group-by expressions (histogram + breakdown) and 1 aggregate (count(*))
             if aggregate.group_expr().expr().len() == 2
                 && aggregate.aggr_expr().len() == 1
-                && aggregate.aggr_expr()[0].name() == "count(Int64(1))"
+                && is_count_rows_aggregate(&aggregate.aggr_expr()[0])
             {
                 let groups = aggregate.group_expr().expr();
                 // One must be date_bin (histogram), the other must be an index field column
@@ -334,7 +334,19 @@ mod tests {
                 )),
             ),
             (
+                "SELECT histogram(_timestamp) as ts, count(_timestamp) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757401680000000,
+                    60000000,
+                    16,
+                )),
+            ),
+            (
                 "SELECT name, histogram(_timestamp) as ts, count(*) as cnt from t group by name, ts",
+                None,
+            ),
+            (
+                "SELECT histogram(_timestamp) as ts, count(name) as cnt from t group by ts",
                 None,
             ),
         ];
@@ -393,9 +405,23 @@ mod tests {
                     "level".to_string(),
                 )),
             ),
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(_timestamp) as cnt from t group by ts, level",
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1757401680000000,
+                    1757402594060000,
+                    60000000,
+                    "level".to_string(),
+                )),
+            ),
             // level not in index_fields
             (
                 "SELECT histogram(_timestamp) as ts, name, count(*) as cnt from t group by ts, name",
+                None,
+            ),
+            // count over non-timestamp field is not equivalent to count(*)
+            (
+                "SELECT histogram(_timestamp) as ts, level, count(name) as cnt from t group by ts, level",
                 None,
             ),
             // single group by (no breakdown) - should not match multi histogram
