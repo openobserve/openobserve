@@ -422,7 +422,9 @@
     "menuGroupInspect": "Inspeccionar",
     "validSql": "SQL válido",
     "invalidSql": "Consulta no válida",
-    "menuGroupExplain": "Explique"
+    "menuGroupExplain": "Explique",
+    "fieldValuesEmpty": "No se ha encontrado ningún valor.",
+    "fieldValuesEmptyHint": "Prueba con un intervalo de tiempo más amplio para ver los valores."
   },
   "menu": {
     "home": "Inicio",
