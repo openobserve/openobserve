@@ -744,11 +744,29 @@ export default defineComponent({
 
       if (
         value.valueType === "absolute" &&
-        store.state.zoConfig?.auto_query_enabled
+        searchObj.meta.liveMode &&
+        store.state.zoConfig?.auto_query_enabled &&
+        value.userChangedValue === true &&
+        datetimeChanged
       ) {
         // Debounce query trigger so user can finish typing the full time value
         triggerAbsoluteQueryDebounced(value);
         return;
+      }
+
+      // Live mode: auto-trigger search ONLY on a genuine user-driven time-range
+      // change. `userChangedValue` (stamped by DateTime.vue) is the authoritative
+      // signal — programmatic sets (redirect, metrics brush, mount replay) emit
+      // `false` and must never auto-run, since they are owned by an explicit
+      // trigger elsewhere. `datetimeChanged` additionally filters a user toggling
+      // the type tab without actually changing the range.
+      if (
+        store.state.zoConfig?.auto_query_enabled &&
+        searchObj.meta.liveMode &&
+        value.userChangedValue === true &&
+        datetimeChanged
+      ) {
+        emit("searchdata");
       }
 
       if (config.isCloud == "true" && value.userChangedValue) {
@@ -762,19 +780,6 @@ export default defineComponent({
           page: "Search Logs",
         });
       }
-
-      // Live mode: auto-trigger search on a real time-range change.
-      // The DateTime component also fires `on:date-change` once on its own
-      // mount with the current value (no actual change). The `prev`
-      // comparison above filters out that mount-time replay so a tab
-      // switch that remounts the picker doesn't fire a redundant search.
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        datetimeChanged
-      ) {
-        emit("searchdata");
-      }
     };
 
     const toggleLiveMode = () => {
@@ -783,12 +788,6 @@ export default defineComponent({
         "oo_toggle_auto_run",
         String(searchObj.meta.liveMode),
       );
-    };
-
-    const updateQuery = () => {
-      // alert(searchObj.data.query);
-      if (queryEditorRef.value?.setValue)
-        queryEditorRef.value.setValue(searchObj.data.query);
     };
 
     // This method is used in parent component using ref
@@ -978,7 +977,6 @@ export default defineComponent({
       onQueryEditorBlur,
       updateQueryValue,
       updateDateTime,
-      updateQuery,
       downloadLogs,
       setEditorValue,
       autoCompleteKeywords,
@@ -1020,7 +1018,6 @@ export default defineComponent({
           this.searchObj.data.editorValue,
         );
         this.searchObj.data.editorValue = newValue;
-        this.searchObj.data.query = newValue;
         this.searchObj.data.stream.addToFilter = "";
         if (this.queryEditorRef?.setValue)
           this.queryEditorRef.setValue(newValue);
@@ -1039,7 +1036,6 @@ export default defineComponent({
         fieldName,
       );
       this.searchObj.data.editorValue = newValue;
-      this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
       if (
