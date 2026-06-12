@@ -911,8 +911,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
   describe("DateTime Handling", () => {
     it("should restore datetime from URL params", async () => {
-      const startTime = "1755853746625720";
-      const endTime = "1755853746725720";
+      const startTime = 1755853746625720;
+      const endTime = 1755853746725720;
 
       routerCurrentRouteSpy.mockReturnValue({
         value: {
@@ -1065,7 +1065,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "service_name = 'test'",
-      ], false); // liveMode is undefined, so skipSearch = false
+      ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
     it("should append error filter to applyFilters call when showErrorOnly is enabled", async () => {
@@ -1079,7 +1079,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockApplyFilters).toHaveBeenCalledWith([
         "duration >= 100",
         "span_status = 'ERROR'",
-      ], false); // liveMode is undefined, so skipSearch = false
+      ]); // applyFilters owns the single trigger; no skipSearch arg
     });
 
     it("should not duplicate error filter when it is already present in incoming filters", async () => {
@@ -1121,7 +1121,10 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
     });
 
-    it("should skip search when live mode is ON", async () => {
+    // Index no longer branches on liveMode / passes a skipSearch flag — it always
+    // calls applyFilters with just the filters; the live-mode search-gating now
+    // lives inside SearchBar.applyFilters (covered in SearchBar.spec).
+    it("should call applyFilters with only the filters when live mode is ON", async () => {
       mockSearchObj.meta.liveMode = true;
       store.state.zoConfig.auto_query_enabled = true;
       wrapper = mountWithSearchBarStub();
@@ -1131,10 +1134,10 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, true);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
-    it("should not skip search when live mode is OFF", async () => {
+    it("should call applyFilters with only the filters when live mode is OFF", async () => {
       mockSearchObj.meta.liveMode = false;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
@@ -1143,10 +1146,10 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
-    it("should handle undefined liveMode as false", async () => {
+    it("should call applyFilters with only the filters when liveMode is undefined", async () => {
       mockSearchObj.meta.liveMode = undefined;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
@@ -1155,7 +1158,7 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper.vm.onMetricsFiltersUpdated(testFilters);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters, false);
+      expect(mockApplyFilters).toHaveBeenCalledWith(testFilters);
     });
 
     it("should handle searchBarRef not available", async () => {
@@ -1258,6 +1261,40 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // SQL-style escaping uses double quotes: test'service becomes test''service
       expect(mockSearchObj.data.editorValue).toContain("test''service");
+    });
+
+    it("should not write searchObj.data.query on view-traces (no duplicate trigger)", async () => {
+      // The redirect used to set searchObj.data.query, which tripped a query
+      // watcher in addition to its own runQueryFn() → duplicate search. The
+      // watcher and that write are removed; only editorValue is set now.
+      mockSearchObj.data.query = "";
+
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+      await flushPromises();
+
+      wrapper.vm.handleServiceGraphViewTraces({
+        stream: "default",
+        serviceName: "checkout",
+        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+      });
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toContain("checkout");
+      expect(mockSearchObj.data.query).toBe("");
     });
 
     function mountIndexComponent() {

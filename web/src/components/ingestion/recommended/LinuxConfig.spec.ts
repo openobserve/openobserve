@@ -79,7 +79,7 @@ describe('LinuxConfig.vue', () => {
 
     it('should render installation description', () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain('Once you have installed');
+      expect(wrapper.text()).toContain('Once installed');
     });
 
     it('should render system logs collection info', () => {
@@ -105,41 +105,41 @@ describe('LinuxConfig.vue', () => {
     });
   });
 
-  describe('getCommand Computed', () => {
+  describe('activeCommand Computed', () => {
     it('should generate a command string', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(typeof vm.getCommand).toBe('string');
+      expect(typeof vm.activeCommand).toBe('string');
     });
 
     it('should include install.sh in the command', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getCommand).toContain('install.sh');
+      expect(vm.activeCommand).toContain('install.sh');
     });
 
     it('should include the endpoint URL in the command', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getCommand).toContain('http://localhost:5080');
+      expect(vm.activeCommand).toContain('http://localhost:5080');
     });
 
     it('should include the org identifier in the command', () => {
       wrapper = createWrapper({ currOrgIdentifier: 'my-org' });
       const vm = wrapper.vm as any;
-      expect(vm.getCommand).toContain('my-org');
+      expect(vm.activeCommand).toContain('my-org');
     });
 
     it('should include BASIC_PASSCODE placeholder', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getCommand).toContain('[BASIC_PASSCODE]');
+      expect(vm.activeCommand).toContain('[BASIC_PASSCODE]');
     });
 
     it('should include curl command', () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getCommand).toContain('curl');
+      expect(vm.activeCommand).toContain('curl');
     });
   });
 

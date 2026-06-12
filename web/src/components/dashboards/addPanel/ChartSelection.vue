@@ -253,6 +253,6 @@ export default defineComponent({
 }
 
 .chart-item-selected {
-  background-color: var(--color-border-subtle);
+  background-color: var(--o2-label-chip-url-bg);
 }
 </style>
