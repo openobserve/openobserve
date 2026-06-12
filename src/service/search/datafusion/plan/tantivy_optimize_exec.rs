@@ -204,7 +204,7 @@ async fn adapt_tantivy_result(
                 result.num_rows() as i64
             ]))]]
         }
-        IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets) => {
+        IndexOptimizeMode::SimpleHistogram(min_value, bucket_width, num_buckets, _ts_offset) => {
             vec![create_histogram_arrow_array(
                 &schema,
                 result.histogram(),

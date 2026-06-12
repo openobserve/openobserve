@@ -2271,6 +2271,7 @@ dependencies = [
  "dotenv_config",
  "dotenvy",
  "expect-test",
+ "fastdivide",
  "faststr",
  "float-cmp",
  "futures",
