@@ -3,12 +3,41 @@
 import { mount, VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
-
 vi.mock("@/composables/useIngestion", () => ({
-  default: () => ({ aiContent: "mock-ai-content" }),
+  default: () => ({
+    aiContent: "mock-ai-content",
+    endpoint: { value: { url: "https://api.example.com" } },
+  }),
+}));
+
+// Empty placement manifest → categories stay as defined in data.ts for these tests.
+vi.mock("@/components/ingestion/ai/content/manifest", () => ({
+  manifestIntegrations: [],
+  manifestCategories: [],
+}));
+
+// Content is fetched at build time (no committed snapshot), so stub it here.
+vi.mock("./content", () => ({
+  getAICardRaw: (slug: string) => {
+    if (slug === "langchain") return "# LangChain\n\nbody";
+    if (slug === "openai")
+      return "# OpenAI — Data Sources UI panel content\n\n## Card metadata\n\n| Field | Value |\n|---|---|\n| Display name | OpenAI |\n";
+    return undefined;
+  },
 }));
 
 import AIIntegrationDetail from "./AIIntegrationDetail.vue";
+
+const CARD_STUB = {
+  name: "AIIntegrationCard",
+  template: '<div data-test="ai-integration-card-stub" />',
+  props: ["content", "docUrl"],
+};
+const COPY_STUB = {
+  name: "CopyContent",
+  template: '<div data-test="ai-integration-detail-copy-content"><slot /></div>',
+  props: ["content"],
+};
 
 describe("AIIntegrationDetail", () => {
   let wrapper: VueWrapper;
@@ -18,46 +47,42 @@ describe("AIIntegrationDetail", () => {
       categorySlug: "frameworks",
       integrationSlug: "agno",
     },
-  ) => {
-    return mount(AIIntegrationDetail, {
+  ) =>
+    mount(AIIntegrationDetail, {
       props,
       global: {
-        stubs: {
-          CopyContent: {
-            template:
-              '<div data-test="ai-integration-detail-copy-content"><slot /></div>',
-            props: ["content"],
-          },
-        },
+        stubs: { AIIntegrationCard: CARD_STUB, CopyContent: COPY_STUB },
       },
     });
-  };
-
-  beforeEach(() => {
-    wrapper = mountDetail();
-  });
 
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
   });
 
-  describe("initial render", () => {
-    it("should mount successfully", () => {
+  describe("legacy fallback (integration without rich content)", () => {
+    beforeEach(() => {
+      wrapper = mountDetail({
+        categorySlug: "frameworks",
+        integrationSlug: "agno",
+      });
+    });
+
+    it("mounts successfully", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render copy content when integration found", () => {
+    it("renders the legacy CopyContent snippet", () => {
       expect(
-        wrapper
-          .find('[data-test="ai-integration-detail-copy-content"]')
-          .exists(),
+        wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists(),
       ).toBe(true);
+      expect(
+        wrapper.find('[data-test="ai-integration-card-stub"]').exists(),
+      ).toBe(false);
     });
 
-    it("should render documentation link", () => {
+    it("renders the documentation link", () => {
       const link = wrapper.find("a");
-      expect(link.exists()).toBe(true);
       expect(link.attributes("href")).toBe(
         "https://openobserve.ai/docs/integration/ai/frameworks/agno/",
       );
@@ -65,58 +90,49 @@ describe("AIIntegrationDetail", () => {
     });
   });
 
+  describe("rich card (integration with bundled content)", () => {
+    it("renders AIIntegrationCard for a direct-slug match (langchain)", () => {
+      wrapper = mountDetail({
+        categorySlug: "frameworks",
+        integrationSlug: "langchain",
+      });
+      expect(
+        wrapper.find('[data-test="ai-integration-card-stub"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists(),
+      ).toBe(false);
+    });
+
+    it("resolves content via contentSlug alias (openai-python → openai)", () => {
+      wrapper = mountDetail({
+        categorySlug: "model-providers",
+        integrationSlug: "openai-python",
+      });
+      const card = wrapper.findComponent(CARD_STUB);
+      expect(card.exists()).toBe(true);
+      expect(card.props("content")).toContain("OpenAI");
+    });
+  });
+
   describe("when integration is not found", () => {
-    it("should show select prompt for invalid category", () => {
-      const emptyWrapper = mountDetail({
+    it("shows the select prompt", () => {
+      wrapper = mountDetail({
         categorySlug: "nonexistent",
         integrationSlug: "nonexistent",
       });
-
-      expect(emptyWrapper.find("a").exists()).toBe(false);
-      expect(emptyWrapper.text()).toContain(
-        "Select an integration to view details.",
-      );
-      emptyWrapper.unmount();
+      expect(wrapper.find("a").exists()).toBe(false);
+      expect(wrapper.text()).toContain("Select an integration to view details.");
     });
   });
 
   describe("display name", () => {
-    it("should fall back to integrationSlug when integration not found", () => {
-      const emptyWrapper = mountDetail({
+    it("falls back to integrationSlug when integration not found", () => {
+      wrapper = mountDetail({
         categorySlug: "frameworks",
         integrationSlug: "unknown-integration",
       });
-
-      expect(emptyWrapper.vm.displayName).toBe("unknown-integration");
-      emptyWrapper.unmount();
-    });
-  });
-
-  describe("with different integrations", () => {
-    it("should render correct doc URL for model provider", () => {
-      const providerWrapper = mountDetail({
-        categorySlug: "model-providers",
-        integrationSlug: "openai-python",
-      });
-
-      const link = providerWrapper.find("a");
-      expect(link.attributes("href")).toBe(
-        "https://openobserve.ai/docs/integration/ai/providers/openai/",
-      );
-      providerWrapper.unmount();
-    });
-
-    it("should render correct doc URL for gateway", () => {
-      const gatewayWrapper = mountDetail({
-        categorySlug: "gateways",
-        integrationSlug: "litellm-proxy",
-      });
-
-      const link = gatewayWrapper.find("a");
-      expect(link.attributes("href")).toBe(
-        "https://openobserve.ai/docs/integration/ai/gateways/litellm-proxy/",
-      );
-      gatewayWrapper.unmount();
+      expect((wrapper.vm as any).displayName).toBe("unknown-integration");
     });
   });
 });

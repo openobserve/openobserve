@@ -16,17 +16,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
+import { b64EncodeStandard } from "@/utils/zincutils";
 import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
+import { getAICardRaw } from "./content";
+import type { CardSubstitutions } from "./content/renderMarkdown";
+import { getRichCardContent } from "./content/richCard/registry";
+import AIIntegrationCard from "./content/AIIntegrationCard.vue";
+import AIRichSetupCard from "./content/richCard/AIRichSetupCard.vue";
 
 const props = defineProps<{
   categorySlug: string;
   integrationSlug: string;
 }>();
 
-const { aiContent } = useIngestion();
+const store = useStore();
+const { aiContent, endpoint } = useIngestion();
 
 const category = computed<AICategory | undefined>(() =>
   aiCategories.find((c) => c.slug === props.categorySlug),
@@ -40,14 +48,62 @@ const docURL = computed(() => integration.value?.docURL ?? "");
 const displayName = computed(
   () => integration.value?.name ?? props.integrationSlug,
 );
+
+// Rich card markdown sourced from o2-datasource (if this integration has it),
+// otherwise fall back to the legacy 3-line snippet + doc link.
+const cardContent = computed(() =>
+  getAICardRaw(integration.value?.contentSlug ?? integration.value?.slug),
+);
+
+// Per-org url/org/token used by the rich card's commands + .env download (mirrors
+// AIIntegrationCard.vue's substitutions). `token` is the base64 of email:password
+// WITHOUT the "Basic " prefix — the snippets add it.
+const subs = computed<CardSubstitutions>(() => {
+  const email = store.state.userInfo?.email ?? "";
+  const passcode = store.state.organizationData?.organizationPasscode ?? "";
+  return {
+    url: endpoint.value?.url ?? "",
+    org: store.state.selectedOrganization?.identifier ?? "",
+    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
+  };
+});
+
+// Rich, stepped setup card for integrations that have it (registry-driven, keyed
+// by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
+const richContent = computed(() =>
+  getRichCardContent(
+    integration.value?.contentSlug ?? integration.value?.slug,
+    subs.value,
+  ),
+);
 </script>
 
 <template>
   <div v-if="integration" class="tw:p-2">
-    <div class="tw:text-[16px]">
+    <AIRichSetupCard
+      v-if="richContent"
+      :content="richContent"
+      :subs="subs"
+      :logo-url="integration.logo"
+    />
+    <AIIntegrationCard
+      v-else-if="cardContent"
+      :content="cardContent"
+      :doc-url="docURL"
+    />
+    <div v-else class="tw:text-[16px]">
       <CopyContent :content="aiContent" />
       <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click <a :href="docURL" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
+        Click
+        <a
+          :href="docURL"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-blue-500 hover:text-blue-600"
+          style="text-decoration: underline"
+          >here</a
+        >
+        to check further documentation.
       </div>
     </div>
   </div>

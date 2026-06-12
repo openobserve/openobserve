@@ -23,6 +23,21 @@ vi.mock("quasar", async (importOriginal) => {
   return { ...actual, useQuasar: () => ({ notify: vi.fn() }) };
 });
 
+// The placement manifest is fetched at build time (absent in tests), so stub it.
+// codex (no existing home) → real "ai-codex" entry pinned to top of Frameworks.
+// openai → matches openai-python, so it MOVES to the top of Model Providers
+// (reusing route ai-openai-python) and the original is removed (no duplicate).
+vi.mock("@/components/ingestion/ai/content/manifest", () => ({
+  manifestIntegrations: [
+    { slug: "codex", name: "OpenAI Codex", category: "frameworks", order: 1, docURL: "", keywords: ["codex"] },
+    { slug: "openai", name: "OpenAI", category: "model-providers", order: 1, docURL: "https://example.com/openai", keywords: ["openai"] },
+  ],
+  manifestCategories: [
+    { slug: "frameworks", label: "AI Frameworks & Agents", order: 1 },
+    { slug: "model-providers", label: "Model Providers", order: 2 },
+  ],
+}));
+
 import AIIntegrations from "./AIIntegrations.vue";
 
 describe("AIIntegrations", () => {
@@ -81,18 +96,18 @@ describe("AIIntegrations", () => {
 
     it("should render integration tabs", () => {
       expect(
-        wrapper.find('[data-test="ai-integrations-item-agno"]').exists(),
+        wrapper.find('[data-test="ai-integrations-item-codex"]').exists(),
       ).toBe(true);
     });
   });
 
   describe("initial state", () => {
-    it("should default to first category", () => {
+    it("should default to first category (manifest order → frameworks)", () => {
       expect(wrapper.vm.selectedCategory).toBe("frameworks");
     });
 
     it("should default to first integration route name", () => {
-      expect(wrapper.vm.selectedIntegration).toBe("ai-agno");
+      expect(wrapper.vm.selectedIntegration).toBe("ai-codex");
     });
 
     it("should have empty search filter initially", () => {
@@ -103,7 +118,7 @@ describe("AIIntegrations", () => {
   describe("navigating to first integration", () => {
     it("should navigate to first integration on mount when route is ai-integrations", () => {
       expect(mockReplace).toHaveBeenCalledWith({
-        name: "ai-agno",
+        name: "ai-codex",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
     });
@@ -114,9 +129,10 @@ describe("AIIntegrations", () => {
       wrapper.vm.selectedCategory = "model-providers";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.selectedIntegration).toBe("ai-anthropic-python");
+      // OpenAI is pinned to the top of Model Providers by the manifest.
+      expect(wrapper.vm.selectedIntegration).toBe("ai-openai-python");
       expect(mockReplace).toHaveBeenCalledWith({
-        name: "ai-anthropic-python",
+        name: "ai-openai-python",
         query: { org_identifier: store.state.selectedOrganization.identifier },
       });
     });
@@ -137,11 +153,12 @@ describe("AIIntegrations", () => {
     });
 
     it("should filter integrations by name (case insensitive)", async () => {
-      wrapper.vm.integrationFilter = "agno";
+      // "codex" lives in the default-selected Popular category
+      wrapper.vm.integrationFilter = "codex";
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.filteredIntegrations).toHaveLength(1);
-      expect(wrapper.vm.filteredIntegrations[0].slug).toBe("agno");
+      expect(wrapper.vm.filteredIntegrations[0].slug).toBe("codex");
     });
 
     it("should return empty when no match found", async () => {
@@ -165,6 +182,8 @@ describe("AIIntegrations", () => {
 
   describe("route sync on mount", () => {
     it("should sync selectedCategory from current route", () => {
+      // langchain isn't in the mocked Popular manifest, so a deep link
+      // resolves to its real category (frameworks).
       mockCurrentRoute.value = { name: "ai-langchain" };
 
       const syncedWrapper = mountComponent();
