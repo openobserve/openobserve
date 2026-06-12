@@ -65,6 +65,7 @@ vi.mock('@/services/iam', () => ({
     ],
   })),
   getResourcePermission: vi.fn(async () => ({ data: [] })),
+  getAllRolePermissions: vi.fn(async () => ({ data: [] })),
   getRoleUsers: vi.fn(async () => ({ data: ['u1@example.com', 'u2@example.com'] })),
   updateRole: vi.fn(async () => ({ data: { code: 200 } })),
   getGroups: vi.fn(async () => ({ data: [] })),
