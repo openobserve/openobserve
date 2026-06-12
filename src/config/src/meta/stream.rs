@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 
 use crate::{
     get_config,
-    meta::self_reporting::usage::Stats,
+    meta::{packed_ids::PackedRowIds, self_reporting::usage::Stats},
     stats::MemorySize,
     utils::{
         hash::{Sum64, gxhash},
@@ -274,8 +274,8 @@ impl MemorySize for RemoteStreamParams {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FileSelection {
-    /// Row ids matched by the tantivy index.
-    Rows(Arc<Vec<u32>>),
+    /// Row ids matched by the tantivy index, delta-bitpacked.
+    Rows(Arc<PackedRowIds>),
     /// Row group ids selected by row-group-level sampling.
     RowGroups(Arc<Vec<u32>>),
 }
@@ -1917,7 +1917,7 @@ mod tests {
     fn test_file_key_with_selection() {
         let mut key = FileKey::from_file_name("files/k.parquet");
         assert!(key.selection.is_none());
-        let selection = FileSelection::Rows(Arc::new(vec![1, 5, 9]));
+        let selection = FileSelection::Rows(Arc::new(PackedRowIds::from_sorted(&[1, 5, 9])));
         key.with_selection(selection, Some(1024));
         assert!(key.selection.is_some());
         assert_eq!(key.row_group_size, Some(1024));

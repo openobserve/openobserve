@@ -18,9 +18,8 @@ use std::{
     sync::{Arc, LazyLock as Lazy},
 };
 
-use config::metrics;
+use config::{meta::packed_ids::PackedRowIds, metrics};
 use dashmap::DashMap;
-use roaring::RoaringBitmap;
 
 use super::TantivyResult;
 
@@ -30,8 +29,9 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
     /// (matched_row_ids, row_group_size_from_index_file)
-    /// roaring adapts its container layout to sparse and dense id sets alike
-    RowIds(RoaringBitmap, Option<u32>),
+    /// shares the same packed buffer the query pipeline uses, so put/get are
+    /// refcount bumps
+    RowIds(Arc<PackedRowIds>, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -42,10 +42,8 @@ pub enum CacheEntry {
 impl From<CacheEntry> for TantivyResult {
     fn from(entry: CacheEntry) -> Self {
         match entry {
-            CacheEntry::RowIds(roaring, row_group_size) => TantivyResult::RowIdsSelection {
-                // roaring iterates in ascending order, matching the sorted
-                // contract of RowIdsSelection
-                row_ids: roaring.into_iter().collect(),
+            CacheEntry::RowIds(row_ids, row_group_size) => TantivyResult::RowIdsSelection {
+                row_ids,
                 row_group_size,
             },
             CacheEntry::Count(count) => TantivyResult::Count(count),
@@ -62,9 +60,7 @@ impl From<CacheEntry> for TantivyResult {
 impl CacheEntry {
     pub fn get_memory_size(&self) -> usize {
         match self {
-            CacheEntry::RowIds(roaring, ..) => {
-                roaring.serialized_size() + std::mem::size_of::<RoaringBitmap>()
-            }
+            CacheEntry::RowIds(packed, ..) => packed.memory_size(),
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
@@ -179,7 +175,7 @@ mod tests {
     use super::*;
 
     fn create_test_tantivy_result() -> CacheEntry {
-        CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20, 30]), None)
+        CacheEntry::RowIds(Arc::new(PackedRowIds::from_sorted(&[10, 20, 30])), None)
     }
 
     fn create_test_count_result() -> CacheEntry {
@@ -207,7 +203,7 @@ mod tests {
     }
 
     fn create_test_row_ids_result() -> CacheEntry {
-        CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20, 30]), None)
+        CacheEntry::RowIds(Arc::new(PackedRowIds::from_sorted(&[10, 20, 30])), None)
     }
 
     #[test]
@@ -228,7 +224,7 @@ mod tests {
         assert!(retrieved.is_some());
         match retrieved.unwrap() {
             TantivyResult::RowIdsSelection { row_ids, .. } => {
-                assert_eq!(row_ids, vec![10, 20, 30]);
+                assert_eq!(row_ids.iter().collect::<Vec<_>>(), vec![10, 20, 30]);
             }
             _ => panic!("Expected RowIdsSelection result"),
         }
@@ -450,7 +446,7 @@ mod tests {
     fn test_tantivy_result_cache_row_ids_roundtrip() {
         let cache = TantivyResultCache::new(10);
 
-        let entry = CacheEntry::RowIds(RoaringBitmap::from_iter([10u32, 20]), Some(1024));
+        let entry = CacheEntry::RowIds(Arc::new(PackedRowIds::from_sorted(&[10, 20])), Some(1024));
         cache.put("row_ids_key".to_string(), entry);
 
         if let Some(TantivyResult::RowIdsSelection {
@@ -458,7 +454,7 @@ mod tests {
             row_group_size,
         }) = cache.get("row_ids_key")
         {
-            assert_eq!(row_ids, vec![10, 20]);
+            assert_eq!(row_ids.iter().collect::<Vec<_>>(), vec![10, 20]);
             assert_eq!(row_group_size, Some(1024));
         } else {
             panic!("Expected RowIdsSelection result");

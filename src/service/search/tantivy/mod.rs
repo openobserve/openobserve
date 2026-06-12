@@ -25,6 +25,7 @@ use config::{
     get_config,
     meta::{
         inverted_index::IndexOptimizeMode,
+        packed_ids::PackedRowIds,
         search::ScanStats,
         stream::{FileKey, FileSelection, StreamType},
     },
@@ -36,7 +37,6 @@ use futures::{StreamExt, stream};
 use hashbrown::HashMap;
 use infra::{cache::file_data, errors::Error};
 use itertools::Itertools;
-use roaring::RoaringBitmap;
 pub use search::{TantivyMultiResult, TantivyMultiResultBuilder, TantivyResult};
 use tantivy::{
     Directory, ReloadPolicy, Term,
@@ -273,10 +273,7 @@ pub async fn tantivy_search(
                             } else {
                                 tantivy_result_builder.add_row_nums(row_ids.len() as u64);
                                 let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_selection(
-                                    FileSelection::Rows(Arc::new(row_ids)),
-                                    row_group_size,
-                                );
+                                file.with_selection(FileSelection::Rows(row_ids), row_group_size);
                             }
                         }
                         TantivyResult::Count(count) => {
@@ -592,7 +589,7 @@ async fn search_tantivy_index(
                 return Ok((
                     key,
                     TantivyResult::RowIdsSelection {
-                        row_ids: Vec::new(),
+                        row_ids: Arc::new(PackedRowIds::default()),
                         row_group_size,
                     },
                     false,
@@ -628,7 +625,7 @@ async fn search_tantivy_index(
                 ));
             }
             TantivyResult::RowIdsSelection {
-                row_ids,
+                row_ids: Arc::new(PackedRowIds::from_sorted(&row_ids)),
                 row_group_size,
             }
         }
@@ -666,11 +663,9 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
             row_ids,
             row_group_size,
         } => {
-            // row_ids are sorted and deduped, so the fast sorted constructor
-            // always succeeds
-            let roaring = RoaringBitmap::from_sorted_iter(row_ids)
-                .expect("RowIdsSelection row ids must be sorted");
-            CacheEntry::RowIds(roaring, row_group_size)
+            // the packed ids are immutable and shared via Arc, so caching is
+            // a refcount bump
+            CacheEntry::RowIds(row_ids, row_group_size)
         }
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
@@ -821,16 +816,15 @@ mod tests {
     #[test]
     fn test_get_cache_entry_row_ids_selection() {
         let result = TantivyResult::RowIdsSelection {
-            row_ids: vec![0, 2],
+            row_ids: Arc::new(PackedRowIds::from_sorted(&[0, 2])),
             row_group_size: Some(1024),
         };
 
         let entry = get_cache_entry(result);
         match entry {
-            CacheEntry::RowIds(roaring, row_group_size) => {
-                assert_eq!(roaring.len(), 2);
-                assert!(roaring.contains(0));
-                assert!(roaring.contains(2));
+            CacheEntry::RowIds(packed, row_group_size) => {
+                assert_eq!(packed.len(), 2);
+                assert_eq!(packed.iter().collect::<Vec<_>>(), vec![0, 2]);
                 assert_eq!(row_group_size, Some(1024));
             }
             _ => panic!("Expected RowIds cache entry"),

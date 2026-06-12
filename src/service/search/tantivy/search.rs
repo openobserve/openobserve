@@ -13,11 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashSet, fmt::Display, sync::Arc};
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
+    meta::{
+        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
+        packed_ids::PackedRowIds,
+    },
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
@@ -41,7 +44,7 @@ use crate::service::search::index::IndexCondition;
 pub enum TantivyResult {
     RowIds(Vec<u32>),
     RowIdsSelection {
-        row_ids: Vec<u32>, // already sorted by doc id
+        row_ids: Arc<PackedRowIds>, // sorted doc ids, delta-bitpacked
         row_group_size: Option<u32>,
     },
     Skipped {
@@ -68,9 +71,7 @@ impl TantivyResult {
             Self::RowIds(row_ids) => {
                 row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
-            Self::RowIdsSelection { row_ids, .. } => {
-                row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
-            }
+            Self::RowIdsSelection { row_ids, .. } => row_ids.memory_size(),
             Self::Skipped { .. } => std::mem::size_of::<usize>(),
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
@@ -864,11 +865,11 @@ mod tests {
     fn test_memory_size_edge_cases() {
         // Test with empty collections
         let result = TantivyResult::RowIdsSelection {
-            row_ids: Vec::new(),
+            row_ids: Arc::new(PackedRowIds::from_sorted(&[])),
             row_group_size: None,
         };
         let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<Vec<u32>>());
+        assert_eq!(memory_size, std::mem::size_of::<PackedRowIds>());
 
         let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();
