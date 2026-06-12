@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           :options="roleOptions"
           class="tw:pt-3 tw:pb-2 showLabelOnTop"
+          data-test="iam-update-role-select"
         />
 
         <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
@@ -43,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('update:open', false)"
             variant="outline"
             size="sm-action"
+            data-test="iam-update-role-cancel-btn"
           >
             {{ t('user.cancel') }}
           </OButton>
@@ -50,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="primary"
             size="sm-action"
             @click="onSubmit"
+            data-test="iam-update-role-save-btn"
           >
             {{ t('user.save') }}
           </OButton>
