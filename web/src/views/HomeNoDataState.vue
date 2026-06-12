@@ -70,15 +70,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="go('ingestLogsFromOtel')"
         >{{ t("home.noDataState.otel") }}</EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="layers"
           data-test="home-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
-        >{{ t("home.noDataState.kubernetes") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/common/kubernetes.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("home.noDataState.kubernetes") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
-          icon="cloud"
           data-test="home-no-data-aws-btn"
           @click="go('AWSConfig')"
-        >{{ t("home.noDataState.aws") }}</EmptyStateIngestionChip>
+        >
+          <img :src="getImageURL('images/ingestion/aws.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          {{ t("home.noDataState.aws") }}
+        </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           icon="insights"
           data-test="home-no-data-ai-btn"
@@ -102,6 +106,7 @@ import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import { getImageURL } from "@/utils/zincutils";
 
 const { t } = useI18n();
 const router = useRouter();

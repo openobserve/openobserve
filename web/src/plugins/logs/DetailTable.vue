@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-include-field-btn"
                       @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                     >
-                      <template #icon-left><EqualIcon class="tw:size-4" /></template>
+                      <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
                       {{ t("common.includeSearchTerm") }}
                     </ODropdownItem>
                     <ODropdownItem
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-exclude-field-btn"
                       @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                     >
-                      <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+                      <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
                       {{ t("common.excludeSearchTerm") }}
                     </ODropdownItem>
                     <template v-if="row.field !== store.state.zoConfig.timestamp_column">
