@@ -325,13 +325,28 @@ describe("TenstackTable", () => {
 
   // ── Loading state ─────────────────────────────────────────────────────────
   describe("loading state", () => {
-    it("should show the default loading indicator when loading=true and no rows", () => {
+    it("should show the skeleton loading body when loading=true and no rows", () => {
       wrapper = mountTable({ rows: [], loading: true });
       expect(
-        wrapper.find('[data-test="tenstack-table-loading-indicator"]').exists(),
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
       ).toBe(true);
-      // i18n key is rendered as-is by the mock
-      expect(wrapper.html()).toContain("confirmDialog.loading");
+    });
+
+    it("should not show the skeleton body when a custom loading slot is provided", () => {
+      wrapper = mountTable(
+        { rows: [], loading: true },
+        { loading: '<div data-test="custom-loading-slot">Loading…</div>' },
+      );
+      expect(
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
+      ).toBe(false);
+    });
+
+    it("should show the skeleton body when loading=true (follows O2 pattern)", () => {
+      wrapper = mountTable({ loading: true });
+      expect(
+        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
+      ).toBe(true);
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {

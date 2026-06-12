@@ -83,42 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <!-- Loading banner: shown above rows while a new page is fetching -->
-          <template #loading-banner>
-            <div
-              data-test="traces-table-loading-banner-row"
-              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-            >
-              <OSpinner
-                size="xs"
-                class="tw:mx-[0.25rem]"
-                data-test="traces-search-result-loading-indicator"
-              />
-              <span
-                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-                >{{ t("traces.fetchingTraces") }}</span
-              >
-            </div>
-          </template>
-
-          <!-- Loading row: shown when no rows exist yet (first fetch) -->
-          <template #loading>
-            <div
-              data-test="traces-table-loading-row"
-              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-            >
-              <OSpinner
-                size="xs"
-                class="tw:mr-[0.25rem]"
-                data-test="traces-search-result-loading-indicator"
-              />
-              <span
-                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-                >{{ t("traces.fetchingTraces") }}</span
-              >
-            </div>
-          </template>
-
           <template
             #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
           >
