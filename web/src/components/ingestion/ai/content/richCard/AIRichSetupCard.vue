@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Add a provider by authoring a RichCardContent — no edits here.
 -->
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -84,18 +84,8 @@ const stepState = (i: number) => {
   return activeIndex.value === i ? "active" : "pending";
 };
 
-const copyStepIds = computed(() =>
-  props.content.steps.filter((s) => s.completeOn === "copy").map((s) => s.id),
-);
-const allCopyDone = computed(() =>
-  copyStepIds.value.every((id) => copied.value[id]),
-);
-
-// Begin listening automatically once the app is instrumented (all copy-steps
-// done). The status-bar Start button is the manual fallback.
-watch(allCopyDone, (done) => {
-  if (done && detect.idle.value) detect.start();
-});
+// Detection only starts when the user clicks Start in the status bar
+// (detect.start()) — never automatically.
 
 // ── next-step auto-advance scroll ────────────────────────────────────────────
 const stepEls = ref<(HTMLElement | null)[]>([]);
