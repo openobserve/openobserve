@@ -422,7 +422,9 @@
     "menuGroupInspect": "İnceleyin",
     "validSql": "Geçerli SQL",
     "invalidSql": "Geçersiz sorgu",
-    "menuGroupExplain": "Açıklamak"
+    "menuGroupExplain": "Açıklamak",
+    "fieldValuesEmpty": "Değer bulunamadı.",
+    "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin."
   },
   "menu": {
     "home": "Ana Sayfa",

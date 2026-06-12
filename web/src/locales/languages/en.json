@@ -457,6 +457,8 @@
     "source": "_source",
     "noResult": "No results found.",
     "noData": "No data available",
+    "fieldValuesEmpty": "No values found.",
+    "fieldValuesEmptyHint": "Try a broader time range to see values.",
     "syntaxGuide": "Syntax guide",
     "recordsPerPage": "Records per page",
     "showing": "Showing",
@@ -5361,11 +5363,11 @@
     "noEvents": {
       "title": "No events found",
       "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
-      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range, easing a filter, or resetting the query.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
+      "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
+      "jumpToData": "Jump to latest data",
       "expandRange": "Expand the time range",
       "expandRangeDescAbsolute": "Switch to a wider relative time range",
-      "removeFilter": "Remove a filter",
-      "removeFilterDescSql": "You have SQL conditions applied to this query",
       "openHistory": "Open search history",
       "askAi": "Ask AI to fix my query",
       "selectedRange": "the selected range"

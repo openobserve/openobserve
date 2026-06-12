@@ -171,8 +171,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
                         :ai-enabled="isAiEnabled"
+                        :stream-doc-time-range="streamDocTimeRange"
+                        :query-window-us="queryWindowUs"
+                        :timezone="store.state.timezone"
                         @widen-range="onWidenRange"
-                        @remove-filter="onRemoveFilter"
+                        @jump-to-stream-data="onJumpToStreamData"
                         @open-history="showSearchHistoryfn"
                         @ask-ai="onAskAiFixQuery"
                       />
@@ -1505,15 +1508,55 @@ export default defineComponent({
       searchObj.runQuery = true;
     };
 
+    // Microsecond bounds of the selected streams' data (union across all selected streams).
+    // undefined when no stream is selected or stats are unavailable.
+    const streamDocTimeRange = computed<{ min: number; max: number } | undefined>(() => {
+      const selected: string[] = searchObj.data.stream.selectedStream ?? [];
+      if (!selected.length) return undefined;
+      const list: any[] = searchObj.data.streamResults?.list ?? [];
+      let min = Infinity;
+      let max = -Infinity;
+      for (const s of list) {
+        if (!selected.includes(s.name)) continue;
+        const st = s.stats;
+        if (!st) continue;
+        if (st.doc_time_min > 0 && st.doc_time_min < min) min = st.doc_time_min;
+        if (st.doc_time_max > 0 && st.doc_time_max > max) max = st.doc_time_max;
+      }
+      if (!isFinite(min) || !isFinite(max)) return undefined;
+      return { min, max };
+    });
+
+    // Resolved microsecond bounds of the current query window.
+    const queryWindowUs = computed<{ start: number; end: number } | undefined>(() => {
+      const dt = searchObj.data.datetime;
+      if (dt.type === "absolute" && dt.startTime && dt.endTime) {
+        return { start: Number(dt.startTime), end: Number(dt.endTime) };
+      }
+      if (dt.type === "relative" && dt.relativeTimePeriod) {
+        const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+        if (r) return { start: r.startTime, end: r.endTime };
+      }
+      return undefined;
+    });
+
+    const onJumpToStreamData = (fromUs: number, toUs: number) => {
+      searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+      searchObj.data.datetime.startTime = fromUs;
+      searchObj.data.datetime.endTime = toUs;
+      searchObj.data.datetime.type = "absolute";
+      searchObj.runQuery = true;
+    };
+
     const onRemoveFilter = () => {
       searchObj.data.query = "";
-      searchObj.data.editorValue = "";
       searchBarRef.value?.updateQuery?.();
       searchObj.runQuery = true;
     };
 
     const onAskAiFixQuery = () => {
-      const queryContext = searchObj.meta.sqlMode
+      const sqlMode = searchObj.meta.sqlMode;
+      const queryContext = sqlMode
         ? searchObj.data.editorValue
         : searchObj.data.query;
       const errorContext = searchObj.data.errorMsg
@@ -1524,9 +1567,15 @@ export default defineComponent({
             return text ? ` Error: ${text}.` : "";
           })()
         : "";
+      const modeContext = sqlMode
+        ? `I am using SQL mode. Full query: ${queryContext || "(none)"}.`
+        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+      const outcome = errorContext
+        ? `The query produced an error.${errorContext}`
+        : `The query ran successfully but returned no results.`;
       emit(
         "sendToAiChat",
-        `My logs query failed.${errorContext} Query: ${queryContext || "(none)"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me fix it?`,
+        `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
         false,
       );
     };
@@ -3188,6 +3237,9 @@ export default defineComponent({
       onWidenRange,
       onRemoveFilter,
       onAskAiFixQuery,
+      streamDocTimeRange,
+      queryWindowUs,
+      onJumpToStreamData,
       onFixQuery,
       onConfigureStream,
       redirectBackToLogs,
