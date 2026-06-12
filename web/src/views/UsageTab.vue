@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:overflow-y-auto"
+      class="usage-scroll tw:w-full tw:h-full tw:overflow-y-auto"
     >
       <!-- Banners -->
       <div class="banners-wrapper">
@@ -1176,7 +1176,9 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 @mixin dark-theme-vars {
-  --tile-bg: #2b2c2d;
+  /* No card fill in dark mode — the border alone defines each card (the solid
+     grey fill read as odd against the near-black theme). */
+  --tile-bg: transparent;
   --tile-border: #444444;
   --text-primary: #cccfd1;
   --text-secondary: #b7b7b7;
@@ -1237,6 +1239,14 @@ watch(orgId, (newVal, oldVal) => {
 }
 
 /* ===== 3. Layout Components ===== */
+
+/* The scroll container is pulled to the content-card's right edge by its panel
+   (see HomeView `.home-tab-panel--usage`) so the scrollbar sits flush at the
+   edge instead of floating inset. This padding-right restores the gap between
+   the cards and the scrollbar so the content still has breathing room. */
+.usage-scroll {
+  padding-right: 0.625rem;
+}
 
 .banners-wrapper {
   flex-shrink: 0;

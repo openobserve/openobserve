@@ -638,6 +638,30 @@ body.body--dark [data-destructive-icon="true"]:hover {
   transform: rotate(180deg);
 }
 
+// Dark mode: calm the left navigation rail. Its inactive icons + labels use
+// `--color-tabs-inactive-text`, which has no dark override and so inherits the
+// near-white heading colour — making the whole rail blaze and steal focus.
+// Scope a mid tone (secondary, between the near-white heading and the dim
+// caption) to the nav container only, so other inactive tabs and the folder
+// rail keep their own brightness. Hover/active still brighten via MenuLink.
+:root.dark .navbar-links,
+.dark .navbar-links {
+  --color-tabs-inactive-text: var(--color-text-secondary);
+}
+
+// Dark mode: org selector + edition badge (both `outline-primary`). Their
+// shared primary-800 fill under primary-400 text was too close in luminance,
+// so the text looked blurry. Scope a higher-contrast pairing (brighter text on
+// a darker fill) to ONLY these two buttons via their data-test ids, so no other
+// ghost/outline-primary button anywhere else is affected.
+:root.dark [data-test="navbar-organizations-select-trigger"],
+:root.dark [data-test="upgrade-to-enterprise-btn"],
+.dark [data-test="navbar-organizations-select-trigger"],
+.dark [data-test="upgrade-to-enterprise-btn"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 9. Scrollbar Styling
 // ═══════════════════════════════════════════════════════════════

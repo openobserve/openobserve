@@ -45,21 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <router-view title="" />
       </ConstrainedPage>
     </div>
-    <!-- Full-width section that keeps the shell-owned header (e.g. correlation). -->
-    <div
-      v-else-if="isHeaderedSection"
-      class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
-    >
-      <AppPageHeader
-        :title="activeSectionItem?.label || ''"
-        :subtitle="activeSectionItem?.description || ''"
-        :icon="(activeSectionItem?.icon as any)"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
-      />
-      <section class="tw:flex-1 tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
-        <router-view title="" />
-      </section>
-    </div>
     <!-- Table/list sections render their own AppPageHeader inside. -->
     <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
       <router-view title="" />
@@ -160,11 +145,6 @@ export default defineComponent({
 
     // Full-width sections that still want the shell-owned header (their content
     // fills the whole width instead of a centered reading column).
-    const HEADERED_FULLWIDTH_SECTIONS = new Set(["correlation_settings"]);
-    const isHeaderedSection = computed(() =>
-      HEADERED_FULLWIDTH_SECTIONS.has(activeSection.value),
-    );
-
     // The rail is always shown, so the Settings root has no standalone landing —
     // send it to the first section (General). Also guard meta-only sections.
     const handleSettingsRouting = () => {
@@ -423,7 +403,6 @@ export default defineComponent({
       hubRoute,
       activeSection,
       isConstrainedSection,
-      isHeaderedSection,
       activeSectionItem,
       sectionGroups,
       handleSettingsRouting,
