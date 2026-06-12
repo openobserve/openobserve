@@ -26,7 +26,7 @@ use infra::table;
 
 use crate::common::{
     meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+    utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
 
 pub mod executor_runtime;
@@ -129,6 +129,7 @@ pub async fn update_job(
 pub async fn list_jobs(
     org_id: &str,
     status: Option<&str>,
+    permitted_objects: Option<Vec<String>>,
 ) -> Result<Vec<table::online_eval_jobs::OnlineEvalJob>, EvalJobError> {
     let jobs = match status {
         Some(s) => {
@@ -139,7 +140,12 @@ pub async fn list_jobs(
         }
         None => table::online_eval_jobs::get_all_by_org(org_id).await?,
     };
-    Ok(jobs)
+    Ok(jobs
+        .into_iter()
+        .filter(|job| {
+            is_ofga_object_visible(org_id, "eval_job", &job.id, permitted_objects.as_deref())
+        })
+        .collect())
 }
 
 #[tracing::instrument()]

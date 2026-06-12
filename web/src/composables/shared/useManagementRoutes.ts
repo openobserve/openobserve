@@ -89,6 +89,20 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          // Available in all builds (used by the AI Observability / Online
+          // Evals flows), not just enterprise.
+          path: "llm_providers",
+          name: "llmProviders",
+          component: () =>
+            import("@/components/settings/LlmProvidersSettings.vue"),
+          meta: {
+            title: "LLM Providers",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     },
   ];
@@ -150,18 +164,6 @@ const useManagementRoutes = () => {
             import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             title: "Storage Settings",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "llm_providers",
-          name: "llmProviders",
-          component: () =>
-            import("@/components/settings/LlmProvidersSettings.vue"),
-          meta: {
-            title: "LLM Providers",
           },
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
