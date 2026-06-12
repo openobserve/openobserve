@@ -80,7 +80,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Check if the AggregateExec matches SimpleHistogram pattern
             if aggregate.group_expr().expr().len() == 1
                 && aggregate.aggr_expr().len() == 1
@@ -111,7 +111,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
             // If AggregateExec doesn't match SimpleHistogram pattern, stop visiting
             self.simple_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Check ProjectionExec for the structure: [histogram(_timestamp), count(*)]
             let exprs = projection.expr();
             if exprs.len() == 2 {
@@ -132,7 +132,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
 }
 
 fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
-    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>()
+    if let Some(func) = expr.downcast_ref::<ScalarFunctionExpr>()
         && func.fun().name().to_lowercase() == "date_bin"
     {
         Some(func)
@@ -143,7 +143,7 @@ fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
 
 // unit: microseconds
 fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
-    let interval = expr.as_any().downcast_ref::<Literal>()?.value();
+    let interval = expr.downcast_ref::<Literal>()?.value();
     match interval {
         ScalarValue::IntervalMonthDayNano(Some(interval)) => {
             // convert interval to nanoseconds
@@ -157,7 +157,7 @@ fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
 }
 
 fn is_timestamp_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
+    if let Some(func) = expr.downcast_ref::<ScalarFunctionExpr>() {
         let column_name = get_column_name(&func.args()[0]);
         column_name == TIMESTAMP_COL_NAME
     } else {
@@ -218,7 +218,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             // Exactly 2 group-by expressions (histogram + breakdown) and 1 aggregate (count(*))
             if aggregate.group_expr().expr().len() == 2
                 && aggregate.aggr_expr().len() == 1
@@ -261,7 +261,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
             // If AggregateExec doesn't match, stop visiting
             self.simple_multi_histogram = None;
             return Ok(TreeNodeRecursion::Stop);
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // Projection should have 3 expressions: timestamp, breakdown, count
             let exprs = projection.expr();
             if exprs.len() == 3 {

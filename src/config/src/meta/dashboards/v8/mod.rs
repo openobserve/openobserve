@@ -1001,7 +1001,7 @@ mod tests {
         let s: AxisArgValueWrapper = serde_json::from_value(serde_json::json!("hello")).unwrap();
         assert!(matches!(s, AxisArgValueWrapper::String(_)));
 
-        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.14)).unwrap();
+        let n: AxisArgValueWrapper = serde_json::from_value(serde_json::json!(3.15)).unwrap();
         assert!(matches!(n, AxisArgValueWrapper::Number(_)));
     }
 

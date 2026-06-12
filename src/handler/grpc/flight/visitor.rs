@@ -53,7 +53,7 @@ impl<'n> TreeNodeVisitor<'n> for RemoteScanVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "RemoteScanExec" {
-            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
             self.scan_stats = Some(remote_scan_exec.scan_stats());
             Ok(TreeNodeRecursion::Stop)
         } else {
@@ -86,7 +86,7 @@ impl<'n> TreeNodeVisitor<'n> for MetricsVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "RemoteScanExec" {
-            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
             self.metrics.push(remote_scan_exec.cluster_metrics());
         }
         Ok(TreeNodeRecursion::Continue)
@@ -114,7 +114,7 @@ impl<'n> TreeNodeVisitor<'n> for PartialErrVisitor {
 
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         if node.name() == "RemoteScanExec" {
-            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
             self.partial_err = Some(remote_scan_exec.partial_err());
             Ok(TreeNodeRecursion::Stop)
         } else {
@@ -145,7 +145,7 @@ impl<'n> TreeNodeVisitor<'n> for PeakMemoryVisitor {
     fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
         let name = node.name();
         if name == "RemoteScanExec" {
-            let remote_scan_exec = node.as_any().downcast_ref::<RemoteScanExec>().unwrap();
+            let remote_scan_exec = node.downcast_ref::<RemoteScanExec>().unwrap();
             self.peak_memory = Some(remote_scan_exec.peak_memory());
         }
         Ok(TreeNodeRecursion::Continue)

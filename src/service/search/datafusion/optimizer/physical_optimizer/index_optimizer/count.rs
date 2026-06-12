@@ -67,7 +67,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleCountVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             if aggregate.group_expr().is_empty()
                 && aggregate.aggr_expr().len() == 1
                 && aggregate.aggr_expr()[0].name() == "count(Int64(1))"

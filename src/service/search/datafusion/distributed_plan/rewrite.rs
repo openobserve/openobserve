@@ -68,7 +68,7 @@ impl TreeNodeRewriter for TantivyOptimizeRewriter {
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
         if node.name() == "AggregateExec" {
-            let aggregate = node.as_any().downcast_ref::<AggregateExec>().unwrap();
+            let aggregate = node.downcast_ref::<AggregateExec>().unwrap();
             if *aggregate.mode() == AggregateMode::Partial {
                 let new_node = UnionExec::try_new(vec![node, self.tantivy_exec.clone() as _])?;
                 Ok(Transformed::new(new_node, true, TreeNodeRecursion::Stop))

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, collections::HashSet, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use arrow::array::{
     Array, Int64Array, TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
@@ -112,10 +112,6 @@ impl DisplayAs for TantivyOptimizeExec {
 impl ExecutionPlan for TantivyOptimizeExec {
     fn name(&self) -> &'static str {
         "TantivyOptimizeExec"
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
     }
 
     fn properties(&self) -> &Arc<PlanProperties> {

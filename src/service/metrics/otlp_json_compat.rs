@@ -284,7 +284,7 @@ mod tests {
     fn test_gauge_with_double_value() {
         let data = parse(
             r#"{"name":"g","gauge":{"dataPoints":[{
-                "timeUnixNano":"1700000005000000000","asDouble":3.14
+                "timeUnixNano":"1700000005000000000","asDouble":3.15
             }]}}"#,
         );
         let Data::Gauge(gauge) = data else {
@@ -292,7 +292,7 @@ mod tests {
         };
         assert_eq!(
             gauge.data_points[0].value,
-            Some(number_data_point::Value::AsDouble(3.14))
+            Some(number_data_point::Value::AsDouble(3.15))
         );
     }
 

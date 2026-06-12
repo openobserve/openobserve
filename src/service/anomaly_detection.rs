@@ -1922,8 +1922,8 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[test]
     fn test_extract_value_from_hit_value_field_f64() {
-        let hit = serde_json::json!({"value": 3.14});
-        assert!((extract_value_from_hit(&hit).unwrap() - 3.14).abs() < f64::EPSILON);
+        let hit = serde_json::json!({"value": 3.15});
+        assert!((extract_value_from_hit(&hit).unwrap() - 3.15).abs() < f64::EPSILON);
     }
 
     #[cfg(feature = "enterprise")]

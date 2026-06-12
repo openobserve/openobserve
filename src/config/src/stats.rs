@@ -761,7 +761,7 @@ mod tests {
         assert_eq!(42i32.mem_size(), std::mem::size_of::<i32>());
         assert_eq!(42u8.mem_size(), std::mem::size_of::<u8>());
         assert_eq!(true.mem_size(), std::mem::size_of::<bool>());
-        assert_eq!(3.14f64.mem_size(), std::mem::size_of::<f64>());
+        assert_eq!(3.15f64.mem_size(), std::mem::size_of::<f64>());
     }
 
     #[test]

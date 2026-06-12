@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{any::Any, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use datafusion::{
@@ -64,10 +64,6 @@ impl NewEmptyTable {
 
 #[async_trait]
 impl TableProvider for NewEmptyTable {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }

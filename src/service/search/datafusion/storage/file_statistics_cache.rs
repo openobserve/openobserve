@@ -25,9 +25,9 @@ use std::{
 use config::metrics;
 use dashmap::DashMap;
 use datafusion::{
-    common::Statistics,
+    common::{Statistics, TableReference},
     execution::cache::{
-        CacheAccessor,
+        CacheAccessor, TableScopedPath,
         cache_manager::{CachedFileMetadata, FileStatisticsCacheEntry},
     },
 };
@@ -137,6 +137,38 @@ impl FileStatisticsCache {
             k.to_string()
         }
     }
+
+    pub fn get(&self, k: &Path) -> Option<CachedFileMetadata> {
+        let key = TableScopedPath {
+            table: None,
+            path: k.clone(),
+        };
+        <Self as CacheAccessor<TableScopedPath, CachedFileMetadata>>::get(self, &key)
+    }
+
+    pub fn put(&self, k: &Path, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
+        let key = TableScopedPath {
+            table: None,
+            path: k.clone(),
+        };
+        <Self as CacheAccessor<TableScopedPath, CachedFileMetadata>>::put(self, &key, value)
+    }
+
+    pub fn remove(&self, k: &Path) -> Option<CachedFileMetadata> {
+        let key = TableScopedPath {
+            table: None,
+            path: k.clone(),
+        };
+        <Self as CacheAccessor<TableScopedPath, CachedFileMetadata>>::remove(self, &key)
+    }
+
+    pub fn contains_key(&self, k: &Path) -> bool {
+        let key = TableScopedPath {
+            table: None,
+            path: k.clone(),
+        };
+        <Self as CacheAccessor<TableScopedPath, CachedFileMetadata>>::contains_key(self, &key)
+    }
 }
 
 impl Default for FileStatisticsCache {
@@ -145,10 +177,10 @@ impl Default for FileStatisticsCache {
     }
 }
 
-impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
+impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     /// Get cached metadata for file location.
-    fn get(&self, k: &Path) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn get(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         match self.statistics.get(&k) {
             Some(s) => {
                 metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
@@ -171,8 +203,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
     }
 
     /// Save collected file statistics
-    fn put(&self, k: &Path, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn put(&self, k: &TableScopedPath, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         let entry_size = Self::estimate_entry_size(&k, &value.meta, &value.statistics);
 
         let old = self.statistics.insert(
@@ -201,8 +233,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         old.map(|(meta, stats, _)| CachedFileMetadata::new(meta, stats, None))
     }
 
-    fn remove(&self, k: &Path) -> Option<CachedFileMetadata> {
-        let k = self.format_key(k);
+    fn remove(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
+        let k = self.format_key(&k.path);
         self.statistics.remove(&k).map(|(_, (meta, stats, size))| {
             self.current_memory
                 .fetch_sub(size as i64, Ordering::Relaxed);
@@ -210,8 +242,8 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
         })
     }
 
-    fn contains_key(&self, k: &Path) -> bool {
-        let k = self.format_key(k);
+    fn contains_key(&self, k: &TableScopedPath) -> bool {
+        let k = self.format_key(&k.path);
         self.statistics.contains_key(&k)
     }
 
@@ -230,11 +262,24 @@ impl CacheAccessor<Path, CachedFileMetadata> for FileStatisticsCache {
 }
 
 impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileStatisticsCache {
-    fn list_entries(&self) -> HashMap<Path, FileStatisticsCacheEntry> {
-        let mut entries = HashMap::<Path, FileStatisticsCacheEntry>::new();
+    fn cache_limit(&self) -> usize {
+        config::get_config()
+            .limit
+            .datafusion_file_stat_cache_max_size
+    }
+
+    fn update_cache_limit(&self, limit: usize) {
+        self.evict(limit);
+    }
+
+    fn list_entries(&self) -> HashMap<TableScopedPath, FileStatisticsCacheEntry> {
+        let mut entries = HashMap::<TableScopedPath, FileStatisticsCacheEntry>::new();
 
         for entry in &self.statistics {
-            let path = Path::from(entry.key().as_str());
+            let path = TableScopedPath {
+                table: None,
+                path: Path::from(entry.key().as_str()),
+            };
             let (object_meta, stats, _) = entry.value();
             entries.insert(
                 path,
@@ -250,6 +295,16 @@ impl datafusion::execution::cache::cache_manager::FileStatisticsCache for FileSt
         }
 
         entries
+    }
+
+    fn drop_table_entries(
+        &self,
+        table_ref: &Option<TableReference>,
+    ) -> datafusion::error::Result<()> {
+        if table_ref.is_none() {
+            self.clear();
+        }
+        Ok(())
     }
 }
 
@@ -448,7 +503,7 @@ mod tests {
         cache.put(&path, CachedFileMetadata::new(meta, stats, None));
         let entries = FscTrait::list_entries(&cache);
         assert_eq!(entries.len(), 1);
-        assert!(entries.contains_key(&path));
+        assert!(entries.contains_key(&TableScopedPath { table: None, path }));
     }
 
     #[test]

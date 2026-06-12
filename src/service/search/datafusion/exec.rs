@@ -126,7 +126,7 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
         RuntimeEnvBuilder::new().with_object_store_registry(Arc::new(object_store_registry));
     if cfg.limit.datafusion_file_stat_cache_max_size > 0 {
         let cache_config = CacheManagerConfig::default();
-        let cache_config = cache_config.with_files_statistics_cache(Some(
+        let cache_config = cache_config.with_file_statistics_cache(Some(
             super::storage::file_statistics_cache::GLOBAL_CACHE.clone(),
         ));
         builder = builder.with_cache_manager(cache_config);

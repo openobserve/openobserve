@@ -57,14 +57,11 @@ pub(super) fn try_decode(
 }
 
 pub(super) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-    let exec = node
-        .as_any()
-        .downcast_ref::<DeduplicationExec>()
-        .ok_or_else(|| {
-            datafusion::error::DataFusionError::Internal(
-                "Failed to downcast to DeduplicationExec".to_string(),
-            )
-        })?;
+    let exec = node.downcast_ref::<DeduplicationExec>().ok_or_else(|| {
+        datafusion::error::DataFusionError::Internal(
+            "Failed to downcast to DeduplicationExec".to_string(),
+        )
+    })?;
 
     // Encode deduplication columns as PhysicalExprNodes
     let mut deduplication_columns_proto = Vec::new();

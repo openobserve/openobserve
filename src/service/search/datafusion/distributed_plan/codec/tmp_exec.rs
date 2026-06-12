@@ -42,7 +42,7 @@ pub(crate) fn try_decode(
 }
 
 pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-    let Some(node) = node.as_any().downcast_ref::<TmpExec>() else {
+    let Some(node) = node.downcast_ref::<TmpExec>() else {
         return internal_err!("Not supported");
     };
     let plan_node = cluster_rpc::TmpExecNode {
@@ -111,8 +111,8 @@ mod tests {
         let ctx = datafusion::prelude::SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
-        let plan2 = plan2.as_any().downcast_ref::<TmpExec>().unwrap();
-        let plan = plan.as_any().downcast_ref::<TmpExec>().unwrap();
+        let plan2 = plan2.downcast_ref::<TmpExec>().unwrap();
+        let plan = plan.downcast_ref::<TmpExec>().unwrap();
 
         // check
         assert_eq!(plan.trace_id(), plan2.trace_id());

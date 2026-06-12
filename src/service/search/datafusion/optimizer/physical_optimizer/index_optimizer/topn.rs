@@ -89,7 +89,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
-        if let Some(sort_merge) = node.as_any().downcast_ref::<SortPreservingMergeExec>() {
+        if let Some(sort_merge) = node.downcast_ref::<SortPreservingMergeExec>() {
             // need a fetch limit, a primary sort plus up to one secondary sort per group field
             let fetch = sort_merge.fetch().unwrap_or(0);
             let sort_exprs = sort_merge.expr();
@@ -120,7 +120,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
 
             // fields are filled in at the AggregateExec
             self.simple_topn = Some((vec![], fetch, !first_sort.options.descending));
-        } else if let Some(projection) = node.as_any().downcast_ref::<ProjectionExec>() {
+        } else if let Some(projection) = node.downcast_ref::<ProjectionExec>() {
             // expect [field1, .., fieldN, count(*)]; the exact length is validated against
             // the group by at the AggregateExec
             let exprs = projection.expr();
@@ -141,7 +141,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleTopnVisitor {
             {
                 return self.reject();
             }
-        } else if let Some(aggregate) = node.as_any().downcast_ref::<AggregateExec>() {
+        } else if let Some(aggregate) = node.downcast_ref::<AggregateExec>() {
             let group_len = aggregate.group_expr().expr().len();
             if !(1..=MAX_SIMPLE_TOPN_FIELDS).contains(&group_len)
                 || aggregate.aggr_expr().len() != 1

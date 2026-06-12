@@ -36,7 +36,7 @@ pub(crate) fn try_decode(
     };
     let extension_codec = super::get_physical_extension_codec();
     let aggregate_plan = aggregate_plan.try_into_physical_plan(ctx, &extension_codec)?;
-    let Some(aggregate_plan) = aggregate_plan.as_any().downcast_ref::<AggregateExec>() else {
+    let Some(aggregate_plan) = aggregate_plan.downcast_ref::<AggregateExec>() else {
         return internal_err!("aggregate_plan is not an AggregateExec");
     };
     let aggregate_plan = Arc::new(aggregate_plan.clone());
@@ -61,7 +61,7 @@ pub(crate) fn try_decode(
 }
 
 pub(crate) fn try_encode(node: Arc<dyn ExecutionPlan>, buf: &mut Vec<u8>) -> Result<()> {
-    let Some(node) = node.as_any().downcast_ref::<StreamingAggsExec>() else {
+    let Some(node) = node.downcast_ref::<StreamingAggsExec>() else {
         return internal_err!("Not supported");
     };
 
@@ -169,8 +169,8 @@ mod tests {
         let ctx = datafusion::prelude::SessionContext::new();
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
-        let plan2 = plan2.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
-        let plan = plan.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
+        let plan2 = plan2.downcast_ref::<StreamingAggsExec>().unwrap();
+        let plan = plan.downcast_ref::<StreamingAggsExec>().unwrap();
 
         // check
         assert_eq!(plan.id(), plan2.id());
@@ -255,8 +255,8 @@ mod tests {
         ctx.register_udf(STR_MATCH_UDF.clone());
         let plan2 =
             physical_plan_from_bytes_with_extension_codec(&plan_bytes, &ctx.task_ctx(), &proto)?;
-        let plan2 = plan2.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
-        let plan = plan.as_any().downcast_ref::<StreamingAggsExec>().unwrap();
+        let plan2 = plan2.downcast_ref::<StreamingAggsExec>().unwrap();
+        let plan = plan.downcast_ref::<StreamingAggsExec>().unwrap();
 
         // check
         assert_eq!(plan.id(), plan2.id());
@@ -268,14 +268,11 @@ mod tests {
 
         // Verify that the aggregate plan contains a FilterExec
         let agg_plan_decoded = plan2.aggregate_plan();
-        let agg_exec = agg_plan_decoded
-            .as_any()
-            .downcast_ref::<AggregateExec>()
-            .unwrap();
+        let agg_exec = agg_plan_decoded.as_ref();
         let input_plan = agg_exec.input();
 
         // The input should be a FilterExec
-        assert!(input_plan.as_any().downcast_ref::<FilterExec>().is_some());
+        assert!(input_plan.downcast_ref::<FilterExec>().is_some());
 
         Ok(())
     }
