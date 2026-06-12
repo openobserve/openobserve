@@ -472,6 +472,7 @@ export default defineComponent({
     const revokeInviteEmail = ref("");
 
     const getRoles = () => {
+      if (!store.state.zoConfig?.rbac_enabled) return Promise.resolve();
       return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)

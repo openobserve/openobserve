@@ -117,7 +117,9 @@ const confirmBulkDelete = ref(false);
 const { rolesState } = usePermissions();
 
 onBeforeMount(() => {
-  setupRoles();
+  if (store.state.zoConfig?.rbac_enabled) {
+    setupRoles();
+  }
 });
 
 const updateTable = () => {

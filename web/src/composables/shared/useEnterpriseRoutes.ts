@@ -158,6 +158,11 @@ const useEnterpriseRoutes = () => {
           },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
+            const store = (window as any).store;
+            if (!store?.state?.zoConfig?.rbac_enabled) {
+              next({ name: "users", query: to.query });
+              return;
+            }
             routeGuard(to, from, next);
           },
         },
@@ -169,6 +174,11 @@ const useEnterpriseRoutes = () => {
           },
           component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
+            const store = (window as any).store;
+            if (!store?.state?.zoConfig?.rbac_enabled) {
+              next({ name: "users", query: to.query });
+              return;
+            }
             routeGuard(to, from, next);
           },
         },
@@ -180,6 +190,11 @@ const useEnterpriseRoutes = () => {
           },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
+            const store = (window as any).store;
+            if (!store?.state?.zoConfig?.rbac_enabled) {
+              next({ name: "users", query: to.query });
+              return;
+            }
             routeGuard(to, from, next);
           },
         },
@@ -191,6 +206,11 @@ const useEnterpriseRoutes = () => {
           },
           component: EditRole,
           beforeEnter(to: any, from: any, next: any) {
+            const store = (window as any).store;
+            if (!store?.state?.zoConfig?.rbac_enabled) {
+              next({ name: "users", query: to.query });
+              return;
+            }
             routeGuard(to, from, next);
           },
         },
@@ -199,6 +219,11 @@ const useEnterpriseRoutes = () => {
           name: "quota",
           component: Quota,
           beforeEnter(to: any, from: any, next: any) {
+            const store = (window as any).store;
+            if (!store?.state?.zoConfig?.rbac_enabled) {
+              next({ name: "users", query: to.query });
+              return;
+            }
             routeGuard(to, from, next);
           },
         },
