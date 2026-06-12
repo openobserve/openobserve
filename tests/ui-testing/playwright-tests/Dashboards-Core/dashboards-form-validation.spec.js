@@ -502,3 +502,179 @@ test.describe("Dashboard AddCondition form validation", () => {
         testLogger.info('Condition row removed correctly');
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard GeneralSettings form validation
+// Requires an existing dashboard — creates one in beforeEach.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard GeneralSettings form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName = 'e2e_fv_general_settings_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await pm.dashboardsFormValidation.navigateToDashboards();
+        // Create the dashboard if it doesn't exist, then open it
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardsFormValidation.openAddDashboardForm();
+            await pm.dashboardsFormValidation.fillDashboardName(dashName);
+            await pm.dashboardsFormValidation.submitDashboardForm();
+            await pm.dashboardsFormValidation.getDashboardDialogLocator().waitFor({ state: 'hidden', timeout: 10000 });
+        }
+        await pm.dashboardsFormValidation.openDashboardByName(dashName);
+        await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        testLogger.info('Dashboard opened for GeneralSettings tests');
+    });
+
+    test("should show required error when dashboard name is cleared in GeneralSettings", {
+        tag: ['@domainFormValidation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-GS-001: Empty name → required error in GeneralSettings');
+
+        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
+        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
+        if (!settingsVisible) {
+            testLogger.info('Settings button not found — skipping');
+            test.skip(true, 'Dashboard settings button not rendered in this environment');
+            return;
+        }
+        await settingsBtn.click();
+
+        // General tab is the default tab — wait for name field
+        const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Clear the name and attempt to save
+        await nameField.fill('');
+        await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
+
+        const nameError = pm.dashboardsFormValidation.getGeneralSettingNameErrorLocator();
+        const saveBtn   = pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator();
+
+        const errorVisible = await nameError.isVisible().catch(() => false);
+        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
+
+        expect(errorVisible || btnDisabled).toBe(true);
+        testLogger.info('GeneralSettings empty name validation passed');
+    });
+
+    test("should close GeneralSettings panel when Cancel is clicked", {
+        tag: ['@domainFormValidation', '@P0', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-GS-002: Cancel closes GeneralSettings');
+
+        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
+        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
+        if (!settingsVisible) {
+            test.skip(true, 'Dashboard settings button not rendered in this environment');
+            return;
+        }
+        await settingsBtn.click();
+
+        const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+
+        await pm.dashboardsFormValidation.getGeneralSettingCancelBtnLocator().click();
+
+        // After cancel, the name field should no longer be visible
+        await expect(nameField).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('GeneralSettings panel closed after Cancel');
+    });
+
+    test("should save successfully when valid name is entered in GeneralSettings", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-GS-003: Valid name → save succeeds in GeneralSettings');
+
+        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
+        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
+        if (!settingsVisible) {
+            test.skip(true, 'Dashboard settings button not rendered in this environment');
+            return;
+        }
+        await settingsBtn.click();
+
+        const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
+        await nameField.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Fill a valid name and save
+        await nameField.fill('e2e_fv_general_settings_renamed_001');
+        await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
+
+        // After save the panel should close (name field no longer visible)
+        await expect(nameField).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('GeneralSettings saved successfully');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddAnnotation dialog form validation
+// Requires a dashboard with at least one panel — skipped in environments without panels.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard AddAnnotation form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await pm.dashboardsFormValidation.navigateToDashboards();
+    });
+
+    test("should show title required error when annotation is saved with empty title", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
+
+        // To reach this dialog: open a dashboard → click annotation mode btn on panel → click panel area
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Leave title empty and click Save
+        await pm.dashboardsFormValidation.getAnnotationSaveBtnLocator().click();
+
+        const titleError = pm.dashboardsFormValidation.getAnnotationTitleErrorLocator();
+        await expect(titleError).toBeVisible({ timeout: 5000 });
+        const errorText = (await titleError.textContent()).trim();
+        expect(errorText.length).toBeGreaterThan(0);
+        testLogger.info('Annotation title required error shown');
+    });
+
+    test("should close AddAnnotation dialog when Cancel is clicked", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
+
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        await pm.dashboardsFormValidation.getAnnotationCancelBtnLocator().click();
+
+        await expect(dialog).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('AddAnnotation dialog closed after Cancel');
+    });
+
+    test("should render title, description, and panels selector in AddAnnotation dialog", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
+
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        await expect(pm.dashboardsFormValidation.getAnnotationTitleFieldLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getAnnotationTextFieldLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getAnnotationPanelsPopoverLocator()).toBeVisible();
+        testLogger.info('AddAnnotation dialog elements rendered correctly');
+    });
+});

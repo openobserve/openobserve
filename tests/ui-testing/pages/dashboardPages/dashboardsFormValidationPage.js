@@ -87,9 +87,26 @@ export class DashboardsFormValidationPage {
         this.drilldownTabSelect      = '[data-test="dashboard-drilldown-tab-select-popover"]';
 
         // ── Dashboard Settings navigation ─────────────────────────────────────
-        this.dashboardSettingsBtn   = '[data-test="dashboard-setting-btn"]';
-        this.settingsVariablesTab   = '[data-test="dashboard-settings-variable-tab"]';
-        this.variableAddBtn         = '[data-test="dashboard-variable-add-btn"]';
+        this.dashboardSettingsBtn    = '[data-test="dashboard-setting-btn"]';
+        this.settingsGeneralTab      = '[data-test="dashboard-settings-general-tab"]';
+        this.settingsVariablesTab    = '[data-test="dashboard-settings-variable-tab"]';
+        this.variableAddBtn          = '[data-test="dashboard-variable-add-btn"]';
+
+        // ── AddAnnotation dialog ──────────────────────────────────────────────
+        this.addAnnotationDialog    = '[data-test="add-annotation-dialog"]';
+        this.annotationTitleField   = '[data-test="dashboard-add-annotation-title-input-field"]';
+        this.annotationTitleError   = '[data-test="dashboard-add-annotation-title-input-error"]';
+        this.annotationTextField    = '[data-test="dashboard-add-annotation-text-input-field"]';
+        this.annotationPanelsPopover = '[data-test="dashboard-add-annotation-panels-select-popover"]';
+        this.annotationCancelBtn    = '[data-test="dashboard-add-annotation-cancel-btn"]';
+        this.annotationSaveBtn      = '[data-test="dashboard-add-annotation-save-btn"]';
+
+        // ── GeneralSettings dialog ────────────────────────────────────────────
+        this.generalSettingNameField     = '[data-test="dashboard-general-setting-name-field"]';
+        this.generalSettingNameError     = '[data-test="dashboard-general-setting-name-error"]';
+        this.generalSettingDescField     = '[data-test="dashboard-general-setting-description-field"]';
+        this.generalSettingCancelBtn     = '[data-test="dashboard-general-setting-cancel-btn"]';
+        this.generalSettingSaveBtn       = '[data-test="dashboard-general-setting-save-btn"]';
 
         // ── Variable Settings (Dashboard Settings > Variables) ────────────────
         // OFormInput data-test="dashboard-variable-name" → -field / -error
@@ -305,6 +322,10 @@ export class DashboardsFormValidationPage {
         return this.page.locator(this.dashboardSettingsBtn);
     }
 
+    getSettingsGeneralTabLocator() {
+        return this.page.locator(this.settingsGeneralTab);
+    }
+
     getSettingsVariablesTabLocator() {
         return this.page.locator(this.settingsVariablesTab);
     }
@@ -335,6 +356,58 @@ export class DashboardsFormValidationPage {
 
     getVariableSaveBtnLocator() {
         return this.page.locator(this.variableSaveBtn);
+    }
+
+    // ── AddAnnotation helpers ─────────────────────────────────────────────────
+
+    getAddAnnotationDialogLocator() {
+        return this.page.locator(this.addAnnotationDialog);
+    }
+
+    getAnnotationTitleFieldLocator() {
+        return this.page.locator(this.annotationTitleField);
+    }
+
+    getAnnotationTitleErrorLocator() {
+        return this.page.locator(this.annotationTitleError);
+    }
+
+    getAnnotationTextFieldLocator() {
+        return this.page.locator(this.annotationTextField);
+    }
+
+    getAnnotationPanelsPopoverLocator() {
+        return this.page.locator(this.annotationPanelsPopover);
+    }
+
+    getAnnotationCancelBtnLocator() {
+        return this.page.locator(this.annotationCancelBtn);
+    }
+
+    getAnnotationSaveBtnLocator() {
+        return this.page.locator(this.annotationSaveBtn);
+    }
+
+    // ── GeneralSettings helpers ───────────────────────────────────────────────
+
+    getGeneralSettingNameFieldLocator() {
+        return this.page.locator(this.generalSettingNameField);
+    }
+
+    getGeneralSettingNameErrorLocator() {
+        return this.page.locator(this.generalSettingNameError);
+    }
+
+    getGeneralSettingDescFieldLocator() {
+        return this.page.locator(this.generalSettingDescField);
+    }
+
+    getGeneralSettingCancelBtnLocator() {
+        return this.page.locator(this.generalSettingCancelBtn);
+    }
+
+    getGeneralSettingSaveBtnLocator() {
+        return this.page.locator(this.generalSettingSaveBtn);
     }
 
     // ── AddCondition helpers ──────────────────────────────────────────────────
