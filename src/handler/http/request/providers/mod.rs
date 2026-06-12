@@ -15,6 +15,10 @@
 
 use axum::{extract::Path, response::Response};
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::extractors::Headers;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::providers::{
@@ -58,8 +62,28 @@ impl From<ProviderError> for Response {
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "list"})),
     ),
 )]
-pub async fn list_providers(Path(org_id): Path<String>) -> Response {
-    match providers::list_providers(&org_id).await {
+pub async fn list_providers(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let permitted_objects = {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "provider",
+        )
+        .await
+        {
+            Ok(list) => list,
+            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_objects = None;
+
+    match providers::list_providers(&org_id, permitted_objects).await {
         Ok(list) => {
             let body: ListProvidersResponseBody = list.into();
             MetaHttpResponse::json(body)
