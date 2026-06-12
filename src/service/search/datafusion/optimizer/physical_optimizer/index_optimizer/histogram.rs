@@ -21,9 +21,12 @@ use datafusion::{
         Result,
         tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
     },
+    logical_expr::Operator,
     physical_expr::ScalarFunctionExpr,
     physical_plan::{
-        ExecutionPlan, PhysicalExpr, aggregates::AggregateExec, expressions::Literal,
+        ExecutionPlan, PhysicalExpr,
+        aggregates::AggregateExec,
+        expressions::{BinaryExpr, Literal},
         projection::ProjectionExec,
     },
     scalar::ScalarValue,
@@ -36,7 +39,9 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 };
 
 #[rustfmt::skip]
-/// SimpleHistogram(i64, u64, usize): select histogram(_timestamp, '1m') as ts, count(*) as cnt from table where match_all() group by ts;
+/// SimpleHistogram(i64, u64, usize, i64): select histogram(_timestamp, '1m') as ts, count(*) as cnt from table where match_all() group by ts;
+/// histogram() with a timezone rewrites to date_bin over `_timestamp@0 + offset`; the
+/// extracted mode then carries the offset and its bucket edges live in local wall-clock space.
 /// condition: group by histogram(_timestamp), only count(*)
 /// example plan:
 /// ProjectionExec: expr=[histogram(default._timestamp)@0 as histogram(default._timestamp), count(Int64(1))@1 as cnt]
@@ -51,11 +56,12 @@ use crate::service::search::datafusion::optimizer::physical_optimizer::{
 pub(crate) fn is_simple_histogram(plan: Arc<dyn ExecutionPlan>, time_range: (i64, i64)) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleHistogramVisitor::new(time_range);
     let _ = plan.visit(&mut visitor);
-    if let Some((min_value, bucket_width, num_buckets)) = visitor.simple_histogram {
+    if let Some((min_value, bucket_width, num_buckets, ts_offset)) = visitor.simple_histogram {
         Some(IndexOptimizeMode::SimpleHistogram(
             min_value,
             bucket_width,
             num_buckets,
+            ts_offset,
         ))
     } else {
         None
@@ -64,7 +70,7 @@ pub(crate) fn is_simple_histogram(plan: Arc<dyn ExecutionPlan>, time_range: (i64
 
 struct SimpleHistogramVisitor {
     time_range: (i64, i64),
-    pub simple_histogram: Option<(i64, u64, usize)>,
+    pub simple_histogram: Option<(i64, u64, usize, i64)>,
 }
 
 impl SimpleHistogramVisitor {
@@ -90,8 +96,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                 if let Some((group_expr, _)) = aggregate.group_expr().expr().first()
                     && let Some(func) = get_data_bin(group_expr)
                     && func.args().len() == 3
-                    && is_timestamp_column(&func.args()[1])
-                // check second argument is _timestamp
+                    // check second argument is _timestamp (with an optional timezone shift)
+                    && let Some(ts_offset) = get_timestamp_offset(&func.args()[1])
                 {
                     let args = func.args();
                     if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
@@ -103,7 +109,8 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                         let num_buckets = ((max_value - min_value) as f64
                             / histogram_interval as f64)
                             .ceil() as usize;
-                        self.simple_histogram = Some((min_value, histogram_interval, num_buckets));
+                        self.simple_histogram =
+                            Some((min_value, histogram_interval, num_buckets, ts_offset));
                         return Ok(TreeNodeRecursion::Continue);
                     }
                 }
@@ -156,17 +163,30 @@ fn get_histogram_interval(expr: &Arc<dyn PhysicalExpr>) -> Option<u64> {
     }
 }
 
-fn is_timestamp_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if let Some(func) = expr.as_any().downcast_ref::<ScalarFunctionExpr>() {
-        let column_name = get_column_name(&func.args()[0]);
-        column_name == TIMESTAMP_COL_NAME
-    } else {
-        false
+/// Returns the fixed timezone offset (µs east of UTC) carried by the date_bin source
+/// expression: `to_timestamp_micros(_timestamp)` yields 0 and
+/// `to_timestamp_micros(_timestamp + offset)` — the shape histogram() with a timezone
+/// rewrites to — yields the offset. None when the source is not the timestamp column.
+fn get_timestamp_offset(expr: &Arc<dyn PhysicalExpr>) -> Option<i64> {
+    let func = expr.as_any().downcast_ref::<ScalarFunctionExpr>()?;
+    let arg = func.args().first()?;
+    if get_column_name(arg) == TIMESTAMP_COL_NAME {
+        return Some(0);
+    }
+    let bin = arg.as_any().downcast_ref::<BinaryExpr>()?;
+    if *bin.op() != Operator::Plus || get_column_name(bin.left()) != TIMESTAMP_COL_NAME {
+        return None;
+    }
+    match bin.right().as_any().downcast_ref::<Literal>()?.value() {
+        ScalarValue::Int64(Some(ts_offset)) => Some(*ts_offset),
+        _ => None,
     }
 }
 
 #[rustfmt::skip]
-/// SimpleMultiHistogram(i64, i64, u64, String):
+/// SimpleMultiHistogram(i64, i64, u64, i64, String):
+/// histogram() with a timezone rewrites to date_bin over `_timestamp@0 + offset`; the
+/// extracted mode then carries the offset and its bucket edges live in local wall-clock space.
 /// select histogram(_timestamp) as ts, level as zo_sql_breakdown, count(*) as cnt
 ///   from table where match_all() group by ts, zo_sql_breakdown;
 /// condition: group by histogram(_timestamp) AND a secondary index field, only count(*)
@@ -184,13 +204,14 @@ pub(crate) fn is_simple_multi_histogram(
 ) -> Option<IndexOptimizeMode> {
     let mut visitor = SimpleMultiHistogramVisitor::new(time_range, index_fields);
     let _ = plan.visit(&mut visitor);
-    if let Some((min_value, max_value, bucket_width, breakdown_field)) =
+    if let Some((min_value, max_value, bucket_width, ts_offset, breakdown_field)) =
         visitor.simple_multi_histogram
     {
         Some(IndexOptimizeMode::SimpleMultiHistogram(
             min_value,
             max_value,
             bucket_width,
+            ts_offset,
             breakdown_field,
         ))
     } else {
@@ -201,7 +222,7 @@ pub(crate) fn is_simple_multi_histogram(
 struct SimpleMultiHistogramVisitor {
     time_range: (i64, i64),
     index_fields: HashSet<String>,
-    pub simple_multi_histogram: Option<(i64, i64, u64, String)>,
+    pub simple_multi_histogram: Option<(i64, i64, u64, i64, String)>,
 }
 
 impl SimpleMultiHistogramVisitor {
@@ -239,7 +260,9 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                     if self.index_fields.contains(column_name) {
                         // Extract histogram parameters from the date_bin expression
                         let func = get_data_bin(&groups[db_idx].0).unwrap();
-                        if func.args().len() == 3 && is_timestamp_column(&func.args()[1]) {
+                        if func.args().len() == 3
+                            && let Some(ts_offset) = get_timestamp_offset(&func.args()[1])
+                        {
                             let args = func.args();
                             if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
                                 let (start_time, end_time) = self.time_range;
@@ -250,6 +273,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                                     min_value,
                                     max_value,
                                     histogram_interval,
+                                    ts_offset,
                                     column_name.to_string(),
                                 ));
                                 return Ok(TreeNodeRecursion::Continue);
@@ -331,6 +355,18 @@ mod tests {
                     1757401680000000,
                     60000000,
                     16,
+                    0,
+                )),
+            ),
+            // an explicit timezone shifts the bucket edges into local wall-clock
+            // space and the extracted mode carries the offset (issue #12564)
+            (
+                "SELECT histogram(_timestamp, '1 minute', '+08:00') as ts, count(*) as cnt from t group by ts",
+                Some(IndexOptimizeMode::SimpleHistogram(
+                    1757401680000000,
+                    60000000,
+                    16,
+                    28800000000,
                 )),
             ),
             (
@@ -402,6 +438,19 @@ mod tests {
                     1757401680000000,
                     1757402594060000,
                     60000000,
+                    0,
+                    "level".to_string(),
+                )),
+            ),
+            // an explicit timezone shifts the bucket edges into local wall-clock
+            // space and the extracted mode carries the offset (issue #12564)
+            (
+                "SELECT histogram(_timestamp, '1 minute', '-05:30') as ts, level, count(*) as cnt from t group by ts, level",
+                Some(IndexOptimizeMode::SimpleMultiHistogram(
+                    1757401680000000,
+                    1757402594060000,
+                    60000000,
+                    -19800000000,
                     "level".to_string(),
                 )),
             ),

@@ -316,9 +316,11 @@ code {
     rgba(139, 92, 246, 0.15) 0%,
     rgba(236, 72, 153, 0.15) 100%
   ) !important;
+  color: #6d28d9 !important; // violet-700 — readable on the light purple tint
   transition:
     background 0.3s ease,
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    color 0.3s ease;
 }
 
 html.dark .ai-hover-btn,
@@ -329,17 +331,20 @@ body.body--dark .ai-hover-btn {
     rgba(236, 72, 153, 0.5) 100%
   ) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.2);
+  color: #ede9fe !important; // violet-100 — readable on the medium purple gradient
 }
 
 .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 html.dark .ai-hover-btn:hover,
 body.body--dark .ai-hover-btn:hover {
   background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%) !important;
   box-shadow: 0 0.25rem 0.75rem 0 rgba(139, 92, 246, 0.35);
+  color: white !important; // white on fully opaque gradient
 }
 
 
@@ -660,6 +665,13 @@ body.body--dark [data-destructive-icon="true"]:hover {
 .dark [data-test="upgrade-to-enterprise-btn"] {
   --color-button-ghost-primary-active-bg: var(--color-primary-900);
   --color-button-ghost-primary-text: var(--color-primary-200);
+}
+
+// Force the AI sparkle <img> to white on hover so it stays visible
+// against the fully opaque purple→pink gradient background.
+.ai-hover-btn:hover img {
+  filter: brightness(0) invert(1);
+  transition: filter 0.3s ease;
 }
 
 // ═══════════════════════════════════════════════════════════════

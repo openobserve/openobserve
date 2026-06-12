@@ -8,7 +8,7 @@
         class="tw:w-[11rem] tw:flex-shrink-0"
       >
         <OSelect
-          v-model="streamFilter"
+          :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
@@ -311,7 +311,7 @@ export default defineComponent({
     OCard,
     OCardSection,
 },
-  emits: ["view-traces"],
+  emits: ["view-traces", "request:stream-change"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
@@ -1321,11 +1321,7 @@ export default defineComponent({
     };
 
     const onStreamFilterChange = (stream: string) => {
-      streamFilter.value = stream;
-      localStorage.setItem("serviceGraph_streamFilter", stream);
-
-      // Reload service graph with new stream filter
-      loadServiceGraph();
+      emit("request:stream-change", stream);
     };
 
     const applyFilters = () => {
@@ -1378,6 +1374,18 @@ export default defineComponent({
         loadServiceGraph();
       },
       { deep: true },
+    );
+
+    // Keep streamFilter in sync when Traces/Spans tab changes the global stream
+    watch(
+      () => searchObj.data.stream.selectedStream.value,
+      (newStream) => {
+        if (newStream && newStream !== streamFilter.value) {
+          streamFilter.value = newStream;
+          localStorage.setItem("serviceGraph_streamFilter", newStream);
+          loadServiceGraph();
+        }
+      },
     );
 
     const formatNumber = (num: number) => {

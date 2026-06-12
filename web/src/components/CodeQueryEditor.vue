@@ -1487,6 +1487,7 @@ export default defineComponent({
      width and goes flush again at 2+ digits. automaticLayout measures the
      content box, so the editor adapts to the reduced width. */
   padding-left: 0.5rem;
+  background-color: var(--o2-card-bg);
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;
