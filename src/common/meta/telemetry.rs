@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock, time::Duration};
 
 use config::{
-    SIZE_IN_MB, TELEMETRY_CLIENT,
+    SIZE_IN_MB,
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
     utils::{json, sysinfo},
@@ -30,9 +30,16 @@ use infra::{
     db as infra_db,
     schema::STREAM_SCHEMAS_LATEST,
 };
-use segment::{Client, Message, message::Track};
+use segment::{Message, message::Track};
 
 use crate::common::infra::config::*;
+
+static TELEMETRY_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .unwrap()
+});
 
 #[derive(Clone, Debug, Default)]
 pub struct Telemetry {
@@ -88,9 +95,18 @@ impl Telemetry {
             ..Default::default()
         };
 
+        // replicates segment::HttpClient::send, which is pinned to an older
+        // reqwest than the workspace and cannot take our client
         let res = TELEMETRY_CLIENT
-            .send(get_instance_id(), Message::from(track_event))
-            .await;
+            .post(format!(
+                "{}/v1/track",
+                get_config().common.telemetry_url
+            ))
+            .basic_auth(get_instance_id(), Some(""))
+            .json(&Message::from(track_event))
+            .send()
+            .await
+            .and_then(|r| r.error_for_status());
 
         if res.is_err() {
             log::error!("Error sending event {event}, {res:?}");
