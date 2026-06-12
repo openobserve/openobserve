@@ -287,19 +287,52 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
+    const dashName  = 'e2e_fv_drilldown_001';
+    const panelName = 'e2e_fv_drilldown_panel_001';
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardsFormValidation.navigateToDashboards();
-        testLogger.info('Navigated to Dashboards list page for DrilldownPopup tests');
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+            await pm.dashboardPanelActions.savePanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Enter panel edit mode
+        await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
+
+        // Open the config panel (right sidebar)
+        await pm.dashboardPanelConfigs.openConfigPanel();
+
+        // Wait for drilldown add button and click it to open the DrilldownPopUp
+        await pm.dashboardsFormValidation.getDrilldownAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getDrilldownAddBtnLocator().click();
+
+        // Wait for the DrilldownPopUp dialog to appear
+        await pm.dashboardsFormValidation.getDrilldownPopupLocator().waitFor({ state: 'visible', timeout: 10000 });
+
+        testLogger.info('DrilldownPopup opened');
     });
 
     test("should show name error or keep save disabled when drilldown name is empty", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'DrilldownPopup requires an existing panel in edit mode — reliable navigation cannot be scripted without pre-existing dashboard+panel data. Unskip once a panel setup helper is available.');
-
         testLogger.info('Testing drilldown name required error on empty submit');
 
         // Navigate into panel edit → drilldown section, then verify the name field error
@@ -311,8 +344,6 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
     test("should show URL format error when URL type is selected and invalid URL is entered", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'DrilldownPopup requires an existing panel in edit mode — reliable navigation cannot be scripted without pre-existing dashboard+panel data. Unskip once a panel setup helper is available.');
-
         testLogger.info('Testing drilldown URL format error for invalid URL input');
 
         // Select URL type, enter invalid URL, then verify error
@@ -328,8 +359,6 @@ test.describe("Dashboard DrilldownPopup form validation", () => {
     test("should verify drilldown type selector buttons are rendered", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'DrilldownPopup requires an existing panel in edit mode — reliable navigation cannot be scripted without pre-existing dashboard+panel data. Unskip once a panel setup helper is available.');
-
         testLogger.info('Verifying drilldown type selector buttons render');
 
         await expect(pm.dashboardsFormValidation.getDrilldownByDashboardBtnLocator()).toBeVisible();
@@ -353,61 +382,34 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardsFormValidation.navigateToDashboards();
-
-        // Open the shared dashboard used for settings tests
-        const dashName = 'e2e_dash_fv_tab_001';
-        const dashboardLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
-        const exists = await dashboardLink.isVisible().catch(() => false);
+        const dashName = 'e2e_fv_variable_settings_001';
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
         if (!exists) {
-            testLogger.info(`Dashboard ${dashName} not found — creating it`);
-            await pm.dashboardsFormValidation.openAddDashboardForm();
-            await pm.dashboardsFormValidation.fillDashboardName(dashName);
-            await pm.dashboardsFormValidation.submitDashboardForm();
-            await pm.dashboardsFormValidation.getDashboardDialogLocator().waitFor({ state: 'hidden', timeout: 10000 });
+            await pm.dashboardCreate.createDashboard(dashName);
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
         }
-
-        await pm.dashboardsFormValidation.openDashboardByName(dashName);
-        await pm.dashboardsFormValidation.waitForTabListContainer(15000);
-
-        // Navigate to Settings > Variables tab and open the Add Variable form
-        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
-        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
-        if (!settingsVisible) {
-            testLogger.info('Dashboard settings button not found — skipping variable navigation');
-            return;
-        }
-        await settingsBtn.click();
-        const variablesTab = pm.dashboardsFormValidation.getSettingsVariablesTabLocator();
-        const variablesTabVisible = await variablesTab.isVisible().catch(() => false);
-        if (variablesTabVisible) {
-            await variablesTab.click();
-        }
-        const addVariableBtn = pm.dashboardsFormValidation.getVariableAddBtnLocator();
-        const addVariableBtnVisible = await addVariableBtn.isVisible().catch(() => false);
-        if (addVariableBtnVisible) {
-            await addVariableBtn.click();
-        }
-
-        testLogger.info('Variable add form opened (if navigation succeeded)');
+        // Navigate to Settings > Variables tab > Add Variable
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
+        await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getSettingsVariablesTabLocator().click();
+        await pm.dashboardsFormValidation.getVariableAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getVariableAddBtnLocator().click();
+        await pm.dashboardsFormValidation.getVariableSaveBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Variable add form opened');
     });
 
     test("should show name required error when variable name is empty and save is clicked", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing variable name required error on empty save');
-
-        const saveBtn = pm.dashboardsFormValidation.getVariableSaveBtnLocator();
-        const saveBtnVisible = await saveBtn.isVisible().catch(() => false);
-        if (!saveBtnVisible) {
-            testLogger.info('Variable save button not visible — skipping test body (navigation did not reach form)');
-            test.skip(true, 'Variable add form not reachable without pre-existing dashboard data in this environment');
-            return;
-        }
-
         await pm.dashboardsFormValidation.clickVariableSave();
         await expect(pm.dashboardsFormValidation.getVariableNameErrorLocator()).toBeVisible();
-
         testLogger.info('Variable name required error shown correctly');
     });
 
@@ -415,21 +417,9 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing variable type required error on save without selecting type');
-
-        const saveBtn = pm.dashboardsFormValidation.getVariableSaveBtnLocator();
-        const saveBtnVisible = await saveBtn.isVisible().catch(() => false);
-        if (!saveBtnVisible) {
-            testLogger.info('Variable save button not visible — skipping test body');
-            test.skip(true, 'Variable add form not reachable without pre-existing dashboard data in this environment');
-            return;
-        }
-
-        // Fill name to bypass name error, leave type empty
         await pm.dashboardsFormValidation.fillVariableName('test_fv_var_001');
         await pm.dashboardsFormValidation.clickVariableSave();
-
         await expect(pm.dashboardsFormValidation.getVariableTypeErrorLocator()).toBeVisible();
-
         testLogger.info('Variable type required error shown correctly');
     });
 
@@ -437,46 +427,63 @@ test.describe("Dashboard AddSettingVariable form validation", () => {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
         testLogger.info('Testing variable add form cancel closes the form');
-
-        const cancelBtn = pm.dashboardsFormValidation.getVariableCancelBtnLocator();
-        const cancelBtnVisible = await cancelBtn.isVisible().catch(() => false);
-        if (!cancelBtnVisible) {
-            testLogger.info('Variable cancel button not visible — skipping test body');
-            test.skip(true, 'Variable add form not reachable without pre-existing dashboard data in this environment');
-            return;
-        }
-
         await pm.dashboardsFormValidation.clickVariableCancel();
-
-        // After cancel the save/cancel buttons should no longer be visible
         await expect(pm.dashboardsFormValidation.getVariableSaveBtnLocator()).not.toBeVisible();
-
         testLogger.info('Variable add form closed correctly on cancel');
     });
 });
 
 // ── AddCondition form validation ──────────────────────────────────────────────
-// Pre-condition: Panel config > Conditions tab must be open with at least one
-// condition row visible. These tests verify the condition row elements render
-// and that the remove action works.
+// Pre-condition: Panel editor open with at least one condition row added.
+// These tests verify the condition row elements render and that the remove action works.
 
 test.describe("Dashboard AddCondition form validation", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
+    const dashName  = 'e2e_fv_condition_001';
+    const panelName = 'e2e_fv_condition_panel_001';
+
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardsFormValidation.navigateToDashboards();
-        testLogger.info('Navigated to Dashboards list page for AddCondition tests');
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+            await pm.dashboardPanelActions.savePanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Enter panel edit mode
+        await pm.dashboardPanelActions.selectPanelAction(panelName, 'Edit');
+
+        // Click add condition to create a condition row
+        await pm.dashboardsFormValidation.getAddConditionAddBtnLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getAddConditionAddBtnLocator().click();
+
+        // Wait for condition row to appear
+        await pm.dashboardsFormValidation.getConditionColumn0Locator().waitFor({ state: 'visible', timeout: 5000 });
+
+        testLogger.info('Condition row added in panel editor');
     });
 
     test("should render condition row with column, operator, and value elements", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'AddCondition requires an open panel config in Conditions tab — reliable navigation cannot be scripted without pre-existing panel data. Unskip once a panel setup helper is available.');
-
         testLogger.info('Verifying condition row elements are rendered');
 
         await expect(pm.dashboardsFormValidation.getConditionColumn0Locator()).toBeVisible();
@@ -489,8 +496,6 @@ test.describe("Dashboard AddCondition form validation", () => {
     test("should remove condition row when remove button is clicked", {
         tag: ['@domainFormValidation', '@P0', '@smoke']
     }, async ({ page }) => {
-        test.skip(true, 'AddCondition requires an open panel config in Conditions tab — reliable navigation cannot be scripted without pre-existing panel data. Unskip once a panel setup helper is available.');
-
         testLogger.info('Testing remove condition row');
 
         await expect(pm.dashboardsFormValidation.getConditionColumn0Locator()).toBeVisible();
@@ -518,18 +523,17 @@ test.describe("Dashboard GeneralSettings form validation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardsFormValidation.navigateToDashboards();
-        // Create the dashboard if it doesn't exist, then open it
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
         const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
         const exists = await dashLink.isVisible().catch(() => false);
         if (!exists) {
-            await pm.dashboardsFormValidation.openAddDashboardForm();
-            await pm.dashboardsFormValidation.fillDashboardName(dashName);
-            await pm.dashboardsFormValidation.submitDashboardForm();
-            await pm.dashboardsFormValidation.getDashboardDialogLocator().waitFor({ state: 'hidden', timeout: 10000 });
+            await pm.dashboardCreate.createDashboard(dashName);
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
         }
-        await pm.dashboardsFormValidation.openDashboardByName(dashName);
-        await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('Dashboard opened for GeneralSettings tests');
     });
 
@@ -538,29 +542,17 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-001: Empty name → required error in GeneralSettings');
 
-        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
-        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
-        if (!settingsVisible) {
-            testLogger.info('Settings button not found — skipping');
-            test.skip(true, 'Dashboard settings button not rendered in this environment');
-            return;
-        }
-        await settingsBtn.click();
-
-        // General tab is the default tab — wait for name field
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Clear the name and attempt to save
         await nameField.fill('');
         await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
 
         const nameError = pm.dashboardsFormValidation.getGeneralSettingNameErrorLocator();
         const saveBtn   = pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator();
-
         const errorVisible = await nameError.isVisible().catch(() => false);
         const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
-
         expect(errorVisible || btnDisabled).toBe(true);
         testLogger.info('GeneralSettings empty name validation passed');
     });
@@ -570,20 +562,11 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-002: Cancel closes GeneralSettings');
 
-        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
-        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
-        if (!settingsVisible) {
-            test.skip(true, 'Dashboard settings button not rendered in this environment');
-            return;
-        }
-        await settingsBtn.click();
-
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
         await pm.dashboardsFormValidation.getGeneralSettingCancelBtnLocator().click();
-
-        // After cancel, the name field should no longer be visible
         await expect(nameField).not.toBeVisible({ timeout: 5000 });
         testLogger.info('GeneralSettings panel closed after Cancel');
     });
@@ -593,49 +576,69 @@ test.describe("Dashboard GeneralSettings form validation", () => {
     }, async ({ page }) => {
         testLogger.info('TC-GS-003: Valid name → save succeeds in GeneralSettings');
 
-        const settingsBtn = pm.dashboardsFormValidation.getDashboardSettingsBtnLocator();
-        const settingsVisible = await settingsBtn.isVisible().catch(() => false);
-        if (!settingsVisible) {
-            test.skip(true, 'Dashboard settings button not rendered in this environment');
-            return;
-        }
-        await settingsBtn.click();
-
+        await pm.dashboardsFormValidation.getDashboardSettingsBtnLocator().click();
         const nameField = pm.dashboardsFormValidation.getGeneralSettingNameFieldLocator();
         await nameField.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Fill a valid name and save
         await nameField.fill('e2e_fv_general_settings_renamed_001');
         await pm.dashboardsFormValidation.getGeneralSettingSaveBtnLocator().click();
-
-        // After save the panel should close (name field no longer visible)
         await expect(nameField).not.toBeVisible({ timeout: 10000 });
         testLogger.info('GeneralSettings saved successfully');
     });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AddAnnotation dialog form validation
-// Requires a dashboard with at least one panel — skipped in environments without panels.
+// AddAnnotation dialog form validation (early block)
+// Uses a saved panel — enters annotation mode then clicks the panel canvas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe("Dashboard AddAnnotation form validation", () => {
     test.describe.configure({ mode: 'serial' });
 
+    const dashName  = 'e2e_fv_annotation_live_001';
+    const panelName = 'e2e_fv_annotation_live_panel_001';
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.dashboardsFormValidation.navigateToDashboards();
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+            await pm.dashboardPanelActions.savePanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Enter annotation mode
+        await pm.dashboardsFormValidation.getAnnotationModeButtonLocator().waitFor({ state: 'visible', timeout: 10000 });
+        await pm.dashboardsFormValidation.getAnnotationModeButtonLocator().click();
+
+        // Click the panel canvas to open the AddAnnotation dialog
+        await pm.dashboardsFormValidation.getPanelCanvasLocator().click({ position: { x: 50, y: 50 }, force: true });
+
+        // Wait for dialog
+        await pm.dashboardsFormValidation.getAddAnnotationDialogLocator().waitFor({ state: 'visible', timeout: 10000 });
+
+        testLogger.info('AddAnnotation dialog opened');
     });
 
     test("should show title required error when annotation is saved with empty title", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
-
         // To reach this dialog: open a dashboard → click annotation mode btn on panel → click panel area
         const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
         await dialog.waitFor({ state: 'visible', timeout: 10000 });
@@ -653,8 +656,6 @@ test.describe("Dashboard AddAnnotation form validation", () => {
     test("should close AddAnnotation dialog when Cancel is clicked", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
-
         const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
         await dialog.waitFor({ state: 'visible', timeout: 10000 });
 
@@ -667,8 +668,6 @@ test.describe("Dashboard AddAnnotation form validation", () => {
     test("should render title, description, and panels selector in AddAnnotation dialog", {
         tag: ['@domainFormValidation', '@P1']
     }, async ({ page }) => {
-        test.skip(true, 'AddAnnotation dialog requires a dashboard panel in annotation mode — unskip once panel setup helper is available');
-
         const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
         await dialog.waitFor({ state: 'visible', timeout: 10000 });
 

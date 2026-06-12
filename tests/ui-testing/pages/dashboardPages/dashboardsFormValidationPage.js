@@ -74,6 +74,10 @@ export class DashboardsFormValidationPage {
         // OFormInput data-test="dashboard-config-panel-drilldown-name" → -field / -error
         this.drilldownNameInput     = '[data-test="dashboard-config-panel-drilldown-name-field"]';
         this.drilldownNameError     = '[data-test="dashboard-config-panel-drilldown-name-error"]';
+        // Add drilldown button (in config panel drilldown section)
+        this.drilldownAddBtn        = '[data-test="dashboard-addpanel-config-drilldown-add-btn"]';
+        // DrilldownPopUp dialog wrapper
+        this.drilldownPopup         = '[data-test="dashboard-drilldown-popup"]';
         // Type selector buttons
         this.drilldownByDashboardBtn = '[data-test="dashboard-drilldown-by-dashboard-btn"]';
         this.drilldownByUrlBtn       = '[data-test="dashboard-drilldown-by-url-btn"]';
@@ -264,16 +268,15 @@ export class DashboardsFormValidationPage {
      * @param {string} dashName
      */
     getDashboardByNameLocator(dashName) {
-        return this.page.locator(`[data-test-dashboard-name="${dashName}"]`).first();
+        return this.page.locator(`[data-test="dashboard-name-cell-${dashName}"]`).first();
     }
 
     /**
-     * Clicks into the dashboard row for dashName using its data-test-dashboard-name attribute.
-     * Falls back gracefully — callers should check existence before calling if needed.
+     * Clicks into the dashboard row for dashName.
      * @param {string} dashName
      */
     async openDashboardByName(dashName) {
-        await this.page.locator(`[data-test-dashboard-name="${dashName}"]`).first().click();
+        await this.page.locator(`[data-test="dashboard-name-cell-${dashName}"]`).first().click();
     }
 
     /**
@@ -304,6 +307,14 @@ export class DashboardsFormValidationPage {
 
     getDrilldownNameErrorLocator() {
         return this.page.locator(this.drilldownNameError);
+    }
+
+    getDrilldownAddBtnLocator() {
+        return this.page.locator(this.drilldownAddBtn);
+    }
+
+    getDrilldownPopupLocator() {
+        return this.page.locator(this.drilldownPopup);
     }
 
     getDrilldownByDashboardBtnLocator() {
