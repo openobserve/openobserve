@@ -23,6 +23,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
+        cluster::RoleGroup,
         function::RESULT_ARRAY,
         search::{self},
         self_reporting::usage::{RequestStats, UsageType},
@@ -600,12 +601,13 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
-    is_http_req: bool,
     use_cache: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let cfg = get_config();
 
-    let ctx = PartitionSqlContext::new(req, org_id, stream_type, is_http_req).await?;
+    let role_group = req.search_type.map(RoleGroup::from);
+
+    let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
     let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
 
@@ -627,7 +629,7 @@ pub async fn search_partition(
         non_ts_order_by_cols: vec![],
     };
 
-    let total_secs = estimated_secs(trace_id, &ctx, is_http_req, resp.original_size).await?;
+    let total_secs = estimated_secs(trace_id, &ctx, role_group, resp.original_size).await?;
 
     if ctx.use_single_partition
         || (ctx.is_streaming_aggregate && total_secs <= cfg.limit.aggs_min_num_partition_secs)
@@ -779,6 +781,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 file_list_took: scan_stats.file_list_took,
                 aggs_cache_ratio: scan_stats.aggs_cache_ratio,
                 peak_memory_usage: scan_stats.peak_memory_usage / 1024 / 1024, // change to MB
+                wait_in_queue: scan_stats.wait_in_queue,
             });
         let query_status = if result.is_queue {
             "waiting"
@@ -1021,9 +1024,9 @@ pub async fn search_partition_multi(
                 streaming_output: req.streaming_output,
                 histogram_interval: req.histogram_interval,
                 sampling_ratio: None,
+                search_type: None,
             },
             false,
-            true,
             false, // disable aggs cache
         )
         .await

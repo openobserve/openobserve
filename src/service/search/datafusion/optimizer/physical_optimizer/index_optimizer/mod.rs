@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
@@ -32,6 +29,7 @@ use datafusion::{
     },
     sql::TableReference,
 };
+use hashbrown::HashSet;
 use parking_lot::Mutex;
 
 mod count;
@@ -39,7 +37,6 @@ mod distinct;
 mod histogram;
 mod select;
 mod topn;
-mod topn_multi;
 mod utils;
 
 use crate::service::search::datafusion::{
@@ -50,7 +47,6 @@ use crate::service::search::datafusion::{
         histogram::{is_simple_histogram, is_simple_multi_histogram},
         select::is_simple_select,
         topn::is_simple_topn,
-        topn_multi::is_simple_topn_multi,
         utils::is_complex_plan,
     },
 };
@@ -147,15 +143,10 @@ impl TreeNodeRewriter for FollowerIndexOptimizer {
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             }
 
-            // check if the query is simple topn, topn_multi or simple distinct
+            // check if the query is simple topn or simple distinct
             if config::cluster::LOCAL_NODE.is_single_node() {
                 if let Some(index_optimize_mode) =
                     is_simple_topn(Arc::clone(&plan), self.index_fields.clone())
-                {
-                    *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
-                    return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-                } else if let Some(index_optimize_mode) =
-                    is_simple_topn_multi(Arc::clone(&plan), self.index_fields.clone())
                 {
                     *self.index_optimizer_mode.lock() = Some(index_optimize_mode);
                     return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
@@ -277,13 +268,6 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
                 let plan = plan.rewrite(&mut rewriter)?.data;
                 return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
             } else if let Some(index_optimize_mode) =
-                is_simple_topn_multi(Arc::clone(&plan), index_fields.clone())
-            {
-                // Check for SimpleTopNMulti (two-field GROUP BY)
-                let mut rewriter = IndexOptimizerRewrite::new(index_optimize_mode);
-                let plan = plan.rewrite(&mut rewriter)?.data;
-                return Ok(Transformed::new(plan, true, TreeNodeRecursion::Stop));
-            } else if let Some(index_optimize_mode) =
                 is_simple_distinct(Arc::clone(&plan), index_fields.clone())
             {
                 // Check for SimpleDistinct
@@ -354,10 +338,6 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{HashMap, HashSet},
-        sync::Arc,
-    };
 
     use arrow::datatypes::{DataType, Field, Schema};
     use datafusion::{
@@ -417,7 +397,7 @@ mod tests {
         let plan: Arc<dyn ExecutionPlan> = Arc::new(remote);
 
         // Apply rewrite with a concrete mode and assert it reports transformed=true
-        let mode = IndexOptimizeMode::SimpleTopN("field".to_string(), 10, true);
+        let mode = IndexOptimizeMode::SimpleTopN(vec!["field".to_string()], 10, true);
         let mut rewriter = IndexOptimizerRewrite::new(mode.clone());
         let result = plan.rewrite(&mut rewriter).unwrap();
         assert!(result.transformed, "plan should be marked as transformed");
@@ -529,7 +509,11 @@ mod tests {
         let remote_scan = get_remote_scan(plan);
         assert_eq!(
             remote_scan[0].index_optimize_mode(),
-            Some(IndexOptimizeMode::SimpleTopN("name".to_string(), 10, false))
+            Some(IndexOptimizeMode::SimpleTopN(
+                vec!["name".to_string()],
+                10,
+                false
+            ))
         )
     }
 

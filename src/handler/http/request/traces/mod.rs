@@ -1366,6 +1366,7 @@ async fn process_latest_traces_stream(
         streaming_output: false,
         histogram_interval: 0,
         sampling_ratio: None,
+        search_type: Some(config::meta::search::SearchEventType::UI),
     };
 
     let partitions = match SearchService::search_partition(
@@ -1374,7 +1375,6 @@ async fn process_latest_traces_stream(
         Some(user_id.as_str()),
         stream_type,
         &partition_req,
-        false,
         false,
         use_cache,
     )

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use config::meta::inverted_index::IndexOptimizeMode;
 use datafusion::{
@@ -27,6 +27,7 @@ use datafusion::{
         projection::ProjectionExec, sorts::sort_preserving_merge::SortPreservingMergeExec,
     },
 };
+use hashbrown::HashSet;
 
 use crate::service::search::datafusion::optimizer::physical_optimizer::{
     index_optimizer::utils::is_complex_plan,

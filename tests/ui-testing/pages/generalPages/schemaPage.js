@@ -55,7 +55,7 @@ class SchemaPage {
         // Logs page query / search bar
         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
         this.logsSearchBarRefreshBtn = page.locator('[data-test="logs-search-bar-refresh-btn"]');
-        this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-message"]');
+        this.logsSearchErrorMessage = page.locator('[data-test="logs-search-error-state"]');
         this.dateTimeBtn = page.locator('[data-test="date-time-btn"]');
         this.dateTimeRelativeTab = page.locator('[data-test="date-time-relative-tab"]');
         this.logTableExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
@@ -134,7 +134,7 @@ class SchemaPage {
             logExpandDetailAllKey: '[data-test="log-expand-detail-key-_all"]',
             logsSearchBarQueryEditor: '[data-test="logs-search-bar-query-editor"]',
             logsSearchBarRefreshBtn: '[data-test="logs-search-bar-refresh-btn"]',
-            logsSearchErrorMessage: '[data-test="logs-search-error-message"]',
+            logsSearchErrorMessage: '[data-test="logs-search-error-state"]',
             showQueryToggleBtn: '[data-test="logs-search-bar-show-query-toggle-btn"] div',
             // Stream creation locators
             logStreamAddStreamBtn: '[data-test="log-stream-add-stream-btn"]',

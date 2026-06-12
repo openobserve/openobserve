@@ -65,8 +65,8 @@ export class TracesPage {
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
     // TracesMetricsDashboard.vue: data-test="insights-button"
     this.insightsButton = '[data-test="insights-button"]';
-    // Traces SearchBar.vue: data-test="traces-search-bar-error-only-toggle-btn"
-    this.errorOnlyToggle = '[data-test="traces-search-bar-error-only-toggle-btn"]';
+    // SearchResult.vue: error-count badge doubles as the error-only toggle
+    this.errorOnlyToggle = '[data-test="traces-error-count-badge"]';
     // Traces SearchBar.vue: data-test="traces-search-bar-show-metrics-toggle-btn"
     this.metricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
     // TracesAnalysisDashboard.vue was migrated to ODrawer
@@ -113,7 +113,7 @@ export class TracesPage {
 
     // Error States
     this.noStreamSelectedText = '[data-test="logs-search-no-stream-selected-text"]';
-    this.resultNotFoundText = '[data-test="logs-search-result-not-found-text"]';
+    this.resultNotFoundText = '[data-test="traces-search-result-not-found-text"]';
     this.errorMessage = '[data-test="traces-search-error-message"]';
 
     // Query Editor
@@ -1740,7 +1740,7 @@ export class TracesPage {
     return await chartPanel.first().isVisible({ timeout: 10000 }).catch(() => false);
   }
 
-  // --- Error Only Toggle (Traces SearchBar.vue) ---
+  // --- Error Only Toggle (SearchResult.vue — error-count badge) ---
 
   /**
    * Check if Error Only toggle is visible

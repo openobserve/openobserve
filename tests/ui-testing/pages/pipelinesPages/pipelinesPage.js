@@ -281,8 +281,10 @@ export class PipelinesPage {
         // Scheduled Pipeline Validation locators (Issue #9901 regression tests)
         this.validateAndCloseBtn = page.locator('[data-test="stream-routing-query-save-btn"]');
         this.streamRoutingQueryCancelBtn = page.locator('[data-test="stream-routing-query-cancel-btn"]');
-        this.discardChangesDialog = page.getByText('Discard Changes');
+        this.discardChangesDialog = page.locator('[data-test="confirm-dialog"]');
         this.discardChangesOkBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
+        // Secondary (Cancel/Dismiss) button in the unsaved-changes confirm dialog.
+        this.discardChangesCancelBtn = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]');
         this.scheduledPipelineCancelBtn = page.locator('button').filter({ hasText: 'Cancel' }).first();
 
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)

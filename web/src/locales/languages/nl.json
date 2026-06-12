@@ -525,7 +525,18 @@
     "seekToMoment": "Streef naar dit moment in de sessie",
     "timeInSession": "Sessietijd",
     "route": "Route",
-    "duration": "Duur"
+    "duration": "Duur",
+    "emptyState": {
+      "title": "Bewaak uw gebruikers met Real User Monitoring",
+      "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
+      "webApp": "Instrument: een webapp",
+      "webAppDesc": "Voeg de OpenObserve RUM SDK toe aan elke JavaScript-app",
+      "sessionReplay": "Sessie opnieuw afspelen inschakelen",
+      "sessionReplayDesc": "Gebruikerssessies opnemen en opnieuw afspelen om UX-problemen op te lossen",
+      "learnMore": "Meer informatie:",
+      "quickImpl": "Beknopte implementatiegids",
+      "blogPost": "Basisprincipes van frontend-monitoring"
+    }
   },
   "about": {
     "name": "OpenObserve",
@@ -1791,7 +1802,23 @@
     "tabAiAssistant": "O2 AI-assistent",
     "tabOverview": "Overzicht",
     "tabUsage": "Gebruik",
-    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag"
+    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag",
+    "noDataState": {
+      "title": "Nog geen gegevens opgenomen",
+      "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>opnamevolume, opslag en querygebruik</strong> weergegeven.",
+      "logs": "Logboeken verzenden",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector en meer",
+      "traces": "Sporen verzenden",
+      "tracesDesc": "OTLP/Jaeger/Zipkin gedistribueerde tracering",
+      "metrics": "Statistieken verzenden",
+      "metricsDesc": "Prometheus, Totel Collector, Telegraaf en meer",
+      "or": "Of:",
+      "otel": "OpenTelemetrie",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI-integraties",
+      "shippers": "Verzenders van logboeken"
+    }
   },
   "billing": {
     "header": "Gebruik en facturering",
@@ -3225,7 +3252,42 @@
     "openInFullView": "In volledige weergave openen",
     "serviceMap": "Servicekaart",
     "patternView": "Patroonweergave",
-    "spanView": "Spanweergave"
+    "spanView": "Spanweergave",
+    "noData": {
+      "title": "Begin met het verzenden van sporen naar OpenObserve",
+      "description": "Er zijn nog geen tracestreams gevonden in deze organisatie. Instrument uw diensten en sporen verschijnen hier automatisch.",
+      "otlp": "Traces verzenden via OTLP",
+      "otlpDesc": "Jaeger, Zipkin en elke SDK die compatibel is met OpenTelemetry",
+      "otelCollector": "Verzamelaar/agent van Hotel",
+      "otelCollectorDesc": "Leid alle telemetriesignalen door de Otel Collector",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Vraag AI om tracering in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een traceerstream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt filteren op service, duur, bereikstatus en meer zodra de resultaten zijn geladen.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk beschikbare tracestreams in deze organisatie",
+      "queryGuide": "Lees de traces-gids",
+      "queryGuideDesc": "Servicegrafiek, spanfiltering, RED-statistieken en meer",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen sporen gevonden",
+      "descNoFilters": "Er zijn geen sporen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten of een filter te verwijderen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "selectedRange": "het geselecteerde bereik"
+    },
+    "showAll": "Alles weergeven",
+    "filterByErrors": "Filteren op fouten",
+    "clearErrorFilter": "Foutfilter wissen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3508,7 +3570,9 @@
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
     "insightsButtonLabel": "Inzichten",
-    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht",
+    "inspectBtnLabel": "Inspecteer",
+    "analyzeBtnLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
@@ -3986,7 +4050,13 @@
     "elevatedErrorRate": "Verhoogd foutenpercentage",
     "reqPerSec": "requise/s",
     "allClear": "Alles duidelijk",
-    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster."
+    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster.",
+    "emptyActionAlerts": "Waarschuwingsregels bekijken",
+    "emptyActionAlertsDesc": "Bekijk de geconfigureerde waarschuwingen en drempels",
+    "emptyActionLogs": "Logboeken bekijken",
+    "emptyActionLogsDesc": "Zoek en filter je logstreams",
+    "emptyActionTraces": "Sporen ontdekken",
+    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4370,6 +4440,14 @@
     "noPipelineHistory": {
       "title": "Nog geen geschiedenis van de pijplijn",
       "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
+    },
+    "noStreamSelected": {
+      "title": "Selecteer een stream om aan de slag te gaan",
+      "description": "Kies een stream in de keuzelijst aan de linkerkant en druk vervolgens op 'Query uitvoeren' om je logboeken te bekijken. U kunt ook extra filters toepassen en het datumbereik aanpassen."
+    },
+    "noQueryApplied": {
+      "title": "Voer een query uit om logboeken te bekijken",
+      "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
     }
   },
   "onlineEvals": {
@@ -4728,5 +4806,111 @@
       "scorers": "Scorers",
       "scoreConfigs": "Score-configuraties"
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "Begin met het verzenden van gegevens naar OpenObserve",
+      "description": "Er zijn nog geen gegevens in deze organisatie, dus er zijn geen streams om te verkennen. Stuur je eerste logboeken en ze worden hier automatisch weergegeven. Kies hoe je wilt beginnen.",
+      "curl": "Verzenden via Curl/HTTP API",
+      "curlDesc": "Snelste manier: plak één opdracht en de logboeken beginnen te stromen",
+      "shippers": "Gebruik een logboekverzender",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogging en meer",
+      "otel": "OpenTelemetrie",
+      "otelDesc": "Leveranciersonafhankelijke OTLP-opname voor logboeken, sporen en statistieken",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Ramen",
+      "askAi": "Vraag AI om de opname in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk logboeken, traceringen, statistieken en RUM-streams",
+      "queryGuide": "Lees de handleiding voor zoekopdrachten",
+      "queryGuideDesc": "Filters, SQL-modus, VRL en opgeslagen weergaven",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen evenementen gevonden",
+      "descNoFilters": "Er zijn geen evenementen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten, een filter te vereenvoudigen of de query opnieuw in te stellen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "removeFilterDescSql": "Er zijn SQL-voorwaarden toegepast op deze query",
+      "openHistory": "Zoekgeschiedenis openen",
+      "askAi": "Vraag AI om mijn vraag op te lossen",
+      "selectedRange": "het geselecteerde bereik"
+    },
+    "error": {
+      "sqlError": "SQL-syntaxisfout",
+      "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de query-editor op gemarkeerde fouten.",
+      "streamNotFound": "Stream niet gevonden",
+      "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
+      "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
+      "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
+      "fieldNotFound": "Veld niet gevonden",
+      "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
+      "functionNotDefined": "Functie niet gedefinieerd",
+      "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
+      "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
+      "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
+      "dataTypeMismatch": "Het gegevenstype komt niet overeen",
+      "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
+      "executionError": "Uitvoering van de query is mislukt",
+      "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
+      "serverError": "Serverfout",
+      "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
+      "generic": "Zoekfout",
+      "genericDesc": "Er is een fout opgetreden tijdens het ophalen van zoekgebeurtenissen.",
+      "configureStream": "Stream configureren",
+      "configureStreamDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
+      "fixQuery": "De vraag corrigeren",
+      "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
+      "expandRange": "Probeer een ander tijdbereik",
+      "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
+      "copyError": "Foutgegevens kopiëren",
+      "traceId": "Traceer-ID:",
+      "askAi": "Vraag AI om mijn vraag op te lossen",
+      "showDetail": "Details weergeven",
+      "hideDetail": "Details verbergen"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL-syntaxisfout",
+    "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de editor op gemarkeerde fouten.",
+    "streamNotFound": "Stream niet gevonden",
+    "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
+    "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
+    "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
+    "fieldNotFound": "Veld niet gevonden",
+    "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
+    "functionNotDefined": "Functie niet gedefinieerd",
+    "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
+    "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
+    "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
+    "dataTypeMismatch": "Het gegevenstype komt niet overeen",
+    "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
+    "executionError": "Uitvoering van de query is mislukt",
+    "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
+    "serverError": "Serverfout",
+    "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
+    "generic": "Fout bij de zoekopdracht",
+    "genericDesc": "Er is een fout opgetreden tijdens het verwerken van uw vraag.",
+    "configureResource": "Stream configureren",
+    "configureResourceDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
+    "fixQuery": "De vraag corrigeren",
+    "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
+    "expandRange": "Probeer een ander tijdbereik",
+    "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
+    "copyError": "Foutgegevens kopiëren",
+    "copied": "Gekopieerd!",
+    "traceId": "Traceer-ID:",
+    "askAi": "Vraag AI om mijn vraag op te lossen",
+    "showDetail": "Details weergeven",
+    "hideDetail": "Details verbergen"
   }
 }

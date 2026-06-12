@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !searchObj.data.errorMsg?.trim()?.length &&
           searchObj.searchApplied
         "
+        ref="sectionHeaderRef"
         data-test="traces-section-header"
         class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
@@ -62,8 +63,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]!"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
+          :clickable="true"
+          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
+          :class="!searchObj.meta.showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          @click="toggleErrorOnly"
+        >
+          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
+          <OTooltip
+            :content="searchObj.meta.showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            side="bottom"
+          />
+          <template #trailing>
+            <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
+          </template>
+        </OBadge>
 
         <div class="tw:flex-1" />
 
@@ -78,12 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           variant="outline"
-          size="icon-chip"
+          :size="showActionLabels ? 'chip' : 'icon-chip'"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
           <OIcon name="timeline" size="sm" />
-          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
+          <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
@@ -162,6 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
+          @widen-range="(p) => $emit('widen-range', p)"
+          @remove-filter="$emit('remove-filter')"
         />
       </div>
     </div>
@@ -173,6 +189,8 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  onBeforeUnmount,
+  onMounted,
   ref,
   watch,
 } from "vue";
@@ -215,8 +233,16 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
+    "widen-range",
+    "remove-filter",
+    "error-only-toggled",
   ],
   methods: {
+    toggleErrorOnly() {
+      const newVal = !this.searchObj.meta.showErrorOnly;
+      this.searchObj.meta.showErrorOnly = newVal;
+      this.$emit("error-only-toggled", newVal);
+    },
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
@@ -243,6 +269,26 @@ export default defineComponent({
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const metricsDashboardRef: any = ref(null);
+
+    const sectionHeaderRef = ref<HTMLElement | null>(null);
+    const containerWidth = ref(9999);
+    let headerResizeObserver: ResizeObserver | null = null;
+    const showActionLabels = computed(() => containerWidth.value >= 900);
+
+    onMounted(() => {
+      if (sectionHeaderRef.value) {
+        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
+        headerResizeObserver = new ResizeObserver((entries) => {
+          containerWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        headerResizeObserver.observe(sectionHeaderRef.value);
+      }
+    });
+    
+    //Before unmount
+    onBeforeUnmount(() => {
+      headerResizeObserver?.disconnect();
+    });
 
     watch(
       () => searchObj.loading,
@@ -368,6 +414,8 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      sectionHeaderRef,
+      showActionLabels,
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
