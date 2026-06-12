@@ -424,7 +424,8 @@
     "invalidSql": "Ungültige Abfrage",
     "menuGroupExplain": "Erkläre",
     "fieldValuesEmpty": "Keine Werte gefunden.",
-    "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen."
+    "fieldValuesEmptyHint": "Probieren Sie einen breiteren Zeitraum aus, um die Werte zu sehen.",
+    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus"
   },
   "menu": {
     "home": "Startseite",

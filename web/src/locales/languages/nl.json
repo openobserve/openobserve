@@ -424,7 +424,8 @@
     "invalidSql": "Ongeldige vraag",
     "menuGroupExplain": "Leg uit",
     "fieldValuesEmpty": "Geen waarden gevonden.",
-    "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien."
+    "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien.",
+    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken"
   },
   "menu": {
     "home": "Home",
