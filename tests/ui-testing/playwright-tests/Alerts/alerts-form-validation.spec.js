@@ -245,14 +245,12 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should render filter condition row with all required selectors', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      // Requires at least one stream in the environment
-      test.skip(true, 'requires existing stream — unskip in environments where streams are guaranteed');
-
       await fvPage.openAddAlertWizard();
 
-      // Step 1 — the wizard requires stream/index type selection before Next is active.
-      // If a stream exists in the environment the user would fill it here; this test
-      // is skipped unless the environment guarantees a stream, so no stream fill needed.
+      // Step 1 — select stream type and stream name before advancing
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
       // Wait for the FilterCondition row to appear (step 2 / QueryConfig)
@@ -268,10 +266,12 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should toggle AND/OR operator in filter condition', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      // Requires at least one stream in the environment
-      test.skip(true, 'requires existing stream — unskip in environments where streams are guaranteed');
-
       await fvPage.openAddAlertWizard();
+
+      // Step 1 — select stream type and stream name before advancing
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
       const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
@@ -293,10 +293,12 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
     test('should show column error when condition submitted without column selected', {
       tag: ['@alertsFormValidation', '@P1'],
     }, async ({ page }) => {
-      // Requires at least one stream in the environment
-      test.skip(true, 'requires existing stream — unskip in environments where streams are guaranteed');
-
       await fvPage.openAddAlertWizard();
+
+      // Step 1 — select stream type and stream name before advancing
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 15000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
       await fvPage.clickWizardNext();
 
       const toggleBtn = fvPage.getFilterConditionToggleOperatorBtnLocator();
