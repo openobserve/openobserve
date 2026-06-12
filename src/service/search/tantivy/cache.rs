@@ -29,9 +29,9 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 #[derive(Debug, Clone)]
 pub enum CacheEntry {
     /// (matched_row_ids, row_group_size_from_index_file)
-    /// shares the same packed buffer the query pipeline uses, so put/get are
-    /// refcount bumps
     RowIds(Arc<PackedRowIds>, Option<u32>),
+    /// (coalesced_row_ranges, row_group_size_from_index_file)
+    RowRanges(Arc<Vec<(u32, u32)>>, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -44,6 +44,10 @@ impl From<CacheEntry> for TantivyResult {
         match entry {
             CacheEntry::RowIds(row_ids, row_group_size) => TantivyResult::RowIdsSelection {
                 row_ids,
+                row_group_size,
+            },
+            CacheEntry::RowRanges(ranges, row_group_size) => TantivyResult::RowRangesSelection {
+                ranges,
                 row_group_size,
             },
             CacheEntry::Count(count) => TantivyResult::Count(count),
@@ -61,6 +65,10 @@ impl CacheEntry {
     pub fn get_memory_size(&self) -> usize {
         match self {
             CacheEntry::RowIds(packed, ..) => packed.memory_size(),
+            CacheEntry::RowRanges(ranges, ..) => {
+                ranges.capacity() * std::mem::size_of::<(u32, u32)>()
+                    + std::mem::size_of::<Vec<(u32, u32)>>()
+            }
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()

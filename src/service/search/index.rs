@@ -193,6 +193,12 @@ impl IndexCondition {
     pub fn is_condition_all(&self) -> bool {
         self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
     }
+
+    pub fn has_expensive_filter(&self) -> bool {
+        self.conditions
+            .iter()
+            .any(|condition| condition.has_expensive_filter())
+    }
 }
 
 // single condition
@@ -690,6 +696,25 @@ impl Condition {
             Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
+
+    /// See [`IndexCondition::has_expensive_filter`]. String, regex and
+    /// full-text matching are expensive to re-evaluate row by row; tag-style
+    /// comparisons are not.
+    pub fn has_expensive_filter(&self) -> bool {
+        match self {
+            Condition::MatchAll(_) | Condition::FuzzyMatchAll(..) => true,
+            Condition::Equal(..)
+            | Condition::Regex(..)
+            | Condition::StrMatch(..)
+            | Condition::NotEqual(..)
+            | Condition::In(..)
+            | Condition::All() => false,
+            Condition::Or(left, right) | Condition::And(left, right) => {
+                left.has_expensive_filter() || right.has_expensive_filter()
+            }
+            Condition::Not(condition) => condition.has_expensive_filter(),
+        }
+    }
 }
 
 // TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
@@ -844,6 +869,46 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
+    }
+
+    #[test]
+    fn test_condition_has_expensive_filter() {
+        // tag-style comparisons are cheap to re-evaluate
+        assert!(!Condition::Equal("ns".to_string(), "x".to_string()).has_expensive_filter());
+        assert!(!Condition::NotEqual("ns".to_string(), "x".to_string()).has_expensive_filter());
+        assert!(
+            !Condition::In("ns".to_string(), vec!["x".to_string()], false).has_expensive_filter()
+        );
+        assert!(!Condition::All().has_expensive_filter());
+
+        // string/full-text matching is expensive
+        assert!(Condition::MatchAll("err".to_string()).has_expensive_filter());
+        assert!(Condition::FuzzyMatchAll("err".to_string(), 1).has_expensive_filter());
+        assert!(
+            Condition::StrMatch("body".to_string(), "err".to_string(), false)
+                .has_expensive_filter()
+        );
+        assert!(Condition::Regex("body".to_string(), "err.*".to_string()).has_expensive_filter());
+
+        // composites propagate
+        let cheap = Condition::Equal("ns".to_string(), "x".to_string());
+        let pricey = Condition::MatchAll("err".to_string());
+        assert!(
+            Condition::And(Box::new(cheap.clone()), Box::new(pricey.clone()))
+                .has_expensive_filter()
+        );
+        assert!(
+            Condition::Or(Box::new(pricey.clone()), Box::new(cheap.clone())).has_expensive_filter()
+        );
+        assert!(Condition::Not(Box::new(pricey)).has_expensive_filter());
+        assert!(!Condition::And(Box::new(cheap.clone()), Box::new(cheap)).has_expensive_filter());
+
+        // IndexCondition aggregates over its conditions
+        let mut index_condition = IndexCondition::new();
+        index_condition.add_condition(Condition::Equal("ns".to_string(), "x".to_string()));
+        assert!(!index_condition.has_expensive_filter());
+        index_condition.add_condition(Condition::MatchAll("err".to_string()));
+        assert!(index_condition.has_expensive_filter());
     }
 
     #[test]

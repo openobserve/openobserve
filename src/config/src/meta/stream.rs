@@ -276,6 +276,8 @@ impl MemorySize for RemoteStreamParams {
 pub enum FileSelection {
     /// Row ids matched by the tantivy index, delta-bitpacked.
     Rows(Arc<PackedRowIds>),
+    /// kept when the exact selection is too fragmented for an efficient parquet scan. 
+    Ranges(Arc<Vec<(u32, u32)>>),
     /// Row group ids selected by row-group-level sampling.
     RowGroups(Arc<Vec<u32>>),
 }

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod cache;
+mod fragmentation;
 mod partition;
 pub mod search;
 
@@ -54,6 +55,7 @@ use tokio_stream::StreamExt as _;
 
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
+    fragmentation::{coalesce_sorted_ids, count_runs, runs_cap},
     partition::partition_tantivy_files,
 };
 use crate::service::search::{
@@ -166,6 +168,13 @@ pub async fn tantivy_search(
 
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
+    if is_add_filter_back {
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: {} of {} files have no tantivy index, the filter will be added back to datafusion for them",
+            file_list_map.len() - index_file_names.len(),
+            file_list_map.len(),
+        );
+    }
     let time_range = query.time_range;
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
     let (index_parquet_files, query_limit) =
@@ -274,6 +283,23 @@ pub async fn tantivy_search(
                                 tantivy_result_builder.add_row_nums(row_ids.len() as u64);
                                 let file = file_list_map.get_mut(&file_name).unwrap();
                                 file.with_selection(FileSelection::Rows(row_ids), row_group_size);
+                            }
+                        }
+                        TantivyResult::RowRangesSelection {
+                            ranges,
+                            row_group_size,
+                        } => {
+                            // the coalesced ranges are a superset of the
+                            // matched rows, so the original filter must be
+                            // re-applied by datafusion. Set unconditionally:
+                            // this arm is also reached via the result cache,
+                            // which does not carry the skipped-conditions flag
+                            is_add_filter_back = true;
+                            if ranges.is_empty() {
+                                file_list_map.remove(&file_name);
+                            } else {
+                                let file = file_list_map.get_mut(&file_name).unwrap();
+                                file.with_selection(FileSelection::Ranges(ranges), row_group_size);
                             }
                         }
                         TantivyResult::Count(count) => {
@@ -444,6 +470,7 @@ async fn search_tantivy_index(
     // generate the tantivy query
     let condition: IndexCondition =
         index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
+    let has_expensive_filter = condition.has_expensive_filter();
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
 
@@ -624,12 +651,32 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
-            TantivyResult::RowIdsSelection {
-                row_ids: Arc::new(PackedRowIds::from_sorted(&row_ids)),
-                row_group_size,
+            let runs = count_runs(&row_ids);
+            let runs_cap = runs_cap(parquet_file.meta.records as usize);
+            if runs > runs_cap
+                && cfg.common.feature_pushdown_filter_enabled
+                && !has_expensive_filter
+            {
+                let ranges = coalesce_sorted_ids(&row_ids);
+                log::info!(
+                    "[trace_id {trace_id}] search->tantivy: file: {}, row selection too fragmented ({runs} runs > cap {runs_cap}), degraded to {} coalesced ranges with filter added back",
+                    parquet_file.key,
+                    ranges.len(),
+                );
+                TantivyResult::RowRangesSelection {
+                    ranges: Arc::new(ranges),
+                    row_group_size,
+                }
+            } else {
+                TantivyResult::RowIdsSelection {
+                    row_ids: Arc::new(PackedRowIds::from_sorted(&row_ids)),
+                    row_group_size,
+                }
             }
         }
-        TantivyResult::RowIdsSelection { .. } | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIdsSelection { .. }
+        | TantivyResult::RowRangesSelection { .. }
+        | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
@@ -667,6 +714,10 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
             // a refcount bump
             CacheEntry::RowIds(row_ids, row_group_size)
         }
+        TantivyResult::RowRangesSelection {
+            ranges,
+            row_group_size,
+        } => CacheEntry::RowRanges(ranges, row_group_size),
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
         TantivyResult::MultiHistogram(multi_histogram) => {
@@ -828,6 +879,23 @@ mod tests {
                 assert_eq!(row_group_size, Some(1024));
             }
             _ => panic!("Expected RowIds cache entry"),
+        }
+    }
+
+    #[test]
+    fn test_get_cache_entry_row_ranges_selection() {
+        let result = TantivyResult::RowRangesSelection {
+            ranges: Arc::new(vec![(0, 10), (100, 120)]),
+            row_group_size: Some(1024),
+        };
+
+        let entry = get_cache_entry(result);
+        match entry {
+            CacheEntry::RowRanges(ranges, row_group_size) => {
+                assert_eq!(*ranges, vec![(0, 10), (100, 120)]);
+                assert_eq!(row_group_size, Some(1024));
+            }
+            _ => panic!("Expected RowRanges cache entry"),
         }
     }
 

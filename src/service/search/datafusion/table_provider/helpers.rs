@@ -59,6 +59,9 @@ pub fn generate_access_plan(
             FileSelection::Rows(row_ids) => {
                 generate_parquet_access_plan(file, &row_ids, row_group_size)
             }
+            FileSelection::Ranges(ranges) => {
+                generate_parquet_access_plan_from_ranges(file, &ranges, row_group_size)
+            }
             #[cfg(feature = "enterprise")]
             FileSelection::RowGroups(row_group_ids) => {
                 let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
@@ -74,6 +77,9 @@ pub fn generate_access_plan(
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => match selection {
             FileSelection::Rows(row_ids) => generate_vortex_access_plan(row_ids.iter()),
+            // coalesced ranges come with the filter added back; let the
+            // filter do the work instead of expanding the superset to ids
+            FileSelection::Ranges(_) => None,
             // row-group-level sampling is parquet only; fall back to a full scan
             FileSelection::RowGroups(_) => None,
         },
@@ -142,6 +148,75 @@ fn generate_parquet_access_plan(
 
         access_plan.scan(row_group_id);
         access_plan.scan_selection(row_group_id, RowSelection::from(selection));
+    }
+
+    log::debug!(
+        "file path: file={:?}, row_group_count={row_group_count}, access_plan={access_plan:?}",
+        file.path().as_ref()
+    );
+    Some(Arc::new(access_plan))
+}
+
+/// Build an access plan from coalesced `[start, end)` row ranges.
+///
+/// The ranges come from the fragmentation fuse: gaps below the coalescing
+/// granularity were merged, so a file carries at most `num_rows / 8192`
+/// ranges and the resulting selection has no tiny runs by construction.
+/// A range may span row group boundaries and is split accordingly.
+fn generate_parquet_access_plan_from_ranges(
+    file: &PartitionedFile,
+    ranges: &[(u32, u32)],
+    row_group_size: Option<u32>,
+) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
+    let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
+    let row_group_count = num_rows.div_ceil(row_group_size);
+
+    if let Some(&(_, last_end)) = ranges.last()
+        && last_end as usize > num_rows
+    {
+        log::warn!(
+            "file path: file={:?}, range end {last_end} out of range (num_rows={num_rows}), skip access plan",
+            file.path().as_ref()
+        );
+        return None;
+    }
+
+    let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
+    let mut cur_rg = usize::MAX;
+    let mut selection: Vec<RowSelector> = Vec::new();
+    let mut cursor = 0usize;
+    let mut flush = |rg: usize, selection: &mut Vec<RowSelector>, cursor: usize| {
+        let rg_end = ((rg + 1) * row_group_size).min(num_rows);
+        if cursor < rg_end {
+            selection.push(RowSelector::skip(rg_end - cursor));
+        }
+        access_plan.scan(rg);
+        access_plan.scan_selection(rg, RowSelection::from(std::mem::take(selection)));
+    };
+    for &(range_start, range_end) in ranges {
+        let mut start = range_start as usize;
+        let end = range_end as usize;
+        while start < end {
+            let rg = start / row_group_size;
+            let rg_end = ((rg + 1) * row_group_size).min(num_rows);
+            if rg != cur_rg {
+                if cur_rg != usize::MAX {
+                    flush(cur_rg, &mut selection, cursor);
+                }
+                cur_rg = rg;
+                cursor = rg * row_group_size;
+            }
+            let segment_end = end.min(rg_end);
+            if start > cursor {
+                selection.push(RowSelector::skip(start - cursor));
+            }
+            selection.push(RowSelector::select(segment_end - start));
+            cursor = segment_end;
+            start = segment_end;
+        }
+    }
+    if cur_rg != usize::MAX {
+        flush(cur_rg, &mut selection, cursor);
     }
 
     log::debug!(
@@ -338,6 +413,42 @@ mod tests {
         let row_ids = PackedRowIds::from_sorted(&[0u32, 10]);
 
         assert!(generate_parquet_access_plan(&file, &row_ids, Some(4)).is_none());
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_from_ranges() {
+        // 10 rows, row groups of 4: rg0=[0..4), rg1=[4..8), rg2=[8..10)
+        // range (2, 6) crosses the rg0/rg1 boundary; (9, 10) hits rg2 only
+        let file = make_partitioned_file(10);
+        let ranges = vec![(2u32, 6u32), (9, 10)];
+
+        let plan = generate_parquet_access_plan_from_ranges(&file, &ranges, Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(3);
+        expected.scan(0);
+        expected.scan_selection(
+            0,
+            RowSelection::from(vec![RowSelector::skip(2), RowSelector::select(2)]),
+        );
+        expected.scan(1);
+        expected.scan_selection(
+            1,
+            RowSelection::from(vec![RowSelector::select(2), RowSelector::skip(2)]),
+        );
+        expected.scan(2);
+        expected.scan_selection(
+            2,
+            RowSelection::from(vec![RowSelector::skip(1), RowSelector::select(1)]),
+        );
+        assert_eq!(downcast_plan(&plan), &expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_from_ranges_out_of_range_returns_none() {
+        let file = make_partitioned_file(10);
+        let ranges = vec![(2u32, 11u32)];
+
+        assert!(generate_parquet_access_plan_from_ranges(&file, &ranges, Some(4)).is_none());
     }
 
     fn make_exec() -> Arc<dyn ExecutionPlan> {

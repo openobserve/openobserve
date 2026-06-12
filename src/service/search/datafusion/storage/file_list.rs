@@ -32,7 +32,8 @@ pub struct ScanSelection {
 type ScanSelectionMap = HashMap<String, ScanSelection>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
-static SCAN_SELECTIONS: Lazy<RwLock<HashMap<String, ScanSelectionMap>>> = Lazy::new(Default::default);
+static SCAN_SELECTIONS: Lazy<RwLock<HashMap<String, ScanSelectionMap>>> =
+    Lazy::new(Default::default);
 
 pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.read().get(trace_id) {

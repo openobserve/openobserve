@@ -37,7 +37,10 @@ pub struct PackedRowIds {
 impl PackedRowIds {
     /// Pack a slice of strictly increasing row ids.
     pub fn from_sorted(ids: &[u32]) -> Self {
-        debug_assert!(ids.windows(2).all(|w| w[0] < w[1]), "ids must be strictly increasing");
+        debug_assert!(
+            ids.windows(2).all(|w| w[0] < w[1]),
+            "ids must be strictly increasing"
+        );
         if ids.is_empty() {
             return Self::default();
         }
@@ -132,9 +135,8 @@ impl Iterator for PackedRowIdsIter<'_> {
             } else {
                 // trailing partial block, stored as raw u32s
                 for slot in self.block.iter_mut().take(self.remaining) {
-                    *slot = u32::from_le_bytes(
-                        self.buf[self.pos..self.pos + 4].try_into().unwrap(),
-                    );
+                    *slot =
+                        u32::from_le_bytes(self.buf[self.pos..self.pos + 4].try_into().unwrap());
                     self.pos += 4;
                 }
                 self.block_len = self.remaining;
@@ -203,6 +205,10 @@ mod tests {
         let packed = PackedRowIds::from_sorted(&ids);
         assert_eq!(packed.iter().collect::<Vec<_>>(), ids);
         // 100k ids at ~1 bit/id ≈ 13KB; plain Vec<u32> is 400KB
-        assert!(packed.memory_size() < 20 * 1024, "got {}", packed.memory_size());
+        assert!(
+            packed.memory_size() < 20 * 1024,
+            "got {}",
+            packed.memory_size()
+        );
     }
 }
