@@ -678,3 +678,286 @@ test.describe("Dashboard AddAnnotation form validation", () => {
         testLogger.info('AddAnnotation dialog elements rendered correctly');
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PanelLayoutSettings form validation
+// Requires a saved panel — creates dashboard + panel in beforeEach.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard PanelLayoutSettings form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName  = 'e2e_fv_layout_settings_001';
+    const panelName = 'e2e_fv_layout_panel_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        // Navigate to dashboards list and create (or reuse) the test dashboard
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            // After create, dashboard is open in view mode — add a panel
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+            await pm.dashboardPanelActions.savePanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Open Layout settings from panel actions dropdown
+        await pm.dashboardPanelActions.selectPanelAction(panelName, 'Layout');
+        testLogger.info('PanelLayoutSettings drawer opened');
+    });
+
+    test("should render PanelLayoutSettings dialog with height input", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-PLS-001: Layout settings dialog renders correctly');
+
+        await expect(pm.dashboardsFormValidation.getPanelLayoutDrawerLocator()).toBeVisible({ timeout: 10000 });
+        await expect(pm.dashboardsFormValidation.getPanelLayoutHeightFieldLocator()).toBeVisible();
+        testLogger.info('PanelLayoutSettings dialog visible with height input');
+    });
+
+    test("should show error or disable save when height is cleared in PanelLayoutSettings", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-PLS-002: Empty height → error or save disabled');
+
+        const heightField = pm.dashboardsFormValidation.getPanelLayoutHeightFieldLocator();
+        await heightField.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Clear the height value
+        await heightField.fill('');
+
+        const saveBtn    = pm.dashboardsFormValidation.getPanelLayoutSaveBtnLocator();
+        const heightError = pm.dashboardsFormValidation.getPanelLayoutHeightErrorLocator();
+
+        // Try to save
+        await saveBtn.click();
+
+        const errorVisible = await heightError.isVisible().catch(() => false);
+        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
+
+        expect(errorVisible || btnDisabled).toBe(true);
+        testLogger.info('PanelLayoutSettings empty height validation passed');
+    });
+
+    test("should close PanelLayoutSettings when Cancel is clicked", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-PLS-003: Cancel closes PanelLayoutSettings dialog');
+
+        const drawer = pm.dashboardsFormValidation.getPanelLayoutDrawerLocator();
+        await drawer.waitFor({ state: 'visible', timeout: 10000 });
+
+        await pm.dashboardsFormValidation.getPanelLayoutCancelBtnLocator().click();
+
+        await expect(drawer).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('PanelLayoutSettings dialog closed after Cancel');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddCondition (panel editor Filters section) form validation
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard AddCondition form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName = 'e2e_fv_condition_panel_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        // Navigate to dashboards list and create (or reuse) the test dashboard
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Open Add Panel → panel editor with Filters section visible
+        await pm.dashboardCreate.addPanelSmart();
+        await pm.chartTypeSelector.selectChartType('bar');
+        await pm.chartTypeSelector.selectStreamType('logs');
+        await pm.chartTypeSelector.selectStream('e2e_automate');
+        testLogger.info('Panel editor open — Filters section should be visible');
+    });
+
+    test("should render Add Condition button in Filters section of panel editor", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-AC-001: Add Condition button is visible in Filters section');
+
+        const addCondBtn = pm.dashboardsFormValidation.getAddConditionAddBtnLocator();
+        await expect(addCondBtn).toBeVisible({ timeout: 10000 });
+        testLogger.info('Add Condition button rendered correctly');
+    });
+
+    test("should add a condition row when Add Condition button is clicked", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-AC-002: Clicking Add Condition renders a condition row');
+
+        const addCondBtn = pm.dashboardsFormValidation.getAddConditionAddBtnLocator();
+        await addCondBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await addCondBtn.click();
+
+        // After clicking, a condition row with column and condition selectors appears
+        const conditionColumn    = pm.dashboardsFormValidation.getConditionColumnLocator();
+        const conditionCondition = pm.dashboardsFormValidation.getConditionConditionLocator();
+
+        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
+        await expect(conditionCondition).toBeVisible({ timeout: 5000 });
+        testLogger.info('Condition row rendered with column and condition selectors');
+    });
+
+    test("should remove condition row when remove column button is clicked", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-AC-003: Remove column button removes the condition row');
+
+        const addCondBtn = pm.dashboardsFormValidation.getAddConditionAddBtnLocator();
+        await addCondBtn.waitFor({ state: 'visible', timeout: 10000 });
+        await addCondBtn.click();
+
+        const conditionColumn = pm.dashboardsFormValidation.getConditionColumnLocator();
+        await expect(conditionColumn).toBeVisible({ timeout: 5000 });
+
+        await pm.dashboardsFormValidation.getConditionRemoveColumnLocator().click();
+
+        await expect(conditionColumn).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Condition row removed after clicking remove button');
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AddAnnotation dialog form validation
+// Uses a saved panel — enters annotation mode then clicks the panel canvas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe("Dashboard AddAnnotation form validation", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    const dashName  = 'e2e_fv_annotation_001';
+    const panelName = 'e2e_fv_annotation_panel_001';
+    let pm;
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+
+        // Navigate to dashboards list and create (or reuse) the test dashboard
+        await pm.dashboardList.menuItem('dashboards-item');
+        await pm.dashboardsFormValidation.getDashboardSearchLocator().waitFor({ state: 'visible', timeout: 20000 });
+
+        const dashLink = pm.dashboardsFormValidation.getDashboardByNameLocator(dashName);
+        const exists = await dashLink.isVisible().catch(() => false);
+        if (!exists) {
+            await pm.dashboardCreate.createDashboard(dashName);
+            await pm.dashboardCreate.addPanel();
+            await pm.chartTypeSelector.selectChartType('bar');
+            await pm.chartTypeSelector.selectStreamType('logs');
+            await pm.chartTypeSelector.selectStream('e2e_automate');
+            await pm.chartTypeSelector.removeField('y_axis_1', 'y');
+            await pm.chartTypeSelector.searchAndAddField('kubernetes_pod_name', 'y');
+            await pm.dashboardPanelActions.addPanelName(panelName);
+            await pm.dashboardPanelActions.savePanel();
+        } else {
+            await pm.dashboardsFormValidation.openDashboardByName(dashName);
+            await pm.dashboardsFormValidation.waitForTabListContainer(15000);
+        }
+
+        // Enter annotation mode
+        const annotationBtn = pm.dashboardsFormValidation.getAnnotationModeButtonLocator();
+        await annotationBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await annotationBtn.click();
+        testLogger.info('Annotation mode activated');
+
+        // Click the panel canvas to open the AddAnnotation dialog
+        const panelCanvas = pm.dashboardsFormValidation.getPanelCanvasLocator();
+        const canvasVisible = await panelCanvas.isVisible().catch(() => false);
+        if (canvasVisible) {
+            const box = await panelCanvas.boundingBox();
+            if (box) {
+                await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+            }
+        }
+
+        testLogger.info('Clicked panel canvas to open AddAnnotation dialog');
+    });
+
+    test("should open AddAnnotation dialog and render required fields", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-ANN-001: AddAnnotation dialog renders title, text, panels fields');
+
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        await expect(pm.dashboardsFormValidation.getAnnotationTitleFieldLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getAnnotationTextFieldLocator()).toBeVisible();
+        await expect(pm.dashboardsFormValidation.getAnnotationPanelsPopoverLocator()).toBeVisible();
+        testLogger.info('AddAnnotation dialog fields rendered correctly');
+    });
+
+    test("should show title required error when annotation saved with empty title", {
+        tag: ['@domainFormValidation', '@P1']
+    }, async ({ page }) => {
+        testLogger.info('TC-ANN-002: Empty title → required error in AddAnnotation');
+
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Leave title empty and click Save
+        await pm.dashboardsFormValidation.getAnnotationSaveBtnLocator().click();
+
+        const titleError = pm.dashboardsFormValidation.getAnnotationTitleErrorLocator();
+        const saveBtn    = pm.dashboardsFormValidation.getAnnotationSaveBtnLocator();
+
+        const errorVisible = await titleError.isVisible().catch(() => false);
+        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
+
+        expect(errorVisible || btnDisabled).toBe(true);
+        testLogger.info('AddAnnotation empty title validation passed');
+    });
+
+    test("should close AddAnnotation dialog when Cancel is clicked", {
+        tag: ['@domainFormValidation', '@P1', '@smoke']
+    }, async ({ page }) => {
+        testLogger.info('TC-ANN-003: Cancel closes AddAnnotation dialog');
+
+        const dialog = pm.dashboardsFormValidation.getAddAnnotationDialogLocator();
+        await dialog.waitFor({ state: 'visible', timeout: 10000 });
+
+        await pm.dashboardsFormValidation.getAnnotationCancelBtnLocator().click();
+
+        await expect(dialog).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('AddAnnotation dialog closed after Cancel');
+    });
+});
