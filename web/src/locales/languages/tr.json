@@ -422,7 +422,8 @@
     "menuGroupInspect": "İnceleyin",
     "validSql": "Geçerli SQL",
     "invalidSql": "Geçersiz sorgu",
-    "menuGroupExplain": "Açıklamak"
+    "menuGroupExplain": "Açıklamak",
+    "selectLogsStreamFirst": "Önce Günlükler akışını seçin"
   },
   "menu": {
     "home": "Ana Sayfa",

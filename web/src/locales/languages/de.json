@@ -422,7 +422,8 @@
     "menuGroupInspect": "Inspizieren",
     "validSql": "Gültiges SQL",
     "invalidSql": "Ungültige Abfrage",
-    "menuGroupExplain": "Erkläre"
+    "menuGroupExplain": "Erkläre",
+    "selectLogsStreamFirst": "Wählen Sie zuerst Logs-Stream aus"
   },
   "menu": {
     "home": "Startseite",
