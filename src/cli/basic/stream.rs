@@ -75,6 +75,7 @@ pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(
         };
         let mut settings = unwrap_stream_settings(&schema).unwrap_or_default();
         settings.index_updated_at = updated_at;
+        settings.index_fields_updated_at.clear();
 
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings)?);

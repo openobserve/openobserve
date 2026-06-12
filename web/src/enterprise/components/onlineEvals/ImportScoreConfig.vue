@@ -11,7 +11,6 @@ the Free Software Foundation, either version 3 of the License, or
     :title="t('onlineEvals.scoreConfig.import.title')"
     test-prefix="score-config"
     :is-importing="isImporting"
-    container-class="o2-custom-bg"
     container-style="height: calc(100vh - var(--navbar-height));"
     :editor-heights="editorHeights"
     @back="goBack"

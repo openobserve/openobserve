@@ -67,10 +67,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="aiEnabled"
           variant="ghost"
           size="sm"
-          icon-left="bolt"
+          class="ai-hover-btn"
           data-test="logs-no-events-ask-ai-btn"
           @click="emit('ask-ai')"
         >
+          <template #icon-left>
+            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+          </template>
           {{ t("logs.noEvents.askAi") }}
         </OButton>
       </div>
@@ -84,6 +87,7 @@ import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useAiIcon } from "@/composables/useAiIcon";
 
 const props = defineProps<{
   /** True when SQL mode is active; affects how filter presence is detected. */
@@ -108,6 +112,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { aiIconSrc } = useAiIcon();
 
 // --- filter detection -------------------------------------------------------
 

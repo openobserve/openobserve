@@ -66,7 +66,7 @@ async fn patch_sre_readonly_alerts_incidents() {
     use bytes::Bytes;
 
     const MIGRATION_ORG: &str = "_migration";
-    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v1";
+    const FLAG_KEY: &str = "sre_readonly_afolder_incidents_v2";
 
     if crate::service::kv::get(MIGRATION_ORG, FLAG_KEY)
         .await

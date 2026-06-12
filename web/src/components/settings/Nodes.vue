@@ -40,19 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="overflow: hidden"
     >
       <template #before>
-        <div class="tw:pt-6 tw:flex tw:flex-col" style="height: 100%">
+        <div class="tw:pt-6 tw:flex tw:flex-col tw:border-r4 tw:border-border-default" style="height: 100%">
           <div class="sticky-header tw:px-2 tw:shrink-0">
             <div class="tw:flex tw:items-center tw:justify-between tw:p-2" style="font-size: 18px">
               <span class="tw:flex tw:items-center tw:gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
               </span>
-              <a
-                class="tw:cursor-pointer tw:text-xs tw:underline"
+              <OButton
+                variant="outline"
+                size="xs"
                 :class="filterApplied ? 'text-primary' : ''"
                 @click="clearAll()"
-                >{{ t("nodes.clear_all") }}</a
-              >
+              >{{ t("nodes.clear_all") }}</OButton>
             </div>
           </div>
 
