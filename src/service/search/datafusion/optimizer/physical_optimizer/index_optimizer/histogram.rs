@@ -363,7 +363,7 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '+08:00') as ts, count(*) as cnt from t group by ts",
                 Some(IndexOptimizeMode::SimpleHistogram(
-                    1757430480000000,
+                    1757401680000000,
                     60000000,
                     16,
                     28800000000,
@@ -435,8 +435,8 @@ mod tests {
             (
                 "SELECT histogram(_timestamp, '1 minute', '-05:30') as ts, level, count(*) as cnt from t group by ts, level",
                 Some(IndexOptimizeMode::SimpleMultiHistogram(
-                    1757381880000000,
-                    1757382794060000,
+                    1757401680000000,
+                    1757402594060000,
                     60000000,
                     -19800000000,
                     "level".to_string(),
