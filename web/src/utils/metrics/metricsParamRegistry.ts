@@ -13,23 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// ---------------------------------------------------------------------------
-// Metrics deep-link param registry (Feature 2 / "Mechanism B").
-//
-// The SINGLE source of truth for the inbound override params the Metrics page
-// accepts. Consumed by the page-agnostic engine in `@/utils/url/deepLinkParams`
-// (for both build and apply). Adding a new param is a one-line entry here.
-//
-// NOTE: time (`from`/`to`/`period`) and `refresh` are NOT descriptors — they
-// ride the shared `@/utils/dashboard/urlTimeParams` helper instead.
-// ---------------------------------------------------------------------------
+// Metrics deep-link param registry: the inbound override params the page accepts (consumed by deepLinkParams).
+// time (from/to/period) and refresh are not descriptors — they ride urlTimeParams.
 
 import store from "@/stores";
 import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
 import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import type { ParamDescriptor } from "@/utils/url/deepLinkParams";
 
-// Valid panel chart types (ChartSelection.vue ids). Unknown -> ignored.
+// valid panel chart types (ChartSelection.vue ids); unknown -> ignored
 const VALID_CHART_TYPES = new Set<string>([
   "area",
   "area-stacked",
@@ -53,11 +45,10 @@ const VALID_CHART_TYPES = new Set<string>([
   "custom_chart",
 ]);
 
-/** Return a valid chart type, or null when unrecognized (keep base). */
 export const sanitizeChartType = (raw: string): string | null =>
   VALID_CHART_TYPES.has(raw) ? raw : null;
 
-/** A fresh metrics query slot (cloned from the panel default, stream_type=metrics). */
+// a fresh metrics query slot (cloned from the panel default, stream_type=metrics)
 export const defaultMetricsQuery = (): any => {
   const q = JSON.parse(
     JSON.stringify(getDefaultDashboardPanelData(store).data.queries[0]),
@@ -66,11 +57,6 @@ export const defaultMetricsQuery = (): any => {
   return q;
 };
 
-/**
- * The metrics param vocabulary. `read` pulls a value out of a build-intent
- * (`{ chartType, queryType, queries: [{ stream, query }] }`); `apply` lands a
- * decoded URL value onto the panel (panel scope) or a query slot (perQuery).
- */
 export const METRICS_PARAMS: ParamDescriptor[] = [
   {
     key: "chart_type",
@@ -91,8 +77,7 @@ export const METRICS_PARAMS: ParamDescriptor[] = [
   },
   {
     key: "stream_name",
-    // legacy alias: logs/alerts/incidents deep-links emit `stream`
-    aliases: ["stream"],
+    aliases: ["stream"], // legacy: logs/alerts/incidents emit `stream`
     scope: "perQuery",
     apply: (slot, value) => {
       if (!slot.fields) slot.fields = {};
@@ -104,7 +89,7 @@ export const METRICS_PARAMS: ParamDescriptor[] = [
   {
     key: "query",
     scope: "perQuery",
-    // base64 (url-safe) of the raw PromQL/SQL; presence ⇒ custom, honored verbatim.
+    // base64 of the raw PromQL/SQL; presence ⇒ custom, honored verbatim
     decode: (raw) => b64DecodeUnicodeSafe(raw),
     encode: (value) => b64EncodeUnicode(String(value)),
     apply: (slot, value) => {

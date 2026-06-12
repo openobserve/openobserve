@@ -13,81 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// ---------------------------------------------------------------------------
-// Page-agnostic deep-link param engine.
-//
-// A page describes the URL params it accepts as a list of `ParamDescriptor`s
-// (its "registry"); this engine interprets them generically:
-//   • indexing & aliasing — `key` ≡ `key.0`; `key.1`, `key.2` … ; explicit
-//     ".i" wins over the bare key.
-//   • build  — `buildUrlFromRegistry(url, registry, intent)` emits the params.
-//   • apply  — `applyOverridesFromRegistry(registry, query, state)` reads them
-//     back onto a target state, with override-or-append + gap compaction.
-//   • gate   — `hasAnyDeepLinkParam(query, registry)` powers "auto-run on load".
-//
-// No metrics knowledge lives here — Add Panel / Logs Visualize can reuse it by
-// supplying their own registry. The metrics registry is in
-// `@/utils/metrics/metricsParamRegistry`.
-// ---------------------------------------------------------------------------
+// Page-agnostic deep-link param engine (registry-driven build/apply/auto-run gate).
 
 export type ParamScope = "panel" | "perQuery";
 
 export interface ParamApplyCtx {
-  /** per-query slot index (perQuery scope only). */
   index?: number;
-  /** the full target state (e.g. dashboardPanelData). */
   panelData?: any;
 }
 
 export interface ParamDescriptor<T = any> {
-  /** URL param name, e.g. "chart_type" | "stream_name". */
   key: string;
-  /**
-   * Legacy/alternative URL keys also accepted on READ (apply + auto-run gate),
-   * but NEVER emitted on build — `key` stays the canonical param. E.g.
-   * `stream_name` accepts the legacy `stream` that logs/alerts/incidents emit.
-   */
+  // extra keys accepted on read, never emitted on build (e.g. legacy `stream`)
   aliases?: string[];
-  /** panel-level (applied once) | per-query (indexed: bare ≡ .0, then .1, .2 …). */
-  scope: ParamScope;
-  /** URL string -> value (default: identity). */
+  scope: ParamScope; // per-query is indexed: bare ≡ .0, then .1, .2 …
   decode?: (raw: string) => T;
-  /** value -> URL string (default: String); may return null to skip emit. */
   encode?: (value: T) => string | null;
-  /**
-   * Land the decoded value onto the target:
-   *   panel scope    -> target is the full state (dashboardPanelData)
-   *   perQuery scope -> target is the query slot (queries[i])
-   */
   apply: (target: any, value: T, ctx: ParamApplyCtx) => void;
-  /**
-   * Pull a value out of a build-intent (for buildUrlFromRegistry):
-   *   panel scope    -> source is the intent
-   *   perQuery scope -> source is the per-query intent (intent.queries[i])
-   */
   read?: (source: any, index?: number) => T | undefined | null;
 }
 
 export interface ApplyOptions {
-  /** Where the per-query array lives on the state (default: state.data.queries). */
   getQueries?: (state: any) => any[] | undefined;
-  /** Factory for an appended query slot (default: () => ({})). */
   makeDefaultQuery?: () => any;
-  /** Per-index post-hook (e.g. force a stream_type). Runs after descriptors. */
   onIndexApplied?: (slot: any, index: number, state: any) => void;
-  /**
-   * Compact addressed indices to contiguous slots `0..N-1` (use when BUILDING
-   * FROM SCRATCH — no base blob — so `query.2` alone fills slot 0, no empty
-   * middle queries). When false (default), honor the literal index so a base
-   * (blob) query at `i` is overridden in place (surgical). Values are always
-   * READ from the URL by their literal index regardless.
-   */
+  // compact addressed indices to 0..N-1 (build-from-scratch); else honor literal index
   compactIndices?: boolean;
 }
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Every URL key a descriptor accepts on read: its canonical key + aliases. */
 const keysOf = (d: ParamDescriptor): string[] => [d.key, ...(d.aliases ?? [])];
 
 const decodeValue = (d: ParamDescriptor, raw: any) =>
@@ -96,29 +51,20 @@ const decodeValue = (d: ParamDescriptor, raw: any) =>
 const encodeValue = (d: ParamDescriptor, value: any): string | null =>
   d.encode ? d.encode(value) : String(value);
 
-/** Build the URL key for an index: bare for 0 (the alias), `key.i` otherwise. */
 export const indexedKey = (key: string, i: number): string =>
   i === 0 ? key : `${key}.${i}`;
 
-/**
- * Read a per-query value at index `i`, treating the bare key as `.0` and
- * preferring the explicit `.i` (so `.0` wins over the bare key if both set).
- */
 export const readIndexed = (
   query: Record<string, any>,
   key: string,
   i: number,
 ): any => {
   const dotted = query[`${key}.${i}`];
-  if (dotted !== undefined) return dotted; // explicit ".i" (incl. ".0") wins
+  if (dotted !== undefined) return dotted; // explicit .i wins (incl. .0)
   if (i === 0) return query[key]; // bare ≡ .0
   return undefined;
 };
 
-/**
- * The addressed per-query indices for the given perQuery descriptors, sorted
- * unique. Index 0 is addressed by either the bare key or `.0`.
- */
 export const parseQueryIndices = (
   query: Record<string, any>,
   perQueryDescriptors: ParamDescriptor[],
@@ -137,7 +83,6 @@ export const parseQueryIndices = (
   return Array.from(indices).sort((a, b) => a - b);
 };
 
-/** True if any param in the registry is present on the query (auto-run gate). */
 export const hasAnyDeepLinkParam = (
   query: Record<string, any>,
   registry: ParamDescriptor[],
@@ -150,10 +95,6 @@ export const hasAnyDeepLinkParam = (
     }),
   );
 
-/**
- * Emit every registry param onto `url.searchParams` from a build-intent.
- * Per-query params are emitted indexed (bare for query 0).
- */
 export const buildUrlFromRegistry = (
   url: URL,
   registry: ParamDescriptor[],
@@ -183,12 +124,6 @@ export const buildUrlFromRegistry = (
   return url;
 };
 
-/**
- * Apply override params onto `state` (base = whatever is already there).
- * Panel descriptors apply once; per-query descriptors override `queries[i]`
- * in place when the base has it, else append a cloned default (compacting
- * non-contiguous indices). Precedence is override > base > default.
- */
 export const applyOverridesFromRegistry = (
   registry: ParamDescriptor[],
   query: Record<string, any>,
@@ -202,31 +137,27 @@ export const applyOverridesFromRegistry = (
   const panelDescriptors = registry.filter((d) => d.scope === "panel");
   const perQueryDescriptors = registry.filter((d) => d.scope === "perQuery");
 
-  // Panel-level overrides (applied once). First matching key/alias wins.
   for (const d of panelDescriptors) {
-    const key = keysOf(d).find((k) => query[k] != null);
+    const key = keysOf(d).find((k) => query[k] != null); // first key/alias wins
     if (key != null)
       d.apply(state, decodeValue(d, query[key]), { panelData: state });
   }
 
-  // Per-query overrides (indexed).
   const queries = getQueries(state);
   if (Array.isArray(queries)) {
     const indices = parseQueryIndices(query, perQueryDescriptors);
     const baseLen = queries.length; // capture before appends
     indices.forEach((i, pos) => {
-      // build-from-scratch -> compact to contiguous slots; blob base -> honor
-      // the literal index so existing series are overridden surgically.
+      // compact (build-from-scratch) maps to 0..N-1; else honor the literal index
       const target = options.compactIndices ? pos : i;
       let slot: any;
       if (target < baseLen && queries[target]) {
-        slot = queries[target]; // override in place
+        slot = queries[target];
       } else {
-        slot = makeDefaultQuery(); // cloned default
-        queries.push(slot); // append at next position
+        slot = makeDefaultQuery();
+        queries.push(slot);
       }
       for (const d of perQueryDescriptors) {
-        // read by the literal url index, trying the canonical key then aliases
         let raw: any;
         for (const key of keysOf(d)) {
           raw = readIndexed(query, key, i);

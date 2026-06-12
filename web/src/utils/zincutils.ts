@@ -204,8 +204,7 @@ export const b64DecodeUnicode = (str: string) => {
   }
 };
 
-// url safe base64 decode that never returns undefined/throws — handy when
-// decoding untrusted URL params (bad input -> the provided fallback, default "")
+// url-safe base64 decode that never throws (bad input -> fallback, default "")
 export const b64DecodeUnicodeSafe = (str: string, fallback = ""): string => {
   if (!str) return fallback;
   return b64DecodeUnicode(str) ?? fallback;
