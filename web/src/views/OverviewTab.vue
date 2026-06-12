@@ -1367,11 +1367,6 @@ body.body--dark {
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 0;
-  /* The app's default skeleton base is grey-200 (#e5e5e5), but the Usage tab's
-     skeleton renders on the lighter grey-100 (#f5f5f5). Override the token here
-     so the Overview skeleton reads the same shade as Usage. OSkeleton picks this
-     up via its bg-skeleton-base (= var(--color-skeleton-base)). */
-  --color-skeleton-base: var(--color-grey-100);
 }
 
 /* Height only — OSkeleton provides the surface, rounding and wave shimmer. */
