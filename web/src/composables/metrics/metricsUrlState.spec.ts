@@ -22,7 +22,10 @@ import {
   applyDeepLinkOverrides,
   METRICS_BLOB_VERSION,
 } from "./metricsUrlState";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, b64DecodeUnicodeSafe } from "@/utils/zincutils";
+import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
+import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
+import { queryParamsToSelectedDate } from "@/utils/dashboard/urlTimeParams";
 import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboardPanelDefaults";
 import store from "@/stores";
 
@@ -277,5 +280,58 @@ describe("metricsUrlState · applyDeepLinkOverrides (integration)", () => {
     applyDeepLinkOverrides({ org_identifier: "x" }, dpd);
     expect(dpd.data.queries).toHaveLength(1);
     expect(dpd.data.queries[0].query).toBe("keep");
+  });
+});
+
+// Exercises a verbatim, real alerts -> metrics deep-link URL end-to-end:
+// /web/metrics?stream_type=metrics&stream=container_cpu_usage&stream_value=…
+//   &from=<µs>&to=<µs>&query=<b64>&org_identifier=default&type=alerts&show_histogram=false
+describe("metricsUrlState · real alerts deep-link URL", () => {
+  const URL_STR =
+    "http://localhost:8081/web/metrics?stream_type=metrics&stream=container_cpu_usage" +
+    "&stream_value=container_cpu_usage&from=1781243646093750&to=1781244060000000" +
+    "&query=KGNvbnRhaW5lcl9jcHVfdXNhZ2V7azhzX25hbWVzcGFjZV9uYW1lPSJkZXYifSkgPj0gMC41" +
+    "&org_identifier=default&type=alerts&show_histogram=false";
+
+  // route.query is a flat string map; reproduce it from the URL.
+  const queryFromUrl = (url: string): Record<string, string> => {
+    const sp = new URL(url).searchParams;
+    const q: Record<string, string> = {};
+    sp.forEach((v, k) => (q[k] = v));
+    return q;
+  };
+  const query = queryFromUrl(URL_STR);
+  const EXPECTED_QUERY = '(container_cpu_usage{k8s_namespace_name="dev"}) >= 0.5';
+
+  it("decodes the base64 `query` param to the expected PromQL", () => {
+    expect(b64DecodeUnicodeSafe(query.query)).toBe(EXPECTED_QUERY);
+  });
+
+  it("resolves the legacy `stream` alias, the custom query, and forces stream_type=metrics", () => {
+    const dpd = getDefaultDashboardPanelData(store);
+    applyDeepLinkOverrides(query, dpd);
+    const q0 = dpd.data.queries[0];
+    expect(dpd.data.queries).toHaveLength(1);
+    expect(q0.fields.stream).toBe("container_cpu_usage"); // from the `stream` alias
+    expect(q0.fields.stream_type).toBe("metrics");
+    expect(q0.query).toBe(EXPECTED_QUERY); // base64-decoded
+    expect(q0.customQuery).toBe(true); // a query ⇒ custom, verbatim
+  });
+
+  it("ignores the non-contract params (stream_value, type, show_histogram, stream_type)", () => {
+    const dpd = getDefaultDashboardPanelData(store);
+    expect(() => applyDeepLinkOverrides(query, dpd)).not.toThrow();
+    expect(dpd.data.queries).toHaveLength(1); // no extra queries from junk params
+  });
+
+  it("maps the microsecond from/to to an absolute time selection (preserved verbatim)", () => {
+    const sel = queryParamsToSelectedDate(query);
+    expect(sel.valueType).toBe("absolute");
+    expect(sel.startTime).toBe("1781243646093750");
+    expect(sel.endTime).toBe("1781244060000000");
+  });
+
+  it("triggers auto-run on load (an inbound override param is present)", () => {
+    expect(hasAnyDeepLinkParam(query, METRICS_PARAMS)).toBe(true);
   });
 });
