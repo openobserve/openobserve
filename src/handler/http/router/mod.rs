@@ -939,6 +939,7 @@ pub fn service_routes() -> Router {
 
             // License
             .route("/license", get(license::get_license_info).post(license::store_license))
+            .route("/license/refresh", post(license::refresh_license_limits))
 
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))

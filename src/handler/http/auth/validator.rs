@@ -674,7 +674,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         path_columns.remove(0);
     }
     let url_len = path_columns.len();
-    if path_columns.len() < 2 {
+    if path_columns.len() < 2 || path_columns.first().eq(&Some(&"license")) {
         return Ok(());
     }
     // node and profile are special prefixes, they do not need to create org
