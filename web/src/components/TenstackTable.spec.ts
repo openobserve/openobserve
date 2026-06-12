@@ -342,11 +342,11 @@ describe("TenstackTable", () => {
       ).toBe(false);
     });
 
-    it("should not show the skeleton body once rows are present", () => {
+    it("should show the skeleton body when loading=true (follows O2 pattern)", () => {
       wrapper = mountTable({ loading: true });
       expect(
         wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it("should render a custom loading slot when loading=true and rows is empty", () => {

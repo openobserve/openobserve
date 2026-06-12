@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 No operations found
               </div>
               <div
-                  v-else
+                  v-else-if="recentOperations.length > 0 || loadingOperations"
                   class="tw:overflow-hidden tw:rounded"
                   data-test="service-graph-side-panel-operations-table"
                 >
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 No {{ cfg.label.toLowerCase() }} data found
               </div>
               <div
-                v-else
+                v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
                 class="tw:overflow-hidden tw:rounded"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
