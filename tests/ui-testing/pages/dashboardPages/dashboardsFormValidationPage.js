@@ -92,6 +92,19 @@ export class DashboardsFormValidationPage {
         this.settingsVariablesTab    = '[data-test="dashboard-settings-variable-tab"]';
         this.variableAddBtn          = '[data-test="dashboard-variable-add-btn"]';
 
+        // ── PanelLayoutSettings dialog ────────────────────────────────────────
+        this.panelLayoutDrawer      = '[data-test="panel-layout-settings-drawer"]';
+        this.panelLayoutHeightField = '[data-test="panel-layout-settings-height-input-field"]';
+        this.panelLayoutHeightError = '[data-test="panel-layout-settings-height-input-error"]';
+        this.panelLayoutSaveBtn     = '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-primary-btn"]';
+        this.panelLayoutCancelBtn   = '[data-test="panel-layout-settings-drawer"] [data-test="o-dialog-secondary-btn"]';
+
+        // ── AddCondition (panel editor Filters section) ───────────────────────
+        this.addConditionAddBtn     = '[data-test="dashboard-add-condition-add"]';
+        this.conditionColumn        = '[data-test="dashboard-add-condition-column-0"]';
+        this.conditionCondition     = '[data-test="dashboard-add-condition-condition-0"]';
+        this.conditionRemoveColumn  = '[data-test="dashboard-add-condition-remove-column-0"]';
+
         // ── AddAnnotation dialog ──────────────────────────────────────────────
         this.addAnnotationDialog    = '[data-test="add-annotation-dialog"]';
         this.annotationTitleField   = '[data-test="dashboard-add-annotation-title-input-field"]';
@@ -356,6 +369,62 @@ export class DashboardsFormValidationPage {
 
     getVariableSaveBtnLocator() {
         return this.page.locator(this.variableSaveBtn);
+    }
+
+    // ── PanelLayoutSettings helpers ───────────────────────────────────────────
+
+    getPanelLayoutDrawerLocator() {
+        return this.page.locator(this.panelLayoutDrawer);
+    }
+
+    getPanelLayoutHeightFieldLocator() {
+        return this.page.locator(this.panelLayoutHeightField);
+    }
+
+    getPanelLayoutHeightErrorLocator() {
+        return this.page.locator(this.panelLayoutHeightError);
+    }
+
+    getPanelLayoutSaveBtnLocator() {
+        return this.page.locator(this.panelLayoutSaveBtn);
+    }
+
+    getPanelLayoutCancelBtnLocator() {
+        return this.page.locator(this.panelLayoutCancelBtn);
+    }
+
+    // ── AddCondition helpers ──────────────────────────────────────────────────
+
+    getAddConditionAddBtnLocator() {
+        return this.page.locator(this.addConditionAddBtn);
+    }
+
+    getConditionColumnLocator() {
+        return this.page.locator(this.conditionColumn);
+    }
+
+    getConditionConditionLocator() {
+        return this.page.locator(this.conditionCondition);
+    }
+
+    getConditionRemoveColumnLocator() {
+        return this.page.locator(this.conditionRemoveColumn);
+    }
+
+    // ── Dashboard list search (used to detect dashboards list is ready) ──────
+
+    getDashboardSearchLocator() {
+        return this.page.locator('[data-test="dashboard-search"]');
+    }
+
+    // ── Annotation button (on panel in view mode) ─────────────────────────────
+
+    getAnnotationModeButtonLocator() {
+        return this.page.locator('[data-test="panel-schema-renderer-annotation-button"]');
+    }
+
+    getPanelCanvasLocator() {
+        return this.page.locator('[data-test="dashboard-panel-bar"]').first().locator('canvas').first();
     }
 
     // ── AddAnnotation helpers ─────────────────────────────────────────────────
