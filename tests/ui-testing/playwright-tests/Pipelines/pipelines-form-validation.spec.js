@@ -510,6 +510,90 @@ test.describe(
     }
 );
 
+// ─── Pipeline Stream Node – Form Validation ──────────────────────────────────
+
+test.describe(
+    'Pipelines – Stream Node Form Validation',
+    { tag: ['@domainFormValidation', '@P0', '@smoke'] },
+    () => {
+        /** @type {PageManager} */
+        let pm;
+
+        test.describe.configure({ mode: 'serial' });
+
+        test.beforeEach(async ({ page }, testInfo) => {
+            testLogger.testStart(testInfo.title, testInfo.file);
+            await navigateToBase(page);
+            pm = new PageManager(page);
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+            // Navigate to pipelines and open the pipeline editor with a stream node
+            await pm.pipelinesPage.openPipelineMenu();
+            await pm.pipelinesPage.addPipeline();
+            await pm.pipelinesPage.selectStream();
+            await pm.pipelinesPage.dragStreamToTarget(pm.pipelinesPage.streamButton);
+        });
+
+        // ── Test 1: stream node drawer is visible after drag ──────────────────
+
+        test(
+            'should show the stream node drawer after dragging a stream onto the canvas',
+            { tag: ['@domainFormValidation', '@P0', '@smoke'] },
+            async ({ page }) => {
+                const drawer = pm.pipelinesFormValidation.getStreamNodeDrawerLocator();
+                await drawer.waitFor({ state: 'visible', timeout: 10000 });
+                await expect(drawer).toBeVisible();
+            }
+        );
+
+        // ── Test 2: stream type select renders inside the drawer ──────────────
+
+        test(
+            'should render the stream type select inside the stream node drawer',
+            { tag: ['@domainFormValidation', '@P0', '@smoke'] },
+            async ({ page }) => {
+                const drawer = pm.pipelinesFormValidation.getStreamNodeDrawerLocator();
+                await drawer.waitFor({ state: 'visible', timeout: 10000 });
+
+                const typeSelect = pm.pipelinesFormValidation.getStreamNodeTypeSelectLocator();
+                await expect(typeSelect).toBeVisible({ timeout: 5000 });
+            }
+        );
+
+        // ── Test 3: save without selecting stream type => error or name disabled
+
+        test.skip(
+            'should show an error or disable the stream name select when save is attempted without selecting a stream type',
+            async ({ page }) => {
+                // This test requires confirming the exact data-test attribute on the
+                // save/OK button inside Stream.vue and the validation error selector.
+                // Skip until the component audit confirms those selectors.
+                const drawer = pm.pipelinesFormValidation.getStreamNodeDrawerLocator();
+                await drawer.waitFor({ state: 'visible', timeout: 10000 });
+
+                // Attempt to save via the drawer primary button (if it exists)
+                const saveBtn = drawer.locator('[data-test="o-drawer-primary-btn"]');
+                const saveBtnVisible = await saveBtn.isVisible({ timeout: 3000 }).catch(() => false);
+
+                if (saveBtnVisible) {
+                    await saveBtn.click();
+
+                    // Check if stream name select is disabled when type not selected
+                    const nameSelect = pm.pipelinesFormValidation.getStreamNodeNameSelectLocator();
+                    const nameDisabled = await nameSelect.isDisabled({ timeout: 2000 }).catch(() => false);
+
+                    expect(nameDisabled).toBe(true);
+                } else {
+                    // No save button visible — verify name select is disabled by default
+                    const nameSelect = pm.pipelinesFormValidation.getStreamNodeNameSelectLocator();
+                    const nameDisabled = await nameSelect.isDisabled({ timeout: 2000 }).catch(() => true);
+                    expect(nameDisabled).toBe(true);
+                }
+            }
+        );
+    }
+);
+
 // ─── ImportPipeline – Form Validation ────────────────────────────────────────
 
 test.describe(

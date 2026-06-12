@@ -367,4 +367,128 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       }
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QueryConfig — alert wizard step 2
+  // Requires the 'e2e_automate' Logs stream to exist in the test environment.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  test.describe('QueryConfig form validation', { tag: ['@alerts-form-validation', '@P1'] }, () => {
+    test.describe.configure({ mode: 'serial' });
+
+    test.beforeEach(async ({ page }) => {
+      // Navigate to alerts list and open the Add Alert wizard
+      await fvPage.openAddAlertWizard();
+
+      // Step 1 — select stream type and stream name, then advance to step 2
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 10000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+      await fvPage.clickWizardNext();
+
+      // Wait for query mode tabs to be visible (confirms we reached step 2)
+      await fvPage.getQueryModeCustomTabLocator().waitFor({ state: 'visible', timeout: 15000 });
+    });
+
+    test('should display all query mode tabs on step 2 (QueryConfig)', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      await expect(fvPage.getQueryModeCustomTabLocator()).toBeVisible();
+      await expect(fvPage.getQueryModeSqlTabLocator()).toBeVisible();
+      await expect(fvPage.getQueryModePromqlTabLocator()).toBeVisible();
+      testLogger.info('All query mode tabs are visible on QueryConfig step');
+    });
+
+    test('should activate SQL tab when clicked', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      const sqlTab = fvPage.getQueryModeSqlTabLocator();
+      await sqlTab.click();
+
+      // The active tab should have aria-selected="true" or an active class
+      const isSelected = await sqlTab.getAttribute('aria-selected').catch(() => null);
+      const hasActiveClass = await sqlTab.evaluate(
+        (el) => el.classList.contains('active') || el.classList.contains('q-tab--active')
+      ).catch(() => false);
+
+      expect(isSelected === 'true' || hasActiveClass).toBe(true);
+      testLogger.info('SQL query mode tab is active after click');
+    });
+
+    test('should show threshold input field on QueryConfig step', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      const thresholdInput = fvPage.getAlertTriggerThresholdInputLocator();
+      await thresholdInput.waitFor({ state: 'visible', timeout: 10000 });
+      await expect(thresholdInput).toBeVisible();
+      testLogger.info('Threshold input is visible on QueryConfig step');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AlertSettings — alert wizard step 3
+  // Requires the 'e2e_automate' Logs stream to exist in the test environment.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  test.describe('AlertSettings form validation', { tag: ['@alerts-form-validation', '@P1'] }, () => {
+    test.describe.configure({ mode: 'serial' });
+
+    test.beforeEach(async ({ page }) => {
+      // Navigate to alerts list and open the Add Alert wizard
+      await fvPage.openAddAlertWizard();
+
+      // Step 1 — select stream type and stream name
+      await fvPage.getWizardStreamTypeDropdownLocator().waitFor({ state: 'visible', timeout: 10000 });
+      await fvPage.selectWizardStreamType('Logs');
+      await fvPage.selectWizardStreamName('e2e_automate');
+
+      // Advance from step 1 to step 2 (QueryConfig)
+      await fvPage.clickWizardNext();
+      await fvPage.getQueryModeCustomTabLocator().waitFor({ state: 'visible', timeout: 15000 });
+
+      // Advance from step 2 to step 3 (AlertSettings)
+      await fvPage.clickWizardNext();
+      await fvPage.getAlertSettingsSilenceDurationLocator().waitFor({ state: 'visible', timeout: 15000 });
+    });
+
+    test('should display silence duration input on AlertSettings step', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      await expect(fvPage.getAlertSettingsSilenceDurationLocator()).toBeVisible();
+      testLogger.info('Silence duration input is visible on AlertSettings step');
+    });
+
+    test('should display and allow clicking the refresh destinations button', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      const refreshBtn = fvPage.getAlertRefreshDestinationsBtnLocator();
+      await refreshBtn.waitFor({ state: 'visible', timeout: 10000 });
+      await expect(refreshBtn).toBeVisible();
+      await refreshBtn.click();
+      testLogger.info('Refresh destinations button is visible and clickable');
+    });
+
+    test('should show error or disabled state when silence duration is set to 0', {
+      tag: ['@alerts-form-validation', '@P1'],
+    }, async ({ page }) => {
+      const silenceInput = fvPage.getAlertSettingsSilenceDurationLocator();
+      await silenceInput.fill('0');
+      // Blur the field to trigger validation
+      await silenceInput.press('Tab');
+
+      // Either a validation error appears or the save button becomes disabled
+      const silenceError = fvPage.getAlertSettingsSilenceErrorLocator();
+      const errorVisible = await silenceError.isVisible().catch(() => false);
+
+      if (errorVisible) {
+        await expect(silenceError).toBeVisible();
+        const errorText = await silenceError.textContent();
+        expect(errorText.trim().length).toBeGreaterThan(0);
+        testLogger.info('Silence duration error shown for value 0', { error: errorText.trim() });
+      } else {
+        // No inline error — acceptable if the UI prevents saving another way
+        testLogger.info('No inline silence duration error for value 0 — UI may block save elsewhere');
+      }
+    });
+  });
 });

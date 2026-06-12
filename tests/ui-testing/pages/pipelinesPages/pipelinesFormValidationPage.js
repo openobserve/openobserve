@@ -96,6 +96,12 @@ export class PipelinesFormValidationPage {
         this.editChunkPeriodError        = '[data-test="chunk-period-input-error"]';
         this.editDelayBetweenChunksField = '[data-test="delay-between-chunks-input-field"]';
         this.editDelayBetweenChunksError = '[data-test="delay-between-chunks-input-error"]';
+
+        // ── Pipeline Stream node (Stream.vue) ─────────────────────────────────
+        this.streamNodeDrawer     = '[data-test="input-node-stream-drawer"]';
+        this.streamNodeTypeSelect = '[data-test="input-node-stream-type-select"]';
+        this.streamNodeNameSelect = '[data-test="input-node-stream-name-select"]';
+        this.createStreamToggle   = '[data-test="create-stream-toggle"]';
     }
 
     // ── Navigation helpers ────────────────────────────────────────────────────
@@ -360,6 +366,13 @@ export class PipelinesFormValidationPage {
     getEditDelayBetweenChunksErrorLocator() {
         return this.page.locator(this.editDelayBetweenChunksError);
     }
+
+    // ── Pipeline Stream node getters ─────────────────────────────────────────
+
+    getStreamNodeDrawerLocator()     { return this.page.locator(this.streamNodeDrawer); }
+    getStreamNodeTypeSelectLocator() { return this.page.locator(this.streamNodeTypeSelect).first(); }
+    getStreamNodeNameSelectLocator() { return this.page.locator(this.streamNodeNameSelect); }
+    getCreateStreamToggleLocator()   { return this.page.locator(this.createStreamToggle); }
 
     // ── LLM Evaluation action helpers ─────────────────────────────────────────
 
