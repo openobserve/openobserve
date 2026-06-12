@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="formData.trigger_condition.silence"
                     type="number"
                     min="0"
+                    data-test="alert-settings-silence-duration-input"
                     @update:model-value="
                       $emit('update:trigger', formData.trigger_condition)
                     "
@@ -111,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</template>
                 </OSelect>
                 <OButton
+                  data-test="alert-settings-refresh-destinations-btn"
                   class="tw:ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
@@ -172,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="number"
                     min="1"
                     :debounce="300"
+                    data-test="alert-settings-period-input"
                     @update:model-value="handlePeriodChange"
                   />
                 </div>
@@ -226,6 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="number"
                     min="0"
                     :debounce="300"
+                    data-test="alert-settings-silence-duration-input"
                     @update:model-value="emitTriggerUpdate"
                   />
                 </div>
@@ -292,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</template>
                 </OSelect>
                 <OButton
+                  data-test="alert-settings-refresh-destinations-btn"
                   class="tw:ml-1"
                   variant="ghost"
                   size="icon-circle-sm"
