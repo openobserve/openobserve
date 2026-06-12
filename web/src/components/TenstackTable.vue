@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
           <!-- Loading banner: shown above rows while a new page is fetching -->
-          <tr v-if="loading && tableRows.length > 0" class="tw:w-full">
+          <tr v-if="loading && tableRows.length > 0 && $slots['loading-banner']" class="tw:w-full">
             <td :colspan="columnOrder.length">
               <slot name="loading-banner" />
             </td>
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           when the parent does not provide a custom #loading slot. Mirrors the
           logs TenstackTable pattern. -->
         <tbody
-          v-if="loading && tableRows.length === 0 && !$slots.loading"
+          v-if="loading && !$slots.loading"
           data-test="tenstack-table-skeleton-body"
           aria-busy="true"
           aria-label="Loading"
