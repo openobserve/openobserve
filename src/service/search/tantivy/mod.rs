@@ -653,10 +653,7 @@ async fn search_tantivy_index(
             }
             let runs = count_runs(&row_ids);
             let runs_cap = runs_cap(parquet_file.meta.records as usize);
-            if runs > runs_cap
-                && cfg.common.feature_pushdown_filter_enabled
-                && !has_expensive_filter
-            {
+            if runs > runs_cap && !has_expensive_filter {
                 let ranges = coalesce_sorted_ids(&row_ids);
                 log::info!(
                     "[trace_id {trace_id}] search->tantivy: file: {}, row selection too fragmented ({runs} runs > cap {runs_cap}), degraded to {} coalesced ranges with filter added back",
