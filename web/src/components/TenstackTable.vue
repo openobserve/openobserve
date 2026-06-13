@@ -274,6 +274,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                 </div>
+                <!-- Slot for extra per-column header content (e.g. filter button) -->
+                <slot name="header-cell" :column-id="header.column.id" />
+
+                <!-- Built-in column filter button -->
+                <template v-if="enableColumnFilter">
+                  <ODropdown
+                    side="bottom"
+                    align="start"
+                    :side-offset="4"
+                    @update:open="(v: boolean) => { if (v) colFilterSearch[header.column.id] = '' }"
+                  >
+                    <template #trigger>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs"
+                        :data-test="`o2-table-column-filter-btn-${header.column.id}`"
+                        class="tw:ml-0.5 tw:shrink-0 tw:h-5! tw:w-5! tw:min-h-0! tw:p-0!"
+                        @click.stop
+                      >
+                        <OIcon
+                          name="filter-list"
+                          size="sm"
+                          :class="isColFiltered(header.column.id) ? 'tw:text-[var(--color-primary-600)]' : 'tw:opacity-50'"
+                        />
+                      </OButton>
+                    </template>
+
+                    <!-- Filter panel -->
+                    <div
+                      class="tw:py-1"
+                      style="min-width: 200px; max-width: 300px"
+                      :data-test="`o2-table-column-filter-panel-${header.column.id}`"
+                      @click.stop
+                    >
+                      <!-- Search box — always visible at top -->
+                      <div
+                        class="tw:px-2 tw:pb-1"
+                        style="border-bottom: 1px solid rgba(128, 128, 128, 0.2)"
+                      >
+                        <OInput
+                          v-model="colFilterSearch[header.column.id]"
+                          size="sm"
+                          clearable
+                          :placeholder="t('common.search')"
+                          @click.stop
+                          @keydown.stop
+                        >
+                          <template #icon-left>
+                            <OIcon name="search" size="xs" />
+                          </template>
+                        </OInput>
+                      </div>
+
+                      <!-- Scrollable checkbox list -->
+                      <ul
+                        role="listbox"
+                        aria-multiselectable="true"
+                        style="max-height: 240px; overflow-y: auto"
+                      >
+                        <li
+                          v-for="rawVal in getFilteredUniqueValues(header.column.id)"
+                          :key="String(rawVal)"
+                          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer tw:rounded tw:hover:bg-[var(--color-surface-panel)] tw:transition-colors"
+                          @click.stop="toggleColFilterValue(header.column.id, rawVal)"
+                        >
+                          <OCheckbox
+                            :model-value="getColFilterValues(header.column.id).includes(rawVal)"
+                            size="sm"
+                            @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
+                            @click.stop
+                          />
+                          <span class="tw:text-sm tw:select-none tw:flex-1 tw:truncate">
+                            {{ getFilterDisplayValue(header.column.id, rawVal) }}
+                          </span>
+                        </li>
+                        <li
+                          v-if="getFilteredUniqueValues(header.column.id).length === 0"
+                          class="tw:px-3 tw:py-1.5 tw:text-xs tw:opacity-60"
+                        >
+                          {{ t("common.noMatches") }}
+                        </li>
+                      </ul>
+
+                      <!-- Clear filter — always visible at bottom -->
+                      <div style="border-top: 1px solid rgba(128, 128, 128, 0.2)">
+                        <div
+                          class="tw:px-3 tw:py-1.5 tw:text-xs tw:cursor-pointer tw:opacity-70 tw:hover:bg-[var(--color-surface-panel)]"
+                          @click.stop="clearColFilter(header.column.id)"
+                        >
+                          {{ t("common.clearFilter") }}
+                        </div>
+                      </div>
+                    </div>
+                  </ODropdown>
+                </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
                   class="tw:invisible tw:items-center tw:absolute tw:right-2 tw:top-0 tw:px-2 column-actions tw:h-full tw:flex"
@@ -583,6 +678,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :value="cell.getValue()"
                     />
+                    <!-- Progress bar cell type: value LEFT, bar RIGHT -->
+                    <div
+                      v-else-if="(cell.column.columnDef.meta as any)?._col?.cellType === 'progress_bar'"
+                      class="progress-bar-cell"
+                    >
+                      <span class="progress-bar-label">{{ getCellDisplayValue(cell) }}</span>
+                      <div class="progress-bar-track">
+                        <div
+                          class="progress-bar-fill"
+                          :style="{
+                            width: getProgressBarPct(cell) + '%',
+                            background: (cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)',
+                          }"
+                        />
+                      </div>
+                    </div>
+                    <!-- Sparkline cell type: value LEFT, chart RIGHT -->
+                    <div
+                      v-else-if="(cell.column.columnDef.meta as any)?._col?.cellType === 'sparkline'"
+                      class="sparkline-cell"
+                    >
+                      <span class="sparkline-value">{{ getCellDisplayValue(cell) }}</span>
+                      <!-- Bar sparkline: single vertical bar per row -->
+                      <svg
+                        v-if="isSparklineBar(cell)"
+                        width="12"
+                        height="20"
+                        overflow="visible"
+                        style="display: block; flex-shrink: 0"
+                      >
+                        <rect x="1" y="0" width="10" height="20" rx="2"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          opacity="0.15"
+                        />
+                        <rect
+                          v-if="getSparklineBar(cell)"
+                          x="1"
+                          :y="getSparklineBar(cell)!.y"
+                          width="10"
+                          :height="getSparklineBar(cell)!.h"
+                          rx="2"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                        />
+                      </svg>
+                      <!-- Line sparkline: smooth area chart + dot marker -->
+                      <svg
+                        v-else
+                        width="80"
+                        height="20"
+                        overflow="visible"
+                        style="display: block; flex-shrink: 0"
+                      >
+                        <!-- Filled area under the curve -->
+                        <path
+                          :d="getSparklineArea(cell)"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          opacity="0.12"
+                        />
+                        <!-- Smooth bezier curve line -->
+                        <path
+                          :d="getSparklinePoints(cell)"
+                          fill="none"
+                          :stroke="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                        <!-- Current row's position marker -->
+                        <circle
+                          v-if="getSparklineDot(cell)"
+                          :cx="getSparklineDot(cell)!.cx"
+                          :cy="getSparklineDot(cell)!.cy"
+                          r="3"
+                          :fill="(cell.column.columnDef.meta as any)?._col?.progressColor || 'var(--q-primary)'"
+                          stroke="white"
+                          stroke-width="1.5"
+                        />
+                      </svg>
+                    </div>
                     <!-- Default value with format fn -->
                     <span
                       v-else
@@ -1076,6 +1250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import {
   ref,
+  reactive,
   shallowRef,
   computed,
   watch,
@@ -1090,9 +1265,12 @@ import {
   FlexRender,
   type ColumnDef,
   type SortingState,
+  type ColumnFiltersState,
+  type Updater,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
 } from "@tanstack/vue-table";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -1102,6 +1280,9 @@ import { copyToClipboard } from "@/utils/clipboard";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
@@ -1269,6 +1450,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Enable Excel-style column filter dropdowns. Default: false */
+  enableColumnFilter: {
+    type: Boolean,
+    default: false,
+  },
   /** Enable paginated mode (turns off virtual scroll). Default: false */
   showPagination: {
     type: Boolean,
@@ -1294,6 +1480,85 @@ const emits = defineEmits([
 ]);
 
 const sorting = ref<SortingState>([]);
+
+// ── Column filtering ──────────────────────────────────────────────────────────
+const columnFiltersState = ref<ColumnFiltersState>([]);
+const colFilterSearch = reactive<Record<string, string>>({});
+
+const setColumnFilters = (updater: Updater<ColumnFiltersState>) => {
+  columnFiltersState.value =
+    typeof updater === "function"
+      ? updater(columnFiltersState.value)
+      : updater;
+};
+
+const uniqueValuesCache = shallowRef<Map<string, any[]>>(new Map());
+
+const getUniqueValuesForColumn = (colId: string): any[] => {
+  if (!props.enableColumnFilter) return [];
+  const cache = uniqueValuesCache.value;
+  if (cache.has(colId)) return cache.get(colId)!;
+  const rows = tableRows.value || [];
+  const seen = new Set<any>();
+  for (const row of rows) {
+    const val = (row as any)[colId];
+    if (val !== null && val !== undefined && val !== "") seen.add(val);
+  }
+  const vals = Array.from(seen);
+  vals.sort((a, b) => {
+    if (typeof a === "number" && typeof b === "number") return a - b;
+    return String(a).localeCompare(String(b));
+  });
+  cache.set(colId, vals);
+  return vals;
+};
+
+/** Return unique values filtered by the per-column search string. */
+const getFilteredUniqueValues = (colId: string): any[] => {
+  const all = getUniqueValuesForColumn(colId);
+  const q = (colFilterSearch[colId] ?? "").trim().toLowerCase();
+  if (!q) return all;
+  return all.filter((v) =>
+    getFilterDisplayValue(colId, v).toLowerCase().includes(q),
+  );
+};
+
+/** Return the formatted display label for a raw cell value in the filter dropdown. */
+const getFilterDisplayValue = (colId: string, rawVal: any): string => {
+  const col = table?.getColumn(colId);
+  const fmt = (col?.columnDef?.meta as any)?.format;
+  if (fmt) {
+    const formatted = fmt(rawVal);
+    return formatted != null ? String(formatted) : String(rawVal ?? "");
+  }
+  return String(rawVal ?? "");
+};
+
+const isColFiltered = (colId: string): boolean =>
+  columnFiltersState.value.some(
+    (f) => f.id === colId && (f.value as any[])?.length > 0,
+  );
+
+const getColFilterValues = (colId: string): any[] =>
+  (columnFiltersState.value.find((f) => f.id === colId)?.value as any[]) ?? [];
+
+const toggleColFilterValue = (colId: string, rawVal: any) => {
+  const current = getColFilterValues(colId);
+  const idx = current.indexOf(rawVal);
+  const next = idx === -1 ? [...current, rawVal] : current.filter((_, i) => i !== idx);
+  if (next.length === 0) {
+    columnFiltersState.value = columnFiltersState.value.filter((f) => f.id !== colId);
+  } else {
+    const exists = columnFiltersState.value.some((f) => f.id === colId);
+    columnFiltersState.value = exists
+      ? columnFiltersState.value.map((f) => (f.id === colId ? { id: colId, value: next } : f))
+      : [...columnFiltersState.value, { id: colId, value: next }];
+  }
+};
+
+const clearColFilter = (colId: string) => {
+  columnFiltersState.value = columnFiltersState.value.filter((f) => f.id !== colId);
+};
 
 /** Replace characters invalid in CSS custom property names (e.g. dots) with underscores. */
 const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -1341,6 +1606,8 @@ const tableRowSize = ref(0);
 const columnOrder = ref<any>([]);
 
 const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
+// Invalidate unique-values filter cache whenever rows are replaced
+watch(tableRows, () => { uniqueValuesCache.value = new Map(); });
 
 // ── Dashboard: convert Quasar column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
@@ -1561,6 +1828,104 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
   return style;
 };
 
+const getProgressBarPct = (cell: any): number => {
+  const col = (cell.column.columnDef.meta as any)?._col;
+  const val = parseFloat(String(cell.getValue()));
+  if (isNaN(val)) return 0;
+  const min = col?.progressMin ?? 0;
+  const max = col?.progressMax ?? 100;
+  if (max === min) return 0;
+  return Math.min(100, Math.max(0, ((val - min) / (max - min)) * 100));
+};
+
+interface SparklineDot { cx: string; cy: string; }
+interface SparklineBar { y: string; h: string; }
+interface SparklineData {
+  points: string;
+  areaPoints: string;
+  dots: (SparklineDot | null)[];
+  bars: (SparklineBar | null)[];
+}
+
+const _SVG_W = 80, _SVG_H = 20;
+// Smooth curves look polished at 20 control points; more adds no visible benefit.
+const _SPARKLINE_MAX_PTS = 20;
+
+/**
+ * Build a smooth SVG path using midpoint cubic bezier interpolation.
+ * Each segment uses the segment midpoint as both control points so the curve
+ * passes through every data point and transitions smoothly — the same technique
+ * used by Grafana and D3 sparklines.
+ */
+const buildSparklinePath = (xyPts: [number, number][]): string => {
+  if (xyPts.length < 2) return "";
+  let d = `M ${xyPts[0][0].toFixed(1)},${xyPts[0][1].toFixed(1)}`;
+  for (let i = 1; i < xyPts.length; i++) {
+    const [x1, y1] = xyPts[i - 1];
+    const [x2, y2] = xyPts[i];
+    const mx = ((x1 + x2) / 2).toFixed(1);
+    d += ` C ${mx},${y1.toFixed(1)} ${mx},${y2.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}`;
+  }
+  return d;
+};
+
+/** Pre-computed sparkline data keyed by column field id. Recomputed only when rows change. */
+const sparklineCache = computed((): Map<string, SparklineData> => {
+  const cache = new Map<string, SparklineData>();
+  const cols = (props.columns as any[]) ?? [];
+  const rows = tableRows.value ?? [];
+  for (const col of cols) {
+    if (col.cellType !== "sparkline") continue;
+    const key = String(col.field ?? col.name);
+    const rawVals: (number | null)[] = rows.map((row: any) => {
+      const v = parseFloat(String((row as any)[key]));
+      return isNaN(v) ? null : v;
+    });
+    const nums = rawVals.filter((v): v is number => v !== null);
+    const empty: SparklineData = { points: "", areaPoints: "", dots: rawVals.map(() => null), bars: rawVals.map(() => null) };
+    if (nums.length < 2) { cache.set(key, empty); continue; }
+    let mn = nums[0], mx = nums[0];
+    for (const v of nums) { if (v < mn) mn = v; if (v > mx) mx = v; }
+    const range = mx - mn || 1;
+    // Downsample to _SPARKLINE_MAX_PTS points; use full X coordinate space so
+    // per-row dots (which use exact proportional X) stay aligned with the curve.
+    const step = nums.length > _SPARKLINE_MAX_PTS ? Math.ceil(nums.length / _SPARKLINE_MAX_PTS) : 1;
+    const xyPts: [number, number][] = [];
+    for (let i = 0; i < nums.length; i += step) {
+      xyPts.push([(i / (nums.length - 1)) * _SVG_W, _SVG_H - ((nums[i] - mn) / range) * (_SVG_H - 4) - 2]);
+    }
+    // Always close to the right edge
+    if (xyPts[xyPts.length - 1][0] < _SVG_W - 0.5) {
+      xyPts.push([_SVG_W, _SVG_H - ((nums[nums.length - 1] - mn) / range) * (_SVG_H - 4) - 2]);
+    }
+    const linePath = buildSparklinePath(xyPts);
+    const areaPath = xyPts.length > 1
+      ? `${linePath} L ${_SVG_W},${_SVG_H} L 0,${_SVG_H} Z`
+      : "";
+    // Per-row dot + bar — X always at exact proportional position in full dataset
+    let denseIdx = -1;
+    const dots: (SparklineDot | null)[] = [];
+    const bars: (SparklineBar | null)[] = [];
+    for (const v of rawVals) {
+      if (v === null) { dots.push(null); bars.push(null); continue; }
+      denseIdx++;
+      const cx = ((denseIdx / (nums.length - 1)) * _SVG_W).toFixed(1);
+      const cy = (_SVG_H - ((v - mn) / range) * (_SVG_H - 4) - 2).toFixed(1);
+      dots.push({ cx, cy });
+      const barH = Math.max(1, ((v - mn) / range) * (_SVG_H - 2));
+      bars.push({ y: (_SVG_H - barH).toFixed(1), h: barH.toFixed(1) });
+    }
+    cache.set(key, { points: linePath, areaPoints: areaPath, dots, bars });
+  }
+  return cache;
+});
+
+const getSparklinePoints = (cell: any): string => sparklineCache.value.get(cell.column.id)?.points    ?? "";
+const getSparklineArea   = (cell: any): string => sparklineCache.value.get(cell.column.id)?.areaPoints ?? "";
+const getSparklineDot    = (cell: any): SparklineDot | null => sparklineCache.value.get(cell.column.id)?.dots[cell.row.index as number] ?? null;
+const getSparklineBar    = (cell: any): SparklineBar | null => sparklineCache.value.get(cell.column.id)?.bars[cell.row.index as number] ?? null;
+const isSparklineBar     = (cell: any): boolean => (cell.column.columnDef.meta as any)?._col?.sparklineStyle === "bar";
+
 const getCellDisplayValue = (cell: any): any => {
   const value = cell.getValue();
   const format = (cell.column.columnDef.meta as any)?.format;
@@ -1760,8 +2125,12 @@ let table: any = useVueTable({
     get columnOrder() {
       return columnOrder.value;
     },
+    get columnFilters() {
+      return columnFiltersState.value;
+    },
   },
   onSortingChange: setSorting,
+  onColumnFiltersChange: setColumnFilters,
   // Disable TanStack client sort for pivot (rows are pre-sorted manually)
   // and for dashboard mode (TableRenderer handles sorting externally).
   get enableSorting() {
@@ -1769,9 +2138,15 @@ let table: any = useVueTable({
   },
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
+  getFilteredRowModel: getFilteredRowModel(),
   defaultColumn: {
     minSize: 60,
     maxSize: 800,
+    // Multi-value include filter: row value must be one of the selected values.
+    filterFn: (row: any, columnId: string, filterValue: any[]) => {
+      if (!filterValue || filterValue.length === 0) return true;
+      return filterValue.includes(row.getValue(columnId));
+    },
   },
   columnResizeMode,
   enableColumnResizing: true,
@@ -1814,6 +2189,14 @@ onBeforeUnmount(() => {
   parentRef.value = null;
   table = null;
 });
+
+// Reset column filters when the column set changes (dashboard re-query).
+watch(
+  () => props.columns,
+  () => {
+    if (columnFiltersState.value.length > 0) columnFiltersState.value = [];
+  },
+);
 
 const hasDefaultSourceColumn = computed(
   () => props.defaultColumns && columnOrder.value.includes("source"),
@@ -2347,6 +2730,58 @@ defineExpose({
 // Outer wrapper for the table (used for sticky-column CSS scoping via data-sticky-id)
 .my-sticky-virtscroll-table {
   overflow: hidden;
+}
+
+// Progress bar cell type (dashboard table) — value left, bar right
+.progress-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  overflow: hidden;
+
+  .progress-bar-label {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: inherit;
+  }
+
+  .progress-bar-track {
+    flex: 1;
+    min-width: 32px;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(128, 128, 128, 0.15);
+    overflow: hidden;
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      opacity: 0.8;
+      transition: width 0.25s ease;
+    }
+  }
+}
+
+// Sparkline cell type (dashboard table). Content-sized (not width:100%) so the
+// parent cell flex container can position the whole group — value + chart + copy
+// button — together according to the column's alignment.
+.sparkline-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  height: 100%;
+  min-height: 20px;
+  overflow: hidden;
+
+  .sparkline-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: inherit;
+    flex-shrink: 0;
+  }
 }
 
 // Add explicit hover styles for log rows

@@ -62,7 +62,7 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
+  const { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap } = parseOverrideConfigs(
     panelSchema.config.override_config,
   );
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
@@ -137,13 +137,34 @@ export const convertTableData = (
       obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
       obj["label"] = it.label || it.alias;
-      obj["align"] = !isNumber ? "left" : "right";
+      // alias + isNumeric power inline column formatting: override_config is keyed
+      // by the column alias, while the TanStack column id is the data field.
+      obj["alias"] = it.alias;
+      obj["isNumeric"] = isNumber;
+      obj["align"] = styleConfigMap?.[aliasLower]?.alignment || (!isNumber ? "left" : "right");
       obj["sortable"] = true;
 
       // pass color mode info for renderer - use pre-lowercased lookup
       if (colorConfigMap?.[aliasLower]?.autoColor) {
         obj["colorMode"] = "auto";
       }
+
+      // pass column-level style overrides to renderer
+      const colStyle = styleConfigMap?.[aliasLower];
+      if (colStyle?.textColor) obj["textColor"] = colStyle.textColor;
+      if (colStyle?.bgColor) obj["bgColor"] = colStyle.bgColor;
+
+      // cell type (progress bar / sparkline)
+      const cellTypeCfg = cellTypeConfigMap?.[aliasLower];
+      if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
+        obj["cellType"] = cellTypeCfg.type;
+        if (cellTypeCfg.progressColor) obj["progressColor"] = cellTypeCfg.progressColor;
+        if (cellTypeCfg.sparklineStyle) obj["sparklineStyle"] = cellTypeCfg.sparklineStyle;
+      }
+
+      // conditional styling rules
+      const condRules = conditionalRulesMap?.[aliasLower];
+      if (condRules?.length) obj["conditionalRules"] = condRules;
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {
@@ -376,6 +397,27 @@ export const convertTableData = (
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
+  }
+
+  // Auto-compute progress bar min/max from column data (after final tableRows are set)
+  if (Array.isArray(columns) && Array.isArray(tableRows)) {
+    for (const col of columns as any[]) {
+      if (col.cellType === "progress_bar") {
+        const fieldKey = col.field;
+        const nums = (tableRows as any[])
+          .map((row) => parseFloat(String(row[fieldKey])))
+          .filter((v) => !isNaN(v));
+        if (nums.length > 0) {
+          let max = nums[0];
+          for (const v of nums) if (v > max) max = v;
+          col.progressMin = 0;
+          col.progressMax = max;
+        } else {
+          col.progressMin = 0;
+          col.progressMax = 100;
+        }
+      }
+    }
   }
 
   return {

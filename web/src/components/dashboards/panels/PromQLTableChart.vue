@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :value-mapping="config.mappings ?? []"
         :show-pagination="config.table_pagination && !store.state.printMode"
         :rows-per-page="config.table_pagination_rows_per_page"
+        :enable-filtering="enableFiltering"
+        :enable-inline-formatting="enableInlineFormatting"
         @row-click="$emit('row-click', $event)"
       >
         <!-- Override bottom slot to add legend filter alongside native pagination -->
@@ -92,6 +94,14 @@ export default defineComponent({
     config: {
       type: Object,
       default: () => ({}),
+    },
+    enableFiltering: {
+      type: Boolean,
+      default: false,
+    },
+    enableInlineFormatting: {
+      type: Boolean,
+      default: false,
     },
   },
   components: { TableRenderer, TablePaginationControls, OSelect,

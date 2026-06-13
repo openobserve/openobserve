@@ -48,6 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
+          :enable-filtering="!!panelSchema.config?.table_filtering"
+          :enable-inline-formatting="enableInlineFormatting"
           @row-click="onChartClick"
         />
         <TableRenderer
@@ -65,6 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             panelSchema.config?.table_pagination && !store.state.printMode
           "
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+          :enable-filtering="!!panelSchema.config?.table_filtering"
+          :enable-inline-formatting="enableInlineFormatting"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -432,6 +436,15 @@ export default defineComponent({
       default: null,
     },
     forceLoad: {
+      type: Boolean,
+      default: false,
+      required: false,
+    },
+    /**
+     * Enables the inline per-column formatting affordance on table charts.
+     * Passed as `true` only by the panel editor preview (Edit Panel mode).
+     */
+    enableInlineFormatting: {
       type: Boolean,
       default: false,
       required: false,
