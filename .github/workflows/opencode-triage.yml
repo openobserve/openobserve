@@ -1,0 +1,64 @@
+name: OpenCode Issue Triage
+
+on:
+  issues:
+    types: [opened]
+
+concurrency:
+  group: opencode-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        with:
+          model: deepseek/deepseek-reasoner
+          token: ${{ secrets.E2E_DEV_CI_TOKEN }}
+          prompt: |
+            Triage this new issue for the OpenObserve project (open-source observability platform: logs, metrics, traces).
+
+            Steps:
+            1. **Identify the component** from the issue title and body:
+               - `ingestion` — log/metric/trace ingest, Otel collector, Fluent Bit, Vector
+               - `query` — search, SQL, DataFusion, dashboards, alerts
+               - `storage` — S3/MinIO/local storage, compaction, WAL, retention
+               - `auth` — RBAC, SSO, API keys, organizations
+               - `ui` — Vue frontend, dashboards, alerts UI
+               - `deployment` — Kubernetes, Helm, Docker, config
+               - `docs` — documentation gaps or inaccuracies
+
+            2. **Classify the issue type**: bug, feature request, question, or documentation.
+
+            3. **For bugs**: Check if the reporter included:
+               - OpenObserve version
+               - Deployment method (k8s/docker/binary) and mode (single-node/cluster)
+               - Steps to reproduce
+               - Expected vs actual behavior
+               - Relevant logs or error messages
+               If any of these are missing, politely ask for them.
+
+            4. **For feature requests**: Acknowledge the request, describe briefly how it fits (or doesn't fit) the project's observability focus, and invite the reporter to join the discussion on the [community Slack](https://short.openobserve.ai/community).
+
+            5. **For questions**: Answer if the answer is clear from the docs or codebase. Otherwise point to https://openobserve.ai/docs and the Slack community.
+
+            6. **Add a welcoming, professional comment** summarizing your triage findings. Do not add labels — just comment.
+
+            If the issue is clearly spam or completely off-topic, do not comment.
