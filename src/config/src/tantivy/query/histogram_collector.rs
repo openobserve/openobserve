@@ -35,16 +35,19 @@ use super::topn_collector::{DENSE_GROUP_SPACE_LIMIT, resolve_ords, truncate_top_
 struct BucketComputer {
     min_value: i64,
     ts_offset: i64,
+    bucket_width: u64,
     divider: DividerU64,
     num_buckets: usize,
 }
 
 impl BucketComputer {
     fn new(min_value: i64, bucket_width: u64, num_buckets: usize, ts_offset: i64) -> Self {
+        let bucket_width = bucket_width.max(1);
         Self {
             min_value,
             ts_offset,
-            divider: DividerU64::divide_by(bucket_width.max(1)),
+            bucket_width,
+            divider: DividerU64::divide_by(bucket_width),
             num_buckets,
         }
     }
@@ -76,12 +79,173 @@ fn fetch_first_vals<T: PartialOrd + Copy + std::fmt::Debug + Send + Sync + 'stat
     col.first_vals(docs, buf);
 }
 
+/// Physical ordering of a segment's timestamp column.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SortOrder {
+    Ascending,
+    Descending,
+    Unsorted,
+}
+
+/// Sort direction of the segment's timestamp column.
+///
+/// Time-sorted index files are an OpenObserve design guarantee: every parquet
+/// file is written `ORDER BY _timestamp DESC` and the tantivy index preserves
+/// its row order, so only the direction is probed (two column reads). Debug
+/// builds still verify the full invariant.
+fn column_sort_order(col: &Column<i64>) -> SortOrder {
+    // non-Full means some docs lack the value, so doc-id runs no longer map
+    // 1:1 to value runs — fall back to the scan path
+    if col.get_cardinality() != Cardinality::Full {
+        return SortOrder::Unsorted;
+    }
+    let num_docs = col.num_docs();
+    if num_docs <= 1 {
+        return SortOrder::Descending;
+    }
+    let ascending = col.values.get_val(0) <= col.values.get_val(num_docs - 1);
+    if ascending {
+        SortOrder::Ascending
+    } else {
+        SortOrder::Descending
+    }
+}
+
+/// Bucket marker for doc-id runs whose timestamps fall outside the histogram
+/// range.
+const BUCKET_NONE: u32 = u32::MAX;
+
+/// Maps ascending doc ids to bucket indexes on a time-sorted segment without
+/// reading the timestamp of any matched doc: a binary search on the monotone
+/// column locates the doc-id boundary of every bucket edge once per segment,
+/// and bucketing a doc is then a cursor advance over the resulting
+/// `(first_doc_id, bucket)` runs.
+struct SortedBucketCursor {
+    /// runs ascending by first doc id, covering all docs; `BUCKET_NONE` marks
+    /// out-of-range runs
+    runs: Vec<(DocId, u32)>,
+    cur: usize,
+}
+
+impl SortedBucketCursor {
+    fn build(col: &Column<i64>, computer: &BucketComputer, order: SortOrder) -> Self {
+        let num_docs = col.num_docs();
+        let num_buckets = computer.num_buckets;
+        let mut runs = Vec::with_capacity(num_buckets + 2);
+        runs.push((0u32, BUCKET_NONE));
+        if num_docs == 0 || num_buckets == 0 {
+            return Self { runs, cur: 0 };
+        }
+
+        // bucket edges back in raw timestamp space (`bucket()` shifts each
+        // value by ts_offset, so unshift the edges instead); i128 guards the
+        // multiply against overflow at extreme query bounds
+        let raw_edge = |k: usize| -> i64 {
+            (computer.min_value as i128 - computer.ts_offset as i128
+                + k as i128 * computer.bucket_width as i128)
+                .clamp(i64::MIN as i128, i64::MAX as i128) as i64
+        };
+
+        // Boundary doc id of every bucket edge: Ascending → first doc with
+        // ts >= edge, Descending → first doc with ts < edge. Boundaries are
+        // monotone in k, so each search resumes from the previous result.
+        let values = &col.values;
+        let ascending = order == SortOrder::Ascending;
+        let mut bounds = vec![0u32; num_buckets + 1];
+        let mut prev = if ascending { 0 } else { num_docs };
+        for (k, bound) in bounds.iter_mut().enumerate() {
+            let edge = raw_edge(k);
+            let (mut lo, mut hi) = if ascending {
+                (prev, num_docs)
+            } else {
+                (0, prev)
+            };
+            while lo < hi {
+                let mid = lo + (hi - lo) / 2;
+                let v = values.get_val(mid);
+                if if ascending { v < edge } else { v >= edge } {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
+            }
+            *bound = lo;
+            prev = lo;
+        }
+
+        if ascending {
+            // docs [bounds[k], bounds[k+1]) hold bucket k
+            for (k, &bound) in bounds.iter().take(num_buckets).enumerate() {
+                runs.push((bound, k as u32));
+            }
+            runs.push((bounds[num_buckets], BUCKET_NONE));
+        } else {
+            // docs [bounds[k+1], bounds[k]) hold bucket k, descending in k
+            for k in (0..num_buckets).rev() {
+                runs.push((bounds[k + 1], k as u32));
+            }
+            runs.push((bounds[0], BUCKET_NONE));
+        }
+        Self { runs, cur: 0 }
+    }
+
+    /// Bucket of `doc`, which must not be smaller than any previously passed
+    /// doc id (collectors receive docs in ascending order within a segment).
+    #[inline]
+    fn bucket(&mut self, doc: DocId) -> Option<usize> {
+        while self.cur + 1 < self.runs.len() && doc >= self.runs[self.cur + 1].0 {
+            self.cur += 1;
+        }
+        let bucket = self.runs[self.cur].1;
+        (bucket != BUCKET_NONE).then_some(bucket as usize)
+    }
+
+    /// Counts a whole block of ascending doc ids into `counts`. A contiguous
+    /// block (every doc matched — the no-filter case) is counted one run at a
+    /// time instead of one doc at a time.
+    fn count_block(&mut self, docs: &[DocId], counts: &mut [u32]) {
+        let (Some(&first), Some(&last)) = (docs.first(), docs.last()) else {
+            return;
+        };
+        if docs.len() as u64 != last as u64 - first as u64 + 1 {
+            for &doc in docs {
+                if let Some(bucket) = self.bucket(doc) {
+                    counts[bucket] += 1;
+                }
+            }
+            return;
+        }
+        let mut doc = first as u64;
+        let stop = last as u64 + 1;
+        while doc < stop {
+            // after bucket() the cursor's run contains `doc`, so the next
+            // run's start is strictly greater — the loop always advances
+            let bucket = self.bucket(doc as u32);
+            let run_end = self
+                .runs
+                .get(self.cur + 1)
+                .map_or(u64::MAX, |&(start, _)| start as u64);
+            let end = run_end.min(stop);
+            if let Some(bucket) = bucket {
+                counts[bucket] += (end - doc) as u32;
+            }
+            doc = end;
+        }
+    }
+}
+
 /// Counts matching docs into fixed-width timestamp buckets, for
 /// `SELECT histogram(_timestamp) AS ts, count(*) GROUP BY ts`.
 ///
 /// Replaces `tantivy::collector::HistogramCollector`, which fetches the fast
 /// field per doc through an `Arc<dyn ColumnValues>` and implements no
-/// `collect_block`; this version fetches timestamps block-wise.
+/// `collect_block`.
+///
+/// Segments are time-sorted by design (parquet is written `ORDER BY
+/// _timestamp DESC` and the index preserves row order), so docs map to
+/// buckets by doc id alone via [`SortedBucketCursor`] — no per-doc column
+/// reads at all. Fetching timestamps block-wise remains only as a defensive
+/// fallback for a non-Full timestamp column.
 pub struct SimpleHistogramCollector {
     field: String,
     min_value: i64,
@@ -108,12 +272,23 @@ impl SimpleHistogramCollector {
     }
 }
 
+/// Per-segment bucketing strategy, picked once in `for_segment`.
+enum HistogramMode {
+    /// time-sorted segment: docs map to buckets by id alone, no column reads
+    Sorted(SortedBucketCursor),
+    /// general path: fetch timestamps block-wise and bucket each one
+    Scan {
+        col: Column<i64>,
+        ts_buf: Vec<Option<i64>>,
+    },
+    /// column missing from this segment (legacy index file)
+    Missing,
+}
+
 pub struct SimpleHistogramSegmentCollector {
-    /// None when the column is missing from this segment (legacy index file)
-    col: Option<Column<i64>>,
+    mode: HistogramMode,
     computer: BucketComputer,
     counts: Vec<u32>,
-    ts_buf: Vec<Option<i64>>,
 }
 
 impl Collector for SimpleHistogramCollector {
@@ -126,17 +301,26 @@ impl Collector for SimpleHistogramCollector {
         _segment_local_id: SegmentOrdinal,
         segment: &SegmentReader,
     ) -> tantivy::Result<Self::Child> {
-        let col = segment.fast_fields().column_opt::<i64>(&self.field)?;
+        let computer = BucketComputer::new(
+            self.min_value,
+            self.bucket_width,
+            self.num_buckets,
+            self.ts_offset,
+        );
+        let mode = match segment.fast_fields().column_opt::<i64>(&self.field)? {
+            None => HistogramMode::Missing,
+            Some(col) => match column_sort_order(&col) {
+                SortOrder::Unsorted => HistogramMode::Scan {
+                    col,
+                    ts_buf: Vec::new(),
+                },
+                order => HistogramMode::Sorted(SortedBucketCursor::build(&col, &computer, order)),
+            },
+        };
         Ok(SimpleHistogramSegmentCollector {
-            col,
-            computer: BucketComputer::new(
-                self.min_value,
-                self.bucket_width,
-                self.num_buckets,
-                self.ts_offset,
-            ),
+            mode,
+            computer,
             counts: vec![0; self.num_buckets],
-            ts_buf: Vec::new(),
         })
     }
 
@@ -159,27 +343,38 @@ impl SegmentCollector for SimpleHistogramSegmentCollector {
     type Fruit = Vec<u64>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
-        let Some(col) = &self.col else {
-            return;
-        };
-        if let Some(ts) = col.first(doc)
-            && let Some(bucket) = self.computer.bucket(ts)
-        {
-            self.counts[bucket] += 1;
+        match &mut self.mode {
+            HistogramMode::Sorted(cursor) => {
+                if let Some(bucket) = cursor.bucket(doc) {
+                    self.counts[bucket] += 1;
+                }
+            }
+            HistogramMode::Scan { col, .. } => {
+                if let Some(ts) = col.first(doc)
+                    && let Some(bucket) = self.computer.bucket(ts)
+                {
+                    self.counts[bucket] += 1;
+                }
+            }
+            HistogramMode::Missing => {}
         }
     }
 
-    /// Block variant of [`Self::collect`]: fetch the whole block's timestamps
-    /// at once instead of paying a per-document column lookup.
+    /// Block variant of [`Self::collect`]: count by doc-id runs on a sorted
+    /// segment, otherwise fetch the whole block's timestamps at once instead
+    /// of paying a per-document column lookup.
     fn collect_block(&mut self, docs: &[DocId]) {
-        let Some(col) = &self.col else {
-            return;
-        };
-        fetch_first_vals(col, docs, &mut self.ts_buf);
-        for ts in self.ts_buf.iter().flatten() {
-            if let Some(bucket) = self.computer.bucket(*ts) {
-                self.counts[bucket] += 1;
+        match &mut self.mode {
+            HistogramMode::Sorted(cursor) => cursor.count_block(docs, &mut self.counts),
+            HistogramMode::Scan { col, ts_buf } => {
+                fetch_first_vals(col, docs, ts_buf);
+                for ts in ts_buf.iter().flatten() {
+                    if let Some(bucket) = self.computer.bucket(*ts) {
+                        self.counts[bucket] += 1;
+                    }
+                }
             }
+            HistogramMode::Missing => {}
         }
     }
 
@@ -283,10 +478,12 @@ impl GroupCounts {
 pub struct MultiHistogramSegmentCollector {
     /// None when either column is missing from this segment (legacy index file)
     cols: Option<(Column<i64>, StrColumn)>,
+    /// Some on a time-sorted segment: buckets come from doc-id runs instead
+    /// of fetching the timestamp column
+    sorted: Option<SortedBucketCursor>,
     computer: BucketComputer,
     counts: GroupCounts,
     per_bucket_limit: usize,
-    bucket_width: u64,
     ts_buf: Vec<Option<i64>>,
     ord_buf: Vec<Option<u64>>,
 }
@@ -320,17 +517,24 @@ impl Collector for MultiHistogramCollector {
             }
             None => GroupCounts::Sparse(HashMap::new()),
         };
+        let computer = BucketComputer::new(
+            self.min_value,
+            self.bucket_width,
+            self.num_buckets,
+            self.ts_offset,
+        );
+        let sorted = cols
+            .as_ref()
+            .and_then(|(ts_col, _)| match column_sort_order(ts_col) {
+                SortOrder::Unsorted => None,
+                order => Some(SortedBucketCursor::build(ts_col, &computer, order)),
+            });
         Ok(MultiHistogramSegmentCollector {
             cols,
-            computer: BucketComputer::new(
-                self.min_value,
-                self.bucket_width,
-                self.num_buckets,
-                self.ts_offset,
-            ),
+            sorted,
+            computer,
             counts,
             per_bucket_limit: self.per_bucket_limit,
-            bucket_width: self.bucket_width,
             ts_buf: Vec::new(),
             ord_buf: Vec::new(),
         })
@@ -356,23 +560,38 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
     type Fruit = Vec<(i64, String, u64)>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
-        let Some((ts_col, str_col)) = &self.cols else {
+        let Self {
+            cols,
+            sorted,
+            computer,
+            counts,
+            ..
+        } = self;
+        let Some((ts_col, str_col)) = cols else {
             return;
         };
         // a doc missing the breakdown value forms no group (terms agg `missing: None`)
-        if let Some(ts) = ts_col.first(doc)
+        if let Some(cursor) = sorted {
+            if let Some(bucket) = cursor.bucket(doc)
+                && let Some(ord) = str_col.ords().first(doc)
+            {
+                counts.add(bucket, ord);
+            }
+        } else if let Some(ts) = ts_col.first(doc)
             && let Some(ord) = str_col.ords().first(doc)
-            && let Some(bucket) = self.computer.bucket(ts)
+            && let Some(bucket) = computer.bucket(ts)
         {
-            self.counts.add(bucket, ord);
+            counts.add(bucket, ord);
         }
     }
 
-    /// Block variant of [`Self::collect`]: fetch both columns' values for the
-    /// whole block at once instead of paying per-document column lookups.
+    /// Block variant of [`Self::collect`]: fetch the columns' values for the
+    /// whole block at once instead of paying per-document column lookups; on
+    /// a sorted segment the timestamp fetch is skipped entirely.
     fn collect_block(&mut self, docs: &[DocId]) {
         let Self {
             cols,
+            sorted,
             computer,
             counts,
             ts_buf,
@@ -382,8 +601,19 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
         let Some((ts_col, str_col)) = cols else {
             return;
         };
-        fetch_first_vals(ts_col, docs, ts_buf);
         fetch_first_vals(str_col.ords(), docs, ord_buf);
+        if let Some(cursor) = sorted {
+            for (&doc, ord) in docs.iter().zip(ord_buf.iter()) {
+                let Some(ord) = ord else {
+                    continue;
+                };
+                if let Some(bucket) = cursor.bucket(doc) {
+                    counts.add(bucket, *ord);
+                }
+            }
+            return;
+        }
+        fetch_first_vals(ts_col, docs, ts_buf);
         for (ts, ord) in ts_buf.iter().zip(ord_buf.iter()) {
             let (Some(ts), Some(ord)) = (ts, ord) else {
                 continue;
@@ -400,7 +630,6 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
             computer,
             counts,
             per_bucket_limit,
-            bucket_width,
             ..
         } = self;
         let Some((_, str_col)) = cols else {
@@ -459,7 +688,7 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
         let mut out = Vec::with_capacity(groups.len());
         for (bucket, ord, count) in groups {
             if let Some(s) = ord_map.get(&ord) {
-                let key = computer.min_value + bucket as i64 * bucket_width as i64;
+                let key = computer.min_value + bucket as i64 * computer.bucket_width as i64;
                 out.push((key, s.clone(), count as u64));
             }
         }
@@ -470,49 +699,62 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
 #[cfg(test)]
 mod tests {
     use tantivy::{
-        Index, doc,
-        query::AllQuery,
-        schema::{FAST, SchemaBuilder, TextOptions},
+        Index, Term, doc,
+        query::{AllQuery, TermQuery},
+        schema::{FAST, IndexRecordOption, SchemaBuilder, TextFieldIndexing, TextOptions},
     };
 
     use super::*;
 
-    /// One segment: timestamps 0..50 with breakdown levels, one doc missing
-    /// the level, one doc below and one above the [0, 50) bucket range.
-    fn build_index() -> tantivy::Searcher {
+    /// Builds a single-segment index with the given `(timestamp, level)` rows
+    /// in row order — collectors see doc ids in exactly this order.
+    fn build_index_from(rows: &[(i64, Option<&str>)]) -> tantivy::Searcher {
         let mut schema_builder = SchemaBuilder::new();
         let ts = schema_builder.add_i64_field("_timestamp", FAST);
-        let level = schema_builder.add_text_field("level", TextOptions::default().set_fast(None));
+        let level = schema_builder.add_text_field(
+            "level",
+            TextOptions::default()
+                .set_indexing_options(
+                    TextFieldIndexing::default()
+                        .set_index_option(IndexRecordOption::Basic)
+                        .set_tokenizer("raw"),
+                )
+                .set_fast(None),
+        );
         let index = Index::create_in_ram(schema_builder.build());
 
         let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
-        writer.add_document(doc!(ts => 0i64, level => "a")).unwrap();
-        writer.add_document(doc!(ts => 5i64, level => "b")).unwrap();
-        writer.add_document(doc!(ts => 6i64, level => "b")).unwrap();
-        // missing level: counted by the simple histogram, no group in the multi
-        writer.add_document(doc!(ts => 7i64)).unwrap();
-        writer
-            .add_document(doc!(ts => 15i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 25i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 25i64, level => "b"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => 49i64, level => "c"))
-            .unwrap();
-        // outside [min, max): dropped by both collectors
-        writer
-            .add_document(doc!(ts => 50i64, level => "a"))
-            .unwrap();
-        writer
-            .add_document(doc!(ts => -10i64, level => "a"))
-            .unwrap();
+        for (timestamp, lvl) in rows {
+            let mut doc = doc!(ts => *timestamp);
+            if let Some(lvl) = lvl {
+                doc.add_text(level, lvl);
+            }
+            writer.add_document(doc).unwrap();
+        }
         writer.commit().unwrap();
 
         index.reader().unwrap().searcher()
+    }
+
+    /// One segment: timestamps 0..50 with breakdown levels, one doc missing
+    /// the level, one doc below and one above the [0, 50) bucket range. Rows
+    /// are ordered by timestamp DESC — the physical layout the write path
+    /// guarantees — so the collectors take the sorted fast path.
+    fn build_index() -> tantivy::Searcher {
+        build_index_from(&[
+            // outside [min, max): dropped by both collectors (as is -10 below)
+            (50, Some("a")),
+            (49, Some("c")),
+            (25, Some("a")),
+            (25, Some("b")),
+            (15, Some("a")),
+            // missing level: counted by the simple histogram, no group in the multi
+            (7, None),
+            (6, Some("b")),
+            (5, Some("b")),
+            (0, Some("a")),
+            (-10, Some("a")),
+        ])
     }
 
     #[test]
@@ -659,6 +901,94 @@ mod tests {
         );
         let res = searcher.search(&AllQuery, &collector).unwrap();
         assert!(res.is_empty());
+    }
+
+    #[test]
+    fn test_simple_histogram_collector_sorted_asc() {
+        let searcher = build_index_from(&[
+            (-10, Some("a")),
+            (0, Some("a")),
+            (5, Some("b")),
+            (6, Some("b")),
+            (7, None),
+            (15, Some("a")),
+            (25, Some("a")),
+            (25, Some("b")),
+            (49, Some("c")),
+            (50, Some("a")),
+        ]);
+        let collector = SimpleHistogramCollector::new("_timestamp".to_string(), 0, 10, 5, 0);
+        let res = searcher.search(&AllQuery, &collector).unwrap();
+        assert_eq!(res, vec![4, 1, 2, 0, 1]);
+    }
+
+    #[test]
+    fn test_simple_histogram_collector_with_filter() {
+        let searcher = build_index();
+        let level = searcher.schema().get_field("level").unwrap();
+        // matches ts 50, 25, 15, 0, -10 — a non-contiguous doc set, so the
+        // sorted path buckets doc-by-doc through the cursor
+        let query = TermQuery::new(Term::from_field_text(level, "a"), IndexRecordOption::Basic);
+        let collector = SimpleHistogramCollector::new("_timestamp".to_string(), 0, 10, 5, 0);
+        let res = searcher.search(&query, &collector).unwrap();
+        assert_eq!(res, vec![1, 1, 1, 0, 0]);
+    }
+
+    #[test]
+    fn test_simple_histogram_collector_sorted_ties_on_edges() {
+        // runs of equal timestamps sitting exactly on bucket edges
+        let searcher = build_index_from(&[
+            (20, None),
+            (20, None),
+            (20, None),
+            (10, None),
+            (10, None),
+            (0, None),
+        ]);
+        let collector = SimpleHistogramCollector::new("_timestamp".to_string(), 0, 10, 3, 0);
+        let res = searcher.search(&AllQuery, &collector).unwrap();
+        assert_eq!(res, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_simple_histogram_collector_optional_ts_column_scan_fallback() {
+        // a doc without _timestamp makes the column non-Full, which disables
+        // the sorted fast path; the scan fallback must still count correctly
+        let mut schema_builder = SchemaBuilder::new();
+        let ts = schema_builder.add_i64_field("_timestamp", FAST);
+        let index = Index::create_in_ram(schema_builder.build());
+        let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
+        writer.add_document(doc!(ts => 30i64)).unwrap();
+        writer.add_document(doc!()).unwrap();
+        writer.add_document(doc!(ts => 5i64)).unwrap();
+        writer.commit().unwrap();
+        let searcher = index.reader().unwrap().searcher();
+
+        let collector = SimpleHistogramCollector::new("_timestamp".to_string(), 0, 10, 4, 0);
+        let res = searcher.search(&AllQuery, &collector).unwrap();
+        assert_eq!(res, vec![1, 0, 0, 1]);
+    }
+
+    #[test]
+    fn test_sorted_bucket_cursor_count_block() {
+        // hand-built runs: docs [0,2) out of range, [2,5) bucket 0, bucket 1
+        // empty, [5,9) bucket 2, [9,..) out of range
+        let runs = vec![(0, BUCKET_NONE), (2, 0), (5, 1), (5, 2), (9, BUCKET_NONE)];
+
+        // contiguous block: counted run-at-a-time
+        let mut cursor = SortedBucketCursor {
+            runs: runs.clone(),
+            cur: 0,
+        };
+        let mut counts = vec![0u32; 3];
+        cursor.count_block(&(0..=10).collect::<Vec<_>>(), &mut counts);
+        assert_eq!(counts, vec![3, 0, 4]);
+
+        // sparse block: counted doc-by-doc through the cursor
+        let mut cursor = SortedBucketCursor { runs, cur: 0 };
+        let mut counts = vec![0u32; 3];
+        cursor.count_block(&[2, 6, 9, 10], &mut counts);
+        assert_eq!(counts, vec![1, 0, 1]);
     }
 
     #[test]
