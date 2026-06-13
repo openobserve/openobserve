@@ -19,7 +19,7 @@ use infra::table;
 
 use crate::common::{
     meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+    utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
 
 /// Errors that can occur when interacting with score configs.
@@ -122,9 +122,20 @@ pub async fn update_score_config(
 #[tracing::instrument()]
 pub async fn list_score_configs(
     org_id: &str,
+    permitted_objects: Option<Vec<String>>,
 ) -> Result<Vec<table::score_configs::ScoreConfig>, ScoreConfigError> {
     let configs = table::score_configs::get_all_by_org(org_id).await?;
-    Ok(configs)
+    Ok(configs
+        .into_iter()
+        .filter(|config| {
+            is_ofga_object_visible(
+                org_id,
+                "score_config",
+                &config.entity_id,
+                permitted_objects.as_deref(),
+            )
+        })
+        .collect())
 }
 
 #[tracing::instrument()]

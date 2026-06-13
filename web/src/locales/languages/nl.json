@@ -422,7 +422,9 @@
     "menuGroupInspect": "Inspecteer",
     "validSql": "Geldige SQL",
     "invalidSql": "Ongeldige vraag",
-    "menuGroupExplain": "Leg uit"
+    "menuGroupExplain": "Leg uit",
+    "fieldValuesEmpty": "Geen waarden gevonden.",
+    "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien."
   },
   "menu": {
     "home": "Home",

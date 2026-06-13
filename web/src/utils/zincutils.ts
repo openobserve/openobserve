@@ -204,6 +204,12 @@ export const b64DecodeUnicode = (str: string) => {
   }
 };
 
+// url-safe base64 decode that never throws (bad input -> fallback, default "")
+export const b64DecodeUnicodeSafe = (str: string, fallback = ""): string => {
+  if (!str) return fallback;
+  return b64DecodeUnicode(str) ?? fallback;
+};
+
 /**
  * Helper function to check if a string is base64 encoded
  * Used to detect double-encoded VRL functions from v0.40 legacy data

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
-        minHeight: totalSize + 'px',
+        minHeight: isFirefox ? undefined : totalSize + 'px',
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ? width - 12 + 'px'
                 : defaultColumns
                   ? tableRowSize + 'px'
-                  : table.getTotalSize() + 'px',
+                  : '100%',
             minWidth: '100%',
             background: 'var(--o2-log-table-header-bg)',
           }"
@@ -71,11 +71,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="tw:flex tw:items-center"
         >
           <th
-            v-for="header in headerGroup.headers"
+            v-for="(header, headerIndex) in headerGroup.headers"
             :key="header.id"
             :id="header.id"
             class="tw:px-2 tw:relative table-head tw:text-ellipsis"
-            :style="{ width: `calc(var(--header-${header?.id}-size) * 1px)` }"
+            :style="
+              !defaultColumns && headerIndex === headerGroup.headers.length - 1
+                ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
+                : { width: `calc(var(--header-${header?.id}-size) * 1px)` }
+            "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
             <div
@@ -248,6 +252,7 @@ class="tw:mr-1" />
         data-test="logs-search-result-table-body"
         ref="tableBodyRef"
         class="tw:relative"
+        :style="isFirefox ? { minHeight: totalSize + 'px' } : {}"
       >
         <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
           <tr
@@ -257,8 +262,9 @@ class="tw:mr-1" />
               ]
             }`"
             :style="{
-              transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
+              transform: `translateY(${virtualRow.start}px)`,
               minWidth: '100%',
+              width: (!defaultColumns && !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow) ? '100%' : undefined,
             }"
             :data-index="virtualRow.index"
             :data-expanded="
@@ -351,16 +357,26 @@ class="tw:mr-1" />
                 "
                 class="tw:py-none tw:px-2 tw:flex tw:items-center tw:justify-start tw:relative table-cell"
                 :class="[...tableCellClass, { 'tw:pl-4': cellIndex === 0 }]"
-                :style="{
-                  width:
-                    cell.column.columnDef.id !== 'source' ||
-                    cell.column.columnDef.enableResizing
-                      ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                      : wrap
-                        ? width - 260 - 12 + 'px'
-                        : 'auto',
-                  height: wrap ? '100%' : '20px',
-                }"
+                :style="
+                  !defaultColumns && cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
+                    ? {
+                        flex: '1 1 auto',
+                        minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
+                        width: 'auto',
+                        overflow: 'hidden',
+                        height: wrap ? '100%' : '20px',
+                      }
+                    : {
+                        width:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                            : wrap
+                              ? width - 260 - 12 + 'px'
+                              : 'auto',
+                        height: wrap ? '100%' : '20px',
+                      }
+                "
                 @mouseover="handleCellMouseOver(cell)"
                 @mouseleave="handleCellMouseLeave()"
               >
@@ -823,6 +839,9 @@ const skelTdStyle = (header: any, c: number): Record<string, string> => {
   const isStretchSource = colId === 'source' && !header.column.getCanResize();
   if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
   const w = `calc(var(--col-${colId}-size) * 1px)`;
+  if (!props.defaultColumns && c === headers.value.length - 1) {
+    return { flex: '1 1 auto', minWidth: w, width: 'auto', overflow: 'hidden' };
+  }
   return { width: w, minWidth: w, flexShrink: '0' };
 };
 
@@ -845,8 +864,6 @@ const isFirefox = computed(() => {
     typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
   );
 });
-
-const baseOffset = isFirefox.value ? 20 : 0;
 
 // Cache for expanded row heights
 const expandedRowHeights = ref<{ [key: number]: number }>({});

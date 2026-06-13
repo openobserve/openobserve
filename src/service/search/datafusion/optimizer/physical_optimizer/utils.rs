@@ -22,6 +22,7 @@ use datafusion::{
     logical_expr::Operator,
     physical_expr::{
         PhysicalExpr,
+        aggregate::AggregateFunctionExpr,
         expressions::{Column, Literal},
     },
     physical_plan::{
@@ -116,6 +117,19 @@ pub fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
     } else {
         UNKNOWN_NAME
     }
+}
+
+pub fn is_count_rows_aggregate(expr: &AggregateFunctionExpr) -> bool {
+    if expr.name() == "count(Int64(1))" {
+        return true;
+    }
+
+    if !expr.fun().name().eq_ignore_ascii_case("count") || expr.is_distinct() {
+        return false;
+    }
+
+    let args = expr.expressions();
+    args.len() == 1 && is_column(&args[0]) && get_column_name(&args[0]) == TIMESTAMP_COL_NAME
 }
 
 pub fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
