@@ -46,6 +46,7 @@ vi.mock("@/services/service_streams", () => ({
   getDimensionAnalytics: vi
     .fn()
     .mockResolvedValue({ data: { available_groups: [] } }),
+  buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
 // resolveStreamSchema calls useStreams().getStream() to fetch and cache the
