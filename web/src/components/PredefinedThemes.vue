@@ -53,7 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
-                  :style="{ backgroundColor: theme.light.themeColor }"
+                  :style="theme.light.semanticColors
+                    ? { background: `linear-gradient(135deg, ${theme.light.themeColor} 33%, ${theme.light.semanticColors.error} 33% 66%, ${theme.light.semanticColors.success} 66%)` }
+                    : { backgroundColor: theme.light.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
                   <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
@@ -133,7 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="tw:flex tw:items-center tw:flex-nowrap">
                 <div
                   class="color-preview-small"
-                  :style="{ backgroundColor: theme.dark.themeColor }"
+                  :style="theme.dark.semanticColors
+                    ? { background: `linear-gradient(135deg, ${theme.dark.themeColor} 33%, ${theme.dark.semanticColors.error} 33% 66%, ${theme.dark.semanticColors.success} 66%)` }
+                    : { backgroundColor: theme.dark.themeColor }"
                 ></div>
                 <div class="tw:ml-2" style="flex: 1; min-width: 0">
                   <div class="tw:text-sm tw:font-medium">{{ theme.name }}</div>
@@ -250,7 +254,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
-import { hexToRgba, applyThemeColors } from "@/utils/theme";
+import { hexToRgba, applyThemeColors, type SemanticColors } from "@/utils/theme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
@@ -467,7 +471,7 @@ onMounted(() => {
         const theme = predefinedThemes.find((t) => t.id === appliedTheme);
         if (theme) {
           const modeColors = currentMode === "light" ? theme.light : theme.dark;
-          applyThemeColors(modeColors.themeColor, currentMode, false);
+          applyThemeColors(modeColors.themeColor, currentMode, false, modeColors.semanticColors as SemanticColors | undefined);
         }
       }
     }
@@ -522,7 +526,7 @@ onMounted(() => {
             if (theme) {
               const modeColors =
                 currentMode === "light" ? theme.light : theme.dark;
-              applyThemeColors(modeColors.themeColor, currentMode, false);
+              applyThemeColors(modeColors.themeColor, currentMode, false, modeColors.semanticColors as SemanticColors | undefined);
             }
           }
         } else {
@@ -579,6 +583,50 @@ onUnmounted(() => {
 // - themeColorOpacity: opacity value (always 10 = fully opaque)
 const predefinedThemes = [
   {
+    id: 10,
+    name: "O2 Signature",
+    light: {
+      themeColor: "#6B76E3",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F45B49",
+        errorBg: "#FEF0EE",
+        errorText: "#C0392B",
+        success: "#5ACA7A",
+        successBg: "#EAF9EF",
+        successText: "#208A3C",
+        secondaryBtnBg: "#EFF1FD",
+        secondaryBtnText: "#575FC5",
+        secondaryBtnBorder: "#C8D0F9",
+        outlineText: "#575FC5",
+        outlineBorder: "#B3BDF1",
+        ghostText: "#575FC5",
+        toggleText: "#575FC5",
+        toggleBorder: "#B3BDF1",
+      },
+    },
+    dark: {
+      themeColor: "#8B8DF0",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F47D6E",
+        errorBg: "#402929",
+        errorText: "#F47D6E",
+        success: "#73BD79",
+        successBg: "#253627",
+        successText: "#A0DBA5",
+        secondaryBtnBg: "#22264A",
+        secondaryBtnText: "#A1AFFF",
+        secondaryBtnBorder: "#3A4180",
+        outlineText: "#A1AFFF",
+        outlineBorder: "#454D93",
+        ghostText: "#A1AFFF",
+        toggleText: "#A1AFFF",
+        toggleBorder: "#454D93",
+      },
+    },
+  },
+  {
     id: 2,
     name: "Ocean Breeze",
     light: {
@@ -626,6 +674,314 @@ const predefinedThemes = [
       themeColorOpacity: 10,
     },
   },
+  {
+    id: 11,
+    name: "O2 Midnight Ocean",
+    light: {
+      themeColor: "#0EA5E9",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F43F5E",
+        errorBg: "#FFF1F3",
+        errorText: "#BE123C",
+        success: "#10B981",
+        successBg: "#ECFDF5",
+        successText: "#065F46",
+        secondaryBtnBg: "#E0F2FE",
+        secondaryBtnText: "#0369A1",
+        secondaryBtnBorder: "#BAE6FD",
+        outlineText: "#0369A1",
+        outlineBorder: "#7DD3FC",
+        ghostText: "#0369A1",
+        toggleText: "#0369A1",
+        toggleBorder: "#7DD3FC",
+      },
+    },
+    dark: {
+      themeColor: "#38BDF8",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FB7185",
+        errorBg: "#3D1520",
+        errorText: "#FB7185",
+        success: "#34D399",
+        successBg: "#022C22",
+        successText: "#6EE7B7",
+        secondaryBtnBg: "#0C2A3A",
+        secondaryBtnText: "#7DD3FC",
+        secondaryBtnBorder: "#164E63",
+        outlineText: "#7DD3FC",
+        outlineBorder: "#0E7490",
+        ghostText: "#7DD3FC",
+        toggleText: "#7DD3FC",
+        toggleBorder: "#0E7490",
+      },
+    },
+  },
+  {
+    id: 12,
+    name: "O2 Forest & Fire",
+    light: {
+      themeColor: "#10B981",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F97316",
+        errorBg: "#FFF7ED",
+        errorText: "#C2410C",
+        success: "#10B981",
+        successBg: "#ECFDF5",
+        successText: "#065F46",
+        secondaryBtnBg: "#D1FAE5",
+        secondaryBtnText: "#065F46",
+        secondaryBtnBorder: "#6EE7B7",
+        outlineText: "#059669",
+        outlineBorder: "#6EE7B7",
+        ghostText: "#059669",
+        toggleText: "#059669",
+        toggleBorder: "#6EE7B7",
+      },
+    },
+    dark: {
+      themeColor: "#34D399",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FB923C",
+        errorBg: "#3A1A08",
+        errorText: "#FB923C",
+        success: "#34D399",
+        successBg: "#022C22",
+        successText: "#6EE7B7",
+        secondaryBtnBg: "#052E1C",
+        secondaryBtnText: "#6EE7B7",
+        secondaryBtnBorder: "#065F46",
+        outlineText: "#6EE7B7",
+        outlineBorder: "#065F46",
+        ghostText: "#6EE7B7",
+        toggleText: "#6EE7B7",
+        toggleBorder: "#065F46",
+      },
+    },
+  },
+  {
+    id: 13,
+    name: "O2 Royal Dusk",
+    light: {
+      themeColor: "#8B5CF6",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F59E0B",
+        errorBg: "#FFFBEB",
+        errorText: "#92400E",
+        success: "#06B6D4",
+        successBg: "#ECFEFF",
+        successText: "#155E75",
+        secondaryBtnBg: "#EDE9FE",
+        secondaryBtnText: "#6D28D9",
+        secondaryBtnBorder: "#C4B5FD",
+        outlineText: "#6D28D9",
+        outlineBorder: "#C4B5FD",
+        ghostText: "#6D28D9",
+        toggleText: "#6D28D9",
+        toggleBorder: "#C4B5FD",
+      },
+    },
+    dark: {
+      themeColor: "#A78BFA",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FCD34D",
+        errorBg: "#2D1F00",
+        errorText: "#FCD34D",
+        success: "#22D3EE",
+        successBg: "#031D26",
+        successText: "#67E8F9",
+        secondaryBtnBg: "#1E1530",
+        secondaryBtnText: "#C4B5FD",
+        secondaryBtnBorder: "#4C1D95",
+        outlineText: "#C4B5FD",
+        outlineBorder: "#4C1D95",
+        ghostText: "#C4B5FD",
+        toggleText: "#C4B5FD",
+        toggleBorder: "#4C1D95",
+      },
+    },
+  },
+  {
+    id: 14,
+    name: "O2 Crimson Ink",
+    light: {
+      themeColor: "#E11D48",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F97316",
+        errorBg: "#FFF7ED",
+        errorText: "#C2410C",
+        success: "#6366F1",
+        successBg: "#EEF2FF",
+        successText: "#3730A3",
+        secondaryBtnBg: "#FFE4E6",
+        secondaryBtnText: "#BE123C",
+        secondaryBtnBorder: "#FECDD3",
+        outlineText: "#BE123C",
+        outlineBorder: "#FECDD3",
+        ghostText: "#BE123C",
+        toggleText: "#BE123C",
+        toggleBorder: "#FECDD3",
+      },
+    },
+    dark: {
+      themeColor: "#FB7185",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FB923C",
+        errorBg: "#3A1A08",
+        errorText: "#FB923C",
+        success: "#818CF8",
+        successBg: "#1E1B4B",
+        successText: "#A5B4FC",
+        secondaryBtnBg: "#3D0617",
+        secondaryBtnText: "#FECDD3",
+        secondaryBtnBorder: "#9F1239",
+        outlineText: "#FECDD3",
+        outlineBorder: "#9F1239",
+        ghostText: "#FECDD3",
+        toggleText: "#FECDD3",
+        toggleBorder: "#9F1239",
+      },
+    },
+  },
+  {
+    id: 15,
+    name: "Gemini Modern SaaS",
+    light: {
+      themeColor: "#4F46E5",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F43F5E",
+        errorBg: "#FFF1F3",
+        errorText: "#BE123C",
+        success: "#0D9488",
+        successBg: "#F0FDFA",
+        successText: "#115E59",
+        secondaryBtnBg: "#EEF2FF",
+        secondaryBtnText: "#4338CA",
+        secondaryBtnBorder: "#C7D2FE",
+        outlineText: "#4338CA",
+        outlineBorder: "#C7D2FE",
+        ghostText: "#4338CA",
+        toggleText: "#4338CA",
+        toggleBorder: "#C7D2FE",
+      },
+    },
+    dark: {
+      themeColor: "#818CF8",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FB7185",
+        errorBg: "#3D1520",
+        errorText: "#FB7185",
+        success: "#2DD4BF",
+        successBg: "#042F2E",
+        successText: "#99F6E4",
+        secondaryBtnBg: "#1E1B4B",
+        secondaryBtnText: "#A5B4FC",
+        secondaryBtnBorder: "#3730A3",
+        outlineText: "#A5B4FC",
+        outlineBorder: "#3730A3",
+        ghostText: "#A5B4FC",
+        toggleText: "#A5B4FC",
+        toggleBorder: "#3730A3",
+      },
+    },
+  },
+  {
+    id: 16,
+    name: "Gemini Dark Tech",
+    light: {
+      themeColor: "#0891B2",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#DB2777",
+        errorBg: "#FDF2F8",
+        errorText: "#9D174D",
+        success: "#0D9488",
+        successBg: "#F0FDFA",
+        successText: "#115E59",
+        secondaryBtnBg: "#ECFEFF",
+        secondaryBtnText: "#0E7490",
+        secondaryBtnBorder: "#A5F3FC",
+        outlineText: "#0E7490",
+        outlineBorder: "#A5F3FC",
+        ghostText: "#0E7490",
+        toggleText: "#0E7490",
+        toggleBorder: "#A5F3FC",
+      },
+    },
+    dark: {
+      themeColor: "#00F0FF",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#FF00E6",
+        errorBg: "#2D0033",
+        errorText: "#F0ABFC",
+        success: "#FFE600",
+        successBg: "#1A1500",
+        successText: "#FEF08A",
+        secondaryBtnBg: "#001A1C",
+        secondaryBtnText: "#67E8F9",
+        secondaryBtnBorder: "#164E63",
+        outlineText: "#67E8F9",
+        outlineBorder: "#164E63",
+        ghostText: "#67E8F9",
+        toggleText: "#67E8F9",
+        toggleBorder: "#164E63",
+      },
+    },
+  },
+  {
+    id: 17,
+    name: "Gemini Creative Earth",
+    light: {
+      themeColor: "#6B46C1",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#ED8936",
+        errorBg: "#FFFAF0",
+        errorText: "#C05621",
+        success: "#48BB78",
+        successBg: "#F0FFF4",
+        successText: "#276749",
+        secondaryBtnBg: "#FAF5FF",
+        secondaryBtnText: "#553C9A",
+        secondaryBtnBorder: "#D6BCFA",
+        outlineText: "#553C9A",
+        outlineBorder: "#D6BCFA",
+        ghostText: "#553C9A",
+        toggleText: "#553C9A",
+        toggleBorder: "#D6BCFA",
+      },
+    },
+    dark: {
+      themeColor: "#9F7AEA",
+      themeColorOpacity: 10,
+      semanticColors: {
+        error: "#F6AD55",
+        errorBg: "#2D1A00",
+        errorText: "#F6AD55",
+        success: "#68D391",
+        successBg: "#1A3626",
+        successText: "#9AE6B4",
+        secondaryBtnBg: "#1A1030",
+        secondaryBtnText: "#D6BCFA",
+        secondaryBtnBorder: "#44337A",
+        outlineText: "#D6BCFA",
+        outlineBorder: "#44337A",
+        ghostText: "#D6BCFA",
+        toggleText: "#D6BCFA",
+        toggleBorder: "#44337A",
+      },
+    },
+  },
 ];
 
 // Slugify a theme name into a kebab-case identifier for data-test attributes
@@ -637,7 +993,7 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
   const modeColors = mode === "light" ? theme.light : theme.dark;
 
   // Apply theme colors directly (predefined themes are never "default")
-  applyThemeColors(modeColors.themeColor, mode, false);
+  applyThemeColors(modeColors.themeColor, mode, false, modeColors.semanticColors as SemanticColors | undefined);
 
   // Store the hex color value in localStorage (not the theme ID)
   if (mode === "light") {

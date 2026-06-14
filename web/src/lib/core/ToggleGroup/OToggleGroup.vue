@@ -45,7 +45,7 @@ const wrapperClasses = computed(() => {
   <div v-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
+        'o-input-label tw:text-sm tw:font-medium tw:select-none tw:leading-tight',
         disabled && 'o-input-label--disabled',
       ]"
     >

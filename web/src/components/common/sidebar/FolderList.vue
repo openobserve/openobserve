@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:bg-surface-panel tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem] tw:border-r tw:border-border-default">
       <div class="folder-header" :class="store.state.theme === 'dark' ? 'folder-header-dark' : 'folder-header-light'">
-        <div class="tw:font-semibold tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
+        <div class="tw:font-medium tw:text-sm tw:text-text-primary tw:px-2 tw:py-2 tw:flex tw:items-center tw:justify-between tw:gap-2">
           {{ t('dashboard.folders') }}
           <div>
             <OButton
@@ -373,17 +373,16 @@ export default defineComponent({
         justify-content: flex-start;
         padding: 0 0.625rem;
         border-radius: 0.5rem;
-        /* No forced capitalize — folder names render as authored. Weight 500
-           (record-name weight), not 600, so the list reads calm. Active state is
-           inherited from OTab vertical (tint bg + primary text) so the folder rail
-           matches the IAM/Settings rails exactly. */
-        font-weight: 500;
+        /* Weight 400 — Inter reads heavier than IBM Plex at 500, so drop to
+           normal for calm sidebar list. Active state tint + primary color
+           provides sufficient emphasis without weight. */
+        font-weight: 400;
 
         &__content.tab_content {
           .o-tab {
             &__icon + &__label {
               padding-left: 0.875rem;
-              font-weight: 500;
+              font-weight: 400;
             }
           }
         }

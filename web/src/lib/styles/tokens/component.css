@@ -25,11 +25,14 @@
   --color-button-primary-focus-ring: var(--color-primary-400);
 
   /* Button — secondary */
-  --color-button-secondary: var(--color-surface-panel);
+  --o2-secondary-btn-bg: var(--color-surface-panel);
+  --o2-secondary-btn-text: var(--color-text-primary);
+  --o2-secondary-btn-border: var(--color-border-subtle, #e5e7eb);
+  --color-button-secondary: var(--o2-secondary-btn-bg);
   --color-button-secondary-hover: var(--color-primary-50);
   --color-button-secondary-active: var(--color-primary-100);
   --color-button-secondary-disabled: var(--color-surface-panel);
-  --color-button-secondary-foreground: var(--color-text-primary);
+  --color-button-secondary-foreground: var(--o2-secondary-btn-text);
   --color-button-secondary-focus-ring: var(--color-primary-400);
 
   /* Button — outline */
@@ -111,7 +114,7 @@
   --color-toggle-item-active-bg: var(--color-primary-100);
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
-  --color-toggle-border: var(--color-border-default);
+  --color-toggle-border: var(--color-border-strong);
   --color-toggle-focus-ring: var(--color-primary-400);
 
   /* Dropdown */
@@ -397,6 +400,7 @@
   --color-input-hint: var(--color-text-secondary);
   --color-input-help-text: var(--color-text-secondary);
   --color-input-error-text: var(--color-error-600);
+  --color-input-addon-bg: var(--color-surface-panel);
   --color-input-addon-text: var(--color-text-secondary);
   --color-input-clear-btn: var(--color-text-secondary);
   --color-input-clear-btn-hover: var(--color-text-primary);
@@ -829,6 +833,7 @@
   --color-input-hint: var(--color-input-hint);
   --color-input-help-text: var(--color-input-help-text);
   --color-input-error-text: var(--color-input-error-text);
+  --color-input-addon-bg: var(--color-input-addon-bg);
   --color-input-addon-text: var(--color-input-addon-text);
   --color-input-clear-btn: var(--color-input-clear-btn);
   --color-input-clear-btn-hover: var(--color-input-clear-btn-hover);

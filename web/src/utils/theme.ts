@@ -55,6 +55,24 @@ export const mixColors = (color1: string, color2: string, percentage: number): s
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
+export interface SemanticColors {
+  error: string;        // coral hex, e.g. "#F45B49"
+  errorBg: string;      // coral tint bg, e.g. "#FEF0EE"
+  errorText: string;    // dark coral for text, e.g. "#C0392B"
+  success: string;      // emerald hex, e.g. "#5ACA7A"
+  successBg: string;    // emerald tint bg, e.g. "#EAF9EF"
+  successText: string;  // dark emerald for text, e.g. "#208A3C"
+  secondaryBtnBg: string;
+  secondaryBtnText: string;
+  secondaryBtnBorder: string;
+  // Outline + ghost button tinting — makes Cancel, Builder/SQL, icon buttons use primary color
+  outlineText?: string;
+  outlineBorder?: string;
+  ghostText?: string;
+  toggleText?: string;
+  toggleBorder?: string;
+}
+
 /**
  * Generate a full primary color palette from a single base hex color.
  * The base color is treated as the 600 shade; lighter shades are mixed
@@ -93,7 +111,7 @@ const syncO2LibraryTokens = (themeColor: string): void => {
  * @param mode - Theme mode ("light" or "dark")
  * @param isDefault - Whether this is the default theme
  */
-export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false) => {
+export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false, semanticColors?: SemanticColors) => {
   const isDarkMode = mode === "dark";
 
   // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
@@ -224,6 +242,43 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     document.body.style.removeProperty('--o2-menu-gradient-start');
     document.body.style.removeProperty('--o2-menu-gradient-end');
     document.body.style.removeProperty('--o2-menu-color');
+  }
+
+  // Apply semantic colors (O2 Signature triadic theme and any future multi-color themes)
+  const semanticTokenNames = [
+    '--o2-negative', '--o2-status-error-text', '--o2-status-error-bg',
+    '--o2-positive', '--o2-status-success-text', '--o2-status-success-bg',
+    '--o2-secondary-btn-bg', '--o2-secondary-btn-text', '--o2-secondary-btn-border',
+    '--color-button-outline-text', '--color-button-outline-border',
+    '--color-button-ghost-text',
+    '--color-toggle-item-text', '--color-toggle-border',
+  ];
+  if (semanticColors) {
+    // Clear both targets first to avoid stale values from a prior mode switch
+    semanticTokenNames.forEach(t => {
+      document.body.style.removeProperty(t);
+      document.documentElement.style.removeProperty(t);
+    });
+    const target = isDarkMode ? document.body : document.documentElement;
+    target.style.setProperty('--o2-negative', semanticColors.error);
+    target.style.setProperty('--o2-status-error-text', semanticColors.errorText);
+    target.style.setProperty('--o2-status-error-bg', semanticColors.errorBg);
+    target.style.setProperty('--o2-positive', semanticColors.success);
+    target.style.setProperty('--o2-status-success-text', semanticColors.successText);
+    target.style.setProperty('--o2-status-success-bg', semanticColors.successBg);
+    target.style.setProperty('--o2-secondary-btn-bg', semanticColors.secondaryBtnBg);
+    target.style.setProperty('--o2-secondary-btn-text', semanticColors.secondaryBtnText);
+    target.style.setProperty('--o2-secondary-btn-border', semanticColors.secondaryBtnBorder);
+    if (semanticColors.outlineText) target.style.setProperty('--color-button-outline-text', semanticColors.outlineText);
+    if (semanticColors.outlineBorder) target.style.setProperty('--color-button-outline-border', semanticColors.outlineBorder);
+    if (semanticColors.ghostText) target.style.setProperty('--color-button-ghost-text', semanticColors.ghostText);
+    if (semanticColors.toggleText) target.style.setProperty('--color-toggle-item-text', semanticColors.toggleText);
+    if (semanticColors.toggleBorder) target.style.setProperty('--color-toggle-border', semanticColors.toggleBorder);
+  } else {
+    semanticTokenNames.forEach(t => {
+      document.documentElement.style.removeProperty(t);
+      document.body.style.removeProperty(t);
+    });
   }
 
   // Dispatch event to notify components (like SearchResult) to re-render

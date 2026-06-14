@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-query-config" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
+  <div class="step-query-config">
     <div class="step-content card-container">
       <!-- Section header -->
       <div class="section-header">
@@ -433,39 +433,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <span class="condition-text">on these</span>
                   <div
-                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
-                    :class="store.state.theme === 'dark'
-                      ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
-                      : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
+                    class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors tw:bg-surface-panel hover:tw:bg-primary-50"
                     @click="toggleFilters"
                   >
                     <OIcon
                       name="filter-alt"
                       size="xs"
-                      :class="filterCount > 0
-                        ? 'tw:text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
+                      :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'"
                     />
                     <span class="tw:text-xs tw:font-semibold"
-                          :class="filterCount > 0
-                            ? 'tw:text-[var(--q-primary)]'
-                            : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
+                          :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'">
                       filters
                     </span>
                     <span v-if="filterCount > 0"
-                          class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
-                          :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
+                          class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5 tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text">
                       {{ filterCount }}
                     </span>
                     <OIcon
                       :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="sm"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                      class="tw:text-text-secondary"
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
-                          class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint"
-                          :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+                          class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint tw:text-text-secondary">
                       view the alert query
                       <OTooltip :delay="200" side="bottom">
                         <template #content>
@@ -477,8 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Cron description + error -->
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic"
-                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:ml-0 tw:italic tw:text-text-secondary">
                   {{ cronDescription }}
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px] tw:ml-0">
@@ -511,39 +501,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="tw:mb-1 tw:px-3">
             <div class="tw:flex tw:items-center tw:gap-2 tw:py-1">
               <div
-                class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors"
-                :class="store.state.theme === 'dark'
-                  ? 'tw:bg-gray-700/60 hover:tw:bg-gray-600/70'
-                  : 'tw:bg-gray-100 hover:tw:bg-gray-200'"
+                class="tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:select-none filters-inline-toggle tw:px-2 tw:py-0.5 tw:rounded-md tw:transition-colors tw:bg-surface-panel hover:tw:bg-primary-50"
                 @click="toggleFilters"
               >
                 <OIcon
                   name="filter-alt"
                   size="xs"
-                  :class="filterCount > 0
-                    ? 'tw:text-[var(--q-primary)]'
-                    : (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500')"
+                  :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'"
                 />
                 <span class="tw:text-xs tw:font-semibold"
-                      :class="filterCount > 0
-                        ? 'tw:text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-600')">
+                      :class="filterCount > 0 ? 'tw:text-[var(--q-primary)]' : 'tw:text-text-secondary'">
                   filters
                 </span>
                 <span v-if="filterCount > 0"
-                      class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-blue-800 tw:text-blue-200' : 'tw:bg-blue-100 tw:text-blue-700'">
+                      class="tw:text-[11px] tw:px-1.5 tw:py-0 tw:rounded-full tw:font-bold tw:leading-5 tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text">
                   {{ filterCount }}
                 </span>
                 <OIcon
                   :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="sm"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
+                  class="tw:text-text-secondary"
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
-                      class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'">
+                      class="tw:text-xs tw:italic tw:ml-1 tw:whitespace-nowrap sql-query-hint tw:text-text-secondary">
                   view the alert query
                   <OTooltip :delay="200" side="bottom">
                     <template #content>
@@ -584,8 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- SQL/PromQL pane — with its own header -->
               <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
                 :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
-                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'inline-editor-header--dark' : 'inline-editor-header--light'">
+                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between">
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <div class="pane-accent-bar pane-accent-bar--primary" />
                     <span class="inline-editor-title">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
@@ -627,9 +607,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- VRL pane — with its own header, side-by-side with SQL pane -->
               <div v-if="showVrl && localTab === 'sql'"
                 style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
-                :style="{ borderLeft: store.state.theme === 'dark' ? '1px solid #2d3748' : '1px solid #e5e7eb' }">
-                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between"
-                  :class="store.state.theme === 'dark' ? 'inline-editor-header--dark' : 'inline-editor-header--light'">
+                class="tw:border-l tw:border-border-default">
+                <div class="inline-editor-header tw:flex tw:items-center tw:justify-between">
                   <div class="tw:flex tw:items-center tw:gap-2">
                     <div class="pane-accent-bar pane-accent-bar--secondary" />
                     <span class="inline-editor-title">VRL Editor</span>
@@ -686,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="localTab !== 'promql'"
             class="inline-sql-status-bar"
-            :class="[inlineStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']"
+            :class="[inlineStatusState]"
           >
             <div class="sql-status-bar__inner">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
@@ -768,8 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic"
-                     :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="tw:text-[11px] tw:italic tw:text-text-secondary">
                   {{ cronDescription }}
                 </div>
                 <div v-if="frequencyMode === 'cron' && cronError" class="tw:text-red-500 tw:text-[11px]">
@@ -2358,36 +2336,18 @@ export default defineComponent({
     box-sizing: border-box;
   }
 
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-    .section-header {
-      border-bottom: 1px solid #343434;
-    }
-    .section-header-title {
-      color: #e0e0e0;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
+  .step-content {
+    background-color: var(--color-surface-overlay);
+    border: 1px solid var(--color-border-default);
   }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-    .section-header {
-      border-bottom: 1px solid #eeeeee;
-    }
-    .section-header-title {
-      color: #374151;
-    }
-    .section-header-accent {
-      background: var(--q-primary);
-    }
+  .section-header {
+    border-bottom: 1px solid var(--color-border-default);
+  }
+  .section-header-title {
+    color: var(--color-text-primary);
+  }
+  .section-header-accent {
+    background: var(--q-primary);
   }
 }
 
@@ -2494,15 +2454,8 @@ export default defineComponent({
   padding: 0 10px;
   flex-shrink: 0;
   height: 36px;
-
-  &--light {
-    background-color: #f3f4f6;
-    border-bottom: 1px solid #e5e7eb;
-  }
-  &--dark {
-    background-color: rgba(255, 255, 255, 0.04);
-    border-bottom: 1px solid #2d3748;
-  }
+  background-color: var(--color-surface-panel);
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 .inline-editor-title {
@@ -2536,26 +2489,15 @@ export default defineComponent({
     flex: 1;
   }
 
-  &.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
-  &.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
-  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
+  border-left: 1px solid var(--color-border-default);
+  border-right: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--color-border-default);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
 
-  &.sql-status-bar--light {
-    border-left: 1px solid #e5e7eb;
-    border-right: 1px solid #e5e7eb;
-    border-bottom: 1px solid #e5e7eb;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-  }
-  &.sql-status-bar--dark {
-    border-left: 1px solid #2d3748;
-    border-right: 1px solid #2d3748;
-    border-bottom: 1px solid #2d3748;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-    &.sql-status-bar--hint,
-    &.sql-status-bar--idle { background: rgba(255, 255, 255, 0.04); color: #d1d5db; }
-  }
+  &.sql-status-bar--hint    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
+  &.sql-status-bar--idle    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
+  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
 }
 
 .pane-accent-bar {

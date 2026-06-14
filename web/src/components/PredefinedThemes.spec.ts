@@ -248,6 +248,51 @@ describe("PredefinedThemes", () => {
       expect(vm.predefinedThemes.length).toBeGreaterThan(0);
     });
 
+    it("includes O2 Signature as the first predefined theme", () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const o2Theme = (vm as any).predefinedThemes[0];
+      expect(o2Theme.name).toBe('O2 Signature');
+      expect(o2Theme.light.themeColor).toBe('#6B76E3');
+      expect(o2Theme.light.semanticColors).toBeDefined();
+      expect(o2Theme.light.semanticColors.error).toBe('#F45B49');
+      expect(o2Theme.light.semanticColors.success).toBe('#5ACA7A');
+      expect(o2Theme.dark.themeColor).toBe('#8B8DF0');
+      expect(o2Theme.dark.semanticColors).toBeDefined();
+    });
+
+    it("passes semanticColors to applyThemeColors when applying O2 Signature", async () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const { applyThemeColors } = await import('@/utils/theme');
+      const o2Theme = (vm as any).predefinedThemes[0];
+      (vm as any).applyTheme(o2Theme, 'light');
+      expect(applyThemeColors).toHaveBeenCalledWith(
+        '#6B76E3',
+        'light',
+        false,
+        expect.objectContaining({
+          error: '#F45B49',
+          success: '#5ACA7A',
+          secondaryBtnBg: '#EFF1FD',
+        }),
+      );
+    });
+
+    it("does not pass semanticColors when applying a non-signature theme", async () => {
+      const wrapper = createWrapper();
+      const { vm } = wrapper;
+      const { applyThemeColors } = await import('@/utils/theme');
+      const oceanTheme = (vm as any).predefinedThemes.find((t: any) => t.name === 'Ocean Breeze');
+      (vm as any).applyTheme(oceanTheme, 'light');
+      expect(applyThemeColors).toHaveBeenCalledWith(
+        oceanTheme.light.themeColor,
+        'light',
+        false,
+        undefined,
+      );
+    });
+
     it("should display custom color option", () => {
       const wrapper = createWrapper();
       expect(wrapper.text()).toContain("Custom Color");
