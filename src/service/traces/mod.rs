@@ -2035,10 +2035,7 @@ mod tests {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         service_att_map.insert(super::SERVICE_NAME.to_string(), json!("serviceA"));
 
-        let key = super::span_attribute_key(
-            "service_name".to_string(),
-            &service_att_map,
-        );
+        let key = super::span_attribute_key("service_name".to_string(), &service_att_map);
 
         assert_eq!(key, "attr_service_name");
     }
@@ -2052,10 +2049,7 @@ mod tests {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         service_att_map.insert("service.version".to_string(), json!("1.0.0"));
 
-        let key = super::span_attribute_key(
-            "service_version".to_string(),
-            &service_att_map,
-        );
+        let key = super::span_attribute_key("service_version".to_string(), &service_att_map);
 
         assert_eq!(key, "attr_service_version");
     }
@@ -2064,10 +2058,7 @@ mod tests {
     fn test_span_attribute_key_allows_non_colliding_attributes() {
         let service_att_map = std::collections::HashMap::new();
 
-        let key = super::span_attribute_key(
-            "http.method".to_string(),
-            &service_att_map,
-        );
+        let key = super::span_attribute_key("http.method".to_string(), &service_att_map);
 
         assert_eq!(key, "http.method");
     }
