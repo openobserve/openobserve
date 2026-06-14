@@ -15,6 +15,10 @@
 
 use std::{collections::HashSet, fmt::Display};
 
+#[cfg(not(feature = "enterprise"))]
+use config::tantivy::query::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -22,11 +26,13 @@ use config::{
         inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     },
     tantivy::query::{
-        contains_query::ContainsAutomaton,
-        histogram_collector::{MultiHistogramCollector, SimpleHistogramCollector},
-        ids_collector::SingleSegmentDocIdCollector,
+        contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
     },
+};
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector,
 };
 use tantivy::{
     DocId, Score, Searcher,
