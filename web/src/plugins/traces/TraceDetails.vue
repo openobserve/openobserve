@@ -297,7 +297,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-0! tw:gap-1 tw:flex tw:items-center"
+              class="unified-search-group tw:mr-1! tw:gap-1 tw:flex tw:items-center"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -352,39 +352,44 @@ size="sm">
             <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
-              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
+              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector tw:mx-1!"
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
-                :label="
-                  searchObj.data.traceDetails.selectedLogStreams.length
-                    ? ''
-                    : t('search.selectLogStream')
-                "
+                :placeholder="t('search.selectLogStream')"
                 :options="filteredStreamOptions"
                 multiple
                 :title="selectedStreamsString"
+                class="tw:w-44!"
               />
-              <span class="traces-view-logs-btn">
-                <OButton
-                  data-test="trace-details-view-logs-btn"
-                  variant="outline"
-                  size="xs"
-                  class="tw:h-full tw:text-[0.75rem]!"
-                  :title="t('traces.viewLogs')"
-                  @click="redirectToLogs"
+              <span class="traces-view-logs-btn tw:pl-1">
+                <!-- Single button with wrapper for tooltip functionality -->
+                <span
+                  class="tw:inline-block"
+                  tabindex="0"
                 >
-                  <template #icon-left
-                    ><OIcon name="search"
-size="xs"
-                  /></template>
-                  {{
-                    searchObj.meta.redirectedFromLogs
-                      ? t("traces.backToLogs")
-                      : t("traces.viewLogs")
-                  }}
-                </OButton>
+                  <OButton
+                    data-test="trace-details-view-logs-btn"
+                    variant="outline"
+                    size="sm"
+                    class="tw:text-[0.75rem] tw:h-8! tw:font-normal!"
+                    :disabled="isViewLogsDisabled"
+                    @click="redirectToLogs"
+                  >
+                    <template #icon-left
+                      ><OIcon name="search" size="xs"
+                    /></template>
+                    {{
+                      searchObj.meta.redirectedFromLogs
+                        ? t("traces.backToLogs")
+                        : t("traces.viewLogs")
+                    }}
+                  </OButton>
+                  <OTooltip
+                    :content="isViewLogsDisabled ? t('search.selectLogsStreamFirst') : t('traces.viewLogs')"
+                  />
+                </span>
               </span>
             </div>
             <OButton
@@ -392,7 +397,7 @@ size="xs"
                 data-test="trace-details-view-session-replay-btn"
                 variant="outline"
                 size="sm"
-                class="tw:ml-2"
+                class="tw:ml-1"
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left>
@@ -508,6 +513,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -572,6 +579,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -651,6 +660,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -1214,6 +1225,16 @@ export default defineComponent({
     const selectedStreamsString = computed(() =>
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
+
+    // Check if View Logs button should be disabled
+    const isViewLogsDisabled = computed(() => {
+      // In non-enterprise mode with visible log stream selector, disable when no streams are selected
+      return (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        searchObj.data.traceDetails.selectedLogStreams.length === 0
+      );
+    });
 
     // Current trace stream name for correlation
     const currentTraceStreamName = computed(() => {
@@ -2637,6 +2658,7 @@ export default defineComponent({
       filterStreamFn,
       streamSearchValue,
       selectedStreamsString,
+      isViewLogsDisabled,
       openTraceDetails,
       showTraceDetails,
       traceDetails,
@@ -3059,24 +3081,6 @@ body.body--dark {
   .search-navigation-container {
     &:hover {
       border-color: var(--o2-theme-color);
-    }
-  }
-}
-
-.traces-view-logs-btn {
-  height: 1.875rem;
-  margin-left: -1px;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 0.2rem !important;
-  border-bottom-right-radius: 0.2rem !important;
-}
-
-.traces-view-logs-btn,
-.traces-view-session-replay-btn {
-  .q-btn__content {
-    span {
-      font-size: 12px;
     }
   }
 }
