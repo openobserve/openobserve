@@ -69,8 +69,6 @@ export interface SemanticColors {
   outlineText?: string;
   outlineBorder?: string;
   ghostText?: string;
-  toggleText?: string;
-  toggleBorder?: string;
 }
 
 /**
@@ -251,7 +249,6 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     '--o2-secondary-btn-bg', '--o2-secondary-btn-text', '--o2-secondary-btn-border',
     '--color-button-outline-text', '--color-button-outline-border',
     '--color-button-ghost-text',
-    '--color-toggle-item-text', '--color-toggle-border',
   ];
   if (semanticColors) {
     // Clear both targets first to avoid stale values from a prior mode switch
@@ -272,8 +269,6 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     if (semanticColors.outlineText) target.style.setProperty('--color-button-outline-text', semanticColors.outlineText);
     if (semanticColors.outlineBorder) target.style.setProperty('--color-button-outline-border', semanticColors.outlineBorder);
     if (semanticColors.ghostText) target.style.setProperty('--color-button-ghost-text', semanticColors.ghostText);
-    if (semanticColors.toggleText) target.style.setProperty('--color-toggle-item-text', semanticColors.toggleText);
-    if (semanticColors.toggleBorder) target.style.setProperty('--color-toggle-border', semanticColors.toggleBorder);
   } else {
     semanticTokenNames.forEach(t => {
       document.documentElement.style.removeProperty(t);
