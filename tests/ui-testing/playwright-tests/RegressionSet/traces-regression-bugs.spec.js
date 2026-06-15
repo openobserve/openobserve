@@ -147,8 +147,14 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
     await pm.tracesPage.selectTraceStream('default');
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
-    // Switch to SQL mode to access the editor with autocomplete
-    // Uses POM locator: validates against traces SearchBar data-test attributes
+    // Switch to SQL mode to access the editor with autocomplete.
+    // The syntax-guide was moved into the "More" dropdown menu,
+    // so we must open that dropdown first to reveal the toggle.
+    const moreMenuBtn = page.locator('[data-test="traces-search-bar-more-menu-btn"]');
+    await expect(moreMenuBtn, 'More menu button should be visible').toBeVisible({ timeout: 5000 });
+    await moreMenuBtn.click();
+    await page.waitForTimeout(500);
+
     const sqlToggle = pm.tracesPage.getSqlModeToggle().first();
     await expect(sqlToggle, 'SQL mode toggle should be visible').toBeVisible({ timeout: 5000 });
     await sqlToggle.click();
