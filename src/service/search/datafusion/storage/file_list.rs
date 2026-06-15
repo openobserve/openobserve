@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::LazyLock as Lazy;
 
 use chrono::{TimeZone, Utc};
-use config::meta::{bitvec::BitVec, stream::FileKey};
+use config::meta::stream::{FileKey, FileSelection};
 use hashbrown::HashMap;
 use object_store::ObjectMeta;
 use parking_lot::RwLock;
@@ -24,18 +24,16 @@ use parking_lot::RwLock;
 use super::{ACCOUNT_SEPARATOR, TRACE_ID_SEPARATOR};
 
 #[derive(Clone)]
-pub struct SegmentInfo {
-    pub segment_ids: Arc<BitVec>,
-    /// Parquet row group size that was in effect when the tantivy index for
-    /// this file was built. `None` for files written before this property
-    /// existed; callers should fall back to the legacy value.
+pub struct ScanSelection {
+    pub selection: FileSelection,
     pub row_group_size: Option<u32>,
 }
 
-type SegmentData = HashMap<String, SegmentInfo>;
+type ScanSelectionMap = HashMap<String, ScanSelection>;
 
 static FILES: Lazy<RwLock<HashMap<String, Vec<ObjectMeta>>>> = Lazy::new(Default::default);
-static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default::default);
+static SCAN_SELECTIONS: Lazy<RwLock<HashMap<String, ScanSelectionMap>>> =
+    Lazy::new(Default::default);
 
 pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.read().get(trace_id) {
@@ -48,7 +46,7 @@ pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
 pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<FileKey>) {
     let key = format!("{trace_id}/schema={schema_key}/format={format}");
     let mut values = Vec::with_capacity(files.len());
-    let mut segment_data = HashMap::new();
+    let mut scan_selections = HashMap::new();
     for file in files {
         let modified = Utc.timestamp_nanos(file.meta.max_ts * 1000);
         let file_name = if file.account.is_empty() {
@@ -66,18 +64,18 @@ pub async fn set(trace_id: &str, schema_key: &str, format: &str, files: Vec<File
             e_tag: None,
             version: None,
         });
-        if let Some(bin_data) = file.segment_ids {
-            segment_data.insert(
+        if let Some(selection) = file.selection {
+            scan_selections.insert(
                 file.key,
-                SegmentInfo {
-                    segment_ids: bin_data,
+                ScanSelection {
+                    selection,
                     row_group_size: file.row_group_size,
                 },
             );
         }
     }
     FILES.write().insert(key.clone(), values);
-    SEGMENTS.write().insert(key, segment_data);
+    SCAN_SELECTIONS.write().insert(key, scan_selections);
 }
 
 pub fn clear(trace_id: &str) {
@@ -96,9 +94,9 @@ pub fn clear(trace_id: &str) {
     w.shrink_to_fit();
     drop(w);
 
-    // Remove all segment data for the given trace_id
+    // Remove all scan selections for the given trace_id
     // here we can reuse the keys, because they are the same
-    let mut w = SEGMENTS.write();
+    let mut w = SCAN_SELECTIONS.write();
     for key in keys.iter() {
         w.remove(key);
     }
@@ -106,9 +104,9 @@ pub fn clear(trace_id: &str) {
     drop(w);
 }
 
-pub fn get_segment_info(file_key: &str) -> Option<SegmentInfo> {
+pub fn get_scan_selection(file_key: &str) -> Option<ScanSelection> {
     let (trace_id, filename) = file_key.split_once("/$$/")?;
-    let r = SEGMENTS.read();
+    let r = SCAN_SELECTIONS.read();
     let data = r.get(trace_id)?;
     data.get(filename).cloned()
 }
@@ -130,14 +128,14 @@ mod tests {
     }
 
     #[test]
-    fn test_get_segment_info_nonexistent_returns_none() {
-        let result = get_segment_info("nonexistent_trace_file_list/$$/filename.parquet");
+    fn test_get_scan_selection_nonexistent_returns_none() {
+        let result = get_scan_selection("nonexistent_trace_file_list/$$/filename.parquet");
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_get_segment_info_no_separator_returns_none() {
-        let result = get_segment_info("no-separator-here");
+    fn test_get_scan_selection_no_separator_returns_none() {
+        let result = get_scan_selection("no-separator-here");
         assert!(result.is_none());
     }
 }
