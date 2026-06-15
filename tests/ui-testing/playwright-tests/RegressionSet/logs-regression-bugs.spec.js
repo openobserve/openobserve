@@ -1438,25 +1438,17 @@ test.describe("Logs Regression Bug Fixes", () => {
     // then select stream without re-navigating (skipNavigation=true).
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    // Wait for the OSelect stream list to finish loading before interacting
-    await page.waitForTimeout(3000);
+    // Wait for the stream select OSelect to mount before interacting
+    await page.locator('[data-test="log-search-index-list-select-stream"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate', 5, 30000, true);
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Run a query so the page has results state
     await pm.logsPage.clickRunQueryButton();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
     // Open share via POM and verify success notification (link copied to clipboard)
-    const shareBtn = page.locator(pm.logsPage.shareLinkButton);
-    await expect(shareBtn, 'Share button should be visible').toBeVisible({ timeout: 5000 });
-    await shareBtn.click();
-    await page.waitForTimeout(1500);
-
-    // Verify share succeeded — a success notification appears when link is copied
-    const linkCopiedNotification = page.getByText(/link copied|share.*success|success/i).first();
-    const shareInteractionWorked = await linkCopiedNotification.isVisible({ timeout: 5000 }).catch(() => false);
+    const shareInteractionWorked = await pm.logsPage.clickShareLinkAndExpectSuccess();
     testLogger.info(`Share notification visible: ${shareInteractionWorked}`);
     expect(shareInteractionWorked,
       'Bug #5839: Share action should produce a success notification (link copied)'

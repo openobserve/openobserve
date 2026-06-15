@@ -62,19 +62,17 @@ test.describe("Reports Regression Bug Fixes", () => {
       testLogger.info(`Created report: ${TEST_REPORT_NAME}`);
 
       // Wait for success toast after report save (OToast component's success variant)
-      await page.locator('[data-test-variant="success"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await pm.reportsPage.toastSuccess.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
 
       // Navigate to reports list and edit the report to configure schedule
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await pm.reportsPage.reportSearchInputField.fill(TEST_REPORT_NAME);
-      await page.waitForTimeout(2000);
 
       const editBtn = pm.reportsPage.editReportBtn(TEST_REPORT_NAME);
       await expect(editBtn, 'Edit button should be visible').toBeVisible({ timeout: 5000 });
       await editBtn.click();
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       testLogger.info('Opened report for editing');
 
       // Navigate through step 1 (dashboard) to reach step 2 (schedule)
@@ -85,14 +83,13 @@ test.describe("Reports Regression Bug Fixes", () => {
       await expect(pm.reportsPage.scheduleLaterBtn,
         'Schedule Later button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.createReportScheduleLater();
-      await page.waitForTimeout(1000);
 
       const TEST_START_TIME = '10:30';
       const TEST_START_HOUR = 10;
 
       // OTime wraps a hidden <input type="time"> inside the role="group" div.
       // Fill with force:true since the native input is visually hidden.
-      const startTimeInput = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      const startTimeInput = pm.reportsPage.scheduleStartTimeInput;
       await expect(startTimeInput, 'Start Time input should exist').toHaveCount(1, { timeout: 5000 });
       await startTimeInput.fill(TEST_START_TIME, { force: true });
       testLogger.info(`Set start time to: "${TEST_START_TIME}"`);
@@ -103,8 +100,7 @@ test.describe("Reports Regression Bug Fixes", () => {
       // Save with schedule
       await expect(pm.reportsPage.saveButton, 'Save button should be visible').toBeVisible({ timeout: 5000 });
       await pm.reportsPage.saveButton.click({ force: true });
-      await page.waitForTimeout(3000);
-      await expect(page.getByRole('alert').first(),
+      await expect(pm.reportsPage.toastAlert.first(),
         'Save success alert should appear').toBeVisible({ timeout: 15000 });
       testLogger.info('Saved report with schedule configured');
 
@@ -112,12 +108,11 @@ test.describe("Reports Regression Bug Fixes", () => {
       await page.goto(reportsUrl, { timeout: 15000 }).catch(() => {});
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       await pm.reportsPage.reportSearchInputField.fill(TEST_REPORT_NAME);
-      await page.waitForTimeout(2000);
 
       const editBtnReopen = pm.reportsPage.editReportBtn(TEST_REPORT_NAME);
       await expect(editBtnReopen, 'Edit button should still be visible after re-save').toBeVisible({ timeout: 5000 });
       await editBtnReopen.click();
-      await page.waitForTimeout(3000);
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
       // Navigate through step 1 to reach schedule step
       await pm.reportsPage.createReportContinueButtonStep1();
@@ -125,7 +120,7 @@ test.describe("Reports Regression Bug Fixes", () => {
         'Schedule Later button should be visible after re-open').toBeVisible({ timeout: 5000 });
 
       // Read back from the hidden <input type="time">
-      const startTimeInputAfter = page.locator('[data-test="add-report-schedule-start-time-field"] input[type="time"]');
+      const startTimeInputAfter = pm.reportsPage.scheduleStartTimeInput;
       await expect(startTimeInputAfter, 'Start Time input should exist after re-open').toHaveCount(1, { timeout: 5000 });
       const afterStartTime = await startTimeInputAfter.inputValue({ timeout: 5000 });
       testLogger.info(`After re-open start time: "${afterStartTime}"`);

@@ -517,7 +517,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
 
     // Navigate to Settings → Pipeline Destinations via POM
     await pageManager.pipelinesPage.settingsMenu.click();
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Pipeline Destinations tab is enterprise-only (v-if="config.isEnterprise == 'true'")
     const tabExists = await pageManager.pipelinesPage.pipelineDestinationsTab.count();
@@ -528,35 +528,37 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await expect(pageManager.pipelinesPage.pipelineDestinationsTab,
       'Pipeline Destinations tab should be visible').toBeVisible({ timeout: 5000 });
     await pageManager.pipelinesPage.pipelineDestinationsTab.click();
-    await page.waitForTimeout(2000);
+    // Wait for the destinations list add button to confirm the tab content loaded
+    const addBtn = pageManager.pipelinesPage.destinationListAddBtn;
+    await expect(addBtn, 'Add destination button should be visible').toBeVisible({ timeout: 10000 });
     testLogger.info('Navigated to Pipeline Destinations');
 
     // Click Add — opens destination type selection (cards for OpenObserve, Splunk, etc.)
-    const addBtn = page.locator('[data-test="pipeline-destination-list-add-btn"]');
-    await expect(addBtn, 'Add destination button should be visible').toBeVisible({ timeout: 5000 });
     await addBtn.click();
-    await page.waitForTimeout(2000);
+    // Wait for destination type cards to appear
+    const destinationCards = pageManager.pipelinesPage.destinationTypeCard;
+    await expect(destinationCards.first(), 'Destination type cards should appear').toBeVisible({ timeout: 5000 });
     testLogger.info('Opened Add Pipeline Destination');
 
     // Verify destination type cards are visible (not just a blank page / error)
-    const destinationCards = page.locator('[data-test*="destination-type-card"]');
     const cardCount = await destinationCards.count();
     testLogger.info(`Destination type cards visible: ${cardCount}`);
     expect(cardCount, 'Bug #11483: Destination type cards should appear after clicking Add').toBeGreaterThan(0);
 
     // Navigate back to destinations list (cancel add) and verify no duplicate notifications
     await pageManager.pipelinesPage.pipelineDestinationsTab.click();
-    await page.waitForTimeout(1000);
+    // Wait for the add button to reappear before checking for toasts
+    await expect(addBtn, 'Add destination button should be visible after cancel').toBeVisible({ timeout: 10000 });
 
     // Verify no error/spurious notification appeared during the add/cancel flow
     // Use OToast component's explicit data-test attributes (not Quasar CSS classes)
-    const errorToasts = page.locator('[data-test-variant="error"]');
+    const errorToasts = pageManager.pipelinesPage.toastError;
     const errorToastCount = await errorToasts.count();
     testLogger.info(`Error toasts visible after cancel: ${errorToastCount}`);
 
     // Bug #11483 was about duplicate success notifications on save.
     // The UI must not show spurious success toasts during the add/cancel flow.
-    const successToasts = page.locator('[data-test-variant="success"]');
+    const successToasts = pageManager.pipelinesPage.toastSuccess;
     const successToastCount = await successToasts.count();
     expect(successToastCount, 'Bug #11483: No duplicate success toasts should appear during add/cancel').toBe(0);
 
