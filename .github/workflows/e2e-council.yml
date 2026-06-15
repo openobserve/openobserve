@@ -5,13 +5,12 @@ name: E2E Council (Test Generation)
 #
 # REQUIRED SECRET: DEEPSEEK_API_KEY_E2E (repo Settings → Secrets and variables → Actions).
 #
-# WHAT IT TRIAGES (it needs a diff — there is nothing to do without one):
-#   - `/e2e` comment on a PR  → that PR's diff.
-#   - Manual run with `pr_number` → that PR's diff (recommended for on-demand triage).
-#   - Manual run with `oss_branch` (a feature branch ahead of main) → that branch's diff vs main.
-#   - Manual run with neither / oss_branch=main → EMPTY diff → the run fails fast with a clear
-#     message. (Running from main triages main-against-itself = nothing.)
-#   Example: to triage PR #1234, dispatch with pr_number=1234 (leave oss_branch empty).
+# EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
+# detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
+#   - `/e2e` comment on a PR        → triages that PR's diff.
+#   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED).
+# No PR ⇒ no run. (There is intentionally no free-form branch option.)
+#   Example: to triage PR #1234, dispatch with pr_number=1234.
 #
 # IMPORTANT: both triggers read this workflow's definition from the DEFAULT BRANCH (main).
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
@@ -28,13 +27,8 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to triage (recommended, e.g. '1234'). Overrides oss_branch when set."
-        required: false
-        default: ""
-      oss_branch:
-        description: "OR a feature branch AHEAD of main to triage (ignored if pr_number is set). If set to 'main' (or left empty with no pr_number), the diff is empty and the run fails with a clear message."
-        required: false
-        default: ""
+        description: "PR number to triage / generate E2E tests for (REQUIRED, e.g. '1234'). Tests are only ever generated for a PR."
+        required: true
       feature_hint:
         description: "Optional feature name/area hint for triage"
         required: false
@@ -55,7 +49,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: e2e-council-${{ github.event.issue.number || github.event.inputs.oss_branch || github.ref }}
+  group: e2e-council-${{ github.event.issue.number || github.event.inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -100,7 +94,7 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            // issue_comment → the commented PR; workflow_dispatch → the optional pr_number input.
+            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input.
             const pr = context.eventName === 'issue_comment'
               ? context.payload.issue.number
               : (context.payload.inputs.pr_number || '');
@@ -136,33 +130,25 @@ jobs:
 
       - name: Fetch diff + untrusted inputs as files
         # The PR change is read as a DIFF via the API (data) — the PR head is never checked out.
-        # Untrusted text (comment, hint, branch name) goes through env vars + files, never
-        # interpolated into a shell command. The agent treats all of it as data, not instructions.
+        # Untrusted text (comment, hint) goes through env vars + files, never interpolated into a
+        # shell command. The agent treats all of it as data, not instructions.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OSS_BRANCH: ${{ github.event.inputs.oss_branch }}
           PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
           FEATURE_HINT: ${{ github.event.inputs.feature_hint }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           mkdir -p docs/test_generator/ci
-          if [ -n "$PR_NUMBER" ]; then
-            # A PR was given (comment trigger, or pr_number on manual dispatch).
-            # Read the PR's diff via API — do NOT check out its code.
-            echo "Triaging PR #$PR_NUMBER"
-            gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
-          elif [ -n "$OSS_BRANCH" ] && [ "$OSS_BRANCH" != "main" ]; then
-            # Manual dispatch against a feature branch: diff it vs main (fetch only; no checkout/run).
-            echo "Triaging branch '$OSS_BRANCH' vs main"
-            git fetch origin "$OSS_BRANCH" --depth=50 || true
-            git diff "origin/main...origin/$OSS_BRANCH" > docs/test_generator/ci/diff.patch 2>/dev/null || true
-          else
-            : > docs/test_generator/ci/diff.patch
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::No PR number. This workflow only runs against a PR — comment /e2e on a PR, or dispatch with pr_number."
+            exit 1
           fi
-          # Guard: nothing to triage. Fail fast with a clear, actionable message rather than
-          # running the model on an empty diff (e.g. someone dispatched with oss_branch=main).
+          # Read the PR's diff via API — do NOT check out its code.
+          echo "Triaging PR #$PR_NUMBER"
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
+          # Guard: empty diff (e.g. invalid/closed PR, or a PR with no file changes).
           if [ ! -s docs/test_generator/ci/diff.patch ]; then
-            echo "::error::Nothing to triage — empty diff. Provide a 'pr_number', or an 'oss_branch' that has commits ahead of main (not 'main' itself), or comment /e2e on a PR."
+            echo "::error::Empty diff for PR #$PR_NUMBER — nothing to triage (invalid PR number, or no changes)."
             exit 1
           fi
           # Cap the diff so it can't exceed the model context window.
