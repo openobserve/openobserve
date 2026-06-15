@@ -366,6 +366,7 @@ pub async fn zo_config() -> impl IntoResponse {
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is always on when the enterprise feature is compiled in — no runtime flag.
     let anomaly_detection_enabled = enterprise_value!(false, true);
+    let online_evals_enabled = enterprise_value!(false, o2cfg.common.online_evals_enabled);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -473,7 +474,7 @@ pub async fn zo_config() -> impl IntoResponse {
         incidents_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
-        online_evals_enabled: cfg.common.online_evals_enabled,
+        online_evals_enabled,
         anomaly_detection_enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
