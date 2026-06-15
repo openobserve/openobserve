@@ -579,16 +579,22 @@ jobs:
         continue-on-error: true
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+          # Pass the (regex-validated) spec paths via env — never interpolate ${{ }} into the
+          # shell/command, which would be a script-injection sink.
+          SPEC: ${{ steps.spec.outputs.spec }}
+          REL: ${{ steps.spec.outputs.rel }}
         run: |
           opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${{ steps.spec.outputs.spec }}. Run it with 'cd tests/ui-testing && npx playwright test ${{ steps.spec.outputs.rel }} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 3 iterations, then stop. Keep your reasoning concise to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
+            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${SPEC}. Run it with 'cd tests/ui-testing && npx playwright test ${REL} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 3 iterations, then stop. Keep your reasoning concise to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
 
       - name: Authoritative final run (the workflow decides pass/fail, not the LLM)
         id: finalrun
         timeout-minutes: 15
+        env:
+          REL: ${{ steps.spec.outputs.rel }}
         run: |
           cd tests/ui-testing
-          if npx playwright test "${{ steps.spec.outputs.rel }}" --workers=4 --reporter=line; then
+          if npx playwright test "$REL" --workers=4 --reporter=line; then
             echo "status=passing" >> "$GITHUB_OUTPUT"
             echo "::notice::Generated spec PASSES against a live OpenObserve."
           else
@@ -599,9 +605,10 @@ jobs:
       - name: Sentinel re-audit (post-heal)
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+          SPEC: ${{ steps.spec.outputs.spec }}
         run: |
           opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
-            "Re-audit the healed spec/page objects for ${{ steps.spec.outputs.spec }}; update docs/test_generator/ci/sentinel-verdict.json."
+            "Re-audit the healed spec/page objects for ${SPEC}; update docs/test_generator/ci/sentinel-verdict.json."
 
       - name: Commit + push healer fixes to autoe2e branch
         env:
