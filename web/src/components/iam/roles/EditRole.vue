@@ -314,6 +314,7 @@ import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import onlineEvalsService from "@/services/online-evals.service";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -1440,26 +1441,39 @@ const getResourceEntities = (resource: Resource | Entity) => {
     afolder: getAlertFolders,
     rfolder: getReportFolders,
     re_patterns: getRePatterns,
+    provider: getProviders,
+    score_config: getScoreConfigs,
+    scorer: getScorers,
+    eval_job: getEvalJobs,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
   };
 
   return new Promise(async (resolve, reject) => {
-    if (!resource.entities?.length) {
-      resource.is_loading = true;
-      if (resource.childName) {
-        await listEntitiesFnMap[resource.childName](resource);
-      } else {
-        await listEntitiesFnMap[resource.resourceName](resource);
+    try {
+      if (!resource.entities?.length) {
+        resource.is_loading = true;
+        try {
+          const listEntities = resource.childName
+            ? listEntitiesFnMap[resource.childName]
+            : listEntitiesFnMap[resource.resourceName];
+
+          if (listEntities) {
+            await listEntities(resource);
+          }
+        } finally {
+          resource.is_loading = false;
+        }
+
+        // unncecessaryly we are updating the all resource entities, fix to update the current resource
+        updatePermissionVisibility(permissionsState.permissions);
       }
 
-      // unncecessaryly we are updating the all resource entities, fix to update the current resource
-      updatePermissionVisibility(permissionsState.permissions);
-      resource.is_loading = false;
+      resolve(true);
+    } catch (err) {
+      reject(err);
     }
-
-    resolve(true);
   });
 };
 
@@ -1891,6 +1905,84 @@ const getRePatterns = async () => {
   );
 
   return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getProviders = async () => {
+  const providers = await onlineEvalsService.providers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "provider",
+    ["id"],
+    providers,
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScoreConfigs = async () => {
+  const scoreConfigs = await onlineEvalsService.scoreConfigs.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "score_config",
+    ["entityId"],
+    scoreConfigs.map((scoreConfig: any) => ({
+      ...scoreConfig,
+      entityId: scoreConfig.entityId ?? scoreConfig.entity_id ?? scoreConfig.id,
+    })),
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScorers = async () => {
+  const scorers = await onlineEvalsService.scorers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "scorer",
+    ["entityId"],
+    scorers.map((scorer: any) => ({
+      ...scorer,
+      entityId: scorer.entityId ?? scorer.entity_id ?? scorer.id,
+    })),
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getEvalJobs = async () => {
+  const evalJobs = await onlineEvalsService.jobs.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "eval_job",
+    ["id"],
+    evalJobs,
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };

@@ -15,6 +15,10 @@
 
 use std::{collections::HashSet, fmt::Display};
 
+#[cfg(not(feature = "enterprise"))]
+use config::tantivy::query::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector,
+};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -26,14 +30,12 @@ use config::{
         topn_collector::TopNCollector,
     },
 };
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::search::tantivy::histogram_collector::{
+    MultiHistogramCollector, SimpleHistogramCollector,
+};
 use tantivy::{
     DocId, Score, Searcher,
-    aggregation::{
-        AggregationCollector, Key,
-        agg_req::{Aggregation, AggregationVariants, Aggregations},
-        agg_result::{AggregationResult, BucketEntries, BucketResult},
-        bucket::{HistogramAggregation, HistogramBounds, TermsAggregation},
-    },
     collector::{Count, TopDocs},
     query::Query,
 };
@@ -146,14 +148,16 @@ impl TantivyResult {
         min_value: i64,
         bucket_width: u64,
         num_buckets: usize,
+        ts_offset: i64,
     ) -> anyhow::Result<Self> {
         let res = searcher.search(
             &query,
-            &tantivy::collector::HistogramCollector::new::<i64>(
+            &SimpleHistogramCollector::new(
                 TIMESTAMP_COL_NAME.to_string(),
                 min_value,
                 bucket_width,
                 num_buckets,
+                ts_offset,
             ),
         )?;
 
@@ -166,80 +170,22 @@ impl TantivyResult {
         min_value: i64,
         max_value: i64,
         bucket_width: u64,
+        ts_offset: i64,
         breakdown_field: &str,
     ) -> anyhow::Result<Self> {
-        let limit = config::get_config().limit.query_default_limit;
-        // this value should be zero
-        let offset = (min_value % bucket_width as i64) as f64;
-        let histogram_agg = Aggregation {
-            agg: AggregationVariants::Histogram(HistogramAggregation {
-                field: TIMESTAMP_COL_NAME.to_string(),
-                interval: bucket_width as f64,
-                offset: Some(offset),
-                min_doc_count: Some(1),
-                hard_bounds: Some(HistogramBounds {
-                    min: min_value as f64,
-                    max: max_value as f64,
-                }),
-                extended_bounds: None,
-                keyed: false,
-                is_normalized_to_ns: false,
-            }),
-            sub_aggregation: Aggregations::from_iter(vec![(
-                "breakdown".to_string(),
-                Aggregation {
-                    agg: AggregationVariants::Terms(TermsAggregation {
-                        field: breakdown_field.to_string(),
-                        size: Some(limit as u32),
-                        order: None,
-                        missing: None,
-                        min_doc_count: Some(1),
-                        show_term_doc_count_error: Some(false),
-                        segment_size: None,
-                        include: None,
-                        exclude: None,
-                    }),
-                    sub_aggregation: Default::default(),
-                },
-            )]),
-        };
-        let aggregations = Aggregations::from_iter(vec![("histogram".to_string(), histogram_agg)]);
-        let collector = AggregationCollector::from_aggs(aggregations, Default::default());
+        let res = searcher.search(
+            &query,
+            &MultiHistogramCollector::new(
+                TIMESTAMP_COL_NAME.to_string(),
+                breakdown_field.to_string(),
+                min_value,
+                max_value,
+                bucket_width,
+                ts_offset,
+            ),
+        )?;
 
-        let mut res = searcher.search(&query, &collector)?;
-
-        let mut results = Vec::new();
-        if let AggregationResult::BucketResult(BucketResult::Histogram { buckets }) =
-            res.0.remove("histogram").unwrap()
-        {
-            let hist_buckets = match buckets {
-                BucketEntries::Vec(vec) => vec,
-                BucketEntries::HashMap(map) => map.into_values().collect(),
-            };
-            for mut bucket_entry in hist_buckets {
-                let timestamp = match bucket_entry.key {
-                    Key::F64(k) => k as i64,
-                    _ => continue,
-                };
-                if let AggregationResult::BucketResult(BucketResult::Terms {
-                    buckets: term_entries,
-                    ..
-                }) = bucket_entry.sub_aggregation.0.remove("breakdown").unwrap()
-                {
-                    for term_bucket in term_entries {
-                        let breakdown_value = match term_bucket.key {
-                            Key::Str(s) => s,
-                            Key::F64(f) => f.to_string(),
-                            Key::I64(i) => i.to_string(),
-                            Key::U64(u) => u.to_string(),
-                        };
-                        results.push((timestamp, breakdown_value, term_bucket.doc_count));
-                    }
-                }
-            }
-        }
-
-        Ok(Self::MultiHistogram(results))
+        Ok(Self::MultiHistogram(res))
     }
 
     pub fn handle_simple_top_n(
@@ -549,7 +495,7 @@ mod tests {
     #[test]
     fn test_tantivy_multi_result_builder_new() {
         // Test with SimpleHistogram
-        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10));
+        let optimize_rule = Some(IndexOptimizeMode::SimpleHistogram(0, 1000, 10, 0));
         let builder = TantivyMultiResultBuilder::new(&optimize_rule);
         assert!(matches!(builder, TantivyMultiResultBuilder::Histogram(_)));
 

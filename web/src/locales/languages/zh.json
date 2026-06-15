@@ -424,7 +424,10 @@
     "menuGroupInspect": "检查",
     "validSql": "有效的 SQL",
     "invalidSql": "查询无效",
-    "menuGroupExplain": "解释一下"
+    "menuGroupExplain": "解释一下",
+    "fieldValuesEmpty": "未找到任何值。",
+    "fieldValuesEmptyHint": "尝试更宽的时间范围来查看数值。",
+    "selectLogsStreamFirst": "先选择日志直播"
   },
   "menu": {
     "home": "主页",

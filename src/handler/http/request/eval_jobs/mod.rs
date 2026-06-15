@@ -18,6 +18,10 @@ use axum::{
     response::Response,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::extractors::Headers;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::eval_jobs::{
@@ -64,8 +68,26 @@ impl From<EvalJobError> for Response {
 pub async fn list_eval_jobs(
     Path(org_id): Path<String>,
     Query(query): Query<ListEvalJobsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match eval_jobs::list_jobs(&org_id, query.status.as_deref()).await {
+    #[cfg(feature = "enterprise")]
+    let permitted_objects = {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "eval_job",
+        )
+        .await
+        {
+            Ok(list) => list,
+            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_objects = None;
+
+    match eval_jobs::list_jobs(&org_id, query.status.as_deref(), permitted_objects).await {
         Ok(list) => {
             let body: ListEvalJobsResponseBody = list.into();
             MetaHttpResponse::json(body)

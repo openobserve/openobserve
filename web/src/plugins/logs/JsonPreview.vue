@@ -101,7 +101,7 @@
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
-            <template #icon-left><EqualIcon class="tw:size-4" /></template>
+            <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
@@ -115,7 +115,7 @@
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
-            <template #icon-left><NotEqualIcon class="tw:size-4" /></template>
+            <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem

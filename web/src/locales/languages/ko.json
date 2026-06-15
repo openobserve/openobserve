@@ -424,7 +424,10 @@
     "menuGroupInspect": "검사",
     "validSql": "유효한 SQL",
     "invalidSql": "잘못된 쿼리",
-    "menuGroupExplain": "설명하다"
+    "menuGroupExplain": "설명하다",
+    "fieldValuesEmpty": "값을 찾을 수 없습니다.",
+    "fieldValuesEmptyHint": "값을 보려면 더 넓은 시간 범위를 사용해 보십시오.",
+    "selectLogsStreamFirst": "먼저 로그 스트림을 선택합니다."
   },
   "menu": {
     "home": "홈",
