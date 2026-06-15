@@ -647,6 +647,7 @@ jobs:
           echo "::error::OpenObserve failed to start in 120s"; tail -80 o2.log; exit 1
 
       - name: Install Playwright + write .env
+        id: pwinstall
         run: |
           : > .env
           for v in ZO_ROOT_USER_EMAIL ZO_ROOT_USER_PASSWORD ZO_BASE_URL WS_ZO_BASE_URL ZO_BASE_URL_SC ZO_BASE_URL_SC_UI INGESTION_URL ORGNAME ZO_SMTP_ENABLED; do
@@ -745,15 +746,21 @@ jobs:
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           BOOT_OUTCOME: ${{ steps.boot.outcome }}
+          PWINSTALL_OUTCOME: ${{ steps.pwinstall.outcome }}
+          SPEC_OUTCOME: ${{ steps.spec.outcome }}
           HEAL_OUTCOME: ${{ steps.heal.outcome }}
           FINAL_STATUS: ${{ steps.finalrun.outputs.status }}
         run: |
           RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          # Root cause = the most-upstream failing stage.
+          # Root cause = the most-upstream failing stage (build -> boot -> pw-setup -> spec-resolve -> heal -> final).
           if [ "$BUILD_OUTCOME" = "failure" ]; then
             CAUSE="Building OpenObserve from the feature branch failed (compile / frontend build error)."
           elif [ "$BOOT_OUTCOME" = "failure" ]; then
             CAUSE="OpenObserve built but failed to boot/serve on :5080 within the timeout."
+          elif [ "$PWINSTALL_OUTCOME" = "failure" ]; then
+            CAUSE="Setting up the test environment failed (npm ci / Playwright browser install) — a CI/infra problem, not the generated test."
+          elif [ "$SPEC_OUTCOME" = "failure" ]; then
+            CAUSE="Could not resolve the generated spec path from run metadata (generation/hand-off problem — run-context.json missing or spec_path invalid)."
           elif [ "$HEAL_OUTCOME" = "failure" ] || [ "$HEAL_OUTCOME" = "cancelled" ]; then
             CAUSE="The healer hit its 30-minute cap (hung or too-slow heal loop) and was stopped before the tests passed."
           elif [ "$FINAL_STATUS" = "failing" ]; then
