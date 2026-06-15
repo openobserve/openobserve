@@ -3592,6 +3592,19 @@ export class LogsPage {
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
+    async expectSqlErrorStateNotVisible(timeout = 5000) {
+        return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
+    }
+
+    async expectSqlErrorStateNotContain(text, timeout = 5000) {
+        const errorLocator = this.page.locator(this.errorMessage);
+        const isVisible = await errorLocator.isVisible({ timeout }).catch(() => false);
+        if (isVisible) {
+            const errorText = (await errorLocator.textContent()) || '';
+            expect(errorText).not.toContain(text);
+        }
+    }
+
     /**
      * Get the detailed error dialog text.
      *
