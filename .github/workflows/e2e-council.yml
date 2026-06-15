@@ -7,7 +7,7 @@ name: E2E Council (Test Generation)
 #
 # EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
 # detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
-#   - `/e2e` comment on a PR        → triages that PR's diff.
+#   - a comment that is EXACTLY `/e2e` on a PR → triages that PR's diff (extra text won't match).
 #   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED; accepts a
 #                                     bare number, "#123", or a full PR URL).
 # No PR ⇒ no run. (There is intentionally no free-form branch option.)
@@ -63,12 +63,14 @@ jobs:
   # write run-context.json, and post the decision as a PR comment.
   # ---------------------------------------------------------------------------
   triage:
-    # Run for manual dispatch, or for a `/e2e` comment on a PR by a trusted author.
+    # Run for manual dispatch, or for a comment that is EXACTLY `/e2e` on a PR by a trusted
+    # author. Exact match (not `contains`) so "Generate /e2e", "/e2e please", etc. do NOT trigger
+    # — the job never starts, so there is no reaction, no comment, and no run for those.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/e2e') &&
+       github.event.comment.body == '/e2e' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 15
