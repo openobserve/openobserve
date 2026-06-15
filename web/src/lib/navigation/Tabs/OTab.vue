@@ -78,7 +78,7 @@ const baseClasses = computed<string>(() => [
   isVertical.value
     ? 'tw:flex tw:justify-start'
     : 'tw:inline-flex tw:justify-center',
-  'tw:px-2 tw:font-medium tw:text-sm tw:whitespace-nowrap',
+  'tw:px-2 tw:font-normal tw:text-sm tw:whitespace-nowrap',
   isVertical.value ? 'tw:rounded-lg' : 'tw:rounded-t-md',
   'tw:outline-none tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150',
   'tw:select-none',
