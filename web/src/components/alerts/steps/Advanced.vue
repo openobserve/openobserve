@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               clearable
               :placeholder="t('alerts.advanced.selectTemplate')"
               class="tw:min-w-[240px] tw:max-w-[300px]"
+              data-test="advanced-template-override-select"
               @update:model-value="emitTemplateUpdate"
             >
               <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
