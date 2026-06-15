@@ -10,7 +10,7 @@
       "name": "DeepSeek",
       "options": {
         "baseURL": "https://api.deepseek.com",
-        "apiKey": "{env:DEEPSEEK_API_KEY}"
+        "apiKey": "{env:DEEPSEEK_API_KEY_E2E}"
       },
       "models": {
         "deepseek-v4-pro": {
