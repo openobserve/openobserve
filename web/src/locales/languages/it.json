@@ -2835,7 +2835,26 @@
     "usageStreamEnabledLabel": "Abilita flusso di utilizzo",
     "aiToolsets": "Set di strumenti AI",
     "llmModelPricing": "Prezzi del modello LLM",
-    "ingestionTokens": "Token di ingestione"
+    "ingestionTokens": "Token di ingestione",
+    "genAiAgentMapping": {
+      "tabLabel": "Mappatura degli agenti GenAI",
+      "title": "Mappatura degli agenti GenAI",
+      "description": "Configura gli attributi di telemetria di riserva utilizzati per normalizzare l'identità dell'agente per le tracce e le valutazioni LLM.",
+      "howItWorksTitle": "Come funziona la mappatura",
+      "howItWorksDescription": "OpenObserve conserva innanzitutto gli attributi gen_ai.agent.name e gen_ai.agent.id standard. Questi elenchi vengono controllati solo quando gli attributi standard sono mancanti o vuoti. Aggiungi un attributo di telemetria in entrata per riga.",
+      "agentNameFields": "Campi di riserva del nome dell'agente",
+      "agentNameHelp": "Attributi in entrata da utilizzare come fallback per gen_ai.agent.name.",
+      "agentIdFields": "Campi di riserva dell'ID agente",
+      "agentIdHelp": "Attributi in entrata da utilizzare come fallback per gen_ai.agent.id.",
+      "fieldsPlaceholder": "nome.agente\nllm.agent.name",
+      "applyDefaults": "Applica i valori predefiniti",
+      "resetToEmpty": "Reimposta a vuoto",
+      "defaultsSource": "I valori predefiniti vengono caricati da openobserve/sdr_patterns e possono essere modificati prima del salvataggio per questa organizzazione.",
+      "saved": "Mappatura degli agenti GenAI salvata con successo",
+      "loadFailed": "Impossibile caricare la mappatura dell'agente GenAI",
+      "saveFailed": "Impossibile salvare la mappatura dell'agente GenAI",
+      "defaultsLoadFailed": "Impossibile caricare le impostazioni predefinite di mappatura dell'agente GenAI"
+    }
   },
   "iam": {
     "users": "Utenti",

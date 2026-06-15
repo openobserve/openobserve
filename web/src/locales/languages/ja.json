@@ -2845,7 +2845,26 @@
     "usageStreamEnabledLabel": "使用ストリームを有効にする",
     "aiToolsets": "AI ツールセット",
     "llmModelPricing": "LLM モデルの価格設定",
-    "ingestionTokens": "インジェストトークン"
+    "ingestionTokens": "インジェストトークン",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI エージェントマッピング",
+      "title": "GenAI エージェントマッピング",
+      "description": "LLM トレースと評価のエージェント ID を正規化するために使用されるフォールバックテレメトリ属性を設定します。",
+      "howItWorksTitle": "マッピングの仕組み",
+      "howItWorksDescription": "OpenObserveはまず標準の gen_ai.agent.name 属性と gen_ai.agent.id 属性を保存します。これらのリストは、標準属性が存在しないか空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
+      "agentNameFields": "エージェント名フォールバックフィールド",
+      "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信アトリビュート。",
+      "agentIdFields": "エージェント ID フォールバックフィールド",
+      "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信アトリビュート。",
+      "fieldsPlaceholder": "エージェント名\nllm.agent.name",
+      "applyDefaults": "デフォルトを適用",
+      "resetToEmpty": "空にリセット",
+      "defaultsSource": "デフォルトは openobserve/sdr_patterns から読み込まれ、この組織に保存する前に変更できます。",
+      "saved": "GenAI エージェントマッピングが正常に保存されました",
+      "loadFailed": "GenAI エージェントマッピングを読み込めませんでした",
+      "saveFailed": "GenAI エージェントマッピングを保存できませんでした",
+      "defaultsLoadFailed": "GenAI エージェントマッピングのデフォルトをロードできませんでした"
+    }
   },
   "iam": {
     "users": "ユーザー",

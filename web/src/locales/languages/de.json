@@ -2824,7 +2824,26 @@
     "usageStreamEnabledLabel": "Nutzungsstream aktivieren",
     "aiToolsets": "KI-Toolsets",
     "llmModelPricing": "LLM-Modellpreisgestaltung",
-    "ingestionTokens": "Tokens für die Aufnahme"
+    "ingestionTokens": "Tokens für die Aufnahme",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Agentenzuordnung",
+      "title": "GenAI Agentenzuordnung",
+      "description": "Konfigurieren Sie Fallback-Telemetrieattribute, die zur Normalisierung der Agentenidentität für LLM-Traces und -Auswertungen verwendet werden.",
+      "howItWorksTitle": "So funktioniert Mapping",
+      "howItWorksDescription": "OpenObserve behält zunächst die Standardattribute gen_ai.agent.name und gen_ai.agent.id bei. Diese Listen werden nur überprüft, wenn die Standardattribute fehlen oder leer sind. Fügen Sie ein eingehendes Telemetrieattribut pro Zeile hinzu.",
+      "agentNameFields": "Fallback-Felder für Agentennamen",
+      "agentNameHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.name verwendet werden sollen.",
+      "agentIdFields": "Fallback-Felder für Agenten-IDs",
+      "agentIdHelp": "Eingehende Attribute, die als Fallbacks für gen_ai.agent.id verwendet werden sollen.",
+      "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "applyDefaults": "Standardwerte anwenden",
+      "resetToEmpty": "Auf leer zurücksetzen",
+      "defaultsSource": "Die Standardwerte werden aus openobserve/sdr_patterns geladen und können vor dem Speichern für diese Organisation geändert werden.",
+      "saved": "Das GenAI-Agent-Mapping wurde erfolgreich gespeichert",
+      "loadFailed": "GenAI Agent-Mapping konnte nicht geladen werden",
+      "saveFailed": "Die GenAI-Agentenzuordnung konnte nicht gespeichert werden",
+      "defaultsLoadFailed": "Die Standardeinstellungen für die GenAI-Agentenzuordnung konnten nicht geladen werden"
+    }
   },
   "iam": {
     "users": "Nutzer",
