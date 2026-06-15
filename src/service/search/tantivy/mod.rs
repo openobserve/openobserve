@@ -19,7 +19,7 @@ pub mod search;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
 
-use arrow::{array::builder::BooleanBufferBuilder, buffer::BooleanBuffer};
+use arrow::array::builder::BooleanBufferBuilder;
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -274,14 +274,13 @@ pub async fn tantivy_search(
                             row_ids,
                             row_group_size,
                         } => {
-                            if row_ids.is_empty() {
-                                // if no rows matched then we remove the file from the list
-                                file_list_map.remove(&file_name);
-                            } else {
-                                tantivy_result_builder.add_row_nums(row_ids.len() as u64);
-                                let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_selection(FileSelection::Rows(row_ids), row_group_size);
-                            }
+                            let matched = row_ids.count_set_bits() as u64;
+                            tantivy_result_builder.add_row_nums(matched);
+                            let file = file_list_map.get_mut(&file_name).unwrap();
+                            file.with_selection(FileSelection::Rows(row_ids), row_group_size);
+                        }
+                        TantivyResult::NoMatch => {
+                            file_list_map.remove(&file_name);
                         }
                         TantivyResult::Count(count) => {
                             tantivy_result_builder.add_row_nums(count as u64);
@@ -594,18 +593,9 @@ async fn search_tantivy_index(
         }
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
-        TantivyResult::RowIds(mut row_ids) => {
+        TantivyResult::RowIds(row_ids) => {
             if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((
-                    key,
-                    TantivyResult::RowIdsSelection {
-                        row_ids: Arc::new(BooleanBuffer::new_unset(
-                            parquet_file.meta.records.max(0) as usize,
-                        )),
-                        row_group_size,
-                    },
-                    false,
-                ));
+                return Ok((key, TantivyResult::NoMatch, false));
             }
             // return early if the number of matched docs is too large
             let skip_threshold = cfg.limit.inverted_index_skip_threshold;
@@ -625,11 +615,7 @@ async fn search_tantivy_index(
                 ));
             }
             percent = row_ids_percent;
-            // the doc-id collector emits ids in ascending order already, but
-            // the TopDocs-based SimpleSelect path returns them in score order
-            row_ids.sort_unstable();
-            row_ids.dedup();
-            let max_doc_id = *row_ids.last().unwrap() as i64;
+            let max_doc_id = row_ids.iter().copied().max().unwrap() as i64;
             if max_doc_id >= parquet_file.meta.records {
                 return Err(anyhow::anyhow!(
                     "doc_id {max_doc_id} is out of range, records {}",
@@ -647,7 +633,9 @@ async fn search_tantivy_index(
                 row_group_size,
             }
         }
-        TantivyResult::RowIdsSelection { .. } | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIdsSelection { .. }
+        | TantivyResult::NoMatch
+        | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
@@ -692,7 +680,7 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
         }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
-        TantivyResult::RowIds(_) | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIds(_) | TantivyResult::NoMatch | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
@@ -716,6 +704,7 @@ fn generate_cache_key(
 
 #[cfg(test)]
 mod tests {
+    use arrow::buffer::BooleanBuffer;
     use config::{TIMESTAMP_COL_NAME, meta::stream::FileMeta};
 
     use super::*;
