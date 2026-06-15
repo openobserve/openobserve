@@ -24,12 +24,10 @@ name: E2E Council (Test Generation)
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
 # `/e2e` comments take effect. The first run is dry-run, which only posts a comment.
 #
-# VERIFY AT FIRST RUN (intentionally deferred per the handoff doc):
-#   - OpenCode install command + version (`npm install -g opencode-ai` below).
-#   - Whether `--agent e2e-ci-*` resolves agents nested in
-#     .opencode/agents/e2e_ci_council_of_agents/ (if discovery doesn't recurse, flatten the
-#     files or register them in opencode.jsonc).
-#   - DeepSeek model id `deepseek/deepseek-v4-pro`.
+# VERIFIED LIVE (triage dry-runs, 2026-06-15): OpenCode installs (pinned opencode-ai@1.17.7),
+# DeepSeek model `deepseek/deepseek-v4-pro` works, and `--agent e2e-ci-*` resolves via the
+# `agent` block in opencode.jsonc (nested-folder auto-discovery does NOT work — registration does).
+# STILL UNVERIFIED: Jobs 2-4 end-to-end (generate/heal/PR-back) — only run with dry_run=false.
 
 on:
   workflow_dispatch:
@@ -61,6 +59,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Model every agent runs on (provider `deepseek` configured in opencode.jsonc, keyed by the
+  # DEEPSEEK_API_KEY_E2E secret). Passed as --model to each `opencode run`.
   PIPELINE_MODEL: deepseek/deepseek-v4-pro
   MAX_DIFF_BYTES: "500000" # cap diff fed to the LLM so we don't blow the context window
 
@@ -92,6 +92,7 @@ jobs:
       author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
       author: ${{ steps.prinfo.outputs.author }}
       head_ref: ${{ steps.prinfo.outputs.head_ref }}
+      head_sha: ${{ steps.prinfo.outputs.head_sha }}
     steps:
       - name: Check required secret
         env:
@@ -140,6 +141,7 @@ jobs:
             core.setOutput('author', author);
             core.setOutput('author_allowed', allowed ? 'true' : 'false');
             core.setOutput('head_ref', data.head ? data.head.ref : '');
+            core.setOutput('head_sha', data.head ? data.head.sha : '');  // immutable — pinned by generate to avoid TOCTOU
             core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
 
       - name: Determine dry-run mode
@@ -187,7 +189,7 @@ jobs:
         # branch (which provides the agent files). We NEVER check out the PR head; the PR change
         # is analyzed as a diff (inert data) fetched via the API below, and its code is never run.
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: actions/setup-node@v4
         if: steps.prinfo.outputs.author_allowed == 'true'
@@ -197,7 +199,7 @@ jobs:
       - name: Install OpenCode
         if: steps.prinfo.outputs.author_allowed == 'true'
         run: |
-          npm install -g opencode-ai || { echo "::error::OpenCode install failed (verify package name/version)"; exit 1; }
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed (verify package name/version)"; exit 1; }
           command -v opencode >/dev/null || { echo "::error::opencode not on PATH after install"; exit 1; }
           opencode --version || true
 
@@ -260,10 +262,13 @@ jobs:
           echo "needs_e2e=$(jq -r '.needs_e2e' "$f")" >> "$GITHUB_OUTPUT"
 
       - name: Upload run context
+        # Contains run-context.json / triage.json / diff.patch (handed to Job 2). Expire quickly —
+        # the diff is from a public PR but there's no reason to retain it.
         if: steps.prinfo.outputs.author_allowed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: triage-context
+          retention-days: 2
           path: docs/test_generator/ci/
 
       - name: Post or update triage comment
@@ -333,8 +338,13 @@ jobs:
       - name: Checkout PR head (feature source needed to generate accurate tests)
         uses: actions/checkout@v4
         with:
-          ref: refs/pull/${{ needs.triage.outputs.pr_number }}/head
-          fetch-depth: 0
+          # Pin to the IMMUTABLE head SHA captured at triage time (not the mutable refs/pull/N/head)
+          # to close the TOCTOU window, and do NOT persist the token in the workspace while we run
+          # on PR-authored code. (This job runs only via workflow_dispatch — dry_run=false is
+          # dispatch-only — and only for allowlisted PR authors; it never runs from issue_comment.)
+          ref: ${{ needs.triage.outputs.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Restore pipeline files from trusted main (anti-hijack)
         # Even though the author is trusted, run the pipeline's OWN definition from main — not
@@ -356,7 +366,7 @@ jobs:
 
       - name: Install OpenCode
         run: |
-          npm install -g opencode-ai || { echo "::error::OpenCode install failed"; exit 1; }
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
           command -v opencode >/dev/null || { echo "::error::opencode not on PATH"; exit 1; }
           opencode --version || true
 
@@ -372,13 +382,19 @@ jobs:
           run e2e-ci-sentinel  "Run your spec. Audit the generated spec/page objects; write docs/test_generator/ci/sentinel-verdict.json (and the audit report)."
 
       - name: Enforce Sentinel verdict (block on critical)
+        # Verdict schema (written by e2e-ci-sentinel): { "verdict": "PASS"|"FAIL",
+        # "critical_count": <int>, "warning_count": <int>, "auto_fixed": <int> }.
+        # Fail CLOSED: missing file, malformed JSON, or anything other than an explicit PASS with
+        # zero criticals blocks the pipeline (a malformed/LLM-mangled verdict must NOT pass).
         run: |
           v=docs/test_generator/ci/sentinel-verdict.json
           [ -f "$v" ] || { echo "::error::Sentinel produced no verdict"; exit 1; }
-          verdict=$(jq -r '.verdict // "FAIL"' "$v"); crit=$(jq -r '.critical_count // 0' "$v")
+          jq empty "$v" 2>/dev/null || { echo "::error::Sentinel verdict is not valid JSON — blocking."; exit 1; }
+          verdict=$(jq -r 'if .verdict == "PASS" then "PASS" else "FAIL" end' "$v")
+          crit=$(jq -r 'if (.critical_count|type) == "number" then .critical_count else 1 end' "$v")
           echo "Sentinel verdict=$verdict critical=$crit"
-          if [ "$verdict" = "FAIL" ] || [ "$crit" -gt 0 ]; then
-            echo "::error::Sentinel blocked generation (critical issues). See audit report."; exit 1
+          if [ "$verdict" != "PASS" ] || [ "$crit" -gt 0 ]; then
+            echo "::error::Sentinel blocked generation (not a clean PASS). See audit report."; exit 1
           fi
 
       - name: Package generated test changes
@@ -390,10 +406,19 @@ jobs:
           echo "generated patch bytes: $(wc -c < docs/test_generator/ci/generated-tests.patch)"
 
       - name: Upload generated output
+        # Job 4 consumes ci/ (run-context, playwright-registration, generated-tests.patch); the
+        # report dirs ride along for the PR body. Scope to these — not the whole docs/test_generator
+        # (which also holds unrelated pre-existing docs) — and expire quickly.
         uses: actions/upload-artifact@v4
         with:
           name: generated-tests
-          path: docs/test_generator/
+          retention-days: 2
+          path: |
+            docs/test_generator/ci/
+            docs/test_generator/features/
+            docs/test_generator/test-plans/
+            docs/test_generator/generation-reports/
+            docs/test_generator/audit-reports/
 
   # ---------------------------------------------------------------------------
   # JOB 3 — Verify / Heal. Build + boot OSS local binary; Healer + Sentinel re-audit.
