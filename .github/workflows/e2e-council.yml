@@ -476,14 +476,26 @@ jobs:
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
           echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it; it also registers playwright.yml)."
 
-      - name: Upload run metadata (for Job 3/4 + debugging)
+      - name: Upload run metadata (consumed by Job 3/4)
+        # SINGLE path on purpose: with one path, the artifact root = the contents of ci/, so
+        # downloads to docs/test_generator/ci/ (verify_heal) and meta/ (pr_back) land the files
+        # exactly where those jobs read them. (Multiple paths re-root the archive at the common
+        # parent and break those download paths.)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-meta
           retention-days: 2
+          path: docs/test_generator/ci/
+
+      - name: Upload generation reports (debug only — not consumed by jobs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-reports
+          retention-days: 2
+          if-no-files-found: ignore
           path: |
-            docs/test_generator/ci/
             docs/test_generator/audit-reports/
             docs/test_generator/features/
             docs/test_generator/test-plans/
