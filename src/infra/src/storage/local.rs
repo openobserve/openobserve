@@ -15,9 +15,12 @@
 
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
-use std::{ops::Range, path::PathBuf};
+#[cfg(unix)]
+use std::ops::Range;
+use std::path::PathBuf;
 
 use async_trait::async_trait;
+#[cfg(unix)]
 use bytes::Bytes;
 use config::metrics;
 use futures::{StreamExt, stream::BoxStream};
@@ -31,6 +34,7 @@ use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    #[cfg_attr(not(unix), expect(dead_code))]
     root_dir: PathBuf,
     with_prefix: bool,
 }
@@ -51,6 +55,7 @@ impl Local {
     /// Resolve an object-store Path to a filesystem path.
     /// For local storage format_key is a no-op, so the file lives at
     /// `root_dir / key`.
+    #[cfg_attr(not(unix), expect(dead_code))]
     #[inline]
     fn full_path(&self, location: &Path) -> PathBuf {
         self.root_dir

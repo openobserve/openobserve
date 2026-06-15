@@ -530,7 +530,7 @@ pub async fn get_latest_traces(
         let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
         let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap());
         let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap());
-        let trace_duration = json::get_int_value(item.get("zo_sql_duration").unwrap());
+        let _trace_duration = json::get_int_value(item.get("zo_sql_duration").unwrap());
         // trace time is nanosecond, need to compare with microsecond
         if trace_start_time / 1000 < start_time {
             start_time = trace_start_time / 1000;
