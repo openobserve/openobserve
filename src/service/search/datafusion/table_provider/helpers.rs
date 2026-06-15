@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 
 use arrow::buffer::BooleanBuffer;
 use arrow_schema::{DataType, SchemaRef};
@@ -22,7 +22,7 @@ use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
     logical_expr::Operator,
-    parquet::arrow::arrow_reader::{RowSelection, RowSelector},
+    parquet::arrow::arrow_reader::RowSelection,
     physical_expr::conjunction,
     physical_plan::{
         ExecutionPlan, PhysicalExpr,
@@ -88,62 +88,91 @@ fn generate_parquet_access_plan(
     let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
     let row_group_count = num_rows.div_ceil(row_group_size);
 
-    if row_ids.len() > num_rows {
-        log::warn!(
-            "file path: file={:?}, selection bitmap len {} exceeds num_rows {num_rows}, skip access plan",
-            file.path().as_ref(),
-            row_ids.len(),
-        );
-        return None;
-    }
-
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    for row_group_id in 0..row_group_count {
-        let rg_start = row_group_id * row_group_size;
-        let rg_end = (rg_start + row_group_size).min(num_rows);
+    let mut row_group_selection =
+        RowGroupSelectionBuilder::new(&mut access_plan, row_group_size, num_rows);
 
-        let mut selection = Vec::new();
-        let mut current_count = 0;
-        let mut current_select = false;
-
-        for row_id in rg_start..rg_end {
-            // rows past the bitmap length are treated as unmatched
-            let val = row_id < row_ids.len() && row_ids.value(row_id);
-            if val == current_select {
-                current_count += 1;
-            } else {
-                if current_count > 0 {
-                    if current_select {
-                        selection.push(RowSelector::select(current_count));
-                    } else {
-                        selection.push(RowSelector::skip(current_count));
-                    }
-                }
-                current_select = val;
-                current_count = 1;
-            }
+    for (start, end) in row_ids.set_slices() {
+        if end > num_rows {
+            return None;
         }
 
-        // handle the last batch
-        if current_count > 0 {
-            if current_select {
-                selection.push(RowSelector::select(current_count));
-            } else {
-                selection.push(RowSelector::skip(current_count));
-            }
-        }
-
-        if selection.iter().any(|s| !s.skip) {
-            access_plan.scan(row_group_id);
-            access_plan.scan_selection(row_group_id, RowSelection::from(selection));
-        }
+        row_group_selection.push_selected_range(start, end);
     }
+    row_group_selection.finish();
 
     log::debug!(
         "file path: file={:?}, row_group_count={row_group_count}, access_plan={access_plan:?}",
         file.path().as_ref()
     );
     Some(Arc::new(access_plan))
+}
+
+struct RowGroupSelectionBuilder<'a> {
+    access_plan: &'a mut ParquetAccessPlan,
+    row_group_size: usize,
+    num_rows: usize,
+    current_row_group: Option<usize>,
+    current_ranges: Vec<Range<usize>>,
+}
+
+impl<'a> RowGroupSelectionBuilder<'a> {
+    fn new(access_plan: &'a mut ParquetAccessPlan, row_group_size: usize, num_rows: usize) -> Self {
+        Self {
+            access_plan,
+            row_group_size,
+            num_rows,
+            current_row_group: None,
+            current_ranges: Vec::new(),
+        }
+    }
+
+    fn push_selected_range(&mut self, mut start: usize, end: usize) {
+        while start < end {
+            let row_group_id = start / self.row_group_size;
+            let row_group_start = row_group_id * self.row_group_size;
+            let row_group_end = (row_group_start + self.row_group_size).min(self.num_rows);
+            let selected_end = end.min(row_group_end);
+
+            self.start_row_group(row_group_id);
+            self.current_ranges
+                .push((start - row_group_start)..(selected_end - row_group_start));
+            start = selected_end;
+        }
+    }
+
+    fn finish(mut self) {
+        self.flush();
+    }
+
+    fn start_row_group(&mut self, row_group_id: usize) {
+        if self.current_row_group == Some(row_group_id) {
+            return;
+        }
+
+        self.flush();
+        self.current_row_group = Some(row_group_id);
+    }
+
+    fn flush(&mut self) {
+        let Some(row_group_id) = self.current_row_group else {
+            return;
+        };
+
+        let row_group_start = row_group_id * self.row_group_size;
+        let row_group_len =
+            (row_group_start + self.row_group_size).min(self.num_rows) - row_group_start;
+
+        self.access_plan.scan(row_group_id);
+        self.access_plan.scan_selection(
+            row_group_id,
+            RowSelection::from_consecutive_ranges(
+                std::mem::take(&mut self.current_ranges).into_iter(),
+                row_group_len,
+            ),
+        );
+        self.current_row_group = None;
+    }
 }
 
 /// Exact row count of the file and the row group size.
@@ -243,7 +272,7 @@ pub fn apply_combined_filter(
 #[cfg(test)]
 mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
-    use datafusion::common::Statistics;
+    use datafusion::{common::Statistics, parquet::arrow::arrow_reader::RowSelector};
 
     use super::*;
 
@@ -301,6 +330,27 @@ mod tests {
         let mut expected = ParquetAccessPlan::new_none(3);
         expected.scan(1);
         expected.scan_selection(1, RowSelection::from(vec![RowSelector::select(4)]));
+        assert_eq!(downcast_plan(&plan), &expected);
+    }
+
+    #[test]
+    fn test_generate_parquet_access_plan_keeps_disjoint_ranges_in_same_row_group() {
+        let file = make_partitioned_file(8);
+        let row_ids = BooleanBuffer::from_iter((0..8u32).map(|i| [0u32, 2].contains(&i)));
+
+        let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
+
+        let mut expected = ParquetAccessPlan::new_none(2);
+        expected.scan(0);
+        expected.scan_selection(
+            0,
+            RowSelection::from(vec![
+                RowSelector::select(1),
+                RowSelector::skip(1),
+                RowSelector::select(1),
+                RowSelector::skip(1),
+            ]),
+        );
         assert_eq!(downcast_plan(&plan), &expected);
     }
 
