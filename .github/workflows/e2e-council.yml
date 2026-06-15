@@ -5,6 +5,13 @@ name: E2E Council (Test Generation)
 #
 # REQUIRED SECRET: DEEPSEEK_API_KEY_E2E (repo Settings → Secrets and variables → Actions).
 #
+# WHAT IT TRIAGES (it needs a diff — there is nothing to do without one):
+#   - `/e2e` comment on a PR  → that PR's diff.
+#   - Manual run with `pr_number` → that PR's diff (recommended for on-demand triage).
+#   - Manual run with `oss_branch` (a feature branch ahead of main) → that branch's diff vs main.
+#   - Manual run with neither / oss_branch=main → EMPTY diff → the run fails fast with a clear
+#     message. (Running from main triages main-against-itself = nothing.)
+#
 # IMPORTANT: both triggers read this workflow's definition from the DEFAULT BRANCH (main).
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
 # `/e2e` comments take effect. The first run is dry-run, which only posts a comment.
@@ -19,10 +26,14 @@ name: E2E Council (Test Generation)
 on:
   workflow_dispatch:
     inputs:
+      pr_number:
+        description: "PR number to triage (recommended). Overrides oss_branch when set."
+        required: false
+        default: ""
       oss_branch:
-        description: "OSS branch to analyze for new E2E tests"
-        required: true
-        default: "main"
+        description: "OR a feature branch AHEAD of main to triage (ignored if pr_number is set). Do NOT use 'main' — it diffs against itself and triages nothing."
+        required: false
+        default: ""
       feature_hint:
         description: "Optional feature name/area hint for triage"
         required: false
@@ -88,7 +99,10 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            const pr = context.eventName === 'issue_comment' ? context.payload.issue.number : '';
+            // issue_comment → the commented PR; workflow_dispatch → the optional pr_number input.
+            const pr = context.eventName === 'issue_comment'
+              ? context.payload.issue.number
+              : (context.payload.inputs.pr_number || '');
             core.setOutput('pr_number', pr);
 
       - name: Determine dry-run mode
@@ -131,13 +145,24 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           mkdir -p docs/test_generator/ci
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+          if [ -n "$PR_NUMBER" ]; then
+            # A PR was given (comment trigger, or pr_number on manual dispatch).
             # Read the PR's diff via API — do NOT check out its code.
+            echo "Triaging PR #$PR_NUMBER"
             gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
-          else
-            # workflow_dispatch: diff the chosen branch against main (fetch only; no checkout/run).
+          elif [ -n "$OSS_BRANCH" ] && [ "$OSS_BRANCH" != "main" ]; then
+            # Manual dispatch against a feature branch: diff it vs main (fetch only; no checkout/run).
+            echo "Triaging branch '$OSS_BRANCH' vs main"
             git fetch origin "$OSS_BRANCH" --depth=50 || true
             git diff "origin/main...origin/$OSS_BRANCH" > docs/test_generator/ci/diff.patch 2>/dev/null || true
+          else
+            : > docs/test_generator/ci/diff.patch
+          fi
+          # Guard: nothing to triage. Fail fast with a clear, actionable message rather than
+          # running the model on an empty diff (e.g. someone dispatched with oss_branch=main).
+          if [ ! -s docs/test_generator/ci/diff.patch ]; then
+            echo "::error::Nothing to triage — empty diff. Provide a 'pr_number', or an 'oss_branch' that has commits ahead of main (not 'main' itself), or comment /e2e on a PR."
+            exit 1
           fi
           # Cap the diff so it can't exceed the model context window.
           if [ "$(wc -c < docs/test_generator/ci/diff.patch)" -gt "$MAX_DIFF_BYTES" ]; then
