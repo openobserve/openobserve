@@ -102,12 +102,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Correlation and View sections (dialog mode) -->
       <div
         v-if="contextChips.length > 0 || subjectChips.length > 0"
+        ref="dimensionsContainerRef"
         class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:py-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
       >
-        <!-- Correlation By section -->
-        <div v-if="contextChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
-          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">Correlated By</h4>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+        <!-- Context chips section - max width but only takes space it needs -->
+        <div
+          v-if="contextChips.length > 0"
+          class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-12.5rem)]"
+        >
+          <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70 tw:shrink-0">Correlated By</h4>
+          <div
+            class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden"
+          >
             <OBadge
               v-for="chip in visibleContextChips"
               :key="chip.key"
@@ -124,18 +130,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
               </template>
             </OBadge>
-            <div
-              v-if="hiddenContextChipCount > 0"
-              class="dim-chip-more"
-              @click="chipOverflowExpanded = !chipOverflowExpanded"
-            >
-              {{ chipOverflowExpanded ? "show less" : `+${hiddenContextChipCount} more` }}
-            </div>
+
+            <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
+            <span v-if="hiddenContextChipCount > 0" class="tw:contents">
+              <OBadge
+                variant="secondary"
+                size="sm"
+                class="tw:cursor-default"
+                :data-test="`correlation-dashboard-context-overflow-${hiddenContextChipCount}`"
+              >
+                +{{ hiddenContextChipCount }}
+              </OBadge>
+              <OTooltip
+                :content="hiddenContextChipsTooltip"
+                side="top"
+                :disabled="hiddenContextChipCount === 0"
+              />
+            </span>
           </div>
         </div>
 
-        <!-- View By section -->
-        <div v-if="subjectChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
+        <!-- Subject chips section - positioned right after context chips -->
+        <div
+          v-if="subjectChips.length > 0"
+          class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
+        >
           <h4 class="tw:text-sm tw:font-semibold tw:m-0 tw:opacity-70">View By</h4>
           <OToggleGroup v-model="activeSubject" type="single" size="sm">
             <OToggleGroupItem
@@ -640,27 +659,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="severityClass(sourceEvent.severity)"
         class="tw:px-2"
       >{{ sourceEvent.severity }}</OBadge>
-      <span class="tw:text-xs tw:font-mono tw:opacity-80">
+      <div class="tw:text-xs tw:font-mono tw:text-typography-meta">
         {{ formatEventTimestamp(sourceEvent.timestamp) }}
-      </span>
-      <span
+      </div>
+      <OSeparator vertical class="tw:mx-0" />
+      <div
         v-if="sourceEvent.message"
         class="tw:text-xs tw:flex-1 tw:font-mono tw:opacity-90 source-event-message"
         :title="sourceEvent.message"
       >
         {{ sourceEvent.message }}
-      </span>
+    </div>
     </div>
 
     <!-- Correlation and View sections (embedded mode) -->
     <div
       v-if="contextChips.length > 0 || subjectChips.length > 0"
+      ref="dimensionsContainerRef"
       class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:py-1 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <!-- Correlation By section -->
-      <div v-if="contextChips.length > 0" class="tw:flex tw:items-center tw:gap-3 tw:flex-1">
-        <span class="tw:text-2! tw:m-0 tw:opacity-70">Correlated by:</span>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+      <!-- Context chips section - max width but only takes space it needs -->
+      <div
+        v-if="contextChips.length > 0"
+        class="tw:flex tw:items-center tw:gap-3 tw:max-w-[calc(100%-15.625rem)]"
+      >
+        <span class="tw:text-2! tw:m-0 tw:opacity-70 tw:shrink-0">Correlated by:</span>
+        <div
+          class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden"
+        >
           <OBadge
             v-for="chip in visibleContextChips"
             :key="chip.key"
@@ -677,18 +703,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="`No metric streams found for this ${chip.label.toLowerCase()}`" side="top" />
             </template>
           </OBadge>
-          <div
-            v-if="hiddenContextChipCount > 0"
-            class="dim-chip-more"
-            @click="chipOverflowExpanded = !chipOverflowExpanded"
-          >
-            {{ chipOverflowExpanded ? "show less" : `+${hiddenContextChipCount} more` }}
-          </div>
+
+          <!-- Non-expandable overflow indicator with tooltip (badge-like styling) -->
+          <span v-if="hiddenContextChipCount > 0" class="tw:contents">
+            <OBadge
+              variant="secondary"
+              size="md"
+              class="tw:cursor-default"
+              :data-test="`correlation-dashboard-context-overflow-${hiddenContextChipCount}`"
+            >
+              +{{ hiddenContextChipCount }}
+            </OBadge>
+            <OTooltip
+              :content="hiddenContextChipsTooltip"
+              side="top"
+              :disabled="hiddenContextChipCount === 0"
+            />
+          </span>
         </div>
       </div>
 
-      <!-- View By section -->
-      <div v-if="subjectChips.length > 0" class="tw:flex tw:items-center tw:gap-3">
+      <!-- Subject chips section - positioned right after context chips -->
+      <div
+        v-if="subjectChips.length > 0"
+        class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
+      >
         <OSeparator vertical class="tw:my-2" />
         <span class="tw:text-2! tw:m-0 tw:opacity-70">View by:</span>
         <OToggleGroup v-model="activeSubject" type="single" size="xs">
@@ -1259,6 +1298,8 @@ import {
   defineAsyncComponent,
   provide,
   nextTick,
+  onBeforeMount,
+  onBeforeUnmount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -1946,16 +1987,26 @@ watch(
   { immediate: true },
 );
 
-const CHIP_OVERFLOW_THRESHOLD = 4;
-const chipOverflowExpanded = ref(false);
+// Dimensions container width tracking
+const dimensionsContainerRef = ref<HTMLElement>();
+const dimensionsContainerWidth = ref(0);
+
+// Dynamic chip calculation constants
+const CHIP_GAP = 8; // tw:gap-2 = 0.5rem = 8px
+const OVERFLOW_INDICATOR_WIDTH = 40; // Estimated "+N" indicator width (smaller since non-clickable)
+
+// Chip width estimation function
+function estimateChipWidth(chip: any, badgeSize: 'sm' | 'md' = 'sm'): number {
+  const text = `${chip.label} = ${chip.value}`;
+  const baseCharWidth = badgeSize === 'sm' ? 6.5 : 7.5;
+  const labelWidth = Math.min(Math.ceil(text.length * baseCharWidth), 200);
+  const paddingAndDot = badgeSize === 'sm' ? 24 : 28; // padding + dot space
+  return labelWidth + paddingAndDot;
+}
 
 const tabFilteredChips = computed(() => unifiedChips.value);
-const visibleChips = computed(() =>
-  chipOverflowExpanded.value ? tabFilteredChips.value : tabFilteredChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
-);
-const hiddenChipCount = computed(() =>
-  Math.max(0, tabFilteredChips.value.length - CHIP_OVERFLOW_THRESHOLD),
-);
+const visibleChips = computed(() => tabFilteredChips.value);
+const hiddenChipCount = computed(() => 0);
 
 // Split chips by type for new UI structure
 const contextChips = computed(() =>
@@ -1964,12 +2015,71 @@ const contextChips = computed(() =>
 const subjectChips = computed(() =>
   unifiedChips.value.filter(chip => chip.kind === "subject")
 );
-const visibleContextChips = computed(() =>
-  chipOverflowExpanded.value ? contextChips.value : contextChips.value.slice(0, CHIP_OVERFLOW_THRESHOLD),
+
+// Dynamic visible context chips calculation (no expansion, just truncation)
+const visibleContextChips = computed(() => {
+  if (contextChips.value.length === 0) return [];
+
+  // Calculate available space for context chips within the dimensions container
+  const fullContainerWidth = dimensionsContainerWidth.value;
+  const reservedForSubjects = 200; // 15.625rem = 250px, 12.5rem = 200px
+  const labelWidth = 120; // "Correlated by:" vs "Correlated By"
+  const paddingAndGaps = 32; // Container padding and gaps
+
+  const availableWidth = Math.max(150, fullContainerWidth - reservedForSubjects - labelWidth - paddingAndGaps);
+  const badgeSize = 'sm';
+
+  let usedWidth = 0;
+  let visibleCount = 0;
+
+  for (let i = 0; i < contextChips.value.length; i++) {
+    const chipWidth = estimateChipWidth(contextChips.value[i], badgeSize);
+    const remaining = contextChips.value.length - i - 1;
+    const overflowSpace = remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
+    const neededWidth = chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
+
+    if (usedWidth + neededWidth > availableWidth && visibleCount > 0) break;
+
+    usedWidth += chipWidth + (i > 0 ? CHIP_GAP : 0);
+    visibleCount++;
+  }
+
+  // Always show at least 1 chip for UX
+  return contextChips.value.slice(0, Math.max(1, visibleCount));
+});
+
+const hiddenContextChips = computed(() =>
+  contextChips.value.slice(visibleContextChips.value.length)
 );
-const hiddenContextChipCount = computed(() =>
-  Math.max(0, contextChips.value.length - CHIP_OVERFLOW_THRESHOLD),
-);
+const hiddenContextChipCount = computed(() => hiddenContextChips.value.length);
+
+// Tooltip content for hidden chips (badge-like format for better readability)
+const hiddenContextChipsTooltip = computed(() => {
+  if (hiddenContextChipCount.value === 0) return '';
+  return hiddenContextChips.value
+    .map(chip => `${chip.label} = ${chip.value}`)
+    .join('\n'); // Line breaks for better readability in badge-like format
+});
+
+// Dimensions container width tracking with ResizeObserver
+watch(dimensionsContainerRef, (el, _prev, onCleanup) => {
+  if (!el) return;
+
+  const updateWidth = () => {
+    dimensionsContainerWidth.value = el.getBoundingClientRect().width;
+  };
+
+  updateWidth(); // Initial measurement
+  const ro = new ResizeObserver(updateWidth);
+  ro.observe(el);
+
+  onCleanup(() => ro.disconnect());
+}, { flush: 'post' });
+
+onBeforeUnmount(() => {
+  // Additional cleanup safety
+  dimensionsContainerWidth.value = 0;
+});
 
 // ── Source event banner ────────────────────────────────────────────────────
 const TS_NS_MIN = 1e17;
