@@ -194,6 +194,9 @@ jobs:
         # is analyzed as a diff (inert data) fetched via the API below, and its code is never run.
         with:
           fetch-depth: 1
+          # Don't leave the token in .git/config while the triage agent processes the untrusted
+          # diff (it can't then read creds off disk). Triage uses gh (GH_TOKEN env) for the diff.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         if: steps.prinfo.outputs.author_allowed == 'true'
@@ -340,6 +343,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # push the generated tests to the autoe2e/<branch> (never to main)
+      issues: write # post a failure comment on the source PR (scoped GITHUB_TOKEN)
     steps:
       - name: Checkout PR head (feature source needed to generate accurate tests)
         uses: actions/checkout@v4
@@ -468,7 +472,10 @@ jobs:
         # tell the dev on their PR with the likely cause + a link to this run — no silent failure.
         if: failure()
         env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          # GITHUB_TOKEN (NOT ORG_ADMIN_TOKEN): this job ran the AI agents on PR-influenced input,
+          # so we must not expose a powerful org-admin token here. A failure comment only needs
+          # issues:write, which the scoped GITHUB_TOKEN has.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
           GEN_OUTCOME: ${{ steps.gen.outcome }}
           VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
@@ -512,6 +519,7 @@ jobs:
     timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
     permissions:
       contents: write # push the healer's fixes to autoe2e/<branch>
+      issues: write # post a failure comment on the source PR (scoped GITHUB_TOKEN)
     outputs:
       heal_status: ${{ steps.finalrun.outputs.status }}
     env:
@@ -692,7 +700,10 @@ jobs:
         # comment URL as the final step (so the dev can go verify). No PR is opened in this case.
         if: always() && steps.finalrun.outputs.status != 'passing'
         env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          # GITHUB_TOKEN (NOT ORG_ADMIN_TOKEN): this job BUILDS + RUNS the PR's code, so an
+          # org-admin token must never be present here (a malicious build could intercept it).
+          # A failure comment only needs the scoped GITHUB_TOKEN.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SRC_PR: ${{ needs.triage.outputs.pr_number }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           BOOT_OUTCOME: ${{ steps.boot.outcome }}
