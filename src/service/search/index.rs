@@ -690,7 +690,6 @@ impl Condition {
             Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
-
 }
 
 // TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
@@ -846,7 +845,6 @@ mod tests {
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
     }
-
 
     #[test]
     fn test_condition_get_tantivy_fields_in() {

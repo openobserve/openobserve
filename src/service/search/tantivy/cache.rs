@@ -31,8 +31,6 @@ pub static GLOBAL_CACHE: Lazy<Arc<TantivyResultCache>> =
 pub enum CacheEntry {
     /// (matched_row_ids bitmap, row_group_size_from_index_file)
     RowIds(Arc<BooleanBuffer>, Option<u32>),
-    /// (coalesced_row_ranges, row_group_size_from_index_file)
-    RowRanges(Arc<Vec<(u32, u32)>>, Option<u32>),
     Count(usize),                            // simple count optimization
     Histogram(Vec<u64>),                     // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
@@ -45,10 +43,6 @@ impl From<CacheEntry> for TantivyResult {
         match entry {
             CacheEntry::RowIds(row_ids, row_group_size) => TantivyResult::RowIdsSelection {
                 row_ids,
-                row_group_size,
-            },
-            CacheEntry::RowRanges(ranges, row_group_size) => TantivyResult::RowRangesSelection {
-                ranges,
                 row_group_size,
             },
             CacheEntry::Count(count) => TantivyResult::Count(count),
@@ -67,10 +61,6 @@ impl CacheEntry {
         match self {
             CacheEntry::RowIds(packed, ..) => {
                 packed.inner().len() + std::mem::size_of::<BooleanBuffer>()
-            }
-            CacheEntry::RowRanges(ranges, ..) => {
-                ranges.capacity() * std::mem::size_of::<(u32, u32)>()
-                    + std::mem::size_of::<Vec<(u32, u32)>>()
             }
             CacheEntry::Count(_) => std::mem::size_of::<usize>(),
             CacheEntry::Histogram(histogram) => {
@@ -467,13 +457,12 @@ mod tests {
     fn test_tantivy_result_cache_row_ids_roundtrip() {
         let cache = TantivyResultCache::new(10);
 
-        let entry =
-            CacheEntry::RowIds(
-                Arc::new(BooleanBuffer::from_iter(
-                    (0..64u32).map(|i| [10u32, 20].contains(&i)),
-                )),
-                Some(1024),
-            );
+        let entry = CacheEntry::RowIds(
+            Arc::new(BooleanBuffer::from_iter(
+                (0..64u32).map(|i| [10u32, 20].contains(&i)),
+            )),
+            Some(1024),
+        );
         cache.put("row_ids_key".to_string(), entry);
 
         if let Some(TantivyResult::RowIdsSelection {

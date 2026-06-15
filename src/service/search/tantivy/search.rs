@@ -45,11 +45,6 @@ pub enum TantivyResult {
         row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
         row_group_size: Option<u32>,
     },
-    /// coalesced [start, end) row ranges, is_add_filter_back = true
-    RowRangesSelection {
-        ranges: Arc<Vec<(u32, u32)>>,
-        row_group_size: Option<u32>,
-    },
     Skipped {
         percent: usize, // skipped tantivy search, with the percentage
     },
@@ -76,10 +71,6 @@ impl TantivyResult {
             }
             Self::RowIdsSelection { row_ids, .. } => {
                 row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
-            }
-            Self::RowRangesSelection { ranges, .. } => {
-                ranges.capacity() * std::mem::size_of::<(u32, u32)>()
-                    + std::mem::size_of::<Vec<(u32, u32)>>()
             }
             Self::Skipped { .. } => std::mem::size_of::<usize>(),
             Self::Count(_) => std::mem::size_of::<usize>(),

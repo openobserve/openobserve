@@ -278,8 +278,6 @@ pub enum FileSelection {
     /// Row ids matched by the tantivy index, as a per-row bitmap of length
     /// `num_rows` (one bit per parquet row).
     Rows(Arc<BooleanBuffer>),
-    /// kept when the exact selection is too fragmented for an efficient parquet scan. 
-    Ranges(Arc<Vec<(u32, u32)>>),
     /// Row group ids selected by row-group-level sampling.
     RowGroups(Arc<Vec<u32>>),
 }

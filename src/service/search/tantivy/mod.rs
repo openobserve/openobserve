@@ -283,23 +283,6 @@ pub async fn tantivy_search(
                                 file.with_selection(FileSelection::Rows(row_ids), row_group_size);
                             }
                         }
-                        TantivyResult::RowRangesSelection {
-                            ranges,
-                            row_group_size,
-                        } => {
-                            // the coalesced ranges are a superset of the
-                            // matched rows, so the original filter must be
-                            // re-applied by datafusion. Set unconditionally:
-                            // this arm is also reached via the result cache,
-                            // which does not carry the skipped-conditions flag
-                            is_add_filter_back = true;
-                            if ranges.is_empty() {
-                                file_list_map.remove(&file_name);
-                            } else {
-                                let file = file_list_map.get_mut(&file_name).unwrap();
-                                file.with_selection(FileSelection::Ranges(ranges), row_group_size);
-                            }
-                        }
                         TantivyResult::Count(count) => {
                             tantivy_result_builder.add_row_nums(count as u64);
                             file_list_map.remove(&file_name); // maybe we do not need to remove it?
@@ -661,9 +644,7 @@ async fn search_tantivy_index(
                 row_group_size,
             }
         }
-        TantivyResult::RowIdsSelection { .. }
-        | TantivyResult::RowRangesSelection { .. }
-        | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIdsSelection { .. } | TantivyResult::Skipped { .. } => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
@@ -701,10 +682,6 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
             // a refcount bump
             CacheEntry::RowIds(row_ids, row_group_size)
         }
-        TantivyResult::RowRangesSelection {
-            ranges,
-            row_group_size,
-        } => CacheEntry::RowRanges(ranges, row_group_size),
         TantivyResult::Count(count) => CacheEntry::Count(count),
         TantivyResult::Histogram(histogram) => CacheEntry::Histogram(histogram),
         TantivyResult::MultiHistogram(multi_histogram) => {
@@ -854,7 +831,9 @@ mod tests {
     #[test]
     fn test_get_cache_entry_row_ids_selection() {
         let result = TantivyResult::RowIdsSelection {
-            row_ids: Arc::new(BooleanBuffer::from_iter((0..4u32).map(|i| [0u32, 2].contains(&i)))),
+            row_ids: Arc::new(BooleanBuffer::from_iter(
+                (0..4u32).map(|i| [0u32, 2].contains(&i)),
+            )),
             row_group_size: Some(1024),
         };
 
@@ -866,23 +845,6 @@ mod tests {
                 assert_eq!(row_group_size, Some(1024));
             }
             _ => panic!("Expected RowIds cache entry"),
-        }
-    }
-
-    #[test]
-    fn test_get_cache_entry_row_ranges_selection() {
-        let result = TantivyResult::RowRangesSelection {
-            ranges: Arc::new(vec![(0, 10), (100, 120)]),
-            row_group_size: Some(1024),
-        };
-
-        let entry = get_cache_entry(result);
-        match entry {
-            CacheEntry::RowRanges(ranges, row_group_size) => {
-                assert_eq!(*ranges, vec![(0, 10), (100, 120)]);
-                assert_eq!(row_group_size, Some(1024));
-            }
-            _ => panic!("Expected RowRanges cache entry"),
         }
     }
 
