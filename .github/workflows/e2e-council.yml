@@ -623,6 +623,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install OpenCode
+        # REQUIRED: the healer + post-heal Sentinel run via `opencode`. verify_heal is a separate
+        # job on a separate runner from generate, so it needs its own install (without this, both
+        # agents die with `opencode: command not found` and NO healing happens).
+        run: |
+          npm install -g opencode-ai@1.17.7 || { echo "::error::OpenCode install failed"; exit 1; }
+          opencode --version
+
       - name: Build OpenObserve binary + frontend
         id: build
         env:
@@ -698,6 +706,11 @@ jobs:
           fi
 
       - name: Sentinel re-audit (post-heal)
+        # ADVISORY ONLY: the authoritative final run already decided pass/fail. This re-audit is a
+        # quality annotation, so it must NEVER abort the job — continue-on-error keeps a green heal
+        # from being flipped to "failed" just because the audit (or opencode) hiccuped.
+        continue-on-error: true
+        if: steps.finalrun.outputs.status == 'passing'
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
           SPEC: ${{ steps.spec.outputs.spec }}
