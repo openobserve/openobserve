@@ -497,10 +497,9 @@ export class DashboardPage {
   // empty when Apply runs (CI flake on custom-charts.spec.js). Set the model
   // directly via Monaco's API and poll until the value sticks.
   async setCustomChartCode(code) {
-    // Set the Monaco model value directly via the API and confirm it lands.
-    // Pass trimmed code because CodeQueryEditor emits getValue().trim(), so
-    // trailing newlines in JSON files would cause Vue state to differ from raw input.
+    // CodeQueryEditor emits getValue().trim() — trim input so Vue state matches.
     const trimmedCode = code.trim();
+    // Step 1: set Monaco model and confirm the editor holds the value.
     await this.page.waitForFunction(
       (chartCode) => {
         const host = document.querySelector('[data-test="dashboard-markdown-editor-query-editor"]');
@@ -516,9 +515,18 @@ export class DashboardPage {
       trimmedCode,
       { timeout: 10000 }
     );
-    // Wait past CodeQueryEditor's 500ms debounce so Vue state is updated before
-    // the next step (Apply). 1000ms gives a 500ms margin on slow CI runners.
-    await this.page.waitForTimeout(1000);
+    // Step 2: poll the sentinel div that Vue keeps in sync with customChartContent.
+    // This is deterministic — no fixed timeout — so it works regardless of CI load.
+    // The sentinel is a hidden <div data-test="dashboard-custom-chart-committed-value">
+    // in PanelEditor.vue whose :data-test-value binding reflects the reactive state.
+    await this.page.waitForFunction(
+      (chartCode) => {
+        const el = document.querySelector('[data-test="dashboard-custom-chart-committed-value"]');
+        return el && el.getAttribute('data-test-value').trim() === chartCode;
+      },
+      trimmedCode,
+      { timeout: 10000 }
+    );
   }
 
   // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
@@ -528,7 +536,6 @@ export class DashboardPage {
   // whatever the auto-gen produced (or empty). Drive Monaco's model directly and
   // poll to confirm the value lands before Apply.
   async setDashboardPanelQuery(sql) {
-    // Trim for the same reason as setCustomChartCode — CodeQueryEditor emits trim().
     const trimmedSql = sql.trim();
     await this.page.waitForFunction(
       (query) => {
@@ -545,8 +552,16 @@ export class DashboardPage {
       trimmedSql,
       { timeout: 10000 }
     );
-    // Wait past CodeQueryEditor's 500ms debounce so Vue state is updated before Apply.
-    await this.page.waitForTimeout(1000);
+    // Poll the sentinel div (added in DashboardQueryEditor.vue) that reflects the
+    // committed query in Vue state — deterministic, no fixed timeout.
+    await this.page.waitForFunction(
+      (query) => {
+        const el = document.querySelector('[data-test="dashboard-panel-query-committed-value"]');
+        return el && el.getAttribute('data-test-value').trim() === query;
+      },
+      trimmedSql,
+      { timeout: 10000 }
+    );
   }
 
 }

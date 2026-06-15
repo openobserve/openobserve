@@ -459,6 +459,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="dashboardPanelData.data.customChartContent"
                           style="width: 100%; height: 100%"
                         />
+                        <div
+                          data-test="dashboard-custom-chart-committed-value"
+                          :data-test-value="dashboardPanelData.data.customChartContent"
+                          style="display: none"
+                        />
                         <!-- Example Charts button (dashboard mode only) -->
                         <div
                           v-if="pageType === 'dashboard'"

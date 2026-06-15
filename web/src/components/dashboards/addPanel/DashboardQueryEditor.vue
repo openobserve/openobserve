@@ -231,6 +231,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test-prefix="dashboard-query"
                 editor-height="100%"
               />
+              <div
+                data-test="dashboard-panel-query-committed-value"
+                :data-test-value="dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query ?? ''"
+                style="display: none"
+              />
             </template>
             <template #after>
               <div style="display: flex; flex-direction: column; height: 100%; width: 100%">
