@@ -367,15 +367,25 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Select all existing content and replace with a query that uses
-    // "default" as an unquoted identifier (the bug scenario from #4288:
-    // the SQL parser treats "default" as a reserved keyword)
-    const isMac = process.platform === 'darwin';
-    const modifier = isMac ? 'Meta' : 'Control';
-    await page.keyboard.press(`${modifier}+a`);
-    await page.waitForTimeout(200);
-    await page.keyboard.type('SELECT * FROM default', { delay: 50 });
-    await page.waitForTimeout(1000);
+    // Use Monaco API to set editor content reliably.
+    // Keyboard shortcuts (Cmd/Ctrl+A + type) are unreliable
+    // with Monaco because the virtualised viewport, focus management,
+    // and IME handling can swallow synthesized keystrokes.
+    // Retry until Monaco editors are fully initialized (parallel test runs
+    // may delay Monaco boot).
+    await expect(async () => {
+      const content = await page.evaluate(() => {
+        const editors = window.monaco?.editor?.getEditors?.();
+        if (editors && editors.length > 0) {
+          const editor = editors[editors.length - 1];
+          editor.setValue('SELECT * FROM default');
+          return editor.getValue();
+        }
+        return null;
+      });
+      expect(content).toContain('default');
+    }).toPass({ timeout: 10000, intervals: [1000] });
+    await page.waitForTimeout(500);
 
     // Verify the rendered .view-lines contain "default"
     const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');

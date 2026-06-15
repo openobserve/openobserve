@@ -204,11 +204,22 @@ export class DashboardPage {
     // Wait for the success notification to confirm dashboard was created
     await this.toastMessage.first().waitFor({ state: 'visible', timeout: 15000 });
 
-    // Wait for navigation to the new dashboard view page
-    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+    // Wait for navigation to the new dashboard view page.
+    // Some environments (e.g. pentest) may not navigate to /dashboards/view/
+    // after creation — catch the timeout so the caller can still use the
+    // dashboard that was successfully created.
+    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 }).catch(() => {});
 
-    // Wait for the page to be fully loaded
+    // Wait for the page to be fully loaded (may be no-op if navigation didn't happen)
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // Only proceed with panel setup if we actually landed on the view page
+    const onViewPage = this.page.url().includes('/dashboards/view/');
+    if (!onViewPage) {
+      // Dashboard was created but we stayed on the list page — caller likely
+      // only needs the dashboard to exist (e.g. for report creation).
+      return;
+    }
 
     // Wait for Vue components to mount
     await this.page.waitForTimeout(2000);

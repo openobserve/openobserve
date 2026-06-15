@@ -1434,9 +1434,13 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("Shared logs page should display searchbar correctly @bug-5839 @P3 @regression @logsRegression", async ({ page }) => {
     testLogger.info('Test: Verify shared logs page searchbar renders correctly (Bug #5839)');
 
-    await pm.logsPage.navigateToLogs();
+    // Navigate using the sidebar (same pattern as other passing logs tests)
+    // then select stream without re-navigating (skipNavigation=true).
+    await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await pm.logsPage.selectStream('e2e_automate');
+    // Wait for the OSelect stream list to finish loading before interacting
+    await page.waitForTimeout(3000);
+    await pm.logsPage.selectStream('e2e_automate', 5, 30000, true);
     await page.waitForTimeout(2000);
 
     // Run a query so the page has results state
