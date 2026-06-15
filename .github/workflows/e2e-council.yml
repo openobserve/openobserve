@@ -417,15 +417,21 @@ jobs:
         id: audit
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
-          FIX_ATTEMPTS: "3"
+          FIX_ATTEMPTS: "3" # max Sentinel→Engineer fix rounds before we stop + report (safety cap)
         run: |
+          set -uo pipefail
           v=docs/test_generator/ci/sentinel-verdict.json
           clean=false
           for i in $(seq 1 "$FIX_ATTEMPTS"); do
             echo "::group::Sentinel audit — attempt $i/$FIX_ATTEMPTS"
+            # Remove any stale verdict so we never read a previous iteration's result.
+            rm -f "$v"
             opencode run --agent e2e-ci-sentinel --model "$PIPELINE_MODEL" \
-              "Run your spec. Audit the generated spec + page objects for the feature in docs/test_generator/ci/run-context.json. Auto-fix the SAFE issues yourself. Write docs/test_generator/ci/sentinel-verdict.json and the audit report under docs/test_generator/audit-reports/."
-            { [ -f "$v" ] && jq empty "$v" 2>/dev/null; } || { echo "::error::Sentinel verdict missing/invalid"; exit 1; }
+              "Run your spec. Audit the generated spec + page objects for the feature in docs/test_generator/ci/run-context.json. Auto-fix the SAFE issues yourself. Write docs/test_generator/ci/sentinel-verdict.json and the audit report under docs/test_generator/audit-reports/." \
+              || { echo "::error::Sentinel agent run failed (attempt $i)"; exit 1; }
+            # Verdict must exist, be valid JSON, and have the required fields (else fail-closed).
+            { [ -f "$v" ] && jq -e 'has("verdict") and has("critical_count")' "$v" >/dev/null 2>&1; } \
+              || { echo "::error::Sentinel verdict missing/invalid or lacks required fields"; exit 1; }
             verdict=$(jq -r 'if .verdict == "PASS" then "PASS" else "FAIL" end' "$v")
             crit=$(jq -r 'if (.critical_count|type) == "number" then .critical_count else 1 end' "$v")
             echo "verdict=$verdict critical=$crit"
@@ -434,7 +440,8 @@ jobs:
             if [ "$i" -lt "$FIX_ATTEMPTS" ]; then
               echo "Sentinel found issues — Engineer fixing them (fix attempt $i)…"
               opencode run --agent e2e-ci-engineer --model "$PIPELINE_MODEL" \
-                "The Sentinel audit flagged issues. Read the latest audit report under docs/test_generator/audit-reports/ and FIX every critical issue + warning in the spec + page objects named in run-context.json: move ALL raw selectors out of the spec into page objects (including inside expect(...)), ensure every test has a real meaningful assertion (never expect(true).toBe(true)), replace console.log with testLogger, await all async calls, remove hardcoded credentials. Keep tests valid and meaningful — do NOT weaken or delete assertions to pass. GENERATE ONLY — do not run."
+                "The Sentinel audit flagged issues. Read the latest audit report under docs/test_generator/audit-reports/ and FIX every critical issue + warning in the spec + page objects named in run-context.json: move ALL raw selectors out of the spec into page objects (including inside expect(...)), ensure every test has a real meaningful assertion (never expect(true).toBe(true)), replace console.log with testLogger, await all async calls, remove hardcoded credentials. Keep tests valid and meaningful — do NOT weaken or delete assertions to pass. GENERATE ONLY — do not run." \
+                || { echo "::error::Engineer fix run failed (attempt $i)"; exit 1; }
             fi
           done
           if [ "$clean" != "true" ]; then
@@ -448,7 +455,10 @@ jobs:
         env:
           REG: docs/test_generator/ci/playwright-registration.json
         run: |
-          [ -f "$REG" ] || { echo "::error::no playwright-registration.json from the Engineer"; exit 1; }
+          # Re-validate here too: the audit/fix loop re-ran the Engineer, which could have rewritten
+          # this file. Require valid JSON with the required fields before trusting it.
+          { [ -f "$REG" ] && jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1; } \
+            || { echo "::error::playwright-registration.json missing/invalid after the fix loop"; exit 1; }
           GROUP=$(jq -r '.group' "$REG")
           FNAME=$(jq -r '.spec_filename' "$REG")
           echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' || { echo "::error::unsafe spec_filename: $FNAME"; exit 1; }
