@@ -18,7 +18,6 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{Arc, LazyLock as Lazy},
-    time::Duration,
 };
 
 use arc_swap::ArcSwap;
@@ -338,16 +337,6 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 
-pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
-    segment::HttpClient::new(
-        reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .unwrap(),
-        CONFIG.load().common.telemetry_url.clone(),
-    )
-});
-
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
 }
@@ -595,7 +584,6 @@ pub struct Config {
     pub s3: S3,
     pub sns: Sns,
     pub prom: Prometheus,
-    pub profiling: Profiling,
     pub smtp: Smtp,
     pub rum: RUM,
     pub chrome: Chrome,
@@ -689,28 +677,6 @@ pub struct Smtp {
     pub smtp_from_email: String,
     #[env_config(name = "ZO_SMTP_ENCRYPTION", default = "")]
     pub smtp_encryption: String,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
-pub struct Profiling {
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_ENABLED",
-        default = false,
-        help = "Enable pyroscope profiling with pyroscope-rs"
-    )]
-    pub pyroscope_enabled: bool,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_SERVER_URL",
-        default = "http://localhost:4040",
-        help = "Pyroscope server URL"
-    )]
-    pub pyroscope_server_url: String,
-    #[env_config(
-        name = "ZO_PROF_PYROSCOPE_PROJECT_NAME",
-        default = "openobserve",
-        help = "Pyroscope project name"
-    )]
-    pub pyroscope_project_name: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1112,6 +1078,12 @@ pub struct Common {
     pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_BLOOM_FILTER_PARQUET_ENABLED",
+        default = false,
+        help = "Enable bloom filter for parquet files"
+    )]
+    pub bloom_filter_parquet_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_DEFAULT_FIELDS", default = "")]
     pub bloom_filter_default_fields: String,
     #[env_config(
@@ -1394,7 +1366,7 @@ pub struct Common {
     pub model_pricing_enabled: bool,
     #[env_config(
         name = "ZO_ONLINE_EVALS_ENABLED",
-        default = false,
+        default = true,
         help = "Show the Online Evaluations UI (top-level Evaluations route) and the LLM Providers Settings page. When false, both are hidden. The backend endpoints remain reachable regardless — this flag only gates the frontend surface."
     )]
     pub online_evals_enabled: bool,
@@ -1851,6 +1823,12 @@ pub struct Limit {
     )]
     pub inverted_index_skip_threshold: usize,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
+        default = 1000,
+        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
+    )]
+    pub inverted_index_topn_max_group_num: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
         default = 2,
         help = "Minimum length of a token in the inverted index."
@@ -1898,6 +1876,12 @@ pub struct Limit {
         default = true
     )]
     pub histogram_enabled: bool,
+    #[env_config(
+        name = "ZO_TIMECHART_ENABLED",
+        help = "Show timechart tab on logs page",
+        default = false
+    )]
+    pub timechart_enabled: bool,
     #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",

@@ -387,6 +387,7 @@ fn string_key_value(key: impl Into<String>, value: impl Into<String>) -> KeyValu
         value: Some(AnyValue {
             value: Some(any_value::Value::StringValue(value.into())),
         }),
+        ..Default::default()
     }
 }
 
@@ -410,6 +411,7 @@ fn push_i64_attr(attrs: &mut Vec<KeyValue>, key: impl Into<String>, value: i64) 
         value: Some(AnyValue {
             value: Some(any_value::Value::IntValue(value)),
         }),
+        ..Default::default()
     });
 }
 
@@ -425,6 +427,7 @@ fn push_f64_attr(attrs: &mut Vec<KeyValue>, key: impl Into<String>, value: f64) 
         value: Some(AnyValue {
             value: Some(any_value::Value::DoubleValue(value)),
         }),
+        ..Default::default()
     });
 }
 
@@ -434,6 +437,7 @@ fn push_bool_attr(attrs: &mut Vec<KeyValue>, key: impl Into<String>, value: bool
         value: Some(AnyValue {
             value: Some(any_value::Value::BoolValue(value)),
         }),
+        ..Default::default()
     });
 }
 

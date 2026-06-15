@@ -23,11 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="index"
           :class="[
             'dashboard-chart-border',
-            selectedChartType === item.id
-              ? store.state.theme === 'dark'
-                ? 'tw:bg-gray-400'
-                : 'tw:bg-gray-200'
-              : '',
+            'chart-selection-item',
+            selectedChartType === item.id ? 'chart-item-selected' : '',
             isChartDisabled(item)
               ? 'tw:opacity-50 tw:cursor-not-allowed'
               : 'tw:cursor-pointer',
@@ -245,5 +242,17 @@ export default defineComponent({
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.chart-selection-item {
+  transition: background-color 0.15s ease;
+}
+
+.chart-selection-item:hover {
+  background-color: var(--color-surface-subtle);
+}
+
+.chart-item-selected {
+  background-color: var(--o2-label-chip-url-bg);
 }
 </style>

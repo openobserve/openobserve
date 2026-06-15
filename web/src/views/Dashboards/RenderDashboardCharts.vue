@@ -18,8 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="card-container"
-    :class="store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto'"
+    class="tw:bg-surface-base"
+    :class="[
+      frame ? 'tw:border tw:border-border-default tw:rounded-xl' : '',
+      store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto',
+    ]"
   >
     <div class="tw:px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
@@ -137,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: 100%; width: 100%"
           />
         </div>
-        <div v-else ref="gridStackContainer" class="grid-stack">
+        <div v-else-if="panels.length > 0" ref="gridStackContainer" class="grid-stack">
           <div
             v-for="item in panels"
             :key="item.id + selectedTabId"
@@ -263,16 +266,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="98"
         :show-close="false"
       >
-        <ViewPanel
-          :folderId="folderId"
-          :dashboardId="dashboardData.dashboardId"
-          :panelId="viewPanelId"
-          :selectedDateForViewPanel="viewPanelSelectedDate"
-          :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
-          :searchType="searchType"
-          @close-panel="() => (showViewPanel = false)"
-          @update:initial-variable-values="updateInitialVariableValues"
-        />
+        <!-- Explicit height wrapper: fills the dialog body's available space
+             (90vh − body padding) so ViewPanel can use height:100% and
+             flex:1 works all the way down without causing a body scrollbar. -->
+        <div class="view-panel-height-wrapper">
+          <ViewPanel
+            :folderId="folderId"
+            :dashboardId="dashboardData.dashboardId"
+            :panelId="viewPanelId"
+            :selectedDateForViewPanel="viewPanelSelectedDate"
+            :initialVariableValues="getMergedVariablesForPanel(viewPanelId)"
+            :searchType="searchType"
+            @close-panel="() => (showViewPanel = false)"
+            @update:initial-variable-values="updateInitialVariableValues"
+          />
+        </div>
       </ODialog>
       <div v-if="!panels.length">
         <!-- if data not available show nodata component -->
@@ -392,6 +400,13 @@ export default defineComponent({
     simplifiedPanelView: {
       type: Boolean,
       default: false,
+    },
+    /** Draws the component's own bordered card. Set false when embedded inside
+     *  an already-bordered container (e.g. the dashboard view page card) to
+     *  avoid a double border. */
+    frame: {
+      type: Boolean,
+      default: true,
     },
   },
 
@@ -1010,6 +1025,18 @@ export default defineComponent({
         await refreshGridStack();
       },
       { deep: true }, // Deep watch to catch layout changes within panels
+    );
+
+    watch(
+      () => panels.value.length,
+      async (newLen, oldLen) => {
+        // When panels are added to a previously-empty tab the grid-stack element
+        // is freshly mounted (v-else-if), so GridStack must be re-initialized.
+        if (newLen > 0 && oldLen === 0) {
+          await nextTick();
+          await refreshGridStack();
+        }
+      },
     );
 
     // Initialize GridStack when component is mounted
@@ -1662,6 +1689,16 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Fills the ODialog body's available space (dialog max-h:90vh minus body padding)
+// so ViewPanel can use height:100% and flex:1 chains work without a scrollbar.
+.view-panel-height-wrapper {
+  height: calc(90vh - var(--spacing-dialog-content-py) * 2);
+  margin: calc(-1 * var(--spacing-dialog-content-py)) calc(-1 * var(--spacing-dialog-content-px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;
@@ -1703,6 +1740,13 @@ export default defineComponent({
 
   &.dark {
     border-color: rgba(204, 204, 220, 0.12) !important;
+
+    /* The visible panel outline lives on the content child; in dark mode pull
+       it onto the design token (clean solid edge) instead of the bright
+       #c2c2c27a gray, which reads too light against the dark canvas. */
+    .grid-stack-item-content {
+      border-color: var(--color-border-default);
+    }
   }
   .grid-stack-item-content {
     border: 1px solid #c2c2c27a;

@@ -1,0 +1,27 @@
+{
+  // OpenCode configuration for the e2e_ci_council_of_agents pipeline.
+  // Used by .github/workflows/e2e-council.yml to run the CI test-generation agents on DeepSeek.
+  // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
+  "$schema": "https://opencode.ai/config.json",
+
+  "provider": {
+    "deepseek": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "{env:DEEPSEEK_API_KEY_E2E}"
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek-V4-Pro",
+          "limit": { "context": 1048576, "output": 262144 }
+        }
+      }
+    }
+  },
+
+  // Default model for runs that don't pass --model explicitly.
+  // The workflow passes --model deepseek/deepseek-v4-pro per agent invocation.
+  "model": "deepseek/deepseek-v4-pro"
+}

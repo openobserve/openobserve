@@ -20,12 +20,13 @@ import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
-import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
-import EvalTemplateList from "@/enterprise/components/EvalTemplateList.vue";
-import EvalTemplateEditor from "@/enterprise/components/EvalTemplateEditor.vue";
-import { routeGuard } from "@/utils/zincutils";
+import useAIRoutes from "@/composables/shared/useAIRoutes";
 
 const useEnvRoutes = () => {
+  // AI Observability / Online Evals routes are shared with the open-source
+  // router so the feature is available in every build.
+  const ai = useAIRoutes();
+
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
   // The backend sets a cookie and redirects to Dex login
   const parentRoutes: any = [
@@ -56,18 +57,7 @@ const useEnvRoutes = () => {
   ];
 
   const homeChildRoutes = [
-    {
-      path: "online-evals",
-      name: "onlineEvals",
-      component: OnlineEvals,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-      meta: {
-        title: "Online Evals",
-        keepAlive: false,
-      },
-    },
+    ...ai.homeChildRoutes,
     {
       path: "billings",
       name: "billings",
@@ -100,42 +90,7 @@ const useEnvRoutes = () => {
     },
   ];
 
-  // Child routes to merge under pipeline/pipelines path
-  const pipelineChildren = [
-    {
-      path: "online-evals",
-      redirect: "/online-evals",
-    },
-    {
-      path: "eval-templates",
-      name: "evalTemplates",
-      component: EvalTemplateList,
-      meta: {
-        title: "Evaluation Templates",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/add",
-      name: "evalTemplatesAdd",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Create Evaluation Template",
-        keepAlive: false,
-      },
-    },
-    {
-      path: "eval-templates/:id/edit",
-      name: "evalTemplatesEdit",
-      component: EvalTemplateEditor,
-      meta: {
-        title: "Edit Evaluation Template",
-        keepAlive: false,
-      },
-    },
-  ];
-
-  return { parentRoutes, homeChildRoutes, pipelineChildren };
+  return { parentRoutes, homeChildRoutes };
 };
 
 export default useEnvRoutes;

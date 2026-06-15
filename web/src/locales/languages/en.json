@@ -1,4 +1,306 @@
 {
+  "emptyState": {
+    "noSearchResults": {
+      "title": "We couldn't find any data",
+      "description": "Nothing matches your current filters or time range. Try broadening your search, widening the time range, or clearing the filters.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all applied filters"
+    },
+    "noLogs": {
+      "title": "No logs in this range",
+      "description": "We didn't find any logs for the selected stream and time range. Try a wider time range or a different stream.",
+      "action": "Widen time range",
+      "actionDesc": "Search across a longer period"
+    },
+    "noStreamSelected": {
+      "title": "Select a stream to get started",
+      "description": "Choose a stream from the dropdown on the left, then press 'Run query' to start exploring. You can also apply additional filters and adjust the date range."
+    },
+    "noQueryApplied": {
+      "title": "Run a query to see results",
+      "description": "Adjust your filters and click 'Run query' to load events for this stream."
+    },
+
+    "noDashboards": {
+      "title": "Create your first dashboard",
+      "description": "Dashboards bring your metrics, logs, and traces together in one view. Build one to get started.",
+      "action": "New dashboard",
+      "actionDesc": "Start from an empty canvas",
+      "import": "Import dashboard",
+      "importDesc": "Upload a dashboard JSON file",
+      "templates": "Browse templates",
+      "templatesDesc": "Start from a community dashboard"
+    },
+    "noDashboardsInFolder": {
+      "title": "No dashboards in this folder",
+      "description": "This folder is empty. Add a dashboard here or move one from another folder.",
+      "action": "New dashboard",
+      "actionDesc": "Create a dashboard in this folder",
+      "import": "Import dashboard",
+      "importDesc": "Upload a dashboard JSON file",
+      "templates": "Browse templates",
+      "templatesDesc": "Start from a community dashboard"
+    },
+    "noGroups": {
+      "title": "No groups yet",
+      "description": "Groups let you manage permissions for multiple users at once. Create one to get started.",
+      "action": "New group",
+      "actionDesc": "Create a user group"
+    },
+    "noRoles": {
+      "title": "No roles yet",
+      "description": "Roles define what actions users can perform. Create a custom role to control access.",
+      "action": "New role",
+      "actionDesc": "Define a custom access role"
+    },
+    "noAnomalyConfigs": {
+      "title": "No anomaly detection configured",
+      "description": "Set up anomaly detection to automatically identify unusual patterns in your data.",
+      "action": "New config",
+      "actionDesc": "Configure anomaly detection"
+    },
+    "noApiLimits": {
+      "title": "No API limits configured",
+      "description": "API limits control how much data each organization can ingest and query per time window."
+    },
+    "noRoleLimits": {
+      "title": "No role limits configured",
+      "description": "Role limits define the ingest and query quotas applied to individual roles within an organization."
+    },
+    "noIngestionTokens": {
+      "title": "No ingestion tokens yet",
+      "description": "Ingestion tokens authenticate data sources when sending logs, metrics, and traces.",
+      "action": "New token",
+      "actionDesc": "Generate an ingestion token"
+    },
+    "noOrganizations": {
+      "title": "No organizations yet",
+      "description": "Organizations group your users and data together. Create one to get started."
+    },
+    "noAlertDestinations": {
+      "title": "No destinations yet",
+      "description": "Destinations define where alert notifications are sent — Slack, email, webhooks, and more.",
+      "action": "New destination",
+      "actionDesc": "Connect a notification channel"
+    },
+    "noPipelineDestinations": {
+      "title": "No destinations yet",
+      "description": "External targets for pipeline output — HTTP endpoints and remote write targets.",
+      "action": "New destination",
+      "actionDesc": "Connect a pipeline destination"
+    },
+    "noAlertTemplates": {
+      "title": "No templates yet",
+      "description": "Templates define the format of alert notification messages.",
+      "action": "New template",
+      "actionDesc": "Create a notification template"
+    },
+    "noEvalTemplates": {
+      "title": "No evaluation templates yet",
+      "description": "Evaluation templates define reusable scoring criteria for LLM evaluations.",
+      "action": "New template",
+      "actionDesc": "Create an evaluation template"
+    },
+    "noEnrichmentTables": {
+      "title": "No enrichment tables yet",
+      "description": "Enrichment tables let you attach additional context to your log data at query time.",
+      "action": "New table",
+      "actionDesc": "Create an enrichment table"
+    },
+    "noCipherKeys": {
+      "title": "No cipher keys yet",
+      "description": "Cipher keys are used to encrypt sensitive fields in your data streams.",
+      "action": "New key",
+      "actionDesc": "Generate a cipher key"
+    },
+    "noAiToolsets": {
+      "title": "No AI toolsets yet",
+      "description": "AI toolsets connect your organization to external AI capabilities.",
+      "action": "New toolset",
+      "actionDesc": "Add an AI toolset"
+    },
+    "noLlmProviders": {
+      "title": "No LLM providers configured",
+      "description": "Connect a language model provider to enable AI-powered features.",
+      "action": "Add provider",
+      "actionDesc": "Configure an LLM provider"
+    },
+    "noDiscoveredServices": {
+      "title": "No services discovered",
+      "description": "Services will appear here automatically once traces start arriving."
+    },
+    "noNodes": {
+      "title": "No nodes available",
+      "description": "Cluster nodes will appear here once they are registered."
+    },
+    "noSourceMaps": {
+      "title": "No source maps uploaded",
+      "description": "Upload source maps to enable readable stack traces in your RUM error reports.",
+      "action": "Upload",
+      "actionDesc": "Upload a source map file"
+    },
+    "noBackfillJobs": {
+      "title": "No backfill jobs",
+      "description": "Backfill jobs reprocess historical data through a pipeline. Run one to get started."
+    },
+    "noPipelineHistory": {
+      "title": "No pipeline history yet",
+      "description": "Pipeline execution history will appear here once your pipelines run."
+    },
+    "noPipelines": {
+      "title": "Create your first pipeline",
+      "description": "Pipelines transform and route your data as it arrives. Set one up to start shaping your streams.",
+      "action": "New pipeline",
+      "actionDesc": "Build a flow from scratch",
+      "import": "Import pipeline",
+      "importDesc": "Upload a pipeline definition"
+    },
+    "noFunctions": {
+      "title": "Create your first function",
+      "description": "Functions enrich and reshape your data at ingest or query time. Add one to get started.",
+      "action": "New function",
+      "actionDesc": "Write a new VRL function"
+    },
+    "noStreams": {
+      "title": "Waiting for your first data",
+      "description": "No data has arrived yet. Connect a source and your streams will show up here automatically.",
+      "action": "Set up ingestion",
+      "actionDesc": "Connect a data source"
+    },
+    "noAlerts": {
+      "title": "Create your first alert",
+      "description": "Alerts notify you the moment your data crosses a threshold. Define one to start monitoring.",
+      "action": "New alert",
+      "actionDesc": "Define a condition to monitor"
+    },
+    "noIncidents": {
+      "title": "No active incidents",
+      "description": "You're all caught up — nothing needs your attention right now. Triggered incidents will appear here."
+    },
+    "noLLMInsights": {
+      "title": "No LLM activity yet",
+      "description": "Instrument your services with the OpenTelemetry Gen-AI semantic conventions and ingest at least one trace to populate this dashboard.",
+      "action": "Instrument with OpenTelemetry",
+      "actionDesc": "Capture gen_ai_* attributes on your traces"
+    },
+    "noLLMSessions": {
+      "title": "No LLM sessions yet",
+      "description": "Sessions are grouped by gen_ai_conversation_id. Instrument your services so each conversation tags its traces, and sessions will appear here.",
+      "action": "Instrument with OpenTelemetry",
+      "actionDesc": "Tag spans with gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "No scorers yet",
+      "description": "Scorers grade LLM responses against your score configs — start with an LLM judge or import one from the library.",
+      "action": "Create scorer",
+      "actionDesc": "Define an LLM judge or remote scorer"
+    },
+    "noEvalJobs": {
+      "title": "No evaluation jobs yet",
+      "description": "Jobs schedule scorers against an LLM stream. Create one to start grading conversations on a cadence.",
+      "action": "Create eval job",
+      "actionDesc": "Pick a stream + scorers + cadence"
+    },
+    "noScoreConfigs": {
+      "title": "No score configs yet",
+      "description": "Score configs define the schema scorers produce — numeric, boolean, or categorical. Add one to start scoring.",
+      "action": "Create score config",
+      "actionDesc": "Define the score shape + healthy range"
+    },
+    "loadError": {
+      "title": "Something went wrong",
+      "description": "We couldn't load this data. It's usually temporary — give it another try in a moment.",
+      "action": "Retry",
+      "actionDesc": "Try loading the data again"
+    },
+    "noData": {
+      "title": "Nothing here yet",
+      "description": "There's no data to show right now."
+    },
+    "noTraces": {
+      "title": "No traces found",
+      "description": "No traces match the selected service and time range. Try a wider time range or a different service."
+    },
+    "noSearchHistory": {
+      "title": "No search history yet",
+      "description": "Searches you run will be listed here so you can revisit and re-run them."
+    },
+    "noSearchJobs": {
+      "title": "No scheduled search jobs",
+      "description": "Long-running searches you schedule will appear here, where you can track their status and explore results once they finish."
+    },
+    "noUsers": {
+      "title": "No users yet",
+      "description": "Invite your teammates to collaborate in this organization.",
+      "action": "Add user",
+      "actionDesc": "Invite a teammate by email"
+    },
+    "noReports": {
+      "title": "No reports yet",
+      "description": "Schedule a report to get dashboards delivered to your inbox.",
+      "action": "New report",
+      "actionDesc": "Schedule a dashboard delivery"
+    },
+    "noQueries": {
+      "title": "No running queries",
+      "description": "There are no active queries right now. Long-running queries will appear here while they run."
+    },
+    "noServiceAccounts": {
+      "title": "No service accounts yet",
+      "description": "Service accounts let applications authenticate with the API. Create one to get started.",
+      "action": "Add service account",
+      "actionDesc": "Create an API service account"
+    },
+    "noInvitations": {
+      "title": "No pending invitations",
+      "description": "Invitations you've sent or received will show up here."
+    },
+    "filtered": {
+      "title": "No {noun} found",
+      "description": "No {noun} match your current filters or search. Try adjusting or clearing them.",
+      "action": "Clear filters",
+      "actionDesc": "Reset all filters and search",
+      "fallbackNoun": "results"
+    },
+    "nouns": {
+      "logs": "logs",
+      "dashboards": "dashboards",
+      "pipelines": "pipelines",
+      "functions": "functions",
+      "streams": "streams",
+      "alerts": "alerts",
+      "incidents": "incidents",
+      "traces": "traces",
+      "searches": "searches",
+      "searchJobs": "search jobs",
+      "users": "users",
+      "reports": "reports",
+      "queries": "queries",
+      "serviceAccounts": "service accounts",
+      "invitations": "invitations",
+      "groups": "groups",
+      "roles": "roles",
+      "anomalyConfigs": "anomaly detection configs",
+      "apiLimits": "API limits",
+      "roleLimits": "role limits",
+      "ingestionTokens": "ingestion tokens",
+      "organizations": "organizations",
+      "alertDestinations": "destinations",
+      "pipelineDestinations": "destinations",
+      "alertTemplates": "templates",
+      "evalTemplates": "evaluation templates",
+      "enrichmentTables": "enrichment tables",
+      "cipherKeys": "cipher keys",
+      "aiToolsets": "AI toolsets",
+      "llmProviders": "LLM providers",
+      "sourceMaps": "source maps",
+      "backfillJobs": "backfill jobs",
+      "scorers": "scorers",
+      "evalJobs": "evaluation jobs",
+      "scoreConfigs": "score configs",
+      "pipelineHistory": "pipeline history"
+    }
+  },
   "common": {
     "close": "Close",
     "cancel": "Cancel",
@@ -145,6 +447,7 @@
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
     "selectStreamFirst": "Select a stream first",
+    "selectLogsStreamFirst": "Select Logs stream first",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
     "searchDimension": "Search Dimensions",
@@ -155,6 +458,8 @@
     "source": "_source",
     "noResult": "No results found.",
     "noData": "No data available",
+    "fieldValuesEmpty": "No values found.",
+    "fieldValuesEmptyHint": "Try a broader time range to see values.",
     "syntaxGuide": "Syntax guide",
     "recordsPerPage": "Records per page",
     "showing": "Showing",
@@ -216,6 +521,7 @@
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schedule",
     "menuGroupInspect": "Inspect",
+    "menuGroupExplain": "Explain",
     "validSql": "Valid SQL",
     "invalidSql": "Invalid query",
     "toggleFunctionLabel": "Function",
@@ -304,6 +610,12 @@
     "nlQueryGenerationSuccess": "Query generated successfully!",
     "askAIPlaceholder": "Ask AI to help with your query...",
     "askAIFunctionPlaceholder": "Ask AI to help with your function...",
+    "askAIPlaceholderRotation": {
+      "one": "Show me errors from the last hour…",
+      "two": "Find slow queries taking more than 5s…",
+      "three": "Count 5xx responses grouped by service…",
+      "four": "Filter logs where level = 'error'…"
+    },
     "enterPrompt": "Enter a prompt to generate query",
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "analyzingQuery": "Analyzing query...",
@@ -431,6 +743,7 @@
     "search": "Logs",
     "traces": "Traces",
     "evals": "Evaluations",
+    "aiObservability": "AI",
     "template": "Template",
     "signOut": "Sign Out",
     "account": "Account",
@@ -466,6 +779,17 @@
     "webVitals": "Web Vitals",
     "errors": "Errors",
     "api": "API",
+    "emptyState": {
+      "title": "Monitor your users with Real User Monitoring",
+      "description": "RUM tracks real user interactions — page loads, errors, API calls, and session replays — so you can see exactly how users experience your application.",
+      "webApp": "Instrument a web app",
+      "webAppDesc": "Add the OpenObserve RUM SDK to any JavaScript app",
+      "sessionReplay": "Enable Session Replay",
+      "sessionReplayDesc": "Record and replay user sessions to debug UX issues",
+      "learnMore": "Learn more:",
+      "quickImpl": "Quick implementation guide",
+      "blogPost": "Frontend monitoring basics"
+    },
     "aboutRUMTitle": "Discover Real User Monitoring to Enhance Your User Experience",
     "aboutRUMMessage": "Real User Monitoring allows you to track and analyze the performance of your website or application from the perspective of real users. This means understanding how actual users experience your site, where they face slowdowns, which pages they frequently use, and more.",
     "getStartedTitle": "Get Started with Real User Monitoring",
@@ -908,6 +1232,7 @@
   },
   "invitation": {
     "pendingInvitations": "Pending Invitations",
+    "search": "Search Invitations",
     "organizationName": "Organization Name",
     "role": "Role",
     "invitedBy": "Invited By",
@@ -1033,7 +1358,8 @@
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
     "proceed_subscription": "Proceed to Subscription",
-    "subscription_plan": "Subscription Plan"
+    "subscription_plan": "Subscription Plan",
+    "manage": "Manage"
   },
   "template": {
     "header": "Templates",
@@ -1107,6 +1433,7 @@
   },
   "pipeline": {
     "header": "Pipelines",
+    "subtitle": "Transform, enrich and route data in flight",
     "create": "Create Pipeline",
     "SelectParentNode": "Select Parent Node",
     "SelectChildNode": "Select Child Node",
@@ -1224,7 +1551,9 @@
     "thresholdShouldNotBeEmpty": "Threshold should not be empty",
     "errorGettingResults": "Error while getting results",
     "save": "Save",
-    "evalTemplates": "Evaluation Templates"
+    "evalTemplates": "Evaluation Templates",
+    "selectStream": "Select a stream ...",
+    "queryEditorPlaceholder": "Select a stream or write SQL query here..."
   },
   "evalTemplate": {
     "header": "Evaluation Templates",
@@ -1273,7 +1602,7 @@
     "header": "Functions",
     "add": "New function",
     "search": "Search Function",
-    "name": "Name",
+    "name": "Enter Function Name",
     "function": "Function Detail",
     "save": "Save",
     "jsfunction": "JavaScript Function",
@@ -1362,12 +1691,14 @@
     "tabLabel": "Rate",
     "analyzeButton": "Rate Analysis",
     "analyzeTooltip": "Analyze trace rate patterns across dimensions",
-    "analyzeTooltipLogs": "Analyze dimension distribution for current time range",
+    "analyzeTooltipLogs": "View insights for current time range",
     "analyzeTooltipTraces": "Analyze trace dimensions for rate, latency, and error patterns",
     "insightsButtonLabel": "Insights",
     "rateLabel": "Rate:",
     "timeRangeLabel": "Time Range:",
-    "searchInspectionsLabel": "Inspect search job execution details"
+    "searchInspectionsLabel": "Inspect search job execution details",
+    "inspectBtnLabel": "Inspect",
+    "analyzeBtnLabel": "Insights"
   },
   "errorInsights": {
     "title": "Insights",
@@ -1462,6 +1793,7 @@
     "aiLabel": "AI Integrations",
     "manageTokensBtnLabel": "Manage Tokens",
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
+    "orgLevelSummary": "Organization-level tokens for ingestion endpoints.",
     "resetDefaultTokenLabel": "Reset Token",
     "tokenManagementTitle": "Manage Ingestion Tokens",
     "defaultTokenBadge": "DEFAULT",
@@ -2038,6 +2370,22 @@
     "scheduledAlert": "Scheduled",
     "rtAlert": "Real time",
     "noData": "No Data Ingested",
+    "noDataState": {
+      "title": "No data ingested yet",
+      "description": "This organization hasn't received any data, so there's nothing to chart. Once events start flowing, your <strong>ingestion volume, storage and query usage</strong> will appear here automatically.",
+      "logs": "Send logs",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector & more",
+      "traces": "Send traces",
+      "tracesDesc": "OTLP / Jaeger / Zipkin distributed tracing",
+      "metrics": "Send metrics",
+      "metricsDesc": "Prometheus, OTel Collector, Telegraf & more",
+      "or": "Or:",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS / CloudWatch",
+      "aiIntegrations": "AI integrations",
+      "shippers": "Log shippers"
+    },
     "indexSizeLbl": "Index Size",
     "docsCountLbl": "Events",
     "findIngestion": "Find how to ingest data >>",
@@ -2054,7 +2402,8 @@
     "totalDashboard": "Dashboards",
     "tabAiAssistant": "O2 Assistant",
     "tabOverview": "Overview",
-    "tabUsage": "Usage"
+    "tabUsage": "Usage",
+    "subtitle": "Your observability workspace at a glance"
   },
   "overview": {
     "title": "System Overview",
@@ -2067,8 +2416,14 @@
     "viewLatencyCharts": "View latency & RED charts",
     "elevatedErrorRate": "Elevated error rate",
     "reqPerSec": "req/s",
-    "allClear": "All clear",
-    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window."
+    "allClear": "All systems clear",
+    "allClearDesc": "No active anomalies, incidents, or degraded services in the selected time window. Your infrastructure looks healthy.",
+    "emptyActionAlerts": "View alert rules",
+    "emptyActionAlertsDesc": "Review configured alerts and thresholds",
+    "emptyActionLogs": "Explore logs",
+    "emptyActionLogsDesc": "Search and filter your log streams",
+    "emptyActionTraces": "Explore traces",
+    "emptyActionTracesDesc": "Inspect distributed traces and service latency"
   },
   "chatHistory": {
     "title": "Chats",
@@ -2687,7 +3042,7 @@
       "correlatedBySemanticGroups": "Dimensions",
       "correlatedByAlertId": "Alert ID",
       "filterByStatus": "Filter by status",
-      "allStatuses": "All Statuses",
+      "allStatuses": "All",
       "loading": "Loading incidents...",
       "errorLoading": "Failed to load incidents",
       "statusUpdated": "Incident status updated",
@@ -3370,6 +3725,20 @@
     "loadingStream": "Loading Stream...",
     "noTracesFound": "Result not found.",
     "noLogsAvailableForService": "No Logs available for this service",
+    "noData": {
+      "title": "Start sending traces to OpenObserve",
+      "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
+      "otlp": "Send traces via OTLP",
+      "otlpDesc": "Jaeger, Zipkin & any OpenTelemetry-compatible SDK",
+      "otelCollector": "OTel Collector / Agent",
+      "otelCollectorDesc": "Route all telemetry signals through the OTel Collector",
+      "or": "Or:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Ask AI to set up tracing"
+    },
     "configureFullTextSearch": "to configure a full text search field to the stream.",
     "collapseFields": "Collapse Fields",
     "openFields": "Open Fields",
@@ -3378,6 +3747,24 @@
     "errorRetrievingTraces": "Error occurred while retrieving traces.",
     "fetchingTraces": "Loading Traces...",
     "noTracesFoundAdjust": "No traces found. Please adjust the filters and try again.",
+    "noStream": {
+      "title": "Pick a stream to start exploring",
+      "description": "Choose a trace stream, then press <strong>Run query</strong>. You can filter by service, duration, span status, and more once results load.",
+      "selectStream": "Select a stream",
+      "selectStreamDesc": "Browse available trace streams in this organization",
+      "queryGuide": "Read the traces guide",
+      "queryGuideDesc": "Service graph, span filtering, RED metrics & more",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "No traces found",
+      "descNoFilters": "No traces were found in {range}. Try widening the time range to load results.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. Try widening the time range or removing a filter.",
+      "expandRange": "Expand the time range",
+      "expandRangeDescAbsolute": "Switch to a wider relative time range",
+      "removeFilter": "Remove a filter",
+      "selectedRange": "the selected range"
+    },
     "tracesTitle": "TRACES",
     "tracesFound": "Traces Found",
     "spansTitle": "SPANS",
@@ -3385,6 +3772,9 @@
     "spansTruncatedWarning": "Showing {count} of {total} spans, trace may be incomplete. Contact your administrator to increase the span limit.",
     "errorTraces": "Error Traces",
     "errorSpans": "Error Spans",
+    "showAll": "Show All",
+    "filterByErrors": "Filter by errors",
+    "clearErrorFilter": "Clear error filter",
     "error": "ERROR",
     "errors": "ERRORS",
     "success": "SUCCESS",
@@ -4151,6 +4541,21 @@
     "tierDefaultName": "Default",
     "tierConditionalName": "Conditional Tier"
   },
+  "aiObservability": {
+    "title": "AI Observability",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evaluate"
+    },
+    "nav": {
+      "llmInsights": "LLM Insights",
+      "sessions": "LLM Sessions",
+      "quality": "Quality",
+      "evalJobs": "Eval Jobs",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score Configs"
+    }
+  },
   "onlineEvals": {
     "title": "Evaluations",
     "description": "Configure LLM providers, score definitions, scorers, and live evaluation jobs.",
@@ -4210,11 +4615,6 @@
           "title": "Evaluated Spans",
           "unit": "",
           "hint": "Distinct span IDs in _llm_scores within the window"
-        },
-        "qualityIssueRate": {
-          "title": "Quality Issue Rate",
-          "unit": "%",
-          "hint": "Evaluated spans with any dimension below threshold"
         },
         "evaluationCost": {
           "title": "Evaluation Cost",
@@ -4360,6 +4760,9 @@
       "useAsDefault": "Use as default provider",
       "authConfigLabel": "Auth config JSON",
       "authConfigHelp": "Credentials are encrypted at rest and cannot be read back after saving.",
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "Enter API key",
+      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when editing to keep the existing key.",
       "authSection": "Authentication",
       "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
       "cannotRename": "Cannot be renamed after creation.",
@@ -4931,5 +5334,111 @@
       "title": "No LLM Providers Yet",
       "description": "LLM Providers store the connection details (endpoint + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
+  },
+  "logs": {
+    "noData": {
+      "title": "Start sending data to OpenObserve",
+      "description": "There's no data in this organization yet, so there are no streams to explore. Send your first logs and they'll show up here automatically — pick how you want to start.",
+      "curl": "Send via Curl / HTTP API",
+      "curlDesc": "Quickest way — paste one command and logs start flowing",
+      "shippers": "Use a log shipper",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SyslogNg & more",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Vendor-neutral OTLP ingestion for logs, traces & metrics",
+      "or": "Or:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS / CloudWatch",
+      "linux": "Linux",
+      "windows": "Windows",
+      "askAi": "Ask AI to set up ingestion"
+    },
+    "noStream": {
+      "title": "Pick a stream to start exploring",
+      "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
+      "selectStream": "Select a stream",
+      "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
+      "queryGuide": "Read the query guide",
+      "queryGuideDesc": "Filters, SQL mode, VRL & saved views",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "No events found",
+      "descNoFilters": "No events were found in {range}. Try widening the time range to load results.",
+      "descWithFilters": "Nothing matched <strong>this query</strong> in the selected window. The stream has data here — try relaxing a filter in the query bar.",
+      "descOutOfRange": "Your time window doesn't contain any data from this stream. Jump to when data was last seen.",
+      "jumpToData": "Jump to latest data",
+      "expandRange": "Expand the time range",
+      "expandRangeDescAbsolute": "Switch to a wider relative time range",
+      "openHistory": "Open search history",
+      "askAi": "Ask AI to fix my query",
+      "selectedRange": "the selected range"
+    },
+    "error": {
+      "sqlError": "SQL syntax error",
+      "sqlErrorDesc": "Your query has a syntax error. Review the query editor for highlighted errors.",
+      "streamNotFound": "Stream not found",
+      "streamNotFoundDesc": "The selected stream does not exist or was removed.",
+      "ftsNotConfigured": "Full-text search not configured",
+      "ftsNotConfiguredDesc": "This stream does not have a full-text search field. Configure one to enable keyword search.",
+      "fieldNotFound": "Field not found",
+      "fieldNotFoundDesc": "Your query references one or more fields that do not exist in this stream.",
+      "functionNotDefined": "Function not defined",
+      "functionNotDefinedDesc": "Your query calls a VRL function that is not defined.",
+      "dataUnavailable": "Data files unavailable",
+      "dataUnavailableDesc": "Some data files for this time range are inaccessible. Try a different time window.",
+      "dataTypeMismatch": "Data type mismatch",
+      "dataTypeMismatchDesc": "A field in your query is used with an incompatible data type.",
+      "executionError": "Query execution failed",
+      "executionErrorDesc": "An error occurred while executing your query.",
+      "serverError": "Server error",
+      "serverErrorDesc": "An internal error occurred on the server.",
+      "generic": "Search error",
+      "genericDesc": "An error occurred while retrieving search events.",
+      "configureStream": "Configure stream",
+      "configureStreamDesc": "Add a full-text search field in stream settings",
+      "fixQuery": "Fix the query",
+      "fixQueryDesc": "Review and correct the query in the editor",
+      "expandRange": "Try a different time range",
+      "expandRangeDesc": "Accessible data may be in a different time window",
+      "copyError": "Copy error details",
+      "traceId": "Trace ID:",
+      "askAi": "Ask AI to fix my query",
+      "showDetail": "Show details",
+      "hideDetail": "Hide details"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL syntax error",
+    "sqlErrorDesc": "Your query has a syntax error. Review the editor for highlighted errors.",
+    "streamNotFound": "Stream not found",
+    "streamNotFoundDesc": "The selected stream does not exist or was removed.",
+    "ftsNotConfigured": "Full-text search not configured",
+    "ftsNotConfiguredDesc": "This stream does not have a full-text search field. Configure one to enable keyword search.",
+    "fieldNotFound": "Field not found",
+    "fieldNotFoundDesc": "Your query references one or more fields that do not exist in this stream.",
+    "functionNotDefined": "Function not defined",
+    "functionNotDefinedDesc": "Your query calls a VRL function that is not defined.",
+    "dataUnavailable": "Data files unavailable",
+    "dataUnavailableDesc": "Some data files for this time range are inaccessible. Try a different time window.",
+    "dataTypeMismatch": "Data type mismatch",
+    "dataTypeMismatchDesc": "A field in your query is used with an incompatible data type.",
+    "executionError": "Query execution failed",
+    "executionErrorDesc": "An error occurred while executing your query.",
+    "serverError": "Server error",
+    "serverErrorDesc": "An internal error occurred on the server.",
+    "generic": "Query error",
+    "genericDesc": "An error occurred while processing your query.",
+    "configureResource": "Configure stream",
+    "configureResourceDesc": "Add a full-text search field in stream settings",
+    "fixQuery": "Fix the query",
+    "fixQueryDesc": "Review and correct the query in the editor",
+    "expandRange": "Try a different time range",
+    "expandRangeDesc": "Accessible data may be in a different time window",
+    "copyError": "Copy error details",
+    "copied": "Copied!",
+    "traceId": "Trace ID:",
+    "askAi": "Ask AI to fix my query",
+    "showDetail": "Show details",
+    "hideDetail": "Hide details"
   }
 }

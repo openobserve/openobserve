@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
           <span
             v-if="patternLevelInfo"
-            class="tw:shrink-0 tw:inline-flex tw:items-center tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[0.625rem] tw:font-bold tw:uppercase tw:tracking-wide tw:text-white"
+            class="tw:shrink-0 tw:inline-flex tw:items-center tw:px-1.5 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-white"
             :style="{ backgroundColor: patternLevelInfo.color }"
           >
             {{ patternLevelInfo.level }}
@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="index"
             pagination="none"
             :show-global-filter="false"
+            :default-columns="false"
             :max-height="undefined"
             class="tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
           >
@@ -321,6 +322,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import {
   tokenizeTemplate,
   wildcardChipColor,
@@ -385,8 +387,8 @@ const anomalyExplanationForSelected = computed(() =>
 );
 
 const variableColumns = computed<OTableColumnDef[]>(() => [
-  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", meta: { align: "left" } },
-  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", meta: { align: "left" } },
+  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", size: COL.name, meta: { align: "left", autoWidth: true } },
+  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", size: COL.type, meta: { align: "left" } },
 ]);
 </script>
 

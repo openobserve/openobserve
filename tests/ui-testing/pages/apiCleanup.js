@@ -2995,6 +2995,64 @@ class APICleanup {
             testLogger.info(`Cleaned up ${files.length} screenshot(s)`, { prefixes });
         }
     }
+
+    /**
+     * Delete model-pricing records whose names match any of the provided patterns.
+     * Patterns may be RegExp objects or plain strings (treated as prefix match).
+     * Handles 404/disabled gracefully so it's safe on OSS instances without the feature.
+     *
+     * @param {Array<RegExp|string>} patterns
+     */
+    async cleanupModelPricingModels(patterns = []) {
+        testLogger.info('Starting model pricing cleanup', { patternCount: patterns.length });
+
+        const apiBase = `${this.baseUrl}/api/${this.org}/llm/models`;
+        try {
+            const listRes = await this._fetch(apiBase, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            });
+
+            if (!listRes.ok) {
+                if (listRes.status === 404) {
+                    testLogger.info('Model pricing endpoint not available — skipping cleanup');
+                } else {
+                    testLogger.warn('Failed to list model pricing records', { status: listRes.status });
+                }
+                return;
+            }
+
+            const data = await listRes.json();
+            const models = data.list || data || [];
+
+            const matches = models.filter(m => {
+                if (!m.name) return false;
+                return patterns.some(p =>
+                    p instanceof RegExp ? p.test(m.name) : m.name.startsWith(p)
+                );
+            });
+
+            if (matches.length === 0) {
+                testLogger.info('No model pricing records matched cleanup patterns');
+                return;
+            }
+
+            testLogger.info(`Deleting ${matches.length} model pricing record(s)`, {
+                names: matches.map(m => m.name),
+            });
+
+            await Promise.all(matches.map(m =>
+                this._fetch(`${apiBase}/${m.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                }).catch(err => testLogger.warn('Failed to delete model pricing record', { id: m.id, error: err.message }))
+            ));
+
+            testLogger.info('Model pricing cleanup completed');
+        } catch (err) {
+            testLogger.warn('Model pricing cleanup failed (non-fatal)', { error: err.message });
+        }
+    }
 }
 
 module.exports = APICleanup;

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::Schema;
 use config::meta::{
@@ -24,6 +24,7 @@ use datafusion::{
     datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache,
     sql::TableReference,
 };
+use hashbrown::HashSet;
 use infra::errors::Result;
 
 use super::{datafusion::exec::TableBuilder, index::IndexCondition};

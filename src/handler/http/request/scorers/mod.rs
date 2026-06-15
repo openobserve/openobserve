@@ -18,6 +18,10 @@ use axum::{
     response::Response,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::utils::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use crate::handler::http::extractors::Headers;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::scorers::{
@@ -75,8 +79,26 @@ impl From<ScorerError> for Response {
 pub async fn list_scorers(
     Path(org_id): Path<String>,
     Query(query): Query<ListScorersQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match scorers::list_scorers(&org_id, query.scorer_type.as_ref()).await {
+    #[cfg(feature = "enterprise")]
+    let permitted_objects = {
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            &user_email.user_id,
+            "GET",
+            "scorer",
+        )
+        .await
+        {
+            Ok(list) => list,
+            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
+        }
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let permitted_objects = None;
+
+    match scorers::list_scorers(&org_id, query.scorer_type.as_ref(), permitted_objects).await {
         Ok(list) => {
             let body: ListScorersResponseBody = list.into();
             MetaHttpResponse::json(body)

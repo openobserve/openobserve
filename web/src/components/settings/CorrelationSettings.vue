@@ -15,42 +15,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
-    <!-- Sticky header: title + tabs -->
-    <div class="tw:shrink-0 tw:bg-[var(--o2-card-bg)]">
-      <div class="tw:px-3 tw:py-3">
-        <div class="general-page-title">
-          {{ t("settings.correlation.title") }}
-        </div>
-        <div class="general-page-subtitle">
-          {{ t("settings.correlation.subtitle") }}
-        </div>
-      </div>
-      <div class="tw:px-4 tw:flex tw:justify-start">
-        <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
-          <OTab
-            name="services"
-            :label="t('settings.correlation.discoveredServicesTab')"
-          />
-          <OTab
-            name="discovery"
-            :label="t('settings.correlation.serviceDiscoveryTab')"
-          />
-          <OTab
-            name="alert-correlation"
-            :label="t('settings.correlation.alertCorrelationTab')"
-          />
-          <OTab
-            name="field-aliases"
-            :label="t('settings.correlation.fieldAliasesTab')"
-          />
-        </OTabs>
-      </div>
+  <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <AppPageHeader
+      icon="group-work"
+      subtitle="Telemetry correlation configuration"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      data-test="correlation-settings-header"
+    >
+      <template #title>
+        <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
+      </template>
+    </AppPageHeader>
+
+    <!-- Tab bar -->
+    <div class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle" data-test="correlation-settings-tabs">
+      <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
+        <OTab
+          name="services"
+          :label="t('settings.correlation.discoveredServicesTab')"
+        />
+        <OTab
+          name="discovery"
+          :label="t('settings.correlation.serviceDiscoveryTab')"
+        />
+        <OTab
+          name="alert-correlation"
+          :label="t('settings.correlation.alertCorrelationTab')"
+        />
+        <OTab
+          name="field-aliases"
+          :label="t('settings.correlation.fieldAliasesTab')"
+        />
+      </OTabs>
     </div>
 
-    <!-- Scrollable content -->
-    <div class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:py-2">
-      <div v-show="activeTab === 'discovery'">
+    <!-- Tab content -->
+    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div v-show="activeTab === 'services'" class="tw:h-full">
+        <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
+      </div>
+
+      <div v-show="activeTab === 'discovery'" class="tw:h-full tw:overflow-y-auto tw:px-4 tw:py-3">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -60,36 +65,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'services'">
-        <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
+      <div v-show="activeTab === 'alert-correlation'" class="tw:h-full tw:overflow-y-auto tw:px-4">
+        <OrganizationDeduplicationSettings
+          :org-id="store.state.selectedOrganization.identifier"
+          :config="store.state.organizationSettings?.deduplication_config"
+          @saved="onCorrelationSettingsSaved"
+        />
       </div>
 
-      <OrganizationDeduplicationSettings
-        v-show="activeTab === 'alert-correlation'"
-        :org-id="store.state.selectedOrganization.identifier"
-        :config="store.state.organizationSettings?.deduplication_config"
-        @saved="onCorrelationSettingsSaved"
-      />
-
-      <SemanticFieldGroupsConfig
-        v-show="activeTab === 'field-aliases'"
-        :key="`field-aliases-${fieldAliasesEditorKey}`"
-        :semantic-field-groups="draftSemanticGroups"
-        :scroll-to-group-id="aliasScrollToGroup"
-        @update:semanticFieldGroups="onDraftSemanticGroupsChange"
-      >
-        <template #header-actions>
-          <OButton
-            data-test="correlation-semanticfieldgroup-save-btn"
-            :variant="isFieldAliasesDirty ? 'primary' : 'outline'"
-            size="sm"
-            :loading="savingFieldAliases"
-            @click="saveSemanticGroups"
-          >
-            {{ t("common.save") }}
-          </OButton>
-        </template>
-      </SemanticFieldGroupsConfig>
+      <div v-show="activeTab === 'field-aliases'" class="tw:h-full tw:overflow-y-auto tw:px-4">
+        <SemanticFieldGroupsConfig
+          :key="`field-aliases-${fieldAliasesEditorKey}`"
+          :semantic-field-groups="draftSemanticGroups"
+          :scroll-to-group-id="aliasScrollToGroup"
+          @update:semanticFieldGroups="onDraftSemanticGroupsChange"
+        >
+          <template #header-actions>
+            <OButton
+              data-test="correlation-semanticfieldgroup-save-btn"
+              :variant="isFieldAliasesDirty ? 'primary' : 'outline'"
+              size="sm"
+              :loading="savingFieldAliases"
+              @click="saveSemanticGroups"
+            >
+              {{ t("common.save") }}
+            </OButton>
+          </template>
+        </SemanticFieldGroupsConfig>
+      </div>
     </div>
   </div>
 </template>
@@ -107,6 +110,7 @@ import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue
 import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -122,6 +126,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
+    AppPageHeader,
   },
   setup() {
     const store = useStore();
@@ -355,14 +360,6 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.general-page-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.5rem;
-}
-.general-page-subtitle {
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.25rem;
-}
+/* .general-page-title / .general-page-subtitle removed — section title now
+   renders via the standard AppPageHeader. */
 </style>

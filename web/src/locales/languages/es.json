@@ -405,6 +405,12 @@
     "noData": "No hay datos disponibles",
     "functionEditorLabel": "Editor de funciones",
     "loadingStream": "Cargando Stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Muéstrame los errores de la última hora...",
+      "two": "Encuentra consultas lentas que tardan más de 5 segundos...",
+      "three": "Cuenta 5xx respuestas agrupadas por servicio...",
+      "four": "Filtrar registros en los que nivel = 'error'..."
+    },
     "hideHistogram": "Ocultar histograma",
     "disableQuickMode": "Desactivar el modo rápido",
     "menuGroupSetOnce": "Establecer una vez",
@@ -415,7 +421,11 @@
     "menuGroupSchedule": "Programar",
     "menuGroupInspect": "Inspeccionar",
     "validSql": "SQL válido",
-    "invalidSql": "Consulta no válida"
+    "invalidSql": "Consulta no válida",
+    "menuGroupExplain": "Explique",
+    "fieldValuesEmpty": "No se ha encontrado ningún valor.",
+    "fieldValuesEmptyHint": "Prueba con un intervalo de tiempo más amplio para ver los valores.",
+    "selectLogsStreamFirst": "Selecciona la transmisión de registros primero"
   },
   "menu": {
     "home": "Inicio",
@@ -449,7 +459,8 @@
     "language": "Idioma",
     "actions": "Acciones",
     "incidents": "Incidentes",
-    "evals": "Evaluaciones"
+    "evals": "Evaluaciones",
+    "aiObservability": "Observabilidad de la IA"
   },
   "rum": {
     "title": "Monitorización de usuarios reales",
@@ -517,7 +528,18 @@
     "seekToMoment": "Busca este momento de la sesión",
     "timeInSession": "Tiempo de sesión",
     "route": "Ruta",
-    "duration": "Duración"
+    "duration": "Duración",
+    "emptyState": {
+      "title": "Supervise a sus usuarios con Real User Monitoring",
+      "description": "RUM rastrea las interacciones reales de los usuarios (cargas de páginas, errores, llamadas a la API y repeticiones de sesiones) para que puedas ver exactamente cómo los usuarios experimentan tu aplicación.",
+      "webApp": "Instrumente una aplicación web",
+      "webAppDesc": "Agregue el SDK RUM de OpenObserve a cualquier aplicación de JavaScript",
+      "sessionReplay": "Habilitar la reproducción de sesiones",
+      "sessionReplayDesc": "Graba y reproduce las sesiones de usuario para depurar problemas de UX",
+      "learnMore": "Obtenga más información:",
+      "quickImpl": "Guía de implementación rápida",
+      "blogPost": "Conceptos básicos de monitoreo de frontend"
+    }
   },
   "about": {
     "name": "Abrir Observe",
@@ -958,7 +980,8 @@
     "subscription_type": "Tipo de plan",
     "proceed_subscription": "Proceder a la suscripción",
     "subscription_plan": "Plan de suscripción",
-    "makeBilledMember": "Haga de esta organización un miembro de facturación de {org}"
+    "makeBilledMember": "Haga de esta organización un miembro de facturación de {org}",
+    "manage": "Administrar"
   },
   "template": {
     "header": "Plantillas",
@@ -1200,7 +1223,8 @@
     "tokenRotateError": "No se pudo rotar el token.",
     "tokenDeleteError": "No se pudo eliminar el token.",
     "noTokensFound": "No se ha encontrado ningún token de ingestión.",
-    "createdBy": "Creado por"
+    "createdBy": "Creado por",
+    "orgLevelSummary": "Tokens a nivel de organización para puntos finales de ingestión."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -1780,7 +1804,24 @@
     "noDataAvailable": "No hay datos disponibles",
     "tabAiAssistant": "Asistente O2 AI",
     "tabOverview": "Visión general",
-    "tabUsage": "Uso"
+    "tabUsage": "Uso",
+    "subtitle": "Su espacio de trabajo de observabilidad de un vistazo",
+    "noDataState": {
+      "title": "Aún no se han ingerido datos",
+      "description": "Esta organización no ha recibido ningún dato, por lo que no hay nada que registrar. Una vez que los eventos empiecen a fluir, el <strong>volumen de ingesta, el almacenamiento y el uso de las consultas</strong> aparecerán aquí automáticamente.",
+      "logs": "Enviar registros",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector y más",
+      "traces": "Enviar trazas",
+      "tracesDesc": "Rastreo distribuido de OTLP/Jaeger/Zipkin",
+      "metrics": "Enviar métricas",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf y más",
+      "or": "O:",
+      "otel": "Telemetría abierta",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Integraciones de IA",
+      "shippers": "Transportistas de troncos"
+    }
   },
   "billing": {
     "header": "Uso y facturación",
@@ -2937,7 +2978,10 @@
     "evaluationTemplate": "Plantilla de evaluación",
     "evaluationTemplateHelp": "Seleccione una plantilla de evaluación que defina los criterios y las dimensiones del juez del LLM.",
     "noTemplatesFound": "No se ha encontrado ninguna plantilla de evaluación. Cree una en la página de plantillas de evaluación.",
-    "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente"
+    "evalTemplatesRefreshed": "Las plantillas de evaluación se actualizaron correctamente",
+    "subtitle": "Transforme, enriquezca y dirija los datos durante el vuelo",
+    "selectStream": "Selecciona una transmisión...",
+    "queryEditorPlaceholder": "Seleccione una secuencia o escriba una consulta SQL aquí..."
   },
   "reports": {
     "header": "Informes",
@@ -3196,7 +3240,42 @@
     "openInFullView": "Abrir a la vista",
     "serviceMap": "Mapa de servicios",
     "patternView": "Vista de patrón",
-    "spanView": "Vista de España"
+    "spanView": "Vista de España",
+    "noData": {
+      "title": "Comience a enviar rastreos a OpenObserve",
+      "description": "Aún no se han encontrado rastros en esta organización. Instrumente sus servicios y los rastros aparecerán aquí automáticamente.",
+      "otlp": "Enviar trazas mediante OTL",
+      "otlpDesc": "Jaeger, Zipkin y cualquier SDK compatible con OpenTelemetry",
+      "otelCollector": "Coleccionista de hoteles//Agente",
+      "otelCollectorDesc": "Dirija todas las señales de telemetría a través del colector Otel",
+      "or": "O:",
+      "kubernetes": "Kubernetes",
+      "python": "Pitón",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Pídele a la IA que configure el rastreo"
+    },
+    "noStream": {
+      "title": "Elige un arroyo para empezar a explorar",
+      "description": "Elige una secuencia de seguimiento y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes filtrar por servicio, duración, estado del intervalo, etc. una vez que se carguen los resultados.",
+      "selectStream": "Selecciona una transmisión",
+      "selectStreamDesc": "Explore los flujos de rastreo disponibles en esta organización",
+      "queryGuide": "Lea la guía de trazas",
+      "queryGuideDesc": "Gráfico de servicio, filtrado de intervalos, métricas RED y más",
+      "recent": "Reciente:"
+    },
+    "noEvents": {
+      "title": "No se han encontrado rastros",
+      "descNoFilters": "No se encontraron rastros en {range}. Intente ampliar el intervalo de tiempo para cargar los resultados.",
+      "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo o eliminar un filtro.",
+      "expandRange": "Amplíe el rango de tiempo",
+      "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+      "removeFilter": "Eliminar un filtro",
+      "selectedRange": "el rango seleccionado"
+    },
+    "showAll": "Mostrar todo",
+    "filterByErrors": "Filtrar por errores",
+    "clearErrorFilter": "Borrar filtro de errores"
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -3214,7 +3293,8 @@
     "confirmRejectMsg": "¿Estás seguro de que quieres rechazar la invitación para unirte a {org}?",
     "expired": "Expirado",
     "expiresToday": "Caduca hoy",
-    "daysLeft": "Quedan {días} días"
+    "daysLeft": "Quedan {días} días",
+    "search": "Buscar invitaciones"
   },
   "serviceAccounts": {
     "header": "Cuentas de servicio",
@@ -3478,7 +3558,9 @@
     "timeRangeLabel": "Intervalo de tiempo:",
     "analyzeTooltipTraces": "Analice las dimensiones de seguimiento para determinar la velocidad, la latencia y los patrones de error",
     "insightsButtonLabel": "Perspectivas",
-    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda"
+    "searchInspectionsLabel": "Inspeccione los detalles de ejecución del trabajo de búsqueda",
+    "inspectBtnLabel": "Inspeccionar",
+    "analyzeBtnLabel": "Perspectivas"
   },
   "errorInsights": {
     "title": "Perspectivas",
@@ -3956,7 +4038,13 @@
     "elevatedErrorRate": "Tasa de error elevada",
     "reqPerSec": "solicitud/s",
     "allClear": "Todo despejado",
-    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada."
+    "allClearDesc": "No hay anomalías, incidentes ni servicios degradados activos en la ventana de tiempo seleccionada.",
+    "emptyActionAlerts": "Ver reglas de alertas",
+    "emptyActionAlertsDesc": "Revise las alertas y los umbrales configurados",
+    "emptyActionLogs": "Explore los registros",
+    "emptyActionLogsDesc": "Busque y filtre sus flujos de registro",
+    "emptyActionTraces": "Explora las huellas",
+    "emptyActionTracesDesc": "Inspeccione los rastros distribuidos y la latencia del servicio"
   },
   "chatHistory": {
     "title": "Charlas",
@@ -4069,6 +4157,285 @@
       "one": "Muéstrame los errores de la última hora...",
       "two": "Escriba VRL para analizar JSON desde los registros de nginx...",
       "three": "Cree un panel de control para el estado de los nodos de K8..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "No hemos podido encontrar ningún dato",
+      "description": "No hay nada que coincida con tus filtros o intervalos de tiempo actuales. Intenta ampliar la búsqueda, ampliar el intervalo de tiempo o borrar los filtros.",
+      "action": "Borrar filtros",
+      "actionDesc": "Restablecer todos los filtros aplicados"
+    },
+    "noLogs": {
+      "title": "No hay registros en este rango",
+      "description": "No hemos encontrado ningún registro para la transmisión y el intervalo de tiempo seleccionados. Prueba con un intervalo de tiempo más amplio o con una transmisión diferente.",
+      "action": "Ampliar el rango de tiempo",
+      "actionDesc": "Búsqueda durante un período más largo"
+    },
+    "noDashboards": {
+      "title": "Crea tu primer panel",
+      "description": "Los paneles reúnen las métricas, los registros y los seguimientos en una sola vista. Crea uno para empezar.",
+      "action": "Nuevo panel",
+      "actionDesc": "Empieza desde un lienzo vacío",
+      "import": "Panel de importación",
+      "importDesc": "Cargar un archivo JSON del panel",
+      "templates": "Navega por las plantillas",
+      "templatesDesc": "Empieza desde un panel de control de la comunidad"
+    },
+    "noPipelines": {
+      "title": "Crea tu primera canalización",
+      "description": "Las canalizaciones transforman y enrutan los datos a medida que llegan. Configure uno para empezar a dar forma a sus transmisiones.",
+      "action": "Nuevo gasoducto",
+      "actionDesc": "Cree un flujo desde cero",
+      "import": "Canalización de importación",
+      "importDesc": "Cargar una definición de canalización"
+    },
+    "noFunctions": {
+      "title": "Crea tu primera función",
+      "description": "Las funciones enriquecen y remodelan los datos en el momento de la ingesta o la consulta. Añada una para empezar.",
+      "action": "Nueva función",
+      "actionDesc": "Escribir una nueva función VRL"
+    },
+    "noStreams": {
+      "title": "Esperando tus primeros datos",
+      "description": "Aún no ha llegado ningún dato. Conecta una fuente y tus transmisiones se mostrarán aquí automáticamente.",
+      "action": "Configurar la ingestión",
+      "actionDesc": "Conectar una fuente de datos"
+    },
+    "noAlerts": {
+      "title": "Crea tu primera alerta",
+      "description": "Las alertas le notifican en el momento en que sus datos cruzan un umbral. Defina uno para comenzar a monitorear.",
+      "action": "Nueva alerta",
+      "actionDesc": "Definir una condición para supervisar"
+    },
+    "noIncidents": {
+      "title": "No hay incidentes activos",
+      "description": "Estás atrapado, nada necesita tu atención en este momento. Los incidentes desencadenados aparecerán aquí."
+    },
+    "loadError": {
+      "title": "Algo salió mal",
+      "description": "No hemos podido cargar estos datos. Por lo general, es temporal; inténtelo de nuevo en un momento.",
+      "action": "Reintentar",
+      "actionDesc": "Intente cargar los datos de nuevo"
+    },
+    "noData": {
+      "title": "Aún no hay nada aquí",
+      "description": "No hay datos que mostrar en este momento."
+    },
+    "noTraces": {
+      "title": "No se han encontrado rastros",
+      "description": "No hay rastros que coincidan con el servicio y el rango de tiempo seleccionados. Prueba con un intervalo de tiempo más amplio o con un servicio diferente."
+    },
+    "noSearchHistory": {
+      "title": "Aún no hay historial de búsqueda",
+      "description": "Las búsquedas que realices se mostrarán aquí para que puedas revisarlas y volver a ejecutarlas."
+    },
+    "noUsers": {
+      "title": "Aún no hay usuarios",
+      "description": "Invita a tus compañeros de equipo a colaborar en esta organización.",
+      "action": "Agregar usuario",
+      "actionDesc": "Invita a un compañero de equipo por correo electrónico"
+    },
+    "noReports": {
+      "title": "Aún no hay informes",
+      "description": "Programa un informe para recibir los paneles en tu bandeja de entrada.",
+      "action": "Nuevo informe",
+      "actionDesc": "Programe la entrega de un panel"
+    },
+    "noQueries": {
+      "title": "No hay consultas en ejecución",
+      "description": "No hay consultas activas en este momento. Las consultas de larga duración aparecerán aquí mientras se ejecuten."
+    },
+    "noServiceAccounts": {
+      "title": "Aún no hay cuentas de servicio",
+      "description": "Las cuentas de servicio permiten que las aplicaciones se autentiquen con la API. Crea una para empezar.",
+      "action": "Agregar cuenta de servicio",
+      "actionDesc": "Crear una cuenta de servicio de API"
+    },
+    "noInvitations": {
+      "title": "No hay invitaciones pendientes",
+      "description": "Las invitaciones que hayas enviado o recibido se mostrarán aquí."
+    },
+    "filtered": {
+      "title": "No se encontró {noun}",
+      "description": "No hay {noun} que coincida con los filtros o la búsqueda actuales. Intenta ajustarlos o borrarlos.",
+      "action": "Borrar filtros",
+      "actionDesc": "Restablecer todos los filtros y la búsqueda",
+      "fallbackNoun": "resultados"
+    },
+    "nouns": {
+      "logs": "registros",
+      "dashboards": "tableros",
+      "pipelines": "tuberías",
+      "functions": "funciones",
+      "streams": "corrientes",
+      "alerts": "alertas",
+      "incidents": "incidentes",
+      "traces": "rastros",
+      "searches": "búsquedas",
+      "users": "usuarios",
+      "reports": "informes",
+      "queries": "consultas",
+      "serviceAccounts": "cuentas de servicio",
+      "invitations": "invitaciones"
+    },
+    "noDashboardsInFolder": {
+      "title": "No hay paneles en esta carpeta",
+      "description": "Esta carpeta está vacía. Agregue un panel aquí o mueva uno de otra carpeta.",
+      "action": "Nuevo panel",
+      "actionDesc": "Crear un panel de control en esta carpeta",
+      "import": "Panel de importación",
+      "importDesc": "Cargar un archivo JSON del panel",
+      "templates": "Navega por las plantillas",
+      "templatesDesc": "Empieza desde un panel de control de la comunidad"
+    },
+    "noGroups": {
+      "title": "Aún no hay grupos",
+      "description": "Los grupos te permiten administrar los permisos de varios usuarios a la vez. Crea uno para empezar.",
+      "action": "Nuevo grupo",
+      "actionDesc": "Crear un grupo de usuarios"
+    },
+    "noRoles": {
+      "title": "Aún no hay roles",
+      "description": "Los roles definen las acciones que pueden realizar los usuarios. Cree un rol personalizado para controlar el acceso.",
+      "action": "Nuevo rol",
+      "actionDesc": "Definir un rol de acceso personalizado"
+    },
+    "noAnomalyConfigs": {
+      "title": "No hay ninguna detección de anomalías configurada",
+      "description": "Configure la detección de anomalías para identificar automáticamente patrones inusuales en sus datos.",
+      "action": "Nueva configuración",
+      "actionDesc": "Configurar la detección de anomalías"
+    },
+    "noApiLimits": {
+      "title": "No hay límites de API configurados",
+      "description": "Los límites de la API controlan la cantidad de datos que cada organización puede ingerir y consultar por período de tiempo."
+    },
+    "noRoleLimits": {
+      "title": "No hay límites de roles configurados",
+      "description": "Los límites de funciones definen las cuotas de ingesta y consulta que se aplican a las funciones individuales de una organización."
+    },
+    "noIngestionTokens": {
+      "title": "Aún no hay tokens de ingestión",
+      "description": "Los tokens de ingesta autentican las fuentes de datos al enviar registros, métricas y seguimientos.",
+      "action": "Nuevo token",
+      "actionDesc": "Generar un token de ingesta"
+    },
+    "noOrganizations": {
+      "title": "Aún no hay organizaciones",
+      "description": "Las organizaciones agrupan los usuarios y los datos. Crea uno para empezar."
+    },
+    "noAlertDestinations": {
+      "title": "Aún no hay destinos",
+      "description": "Los destinos definen dónde se envían las notificaciones de alerta: Slack, correo electrónico, webhooks y más.",
+      "action": "Nuevo destino",
+      "actionDesc": "Conectar un canal de notificaciones"
+    },
+    "noAlertTemplates": {
+      "title": "Aún no hay plantillas",
+      "description": "Las plantillas definen el formato de los mensajes de notificación de alerta.",
+      "action": "Nueva plantilla",
+      "actionDesc": "Crear una plantilla de notificación"
+    },
+    "noEnrichmentTables": {
+      "title": "Aún no hay tablas de enriquecimiento",
+      "description": "Las tablas de enriquecimiento le permiten adjuntar contexto adicional a los datos de registro en el momento de la consulta.",
+      "action": "Mesa nueva",
+      "actionDesc": "Crear una tabla de enriquecimiento"
+    },
+    "noCipherKeys": {
+      "title": "Aún no hay claves de cifrado",
+      "description": "Las claves de cifrado se utilizan para cifrar los campos sensibles de los flujos de datos.",
+      "action": "Clave nueva",
+      "actionDesc": "Generar una clave de cifrado"
+    },
+    "noAiToolsets": {
+      "title": "Aún no hay conjuntos de herramientas de IA",
+      "description": "Los conjuntos de herramientas de IA conectan a su organización con capacidades de IA externas.",
+      "action": "Nuevo conjunto de herramientas",
+      "actionDesc": "Añadir un conjunto de herramientas de IA"
+    },
+    "noLlmProviders": {
+      "title": "No hay ningún proveedor de LLM configurado",
+      "description": "Conecte un proveedor de modelos lingüísticos para habilitar las funciones impulsadas por la IA.",
+      "action": "Agregar proveedor",
+      "actionDesc": "Configurar un proveedor de LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "No se ha descubierto ningún servicio",
+      "description": "Los servicios aparecerán aquí automáticamente una vez que empiecen a llegar los rastros."
+    },
+    "noNodes": {
+      "title": "No hay nodos disponibles",
+      "description": "Los nodos del clúster aparecerán aquí una vez registrados."
+    },
+    "noSourceMaps": {
+      "title": "No se han subido mapas de origen",
+      "description": "Cargue los mapas de origen para permitir que los rastros de pila sean legibles en sus informes de errores de RUM.",
+      "action": "Cargar",
+      "actionDesc": "Cargar un archivo de mapa fuente"
+    },
+    "noBackfillJobs": {
+      "title": "Sin trabajos de relleno",
+      "description": "Los trabajos de relleno reprocesan los datos históricos a través de una canalización. Ejecute uno para empezar."
+    },
+    "noSearchJobs": {
+      "title": "No hay trabajos de búsqueda programados",
+      "description": "Las búsquedas de larga duración que programes aparecerán aquí, donde podrás realizar un seguimiento de su estado y explorar los resultados una vez finalizadas."
+    },
+    "noPipelineDestinations": {
+      "title": "Aún no hay destinos",
+      "description": "Destinos externos para la salida de canalización: puntos finales HTTP y destinos de escritura remota.",
+      "action": "Nuevo destino",
+      "actionDesc": "Conectar un destino de canalización"
+    },
+    "noLLMInsights": {
+      "title": "Aún no hay actividad de LLM",
+      "description": "Instrumente sus servicios con las convenciones semánticas de la generación AI de OpenTelemetry e ingiera al menos un rastro para rellenar este panel.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Captura los atributos gen_ai_* en tus rastros"
+    },
+    "noLLMSessions": {
+      "title": "Aún no hay sesiones de LLM",
+      "description": "Las sesiones se agrupan por gen_ai_conversation_id. Instrumente sus servicios para que cada conversación etiquete sus rastros y las sesiones aparezcan aquí.",
+      "action": "Instrumento con OpenTelemetry",
+      "actionDesc": "Etiquete intervalos con gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Aún no hay goleadores",
+      "description": "Los evaluadores califican las respuestas del LLM en función de sus configuraciones de puntuación: comience con un juez de LLM o importe uno de la biblioteca.",
+      "action": "Crear anotador",
+      "actionDesc": "Defina un juez de LLM o un anotador remoto"
+    },
+    "noEvalJobs": {
+      "title": "Aún no hay trabajos de evaluación",
+      "description": "Los puntajes del calendario de trabajos se comparan con un flujo de LLM. Crea uno para empezar a calificar las conversaciones siguiendo una cadencia.",
+      "action": "Crear un trabajo de evaluación",
+      "actionDesc": "Elige una transmisión + goleadores + cadencia"
+    },
+    "noScoreConfigs": {
+      "title": "Aún no hay configuraciones de puntuación",
+      "description": "Las configuraciones de puntuación definen el esquema que producen los puntuadores: numérico, booleano o categórico. Agregue uno para empezar a puntuar.",
+      "action": "Crear configuración de puntuación",
+      "actionDesc": "Defina la forma de la puntuación + el rango saludable"
+    },
+    "noEvalTemplates": {
+      "title": "Aún no hay plantillas de evaluación",
+      "description": "Las plantillas de evaluación definen criterios de puntuación reutilizables para las evaluaciones de LLM.",
+      "action": "Nueva plantilla",
+      "actionDesc": "Crear una plantilla de evaluación"
+    },
+    "noPipelineHistory": {
+      "title": "Aún no hay historial de oleoductos",
+      "description": "El historial de ejecución de las canalizaciones aparecerá aquí una vez que las canalizaciones estén en funcionamiento."
+    },
+    "noStreamSelected": {
+      "title": "Selecciona una transmisión para empezar",
+      "description": "Elige una transmisión en el menú desplegable de la izquierda y, a continuación, pulsa «Ejecutar consulta» para explorar tus registros. También puedes aplicar filtros adicionales y ajustar el intervalo de fechas."
+    },
+    "noQueryApplied": {
+      "title": "Ejecute una consulta para ver los registros",
+      "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión."
     }
   },
   "onlineEvals": {
@@ -4412,5 +4779,126 @@
       "title": "Aún no hay proveedores de LLM",
       "description": "Los proveedores de LLM almacenan los detalles de conexión (punto final y credenciales) de los modelos lingüísticos a los que llaman los evaluadores de LLM Judge. Agregue uno para comenzar a realizar evaluaciones basadas en jueces."
     }
+  },
+  "aiObservability": {
+    "title": "LLM Observabilidad",
+    "sections": {
+      "monitor": "Supervisar",
+      "evaluate": "Evalúe"
+    },
+    "nav": {
+      "overview": "Visión general",
+      "sessions": "Sesiones",
+      "quality": "Calidad",
+      "evalJobs": "Empleos en Eval",
+      "scorers": "Goleadores",
+      "scoreConfigs": "Configuraciones de puntuación"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Comience a enviar datos a OpenObserve",
+      "description": "Aún no hay datos en esta organización, por lo que no hay transmisiones que explorar. Envía tus primeros registros y se mostrarán aquí automáticamente. Elige cómo quieres empezar.",
+      "curl": "Enviar a través de la API Curl/HTTP",
+      "curlDesc": "La forma más rápida: pega un comando y los registros comienzan a fluir",
+      "shippers": "Utilice un transportista de troncos",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysloGng y más",
+      "otel": "Telemetría abierta",
+      "otelDesc": "Ingestión de OTLP independiente del proveedor para registros, seguimientos y métricas",
+      "or": "O:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "escaparates",
+      "askAi": "Pídele a la IA que configure la ingestión"
+    },
+    "noStream": {
+      "title": "Elige un arroyo para empezar a explorar",
+      "description": "Elige una transmisión y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
+      "selectStream": "Selecciona una transmisión",
+      "selectStreamDesc": "Explore registros, seguimientos, métricas y flujos de RUM",
+      "queryGuide": "Lea la guía de consultas",
+      "queryGuideDesc": "Filtros, modo SQL, VRL y vistas guardadas",
+      "recent": "Reciente:"
+    },
+    "noEvents": {
+      "title": "No se ha encontrado ningún evento",
+      "descNoFilters": "No se encontró ningún evento en {range}. Intenta ampliar el intervalo de tiempo para cargar los resultados.",
+      "descWithFilters": "No hay nada que coincida con <strong>esta consulta</strong> en la ventana seleccionada. Intente ampliar el intervalo de tiempo, suavizar un filtro o restablecer la consulta.",
+      "expandRange": "Amplíe el rango de tiempo",
+      "expandRangeDescAbsolute": "Cambie a un rango de tiempo relativo más amplio",
+      "removeFilter": "Eliminar un filtro",
+      "removeFilterDescSql": "Tiene condiciones SQL aplicadas a esta consulta",
+      "openHistory": "Abrir historial de búsqueda",
+      "askAi": "Pedir a la IA que corrija mi consulta",
+      "selectedRange": "el rango seleccionado"
+    },
+    "error": {
+      "sqlError": "Error de sintaxis de SQL",
+      "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor de consultas para ver si hay errores resaltados.",
+      "streamNotFound": "No se encontró la transmisión",
+      "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
+      "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
+      "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
+      "fieldNotFound": "No se encontró el campo",
+      "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
+      "functionNotDefined": "Función no definida",
+      "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
+      "dataUnavailable": "Archivos de datos no disponibles",
+      "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
+      "dataTypeMismatch": "Discordancia de tipos de datos",
+      "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
+      "executionError": "Falló la ejecución de la consulta",
+      "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
+      "serverError": "Error de servidor",
+      "serverErrorDesc": "Se ha producido un error interno en el servidor.",
+      "generic": "Error de búsqueda",
+      "genericDesc": "Se ha producido un error al recuperar los eventos de búsqueda.",
+      "configureStream": "Configurar transmisión",
+      "configureStreamDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
+      "fixQuery": "Corregir la consulta",
+      "fixQueryDesc": "Revisa y corrige la consulta en el editor",
+      "expandRange": "Prueba con un intervalo de tiempo diferente",
+      "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
+      "copyError": "Copiar detalles del error",
+      "traceId": "ID de seguimiento:",
+      "askAi": "Pedir a la IA que corrija mi consulta",
+      "showDetail": "Mostrar detalles",
+      "hideDetail": "Ocultar detalles"
+    }
+  },
+  "queryError": {
+    "sqlError": "Error de sintaxis de SQL",
+    "sqlErrorDesc": "La consulta tiene un error de sintaxis. Revisa el editor para ver si hay errores resaltados.",
+    "streamNotFound": "No se encontró la transmisión",
+    "streamNotFoundDesc": "La transmisión seleccionada no existe o se ha eliminado.",
+    "ftsNotConfigured": "La búsqueda de texto completo no está configurada",
+    "ftsNotConfiguredDesc": "Esta transmisión no tiene un campo de búsqueda de texto completo. Configure uno para habilitar la búsqueda por palabras clave.",
+    "fieldNotFound": "No se encontró el campo",
+    "fieldNotFoundDesc": "La consulta hace referencia a uno o más campos que no existen en esta secuencia.",
+    "functionNotDefined": "Función no definida",
+    "functionNotDefinedDesc": "La consulta llama a una función VRL que no está definida.",
+    "dataUnavailable": "Archivos de datos no disponibles",
+    "dataUnavailableDesc": "No se puede acceder a algunos archivos de datos de este intervalo de tiempo. Pruebe con una ventana de tiempo diferente.",
+    "dataTypeMismatch": "Discordancia de tipos de datos",
+    "dataTypeMismatchDesc": "Un campo de la consulta se usa con un tipo de datos incompatible.",
+    "executionError": "Falló la ejecución de la consulta",
+    "executionErrorDesc": "Se ha producido un error al ejecutar la consulta.",
+    "serverError": "Error de servidor",
+    "serverErrorDesc": "Se ha producido un error interno en el servidor.",
+    "generic": "Error de consulta",
+    "genericDesc": "Se ha producido un error al procesar la consulta.",
+    "configureResource": "Configurar transmisión",
+    "configureResourceDesc": "Añadir un campo de búsqueda de texto completo en la configuración de la transmisión",
+    "fixQuery": "Corregir la consulta",
+    "fixQueryDesc": "Revisa y corrige la consulta en el editor",
+    "expandRange": "Prueba con un intervalo de tiempo diferente",
+    "expandRangeDesc": "Los datos accesibles pueden estar en una ventana de tiempo diferente",
+    "copyError": "Copiar detalles del error",
+    "copied": "¡Copiado!",
+    "traceId": "ID de seguimiento:",
+    "askAi": "Pedir a la IA que corrija mi consulta",
+    "showDetail": "Mostrar detalles",
+    "hideDetail": "Ocultar detalles"
   }
 }

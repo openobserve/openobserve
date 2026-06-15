@@ -16,18 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OSplitter
-    v-model="splitterModel"
-    unit="px"
-    class="tw:h-full"
+  <DataSourceSidebarLayout
+    v-model="tabs"
+    :splitter-width="250"
   >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full">
-          <OTabs
-            v-model="tabs"
-            orientation="vertical"
-          >
+    <template #tabs>
             <ORouteTab
               name="ingestLogs"
               data-test="ingestion-custom-tab-ingestLogs"
@@ -61,12 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :label="t('ingestion.tracesLabel')"
             />
-          </OTabs>
-        </div>
-      </div>
     </template>
 
-    <template v-slot:after>
       <div class="tw:overflow-hidden tw:h-full">
         <router-view
           :title="tabs"
@@ -76,14 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </router-view>
       </div>
-    </template>
-  </OSplitter>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
 import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue'
+import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -96,7 +83,7 @@ import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "CustomPage",
-  components: { OTabs, ORouteTab, OSplitter },
+  components: { ORouteTab, DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -209,7 +196,6 @@ export default defineComponent({
       store,
       router,
       config,
-      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,

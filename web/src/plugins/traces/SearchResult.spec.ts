@@ -336,6 +336,9 @@ describe("SearchResult", () => {
         "get:traceDetails",
         "metrics:filters-updated",
         "run-query",
+        "widen-range",
+        "remove-filter",
+        "error-only-toggled",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

@@ -16,10 +16,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FeatureComparisonTable from "./FeatureComparisonTable.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
-
 
 // Mock feature constants
 vi.mock("@/constants/features", () => ({
@@ -33,11 +31,11 @@ vi.mock("@/constants/features", () => ({
       },
     },
   ],
-  getFeatureNameKey: vi.fn((feature) => "features.test_feature"),
+  getFeatureNameKey: vi.fn((_feature: unknown) => "features.test_feature"),
 }));
 
 describe("FeatureComparisonTable", () => {
-  let store: any;
+  let store: ReturnType<typeof createStore>;
 
   beforeEach(() => {
     store = createStore({
@@ -62,15 +60,15 @@ describe("FeatureComparisonTable", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  it("should render feature comparison table", () => {
+  it("should render three edition cards", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    const table = wrapper.findComponent(OTable);
-    expect(table.exists()).toBe(true);
+    const cards = wrapper.findAll(".edition-card");
+    expect(cards).toHaveLength(3);
   });
 
   it("should display opensource message when build type is opensource", () => {
@@ -80,7 +78,9 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("You're currently using OpenObserve Open Source Edition");
+    expect(wrapper.text()).toContain(
+      "You're currently using OpenObserve Open Source Edition",
+    );
   });
 
   it("should display enterprise message when build type is enterprise", () => {
@@ -99,45 +99,23 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("You're using OpenObserve Enterprise Edition");
+    expect(wrapper.text()).toContain(
+      "You're using OpenObserve Enterprise Edition",
+    );
   });
 
-  it("should have three columns: opensource, enterprise, cloud", () => {
+  it("should mark the current edition card as active for opensource build", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    expect(wrapper.vm.columns).toHaveLength(4); // name + 3 editions
-    expect(wrapper.vm.columns[1].id).toBe("opensource");
-    expect(wrapper.vm.columns[2].id).toBe("enterprise");
-    expect(wrapper.vm.columns[3].id).toBe("cloud");
+    const activeCards = wrapper.findAll(".edition-card--active");
+    expect(activeCards).toHaveLength(1);
   });
 
-  it("should load features from registry", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    expect(wrapper.vm.featureData.features).toBeDefined();
-    expect(Array.isArray(wrapper.vm.featureData.features)).toBe(true);
-  });
-
-  it("should highlight opensource column when build type is opensource", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const highlightedCells = wrapper.findAll(".highlighted-column");
-    expect(highlightedCells.length).toBeGreaterThan(0);
-  });
-
-  it("should highlight enterprise column when build type is enterprise", () => {
+  it("should mark the current edition card as active for enterprise build", () => {
     const enterpriseStore = createStore({
       state: {
         theme: "light",
@@ -153,39 +131,8 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const highlightedCells = wrapper.findAll(".highlighted-column");
-    expect(highlightedCells.length).toBeGreaterThan(0);
-  });
-
-  it("should apply dark theme styles", () => {
-    const darkStore = createStore({
-      state: {
-        theme: "dark",
-        zoConfig: {
-          build_type: "opensource",
-        },
-      },
-    });
-
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, darkStore],
-      },
-    });
-
-    const iconWrapper = wrapper.find(".icon-wrapper");
-    expect(iconWrapper.classes()).toContain("icon-wrapper-dark");
-  });
-
-  it("should apply light theme styles", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const iconWrapper = wrapper.find(".icon-wrapper");
-    expect(iconWrapper.classes()).toContain("icon-wrapper-light");
+    const activeCards = wrapper.findAll(".edition-card--active");
+    expect(activeCards).toHaveLength(1);
   });
 
   it("should display feature title", () => {
@@ -198,17 +145,6 @@ describe("FeatureComparisonTable", () => {
     expect(wrapper.text()).toContain("Feature Comparison");
   });
 
-  it("should have correct table styling classes", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const table = wrapper.find(".feature-comparison-table");
-    expect(table.exists()).toBe(true);
-  });
-
   it("should display icon in header", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
@@ -216,74 +152,61 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    const iconWrapper = wrapper.find(".icon-wrapper");
+    const iconWrapper = wrapper.find(".ec-icon-wrapper");
     expect(iconWrapper.exists()).toBe(true);
     const icon = iconWrapper.findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
   });
 
-  it("should show enterprise promotion for opensource build", () => {
+  it("should show Your Plan badge on the active edition card for opensource", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    expect(wrapper.text()).toContain("Good news");
+    const badge = wrapper.find(".your-plan-badge");
+    expect(badge.exists()).toBe(true);
+    expect(badge.text()).toContain("Your Plan");
   });
 
-  it("should have pagination disabled", () => {
+  it("should render feature list items inside each edition card", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    const table = wrapper.findComponent(OTable);
-    expect(table.props("pagination")).toBe("none");
+    const featureItems = wrapper.findAll(".feature-item");
+    // 3 edition cards × 1 mock feature (test_feature, not excluded) = 3
+    expect(featureItems.length).toBeGreaterThan(0);
   });
 
-  it("should display feature comparison wrapper", () => {
+  it("should render pillar chips inside each edition card", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    const wrapper_div = wrapper.find(".feature-comparison-wrapper");
-    expect(wrapper_div.exists()).toBe(true);
+    const chips = wrapper.findAll(".pillar-chip");
+    expect(chips.length).toBeGreaterThan(0);
   });
 
-  it("should compute currentPlanName for opensource build", () => {
+  it("should display edition names Open Source, Enterprise, Cloud", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
       },
     });
 
-    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
+    const text = wrapper.text();
+    expect(text).toContain("Open Source");
+    expect(text).toContain("Enterprise");
+    expect(text).toContain("Cloud");
   });
 
-  it("should compute currentPlanName for enterprise build", () => {
-    const enterpriseStore = createStore({
-      state: {
-        theme: "light",
-        zoConfig: {
-          build_type: "enterprise",
-        },
-      },
-    });
-
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, enterpriseStore],
-      },
-    });
-
-    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
-  });
-
-  it("should compute currentPlanName for cloud build", () => {
+  it("should display cloud subtitle (generic message) for cloud build", () => {
     const cloudStore = createStore({
       state: {
         theme: "light",
@@ -299,90 +222,66 @@ describe("FeatureComparisonTable", () => {
       },
     });
 
-    expect((wrapper.vm as any).currentPlanName).toBeTruthy();
+    // Cloud should not show opensource or enterprise-specific messages
+    expect(wrapper.text()).not.toContain(
+      "You're currently using OpenObserve Open Source Edition",
+    );
+    expect(wrapper.text()).not.toContain(
+      "You're using OpenObserve Enterprise Edition",
+    );
   });
 
-  it("should return empty string for currentPlanName when build_type is unknown", () => {
-    const unknownStore = createStore({
-      state: {
-        theme: "light",
-        zoConfig: {
-          build_type: "unknown",
-        },
-      },
-    });
-
+  it("should render edition card footer rows with license and support info", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
-        plugins: [i18n, unknownStore],
+        plugins: [i18n, store],
       },
     });
 
-    expect((wrapper.vm as any).currentPlanName).toBe("");
+    const footerRows = wrapper.findAll(".footer-row");
+    // 3 cards × 2 footer rows each (license + support)
+    expect(footerRows.length).toBe(6);
   });
 
-  it("should display cloud subtitle (not edition-specific message) for cloud build", () => {
-    const cloudStore = createStore({
-      state: {
-        theme: "light",
-        zoConfig: {
-          build_type: "cloud",
-        },
-      },
-    });
-
+  it("should render CTA buttons/links for each edition card", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
-        plugins: [i18n, cloudStore],
+        plugins: [i18n, store],
       },
     });
 
-    // Cloud should show the generic subtitle, not the edition-specific messages
-    const editionInfo = wrapper.find(".edition-info");
-    expect(editionInfo.exists()).toBe(false);
+    const ctaBtns = wrapper.findAll(".cta-btn");
+    expect(ctaBtns).toHaveLength(3);
   });
 
-  it("should not show enterprise promotion for cloud build", () => {
-    const cloudStore = createStore({
-      state: {
-        theme: "light",
-        zoConfig: {
-          build_type: "cloud",
-        },
-      },
-    });
-
+  it("should render the current plan card CTA as disabled button", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
-        plugins: [i18n, cloudStore],
+        plugins: [i18n, store],
       },
     });
 
-    const promotion = wrapper.find(".enterprise-promotion");
-    expect(promotion.exists()).toBe(false);
+    const currentBtn = wrapper.find(".cta-btn--current");
+    expect(currentBtn.exists()).toBe(true);
+    expect((currentBtn.element as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("should show enterprise promotion message for enterprise build", () => {
-    const enterpriseStore = createStore({
-      state: {
-        theme: "light",
-        zoConfig: {
-          build_type: "enterprise",
-        },
-      },
-    });
-
+  it("should render action CTAs as anchor links for non-current editions", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
-        plugins: [i18n, enterpriseStore],
+        plugins: [i18n, store],
       },
     });
 
-    const promotion = wrapper.find(".enterprise-promotion");
-    expect(promotion.exists()).toBe(true);
+    const actionLinks = wrapper.findAll(".cta-btn--action");
+    // opensource is current → 2 action links remain
+    expect(actionLinks).toHaveLength(2);
+    actionLinks.forEach((link) => {
+      expect(link.element.tagName).toBe("A");
+    });
   });
 
-  it("should load features from registry and each feature has name and values", () => {
+  it("should have editionList computed with 3 editions", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
@@ -390,18 +289,14 @@ describe("FeatureComparisonTable", () => {
     });
 
     const vm = wrapper.vm as any;
-    const features = vm.featureData.features;
-    expect(Array.isArray(features)).toBe(true);
-    features.forEach((feature: any) => {
-      expect(feature).toHaveProperty("name");
-      expect(feature).toHaveProperty("values");
-      expect(feature.values).toHaveProperty("opensource");
-      expect(feature.values).toHaveProperty("enterprise");
-      expect(feature.values).toHaveProperty("cloud");
-    });
+    expect(vm.editionList).toHaveLength(3);
+    const ids = vm.editionList.map((e: any) => e.id);
+    expect(ids).toContain("opensource");
+    expect(ids).toContain("enterprise");
+    expect(ids).toContain("cloud");
   });
 
-  it("should have correct column alignment settings", () => {
+  it("should have listFeatures computed that excludes pillar and footer features", () => {
     const wrapper = mount(FeatureComparisonTable, {
       global: {
         plugins: [i18n, store],
@@ -409,62 +304,9 @@ describe("FeatureComparisonTable", () => {
     });
 
     const vm = wrapper.vm as any;
-    expect(vm.columns[0].meta.align).toBe("left");   // name column
-    expect(vm.columns[1].meta.align).toBe("center"); // opensource
-    expect(vm.columns[2].meta.align).toBe("center"); // enterprise
-    expect(vm.columns[3].meta.align).toBe("center"); // cloud
-  });
-
-  it("should have correct column sortable settings", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    (wrapper.vm as any).columns.forEach((col: any) => {
-      expect(col.sortable).toBe(false);
-    });
-  });
-
-  it("should have editions array with correct ids", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const editionIds = (wrapper.vm as any).featureData.editions.map((e: any) => e.id);
-    expect(editionIds).toContain("opensource");
-    expect(editionIds).toContain("enterprise");
-    expect(editionIds).toContain("cloud");
-  });
-
-  it("should only highlight the current build type column", () => {
-    // When build_type is opensource, only opensource column is highlighted
-    expect(store.state.zoConfig.build_type).toBe("opensource");
-
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const highlighted = wrapper.findAll(".highlighted-column");
-    // Should have at least one highlighted cell (one per row for opensource column)
-    expect(highlighted.length).toBeGreaterThan(0);
-  });
-
-  it("should render table with hidden pagination", () => {
-    const wrapper = mount(FeatureComparisonTable, {
-      global: {
-        plugins: [i18n, store],
-      },
-    });
-
-    const table = wrapper.findComponent(OTable);
-    expect(table.exists()).toBe(true);
-    // pagination="none" means show all rows
-    expect(table.props("pagination")).toBe("none");
+    // test_feature is not excluded, so it should appear
+    expect(Array.isArray(vm.listFeatures)).toBe(true);
+    expect(vm.listFeatures).toHaveLength(1);
+    expect(vm.listFeatures[0].id).toBe("test_feature");
   });
 });

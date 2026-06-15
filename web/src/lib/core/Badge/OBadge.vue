@@ -9,6 +9,7 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(defineProps<BadgeProps>(), {
   variant: "default",
   size: "md",
+  dot: false,
   clickable: false,
   disabled: false,
 });
@@ -116,8 +117,10 @@ const trailingSizeClasses = computed(() =>
 
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
-  // Base — layout + typography + shape
-  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-md",
+  // Base — layout + typography + shape.
+  // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
+  // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
+  "tw:inline-flex tw:items-center tw:whitespace-nowrap tw:rounded-full",
   "tw:font-medium tw:leading-none",
   "tw:transition-colors tw:duration-150",
   // Variant + size
@@ -163,6 +166,16 @@ function handleKeydown(e: KeyboardEvent): void {
     @click="handleClick"
     @keydown="handleKeydown"
   >
+    <!-- Leading status dot (7px solid, inherits the badge's foreground colour). -->
+    <span
+      v-if="dot"
+      :class="[
+        'tw:inline-block tw:shrink-0 tw:rounded-full tw:size-1.75 tw:bg-current',
+        size === 'sm' ? 'tw:me-1' : 'tw:me-1.5',
+      ]"
+      aria-hidden="true"
+    />
+
     <!--
       Left icon area — rendered when either the #icon slot or icon prop is set.
       The slot takes priority; the prop renders a Material Icon as fallback.

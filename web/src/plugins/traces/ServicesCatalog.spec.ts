@@ -31,6 +31,16 @@ vi.mock("@/services/search", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock stream service
+// ---------------------------------------------------------------------------
+const mockStreamSchema = vi.fn().mockResolvedValue({ data: { schema: [] } });
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: (...args: any[]) => mockStreamSchema(...args),
+  },
+}));
+
+// ---------------------------------------------------------------------------
 // Shared reactive searchObj
 // ---------------------------------------------------------------------------
 const now = Date.now();
@@ -1782,8 +1792,8 @@ describe("ServicesCatalog", () => {
       });
     });
 
-    describe("changing stream triggers data reload", () => {
-      it("should update streamFilter, persist to localStorage, and trigger reload", async () => {
+    describe("onStreamFilterChange — emits request:stream-change", () => {
+      it("should emit request:stream-change with the new stream value when stream selection changes", async () => {
         mockGetStreams.mockResolvedValueOnce({
           list: [{ name: "default" }, { name: "production" }],
         });
@@ -1791,18 +1801,140 @@ describe("ServicesCatalog", () => {
         wrapper = mountServicesCatalog();
         await flushPromises();
 
-        // Clear the call from onMounted so we can assert the reload call
         mockFetchQueryDataWithHttpStream.mockClear();
 
-        wrapper.vm.streamFilter = "production";
         wrapper.vm.onStreamFilterChange("production");
+        await flushPromises();
+
+        const emitted = wrapper.emitted("request:stream-change");
+        expect(emitted).toBeTruthy();
+        expect(emitted![0]).toEqual(["production"]);
+      });
+
+      it("should NOT update streamFilter immediately when onStreamFilterChange is called", async () => {
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "default" }, { name: "production" }],
+        });
+
+        // Ensure selectedStream starts as "default" so streamFilter initialises to "default"
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("default");
+
+        wrapper.vm.onStreamFilterChange("production");
+        await flushPromises();
+
+        // streamFilter must remain unchanged — only the watcher syncs it
+        expect(wrapper.vm.streamFilter).toBe("default");
+      });
+
+      it("should NOT call loadServicesCatalog when onStreamFilterChange is called", async () => {
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "default" }, { name: "production" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        // Clear the onMounted call so only subsequent calls are counted
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        wrapper.vm.onStreamFilterChange("production");
+        await flushPromises();
+
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("global stream watch — syncs streamFilter from searchObj", () => {
+      it("should update streamFilter when searchObj.data.stream.selectedStream.value changes externally", async () => {
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("default");
+
+        // Simulate external global stream change
+        mockSearchObj.data.stream.selectedStream = {
+          label: "production",
+          value: "production",
+        };
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("production");
+      });
+
+      it("should call loadServicesCatalog when the global stream changes", async () => {
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        mockSearchObj.data.stream.selectedStream = {
+          label: "production",
+          value: "production",
+        };
+        await flushPromises();
+
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("should persist the new stream to localStorage when the global stream changes", async () => {
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        localStorage.removeItem("servicesCatalog_streamFilter");
+
+        mockSearchObj.data.stream.selectedStream = {
+          label: "production",
+          value: "production",
+        };
         await flushPromises();
 
         expect(localStorage.getItem("servicesCatalog_streamFilter")).toBe(
           "production",
         );
-        expect(wrapper.vm.streamFilter).toBe("production");
-        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+      });
+
+      it("should NOT call loadServicesCatalog when the global stream value is unchanged", async () => {
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        mockFetchQueryDataWithHttpStream.mockClear();
+
+        // Set to same value — watcher guard `newStream !== streamFilter.value` prevents reload
+        mockSearchObj.data.stream.selectedStream = {
+          label: "default",
+          value: "default",
+        };
+        await flushPromises();
+
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       });
     });
 

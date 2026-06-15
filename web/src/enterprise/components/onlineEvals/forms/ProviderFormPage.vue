@@ -120,10 +120,6 @@
           </div>
         </div>
 
-        <label class="provider-checkbox">
-          <input v-model="form.isDefault" type="checkbox" class="provider-checkbox__input" />
-          <span>{{ t("onlineEvals.provider.useAsDefault") }}</span>
-        </label>
       </section>
 
       <section class="provider-section">
@@ -137,19 +133,19 @@
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
-        <div class="provider-field provider-field--auth">
+        <div class="provider-field">
           <label class="provider-field__label">
-            {{ t("onlineEvals.provider.authConfigLabel") }}
+            {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="provider-field__req">*</span>
           </label>
           <OInput
-            v-model="form.authConfig"
-            type="textarea"
+            v-model.trim="form.apiKey"
+            type="password"
             size="sm"
-            :rows="6"
-            data-test="provider-form-auth-config-input"
+            :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
+            data-test="provider-form-api-key-input"
           />
-          <div class="provider-field__help">{{ t("onlineEvals.provider.authConfigHelp") }}</div>
+          <div class="provider-field__help">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>
@@ -192,7 +188,7 @@ import {
   defaultModelOf,
   providerTypeOf,
 } from "../utils/evalEntity";
-import { parseJson, showError, splitCsv } from "../utils/evalFormat";
+import { showError, splitCsv } from "../utils/evalFormat";
 
 const props = defineProps<{
   orgId: string;
@@ -227,8 +223,7 @@ function initForm(row: Provider | null) {
       endpoint: "",
       defaultModel: "",
       availableModels: "",
-      authConfig: '{\n  "api_key": ""\n}',
-      isDefault: false,
+      apiKey: "",
     };
   }
   return {
@@ -237,8 +232,10 @@ function initForm(row: Provider | null) {
     endpoint: row.endpoint || "",
     defaultModel: defaultModelOf(row),
     availableModels: availableModelsOf(row).join(", "),
-    authConfig: '{\n  "api_key": ""\n}',
-    isDefault: booleanOf(row, "isDefault", "is_default"),
+    // Auth is write-only — never seed the existing secret. The user
+    // leaves the field blank to keep the stored value, or enters a new
+    // one to rotate it.
+    apiKey: "",
   };
 }
 
@@ -252,8 +249,14 @@ async function save() {
       endpoint: form.value.endpoint || null,
       defaultModel: form.value.defaultModel,
       availableModels: splitCsv(form.value.availableModels),
-      authConfig: parseJson(form.value.authConfig, t("onlineEvals.provider.authConfigLabel")),
-      isDefault: form.value.isDefault,
+      // Backend expects an authConfig object; the form only collects an
+      // API key, which is the only auth secret the supported providers
+      // need today. Wrap it as { api_key: <value> }.
+      authConfig: { api_key: form.value.apiKey },
+      // `isDefault` is no longer surfaced in the form. Always send false;
+      // backend defaults to non-default and the user manages default-ness
+      // (if ever needed) outside this create/edit flow.
+      isDefault: false,
     };
 
     if (props.mode === "edit" && props.row) {
@@ -430,43 +433,6 @@ async function save() {
   font-size: 11.5px;
   color: var(--color-text-secondary, var(--o2-text-secondary));
   margin-top: 4px;
-}
-
-.provider-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-primary, currentColor);
-  cursor: pointer;
-}
-
-.provider-checkbox__input {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--color-input-border, var(--o2-border-input));
-  border-radius: 3px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-}
-
-.provider-checkbox__input:checked {
-  background: var(--color-primary-600, #3F7994);
-  border-color: var(--color-primary-600, #3F7994);
-}
-
-.provider-checkbox__input:checked::after {
-  content: "";
-  width: 7px;
-  height: 4px;
-  border-left: 1.5px solid white;
-  border-bottom: 1.5px solid white;
-  transform: rotate(-45deg) translate(0, -1px);
 }
 
 .provider-callout {

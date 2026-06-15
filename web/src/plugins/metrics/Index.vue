@@ -15,88 +15,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full tw:pb-2.5" data-test="metrics-page">
-    <!-- Header Section -->
-    <div
-      class="tw:flex tw:px-[0.625rem] tw:mb-[0.625rem] tw:pt-1"
-      style="height: 48px; overflow-y: auto"
+  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full" data-test="metrics-page">
+    <!-- Standard page header: title + icon + all query controls on ONE line
+         (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
+    <AppPageHeader
+      :title="t('search.metrics')"
+      icon="bar-chart"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
     >
-      <div class="card-container tw:w-full tw:h-full tw:flex">
-        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:grow">
-          <div
-            class="tw:flex tw:items-center tw:text-xl tw:tracking-[0.005em] tw:mx-3 tw:font-semibold"
-          >
-            <span>
-              {{ t("search.metrics") }}
-            </span>
-          </div>
-          <syntax-guide-metrics />
-          <MetricLegends />
-        </div>
-        <div
-          class="tw:text-right tw:flex tw:flex-row tw:justify-end tw:items-center tw:gap-2"
+      <template #actions>
+        <syntax-guide-metrics />
+        <MetricLegends />
+        <DateTimePickerDashboard
+          v-if="
+            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
+            selectedDate
+          "
+          v-model="selectedDate"
+          ref="dateTimePickerRef"
+          :disable="disable"
+          class="dashboard-icons"
+          data-test="metrics-date-picker"
+        />
+        <AutoRefreshInterval
+          v-if="
+            !['html', 'markdown', 'custom_chart'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
+          v-model="refreshInterval"
+          trigger
+          :min-refresh-interval="
+            store.state?.zoConfig?.min_auto_refresh_interval || 5
+          "
+          @trigger="runQuery"
+          class="dashboard-icons"
+          data-test="metrics-auto-refresh"
+        />
+        <ShareButton
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          :url="metricsShareUrl"
+          variant="outline"
+          size="icon-toolbar"
+          data-test="metrics-share-btn"
+          class="dashboard-icons"
+        />
+        <template
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
-          <DateTimePickerDashboard
-            v-if="
-              !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
-              selectedDate
-            "
-            v-model="selectedDate"
-            ref="dateTimePickerRef"
-            :disable="disable"
-            class="dashboard-icons"
-            data-test="metrics-date-picker"
-          />
-          <AutoRefreshInterval
-            v-if="
-              !['html', 'markdown', 'custom_chart'].includes(
-                dashboardPanelData.data.type,
-              )
-            "
-            v-model="refreshInterval"
-            trigger
-            :min-refresh-interval="
-              store.state?.zoConfig?.min_auto_refresh_interval || 5
-            "
-            @trigger="runQuery"
-            class="dashboard-icons"
-            data-test="metrics-auto-refresh"
-          />
-          <div
-            v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-            class="dashboard-icons tw:mr-2"
+          <OButton
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+            variant="outline-destructive"
+            size="sm-toolbar"
+            data-test="metrics-cancel"
+            @click="cancelAddPanelQuery"
           >
-            <OButton
-              v-if="
-                config.isEnterprise == 'true' && searchRequestTraceIds.length
-              "
-              variant="outline-destructive"
-              size="sm-toolbar"
-              data-test="metrics-cancel"
-              @click="cancelAddPanelQuery"
-            >
-              <span
-                class="tw:relative tw:flex tw:items-center tw:justify-center"
-              >
-                <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
-                <span class="tw:absolute">{{ t("panel.cancel") }}</span>
-              </span>
-            </OButton>
-            <OButton
-              v-else
-              variant="primary"
-              size="sm-toolbar"
-              data-test="metrics-apply"
-              :loading="disable"
-              :disabled="disable"
-              @click="runQuery"
-            >
-              {{ t("metrics.runQuery") }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
+            <span class="tw:relative tw:flex tw:items-center tw:justify-center">
+              <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
+              <span class="tw:absolute">{{ t("panel.cancel") }}</span>
+            </span>
+          </OButton>
+          <OButton
+            v-else
+            variant="primary"
+            size="sm-toolbar"
+            data-test="metrics-apply"
+            :loading="disable"
+            :disabled="disable"
+            @click="runQuery"
+          >
+            {{ t("metrics.runQuery") }}
+          </OButton>
+        </template>
+      </template>
+    </AppPageHeader>
 
     <!-- PanelEditor Content Area -->
     <PanelEditor
@@ -139,6 +131,7 @@ import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -149,6 +142,22 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
+import { useRoute, useRouter } from "vue-router";
+import ShareButton from "@/components/common/ShareButton.vue";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  applyMetricsBlob,
+  applyDeepLinkOverrides,
+} from "@/composables/metrics/metricsUrlState";
+import {
+  queryParamsToSelectedDate,
+  selectedDateToQueryParams,
+  refreshLabelToInterval,
+  refreshIntervalToLabel,
+} from "@/utils/dashboard/urlTimeParams";
+import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
+import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -160,6 +169,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
+    AppPageHeader,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,
@@ -167,6 +177,7 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    ShareButton,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "metrics");
@@ -179,6 +190,8 @@ export default defineComponent({
     const chartData = ref();
     const { t } = useI18n();
     const store = useStore();
+    const route = useRoute();
+    const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const {
       dashboardPanelData,
@@ -208,25 +221,10 @@ export default defineComponent({
       data: {},
     });
 
-    // this is used to activate the watcher only after on mounted
-    let isPanelConfigWatcherActivated = false;
-    const isPanelConfigChanged = ref(false);
+    // Not kept-alive: re-mounts each navigation, so onMounted is the only restore point.
+    let pendingAutoRun = false;
 
-    onUnmounted(() => {
-      // NOTE: Do NOT call resetDashboardPanelData() here.
-      // When org changes, Vue mounts the new component (onBeforeMount) BEFORE
-      // unmounting the old one (onUnmounted). Resetting the shared singleton
-      // dashboardPanelDataObj["metrics"] here would overwrite the "promql" state
-      // that the new instance just set, causing the PromQL query type to
-      // disappear after every org switch. The new instance's onBeforeMount
-      // already resets and re-initialises the state correctly.
-    });
-
-    // Initialize state before any child components mount so FieldList.vue sees
-    // stream_type = "metrics" from the start, preventing a spurious
-    // streams?type=logs request and the double stream-list fetch that results
-    // from stream_type changing logs → metrics after children have mounted.
-    onBeforeMount(() => {
+    const applyMetricsDefaults = () => {
       errorData.errors = [];
       editMode.value = false;
       resetDashboardPanelData();
@@ -243,16 +241,98 @@ export default defineComponent({
         }
       }
 
-      // set default chart type as line
       dashboardPanelData.data.type = "line";
-      // set the default query type as promql for metrics
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.queries[0].customQuery = false;
-
-      // set the show query bar by default for metrics page
       dashboardPanelData.layout.showQueryBar = true;
-
       chartData.value = {};
+    };
+
+    // panel -> URL: fresh metrics_data blob + time/refresh, dropping override params (diff-guarded).
+    const syncStateToUrl = () => {
+      const query: Record<string, any> = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        refresh: refreshIntervalToLabel(refreshInterval.value),
+        ...selectedDateToQueryParams(selectedDate.value),
+        metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      };
+      const changed =
+        Object.keys(query).some(
+          (k) => String(query[k]) !== String(route.query[k] ?? ""),
+        ) || Object.keys(route.query).some((k) => !(k in query));
+      if (changed) router.replace({ query }).catch(() => {});
+    };
+
+    // URL -> panel (blob -> overrides -> time/refresh); returns the auto-run gate.
+    const hydrateFromUrl = (): boolean => {
+      const q = route.query as Record<string, any>;
+
+      if (q.metrics_data) applyMetricsBlob(q.metrics_data, dashboardPanelData);
+      applyDeepLinkOverrides(q, dashboardPanelData);
+
+      if (q.period || (q.from && q.to)) {
+        selectedDate.value = queryParamsToSelectedDate(q);
+      }
+      if (q.refresh != null) {
+        refreshInterval.value = refreshLabelToInterval(
+          q.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval || 0,
+        );
+      }
+
+      return !!q.metrics_data || hasAnyDeepLinkParam(q, METRICS_PARAMS);
+    };
+
+    // seed builder-mode slots (a stream but no query) with a starter query before auto-run.
+    const seedBuilderSlots = async () => {
+      const queries = dashboardPanelData.data.queries;
+      for (let i = 0; i < queries.length; i++) {
+        const qq = queries[i];
+        if (qq?.fields?.stream && !qq.customQuery && !qq.query) {
+          dashboardPanelData.layout.currentQueryIndex = i;
+          await applyDefaultPanelFields();
+        }
+      }
+      dashboardPanelData.layout.currentQueryIndex = 0;
+    };
+
+    // Share URL: fresh /metrics link from current editor state, freezing relative period to absolute.
+    const metricsShareUrl = computed(() => {
+      void route.fullPath; // reactive dep on URL
+      const url = new URL(window.location.origin + window.location.pathname);
+      const sp = url.searchParams;
+      sp.set("org_identifier", store.state.selectedOrganization.identifier);
+
+      // freeze the window: getConsumableDateTime() is in MICROSECONDS -> ms
+      const ct: any = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        sp.set("from", String(Math.floor(ct.startTime / 1000)));
+        sp.set("to", String(Math.floor(ct.endTime / 1000)));
+      } else {
+        const tp: any = selectedDateToQueryParams(selectedDate.value);
+        if (tp.period) sp.set("period", tp.period);
+        else if (tp.from != null) {
+          sp.set("from", String(tp.from));
+          sp.set("to", String(tp.to));
+        }
+      }
+
+      sp.set("refresh", refreshIntervalToLabel(refreshInterval.value));
+      sp.set(
+        "metrics_data",
+        encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      );
+      return url.href;
+    });
+
+    // this is used to activate the watcher only after on mounted
+    let isPanelConfigWatcherActivated = false;
+    const isPanelConfigChanged = ref(false);
+
+    // Reset before children mount so FieldList sees stream_type=metrics (avoids a spurious logs stream fetch).
+    onBeforeMount(() => {
+      applyMetricsDefaults();
+      pendingAutoRun = hydrateFromUrl();
     });
 
     onMounted(async () => {
@@ -263,15 +343,13 @@ export default defineComponent({
       await nextTick();
       isPanelConfigWatcherActivated = true;
 
-      // Seed the default builder query on initial load (the PromQL builder only
-      // rebuilds on label/operation change, so the bar would otherwise be empty).
-      const initialQuery = dashboardPanelData.data.queries[0];
-      if (
-        initialQuery?.fields?.stream &&
-        !initialQuery.customQuery &&
-        !initialQuery.query
-      ) {
-        await applyDefaultPanelFields();
+      await seedBuilderSlots();
+
+      // auto-run a restored blob / inbound deep-link, then normalize the URL
+      if (pendingAutoRun) {
+        pendingAutoRun = false;
+        updateDateTime(selectedDate.value);
+        runQuery();
       }
     });
 
@@ -280,6 +358,11 @@ export default defineComponent({
       async () => {
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+
+        // chart-type change re-renders outside runQuery(); re-sync only for an established view (metrics_data present).
+        if (isPanelConfigWatcherActivated && route.query.metrics_data) {
+          syncStateToUrl();
+        }
       },
     );
 
@@ -346,6 +429,9 @@ export default defineComponent({
       if (panelEditorRef.value) {
         panelEditorRef.value.runQuery();
       }
+
+      // panel -> URL (full blob + time/refresh); normalizes any inbound params.
+      syncStateToUrl();
     };
 
     const updateDateTime = (value: object) => {
@@ -536,6 +622,7 @@ export default defineComponent({
       addToDashboard,
       refreshInterval,
       panelEditorRef,
+      metricsShareUrl,
     };
   },
 });

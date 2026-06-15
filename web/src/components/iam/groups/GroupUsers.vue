@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -90,6 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="iam-group-users"
         :show-global-filter="false"
         :footer-title="t('iam.basicUsers')"
         dense
@@ -122,7 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #empty>
-          <NoData />
+          <OEmptyState
+            size="hero"
+            preset="no-users"
+            :filtered="!!userSearchKey"
+            :hide-action="!userSearchKey"
+            @action="(id) => id === 'clear-filters' ? (userSearchKey = '') : null"
+          />
         </template>
       </OTable>
     </div>
@@ -132,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -147,6 +156,7 @@ import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -224,7 +234,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: 36,
+    size: TABLE_INDEX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -234,7 +244,11 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: t("iam.userName"),
       accessorKey: "email",
       sortable: true,
-      meta: { align: "left" , autoWidth: true},
+      resizable: true,
+      hideable: true,
+      size: COL.email,
+      minSize: 160,
+      meta: { align: "left" , flex: true},
     },
   ];
 
@@ -245,6 +259,9 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "Organizations",
       accessorKey: "org",
       sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.owner,
       meta: { align: "left" },
     });
   }

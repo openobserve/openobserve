@@ -3,6 +3,53 @@
 import type { Component } from "vue";
 import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
 
+// ─── Shared column size constants ────────────────────────────────
+/**
+ * Fixed width (px) of the auto-rendered selection-checkbox column. Includes the
+ * left padding (TABLE_CHECKBOX_COL_PAD_LEFT) that insets the box from the table
+ * edge. Imported by OTableHeader/OTableBodyRow so the three stay in sync.
+ */
+export const TABLE_CHECKBOX_COL_PAD_LEFT = 18;
+export const TABLE_CHECKBOX_COL_SIZE = 44;
+/**
+ * Fixed width (px) of the row-index ("#") column. Wide enough to fit a
+ * zero-padded 3-digit number at text-xs plus the cell's horizontal padding.
+ */
+export const TABLE_INDEX_COL_SIZE = 44;
+
+export const COL = {
+  name:         200,
+  firstName:    130,
+  lastName:     130,
+  email:        220,
+  description:  300,
+  status:       100,
+  toggle:        80,
+  date:         200,
+  // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
+  createdAt:    200,
+  updatedAt:    200,
+  duration:     120,
+  frequency:    130,
+  type:         180,
+  streamType:   120,
+  streamName:   180,
+  method:        80,
+  count:         90,
+  sizeBytes:    130,
+  url:          220,
+  template:     180,
+  owner:        220,
+  folder:       150,
+  role:         160,
+  authType:     100,
+  token:        200,
+  cron:         160,
+  price:        110,
+  defaultModel: 180,
+  version:      100,
+} as const;
+
 // ── Column Definition ────────────────────────────────────────────
 
 export interface OTableColumnMeta {
@@ -12,6 +59,13 @@ export interface OTableColumnMeta {
   headerClass?: string;
   /** Additional class applied to the <td> */
   cellClass?: string;
+  /**
+   * Mark this as the primary "name" column. Per the design system (HANDOFF §8.2)
+   * the record-name column renders at weight 500 — enough to separate it from
+   * metadata columns (which stay 400 / --text-3) without the "wall of bold".
+   * Only affects default-rendered cells; custom `cell` renderers style their own.
+   */
+  isName?: boolean;
   /** Format function applied to cell value before rendering */
   format?: (value: any, row: any) => any;
   /** Arbitrary metadata for custom cell renderers */
@@ -180,6 +234,15 @@ export interface OTableProps<TData = any> {
   maxHeight?: string | number;
 
   // ── Column Features ──
+  /**
+   * Auto-render a fixed-width row-index ("#") column as the first data column.
+   * OTable injects the column, fixes its width (TABLE_INDEX_COL_SIZE), and
+   * numbers rows by their position (accounting for the page offset under
+   * server-side pagination). Pages no longer need to declare a `#` column or
+   * inject a `"#"` value into row data. Ignored if the caller already provides
+   * a column with id `"#"`.
+   */
+  showIndex?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   enableColumnPin?: boolean;
@@ -205,6 +268,12 @@ export interface OTableProps<TData = any> {
   emptyMessage?: string;
   dense?: boolean;
   bordered?: boolean;
+  /**
+   * Draws the outer frame (border) around the whole table region. Default true.
+   * Set false when the table is embedded inside an already-bordered container
+   * (e.g. a page card) so it renders flush without a double border.
+   */
+  frame?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -300,7 +369,6 @@ export interface OTableEmits<TData = any> {
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
-  "column-close": [columnId: string];
   "update:columnSizes": [
     sizes: Record<string, number>,
     idMap: Record<string, string>,
@@ -325,6 +393,11 @@ export interface OTableSlots<TData = any> {
   "header-actions"?: () => any;
   /** Content above the table */
   top?: () => any;
+  /** Toolbar rendered INSIDE the table's bordered frame, above the column
+   *  header (search / filters / view controls). Reads as part of the table. */
+  toolbar?: () => any;
+  /** Trailing toolbar actions rendered AFTER the auto-injected column toggle (e.g. a refresh button). */
+  "toolbar-trailing"?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;

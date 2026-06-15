@@ -405,6 +405,12 @@
     "noData": "Nessun dato disponibile",
     "functionEditorLabel": "Editor di funzioni",
     "loadingStream": "Caricamento dello stream...",
+    "askAIPlaceholderRotation": {
+      "one": "Mostrami gli errori dell'ultima ora...",
+      "two": "Trova le query lente che richiedono più di 5 secondi...",
+      "three": "Conta 5xx risposte raggruppate per servizio...",
+      "four": "Filtra i log dove level = 'error'..."
+    },
     "hideHistogram": "Nascondi istogramma",
     "disableQuickMode": "Disattiva la modalità rapida",
     "menuGroupSetOnce": "Imposta una volta",
@@ -415,7 +421,11 @@
     "menuGroupSchedule": "Pianificazione",
     "menuGroupInspect": "Ispezionare",
     "validSql": "SQL valido",
-    "invalidSql": "Query non valida"
+    "invalidSql": "Query non valida",
+    "menuGroupExplain": "Spiegare",
+    "fieldValuesEmpty": "Nessun valore trovato.",
+    "fieldValuesEmptyHint": "Prova un intervallo di tempo più ampio per visualizzare i valori.",
+    "selectLogsStreamFirst": "Seleziona prima Logs stream"
   },
   "menu": {
     "home": "Home",
@@ -449,7 +459,8 @@
     "language": "Lingua",
     "actions": "Azioni",
     "incidents": "Incidenti",
-    "evals": "Valuta"
+    "evals": "Valuta",
+    "aiObservability": "Osservabilità dell'IA"
   },
   "rum": {
     "title": "Monitoraggio degli utenti reali",
@@ -517,7 +528,18 @@
     "seekToMoment": "Cerca questo momento della sessione",
     "timeInSession": "Durata della sessione",
     "route": "Percorso",
-    "duration": "Durata"
+    "duration": "Durata",
+    "emptyState": {
+      "title": "Monitora i tuoi utenti con Real User Monitoring",
+      "description": "RUM tiene traccia delle interazioni degli utenti reali (caricamento delle pagine, errori, chiamate API e replay delle sessioni) in modo da poter vedere esattamente come gli utenti percepiscono la tua applicazione.",
+      "webApp": "Strumenta un'app web",
+      "webAppDesc": "Aggiungi l'SDK OpenObserve RUM a qualsiasi app JavaScript",
+      "sessionReplay": "Abilita la riproduzione della sessione",
+      "sessionReplayDesc": "Registra e riproduci le sessioni utente per eseguire il debug dei problemi di UX",
+      "learnMore": "Per saperne di più:",
+      "quickImpl": "Guida rapida all'implementazione",
+      "blogPost": "Nozioni di base sul monitoraggio frontend"
+    }
   },
   "about": {
     "name": "Apri Observe",
@@ -958,7 +980,8 @@
     "subscription_type": "Tipo di piano",
     "proceed_subscription": "Procedi alla sottoscrizione",
     "subscription_plan": "Piano di abbonamento",
-    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}"
+    "makeBilledMember": "Rendi questa organizzazione un membro di fatturazione di {org}",
+    "manage": "Gestisci"
   },
   "template": {
     "header": "Modelli",
@@ -1200,7 +1223,8 @@
     "tokenRotateError": "Ruotazione del token non riuscita.",
     "tokenDeleteError": "Eliminazione del token non riuscita.",
     "noTokensFound": "Nessun token di ingestione trovato.",
-    "createdBy": "Creato da"
+    "createdBy": "Creato da",
+    "orgLevelSummary": "Token a livello di organizzazione per gli endpoint di inserimento."
   },
   "dashboard": {
     "selectField": "Campo",
@@ -1780,7 +1804,24 @@
     "noDataAvailable": "Nessun dato disponibile",
     "tabAiAssistant": "Assistente AI O2",
     "tabOverview": "Panoramica",
-    "tabUsage": "Utilizzo"
+    "tabUsage": "Utilizzo",
+    "subtitle": "Il tuo spazio di lavoro per l'osservabilità a colpo d'occhio",
+    "noDataState": {
+      "title": "Nessun dato ancora inserito",
+      "description": "Questa organizzazione non ha ricevuto alcun dato, quindi non c'è nulla da tracciare. Una volta che gli eventi iniziano a fluire, il <strong>volume di inserimento, lo spazio di archiviazione e l'utilizzo delle query</strong> verranno visualizzati qui automaticamente.",
+      "logs": "Inviare registri",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector e altro",
+      "traces": "Invia tracce",
+      "tracesDesc": "Tracciamento distribuito OTLP/Jaeger/Zipkin",
+      "metrics": "Invia metriche",
+      "metricsDesc": "Prometheus, Otel Collector, Telegraf e altro",
+      "or": "Oppure:",
+      "otel": "OpenTelemetry",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "Integrazioni AI",
+      "shippers": "Spedizionieri di log"
+    }
   },
   "billing": {
     "header": "Utilizzo e fatturazione",
@@ -2950,7 +2991,10 @@
     "evaluationTemplate": "Modello di valutazione",
     "evaluationTemplateHelp": "Seleziona un modello di valutazione che definisca i criteri e le dimensioni per il giudice LLM.",
     "noTemplatesFound": "Nessun modello di valutazione trovato. Creane uno nella pagina Modelli di valutazione.",
-    "evalTemplatesRefreshed": "Modelli di valutazione aggiornati con successo"
+    "evalTemplatesRefreshed": "Modelli di valutazione aggiornati con successo",
+    "subtitle": "Trasforma, arricchisci e instrada i dati in volo",
+    "selectStream": "Seleziona uno stream...",
+    "queryEditorPlaceholder": "Seleziona uno stream o scrivi una query SQL qui..."
   },
   "reports": {
     "header": "Rapporti",
@@ -3209,7 +3253,42 @@
     "openInFullView": "Apri a piena vista",
     "serviceMap": "Mappa dei servizi",
     "patternView": "Visualizzazione del modello",
-    "spanView": "Vista Span"
+    "spanView": "Vista Span",
+    "noData": {
+      "title": "Inizia a inviare tracce a OpenObserve",
+      "description": "Non sono ancora state trovate tracce in questa organizzazione. Instrument: i tuoi servizi e le tracce appariranno qui automaticamente.",
+      "otlp": "Invia tracce tramite OTLP",
+      "otlpDesc": "Jaeger, Zipkin e qualsiasi SDK compatibile con OpenTelemery",
+      "otelCollector": "Collezionista/Agente Hotel",
+      "otelCollectorDesc": "Instrada tutti i segnali di telemetria tramite OTel Collector",
+      "or": "Oppure:",
+      "kubernetes": "Kubernetes",
+      "python": "Pitone",
+      "java": "Giava",
+      "nodejs": "Node.js",
+      "askAi": "Chiedi all'IA di configurare il tracciamento"
+    },
+    "noStream": {
+      "title": "Scegli uno stream per iniziare a esplorare",
+      "description": "Scegli un flusso di traccia, quindi premi <strong>Esegui query</strong>. Puoi filtrare per servizio, durata, stato dell'intervallo e altro ancora una volta caricati i risultati.",
+      "selectStream": "Seleziona uno stream",
+      "selectStreamDesc": "Sfoglia i flussi di traccia disponibili in questa organizzazione",
+      "queryGuide": "Leggi la guida alle tracce",
+      "queryGuideDesc": "Grafico del servizio, filtro span, metriche RED e altro",
+      "recent": "Recenti:"
+    },
+    "noEvents": {
+      "title": "Nessuna traccia trovata",
+      "descNoFilters": "Nessuna traccia è stata trovata in {range}. Prova ad ampliare l'intervallo di tempo per caricare i risultati.",
+      "descWithFilters": "Niente corrisponde a <strong>questa query</strong> nella finestra selezionata. Prova ad ampliare l'intervallo di tempo o a rimuovere un filtro.",
+      "expandRange": "Espandi l'intervallo di tempo",
+      "expandRangeDescAbsolute": "Passa a un intervallo di tempo relativo più ampio",
+      "removeFilter": "Rimuovi un filtro",
+      "selectedRange": "la gamma selezionata"
+    },
+    "showAll": "Mostra tutto",
+    "filterByErrors": "Filtra per errori",
+    "clearErrorFilter": "Cancella filtro errori"
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -3227,7 +3306,8 @@
     "confirmRejectMsg": "Sei sicuro di voler rifiutare l'invito a partecipare a {org}?",
     "expired": "Scaduto",
     "expiresToday": "Scade oggi",
-    "daysLeft": "{giorni} giorni rimanenti"
+    "daysLeft": "{giorni} giorni rimanenti",
+    "search": "Cerca inviti"
   },
   "serviceAccounts": {
     "header": "Account di servizio",
@@ -3491,7 +3571,9 @@
     "timeRangeLabel": "Intervallo di tempo:",
     "analyzeTooltipTraces": "Analizza le dimensioni delle tracce per individuare velocità, latenza e modelli di errore",
     "insightsButtonLabel": "Approfondimenti",
-    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca"
+    "searchInspectionsLabel": "Ispeziona i dettagli di esecuzione del lavoro di ricerca",
+    "inspectBtnLabel": "Ispezionare",
+    "analyzeBtnLabel": "Approfondimenti"
   },
   "errorInsights": {
     "title": "Approfondimenti",
@@ -3969,7 +4051,13 @@
     "elevatedErrorRate": "Tasso di errore elevato",
     "reqPerSec": "richiesta/s",
     "allClear": "Tutto chiaro",
-    "allClearDesc": "Nessuna anomalia attiva, incidente o servizio degradato nella finestra temporale selezionata."
+    "allClearDesc": "Nessuna anomalia attiva, incidente o servizio degradato nella finestra temporale selezionata.",
+    "emptyActionAlerts": "Visualizza le regole di avviso",
+    "emptyActionAlertsDesc": "Rivedi gli avvisi e le soglie configurati",
+    "emptyActionLogs": "Esplora i log",
+    "emptyActionLogsDesc": "Cerca e filtra i tuoi flussi di log",
+    "emptyActionTraces": "Esplora le tracce",
+    "emptyActionTracesDesc": "Ispeziona le tracce distribuite e la latenza del servizio"
   },
   "chatHistory": {
     "title": "Chat",
@@ -4082,6 +4170,285 @@
       "one": "Mostrami gli errori dell'ultima ora...",
       "two": "Scrivi VRL per analizzare JSON dai log di nginx...",
       "three": "Crea una dashboard per lo stato dei nodi K8s..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "Non siamo riusciti a trovare alcun dato",
+      "description": "Niente corrisponde ai filtri o all'intervallo di tempo correnti. Prova ad ampliare la ricerca, ad ampliare l'intervallo di tempo o a cancellare i filtri.",
+      "action": "Cancella filtri",
+      "actionDesc": "Reimposta tutti i filtri applicati"
+    },
+    "noLogs": {
+      "title": "Nessun registro in questo intervallo",
+      "description": "Non abbiamo trovato alcun registro per lo stream e l'intervallo di tempo selezionati. Prova con un intervallo di tempo più ampio o con uno stream diverso.",
+      "action": "Amplia l'intervallo di tempo",
+      "actionDesc": "Ricerca su un periodo più lungo"
+    },
+    "noDashboards": {
+      "title": "Crea la tua prima dashboard",
+      "description": "Le dashboard riuniscono metriche, registri e tracce in un'unica visualizzazione. Creane uno per iniziare.",
+      "action": "Nuova dashboard",
+      "actionDesc": "Inizia da una tela vuota",
+      "import": "Dashboard di importazione",
+      "importDesc": "Carica un file JSON della dashboard",
+      "templates": "Sfoglia i modelli",
+      "templatesDesc": "Inizia da una dashboard della community"
+    },
+    "noPipelines": {
+      "title": "Crea la tua prima pipeline",
+      "description": "Le pipeline trasformano e indirizzano i dati man mano che arrivano. Configurane uno per iniziare a dare forma ai tuoi stream.",
+      "action": "Nuova pipeline",
+      "actionDesc": "Crea un flusso da zero",
+      "import": "Pipeline di importazione",
+      "importDesc": "Carica una definizione di pipeline"
+    },
+    "noFunctions": {
+      "title": "Crea la tua prima funzione",
+      "description": "Le funzioni arricchiscono e rimodellano i dati in fase di acquisizione o interrogazione. Aggiungine uno per iniziare.",
+      "action": "Nuova funzione",
+      "actionDesc": "Scrivere una nuova funzione VRL"
+    },
+    "noStreams": {
+      "title": "Aspettando i tuoi primi dati",
+      "description": "Non sono ancora arrivati dati. Collega una fonte e i tuoi stream verranno visualizzati qui automaticamente.",
+      "action": "Configurare l'ingestione",
+      "actionDesc": "Connetti una fonte di dati"
+    },
+    "noAlerts": {
+      "title": "Crea il tuo primo avviso",
+      "description": "Gli avvisi ti avvisano nel momento in cui i tuoi dati superano una soglia. Definiscine uno per iniziare il monitoraggio.",
+      "action": "Nuovo avviso",
+      "actionDesc": "Definire una condizione da monitorare"
+    },
+    "noIncidents": {
+      "title": "Nessun incidente attivo",
+      "description": "Siete tutti presi, niente ha bisogno della vostra attenzione in questo momento. Gli incidenti attivati verranno visualizzati qui."
+    },
+    "loadError": {
+      "title": "Qualcosa è andato storto",
+      "description": "Non siamo riusciti a caricare questi dati. Di solito è temporaneo: riprova tra un attimo.",
+      "action": "Riprova",
+      "actionDesc": "Prova a caricare nuovamente i dati"
+    },
+    "noData": {
+      "title": "Ancora niente qui",
+      "description": "Non ci sono dati da mostrare al momento."
+    },
+    "noTraces": {
+      "title": "Nessuna traccia trovata",
+      "description": "Nessuna traccia corrisponde al servizio e all'intervallo di tempo selezionati. Prova un intervallo di tempo più ampio o un servizio diverso."
+    },
+    "noSearchHistory": {
+      "title": "Ancora nessuna cronologia delle ricerche",
+      "description": "Le ricerche eseguite verranno elencate qui in modo da poterle rivisitare ed eseguire nuovamente."
+    },
+    "noUsers": {
+      "title": "Ancora nessun utente",
+      "description": "Invita i tuoi colleghi a collaborare in questa organizzazione.",
+      "action": "Aggiungi utente",
+      "actionDesc": "Invita un compagno di squadra tramite email"
+    },
+    "noReports": {
+      "title": "Non ci sono ancora segnalazioni",
+      "description": "Pianifica un report per ricevere le dashboard nella tua casella di posta.",
+      "action": "Nuovo rapporto",
+      "actionDesc": "Pianifica la consegna di una dashboard"
+    },
+    "noQueries": {
+      "title": "Nessuna query in esecuzione",
+      "description": "Al momento non ci sono domande attive. Le query di lunga durata verranno visualizzate qui durante l'esecuzione."
+    },
+    "noServiceAccounts": {
+      "title": "Non ci sono ancora account di servizio",
+      "description": "Gli account di servizio consentono alle applicazioni di autenticarsi con l'API. Creane uno per iniziare.",
+      "action": "Aggiungi account di servizio",
+      "actionDesc": "Crea un account di servizio API"
+    },
+    "noInvitations": {
+      "title": "Nessun invito in sospeso",
+      "description": "Gli inviti che hai inviato o ricevuto verranno visualizzati qui."
+    },
+    "filtered": {
+      "title": "Nessun {sostantivo} trovato",
+      "description": "Nessun {sostantivo} corrisponde ai filtri o alla ricerca correnti. Prova a regolarli o cancellarli.",
+      "action": "Cancella filtri",
+      "actionDesc": "Reimposta tutti i filtri e cerca",
+      "fallbackNoun": "risultati"
+    },
+    "nouns": {
+      "logs": "registri",
+      "dashboards": "cruscotti",
+      "pipelines": "oleodotti",
+      "functions": "funzioni",
+      "streams": "ruscelli",
+      "alerts": "avvisi",
+      "incidents": "incidenti",
+      "traces": "tracce",
+      "searches": "ricerche",
+      "users": "utenti",
+      "reports": "resoconti",
+      "queries": "domande",
+      "serviceAccounts": "account di servizio",
+      "invitations": "inviti"
+    },
+    "noDashboardsInFolder": {
+      "title": "Nessuna dashboard in questa cartella",
+      "description": "Questa cartella è vuota. Aggiungi qui una dashboard o spostane una da un'altra cartella.",
+      "action": "Nuova dashboard",
+      "actionDesc": "Crea una dashboard in questa cartella",
+      "import": "Dashboard di importazione",
+      "importDesc": "Carica un file JSON della dashboard",
+      "templates": "Sfoglia i modelli",
+      "templatesDesc": "Inizia da una dashboard della community"
+    },
+    "noGroups": {
+      "title": "Non ci sono ancora gruppi",
+      "description": "I gruppi consentono di gestire le autorizzazioni per più utenti contemporaneamente. Creane uno per iniziare.",
+      "action": "Nuovo gruppo",
+      "actionDesc": "Creare un gruppo di utenti"
+    },
+    "noRoles": {
+      "title": "Ancora nessun ruolo",
+      "description": "I ruoli definiscono le azioni che gli utenti possono eseguire. Crea un ruolo personalizzato per controllare l'accesso.",
+      "action": "Nuovo ruolo",
+      "actionDesc": "Definire un ruolo di accesso personalizzato"
+    },
+    "noAnomalyConfigs": {
+      "title": "Nessun rilevamento di anomalie configurato",
+      "description": "Imposta il rilevamento delle anomalie per identificare automaticamente modelli insoliti nei tuoi dati.",
+      "action": "Nuova configurazione",
+      "actionDesc": "Configurazione del rilevamento delle anomalie"
+    },
+    "noApiLimits": {
+      "title": "Nessun limite API configurato",
+      "description": "I limiti delle API controllano la quantità di dati che ogni organizzazione può acquisire e interrogare per finestra temporale."
+    },
+    "noRoleLimits": {
+      "title": "Nessun limite di ruolo configurato",
+      "description": "I limiti dei ruoli definiscono le quote di inserimento e interrogazione applicate ai singoli ruoli all'interno di un'organizzazione."
+    },
+    "noIngestionTokens": {
+      "title": "Ancora nessun token di ingestione",
+      "description": "I token di ingestione autenticano le fonti di dati durante l'invio di log, metriche e tracce.",
+      "action": "Nuovo token",
+      "actionDesc": "Genera un token di ingestione"
+    },
+    "noOrganizations": {
+      "title": "Ancora nessuna organizzazione",
+      "description": "Le organizzazioni raggruppano utenti e dati. Creane uno per iniziare."
+    },
+    "noAlertDestinations": {
+      "title": "Ancora nessuna destinazione",
+      "description": "Le destinazioni definiscono dove vengono inviate le notifiche di avviso: Slack, email, webhook e altro ancora.",
+      "action": "Nuova destinazione",
+      "actionDesc": "Connetti un canale di notifica"
+    },
+    "noAlertTemplates": {
+      "title": "Non ci sono ancora modelli",
+      "description": "I modelli definiscono il formato dei messaggi di notifica degli avvisi.",
+      "action": "Nuovo modello",
+      "actionDesc": "Creare un modello di notifica"
+    },
+    "noEnrichmentTables": {
+      "title": "Ancora nessuna tabella di arricchimento",
+      "description": "Le tabelle di arricchimento consentono di allegare un contesto aggiuntivo ai dati di registro al momento dell'interrogazione.",
+      "action": "Nuovo tavolo",
+      "actionDesc": "Crea una tabella di arricchimento"
+    },
+    "noCipherKeys": {
+      "title": "Ancora nessuna chiave di cifratura",
+      "description": "Le chiavi di cifratura vengono utilizzate per crittografare i campi sensibili nei flussi di dati.",
+      "action": "Nuova chiave",
+      "actionDesc": "Genera una chiave di cifratura"
+    },
+    "noAiToolsets": {
+      "title": "Non ci sono ancora set di strumenti di intelligenza artificiale",
+      "description": "I set di strumenti di intelligenza artificiale collegano la tua organizzazione a funzionalità di intelligenza artificiale esterne.",
+      "action": "Nuovo set di strumenti",
+      "actionDesc": "Aggiungi un set di strumenti AI"
+    },
+    "noLlmProviders": {
+      "title": "Nessun provider LLM configurato",
+      "description": "Connetti un fornitore di modelli linguistici per abilitare le funzionalità basate sull'intelligenza artificiale.",
+      "action": "Aggiungi fornitore",
+      "actionDesc": "Configurare un provider LLM"
+    },
+    "noDiscoveredServices": {
+      "title": "Nessun servizio scoperto",
+      "description": "I servizi appariranno qui automaticamente non appena inizieranno ad arrivare le tracce."
+    },
+    "noNodes": {
+      "title": "Nessun nodo disponibile",
+      "description": "I nodi del cluster verranno visualizzati qui una volta registrati."
+    },
+    "noSourceMaps": {
+      "title": "Nessuna mappa sorgente caricata",
+      "description": "Carica le mappe dei sorgenti per abilitare tracce di stack leggibili nei report di errore RUM.",
+      "action": "Carica",
+      "actionDesc": "Carica un file di mappa sorgente"
+    },
+    "noBackfillJobs": {
+      "title": "Nessun lavoro di backfill",
+      "description": "I lavori di backfill rielaborano i dati storici tramite una pipeline. Eseguine uno per iniziare."
+    },
+    "noSearchJobs": {
+      "title": "Nessun lavoro di ricerca pianificato",
+      "description": "Le ricerche di lunga durata che pianifichi verranno visualizzate qui, dove potrai monitorare il loro stato ed esplorare i risultati una volta terminate."
+    },
+    "noPipelineDestinations": {
+      "title": "Ancora nessuna destinazione",
+      "description": "Destinazioni esterne per l'output della pipeline: endpoint HTTP e destinazioni di scrittura remota.",
+      "action": "Nuova destinazione",
+      "actionDesc": "Connetti una destinazione della pipeline"
+    },
+    "noLLMInsights": {
+      "title": "Nessuna attività LLM ancora",
+      "description": "Strumenta i tuoi servizi con le convenzioni semantiche OpenTelemetry Gen-AI e inserisci almeno una traccia per popolare questa dashboard.",
+      "action": "Strumento con OpenTelemetry",
+      "actionDesc": "Acquisisci gli attributi gen_ai_* sulle tue tracce"
+    },
+    "noLLMSessions": {
+      "title": "Ancora nessuna sessione LLM",
+      "description": "Le sessioni sono raggruppate per gen_ai_conversation_id. Imposta i tuoi servizi in modo che ogni conversazione tagghi le proprie tracce e le sessioni vengano visualizzate qui.",
+      "action": "Strumento con OpenTelemetry",
+      "actionDesc": "I tag si estendono con gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Ancora nessun marcatore",
+      "description": "I valutatori valutano le risposte LLM in base alle tue configurazioni di punteggio: inizia con un giudice LLM o importane uno dalla libreria.",
+      "action": "Crea segnapunti",
+      "actionDesc": "Definire un giudice LLM o un marcatore remoto"
+    },
+    "noEvalJobs": {
+      "title": "Non ci sono ancora lavori di valutazione",
+      "description": "I punteggi dei job pianificano i punteggi in base a uno stream LLM. Creane uno per iniziare a valutare le conversazioni in base a una cadenza.",
+      "action": "Crea un job di valutazione",
+      "actionDesc": "Scegli uno stream + marcatori + cadenza"
+    },
+    "noScoreConfigs": {
+      "title": "Nessuna configurazione del punteggio ancora",
+      "description": "Le configurazioni dei punteggi definiscono lo schema prodotto dai puntatori: numerico, booleano o categorico. Aggiungine uno per iniziare a segnare.",
+      "action": "Crea configurazione della partitura",
+      "actionDesc": "Definisci la forma del punteggio + un intervallo sano"
+    },
+    "noEvalTemplates": {
+      "title": "Non sono ancora disponibili modelli di valutazione",
+      "description": "I modelli di valutazione definiscono criteri di punteggio riutilizzabili per le valutazioni LLM.",
+      "action": "Nuovo modello",
+      "actionDesc": "Crea un modello di valutazione"
+    },
+    "noPipelineHistory": {
+      "title": "Ancora nessuna cronologia delle pipeline",
+      "description": "La cronologia delle esecuzioni delle pipeline verrà visualizzata qui una volta eseguite le pipeline."
+    },
+    "noStreamSelected": {
+      "title": "Seleziona uno stream per iniziare",
+      "description": "Scegli uno stream dal menu a discesa a sinistra, quindi premi «Esegui query» per esplorare i tuoi log. Puoi anche applicare filtri aggiuntivi e modificare l'intervallo di date."
+    },
+    "noQueryApplied": {
+      "title": "Esegui una query per visualizzare i log",
+      "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream."
     }
   },
   "onlineEvals": {
@@ -4425,5 +4792,126 @@
       "title": "Non ci sono ancora fornitori di LLM",
       "description": "I provider LLM memorizzano i dettagli di connessione (endpoint + credenziali) per i modelli linguistici chiamati dai valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate sui giudizi."
     }
+  },
+  "aiObservability": {
+    "title": "Osservabilità LLM",
+    "sections": {
+      "monitor": "Monitorare",
+      "evaluate": "Valutare"
+    },
+    "nav": {
+      "overview": "Panoramica",
+      "sessions": "Sessioni",
+      "quality": "Qualità",
+      "evalJobs": "Offerte di lavoro Eval",
+      "scorers": "Marcatori",
+      "scoreConfigs": "Configurazioni dei punteggi"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Inizia a inviare dati a OpenObserve",
+      "description": "Non ci sono ancora dati in questa organizzazione, quindi non ci sono stream da esplorare. Invia i tuoi primi log e verranno visualizzati qui automaticamente: scegli da dove iniziare.",
+      "curl": "Invia tramite API Curl/HTTP",
+      "curlDesc": "Il modo più rapido: incolla un comando e i log iniziano a scorrere",
+      "shippers": "Usa un log shipper",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogng e altro",
+      "otel": "OpenTelemetry",
+      "otelDesc": "Inserimento OTLP indipendente dal fornitore per registri, tracce e metriche",
+      "or": "Oppure:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "finestre",
+      "askAi": "Chiedi all'IA di configurare l'ingestione"
+    },
+    "noStream": {
+      "title": "Scegli uno stream per iniziare a esplorare",
+      "description": "Scegli uno stream, quindi premi <strong>Esegui query</strong>. Puoi perfezionare con filtri, una funzione VRL e un intervallo di tempo personalizzato una volta arrivati i risultati.",
+      "selectStream": "Seleziona uno stream",
+      "selectStreamDesc": "Sfoglia i log, le tracce, le metriche e i flussi RUM",
+      "queryGuide": "Leggi la guida alle domande",
+      "queryGuideDesc": "Filtri, modalità SQL, VRL e visualizzazioni salvate",
+      "recent": "Recenti:"
+    },
+    "noEvents": {
+      "title": "Nessun evento trovato",
+      "descNoFilters": "Nessun evento trovato in {range}. Prova ad ampliare l'intervallo di tempo per caricare i risultati.",
+      "descWithFilters": "Niente corrisponde a <strong>questa query</strong> nella finestra selezionata. Prova ad ampliare l'intervallo di tempo, ad alleggerire un filtro o a reimpostare la query.",
+      "expandRange": "Espandi l'intervallo di tempo",
+      "expandRangeDescAbsolute": "Passa a un intervallo di tempo relativo più ampio",
+      "removeFilter": "Rimuovi un filtro",
+      "removeFilterDescSql": "Sono state applicate condizioni SQL a questa query",
+      "openHistory": "Apri la cronologia delle ricerche",
+      "askAi": "Chiedi all'IA di risolvere la mia domanda",
+      "selectedRange": "la gamma selezionata"
+    },
+    "error": {
+      "sqlError": "Errore di sintassi SQL",
+      "sqlErrorDesc": "La tua query ha un errore di sintassi. Controlla l'editor di query per individuare eventuali errori evidenziati.",
+      "streamNotFound": "Stream non trovato",
+      "streamNotFoundDesc": "Lo stream selezionato non esiste o è stato rimosso.",
+      "ftsNotConfigured": "Ricerca full-text non configurata",
+      "ftsNotConfiguredDesc": "Questo stream non dispone di un campo di ricerca full-text. Configurane uno per abilitare la ricerca per parola chiave.",
+      "fieldNotFound": "Campo non trovato",
+      "fieldNotFoundDesc": "La tua query fa riferimento a uno o più campi che non esistono in questo stream.",
+      "functionNotDefined": "Funzione non definita",
+      "functionNotDefinedDesc": "L'interrogazione richiama una funzione VRL non definita.",
+      "dataUnavailable": "File di dati non disponibili",
+      "dataUnavailableDesc": "Alcuni file di dati per questo intervallo di tempo non sono accessibili. Prova con una finestra temporale diversa.",
+      "dataTypeMismatch": "Mancata corrispondenza del tipo di dati",
+      "dataTypeMismatchDesc": "Un campo della query viene utilizzato con un tipo di dati incompatibile.",
+      "executionError": "Esecuzione della query non riuscita",
+      "executionErrorDesc": "Si è verificato un errore durante l'esecuzione della query.",
+      "serverError": "Errore del server",
+      "serverErrorDesc": "Si è verificato un errore interno sul server.",
+      "generic": "Errore di ricerca",
+      "genericDesc": "Si è verificato un errore durante il recupero degli eventi di ricerca.",
+      "configureStream": "Configurazione dello stream",
+      "configureStreamDesc": "Aggiungi un campo di ricerca full-text nelle impostazioni dello stream",
+      "fixQuery": "Correggi la domanda",
+      "fixQueryDesc": "Rivedi e correggi la query nell'editor",
+      "expandRange": "Prova un intervallo di tempo diverso",
+      "expandRangeDesc": "I dati accessibili possono trovarsi in una finestra temporale diversa",
+      "copyError": "Copia i dettagli dell'errore",
+      "traceId": "ID di tracciamento:",
+      "askAi": "Chiedi all'IA di risolvere la mia domanda",
+      "showDetail": "Mostra dettagli",
+      "hideDetail": "Nascondi dettagli"
+    }
+  },
+  "queryError": {
+    "sqlError": "Errore di sintassi SQL",
+    "sqlErrorDesc": "La tua query ha un errore di sintassi. Controlla l'editor per individuare eventuali errori evidenziati.",
+    "streamNotFound": "Stream non trovato",
+    "streamNotFoundDesc": "Lo stream selezionato non esiste o è stato rimosso.",
+    "ftsNotConfigured": "Ricerca full-text non configurata",
+    "ftsNotConfiguredDesc": "Questo stream non dispone di un campo di ricerca full-text. Configurane uno per abilitare la ricerca per parola chiave.",
+    "fieldNotFound": "Campo non trovato",
+    "fieldNotFoundDesc": "La tua query fa riferimento a uno o più campi che non esistono in questo stream.",
+    "functionNotDefined": "Funzione non definita",
+    "functionNotDefinedDesc": "L'interrogazione richiama una funzione VRL non definita.",
+    "dataUnavailable": "File di dati non disponibili",
+    "dataUnavailableDesc": "Alcuni file di dati per questo intervallo di tempo non sono accessibili. Prova con una finestra temporale diversa.",
+    "dataTypeMismatch": "Mancata corrispondenza del tipo di dati",
+    "dataTypeMismatchDesc": "Un campo della query viene utilizzato con un tipo di dati incompatibile.",
+    "executionError": "Esecuzione della query non riuscita",
+    "executionErrorDesc": "Si è verificato un errore durante l'esecuzione della query.",
+    "serverError": "Errore del server",
+    "serverErrorDesc": "Si è verificato un errore interno sul server.",
+    "generic": "Errore di interrogazione",
+    "genericDesc": "Si è verificato un errore durante l'elaborazione della richiesta.",
+    "configureResource": "Configurazione dello stream",
+    "configureResourceDesc": "Aggiungi un campo di ricerca full-text nelle impostazioni dello stream",
+    "fixQuery": "Correggi la domanda",
+    "fixQueryDesc": "Rivedi e correggi la query nell'editor",
+    "expandRange": "Prova un intervallo di tempo diverso",
+    "expandRangeDesc": "I dati accessibili possono trovarsi in una finestra temporale diversa",
+    "copyError": "Copia i dettagli dell'errore",
+    "copied": "Copiato!",
+    "traceId": "ID di tracciamento:",
+    "askAi": "Chiedi all'IA di risolvere la mia domanda",
+    "showDetail": "Mostra dettagli",
+    "hideDetail": "Nascondi dettagli"
   }
 }

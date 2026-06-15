@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <template v-if="isMetaOrg">
     <OTable
+      :frame="false"
       data-test="running-queries-table"
       :data="rows"
       :columns="columns"
@@ -29,11 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="settings-query-management"
       :show-global-filter="false"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #empty>
-        <NoData />
+        <OEmptyState
+          size="hero"
+          preset="no-queries"
+          :filtered="filtered"
+          :hide-action="!filtered"
+          @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+        />
       </template>
       <template #cell-actions="{ row }">
         <OButton
@@ -62,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #bottom>
         <OButton
+          v-if="selectedRowsModel?.length"
           data-test="qm-multiple-cancel-query-btn"
           variant="outline-destructive"
           size="sm-action"
-          :disabled="selectedRowsModel?.length === 0"
           @click="handleMultiQueryCancel"
         >
           {{ t('queries.cancelQuery') }}
@@ -86,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, type Ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -95,10 +105,11 @@ import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, NoData, OButton, ODrawer, OSpinner, OTable },
+  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable },
   props: {
     rows: {
       type: Array,
@@ -108,12 +119,17 @@ export default defineComponent({
       type: Array,
       required: false,
     },
+    filtered: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     "update:selectedRows",
     "delete:queries",
     "delete:query",
     "show:schema",
+    "clear:filters",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -129,19 +145,26 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size:67, meta: { align: "left" } },
+      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
         accessorKey: "user_id",
         sortable: true,
-        meta: { align: "left" , autoWidth: true },
+        resizable: true,
+        hideable: true,
+        size: COL.email,
+        minSize: 160,
+        meta: { align: "left" , flex: true },
       },
       {
         id: "org_id",
         header: t("organization.id"),
         accessorKey: "org_id",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.owner,
         meta: { align: "left" },
       },
       {
@@ -149,6 +172,9 @@ export default defineComponent({
         header: t("queries.searchType"),
         accessorKey: "search_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -156,6 +182,9 @@ export default defineComponent({
         header: t("queries.querySource"),
         accessorKey: "query_source",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 140,
         meta: { align: "left" },
       },
       {
@@ -163,6 +192,9 @@ export default defineComponent({
         header: t("queries.duration"),
         accessorKey: "duration",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 150,
         meta: { align: "left" },
       },
       {
@@ -170,6 +202,9 @@ export default defineComponent({
         header: t("queries.queryRange"),
         accessorKey: "queryRange",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -177,6 +212,9 @@ export default defineComponent({
         header: t("queries.queryType"),
         accessorKey: "work_group",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {
@@ -184,6 +222,9 @@ export default defineComponent({
         header: t("queries.status"),
         accessorKey: "status",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.status,
         meta: { align: "left" },
       },
       {
@@ -191,6 +232,9 @@ export default defineComponent({
         header: t("alerts.streamType"),
         accessorKey: "stream_type",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 130,
         meta: { align: "left" },
       },
       {

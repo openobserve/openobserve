@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="tw:flex tw:flex-col tw:h-full">
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)]"
+      class="tw:flex tw:justify-start tw:items-center tw:pl-3 tw:pr-2 tw:h-[2rem] tw:border-b tw:border-solid tw:border-b-[var(--o2-border-color)] tw:bg-surface-panel"
       data-test="trace-details-sidebar-header"
-      :class="store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-100'"
     >
       <div
         :title="span.operation_name"
@@ -166,18 +165,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="tw:shrink-0">
-            <OButton
-              variant="outline"
-              size="xs"
-              class="tw:h-full tw:text-[0.75rem]!"
-              :title="(config.isEnterprise === 'true' && correlationLoading) ? t('correlation.loadingCorrelation') : t('traces.viewLogs')"
-              :disabled="config.isEnterprise === 'true' && correlationLoading"
-              :loading="config.isEnterprise === 'true' && correlationLoading"
-              @click.stop="viewSpanLogs"
-              data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+            <!-- Single button with wrapper for tooltip functionality -->
+            <span
+              class="tw:inline-block"
+              tabindex="0"
             >
-              View Logs
-            </OButton>
+              <OButton
+                variant="outline"
+                size="xs"
+                class="tw:h-full tw:text-[0.75rem]!"
+                :disabled="isViewLogsDisabled"
+                :loading="config.isEnterprise === 'true' && correlationLoading"
+                @click.stop="viewSpanLogs"
+                data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
+              >
+                View Logs
+              </OButton>
+              <OTooltip :content="viewLogsTooltipContent" />
+            </span>
           </span>
         </div>
       </div>
@@ -789,7 +794,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -847,7 +852,7 @@ class="tw:h-5! tw:text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="tw:text-[0.875rem] tw:font-bold tw:text-red-500"
+                class="tw:text-[0.875rem] tw:font-bold"
               >
                 {{ correlationError }}
               </div>
@@ -871,6 +876,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { cloneDeep } from "lodash-es";
 import { formatTimestamp, formatTimestampNs } from "@/utils/date";
@@ -967,6 +973,14 @@ export default defineComponent({
       type: String,
       default: "attributes",
     },
+    selectedLogStreams: {
+      type: Array,
+      default: () => [],
+    },
+    showLogStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     OSeparator,
@@ -978,6 +992,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OIcon,
+    OTooltip,
     OCollapsible,
     LogsHighLighting,
     JsonPreview,
@@ -1261,6 +1276,41 @@ export default defineComponent({
 
     // Get current theme from store
     const isDarkMode = computed(() => store.state.theme === "dark");
+
+    // Check if View Logs button should be disabled
+    const isViewLogsDisabled = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return true;
+      }
+
+      // Non-enterprise mode with visible log stream selector, disable when no streams are selected
+      return (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      );
+    });
+
+    // Get tooltip content based on disabled state
+    const viewLogsTooltipContent = computed(() => {
+      // Enterprise loading state
+      if (config.isEnterprise === 'true' && correlationLoading.value) {
+        return t('correlation.loadingCorrelation');
+      }
+
+      // Non-enterprise mode with no log streams selected
+      if (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        props.selectedLogStreams.length === 0
+      ) {
+        return t('search.selectLogsStreamFirst');
+      }
+
+      // Default enabled state
+      return t('traces.viewLogs');
+    });
 
     const eventColumns = ref([
       {
@@ -2081,6 +2131,8 @@ export default defineComponent({
       isFullscreen,
       toggleFullscreen,
       isDarkMode,
+      isViewLogsDisabled,
+      viewLogsTooltipContent,
       serviceIconUrl,
       getImageURL,
       copyContentToClipboard,

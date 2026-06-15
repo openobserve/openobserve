@@ -120,7 +120,7 @@ export class LogsPage {
         this.savedViewByLabel = '[data-test$="-option"]';
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
-        this.errorMessage = '[data-test="logs-search-error-message"]';
+        this.errorMessage = '[data-test="logs-search-error-state"]';
         this.warningElement = 'text=warning Query execution';
         this.logsTable = '[data-test="logs-search-result-logs-table"]';
         // Additional locators for multistream functionality
@@ -193,8 +193,13 @@ export class LogsPage {
 
         // Error handling locators
         this.errorIcon = 'text=error';
-        this.resultErrorDetailsBtn = '[data-test="logs-page-result-error-details-btn"]';
-        this.searchDetailErrorMessage = '[data-test="logs-search-detail-error-message"]';
+        // Hero layout (logs page): error-detail-toggle-btn (ErrorDetailPanel) + error-detail-body
+        // Block layout (panels):   query-error-toggle-detail-btn + query-error-detail-expanded
+        this.resultErrorDetailsBtn = '[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]';
+        this.searchDetailErrorMessage = '[data-test="error-detail-body"], [data-test="query-error-detail-expanded"]';
+        // Always-visible first sentence of the error (carries the field/function name).
+        // Hero layout: error-detail-summary · Block layout: query-error-summary
+        this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
@@ -341,7 +346,7 @@ export class LogsPage {
         this.dimensionSearchInputField = '[data-test="dimension-search-input-field"]';
         // Analysis dashboard states
         this.analysisDashboardLoading = '[data-test="traces-analysis-dashboard-drawer"] [data-test="traces-analysis-dashboard-loading-indicator"]';
-        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-message"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
+        this.analysisDashboardError = '[data-test="traces-analysis-dashboard-drawer"] [data-test="logs-search-error-state"], [data-test="traces-analysis-dashboard-drawer"] [role="alert"]';
         // Loading indicator (top-level — appears immediately on click, before drawer's scoped placement)
         this.analysisDashboardLoadingIndicator = '[data-test="traces-analysis-dashboard-loading-indicator"]';
         // Dimension checkboxes (any value)
@@ -1812,7 +1817,7 @@ export class LogsPage {
         const searchResult = this.page.locator(this.searchResultText);
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 10000 });
+                await expect(searchResult).toContainText('1 to 10', { timeout: 10000 });
                 return;
             } catch (e) {
                 if (attempt < 3) {
@@ -1821,7 +1826,7 @@ export class LogsPage {
             }
         }
         // Final attempt — let it throw
-        await expect(searchResult).toContainText('Showing 1 to 10', { timeout: 15000 });
+        await expect(searchResult).toContainText('1 to 10', { timeout: 15000 });
     }
 
     async selectResultsPerPageAndVerify(resultsPerPage, expectedText) {
@@ -1829,13 +1834,13 @@ export class LogsPage {
         let expectedPattern;
         switch (resultsPerPage) {
             case '2':
-                expectedPattern = 'Showing 11 to 20 out of';
+                expectedPattern = '11 to 20 out of';
                 break;
             case '3':
-                expectedPattern = 'Showing 21 to 30 out of';
+                expectedPattern = '21 to 30 out of';
                 break;
             case '4':
-                expectedPattern = 'Showing 31 to';
+                expectedPattern = '31 to';
                 break;
             default:
                 expectedPattern = expectedText;
@@ -3579,38 +3584,65 @@ export class LogsPage {
 
     async expectErrorMessageVisible() {
         // Covers two error display paths in Index.vue:
-        // - errorMsg path: data-test="logs-search-error-message" (query/backend error)
+        // - errorMsg path: data-test="logs-search-error-state" (query/backend error)
         // - filterErrMsg path: data-test="logs-search-filter-error-message" (quickmode filter parse error)
         const errorLocator = this.page.locator(
-            `[data-test="logs-search-error-message"], [data-test="logs-search-filter-error-message"]`
+            `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
         ).first();
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
     }
 
     /**
-     * Get the detailed error dialog text
-     * Clicks on error details button if available and returns the error message text
-     * @returns {Promise<string>} The error dialog text
+     * Get the detailed error dialog text.
+     *
+     * Expands the collapsible error detail panel (best effort) and returns the
+     * FULL error message — both the always-visible summary line (which carries
+     * the offending field/function name) and the expanded detail body (e.g.
+     * "Valid fields are …"). Earlier this returned only the detail body, which
+     * after the QueryErrorState redesign omits the field name.
+     *
+     * @returns {Promise<string>} The full error dialog text (summary line + detail body)
      */
     async getDetailedErrorDialogText() {
-        // Try to click the error details button if visible
-        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn);
+        // The QueryErrorState redesign splits the backend message across two
+        // elements: the summary line (data-test="error-detail-summary",
+        // always visible) carries the first sentence — which is where the
+        // offending field/function name lives (e.g. "No field named X.") —
+        // while the remainder ("Valid fields are …") is tucked behind the
+        // expand toggle in the detail body (data-test="error-detail-body").
+        // Reading only the detail body misses the field name, so we expand the
+        // panel (best effort) and return the WHOLE error container text — the
+        // summary line plus the detail body — to assert against the full message.
+
+        // Expand the collapsible detail panel if a toggle is present.
+        const detailsBtn = this.page.locator(this.resultErrorDetailsBtn).first();
         if (await detailsBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await detailsBtn.click();
             await this.page.waitForTimeout(500);
         }
 
-        // Try to get text from detailed error message first
-        const detailedError = this.page.locator(this.searchDetailErrorMessage);
-        if (await detailedError.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await detailedError.textContent();
+        // Prefer the full error-state container so both the summary line (which
+        // holds the field name) and the expanded detail body are captured in a
+        // single string.
+        const container = this.page.locator(this.errorMessage).first();
+        if (await container.isVisible({ timeout: 2000 }).catch(() => false)) {
+            const text = (await container.textContent()) || '';
+            if (text.trim()) return text;
         }
 
-        // Fall back to the main error message
-        const errorMsg = this.page.locator(this.errorMessage);
-        if (await errorMsg.isVisible({ timeout: 2000 }).catch(() => false)) {
-            return await errorMsg.textContent();
+        // Fallback (container unavailable, e.g. a rendering race): stitch the
+        // summary line and detail body together explicitly so the field name is
+        // never dropped — never fall back to the detail body alone, which is the
+        // exact gap that hid the field name in the first place.
+        const parts = [];
+        for (const selector of [this.searchErrorSummary, this.searchDetailErrorMessage]) {
+            const locator = this.page.locator(selector).first();
+            if (await locator.isVisible({ timeout: 2000 }).catch(() => false)) {
+                const text = (await locator.textContent()) || '';
+                if (text.trim()) parts.push(text.trim());
+            }
         }
+        if (parts.length) return parts.join(' ');
 
         // Return empty string if no error message found
         testLogger.warn('No error message found');
@@ -4391,7 +4423,7 @@ export class LogsPage {
     }
 
     async clickFunctionStreamTab() {
-        return await this.page.locator('button[data-test="function-stream-tab"]').click();
+        return await this.page.locator('[data-test="pipeline-section-tab-functions"]').click();
     }
 
     async clickSearchFunctionInput() {
@@ -4849,7 +4881,7 @@ export class LogsPage {
     async expectPaginationRowCountVisible(timeout = 10000) {
         const title = this.page.locator(this.paginationRowCountTitle);
         await expect(title).toBeVisible({ timeout });
-        await expect(title).toHaveText(/Showing [1-9]\d* to \d+ out of [1-9][\d,]*/, { timeout });
+        await expect(title).toHaveText(/[1-9][\d,]* to \d+ out of [1-9][\d,]*/, { timeout });
     }
 
     /**
@@ -5137,17 +5169,17 @@ export class LogsPage {
         // Verify proper error handling for blank SQL query (the actual behavior from PR #9023)
         // Allow a longer timeout for the error banner — the backend issues a delayed
         // error response for blank queries.
-        // AGENT_RULES §2: target the data-test directly (Index.vue uses
-        // data-test="logs-search-error-message" on the error banner).
+        // Index.vue: data-test="logs-search-error-state" wraps LogsErrorState → QueryErrorState
         const errorMessage = this.page.locator(this.errorMessage).first();
         await expect(errorMessage).toBeVisible({ timeout: 30000 });
-        await expect(errorMessage).toContainText('Error occurred while retrieving search events', { timeout: 5000 });
 
-        // Verify there's a clickable error details button
-        const errorDetailsBtn = this.page.locator('[data-test="logs-page-result-error-details-btn"]');
+        // Verify there's a clickable error details toggle.
+        // Hero layout (logs page) uses error-detail-toggle-btn (in ErrorDetailPanel).
+        // Block layout uses query-error-toggle-detail-btn (in QueryErrorState).
+        const errorDetailsBtn = this.page.locator('[data-test="error-detail-toggle-btn"], [data-test="query-error-toggle-detail-btn"]').first();
         if (await errorDetailsBtn.isVisible()) {
             await errorDetailsBtn.click();
-            testLogger.info('✓ Error details button clicked successfully');
+            testLogger.info('✓ Error details toggle clicked successfully');
         }
     }
 
@@ -6511,22 +6543,27 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isDimensionSidebarVisible() {
-        return await this.page.locator(this.dimensionSelectorSidebar).isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.page.locator(this.dimensionSelectorSidebar).isVisible().catch(() => false);
     }
 
     /**
      * Toggle dimension selector sidebar via collapse button
      */
     async toggleDimensionSidebar() {
-        const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
-        if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            const sidebar = this.page.locator(this.dimensionSelectorSidebar);
-            const wasVisible = await sidebar.isVisible().catch(() => false);
+        const sidebar = this.page.locator(this.dimensionSelectorSidebar);
+        const sidebarVisible = await sidebar.isVisible().catch(() => false);
+        if (sidebarVisible) {
+            // Sidebar is open — click the collapse btn inside it
+            const btn = this.page.locator(this.dimensionSelectorCollapseBtn);
             await btn.click();
-            // Wait for the sidebar visibility state to flip (deterministic transition)
-            await sidebar.waitFor({ state: wasVisible ? 'hidden' : 'visible', timeout: 5000 }).catch(() => {});
-            testLogger.info('Toggled Dimension Selector sidebar');
+            await sidebar.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        } else {
+            // Sidebar is collapsed — click the collapsed bar to expand
+            const collapsedBar = this.page.locator('[data-test="dimension-selector-collapsed-bar"]');
+            await collapsedBar.click();
+            await sidebar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         }
+        testLogger.info('Toggled Dimension Selector sidebar');
     }
 
     /**
@@ -6616,7 +6653,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isNoResultsMessageVisible() {
-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
+        return await this.page.locator('[data-test="logs-search-no-events-found-text"]').isVisible({ timeout: 5000 }).catch(() => false);
     }
 
     /**
@@ -6637,8 +6674,10 @@ export class LogsPage {
     async waitForSearchResultsToLoad() {
         try {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-            // Wait for either results or no-results indicator
-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout: 15000 });
+            // Wait for results table, no-events state, or error state — any definite post-query state
+            await this.page.locator(
+                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+            ).first().waitFor({ state: 'visible', timeout: 15000 });
         } catch {
             // Fallback: at least wait for any loading to finish
             testLogger.info('waitForSearchResultsToLoad: timed out waiting for results indicator');
@@ -7150,7 +7189,10 @@ export class LogsPage {
     async waitForSearchResultOrEmpty(timeout = 30000) {
         try {
             await this.page.waitForLoadState('networkidle', { timeout }).catch(() => {});
-            await this.page.locator(`${this.logsTable}, [data-test="logs-search-result-not-found-text"]`).first().waitFor({ state: 'visible', timeout });
+            // Wait for results table, no-events state, no-query-applied state, or error state
+            await this.page.locator(
+                `${this.logsTable}, [data-test="logs-search-no-events-found-text"], [data-test="logs-search-apply-search-text"], [data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
+            ).first().waitFor({ state: 'visible', timeout });
             testLogger.info('Search result or empty state visible');
         } catch (e) {
             testLogger.warn('waitForSearchResultOrEmpty: timed out waiting for results indicator');
@@ -9047,7 +9089,63 @@ export class LogsPage {
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
         }
 
+        // Phase 3: When in SQL mode on the Build tab, the chart-type-selected signal (Phase 2)
+        // can fire before makeAutoSQLQuery() has finished populating the query editor. Wait
+        // for the Monaco editor inside [data-test="logs-search-bar-query-editor"] to have
+        // non-empty content — this confirms that onBuildQueryGenerated() has been called and
+        // queries[0].query is ready for any Auto→Custom mode switch.
+        try {
+            await this.page.waitForFunction(
+                (editorSelector) => {
+                    const host = document.querySelector(editorSelector);
+                    if (!host) return true; // editor absent — skip
+                    const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                    for (const ed of editors) {
+                        const domNode = ed.getDomNode?.();
+                        if (domNode && host.contains(domNode)) {
+                            const val = ed.getValue();
+                            return val && val.trim().length > 0;
+                        }
+                    }
+                    return false; // editor found but value not yet set
+                },
+                '[data-test="logs-search-bar-query-editor"]',
+                { timeout: 10000, polling: 500 }
+            );
+            testLogger.info('Build tab query editor populated');
+        } catch (error) {
+            // Phase 3 is best-effort — editor may legitimately be empty (SQL mode OFF, empty query)
+            testLogger.warn('Build tab query editor did not populate within 10s, proceeding');
+        }
+
         return true;
+    }
+
+    /**
+     * Wait for the search-bar query editor to contain non-empty content.
+     * Use this after switching to Build tab in SQL mode to ensure makeAutoSQLQuery()
+     * has finished (it depends on the updateGroupedFields API call, which can be slow in CI).
+     * Fails the test if the editor stays empty beyond the timeout.
+     */
+    async expectQueryEditorPopulated(timeout = 30000) {
+        await this.page.waitForFunction(
+            (selector) => {
+                const host = document.querySelector(selector);
+                if (!host) return false;
+                const editors = window.monaco?.editor?.getEditors?.() ?? [];
+                for (const ed of editors) {
+                    const domNode = ed.getDomNode?.();
+                    if (domNode && host.contains(domNode)) {
+                        const val = ed.getValue();
+                        return val && val.trim().length > 0;
+                    }
+                }
+                return false;
+            },
+            '[data-test="logs-search-bar-query-editor"]',
+            { timeout, polling: 500 }
+        );
+        testLogger.info('Query editor populated');
     }
 
     /**
@@ -9697,7 +9795,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isNoResultsVisible() {
-        return await this.page.locator('[data-test="logs-search-result-not-found-text"]')
+        return await this.page.locator('[data-test="logs-search-no-events-found-text"]')
             .isVisible({ timeout: 2000 }).catch(() => false);
     }
 
@@ -9714,7 +9812,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsSearchErrorMessage() {
-        return this.page.locator('[data-test="logs-search-error-message"]').first();
+        return this.page.locator('[data-test="logs-search-error-state"]').first();
     }
 
     // ===== REGRESSION: Scroll Retention (#9044) & Undefined Length (#7354) =====
@@ -9853,7 +9951,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async hasErrorMessage() {
-        const errorEl = this.page.locator('[data-test="logs-search-error-message"]');
+        const errorEl = this.page.locator('[data-test="logs-search-error-state"]');
         return await errorEl.isVisible().catch(() => false);
     }
 

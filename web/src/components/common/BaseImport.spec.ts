@@ -308,9 +308,9 @@ describe("BaseImport.vue", () => {
   // ─── Computed styles ─────────────────────────────────────────────────────────
 
   describe("Computed styles", () => {
-    it("contentStyle sets calc width when showSplitter is true", () => {
+    it("contentStyle returns width 100% when showSplitter is true", () => {
       wrapper = createWrapper({ showSplitter: true });
-      expect((wrapper.vm as any).contentStyle).toContain("calc(100vw - 100px)");
+      expect((wrapper.vm as any).contentStyle).toContain("100%");
     });
 
     it("contentStyle sets width 100% when showSplitter is false", () => {

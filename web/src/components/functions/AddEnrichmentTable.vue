@@ -17,26 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-enrichment-table-page"
-    class="tw:flex tw:flex-col tw:pr-[0.625rem] tw:h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+    class="tw:flex tw:flex-col tw:px-2.5 tw:h-[calc(100vh-var(--navbar-height)-0.875rem)]"
   >
-    <!-- Header bar -->
-    <div class="card-container tw:mb-2 tw:shrink-0">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:h-[64px]">
-        <OButton
-          data-test="add-enrichment-table-back-btn"
-          icon-left="chevron-left"
-          variant="outline"
-          size="icon-xs-sq"
-          @click="$emit('cancel:hideform')"
-        />
-        <span
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="add-enrichment-table-title"
-        >
-          {{ isUpdating ? t("function.updateEnrichmentTable") : t("function.addEnrichmentTable") }}
-        </span>
-      </div>
-    </div>
+    <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
+    <AppPageHeader
+      :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
+      :back="{
+        label: t('function.enrichmentTables'),
+        onClick: () => $emit('cancel:hideform'),
+        dataTest: 'add-enrichment-table-back-btn',
+      }"
+      class="tw:-mx-2.5 tw:px-4 tw:border-b tw:border-border-default tw:mb-2 tw:shrink-0"
+    >
+      <template #title>
+        <span data-test="add-enrichment-table-title">{{
+          isUpdating ? t("function.updateEnrichmentTable") : t("function.addEnrichmentTable")
+        }}</span>
+      </template>
+    </AppPageHeader>
 
     <!-- Form content -->
     <div class="card-container tw:flex-1 tw:min-h-0 tw:mb-2 tw:flex tw:flex-col tw:overflow-y-auto tw:p-4">
@@ -216,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Footer -->
     <div
-      class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2"
+      class="card-container tw:flex tw:items-center tw:justify-end tw:-mx-2.5 tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
     >
       <OButton
         data-test="add-enrichment-table-cancel-btn"
@@ -255,6 +253,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 const defaultValue: any = () => {
   return {
     name: "",
@@ -269,7 +268,7 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OInput, OFile, OOptionGroup, OSwitch,
-    OIcon, OCard,
+    OIcon, OCard, AppPageHeader,
 },
   props: {
     modelValue: {

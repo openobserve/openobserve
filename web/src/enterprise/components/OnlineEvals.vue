@@ -6,7 +6,11 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="online-evals" data-test="online-evals-page">
+  <div
+    class="online-evals"
+    :class="{ 'online-evals--embedded': hideTabBar }"
+    data-test="online-evals-page"
+  >
     <!-- Full-page forms (jobs / scorers) -->
     <ScorerFormPage
       v-if="formPage?.entity === 'scorers'"
@@ -50,14 +54,110 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div class="online-evals__header card-container">
+      <div v-if="!hideTabBar" class="online-evals__header card-container">
         <div>
           <h1>{{ t("onlineEvals.title") }}</h1>
         </div>
       </div>
 
+      <AppPageHeader
+        v-if="hideTabBar && embeddedHeader"
+        :title="embeddedHeader.title"
+        :icon="embeddedHeader.icon"
+        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      >
+        <template
+          v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"
+          #actions
+        >
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="sm"
+                :data-test="`${activeTab}-import`"
+                icon-right="expand-more"
+              >
+                {{ t(`onlineEvals.${importI18nKey}.import.button`) }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              :data-test="`${activeTab}-import-custom`"
+              @select="
+                activeTab === 'scorers'
+                  ? goToImportScorer()
+                  : goToImportScoreConfig()
+              "
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>
+                  {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
+                </span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
+                </span>
+              </div>
+            </ODropdownItem>
+            <ODropdownItem
+              :data-test="`${activeTab}-import-library`"
+              @select="
+                activeTab === 'scorers'
+                  ? openScorerLibrary()
+                  : openScoreConfigLibrary()
+              "
+            >
+              <div class="tw:flex tw:flex-col">
+                <span>
+                  {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
+                </span>
+                <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60">
+                  {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
+                </span>
+              </div>
+            </ODropdownItem>
+          </ODropdown>
+          <OButton
+            v-if="addButtonLabel"
+            :data-test="`${activeTab}-list-add-btn`"
+            variant="primary"
+            size="sm"
+            @click="openCreateDialog"
+          >
+            {{ addButtonLabel }}
+          </OButton>
+        </template>
+        <template v-else-if="activeTab === 'jobs'" #actions>
+          <OButton
+            v-if="addButtonLabel"
+            data-test="eval-job-list-add-btn"
+            variant="primary"
+            size="sm"
+            @click="openCreateDialog"
+          >
+            {{ addButtonLabel }}
+          </OButton>
+        </template>
+        <template v-else-if="activeTab === 'quality'" #actions>
+          <DateTimePickerDashboard
+            ref="qualityDatePickerRef"
+            v-model="qualitySelectedDate"
+            :auto-apply-dashboard="true"
+            data-test="quality-time-range-picker"
+          />
+          <OButton
+            variant="outline"
+            size="sm-toolbar"
+            :loading="qualityRefreshing"
+            data-test="quality-refresh-btn"
+            @click="onQualityRefresh"
+          >
+            Refresh
+          </OButton>
+        </template>
+      </AppPageHeader>
+
       <section class="online-evals__content card-container">
-        <div class="online-evals__tabs">
+        <div v-if="!hideTabBar" class="online-evals__tabs">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -73,6 +173,8 @@ the Free Software Foundation, either version 3 of the License, or
         <div class="online-evals__body">
           <QualityPage
             v-if="activeTab === 'quality'"
+            ref="qualityPageRef"
+            :date-window="qualityDateWindow"
             :score-configs="scoreConfigs"
           />
           <ScoreConfigList
@@ -275,6 +377,14 @@ import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import type { DateWindow } from "./onlineEvals/composables/useQualityData";
+import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
 import { downloadFile } from "@/utils/dom";
 import {
   bulkExportFileName as bulkExportScoreConfigFileName,
@@ -286,6 +396,11 @@ import {
   exportScorerFileName,
   stripScorerForExport,
 } from "./onlineEvals/utils/exportScorer";
+
+// When embedded inside the AI Observability shell, the new secondary
+// sidebar provides tab navigation — the component's own header + tab
+// strip become redundant and should be suppressed.
+withDefaults(defineProps<{ hideTabBar?: boolean }>(), { hideTabBar: false });
 
 const store = useStore();
 const route = useRoute();
@@ -373,6 +488,116 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
   { value: "scoreConfigs", label: t("onlineEvals.tabs.scoreConfigs") },
 ]);
+
+// Header chrome shown only when embedded in the AI Observability shell —
+// mirrors the LLM Insights / Sessions pages so every section in the rail
+// shares the same title strip. Title + icon track the active rail item.
+const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: string; icon: IconName }> = {
+  quality: { i18nKey: "aiObservability.nav.quality", icon: "star-rate" },
+  jobs: { i18nKey: "aiObservability.nav.evalJobs", icon: "event" },
+  scorers: { i18nKey: "aiObservability.nav.scorers", icon: "rule" },
+  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", icon: "tune" },
+};
+
+const embeddedHeader = computed<{ title: string; icon: IconName } | null>(() => {
+  const meta = EMBEDDED_HEADER_META[activeTab.value];
+  if (!meta) return null;
+  return { title: t(meta.i18nKey), icon: meta.icon };
+});
+
+// Per-tab "create" button label for the embedded AppPageHeader. Quality has
+// no list-style create, so it returns an empty string and the button is
+// suppressed via v-if.
+const addButtonLabel = computed<string>(() => {
+  switch (activeTab.value) {
+    case "jobs":
+      return t("onlineEvals.job.newButton");
+    case "scorers":
+      return t("onlineEvals.scorer.newButton");
+    case "scoreConfigs":
+      return t("onlineEvals.scoreConfig.newButton");
+    default:
+      return "";
+  }
+});
+
+// Maps the active tab to the i18n namespace used by the import dropdown's
+// label/subtitle keys — scorers + scoreConfigs share the same shape.
+const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
+  activeTab.value === "scorers" ? "scorer" : "scoreConfig",
+);
+
+// ── Quality tab: date picker + refresh state ─────────────────────────────
+// Lifted out of QualityPage so the picker + refresh button live in the
+// embedded AppPageHeader's #actions slot (matching LLM Insights / Sessions).
+// QualityPage consumes `qualityDateWindow` as a prop and exposes
+// `refreshAll` + `isAnyLoading` for the Refresh button below.
+//
+// Date state is the shared `useAiDateRange()` ref — the same singleton
+// driving LLM Insights and Sessions — so picking a window on one page
+// lands on the other two (incl. across reloads via localStorage).
+const { state: qualitySelectedDate } = useAiDateRange();
+
+const qualityDateWindow = ref<DateWindow>({
+  startUs: (Date.now() - 15 * 60 * 1000) * 1000,
+  endUs: Date.now() * 1000,
+});
+const qualityDatePickerRef = ref<{
+  getConsumableDateTime: () => { startTime: number; endTime: number };
+} | null>(null);
+const qualityPageRef = ref<{
+  refreshAll: () => Promise<void>;
+  isAnyLoading: boolean;
+} | null>(null);
+
+function syncQualityDateWindow() {
+  const picker = qualityDatePickerRef.value;
+  if (!picker) return;
+  const dt = picker.getConsumableDateTime();
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
+    qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
+  }
+}
+
+// LocalStorage persistence is handled inside the composable now. This watch
+// only forwards the change into the absolute `dateWindow` the QualityPage
+// reads as a prop. No deep flag: DateTimePickerDashboard's
+// `update:modelValue` emits a brand-new object on every commit, so the
+// top-level ref identity changes and this watch fires.
+watch(qualitySelectedDate, () => {
+  syncQualityDateWindow();
+});
+
+// Aggregated "is any quality query in flight" — exposed by QualityPage so the
+// Refresh button can show its spinner regardless of which loader is running.
+const qualityRefreshing = computed(
+  () => qualityPageRef.value?.isAnyLoading ?? false,
+);
+
+// Manual refresh: re-anchor the window from the picker (so relative ranges
+// like "Past 15 minutes" advance to "now") and let the QualityPage watch on
+// `dateWindow` drive the actual refetch. We deliberately don't call
+// `qualityPageRef.refreshAll()` here — `syncQualityDateWindow` always
+// assigns a fresh `{startUs,endUs}` object, so the prop's ref identity
+// changes and the watch fires. Calling refreshAll() explicitly on top of
+// that would race two concurrent loads on every Refresh click.
+function onQualityRefresh() {
+  if (qualityDatePickerRef.value) {
+    syncQualityDateWindow();
+  } else {
+    // Picker isn't mounted (shouldn't happen — button + picker render
+    // together for the quality tab — but cover the race during initial
+    // teardown). Run the refresh directly so the click isn't lost.
+    void qualityPageRef.value?.refreshAll?.();
+  }
+}
+
+// Sync the initial dateWindow once the picker mounts (it only mounts while
+// the Quality tab is active). Without this the first render uses the
+// 7-day default instead of the user's persisted/picked range.
+watch(qualityDatePickerRef, (next) => {
+  if (next) syncQualityDateWindow();
+});
 
 const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
 
@@ -811,6 +1036,16 @@ async function performDelete() {
   color: var(--o2-text);
 }
 
+// When rendered inside the AI Observability shell, the AppPageHeader at the
+// top spans flush to the edges (matching LLM Insights / Sessions), so the
+// outer container drops its padding and gap — the header owns the top strip,
+// and the inner section's children handle their own internal padding.
+.online-evals--embedded {
+  height: 100%;
+  padding: 0;
+  gap: 0;
+}
+
 .online-evals__header,
 .online-evals__content {
   background: var(--o2-card-bg);
@@ -836,10 +1071,10 @@ async function performDelete() {
 
 .online-evals__header h1 {
   margin: 0;
-  font-weight: 700;
-  color: var(--o2-text);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-heading);
   letter-spacing: 0;
-  font-size: 18px;
 }
 
 .online-evals__tabs {

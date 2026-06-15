@@ -264,16 +264,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="detail-section">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Alert Name</div>
-                  <div class="tw:text-sm text-weight-medium">
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Alert Name</div>
+                  <div class="tw:text-sm tw:font-medium">
                     {{ selectedRow.alert_name }}
                   </div>
                 </div>
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Status</div>
                   <OBadge
                     :variant="getStatusVariant(selectedRow.status)"
                     size="sm"
+                    dot
                   >
                     {{ selectedRow.status }}
                   </OBadge>
@@ -287,13 +288,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="detail-section">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Timestamp</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Timestamp</div>
                   <div class="tw:text-sm">
                     {{ formatDate(selectedRow.timestamp) }}
                   </div>
                 </div>
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Duration</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Duration</div>
                   <div class="tw:text-sm">
                     {{
                       formatDuration(
@@ -311,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="detail-section">
               <div class="tw:flex tw:gap-3">
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Type</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Type</div>
                   <div class="tw:text-sm">
                     <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -322,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Silenced</div>
+                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Silenced</div>
                   <div class="tw:text-sm">
                     <OIcon
                       v-if="selectedRow.is_silenced"
@@ -354,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="detail-section">
                 <div class="tw:flex tw:gap-3">
                   <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                       Evaluation Time
                     </div>
                     <div class="tw:text-sm">
@@ -362,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div v-if="selectedRow.query_took" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                       Query Time
                     </div>
                     <div class="tw:text-sm">
@@ -370,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Retries</div>
+                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Retries</div>
                     <div class="tw:text-sm">{{ selectedRow.retries }}</div>
                   </div>
                 </div>
@@ -381,8 +382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="selectedRow.source_node">
               <OSeparator class="tw:my-2" />
               <div class="detail-section">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Source Node</div>
-                <div class="tw:text-sm text-mono">
+                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Source Node</div>
+                <div class="tw:text-sm tw:font-mono">
                   {{ selectedRow.source_node }}
                 </div>
               </div>
@@ -392,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="selectedRow.error">
               <OSeparator class="tw:my-2" />
               <div class="detail-section">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                   <OIcon
                     name="error"
                     size="xs"
@@ -420,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="selectedRow.success_response">
               <OSeparator class="tw:my-2" />
               <div class="detail-section">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">
+                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
                   <OIcon
                     name="check-circle"
                     size="xs"
@@ -495,6 +496,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -542,13 +544,14 @@ const errorMessage = ref("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
-  { id: "#", header: "#", accessorKey: "#", size: 37, minSize: 37, maxSize: 37, sortable: false, meta: { align: "left" } },
+  { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, minSize: TABLE_INDEX_COL_SIZE, maxSize: TABLE_INDEX_COL_SIZE, sortable: false, meta: { align: "left" } },
   {
     id: "alert_name",
     header: t("alerts.alertName") || "Alert Name",
     accessorKey: "alert_name",
     sortable: true,
-    meta: { align: "left" },
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
     id: "is_realtime",
@@ -607,8 +610,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.duration") || "Duration",
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
-    size: 80,
-    maxSize: 80,
+    size: COL.duration,
+    maxSize: COL.duration,
     cell: " ",
     meta: { align: "right" },
   },
@@ -617,8 +620,8 @@ const columns = ref<OTableColumnDef[]>([
     header: t("alerts.status") || "Status",
     accessorKey: "status",
     sortable: true,
-    size: 150,
-    maxSize: 150,
+    size: COL.status,
+    maxSize: COL.status,
     cell: " ",
     meta: { align: "left" },
   },
@@ -993,7 +996,7 @@ watch(
 }
 
 .section-label {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   letter-spacing: 0.02em;
   opacity: 0.8;

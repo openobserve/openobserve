@@ -641,6 +641,15 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
+  it("Should reset loading and runQuery when runQueryFn is called with no stream selected", async () => {
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    wrapper.vm.searchObj.loading = true;
+    wrapper.vm.searchObj.runQuery = true;
+    await wrapper.vm.runQueryFn();
+    expect(wrapper.vm.searchObj.loading).toBe(false);
+    expect(wrapper.vm.searchObj.runQuery).toBe(false);
+  });
+
   it("Should toggle expanded logs on toggleExpandLog", async () => {
     wrapper.vm.expandedLogs = [];
     wrapper.vm.toggleExpandLog(1);
@@ -749,10 +758,13 @@ describe("Logs Index", async () => {
   });
 
   it("Should watch runQuery and trigger runQueryFn when true", async () => {
+    // A stream must be selected; without one the guard resets runQuery to false immediately.
+    wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.searchObj.runQuery = true;
     await flushPromises();
-    // state-based check: runQuery watcher should have attempted to run
-    expect(wrapper.vm.searchObj.runQuery).toBe(true);
+    // runQueryFn runs to completion when a stream is present; showJobScheduler is the
+    // observable side-effect that confirms the watcher fired and runQueryFn executed.
+    expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
   it("Should watch fullSQLMode true -> setQuery & updateUrl; false -> reset and maybe getQueryData", async () => {
@@ -802,12 +814,6 @@ describe("Logs Index", async () => {
     } finally {
       (config as any).isCloud = originalIsCloud;
     }
-  });
-
-  it("Should toggle error details visibility", async () => {
-    expect(wrapper.vm.disableMoreErrorDetails).toBe(false);
-    wrapper.vm.toggleErrorDetails();
-    expect(wrapper.vm.disableMoreErrorDetails).toBe(true);
   });
 
   it("Should emit sendToAiChat event with payload", async () => {

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="tw:p-2">
+    <div class="tw:p-2 tw:pt-1">
       <div class="tw:text-base tw:font-medium tw:font-bold">OTLP HTTP</div>
       <ContentCopy class="tw:mt-2" :content="getOtelHttpConfig" />
     </div>

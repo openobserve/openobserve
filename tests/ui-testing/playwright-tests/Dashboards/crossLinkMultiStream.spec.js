@@ -261,6 +261,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await bothSchemasPromise;
 
         // Step 4: Expand a log row
+        // expandFirstLogRow waits up to 30 s for the first row to appear —
+        // UNION ALL queries can be slow to render rows in CI.
         await pm.crossLinkPage.expandFirstLogRow();
 
         // Step 5 & 6: Poll until BOTH cross-links appear (backend merges from both streams).

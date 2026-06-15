@@ -1,3 +1,71 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// Formatted span node in the shape produced by TraceDetails getFormattedSpan,
+// as it appears inside traceTree (children nested under `spans`).
+const treeSpan = (
+  spanId: string,
+  serviceName: string,
+  parentId: string,
+  spans: any[],
+  durationMs: number,
+) => ({
+  spanId,
+  span_id: spanId,
+  serviceName,
+  resolvedIdentity: serviceName,
+  parentId,
+  durationMs,
+  spans,
+  operationName: `${serviceName}:op`,
+  operation_name: `${serviceName}:op`,
+  start_time: 1755853746625720300,
+  spanStatus: "UNSET",
+});
+
+// Trace-tree fixtures for pattern-tree (Trace Graph) tests. Each fixture is
+// the `traceTree` array TraceDetails builds — one entry per root span.
+export const patternTraceTrees = {
+  // Baseline: single root, root service calls one downstream service
+  singleRoot: [
+    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+  ],
+  // Two root spans with distinct services, each with its own downstream call
+  multiRootDistinctServices: [
+    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("i1", "ingester", "", [treeSpan("c1", "compactor", "i1", [], 40)], 60),
+  ],
+  // Two root spans that belong to the same service, no cross-service calls
+  multiRootSameService: [
+    treeSpan("a1", "alertmanager", "", [], 100),
+    treeSpan("a2", "alertmanager", "", [], 50),
+  ],
+  // Two root spans whose services call each other (cyclic service relationship)
+  multiRootCyclicServices: [
+    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("q2", "querier", "", [treeSpan("a2", "alertmanager", "q2", [], 30)], 50),
+  ],
+  // Root span calling another service, plus an orphan root of that same child service
+  multiRootOrphanChildService: [
+    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
+    treeSpan("q2", "querier", "missing-parent", [], 30),
+  ],
+  // Single root span, single service, no relationships at all
+  singleServiceOnly: [treeSpan("a1", "alertmanager", "", [], 100)],
+};
+
 export default {
   tracesDetails: {
     traceMeta: {

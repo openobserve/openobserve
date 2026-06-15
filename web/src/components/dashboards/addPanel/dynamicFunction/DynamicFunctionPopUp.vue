@@ -310,14 +310,14 @@ export default {
 }
 
 .text-label-bold {
-  font-family: "Nunito Sans";
+  font-family: var(--font-sans);
   font-size: 13px;
   font-style: normal;
   font-weight: 600;
 }
 
 .text-label-normal {
-  font-family: "Nunito Sans";
+  font-family: var(--font-sans);
   font-size: 13px;
   font-style: normal;
   font-weight: 400;

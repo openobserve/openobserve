@@ -15,14 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="panel-editor tw:px-[0.625rem]! tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
+  <div class="panel-editor tw:flex-1 tw:flex tw:min-h-0" data-test="panel-editor-container">
     <div class="tw:flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="tw:flex tw:flex-col scroll card-container tw:mr-[0.625rem]"
+          class="tw:flex tw:flex-col scroll card-container tw:bg-surface-panel! tw:border-r tw:border-border-default"
           style="
             overflow-y: auto;
+            overflow-x: hidden;
             height: 100%;
             min-width: 100px;
             max-width: 100px;
@@ -35,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <OSeparator vertical />
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -71,48 +71,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
+          separatorClass="field-list-separator"
+          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List (before slot) -->
           <template #before>
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="tw:flex tw:flex-col card-container"
+                class="tw:flex tw:flex-col card-container tw:bg-surface-panel!"
                 :style="fieldListContainerStyle"
               >
                 <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" />
+                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
-          </template>
-
-          <!-- Splitter separator -->
-          <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
-            <OButton
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ top: '14px', zIndex: 100 }"
-              :class="
-                dashboardPanelData.layout.showFieldList
-                  ? 'splitter-icon-collapse'
-                  : 'splitter-icon-expand'
-              "
-              class="tw:absolute!"
-              @click.stop="collapseFieldList"
-            >
-              <template #icon-left>
-                <OIcon
-                  :name="
-                    dashboardPanelData.layout.showFieldList
-                      ? 'chevron-left'
-                      : 'chevron-right'
-                  "
-                  size="sm"
-                />
-              </template>
-            </OButton>
           </template>
 
           <!-- Main content area (after slot) -->
@@ -125,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- Mode selection (left) + Add To Dashboard (right) row -->
                   <div
-                    class="tw:flex tw:justify-between tw:items-center tw:px-3 tw:py-1"
+                    class="tw:flex tw:justify-between tw:items-center tw:my-2 tw:mx-2"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
@@ -410,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="field-list-sidebar-header-collapsed card-container"
+          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -436,6 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'calc(100% - 50px)',
             height: '100%',
           }"
+          separatorClass="field-list-separator"
+          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List for custom chart -->
           <template #before>
@@ -450,34 +426,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="height: 100%"
                 >
                   <div class="tw:flex tw:flex-col" style="width: 100%">
-                    <PanelFieldList :editMode="editMode" />
+                    <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                   </div>
                 </div>
               </div>
             </div>
-          </template>
-
-          <!-- Custom chart splitter separator -->
-          <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
-            <OButton
-              variant="sidebar-button"
-              size="sidebar-button"
-              :style="{ zIndex: 100 }"
-              class="tw:top-[0.875rem]! tw:left-[0rem]! tw:absolute!"
-              @click="collapseFieldList"
-            >
-              <template #icon-left>
-                <OIcon
-                  :name="
-                    dashboardPanelData.layout.showFieldList
-                      ? 'chevron-left'
-                      : 'chevron-right'
-                  "
-                  size="sm"
-                />
-              </template>
-            </OButton>
           </template>
 
           <!-- Custom chart content area -->
@@ -545,13 +498,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div class="splitter-vertical splitter-enabled"></div>
-                      <div
-                        class="tw:absolute tw:bg-button-primary tw:text-button-primary-foreground tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full"
-                        style="top: 10px; left: 3.5px; z-index: 100"
-                        data-test="panel-editor-custom-chart-drag-indicator"
-                      >
-                        <OIcon name="drag-indicator" size="xs" />
-                      </div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -1284,12 +1230,27 @@ defineExpose({
 }
 
 .splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
+  background-color: transparent;
+  transition: background-color 0.3s;
 }
 
 .splitter-enabled:hover {
+  background-color: orange;
+}
+
+:deep(.field-list-separator::after) {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+:deep(.field-list-separator:hover::after) {
   background-color: orange;
 }
 

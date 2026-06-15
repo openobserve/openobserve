@@ -1,6 +1,6 @@
 ﻿<!-- eslint-disable no-useless-escape -->
 <template>
-  <div class="tw:p-3 kubernetes-config-section tw:pb-lg">
+  <div class="tw:p-1 kubernetes-config-section tw:pb-lg">
     <!-- Quick Install Section -->
     <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
       <div class="tw:flex tw:items-start tw:gap-3">

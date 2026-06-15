@@ -28,9 +28,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !searchObj.data.errorMsg?.trim()?.length &&
           searchObj.searchApplied
         "
+        ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="tw:flex tw:items-center tw:px-[0.5rem]! tw:py-1 tw:shrink-0 tw:min-h-[2rem] tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
       >
+        <!-- Field panel toggle — same style as logs page -->
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          class="tw:mr-1.5 tw:shrink-0"
+          data-test="traces-search-field-list-collapse-btn"
+          @click="toggleFieldList"
+        >
+          <OIcon
+            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            size="sm"
+          />
+          <OTooltip
+            :content="searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')"
+            side="bottom"
+          />
+        </OButton>
+
+        <!-- Left: count chips -->
         <OBadge
           data-test="traces-count-badge"
           variant="default"
@@ -43,36 +63,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           data-test="traces-error-count-badge"
           variant="error"
-          class="tw:text-xs tw:rounded! tw:bg-[var(--o2-error-tag-bg)]! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem] tw:text-[var(--o2-error-tag-text)]! tw:mr-[0.85rem]"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}</OBadge>
-        <!-- Insights Button -->
+          :clickable="true"
+          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
+          :class="!searchObj.meta.showErrorOnly ? 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!' : ''"
+          @click="toggleErrorOnly"
+        >
+          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
+          <OTooltip
+            :content="searchObj.meta.showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            side="bottom"
+          />
+          <template #trailing>
+            <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
+          </template>
+        </OBadge>
+
+        <div class="tw:flex-1" />
+
+        <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
+        <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6 tw:mr-1 tw:overflow-hidden">
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading"
+            :disabled="searchObj.loading"
+            @click="$emit('run-query')"
+          />
+        </div>
         <OButton
           variant="outline"
-          size="chip"
+          :size="showActionLabels ? 'chip' : 'icon-chip'"
           @click.stop="openUnifiedAnalysisDashboard"
           data-test="insights-button"
         >
-          <template #icon-left>
-            <OIcon name="timeline" size="xs" />
-          </template>
-          {{ t("volumeInsights.insightsButtonLabel") }}
-          <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
+          <OIcon name="timeline" size="sm" />
+          <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
-        <ORefreshButton
-          :last-run-at="searchObj.meta.lastRunAt"
-          :loading="searchObj.loading"
-          :disabled="searchObj.loading"
-          @click="$emit('run-query')"
-          class="tw:ml-2"
-        />
-
-        <div class="tw:flex-1" />
-        <!-- Pagination -->
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem] tw:mt-0!"
+            class="select-pagination tw:mr-[0.25rem] tw:mt-0! tw:ml-1"
             size="sm"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
@@ -145,6 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @page-change="changePage"
           @rows-per-page-change="changeRowsPerPage"
           @sort-change="changeSortBy"
+          @widen-range="(p) => $emit('widen-range', p)"
+          @remove-filter="$emit('remove-filter')"
         />
       </div>
     </div>
@@ -156,6 +189,8 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
+  onBeforeUnmount,
+  onMounted,
   ref,
   watch,
 } from "vue";
@@ -198,8 +233,16 @@ export default defineComponent({
     "get:traceDetails",
     "metrics:filters-updated",
     "run-query",
+    "widen-range",
+    "remove-filter",
+    "error-only-toggled",
   ],
   methods: {
+    toggleErrorOnly() {
+      const newVal = !this.searchObj.meta.showErrorOnly;
+      this.searchObj.meta.showErrorOnly = newVal;
+      this.$emit("error-only-toggled", newVal);
+    },
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
@@ -226,6 +269,26 @@ export default defineComponent({
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const metricsDashboardRef: any = ref(null);
+
+    const sectionHeaderRef = ref<HTMLElement | null>(null);
+    const containerWidth = ref(9999);
+    let headerResizeObserver: ResizeObserver | null = null;
+    const showActionLabels = computed(() => containerWidth.value >= 900);
+
+    onMounted(() => {
+      if (sectionHeaderRef.value) {
+        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
+        headerResizeObserver = new ResizeObserver((entries) => {
+          containerWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        headerResizeObserver.observe(sectionHeaderRef.value);
+      }
+    });
+    
+    //Before unmount
+    onBeforeUnmount(() => {
+      headerResizeObserver?.disconnect();
+    });
 
     watch(
       () => searchObj.loading,
@@ -341,12 +404,18 @@ export default defineComponent({
       }
     }
 
+    const toggleFieldList = () => {
+      searchObj.meta.showFields = !searchObj.meta.showFields;
+    };
+
     return {
       t,
       store,
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      sectionHeaderRef,
+      showActionLabels,
       expandRowDetail,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
@@ -359,6 +428,7 @@ export default defineComponent({
       rowsPerPageOptions,
       totalPages,
       openUnifiedAnalysisDashboard,
+      toggleFieldList,
       formatLargeNumber,
     };
   },

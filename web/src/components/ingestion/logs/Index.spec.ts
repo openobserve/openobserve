@@ -100,10 +100,6 @@ describe("IngestLogs Component", () => {
       expect(wrapper.vm.$options.name).toBe("IngestLogs");
     });
 
-    it("should initialise splitterModel to 250", () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
-    });
-
     it("should expose currentUserEmail from the store", () => {
       expect(wrapper.vm.currentUserEmail).toBe(store.state.userInfo.email);
     });
@@ -459,13 +455,6 @@ describe("IngestLogs Component", () => {
   // Reactive Data
   // ─────────────────────────────────────────────────────────────────────────
   describe("Reactive Data", () => {
-    it("should allow splitterModel to be updated reactively", async () => {
-      expect(wrapper.vm.splitterModel).toBe(250);
-      wrapper.vm.splitterModel = 320;
-      await wrapper.vm.$nextTick();
-      expect(wrapper.vm.splitterModel).toBe(320);
-    });
-
     it("should allow ingestiontabs to be updated reactively", async () => {
       wrapper.vm.ingestiontabs = "curl";
       await wrapper.vm.$nextTick();

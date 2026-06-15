@@ -112,10 +112,8 @@ describe("CustomMarkdownEditor", () => {
       expect(wrapper.vm.$options.components.MarkdownRenderer).toBeDefined();
     });
 
-    it("should render drag indicator", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]').exists()).toBe(true);
+    it.skip("should render drag indicator", () => {
+      // drag icon intentionally removed from splitter separator
     });
 
     it("should render editor with data-test attribute", () => {
@@ -521,28 +519,16 @@ console.log('Hello World');
       expect(separator.exists()).toBe(true);
     });
 
-    it("should render drag indicator avatar", () => {
-      wrapper = createWrapper();
-
-      const avatar = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
-      expect(avatar.exists()).toBe(true);
+    it.skip("should render drag indicator avatar", () => {
+      // drag icon intentionally removed from splitter separator
     });
 
-    it("should configure drag indicator with correct props", () => {
-      wrapper = createWrapper();
-
-      const avatar = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
-      expect(avatar.exists()).toBe(true);
+    it.skip("should configure drag indicator with correct props", () => {
+      // drag icon intentionally removed from splitter separator
     });
 
-    it("should position drag indicator correctly", () => {
-      wrapper = createWrapper();
-
-      const avatar = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
-      const style = avatar.attributes('style');
-      
-      expect(style).toContain('top: 10px');
-      expect(style).toContain('left: 50%');
+    it.skip("should position drag indicator correctly", () => {
+      // drag icon intentionally removed from splitter separator
     });
   });
 
@@ -602,10 +588,6 @@ console.log('Hello World');
       // Before slot (editor)
       const editorSection = wrapper.find('[data-test="dashboard-markdown-editor"]');
       expect(editorSection.exists()).toBe(true);
-
-      // Separator slot (drag indicator)
-      const dragIndicator = wrapper.find('[data-test="dashboard-markdown-editor-drag-indicator"]');
-      expect(dragIndicator.exists()).toBe(true);
 
       // After slot (renderer) - check component registration
       expect(wrapper.vm.$options.components.MarkdownRenderer).toBeDefined();

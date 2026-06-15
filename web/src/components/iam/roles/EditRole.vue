@@ -16,13 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="tw:flex tw:flex-col tw:pb-[0.625rem] tw:h-full" data-test="edit-role-page">
+    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
+    <AppPageHeader
+      :title="editingRole"
+      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+    />
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
-      class="tw:pb-[0.625rem] tw:flex-shrink-0"
+      class="tw:shrink-0"
     >
     <div class="card-container tw:py-2 tw:flex tw:flex-col">
-          <span style="font-size: 18px;" class="tw:px-3 tw:mb-2">{{ editingRole }}</span>
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -149,14 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius tw:px-3 tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
-            style="scrollbar-gutter: stable;"
+            class="el-border-radius tw:flex-1 tw:min-h-0 tw:overflow-y-auto"
           >
-            <div
-              v-if="isFetchingInitialRoles"
-              data-test="edit-role-page-loading-spinner"
-              class="tw:flex tw:items-center tw:justify-center tw:py-8"
-            />
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
                 ref="permissionTableRef"
@@ -169,6 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @updated:permission="handlePermissionChange"
                 @updated:permission-batch="handlePermissionBatchChange"
                 @expand:row="expandPermission"
+                @update:filter="onClearFilter"
               />
             </div>
             <div v-show="permissionsUiType === 'json'">
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0 tw:mt-[0.625rem]"
         style="z-index: 2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2">
+      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -285,10 +285,9 @@ import { onBeforeMount } from "vue";
 import {
   updateRole,
   getResources,
-  getResourcePermission,
+  getAllRolePermissions,
   getRoleUsers,
 } from "@/services/iam";
-import type { AxiosPromise } from "axios";
 import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
@@ -305,6 +304,7 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
@@ -313,6 +313,7 @@ import commonService from "@/services/common";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import onlineEvalsService from "@/services/online-evals.service";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -636,24 +637,15 @@ const modifyResourcePermissions = (resource: Resource) => {
 };
 
 const getResourcePermissions = () => {
-  const promises: AxiosPromise<any>[] = [];
-  permissionsState.resources.forEach((resource) => {
-    promises.push(
-      getResourcePermission({
-        role_name: editingRole.value,
-        org_identifier: store.state.selectedOrganization.identifier,
-        resource: resource.key,
-      }),
-    );
-  });
-
+  // Single request returns the role's permissions across all resource types,
+  // replacing one request per resource. Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
-    Promise.all(promises)
-      .then((res) => {
-        res.forEach((resourcePermissions: { data: Permission[] }) => {
-          permissions.value.push(...resourcePermissions.data);
-        });
-        promises.length = 0;
+    getAllRolePermissions({
+      role_name: editingRole.value,
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+      .then((res: { data: Permission[] }) => {
+        permissions.value.push(...res.data);
         resolve(true);
       })
       .catch((err) => {
@@ -1350,6 +1342,12 @@ const onResourceChange = async () => {
   countVisibleResources(permissionsState.permissions);
 };
 
+const onClearFilter = () => {
+  filter.value.value = "";
+  filter.value.resource = "";
+  onResourceChange();
+};
+
 function filterResources(rows: any, terms: any) {
   var filtered = [];
   terms = terms.toLowerCase();
@@ -1433,26 +1431,39 @@ const getResourceEntities = (resource: Resource | Entity) => {
     afolder: getAlertFolders,
     rfolder: getReportFolders,
     re_patterns: getRePatterns,
+    provider: getProviders,
+    score_config: getScoreConfigs,
+    scorer: getScorers,
+    eval_job: getEvalJobs,
     logs_pattern: getLogsPatternStreams,
     logs_insights: getLogsInsightsStreams,
     logs_cache: getLogsCacheStreams,
   };
 
   return new Promise(async (resolve, reject) => {
-    if (!resource.entities?.length) {
-      resource.is_loading = true;
-      if (resource.childName) {
-        await listEntitiesFnMap[resource.childName](resource);
-      } else {
-        await listEntitiesFnMap[resource.resourceName](resource);
+    try {
+      if (!resource.entities?.length) {
+        resource.is_loading = true;
+        try {
+          const listEntities = resource.childName
+            ? listEntitiesFnMap[resource.childName]
+            : listEntitiesFnMap[resource.resourceName];
+
+          if (listEntities) {
+            await listEntities(resource);
+          }
+        } finally {
+          resource.is_loading = false;
+        }
+
+        // unncecessaryly we are updating the all resource entities, fix to update the current resource
+        updatePermissionVisibility(permissionsState.permissions);
       }
 
-      // unncecessaryly we are updating the all resource entities, fix to update the current resource
-      updatePermissionVisibility(permissionsState.permissions);
-      resource.is_loading = false;
+      resolve(true);
+    } catch (err) {
+      reject(err);
     }
-
-    resolve(true);
   });
 };
 
@@ -1884,6 +1895,84 @@ const getRePatterns = async () => {
   );
 
   return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
+const getProviders = async () => {
+  const providers = await onlineEvalsService.providers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "provider",
+    ["id"],
+    providers,
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScoreConfigs = async () => {
+  const scoreConfigs = await onlineEvalsService.scoreConfigs.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "score_config",
+    ["entityId"],
+    scoreConfigs.map((scoreConfig: any) => ({
+      ...scoreConfig,
+      entityId: scoreConfig.entityId ?? scoreConfig.entity_id ?? scoreConfig.id,
+    })),
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScorers = async () => {
+  const scorers = await onlineEvalsService.scorers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "scorer",
+    ["entityId"],
+    scorers.map((scorer: any) => ({
+      ...scorer,
+      entityId: scorer.entityId ?? scorer.entity_id ?? scorer.id,
+    })),
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getEvalJobs = async () => {
+  const evalJobs = await onlineEvalsService.jobs.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "eval_job",
+    ["id"],
+    evalJobs,
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };

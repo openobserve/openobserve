@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use arrow_schema::Schema;
 use config::{
@@ -28,6 +28,7 @@ use config::{
     utils::size::bytes_to_human_readable,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
+use hashbrown::HashSet;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
@@ -36,7 +37,7 @@ use itertools::Itertools;
 use tracing::Instrument;
 
 pub use super::calc_target_partitions;
-pub use crate::service::search::tantivy::{get_tantivy_directory, tantivy_search};
+pub use crate::service::search::tantivy::tantivy_search;
 use crate::service::{
     file_list,
     search::{

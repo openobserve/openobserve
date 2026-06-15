@@ -88,6 +88,16 @@ const o2Stubs = {
     template: `<div data-test="iam-users-selection-table-no-data">No users added</div>`,
     props: [],
   },
+  OEmptyState: {
+    template: `<div data-test="iam-users-selection-table-no-data">No users</div>`,
+    props: ["size", "preset", "filtered", "hideAction"],
+    emits: ["action"],
+  },
+  OSearchInput: {
+    template: `<div><input type="text" :placeholder="placeholder" :value="modelValue" @input="$emit('update:model-value', $event.target.value)" /></div>`,
+    props: ["modelValue", "placeholder"],
+    emits: ["update:model-value"],
+  },
 };
 
 // ── Enhanced store with required properties for GroupUsers ──────────
@@ -448,7 +458,7 @@ describe("GroupUsers Component", () => {
       const selectColumn = wrapper.vm.columns[0];
       expect(selectColumn.id).toBe("select");
       expect(selectColumn.accessorKey).toBe("isInGroup");
-      expect(selectColumn.size).toBe(36);
+      expect(selectColumn.size).toBe(44);
 
       const emailColumn = wrapper.vm.columns[1];
       expect(emailColumn.id).toBe("email");

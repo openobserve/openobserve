@@ -363,9 +363,9 @@ describe("DashboardHeader", () => {
 
       const titleElement = findTitle(wrapper);
       expect(titleElement?.exists()).toBe(true);
-      // The migrated heading uses tw:text-xl + tw:font-semibold.
+      // The migrated heading uses tw:text-base + tw:font-semibold.
       expect(
-        titleElement?.classes().some((c) => c.includes("text-xl")),
+        titleElement?.classes().some((c) => c.includes("text-base")),
       ).toBe(true);
     });
 

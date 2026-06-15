@@ -405,6 +405,12 @@
     "noData": "Geen gegevens beschikbaar",
     "functionEditorLabel": "Functie-editor",
     "loadingStream": "Stream wordt geladen...",
+    "askAIPlaceholderRotation": {
+      "one": "Laat me fouten zien van het afgelopen uur...",
+      "two": "Vind langzame zoekopdrachten die meer dan 5 seconden duren...",
+      "three": "Tel 5xx reacties gegroepeerd per service...",
+      "four": "Filterlogboeken waarbij level = 'error'..."
+    },
     "hideHistogram": "Histogram verbergen",
     "disableQuickMode": "Schakel de snelle modus uit",
     "menuGroupSetOnce": "Eenmaal instellen",
@@ -415,7 +421,11 @@
     "menuGroupSchedule": "Schema",
     "menuGroupInspect": "Inspecteer",
     "validSql": "Geldige SQL",
-    "invalidSql": "Ongeldige vraag"
+    "invalidSql": "Ongeldige vraag",
+    "menuGroupExplain": "Leg uit",
+    "fieldValuesEmpty": "Geen waarden gevonden.",
+    "fieldValuesEmptyHint": "Probeer een breder tijdsbereik om waarden te zien.",
+    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken"
   },
   "menu": {
     "home": "Home",
@@ -449,7 +459,8 @@
     "language": "taal",
     "actions": "Acties",
     "incidents": "Incidenten",
-    "evals": "Evalen"
+    "evals": "Evalen",
+    "aiObservability": "AI-waarneembaarheid"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -517,7 +528,18 @@
     "seekToMoment": "Streef naar dit moment in de sessie",
     "timeInSession": "Sessietijd",
     "route": "Route",
-    "duration": "Duur"
+    "duration": "Duur",
+    "emptyState": {
+      "title": "Bewaak uw gebruikers met Real User Monitoring",
+      "description": "RUM houdt echte gebruikersinteracties bij, zoals het laden van pagina's, fouten, API-aanroepen en herhalingen van sessies, zodat u precies kunt zien hoe gebruikers uw toepassing ervaren.",
+      "webApp": "Instrument: een webapp",
+      "webAppDesc": "Voeg de OpenObserve RUM SDK toe aan elke JavaScript-app",
+      "sessionReplay": "Sessie opnieuw afspelen inschakelen",
+      "sessionReplayDesc": "Gebruikerssessies opnemen en opnieuw afspelen om UX-problemen op te lossen",
+      "learnMore": "Meer informatie:",
+      "quickImpl": "Beknopte implementatiegids",
+      "blogPost": "Basisprincipes van frontend-monitoring"
+    }
   },
   "about": {
     "name": "OpenObserve",
@@ -958,7 +980,8 @@
     "subscription_type": "Soort abonnement",
     "proceed_subscription": "Ga verder met het abonnement",
     "subscription_plan": "Abonnementsplan",
-    "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}"
+    "makeBilledMember": "Maak van deze organisatie een factureringslid van {org}",
+    "manage": "Beheren"
   },
   "template": {
     "header": "Sjablonen",
@@ -1200,7 +1223,8 @@
     "tokenRotateError": "Het roteren van het token is mislukt.",
     "tokenDeleteError": "Het verwijderen van het token is mislukt.",
     "noTokensFound": "Geen innametokens gevonden.",
-    "createdBy": "Gemaakt door"
+    "createdBy": "Gemaakt door",
+    "orgLevelSummary": "Tokens op organisatieniveau voor eindpunten voor opname."
   },
   "dashboard": {
     "selectField": "Veld",
@@ -1780,7 +1804,24 @@
     "noDataAvailable": "Geen gegevens beschikbaar",
     "tabAiAssistant": "O2 AI-assistent",
     "tabOverview": "Overzicht",
-    "tabUsage": "Gebruik"
+    "tabUsage": "Gebruik",
+    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag",
+    "noDataState": {
+      "title": "Nog geen gegevens opgenomen",
+      "description": "Deze organisatie heeft geen gegevens ontvangen, dus er is niets om in kaart te brengen. Zodra de gebeurtenissen beginnen te verlopen, worden hier automatisch uw <strong>opnamevolume, opslag en querygebruik</strong> weergegeven.",
+      "logs": "Logboeken verzenden",
+      "logsDesc": "Curl, Filebeat, Fluentbit, Vector en meer",
+      "traces": "Sporen verzenden",
+      "tracesDesc": "OTLP/Jaeger/Zipkin gedistribueerde tracering",
+      "metrics": "Statistieken verzenden",
+      "metricsDesc": "Prometheus, Totel Collector, Telegraaf en meer",
+      "or": "Of:",
+      "otel": "OpenTelemetrie",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "aiIntegrations": "AI-integraties",
+      "shippers": "Verzenders van logboeken"
+    }
   },
   "billing": {
     "header": "Gebruik en facturering",
@@ -2952,7 +2993,10 @@
     "evaluationTemplate": "Evaluatiesjabloon",
     "evaluationTemplateHelp": "Selecteer een evaluatiesjabloon dat de criteria en dimensies voor de LLM-jurylid definieert.",
     "noTemplatesFound": "Geen evaluatiesjablonen gevonden. Maak er een op de pagina Evaluatiesjablonen.",
-    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd"
+    "evalTemplatesRefreshed": "Evaluatiesjablonen zijn succesvol vernieuwd",
+    "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
+    "selectStream": "Selecteer een stream...",
+    "queryEditorPlaceholder": "Selecteer een stream of schrijf hier een SQL-query..."
   },
   "reports": {
     "header": "Rapporten",
@@ -3211,7 +3255,42 @@
     "openInFullView": "In volledige weergave openen",
     "serviceMap": "Servicekaart",
     "patternView": "Patroonweergave",
-    "spanView": "Spanweergave"
+    "spanView": "Spanweergave",
+    "noData": {
+      "title": "Begin met het verzenden van sporen naar OpenObserve",
+      "description": "Er zijn nog geen tracestreams gevonden in deze organisatie. Instrument uw diensten en sporen verschijnen hier automatisch.",
+      "otlp": "Traces verzenden via OTLP",
+      "otlpDesc": "Jaeger, Zipkin en elke SDK die compatibel is met OpenTelemetry",
+      "otelCollector": "Verzamelaar/agent van Hotel",
+      "otelCollectorDesc": "Leid alle telemetriesignalen door de Otel Collector",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "python": "Python",
+      "java": "Java",
+      "nodejs": "Node.js",
+      "askAi": "Vraag AI om tracering in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een traceerstream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt filteren op service, duur, bereikstatus en meer zodra de resultaten zijn geladen.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk beschikbare tracestreams in deze organisatie",
+      "queryGuide": "Lees de traces-gids",
+      "queryGuideDesc": "Servicegrafiek, spanfiltering, RED-statistieken en meer",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen sporen gevonden",
+      "descNoFilters": "Er zijn geen sporen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten of een filter te verwijderen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "selectedRange": "het geselecteerde bereik"
+    },
+    "showAll": "Alles weergeven",
+    "filterByErrors": "Filteren op fouten",
+    "clearErrorFilter": "Foutfilter wissen"
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -3229,7 +3308,8 @@
     "confirmRejectMsg": "Weet je zeker dat je de uitnodiging om lid te worden {org} wilt weigeren?",
     "expired": "Vervallen",
     "expiresToday": "Vervalt vandaag",
-    "daysLeft": "{dagen} resterende dagen"
+    "daysLeft": "{dagen} resterende dagen",
+    "search": "Uitnodigingen zoeken"
   },
   "serviceAccounts": {
     "header": "Serviceaccounts",
@@ -3493,7 +3573,9 @@
     "timeRangeLabel": "Tijdbereik:",
     "analyzeTooltipTraces": "Analyseer de traceerdimensies voor snelheid, latentie en foutpatronen",
     "insightsButtonLabel": "Inzichten",
-    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht"
+    "searchInspectionsLabel": "Bekijk de details van de uitvoering van de zoekopdracht",
+    "inspectBtnLabel": "Inspecteer",
+    "analyzeBtnLabel": "Inzichten"
   },
   "errorInsights": {
     "title": "Inzichten",
@@ -3971,7 +4053,13 @@
     "elevatedErrorRate": "Verhoogd foutenpercentage",
     "reqPerSec": "requise/s",
     "allClear": "Alles duidelijk",
-    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster."
+    "allClearDesc": "Geen actieve afwijkingen, incidenten of slechte services in het geselecteerde tijdvenster.",
+    "emptyActionAlerts": "Waarschuwingsregels bekijken",
+    "emptyActionAlertsDesc": "Bekijk de geconfigureerde waarschuwingen en drempels",
+    "emptyActionLogs": "Logboeken bekijken",
+    "emptyActionLogsDesc": "Zoek en filter je logstreams",
+    "emptyActionTraces": "Sporen ontdekken",
+    "emptyActionTracesDesc": "Inspecteer gedistribueerde sporen en servicelatentie"
   },
   "chatHistory": {
     "title": "Chats",
@@ -4084,6 +4172,285 @@
       "one": "Laat me fouten zien van het afgelopen uur...",
       "two": "Schrijf VRL om JSON te parseren uit nginx-logboeken...",
       "three": "Bouw een dashboard voor de gezondheid van K8s nodes..."
+    }
+  },
+  "emptyState": {
+    "noSearchResults": {
+      "title": "We konden geen gegevens vinden",
+      "description": "Niets komt overeen met je huidige filters of tijdbereik. Probeer je zoekopdracht uit te breiden, het tijdsbereik te vergroten of de filters te wissen.",
+      "action": "Filters wissen",
+      "actionDesc": "Alle toegepaste filters opnieuw instellen"
+    },
+    "noLogs": {
+      "title": "Geen logboeken in dit bereik",
+      "description": "We hebben geen logboeken gevonden voor de geselecteerde stream en het geselecteerde tijdbereik. Probeer een groter tijdsbereik of een andere stream.",
+      "action": "Vergroot het tijdsbereik",
+      "actionDesc": "Zoek over een langere periode"
+    },
+    "noDashboards": {
+      "title": "Maak je eerste dashboard",
+      "description": "Dashboards brengen je statistieken, logboeken en sporen samen in één weergave. Bouw er een om aan de slag te gaan.",
+      "action": "Nieuw dashboard",
+      "actionDesc": "Begin met een leeg canvas",
+      "import": "Dashboard importeren",
+      "importDesc": "Een JSON-bestand op het dashboard uploaden",
+      "templates": "Sjablonen bekijken",
+      "templatesDesc": "Begin vanuit een communitydashboard"
+    },
+    "noPipelines": {
+      "title": "Maak je eerste pijplijn",
+      "description": "Pijplijnen transformeren en routeren uw gegevens zodra ze binnenkomen. Stel er een in om te beginnen met het vormgeven van je streams.",
+      "action": "Nieuwe pijplijn",
+      "actionDesc": "Bouw een flow vanuit het niets",
+      "import": "Pijplijn importeren",
+      "importDesc": "Een definitie van een pijplijn uploaden"
+    },
+    "noFunctions": {
+      "title": "Maak je eerste functie",
+      "description": "Functies verrijken en hervormen uw gegevens op het moment dat ze worden opgenomen of opgevraagd. Voeg er een toe om aan de slag te gaan.",
+      "action": "Nieuwe functie",
+      "actionDesc": "Schrijf een nieuwe VRL-functie"
+    },
+    "noStreams": {
+      "title": "Wachten op je eerste gegevens",
+      "description": "Er zijn nog geen gegevens binnengekomen. Sluit een bron aan en je streams worden hier automatisch weergegeven.",
+      "action": "Inslikken instellen",
+      "actionDesc": "Een gegevensbron aansluiten"
+    },
+    "noAlerts": {
+      "title": "Maak je eerste waarschuwing",
+      "description": "Waarschuwingen laten u weten op het moment dat uw gegevens een drempel overschrijden. Definieer er een om de monitoring te starten.",
+      "action": "Nieuwe waarschuwing",
+      "actionDesc": "Definieer een voorwaarde om te controleren"
+    },
+    "noIncidents": {
+      "title": "Geen actieve incidenten",
+      "description": "Je bent helemaal verstrikt — niets heeft op dit moment je aandacht nodig. De geactiveerde incidenten verschijnen hier."
+    },
+    "loadError": {
+      "title": "Er is iets misgegaan",
+      "description": "We konden deze gegevens niet laden. Het is meestal tijdelijk — probeer het zo meteen nog eens.",
+      "action": "Probeer het opnieuw",
+      "actionDesc": "Probeer de gegevens opnieuw te laden"
+    },
+    "noData": {
+      "title": "Hier nog niets",
+      "description": "Er zijn op dit moment geen gegevens om weer te geven."
+    },
+    "noTraces": {
+      "title": "Geen sporen gevonden",
+      "description": "Er komen geen sporen overeen met de geselecteerde service en het geselecteerde tijdbereik. Probeer een groter tijdsbereik of een andere service."
+    },
+    "noSearchHistory": {
+      "title": "Nog geen zoekgeschiedenis",
+      "description": "Zoekopdrachten die je uitvoert, worden hier weergegeven, zodat je ze opnieuw kunt bekijken en opnieuw kunt uitvoeren."
+    },
+    "noUsers": {
+      "title": "Nog geen gebruikers",
+      "description": "Nodig je teamgenoten uit om samen te werken in deze organisatie.",
+      "action": "Gebruiker toevoegen",
+      "actionDesc": "Nodig een teamgenoot uit via e-mail"
+    },
+    "noReports": {
+      "title": "Nog geen rapporten",
+      "description": "Plan een rapport om dashboards in je inbox te ontvangen.",
+      "action": "Nieuw rapport",
+      "actionDesc": "Een levering op het dashboard plannen"
+    },
+    "noQueries": {
+      "title": "Geen lopende zoekopdrachten",
+      "description": "Er zijn momenteel geen actieve zoekopdrachten. Langlopende zoekopdrachten worden hier weergegeven terwijl ze worden uitgevoerd."
+    },
+    "noServiceAccounts": {
+      "title": "Nog geen serviceaccounts",
+      "description": "Met serviceaccounts kunnen toepassingen worden geverifieerd met de API. Maak er een om aan de slag te gaan.",
+      "action": "Serviceaccount toevoegen",
+      "actionDesc": "Een API-serviceaccount aanmaken"
+    },
+    "noInvitations": {
+      "title": "Geen uitnodigingen in behandeling",
+      "description": "Uitnodigingen die je hebt verzonden of ontvangen, worden hier weergegeven."
+    },
+    "filtered": {
+      "title": "Geen {zelfstandig naamwoord} gevonden",
+      "description": "Er komt geen {noun} overeen met je huidige filters of zoekopdracht. Probeer ze aan te passen of te wissen.",
+      "action": "Filters wissen",
+      "actionDesc": "Alle filters opnieuw instellen en zoeken",
+      "fallbackNoun": "uitslagen"
+    },
+    "nouns": {
+      "logs": "logboeken",
+      "dashboards": "spatschermen",
+      "pipelines": "pijpleidingen",
+      "functions": "functioneert",
+      "streams": "stromen",
+      "alerts": "waarschuwingen",
+      "incidents": "incidenten",
+      "traces": "sporen",
+      "searches": "zoekopdrachten",
+      "users": "gebruikers",
+      "reports": "rapporten",
+      "queries": "vragen",
+      "serviceAccounts": "serviceaccounts",
+      "invitations": "uitnodigingen"
+    },
+    "noDashboardsInFolder": {
+      "title": "Geen dashboards in deze map",
+      "description": "Deze map is leeg. Voeg hier een dashboard toe of verplaats een dashboard uit een andere map.",
+      "action": "Nieuw dashboard",
+      "actionDesc": "Maak een dashboard in deze map",
+      "import": "Dashboard importeren",
+      "importDesc": "Een JSON-bestand op het dashboard uploaden",
+      "templates": "Sjablonen bekijken",
+      "templatesDesc": "Begin vanuit een communitydashboard"
+    },
+    "noGroups": {
+      "title": "Nog geen groepen",
+      "description": "Met groepen kun je machtigingen voor meerdere gebruikers tegelijk beheren. Maak er een om aan de slag te gaan.",
+      "action": "Nieuwe groep",
+      "actionDesc": "Een gebruikersgroep aanmaken"
+    },
+    "noRoles": {
+      "title": "Nog geen rollen",
+      "description": "Rollen bepalen welke acties gebruikers kunnen uitvoeren. Maak een aangepaste rol om de toegang te beheren.",
+      "action": "Nieuwe rol",
+      "actionDesc": "Definieer een aangepaste toegangsrol"
+    },
+    "noAnomalyConfigs": {
+      "title": "Geen anomaliedetectie geconfigureerd",
+      "description": "Stel anomaliedetectie in om automatisch ongebruikelijke patronen in uw gegevens te identificeren.",
+      "action": "Nieuwe configuratie",
+      "actionDesc": "Anomaliedetectie configureren"
+    },
+    "noApiLimits": {
+      "title": "Geen API-limieten geconfigureerd",
+      "description": "API-limieten bepalen hoeveel gegevens elke organisatie per tijdvenster kan opnemen en opvragen."
+    },
+    "noRoleLimits": {
+      "title": "Geen rollimieten geconfigureerd",
+      "description": "Rollimieten bepalen de opname- en queryquota die worden toegepast op individuele rollen binnen een organisatie."
+    },
+    "noIngestionTokens": {
+      "title": "Nog geen innametokens",
+      "description": "Ingestietokens authenticeren gegevensbronnen bij het verzenden van logboeken, statistieken en sporen.",
+      "action": "Nieuw token",
+      "actionDesc": "Genereer een innametoken"
+    },
+    "noOrganizations": {
+      "title": "Nog geen organisaties",
+      "description": "Organisaties groeperen je gebruikers en gegevens. Maak er een om aan de slag te gaan."
+    },
+    "noAlertDestinations": {
+      "title": "Nog geen bestemmingen",
+      "description": "Bestemmingen bepalen waar waarschuwingsmeldingen worden verzonden: Slack, e-mail, webhooks en meer.",
+      "action": "Nieuwe bestemming",
+      "actionDesc": "Een meldingskanaal koppelen"
+    },
+    "noAlertTemplates": {
+      "title": "Nog geen sjablonen",
+      "description": "Sjablonen bepalen de indeling van waarschuwingsberichten.",
+      "action": "Nieuw sjabloon",
+      "actionDesc": "Een meldingssjabloon maken"
+    },
+    "noEnrichmentTables": {
+      "title": "Nog geen verrijkingstabellen",
+      "description": "Met verrijkingstabellen kunt u tijdens het opvragen extra context aan uw logboekgegevens toevoegen.",
+      "action": "Nieuwe tafel",
+      "actionDesc": "Maak een verrijkingstabel"
+    },
+    "noCipherKeys": {
+      "title": "Nog geen cijfersleutels",
+      "description": "Cijfersleutels worden gebruikt om gevoelige velden in uw datastromen te versleutelen.",
+      "action": "Nieuwe sleutel",
+      "actionDesc": "Genereer een coderingssleutel"
+    },
+    "noAiToolsets": {
+      "title": "Nog geen AI-toolsets",
+      "description": "AI-toolsets verbinden je organisatie met externe AI-mogelijkheden.",
+      "action": "Nieuwe toolset",
+      "actionDesc": "Een AI-toolset toevoegen"
+    },
+    "noLlmProviders": {
+      "title": "Geen LLM-providers geconfigureerd",
+      "description": "Verbind een taalmodelprovider om AI-functies mogelijk te maken.",
+      "action": "Provider toevoegen",
+      "actionDesc": "Configureer een LLM-provider"
+    },
+    "noDiscoveredServices": {
+      "title": "Geen services ontdekt",
+      "description": "Services verschijnen hier automatisch zodra er sporen binnenkomen."
+    },
+    "noNodes": {
+      "title": "Geen nodes beschikbaar",
+      "description": "Clusterknooppunten verschijnen hier zodra ze zijn geregistreerd."
+    },
+    "noSourceMaps": {
+      "title": "Geen bronkaarten geüpload",
+      "description": "Upload bronkaarten om leesbare stacktraceringen in uw RUM-foutrapporten mogelijk te maken.",
+      "action": "Uploaden",
+      "actionDesc": "Een bronmapbestand uploaden"
+    },
+    "noBackfillJobs": {
+      "title": "Geen opvulopdrachten",
+      "description": "Bij opvulopdrachten worden historische gegevens opnieuw verwerkt via een pijplijn. Voer er een uit om te beginnen."
+    },
+    "noSearchJobs": {
+      "title": "Geen geplande zoekopdrachten",
+      "description": "Langlopende zoekopdrachten die je plant, worden hier weergegeven, waar je hun status kunt volgen en de resultaten kunt bekijken zodra ze zijn voltooid."
+    },
+    "noPipelineDestinations": {
+      "title": "Nog geen bestemmingen",
+      "description": "Externe doelen voor pijplijnuitvoer — HTTP-eindpunten en schrijfdoelen op afstand.",
+      "action": "Nieuwe bestemming",
+      "actionDesc": "Een pijplijnbestemming aansluiten"
+    },
+    "noLLMInsights": {
+      "title": "Nog geen LLM-activiteit",
+      "description": "Instrument uw services met de OpenTelemetry Gen-AI semantische conventies en gebruik ten minste één spoor om dit dashboard te vullen.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Leg gen_ai_* attributen vast op je sporen"
+    },
+    "noLLMSessions": {
+      "title": "Nog geen LLM-sessies",
+      "description": "Sessies worden gegroepeerd op gen_ai_conversation_id. Instrumenteer uw services zodat elk gesprek zijn sporen tagt, en sessies worden hier weergegeven.",
+      "action": "Instrument met OpenTelemetrie",
+      "actionDesc": "Tag omspant met gen_ai_conversation_id"
+    },
+    "noScorers": {
+      "title": "Nog geen scorers",
+      "description": "Scorers beoordelen LLM-reacties op basis van je scoreconfiguraties — begin met een LLM-jurylid of importeer er een uit de bibliotheek.",
+      "action": "Maak een scorer",
+      "actionDesc": "Definieer een LLM-jurylid of externe scorer"
+    },
+    "noEvalJobs": {
+      "title": "Nog geen evaluatieopdrachten",
+      "description": "Jobs rangschik scorers tegen een LLM-stream. Maak er een om te beginnen met het beoordelen van gesprekken op basis van een cadans.",
+      "action": "Een evaluatietaak aanmaken",
+      "actionDesc": "Kies een stream + scorers + cadans"
+    },
+    "noScoreConfigs": {
+      "title": "Nog geen scoreconfiguraties",
+      "description": "Scoreconfiguraties definiëren het schema dat scorers produceren: numeriek, booleaans of categorisch. Voeg er een toe om te beginnen met scoren.",
+      "action": "Scoreconfiguratie aanmaken",
+      "actionDesc": "Definieer de scorevorm + gezond bereik"
+    },
+    "noEvalTemplates": {
+      "title": "Nog geen evaluatiesjablonen",
+      "description": "Evaluatiesjablonen definiëren herbruikbare scorecriteria voor LLM-evaluaties.",
+      "action": "Nieuw sjabloon",
+      "actionDesc": "Maak een evaluatiesjabloon"
+    },
+    "noPipelineHistory": {
+      "title": "Nog geen geschiedenis van de pijplijn",
+      "description": "De uitvoeringsgeschiedenis van de pijplijn verschijnt hier zodra uw pijplijnen actief zijn."
+    },
+    "noStreamSelected": {
+      "title": "Selecteer een stream om aan de slag te gaan",
+      "description": "Kies een stream in de keuzelijst aan de linkerkant en druk vervolgens op 'Query uitvoeren' om je logboeken te bekijken. U kunt ook extra filters toepassen en het datumbereik aanpassen."
+    },
+    "noQueryApplied": {
+      "title": "Voer een query uit om logboeken te bekijken",
+      "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden."
     }
   },
   "onlineEvals": {
@@ -4427,5 +4794,126 @@
       "title": "Nog geen LLM-aanbieders",
       "description": "LLM-providers slaan de verbindingsgegevens (eindpunt + inloggegevens) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om te beginnen met het uitvoeren van evaluaties op basis van rechters."
     }
+  },
+  "aiObservability": {
+    "title": "LLM-waarneembaarheid",
+    "sections": {
+      "monitor": "Monitor",
+      "evaluate": "Evalueer"
+    },
+    "nav": {
+      "overview": "Overzicht",
+      "sessions": "Sessies",
+      "quality": "Kwaliteit",
+      "evalJobs": "Vacatures bij Eval",
+      "scorers": "Scorers",
+      "scoreConfigs": "Score-configuraties"
+    }
+  },
+  "logs": {
+    "noData": {
+      "title": "Begin met het verzenden van gegevens naar OpenObserve",
+      "description": "Er zijn nog geen gegevens in deze organisatie, dus er zijn geen streams om te verkennen. Stuur je eerste logboeken en ze worden hier automatisch weergegeven. Kies hoe je wilt beginnen.",
+      "curl": "Verzenden via Curl/HTTP API",
+      "curlDesc": "Snelste manier: plak één opdracht en de logboeken beginnen te stromen",
+      "shippers": "Gebruik een logboekverzender",
+      "shippersDesc": "Filebeat, Fluentbit, Fluentd, Vector, SysLogging en meer",
+      "otel": "OpenTelemetrie",
+      "otelDesc": "Leveranciersonafhankelijke OTLP-opname voor logboeken, sporen en statistieken",
+      "or": "Of:",
+      "kubernetes": "Kubernetes",
+      "aws": "AWS/CloudWatch",
+      "linux": "Linux",
+      "windows": "Ramen",
+      "askAi": "Vraag AI om de opname in te stellen"
+    },
+    "noStream": {
+      "title": "Kies een stream om te beginnen met verkennen",
+      "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
+      "selectStream": "Selecteer een stream",
+      "selectStreamDesc": "Bekijk logboeken, traceringen, statistieken en RUM-streams",
+      "queryGuide": "Lees de handleiding voor zoekopdrachten",
+      "queryGuideDesc": "Filters, SQL-modus, VRL en opgeslagen weergaven",
+      "recent": "Recent:"
+    },
+    "noEvents": {
+      "title": "Geen evenementen gevonden",
+      "descNoFilters": "Er zijn geen evenementen gevonden in {range}. Probeer het tijdbereik te vergroten om de resultaten te laden.",
+      "descWithFilters": "Er kwam niets overeen met <strong>deze zoekopdracht</strong> in het geselecteerde venster. Probeer het tijdbereik te vergroten, een filter te vereenvoudigen of de query opnieuw in te stellen.",
+      "expandRange": "Vergroot het tijdbereik",
+      "expandRangeDescAbsolute": "Overschakelen naar een breder relatief tijdsbereik",
+      "removeFilter": "Een filter verwijderen",
+      "removeFilterDescSql": "Er zijn SQL-voorwaarden toegepast op deze query",
+      "openHistory": "Zoekgeschiedenis openen",
+      "askAi": "Vraag AI om mijn vraag op te lossen",
+      "selectedRange": "het geselecteerde bereik"
+    },
+    "error": {
+      "sqlError": "SQL-syntaxisfout",
+      "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de query-editor op gemarkeerde fouten.",
+      "streamNotFound": "Stream niet gevonden",
+      "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
+      "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
+      "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
+      "fieldNotFound": "Veld niet gevonden",
+      "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
+      "functionNotDefined": "Functie niet gedefinieerd",
+      "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
+      "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
+      "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
+      "dataTypeMismatch": "Het gegevenstype komt niet overeen",
+      "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
+      "executionError": "Uitvoering van de query is mislukt",
+      "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
+      "serverError": "Serverfout",
+      "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
+      "generic": "Zoekfout",
+      "genericDesc": "Er is een fout opgetreden tijdens het ophalen van zoekgebeurtenissen.",
+      "configureStream": "Stream configureren",
+      "configureStreamDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
+      "fixQuery": "De vraag corrigeren",
+      "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
+      "expandRange": "Probeer een ander tijdbereik",
+      "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
+      "copyError": "Foutgegevens kopiëren",
+      "traceId": "Traceer-ID:",
+      "askAi": "Vraag AI om mijn vraag op te lossen",
+      "showDetail": "Details weergeven",
+      "hideDetail": "Details verbergen"
+    }
+  },
+  "queryError": {
+    "sqlError": "SQL-syntaxisfout",
+    "sqlErrorDesc": "Uw zoekopdracht bevat een syntaxisfout. Controleer de editor op gemarkeerde fouten.",
+    "streamNotFound": "Stream niet gevonden",
+    "streamNotFoundDesc": "De geselecteerde stream bestaat niet of is verwijderd.",
+    "ftsNotConfigured": "Zoeken in volledige tekst is niet geconfigureerd",
+    "ftsNotConfiguredDesc": "Deze stream heeft geen zoekveld in de volledige tekst. Configureer een om zoeken op trefwoorden mogelijk te maken.",
+    "fieldNotFound": "Veld niet gevonden",
+    "fieldNotFoundDesc": "Je zoekopdracht verwijst naar een of meer velden die niet bestaan in deze stream.",
+    "functionNotDefined": "Functie niet gedefinieerd",
+    "functionNotDefinedDesc": "Uw zoekopdracht roept een VRL-functie aan die niet is gedefinieerd.",
+    "dataUnavailable": "Gegevensbestanden zijn niet beschikbaar",
+    "dataUnavailableDesc": "Sommige gegevensbestanden voor deze periode zijn niet toegankelijk. Probeer een ander tijdvenster.",
+    "dataTypeMismatch": "Het gegevenstype komt niet overeen",
+    "dataTypeMismatchDesc": "Een veld in uw zoekopdracht wordt gebruikt met een incompatibel gegevenstype.",
+    "executionError": "Uitvoering van de query is mislukt",
+    "executionErrorDesc": "Er is een fout opgetreden tijdens het uitvoeren van uw zoekopdracht.",
+    "serverError": "Serverfout",
+    "serverErrorDesc": "Er is een interne fout opgetreden op de server.",
+    "generic": "Fout bij de zoekopdracht",
+    "genericDesc": "Er is een fout opgetreden tijdens het verwerken van uw vraag.",
+    "configureResource": "Stream configureren",
+    "configureResourceDesc": "Een zoekveld met volledige tekst toevoegen in de streaminstellingen",
+    "fixQuery": "De vraag corrigeren",
+    "fixQueryDesc": "Controleer en corrigeer de zoekopdracht in de editor",
+    "expandRange": "Probeer een ander tijdbereik",
+    "expandRangeDesc": "Toegankelijke gegevens bevinden zich mogelijk in een ander tijdvenster",
+    "copyError": "Foutgegevens kopiëren",
+    "copied": "Gekopieerd!",
+    "traceId": "Traceer-ID:",
+    "askAi": "Vraag AI om mijn vraag op te lossen",
+    "showDetail": "Details weergeven",
+    "hideDetail": "Details verbergen"
   }
 }

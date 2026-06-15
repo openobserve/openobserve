@@ -32,15 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main List View -->
     <div v-if="!showImportModelPricingPage" class="tw:flex tw:flex-col tw:h-full">
       <!-- List View Header -->
-      <div class="tw:flex-shrink-0">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-        style="position: sticky; top: 0; z-index: 1000;"
-      >
-        <div
-          class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]"
-          data-test="model-pricing-list-title"
-        >
+      <!-- Standard section header: title + actions only. Tabs + search moved
+           into the table toolbar below. -->
+      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default">
+        <template #title>
           {{ t("modelPricing.header") }}
           <OButton
             variant="ghost"
@@ -51,21 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info-outline" size="sm" />
             <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
           </OButton>
-        </div>
-        <div class="tw:flex tw:flex-row tw:items-center tw:gap-2">
-          <div class="app-tabs-container tw:h-[36px]">
-            <app-tabs
-              class="tabs-selection-container"
-              :tabs="tabOptions"
-              v-model:active-tab="selectedTab"
-              @update:active-tab="onTabChange"
-            />
-          </div>
-          <OSearchInput
-            v-model="filterQuery"
-            class="no-border o2-search-input"
-            :placeholder="t('modelPricing.searchPlaceholder')"
-          />
+        </template>
+        <template #actions>
           <OButton
             variant="outline"
             size="sm"
@@ -99,14 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("modelPricing.newModel") }}
           </OButton>
-        </div>
-      </div>
-      </div>
+        </template>
+      </AppPageHeader>
 
       <!-- List Table -->
-      <div class="tw:flex-1 tw:min-h-0">
+      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
       <OTable
         ref="qTableRef"
+        :frame="false"
         data-test="model-pricing-list-table"
         :data="filteredModels"
         :columns="columns"
@@ -120,12 +102,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="settings-model-pricing"
         :show-global-filter="false"
         tree
         tree-column-id="name"
         :get-row-warning="(row: any) => !!(row.children?.length && shadowingParentNames.has(row.name))"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
+        <!-- Toolbar: Built-in/Custom tabs + search -->
+        <template #toolbar>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="app-tabs-container tw:h-9">
+              <app-tabs
+                class="tabs-selection-container"
+                :tabs="tabOptions"
+                v-model:active-tab="selectedTab"
+                @update:active-tab="onTabChange"
+              />
+            </div>
+            <OSearchInput
+              v-model="filterQuery"
+              class="tw:ml-auto tw:w-64"
+              :placeholder="t('modelPricing.searchPlaceholder')"
+            />
+          </div>
+        </template>
         <template #tree-warning="{ row }">
           <div class="tw:flex tw:items-center tw:gap-2 tw:py-1 tw:text-sm tw:leading-none">
             <OIcon name="warning-amber" size="sm" class="shadowed-icon" />
@@ -176,27 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
             <div class="o2-table-cell-content">{{ row.name }}</div>
-            <OTooltip
-              v-if="row.name.length > 30"
-              side="top"
-              align="center"
-              :content="row.name"
-            />
           </div>
         </template>
         <template #cell-match_pattern="{ row }">
           <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0">
             <code
-              class="tw:text-xs tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-full pattern-code"
+              class="tw:text-xs tw:block tw:max-w-full pattern-code"
               :class="{ 'shadowed-pattern': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
-            <OTooltip
-              v-if="row.match_pattern && row.match_pattern.length > 40"
-              side="top"
-              align="center"
-              :content="row.match_pattern"
-            />
             <OIcon
               v-if="isChildRow(row)"
               name="warning-amber"
@@ -491,6 +482,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
@@ -586,22 +578,28 @@ const columns: OTableColumnDef[] = [
     header: t("modelPricing.colModel"),
     accessorKey: "name",
     sortable: true,
+    resizable: true,
+    hideable: true,
     minSize: 180,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "match_pattern",
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "pricing",
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
+    resizable: true,
+    hideable: true,
     minSize: 200,
-    meta: { align: "left", autoWidth: true },
+    meta: { align: "left", flex: true },
   },
   {
     id: "actions",

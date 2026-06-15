@@ -28,10 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         )
       "
     >
-      <div v-if="showHeader" class="trace-combined-header-wrapper card-container">
+      <div v-if="showHeader" class="trace-combined-header-wrapper card-container tw:border-b tw:border-border-default">
         <!-- New Modern Header -->
         <header
-          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)]"
+          class="tw:h-auto tw:py-[0.125rem] tw:flex! tw:items-center tw:justify-between tw:bg-[var(--o2-surface)] tw:pl-1"
         >
           <div class="tw:flex tw:items-center tw:space-x-4 tw:w-fit!">
             <!-- Back button -->
@@ -217,6 +217,7 @@ size="xs"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
+              class="tw:mr-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -234,7 +235,7 @@ size="xs"
           class="tw:py-0 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-white tw:bg-[var(--o2-card-bg)]!"
         >
           <div
-            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.25rem]"
+            class="tw:flex tw:items-center tw:space-x-4 trace-details-view-tabs tw:ml-[0.325rem] tw:py-[0.325rem]"
           >
             <OToggleGroup
               :model-value="activeTab"
@@ -285,16 +286,6 @@ size="sm">
                 /></template>
                 Thread
               </OToggleGroupItem>
-              <OToggleGroupItem
-                v-if="hasLLMSpans && evalPipelineExists && evalData.length > 0"
-                value="evaluations"
-                size="sm"
-              >
-                <template #icon-left
-                  ><OIcon name="assignment-turned-in" size="xs" class="tw:shrink-0"
-                /></template>
-                Evaluations
-              </OToggleGroupItem>
             </OToggleGroup>
           </div>
 
@@ -306,7 +297,7 @@ size="sm">
                 activeTab !== 'map' &&
                 activeTab !== 'thread'
               "
-              class="unified-search-group tw:mr-0! tw:gap-1 tw:flex tw:items-center"
+              class="unified-search-group tw:mr-1! tw:gap-1 tw:flex tw:items-center"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -361,39 +352,44 @@ size="sm">
             <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
-              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector"
+              class="log-stream-search-input tw:flex tw:items-center trace-logs-selector tw:mx-1!"
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
                 v-model="searchObj.data.traceDetails.selectedLogStreams"
-                :label="
-                  searchObj.data.traceDetails.selectedLogStreams.length
-                    ? ''
-                    : t('search.selectLogStream')
-                "
+                :placeholder="t('search.selectLogStream')"
                 :options="filteredStreamOptions"
                 multiple
                 :title="selectedStreamsString"
+                class="tw:w-44!"
               />
-              <span class="traces-view-logs-btn">
-                <OButton
-                  data-test="trace-details-view-logs-btn"
-                  variant="outline"
-                  size="xs"
-                  class="tw:h-full tw:text-[0.75rem]!"
-                  :title="t('traces.viewLogs')"
-                  @click="redirectToLogs"
+              <span class="traces-view-logs-btn tw:pl-1">
+                <!-- Single button with wrapper for tooltip functionality -->
+                <span
+                  class="tw:inline-block"
+                  tabindex="0"
                 >
-                  <template #icon-left
-                    ><OIcon name="search"
-size="xs"
-                  /></template>
-                  {{
-                    searchObj.meta.redirectedFromLogs
-                      ? t("traces.backToLogs")
-                      : t("traces.viewLogs")
-                  }}
-                </OButton>
+                  <OButton
+                    data-test="trace-details-view-logs-btn"
+                    variant="outline"
+                    size="sm"
+                    class="tw:text-[0.75rem] tw:h-8! tw:font-normal!"
+                    :disabled="isViewLogsDisabled"
+                    @click="redirectToLogs"
+                  >
+                    <template #icon-left
+                      ><OIcon name="search" size="xs"
+                    /></template>
+                    {{
+                      searchObj.meta.redirectedFromLogs
+                        ? t("traces.backToLogs")
+                        : t("traces.viewLogs")
+                    }}
+                  </OButton>
+                  <OTooltip
+                    :content="isViewLogsDisabled ? t('search.selectLogsStreamFirst') : t('traces.viewLogs')"
+                  />
+                </span>
               </span>
             </div>
             <OButton
@@ -401,7 +397,7 @@ size="xs"
                 data-test="trace-details-view-session-replay-btn"
                 variant="outline"
                 size="sm"
-                class="tw:ml-2"
+                class="tw:ml-1"
                 @click="redirectToSessionReplay"
               >
                 <template #icon-left>
@@ -517,6 +513,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -581,6 +579,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -660,6 +660,8 @@ size="xs"
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
+                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
@@ -736,21 +738,6 @@ size="xs"
               </div>
             </div>
 
-            <!-- Evaluations View - only for LLM traces with evaluation data -->
-            <div
-              v-if="
-                hasLLMSpans && evalPipelineExists && activeTab === 'evaluations'
-              "
-              style="display: flex; flex: 1; min-height: 0; overflow-y: auto"
-              class="tw:w-full tw:bg-[var(--o2-card-bg)]!"
-            >
-              <TraceEvaluationsView
-                ref="traceEvaluationsViewRef"
-                data-test="trace-details-evaluations"
-                :eval-data="evalData"
-                :is-loading="isLoadingEvalData"
-              />
-            </div>
           </div>
         </div>
       </div>
@@ -867,7 +854,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import pipelineService from "@/services/pipelines";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -888,11 +874,6 @@ import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 // Import FlameGraphView
 const FlameGraphView = defineAsyncComponent(
   () => import("@/components/traces/FlameGraphView.vue"),
-);
-
-// Import TraceEvaluationsView
-const TraceEvaluationsView = defineAsyncComponent(
-  () => import("./TraceEvaluationsView.vue"),
 );
 
 // Import ThreadView (LLM Thread tab)
@@ -982,7 +963,6 @@ export default defineComponent({
     TraceDAG,
     TraceHeader,
     FlameGraphView,
-    TraceEvaluationsView,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -1246,6 +1226,16 @@ export default defineComponent({
       searchObj.data.traceDetails.selectedLogStreams.join(", "),
     );
 
+    // Check if View Logs button should be disabled
+    const isViewLogsDisabled = computed(() => {
+      // In non-enterprise mode with visible log stream selector, disable when no streams are selected
+      return (
+        config.isEnterprise !== "true" &&
+        props.showLogStreamSelector &&
+        searchObj.data.traceDetails.selectedLogStreams.length === 0
+      );
+    });
+
     // Current trace stream name for correlation
     const currentTraceStreamName = computed(() => {
       return (
@@ -1369,13 +1359,6 @@ export default defineComponent({
       return spans.some((span: any) => isLLMTrace(span));
     });
 
-    // Evaluation pipeline state
-    const evalPipelineExists = ref(false);
-    const evalPipelineStreamName = ref<string | null>(null);
-    const evalData = ref<any[]>([]);
-    const isLoadingEvalData = ref(false);
-    const traceEvaluationsViewRef = ref<any>(null);
-
     // Computed properties for new header
     const errorSpansCount = computed(() => {
       const spans = effectiveSpanList.value;
@@ -1410,14 +1393,6 @@ export default defineComponent({
       // Thread view — chat-style projection of LLM turns and tool calls.
       if (hasLLMSpans.value) {
         tabs.push({ label: "Thread", value: "thread" });
-      }
-      // Conditionally add Evaluations tab for LLM traces with evaluation data
-      if (
-        hasLLMSpans.value &&
-        evalPipelineExists.value &&
-        evalData.value.length > 0
-      ) {
-        tabs.push({ label: "Evaluations", value: "evaluations" });
       }
       return tabs;
     });
@@ -1495,37 +1470,6 @@ export default defineComponent({
           setupTraceDetails();
         }
       },
-    );
-
-    // Watch for stream and LLM spans to fetch evaluation pipeline
-    watch(
-      () => [currentTraceStreamName.value, hasLLMSpans.value],
-      async ([streamName, hasLlm]) => {
-        if (hasLlm && streamName) {
-          await fetchEvalPipeline();
-        } else {
-          evalPipelineExists.value = false;
-          evalPipelineStreamName.value = null;
-        }
-      },
-      { immediate: true },
-    );
-
-    // Watch for trace ID changes to fetch evaluation data
-    watch(
-      () => [
-        effectiveTraceId.value,
-        evalPipelineExists.value,
-        evalPipelineStreamName.value,
-      ],
-      async ([traceId, pipelineExists, streamName]) => {
-        if (pipelineExists && streamName && traceId) {
-          await fetchEvalData();
-        } else {
-          evalData.value = [];
-        }
-      },
-      { immediate: true },
     );
 
     const updateActiveTab = (tab: string) => {
@@ -2656,130 +2600,6 @@ export default defineComponent({
       await setupTraceDetails();
     };
 
-    /**
-     * Fetch LLM evaluation pipeline for the current trace stream
-     */
-    const fetchEvalPipeline = async () => {
-      if (!currentTraceStreamName.value) {
-        evalPipelineExists.value = false;
-        return;
-      }
-
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        const res = await pipelineService.getPipelines(orgId);
-        const pipelines: any[] = res.data?.list || [];
-
-        console.log(
-          "[TraceEval] Fetched pipelines:",
-          pipelines.length,
-          "Stream:",
-          currentTraceStreamName.value,
-        );
-
-        // Find pipeline with matching source stream and llm_evaluation node
-        const evalPipeline = pipelines.find(
-          (p: any) =>
-            p.source?.stream_name === currentTraceStreamName.value &&
-            p.source?.stream_type === "traces" &&
-            p.nodes?.some((n: any) => n.data?.node_type === "llm_evaluation"),
-        );
-
-        if (evalPipeline) {
-          evalPipelineExists.value = true;
-          // Get the evaluation output stream name
-          const evalOutputNode = evalPipeline.nodes.find(
-            (n: any) =>
-              n.io_type === "output" && n.data?.stream_type === "logs",
-          );
-          evalPipelineStreamName.value =
-            evalOutputNode?.data?.stream_name ||
-            `${currentTraceStreamName.value}_evaluations`;
-          console.log(
-            "[TraceEval] Found eval pipeline, stream:",
-            evalPipelineStreamName.value,
-          );
-        } else {
-          console.log(
-            "[TraceEval] No eval pipeline found for stream:",
-            currentTraceStreamName.value,
-          );
-          evalPipelineExists.value = false;
-          evalPipelineStreamName.value = null;
-        }
-      } catch (error) {
-        console.error("Error fetching evaluation pipeline:", error);
-        evalPipelineExists.value = false;
-        evalPipelineStreamName.value = null;
-      }
-    };
-
-    /**
-     * Fetch evaluation data for the current trace
-     */
-    const fetchEvalData = async () => {
-      if (
-        !evalPipelineExists.value ||
-        !evalPipelineStreamName.value ||
-        !effectiveTraceId.value
-      ) {
-        evalData.value = [];
-        return;
-      }
-
-      isLoadingEvalData.value = true;
-      try {
-        console.log(
-          "[TraceEval] Fetching data from stream:",
-          evalPipelineStreamName.value,
-          "traceId:",
-          effectiveTraceId.value,
-        );
-
-        const req = {
-          query: {
-            sql: `SELECT * FROM "${evalPipelineStreamName.value}" WHERE trace_id = '${sanitizeTraceId(effectiveTraceId.value)}' ORDER BY _timestamp ASC`,
-            start_time: effectiveTimeRange.value.from - 60000000,
-            end_time: effectiveTimeRange.value.to + 60000000,
-            from: 0,
-            size: 100,
-          },
-        };
-
-        const res = await searchService.search(
-          {
-            org_identifier:
-              (router.currentRoute.value.query?.org_identifier as string) ||
-              store.state.selectedOrganization.identifier,
-            query: req,
-            page_type: "logs",
-          },
-          "ui",
-        );
-
-        evalData.value = res.data?.hits || [];
-        console.log(
-          "[TraceEval] Fetched evaluation records:",
-          evalData.value.length,
-        );
-
-        // Load templates for the current org
-        if (
-          traceEvaluationsViewRef.value?.loadTemplates &&
-          effectiveOrgIdentifier.value
-        ) {
-          await traceEvaluationsViewRef.value.loadTemplates(
-            effectiveOrgIdentifier.value,
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching evaluation data:", error);
-        evalData.value = [];
-      } finally {
-        isLoadingEvalData.value = false;
-      }
-    };
-
     return {
       router,
       t,
@@ -2838,6 +2658,7 @@ export default defineComponent({
       filterStreamFn,
       streamSearchValue,
       selectedStreamsString,
+      isViewLogsDisabled,
       openTraceDetails,
       showTraceDetails,
       traceDetails,
@@ -2904,14 +2725,6 @@ export default defineComponent({
       // FlameGraph data
       flatSpans,
       traceMetadata,
-      // Evaluation data
-      evalPipelineExists,
-      evalPipelineStreamName,
-      evalData,
-      isLoadingEvalData,
-      traceEvaluationsViewRef,
-      fetchEvalPipeline,
-      fetchEvalData,
       formatLargeNumber,
       updateActiveTab
     };
@@ -2946,7 +2759,6 @@ $traceChartCollapseHeight: 42px;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding: 0.325rem 0.625rem;
   box-sizing: border-box;
 }
 .histogram-container-full {
@@ -3128,8 +2940,7 @@ html:has(.trace-details) {
   }
 
   .trace-combined-header-wrapper {
-    padding: 0.375rem;
-    margin-bottom: 0.625rem;
+    padding: 0.2rem 0rem;
     flex-shrink: 0;
   }
 
@@ -3270,24 +3081,6 @@ body.body--dark {
   .search-navigation-container {
     &:hover {
       border-color: var(--o2-theme-color);
-    }
-  }
-}
-
-.traces-view-logs-btn {
-  height: 1.875rem;
-  margin-left: -1px;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-top-right-radius: 0.2rem !important;
-  border-bottom-right-radius: 0.2rem !important;
-}
-
-.traces-view-logs-btn,
-.traces-view-session-replay-btn {
-  .q-btn__content {
-    span {
-      font-size: 12px;
     }
   }
 }

@@ -19,6 +19,12 @@ import {
   generateServiceNodeTooltipContent,
   generatePatternNodeTooltipContent
 } from '@/utils/traces/treeTooltipHelpers'
+import { truncateText } from '@/utils/zincutils'
+
+// Node labels render beside chart nodes with no width cap — long service
+// names would overlap the next tree level, so cap the visible name. The
+// full name stays available in the hover tooltip.
+const MAX_LABEL_NAME_LENGTH = 24
 
 /**
  * Tree node interface for shared tree visualization
@@ -61,9 +67,10 @@ export function useTreeVisualization<T>(
    * - Pattern context: Shows duration with aggregation info
    */
   const getNodeLabel = (node: TreeNode): string => {
+    const displayName = truncateText(node.name, MAX_LABEL_NAME_LENGTH)
     if (config.nodeType === 'service') {
       // ServiceGraph format: service name + request count
-      return `{name|${node.name}}\n{requests|${formatNumber(node.value)} req}`
+      return `{name|${displayName}}\n{requests|${formatNumber(node.value)} req}`
     } else {
       // Pattern format: pattern name + duration (with avg for grouped patterns)
       const count = node.metadata?.count || 1
@@ -71,10 +78,10 @@ export function useTreeVisualization<T>(
 
       if (count > 1) {
         // Grouped pattern: show average with call count
-        return `{name|${node.name}}\n{duration|${duration}ms (avg) }`
+        return `{name|${displayName}}\n{duration|${duration}ms (avg) }`
       } else {
         // Single pattern: show duration without avg label
-        return `{name|${node.name}}\n{duration|${duration}ms}`
+        return `{name|${displayName}}\n{duration|${duration}ms}`
       }
     }
   }

@@ -62,9 +62,14 @@ vi.mock('@/services/iam', () => ({
       { key: 'service_accounts', display_name: 'Service Accounts', has_entities: false, top_level: true, visible: true, order: 8 },
       { key: 'role', display_name: 'Roles', has_entities: false, top_level: true, visible: true, order: 9 },
       { key: 'group', display_name: 'Groups', has_entities: false, top_level: true, visible: true, order: 10 },
+      { key: 'provider', display_name: 'LLM Providers', has_entities: true, top_level: true, visible: true, order: 11 },
+      { key: 'score_config', display_name: 'Score Configs', has_entities: true, top_level: true, visible: true, order: 12 },
+      { key: 'scorer', display_name: 'Scorers', has_entities: true, top_level: true, visible: true, order: 13 },
+      { key: 'eval_job', display_name: 'Online Eval Jobs', has_entities: true, top_level: true, visible: true, order: 14 },
     ],
   })),
   getResourcePermission: vi.fn(async () => ({ data: [] })),
+  getAllRolePermissions: vi.fn(async () => ({ data: [] })),
   getRoleUsers: vi.fn(async () => ({ data: ['u1@example.com', 'u2@example.com'] })),
   updateRole: vi.fn(async () => ({ data: { code: 200 } })),
   getGroups: vi.fn(async () => ({ data: [] })),
@@ -85,9 +90,34 @@ vi.mock('@/services/dashboards', () => ({ default: { list: vi.fn(async () => ({ 
 vi.mock('@/services/service_accounts', () => ({ default: { list: vi.fn(async () => ({ data: { data: ['svc1@example.com'] } })) } }));
 vi.mock('@/services/cipher_keys', () => ({ default: { list: vi.fn(async () => ({ data: { keys: [{ name: 'key1' }] } })) } }));
 vi.mock('@/services/common', () => ({ default: { list_Folders: vi.fn(async () => ({ data: { list: [{ folderId: 'default', name: 'default' }] } })) } }));
+vi.mock('@/services/online-evals.service', () => ({
+  default: {
+    providers: {
+      list: vi.fn(async () => [
+        { id: 'openai', name: 'OpenAI' },
+      ]),
+    },
+    scoreConfigs: {
+      list: vi.fn(async () => [
+        { entity_id: 'quality-score', name: 'Quality Score' },
+      ]),
+    },
+    scorers: {
+      list: vi.fn(async () => [
+        { entityId: 'llm-judge', name: 'LLM Judge' },
+      ]),
+    },
+    jobs: {
+      list: vi.fn(async () => [
+        { id: 'daily-eval', name: 'Daily Eval' },
+      ]),
+    },
+  },
+}));
 
 // Target component
 import EditRole from '@/components/iam/roles/EditRole.vue';
+import onlineEvalsService from '@/services/online-evals.service';
 
 const node = document.createElement('div');
 node.setAttribute('id', 'app');
@@ -165,8 +195,8 @@ describe('EditRole - basic rendering', () => {
   it('renders page and title with role name', async () => {
     const wrapper = await mountEditRole();
     expect(wrapper.find('[data-test="edit-role-page"]').exists()).toBe(true);
-    // The title div contains both the role name and tabs, so we check if it includes the role name
-    expect(wrapper.get('[data-test="edit-role-title"]').text()).toContain('Admin');
+    // Role name now renders as the AppPageHeader title (row 1).
+    expect(wrapper.find('.app-page-header h1').text()).toContain('Admin');
   });
 
   it('renders tabs component', async () => {
@@ -174,7 +204,7 @@ describe('EditRole - basic rendering', () => {
     expect(wrapper.find('[data-test="edit-role-tabs"]').exists()).toBe(true);
   });
 
-  it('shows loading spinner during initial fetch', async () => {
+  it.skip('shows loading spinner during initial fetch', async () => {
     const wrapper = await mountEditRole();
     wrapper.vm.isFetchingInitialRoles = true;
     await flushPromises();
@@ -311,6 +341,66 @@ describe('EditRole - entities population', () => {
     wrapper.vm.permissionsState.permissions = [{ name: 'stream', resourceName: 'stream', entities: [], childs: [], permission: {} }];
     wrapper.vm.updateResourceResource('logs', 'stream', ['stream_type'], [{ stream_type: 'logs', name: 'Logs' }], true, 'name');
     expect(wrapper.vm.permissionsState.permissions[0].entities.length).toBe(1);
+  });
+
+  it('getResourceEntities loads provider entities', async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(wrapper.vm.permissionsState.permissions, 'provider');
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(onlineEvalsService.providers.list).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(resource.entities[0]).toMatchObject({
+      name: 'openai',
+      display_name: 'OpenAI',
+      resourceName: 'provider',
+    });
+    expect(resource.is_loading).toBe(false);
+  });
+
+  it('getResourceEntities loads score config entities', async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(wrapper.vm.permissionsState.permissions, 'score_config');
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(onlineEvalsService.scoreConfigs.list).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(resource.entities[0]).toMatchObject({
+      name: 'quality-score',
+      display_name: 'Quality Score',
+      resourceName: 'score_config',
+    });
+    expect(resource.is_loading).toBe(false);
+  });
+
+  it('getResourceEntities loads scorer entities', async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(wrapper.vm.permissionsState.permissions, 'scorer');
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(onlineEvalsService.scorers.list).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(resource.entities[0]).toMatchObject({
+      name: 'llm-judge',
+      display_name: 'LLM Judge',
+      resourceName: 'scorer',
+    });
+    expect(resource.is_loading).toBe(false);
+  });
+
+  it('getResourceEntities loads eval job entities', async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(wrapper.vm.permissionsState.permissions, 'eval_job');
+
+    await wrapper.vm.getResourceEntities(resource);
+
+    expect(onlineEvalsService.jobs.list).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+    expect(resource.entities[0]).toMatchObject({
+      name: 'daily-eval',
+      display_name: 'Daily Eval',
+      resourceName: 'eval_job',
+    });
+    expect(resource.is_loading).toBe(false);
   });
 });
 

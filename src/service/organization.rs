@@ -152,7 +152,9 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .collect::<Vec<_>>()
     };
 
-    let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
+    let pipelines = super::pipeline::list_user_pipelines(org_id, None)
+        .await
+        .unwrap_or_default();
     let pipeline_summary = PipelineSummary {
         num_realtime: pipelines
             .iter()
@@ -1222,29 +1224,27 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 /// Returns the (email, token) credentials for the SysRcaAgent service account in the given org.
-/// Creates the account if it does not yet exist.
+/// Creates the account if it does not yet exist, and self-heals FGA tuples
+/// regardless of whether the DB row already existed.
+///
+/// The DB migration (`m20260331_000001_create_sys_rca_agent_service_accounts`)
+/// provisions the `users` / `org_users` rows but cannot touch OpenFGA. Without
+/// running `ensure_sys_rca_agent` on every call, migration-provisioned accounts
+/// authenticate successfully but carry zero RBAC grants — MCP then returns an
+/// empty tool list, the agent comes up tool-less, and RCA fails with a
+/// "Tool 'GetIncident' not found" error.
 #[cfg(feature = "enterprise")]
 pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String), anyhow::Error> {
     let email = sre_agent_email(org_id);
 
-    match db::org_users::get(org_id, &email).await {
-        Ok(record) => return Ok((email, record.token)),
-        Err(err) => {
-            // Only treat genuine "not found" errors as missing accounts
-            // Other DB errors should bubble up rather than triggering creation
-            if err.to_string().contains("User not found") {
-                ensure_sys_rca_agent(org_id).await?;
-            } else {
-                // Return the original error for non-"not found" failures
-                return Err(err);
-            }
-        }
-    }
+    // Always run the self-heal: creates the DB row if missing AND ensures FGA
+    // tuples exist. Both branches inside ensure_sys_rca_agent are idempotent.
+    ensure_sys_rca_agent(org_id).await?;
 
     match db::org_users::get(org_id, &email).await {
         Ok(record) => Ok((email, record.token)),
         Err(_) => Err(anyhow::anyhow!(
-            "SysRcaAgent SA not found for org '{org_id}' after recreation attempt"
+            "SysRcaAgent SA not found for org '{org_id}' after ensure_sys_rca_agent"
         )),
     }
 }

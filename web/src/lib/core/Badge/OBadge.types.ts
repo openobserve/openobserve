@@ -62,6 +62,13 @@ export interface BadgeProps {
    */
   hideZeroCount?: boolean;
   /**
+   * Renders a 7px solid status dot before the label (HANDOFF §11). The dot
+   * inherits the badge's foreground colour (`currentColor`), so a `success`
+   * badge gets a green dot, an `error` badge a red dot, etc. Use for live
+   * status pills like "active" / "suspended".
+   */
+  dot?: boolean;
+  /**
    * Makes the badge interactive — adds keyboard handling, hover feedback,
    * and a visible focus ring. Emits `click` on activation.
    */

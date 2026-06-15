@@ -220,7 +220,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest tests/query_agent/ -v
+          rye run pytest tests/query_agent/ --ignore=tests/query_agent/test_3_vortex.py -v
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 

@@ -19,14 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="traces-search-result-list tw:h-auto! tw:flex tw:flex-col tw:bg-[var(--o2-card-bg-solid)]"
   >
     <!-- ════════════════════ Empty State ════════════════════ -->
-    <div
+    <TracesNoEventsState
       v-if="noResults"
-      data-test="logs-search-result-not-found-text"
-      class="tw:text-center tw:mx-[10%] tw:my-[2.5rem] tw:text-[1.25rem]"
-    >
-      <OIcon name="info" size="md" />
-      {{ t("traces.noTracesFoundAdjust") }}
-    </div>
+      data-test="traces-search-result-not-found-text"
+      @widen-range="(p) => emit('widen-range', p)"
+      @remove-filter="emit('remove-filter')"
+    />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
     <div
@@ -81,42 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               @send-to-ai-chat="sendToAiChat"
             />
-          </template>
-
-          <!-- Loading banner: shown above rows while a new page is fetching -->
-          <template #loading-banner>
-            <div
-              data-test="traces-table-loading-banner-row"
-              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-            >
-              <OSpinner
-                size="xs"
-                class="tw:mx-[0.25rem]"
-                data-test="traces-search-result-loading-indicator"
-              />
-              <span
-                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-                >{{ t("traces.fetchingTraces") }}</span
-              >
-            </div>
-          </template>
-
-          <!-- Loading row: shown when no rows exist yet (first fetch) -->
-          <template #loading>
-            <div
-              data-test="traces-table-loading-row"
-              class="tw:flex tw:flex-nowrap tw:items-center tw:px-2 tw:min-w-max tw:min-h-[3.25rem] tw:bg-[var(--o2-card-bg)] tw:border-b tw:border-[var(--o2-border-2)]!"
-            >
-              <OSpinner
-                size="xs"
-                class="tw:mr-[0.25rem]"
-                data-test="traces-search-result-loading-indicator"
-              />
-              <span
-                class="tw:tracking-[0.03rem] tw:text-[0.85rem] tw:text-[var(--o2-text-1)] tw:font-bold"
-                >{{ t("traces.fetchingTraces") }}</span
-              >
-            </div>
           </template>
 
           <template
@@ -231,6 +193,7 @@ import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
 
 interface Props {
   hits: any[];
@@ -283,6 +246,8 @@ const emit = defineEmits<{
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
   "send-to-ai-chat": [value: string];
+  "widen-range": [period: string];
+  "remove-filter": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>

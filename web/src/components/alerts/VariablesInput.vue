@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
     <template v-if="!variables.length">
-      <div class="tw:flex tw:justify-between tw:items-center tw:ml-auto">
+      <div class="tw:flex tw:justify-between tw:items-center">
 
         <OButton
           data-test="alert-variables-add-btn"

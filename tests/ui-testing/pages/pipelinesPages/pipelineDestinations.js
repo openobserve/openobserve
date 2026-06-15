@@ -12,8 +12,8 @@ export class PipelineDestinations {
     async navigateToManagement() {
 
         // Wait for the settings menu link to be visible before clicking
-        await this.page.locator('[data-test="menu-link-settings-item"]').waitFor({ state: 'visible' });
-        await this.page.locator('[data-test="menu-link-settings-item"]').click();
+        await this.page.locator('[data-test="menu-link-/settings-item"]').waitFor({ state: 'visible' });
+        await this.page.locator('[data-test="menu-link-/settings-item"]').click();
     }
 
     async navigateToPipelineDestinations() {

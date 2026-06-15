@@ -572,12 +572,14 @@ mod tests {
                     value: Some(AnyValue {
                         value: Some(StringValue("server".to_string())),
                     }),
+                    ..Default::default()
                 },
                 KeyValue {
                     key: "instance_num".to_string(),
                     value: Some(AnyValue {
                         value: Some(IntValue(1)),
                     }),
+                    ..Default::default()
                 },
             ],
             dropped_attributes_count: 1,
@@ -651,12 +653,14 @@ mod tests {
                         value: Some(AnyValue {
                             value: Some(StringValue("test-service".to_string())),
                         }),
+                        ..Default::default()
                     },
                     KeyValue {
                         key: "service.version".to_string(),
                         value: Some(AnyValue {
                             value: Some(StringValue("1.0.0".to_string())),
                         }),
+                        ..Default::default()
                     },
                 ],
                 dropped_attributes_count: 0,
@@ -870,24 +874,28 @@ mod tests {
                     value: Some(AnyValue {
                         value: Some(StringValue("test_value".to_string())),
                     }),
+                    ..Default::default()
                 },
                 KeyValue {
                     key: "int_field".to_string(),
                     value: Some(AnyValue {
                         value: Some(IntValue(42)),
                     }),
+                    ..Default::default()
                 },
                 KeyValue {
                     key: "bool_field".to_string(),
                     value: Some(AnyValue {
                         value: Some(BoolValue(true)),
                     }),
+                    ..Default::default()
                 },
                 KeyValue {
                     key: "double_field".to_string(),
                     value: Some(AnyValue {
                         value: Some(DoubleValue(1.23)),
                     }),
+                    ..Default::default()
                 },
             ],
             dropped_attributes_count: 0,

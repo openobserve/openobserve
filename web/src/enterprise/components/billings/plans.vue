@@ -466,7 +466,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .page-title {
   font-size: 1.5rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 2.25rem;
   color: var(--o2-text-heading);
   margin: 0 0 0.5rem 0;
