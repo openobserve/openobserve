@@ -102,6 +102,90 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text",
   "error-soft":
     "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text",
+
+  // NEW: Extended color families for correlation dimensions
+  // Teal
+  teal:
+    "tw:bg-badge-teal-solid-bg tw:text-badge-teal-solid-text",
+  "teal-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-teal-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border",
+  ].join(" "),
+  "teal-soft":
+    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text",
+
+  // Orange
+  orange:
+    "tw:bg-badge-orange-solid-bg tw:text-badge-orange-solid-text",
+  "orange-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-orange-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border",
+  ].join(" "),
+  "orange-soft":
+    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text",
+
+  // Lime
+  lime:
+    "tw:bg-badge-lime-solid-bg tw:text-badge-lime-solid-text",
+  "lime-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-lime-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border",
+  ].join(" "),
+  "lime-soft":
+    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text",
+
+  // Amber
+  amber:
+    "tw:bg-badge-amber-solid-bg tw:text-badge-amber-solid-text",
+  "amber-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-amber-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border",
+  ].join(" "),
+  "amber-soft":
+    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text",
+
+  // Cyan
+  cyan:
+    "tw:bg-badge-cyan-solid-bg tw:text-badge-cyan-solid-text",
+  "cyan-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-cyan-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border",
+  ].join(" "),
+  "cyan-soft":
+    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text",
+
+  // Blue
+  blue:
+    "tw:bg-badge-blue-solid-bg tw:text-badge-blue-solid-text",
+  "blue-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-blue-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border",
+  ].join(" "),
+  "blue-soft":
+    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text",
+
+  // Purple (solid/soft variants for correlation)
+  purple:
+    "tw:bg-badge-purple-solid-bg tw:text-badge-purple-solid-text",
+  "purple-soft":
+    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text",
+
+  // Indigo
+  indigo:
+    "tw:bg-badge-indigo-solid-bg tw:text-badge-indigo-solid-text",
+  "indigo-outline": [
+    "tw:bg-transparent",
+    "tw:text-badge-indigo-ol-text",
+    "tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border",
+  ].join(" "),
+  "indigo-soft":
+    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text",
 };
 
 // ── Size class map ────────────────────────────────────────────────────────
