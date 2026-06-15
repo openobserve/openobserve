@@ -30,6 +30,7 @@ import { computed, ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import CodeBlock from "../CodeBlock.vue";
@@ -268,17 +269,21 @@ function fireConfetti() {
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
-            <span v-if="content.provider.runtime" class="pv-chip"
-              ><OIcon name="code" size="xs" /> {{ content.provider.runtime }}</span
-            >
-            <span v-if="content.provider.setupTime" class="pv-chip time"
-              ><OIcon name="schedule" size="xs" />
-              {{ content.provider.setupTime }} setup</span
-            >
-            <span class="pv-chip"
-              ><OIcon name="attach-money" size="xs" /> Cost &amp; Tokens
-              Captured</span
-            >
+          <OBadge
+            v-if="content.provider.runtime"
+            variant="default-outline"
+            icon="code"
+            >{{ content.provider.runtime }}</OBadge
+          >
+          <OBadge
+            v-if="content.provider.setupTime"
+            variant="primary-soft"
+            icon="schedule"
+            >{{ content.provider.setupTime }} setup</OBadge
+          >
+          <OBadge variant="default-outline" icon="attach-money"
+            >Cost &amp; Tokens Captured</OBadge
+          >
         </div>
       </div>
 
@@ -318,17 +323,17 @@ function fireConfetti() {
           <div class="step-body" :class="{ 'tw:pb-0': i === content.steps.length - 1 }">
             <div class="step-head">
               <div class="step-title">{{ step.title }}</div>
-              <span
+              <OBadge
                 v-if="step.chip"
-                class="step-tag"
-                :class="{ req: step.required }"
+                size="sm"
+                :variant="step.required ? 'primary-soft' : 'default-outline'"
+                :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
               >
-                <span v-if="step.chip.kind === 'terminal'" class="step-tag-glyph"
-                  >$_</span
-                >
-                <OIcon v-else :name="chipIcon(step.chip.kind)" size="xs" />
+                <template v-if="step.chip.kind === 'terminal'" #icon>
+                  <span class="step-tag-glyph">$_</span>
+                </template>
                 {{ step.chip.label }}
-              </span>
+              </OBadge>
             </div>
 
             <p class="step-desc" v-html="inlineMd(step.description)"></p>
@@ -350,7 +355,13 @@ function fireConfetti() {
             </p>
 
             <div v-if="step.pills?.length" class="pill-list tw:mt-2">
-              <span v-for="p in step.pills" :key="p" class="pkg-pill">{{ p }}</span>
+              <OBadge
+                v-for="p in step.pills"
+                :key="p"
+                variant="default-soft"
+                size="sm"
+                >{{ p }}</OBadge
+              >
             </div>
 
             <!-- Live status bar + fix box on the detection-anchor step -->
@@ -479,9 +490,13 @@ function fireConfetti() {
             <template v-if="extras.installs?.length">
               Installs via pip and verifies imports:
               <div class="pill-list tw:mt-2">
-                <span v-for="p in extras.installs" :key="p" class="pkg-pill">{{
-                  p
-                }}</span>
+                <OBadge
+                  v-for="p in extras.installs"
+                  :key="p"
+                  variant="default-soft"
+                  size="sm"
+                  >{{ p }}</OBadge
+                >
               </div>
             </template>
             <template v-if="extras.envVars?.length">
@@ -489,9 +504,13 @@ function fireConfetti() {
                 Writes these keys to <code>./.env</code> (idempotent):
               </div>
               <div class="pill-list tw:mt-2">
-                <span v-for="p in extras.envVars" :key="p" class="pkg-pill">{{
-                  p
-                }}</span>
+                <OBadge
+                  v-for="p in extras.envVars"
+                  :key="p"
+                  variant="default-soft"
+                  size="sm"
+                  >{{ p }}</OBadge
+                >
               </div>
             </template>
           </div>
@@ -654,39 +673,13 @@ function fireConfetti() {
   font-size: 14px;
   margin: 10px 0 0;
 }
+/* Hero meta chips are now <OBadge> (lib) — just lay them out. */
 .pv-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 11px;
-}
-.pv-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 11px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text-2);
-}
-.pv-chip :deep(svg) {
-  color: var(--text-3);
-}
-.pv-chip.time {
-  border-color: var(--clay-soft);
-  background: var(--clay-soft-2);
-  color: var(--clay);
-}
-.pv-chip.time :deep(svg) {
-  color: var(--clay-bright);
-}
-.dark .pv-chip.time {
-  background: var(--clay-soft);
 }
 
 /* ---- stream-name config input ---- */
@@ -776,39 +769,12 @@ function fireConfetti() {
   gap: 10px;
   flex-wrap: wrap;
 }
-.step-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-  padding: 0 9px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
-  color: var(--text-3);
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-.step-tag :deep(svg) {
-  color: var(--text-3);
-}
+/* Step context chip is now <OBadge> (lib). Only the terminal "$_" glyph (used
+   in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-weight: 800;
   font-size: 11px;
-  color: var(--clay);
-}
-.step-tag.req {
-  border-color: var(--clay-soft);
-  background: var(--clay-soft-2);
-  color: var(--clay);
-}
-.dark .step-tag.req {
-  background: var(--clay-soft);
-}
-.step-tag.req :deep(svg) {
-  color: var(--clay);
 }
 .step-body {
   flex: 1;
@@ -975,19 +941,11 @@ function fireConfetti() {
   border-radius: 4px;
 }
 
-/* ---- pills ---- */
+/* ---- pills (now <OBadge>) — just lay them out ---- */
 .pill-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.pkg-pill {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 11px;
-  background: var(--track);
-  color: var(--text-2);
-  padding: 3px 8px;
-  border-radius: 6px;
 }
 
 /* ---- troubleshooting ---- */
