@@ -464,7 +464,7 @@ jobs:
       needs.triage.outputs.author_allowed == 'true'
     runs-on:
       labels: ubicloud-standard-16
-    timeout-minutes: 60
+    timeout-minutes: 90 # backstop: build (~15) + boot + heal (capped 30) + final run (15) + audit
     permissions:
       contents: write # push the healer's fixes to autoe2e/<branch>
     outputs:
@@ -572,17 +572,23 @@ jobs:
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
       - name: Heal — run ONLY the generated spec, fix until passing (<=3 iters)
+        # HARD-GATED: timeout-minutes kills a runaway/hung healer; continue-on-error lets the
+        # pipeline proceed to the authoritative run + comment instead of getting stuck. Any
+        # fixes the healer wrote to disk before the cap are kept (committed below).
+        timeout-minutes: 30
+        continue-on-error: true
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
         run: |
           opencode run --agent e2e-ci-healer --model "$PIPELINE_MODEL" \
-            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${{ steps.spec.outputs.spec }}. Run it with 'cd tests/ui-testing && npx playwright test ${{ steps.spec.outputs.rel }}', diagnose failures, fix the spec/page objects, re-run — max 3 iterations. Write docs/test_generator/ci/heal-result.json."
+            "Run your spec. A live OpenObserve is booted at ${ZO_BASE_URL}. Heal ONLY this one spec (do NOT run the whole suite): ${{ steps.spec.outputs.spec }}. Run it with 'cd tests/ui-testing && npx playwright test ${{ steps.spec.outputs.rel }} --workers=4', diagnose failures, fix the spec/page objects, re-run — HARD CAP 3 iterations, then stop. Keep your reasoning concise to avoid exhausting context. Write docs/test_generator/ci/heal-result.json."
 
       - name: Authoritative final run (the workflow decides pass/fail, not the LLM)
         id: finalrun
+        timeout-minutes: 15
         run: |
           cd tests/ui-testing
-          if npx playwright test "${{ steps.spec.outputs.rel }}" --reporter=line; then
+          if npx playwright test "${{ steps.spec.outputs.rel }}" --workers=4 --reporter=line; then
             echo "status=passing" >> "$GITHUB_OUTPUT"
             echo "::notice::Generated spec PASSES against a live OpenObserve."
           else
