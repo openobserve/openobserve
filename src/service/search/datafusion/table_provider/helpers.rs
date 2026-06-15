@@ -97,47 +97,46 @@ fn generate_parquet_access_plan(
         return None;
     }
 
-    // single forward pass over the bitmap's set bits: walk matched row ids in
-    // ascending order, merge consecutive ids into select/skip runs per row group
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    let mut it = row_ids.set_indices().peekable();
-    while let Some(&first) = it.peek() {
-        let row_group_id = first / row_group_size;
+    for row_group_id in 0..row_group_count {
         let rg_start = row_group_id * row_group_size;
         let rg_end = (rg_start + row_group_size).min(num_rows);
 
-        let mut selection: Vec<RowSelector> = Vec::new();
-        let mut cursor = rg_start;
-        while let Some(&id) = it.peek() {
-            if id >= rg_end {
-                break;
-            }
-            it.next();
-            let run_start = id;
-            let mut run_end = run_start + 1;
-            // a run must stop at the row group boundary; ids beyond it belong
-            // to the next row group's selection
-            while run_end < rg_end {
-                match it.peek() {
-                    Some(&next) if next == run_end => {
-                        it.next();
-                        run_end += 1;
+        let mut selection = Vec::new();
+        let mut current_count = 0;
+        let mut current_select = false;
+
+        for row_id in rg_start..rg_end {
+            // rows past the bitmap length are treated as unmatched
+            let val = row_id < row_ids.len() && row_ids.value(row_id);
+            if val == current_select {
+                current_count += 1;
+            } else {
+                if current_count > 0 {
+                    if current_select {
+                        selection.push(RowSelector::select(current_count));
+                    } else {
+                        selection.push(RowSelector::skip(current_count));
                     }
-                    _ => break,
                 }
+                current_select = val;
+                current_count = 1;
             }
-            if run_start > cursor {
-                selection.push(RowSelector::skip(run_start - cursor));
-            }
-            selection.push(RowSelector::select(run_end - run_start));
-            cursor = run_end;
-        }
-        if cursor < rg_end {
-            selection.push(RowSelector::skip(rg_end - cursor));
         }
 
-        access_plan.scan(row_group_id);
-        access_plan.scan_selection(row_group_id, RowSelection::from(selection));
+        // handle the last batch
+        if current_count > 0 {
+            if current_select {
+                selection.push(RowSelector::select(current_count));
+            } else {
+                selection.push(RowSelector::skip(current_count));
+            }
+        }
+
+        if selection.iter().any(|s| !s.skip) {
+            access_plan.scan(row_group_id);
+            access_plan.scan_selection(row_group_id, RowSelection::from(selection));
+        }
     }
 
     log::debug!(
