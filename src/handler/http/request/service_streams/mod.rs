@@ -134,7 +134,7 @@ pub async fn list_services(
         } else {
             records
         };
-        return MetaHttpResponse::json(records);
+        MetaHttpResponse::json(records)
     }
     #[cfg(not(feature = "enterprise"))]
     match infra::table::service_streams::list(&org_id).await {
