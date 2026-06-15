@@ -34,38 +34,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pt-1 tw:pb-3">
-      <div
-        v-for="group in visibleGroups"
-        :key="group.label"
-        class="tw:mt-1.5 tw:first:mt-0"
+      <OTabs
+        :model-value="activeKey ?? ''"
+        orientation="vertical"
+        class="tw:w-full"
+        @change="onTabChange"
       >
-        <div
-          class="tw:px-2 tw:pt-2 tw:pb-1 tw:text-[0.72rem] tw:font-semibold tw:text-text-secondary"
-        >
-          {{ group.label }}
-        </div>
-        <button
-          v-for="item in group.items"
-          :key="item.key"
-          type="button"
-          :data-test="item.dataTest"
-          :title="item.label"
-          :aria-current="item.key === activeKey ? 'page' : undefined"
-          class="tw:flex tw:w-full tw:items-center tw:gap-2.5 tw:px-2.5 tw:py-1.5 tw:my-0.5 tw:rounded-lg tw:text-sm tw:font-medium tw:text-left tw:transition-colors"
-          :class="item.key === activeKey
-            ? 'tw:bg-tabs-active-bg tw:text-tabs-active-text'
-            : 'tw:text-text-secondary tw:hover:bg-surface-subtle tw:hover:text-text-primary'"
-          @click="navigate(item.to)"
-        >
-          <OIcon
-            v-if="item.icon"
-            :name="(item.icon as any)"
-            size="sm"
-            class="tw:shrink-0"
+        <template v-for="group in visibleGroups" :key="group.label">
+          <div
+            class="tw:px-2 tw:py-1 tw:text-[0.72rem] tw:font-semibold tw:text-text-secondary"
+          >
+            {{ group.label }}
+          </div>
+          <OTab
+            v-for="item in group.items"
+            :key="item.key"
+            :name="item.key"
+            :label="item.label"
+            :icon="item.icon"
+            :data-test="item.dataTest"
+            class="tw:w-full"
+            @click="navigate(item.to)"
           />
-          <span class="tw:leading-snug tw:whitespace-nowrap tw:truncate tw:min-w-0">{{ item.label }}</span>
-        </button>
-      </div>
+        </template>
+      </OTabs>
     </div>
   </nav>
 </template>
@@ -73,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { SectionHubGroup } from "@/components/common/SectionHub.vue";
 
 const router = useRouter();
@@ -83,6 +76,10 @@ const router = useRouter();
 function navigate(to: RouteLocationRaw) {
   Promise.resolve(router.push(to)).catch(() => {});
 }
+
+// OTabs emits change when a tab is clicked; navigation is handled by navigate()
+// above, so this is a no-op that satisfies the required @change binding.
+function onTabChange(_key: string | number) {}
 
 const props = defineProps<{
   /** The same grouped sections the hub uses. */
@@ -103,5 +100,4 @@ const visibleGroups = computed(() =>
     .filter((g) => g.items.length > 0),
 );
 
-// Group labels in the data are sometimes ALL-CAPS ("ACCESS"); the design system
 </script>
