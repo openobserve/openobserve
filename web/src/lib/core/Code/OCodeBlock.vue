@@ -14,11 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  OCodeBlock — a syntax-highlighted block of code with a copy button, optional
+  secret masking (Reveal/Hide), optional window chrome (terminal / editor), and
+  a slot for extra toolbar actions. Copy always copies the raw `code` prop, never
+  the highlighted markup or the masked variant.
+
+  For inline / simple code chips without highlighting, use OCode.
+-->
 <script setup lang="ts">
-// A single highlighted code block for the AI integration cards. Uses the same
-// copy affordance as the rest of ingestion (OButton ghost + OIcon content-copy
-// + tooltip, as in CopyContent.vue), but adds highlight.js syntax colouring.
-// Copy always copies the RAW `code` prop, never the highlighted markup.
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import hljs from "highlight.js";
@@ -26,40 +30,27 @@ import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type {
+  CodeBlockProps,
+  CodeBlockEmits,
+  CodeBlockSlots,
+} from "./OCodeBlock.types";
 
-const props = defineProps<{
-  /** Raw (already token-substituted) code to display and copy. */
-  code: string;
-  /** Fence language, e.g. "bash" / "python"; "" when unspecified. */
-  lang?: string;
-  /**
-   * Optional masked variant of `code` (e.g. the install command with the token
-   * hidden). When set, the block shows it by default and exposes a Reveal/Hide
-   * toggle; copy always copies the real `code`, never the mask.
-   */
-  codeMasked?: string;
-  /** When true, show a ".env" button that emits `download-env`. */
-  downloadEnv?: boolean;
-  /**
-   * Optional window chrome. "terminal" → macOS-style traffic-light dots + a
-   * "Terminal" label (signals "run this in a shell"). "editor" → a filename tab
-   * (signals "edit your source"). Omitted → the plain language label (default;
-   * unchanged for the markdown cards).
-   */
-  chrome?: "terminal" | "editor";
-  /** Filename shown in the "editor" chrome tab (falls back to the language). */
-  filename?: string;
-}>();
+const props = withDefaults(defineProps<CodeBlockProps>(), {
+  copyable: true,
+  copyMessage: "Copied to clipboard!",
+  revealTooltip: "Reveal",
+  hideTooltip: "Hide",
+  dataTest: "code-block",
+});
 
-const emit = defineEmits<{
-  (e: "copy"): void;
-  (e: "download-env"): void;
-}>();
+const emit = defineEmits<CodeBlockEmits>();
+defineSlots<CodeBlockSlots>();
 
 const store = useStore();
 const isDark = computed(() => store.state?.theme === "dark");
 
-// Token reveal state — only relevant when `codeMasked` is provided.
+// Secret reveal state — only relevant when `codeMasked` is provided.
 const revealed = ref(false);
 const displayCode = computed(() =>
   props.codeMasked && !revealed.value ? props.codeMasked : props.code,
@@ -86,7 +77,7 @@ const highlighted = computed(() => {
 
 const onCopy = () => {
   copyToClipboard(props.code, {
-    successMessage: "Copied to clipboard!",
+    successMessage: props.copyMessage,
     errorMessage: "Error while copying content.",
   });
   emit("copy");
@@ -111,26 +102,19 @@ const onCopy = () => {
       <div class="tw:flex tw:items-center tw:gap-1">
         <OButton
           v-if="codeMasked"
-          data-test="ai-code-reveal-btn"
+          :data-test="`${dataTest}-reveal-btn`"
           variant="ghost"
           size="icon-xs-sq"
           @click="revealed = !revealed"
         >
           <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
-          <OTooltip :content="revealed ? 'Hide Token' : 'Reveal Token'" side="top" />
+          <OTooltip :content="revealed ? hideTooltip : revealTooltip" side="top" />
         </OButton>
+        <!-- Extra toolbar actions (e.g. a download button) -->
+        <slot name="actions" />
         <OButton
-          v-if="downloadEnv"
-          data-test="ai-code-env-btn"
-          variant="ghost"
-          size="icon-xs-sq"
-          @click="emit('download-env')"
-        >
-          <OIcon name="download" size="sm" />
-          <OTooltip content="Download .env" side="top" />
-        </OButton>
-        <OButton
-          data-test="ai-code-copy-btn"
+          v-if="copyable"
+          :data-test="`${dataTest}-copy-btn`"
           variant="ghost"
           size="icon-xs-sq"
           @click="onCopy"

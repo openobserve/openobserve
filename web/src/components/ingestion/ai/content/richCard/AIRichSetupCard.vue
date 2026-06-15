@@ -35,7 +35,8 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
-import CodeBlock from "../CodeBlock.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { CardSubstitutions } from "../renderMarkdown";
 import type { RichCardContent, RichCardStep, StepChipKind } from "./types";
 import { useSpanDetect, prefersReducedMotion } from "./useSpanDetect";
@@ -336,17 +337,30 @@ function fireConfetti() {
           <div class="step-content-pad" :ref="(el) => setStepRef(el, i)">
             <p class="step-desc" v-html="inlineMd(step.description)"></p>
 
-            <CodeBlock
+            <OCodeBlock
               v-if="step.code"
               :lang="step.code.lang"
               :chrome="codeChrome(step)"
               :filename="step.code.filename"
-              :code="subStream(step.code.raw)"
+              :code="subStream(step.code.raw) || ''"
               :code-masked="subStream(step.code.masked)"
-              :download-env="step.code.downloadEnv"
+              data-test="ai-code"
+              reveal-tooltip="Reveal Token"
+              hide-tooltip="Hide Token"
               @copy="onStepCopy(step, i)"
-              @download-env="downloadEnv"
-            />
+            >
+              <template v-if="step.code.downloadEnv" #actions>
+                <OButton
+                  data-test="ai-code-env-btn"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  @click="downloadEnv"
+                >
+                  <OIcon name="download" size="sm" />
+                  <OTooltip content="Download .env" side="top" />
+                </OButton>
+              </template>
+            </OCodeBlock>
 
             <p v-if="step.note" class="step-note">
               <OIcon name="info-outline" size="sm" /> {{ step.note }}
@@ -447,9 +461,10 @@ function fireConfetti() {
                     "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:"
                   }}
                 </p>
-                <CodeBlock
+                <OCodeBlock
                   :lang="extras.fixLang || 'python'"
                   :code="extras.fixSnippet || ''"
+                  data-test="ai-fix-code"
                 />
                 <div class="fixbox-actions">
                   <OButton

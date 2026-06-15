@@ -21,7 +21,7 @@ import useIngestion from "@/composables/useIngestion";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import CodeBlock from "./CodeBlock.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, type CardSubstitutions } from "./renderMarkdown";
 
@@ -56,7 +56,7 @@ const metadata = computed(() => parsed.value.metadata);
 const warnings = computed(() => parsed.value.warnings);
 
 // Each section becomes an ordered list of segments: prose (sanitized HTML,
-// rendered via v-html) and code blocks (rendered with <CodeBlock>). Recomputes
+// rendered via v-html) and code blocks (rendered with <OCodeBlock>). Recomputes
 // if the content or the substitution values change.
 const renderedSections = computed(() =>
   parsed.value.sections.map((s) => ({
@@ -113,7 +113,7 @@ const renderedSections = computed(() =>
             :class="{ 'tw:prose-invert': isDark }"
             v-html="seg.html"
           ></div>
-          <CodeBlock v-else :code="seg.code" :lang="seg.lang" />
+          <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
         </template>
       </section>
 
