@@ -10,7 +10,6 @@
 //   • Body antialiasing
 //   • Monospace log/code rendering with Geist Mono
 //   • Tabular numerics everywhere counts matter
-//   • Consistent teal focus ring
 //   • Selection highlight in brand teal
 //   • Table header subtle polish
 //   • Transition polish on interactive elements
@@ -85,14 +84,6 @@ html.dark ::selection,
 body.body--dark ::selection {
   background: var(--color-primary-800);
   color: var(--color-primary-100);
-}
-
-// ── Consistent teal focus ring ────────────────────────────────
-// Anything that gets a focus-visible ring should use brand teal,
-// not the browser default blue.
-:focus-visible {
-  outline: 2px solid var(--color-primary-400);
-  outline-offset: 2px;
 }
 
 // ── Smooth transitions on interactive elements ────────────────
