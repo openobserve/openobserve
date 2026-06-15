@@ -28,11 +28,21 @@ If `run-context.json` is missing or `skip: true`, stop.
 
 ---
 
+## Scope of each check (important)
+
+- **Spec files** (`*.spec.js` under `playwright-tests/`): full rules below, including the
+  raw-selector ban.
+- **Page object files** (`tests/ui-testing/pages/**`): these **must** contain `page.locator(...)`
+  etc. — that is their purpose. Do **NOT** flag raw selectors here. For page objects, only check:
+  locators defined at the top as properties, no `console.log`, no hardcoded credentials, methods
+  awaited. Never treat a page object's selectors as a violation.
+
 ## CRITICAL checks (any one ⇒ verdict FAIL, pipeline blocks)
 
-1. **Raw selectors in the spec file** — `page.locator(`, `page.getByRole(`, `page.getByText(`,
-   `page.getByTestId(`, `page.$(`, **including `expect(page.locator(...))`**. All selectors must
-   live in page objects. NO exceptions.
+1. **Raw selectors in the spec file** (spec files ONLY — never page objects) — `page.locator(`,
+   `page.getByRole(`, `page.getByText(`, `page.getByTestId(`, `page.$(`, **including
+   `expect(page.locator(...))`**. In specs, all selectors must live in page objects. NO
+   exceptions. (Page object files are exempt — see scope above.)
 2. **Missing assertions** — every test must have ≥1 real assertion.
 3. **Vacuous / always-pass assertions** — `expect(true).toBe(true)`, `expect(1).toBe(1)`,
    `if (visible) {...} else { expect(true).toBe(true) }`. Check **what** is asserted, not just

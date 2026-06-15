@@ -91,34 +91,41 @@ xpath / nth-child / framework classes.
 
 ---
 
-## REGISTER THE SPEC IN `playwright.yml` (required new step)
+## REGISTER THE SPEC IN `playwright.yml` (emit structured data — do NOT edit the file)
 
-A generated spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. After
-writing the spec:
+A generated spec only runs in CI if it's listed in `.github/workflows/playwright.yml`. For
+security, **you do not edit that workflow file directly** — an LLM editing a CI workflow file is
+a code-execution risk. Instead you **describe** the change as structured JSON, and a
+deterministic (non-LLM) workflow step applies the one-line `run_files` append.
 
-1. Open `.github/workflows/playwright.yml`. The matrix is a list of `include:` entries; each has
-   a `testfolder` group and a `run_files` array of **bare spec filenames** (not paths):
+1. Read `.github/workflows/playwright.yml` to understand the matrix. Each `include:` entry has a
+   `testfolder` group and a `run_files` array of **bare spec filenames** (not paths):
    ```yaml
    - testfolder: "Logs-Core"
      browser: "chrome"
-     run_files:
-       [
-         "logspage.spec.js",
-         "logstable.spec.js",
-       ]
+     run_files: [ "logspage.spec.js", "logstable.spec.js" ]
    ```
-2. Find the group named by `playwright_group` from the run context. Append `spec_filename`
-   (bare filename only) to that group's `run_files` array.
-   - If the group doesn't exist, add a new `include:` entry (copy the shape of an existing one:
-     `testfolder`, `browser: "chrome"`, `run_files: [ "<spec_filename>" ]`) and note it in the
-     report.
-3. **Minimal, well-formed edit only:** insert the one filename, preserve existing
-   indentation/formatting, do not reorder, rename, or remove any existing entries. Keep the
-   array valid YAML.
-4. v1 is **OSS only** — edit only the OSS repo's `playwright.yml`. Never touch the enterprise
-   repo (ENT never reaches this agent).
+2. Decide which group the new spec belongs to. Prefer the `playwright_group` from the run
+   context; confirm it exists. If it does not exist, pick the closest existing group, or mark
+   that a new group must be created.
+3. Write `docs/test_generator/ci/playwright-registration.json` (`mkdir -p docs/test_generator/ci`):
+   ```json
+   {
+     "group": "Logs-Core",
+     "spec_filename": "shareLink.spec.js",
+     "create_group": false,
+     "browser": "chrome"
+   }
+   ```
+   - `create_group: true` only when no existing group fits; then `group` is the new name and the
+     deterministic step will add a new `include:` entry.
+   - `spec_filename` is the **bare filename only** (no path, no shell metacharacters; must match
+     `^[A-Za-z0-9._-]+\.spec\.js$`).
+4. v1 is **OSS only** — this targets the OSS repo's `playwright.yml`. Never reference the
+   enterprise repo (ENT never reaches this agent).
 
-Sanity-check the file still parses (it's YAML; keep brackets/commas balanced).
+> You may freely write the spec and page-object files (those are test code). You must **not**
+> modify any file under `.github/workflows/`.
 
 ---
 
@@ -126,11 +133,16 @@ Sanity-check the file still parses (it's YAML; keep brackets/commas balanced).
 
 1. The spec file at `spec_path`.
 2. Any new/edited page-object files under `tests/ui-testing/pages/`.
-3. The `playwright.yml` edit.
+3. `docs/test_generator/ci/playwright-registration.json` (the registration instruction; a
+   deterministic workflow step applies it later — you do not edit `playwright.yml`).
 4. A generation report → `docs/test_generator/generation-reports/<feature_slug>-generation.md`
    (`mkdir -p` first) listing: spec path, page objects touched (new methods/locators), the
-   `playwright.yml` group + filename added, and any open risks (e.g. `NEEDS SELECTOR` items the
-   Analyst flagged and how you handled them).
+   `playwright.yml` group + filename to register, and any open risks (e.g. `NEEDS SELECTOR`
+   items the Analyst flagged and how you handled them).
+
+> **Where outputs go:** you run in an ephemeral CI runner with no commit access. Your files are
+> uploaded as a build artifact and the **PR-back job (Job 4) commits them** to a `test/<slug>`
+> branch and opens the PR. Do not attempt to `git commit` or push.
 
 Print a one-line summary (spec path + playwright.yml group) at the end. Non-interactive —
 finish without waiting for approval.

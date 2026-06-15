@@ -52,8 +52,14 @@ its outputs as files; nothing is passed via conversation. Between GitHub jobs, t
 ```
 docs/test_generator/
   ci/
+    diff.patch              # Workflow writes the change diff (untrusted input).
+    feature_hint.txt        # Workflow writes the optional hint (untrusted input).
+    trigger_comment.txt     # Workflow writes the triggering comment (untrusted input).
     run-context.json        # Triage writes; ALL downstream agents read. The single source of run state.
     triage.json             # Full triage output (for the PR comment in dry-run).
+    playwright-registration.json  # Engineer writes: { group, spec_filename, create_group }. A
+                            # DETERMINISTIC (non-LLM) step applies the run_files edit — agents
+                            # never edit .github/workflows/ themselves.
     sentinel-verdict.json   # Sentinel writes: { verdict: PASS|FAIL, critical_count }.
     heal-result.json        # Healer writes: { status: passing|failing, iterations }.
   features/<slug>-feature.md            # Analyst
@@ -90,6 +96,26 @@ The generated test itself is written to the repo, not under `docs/`:
 `run_files` array the Engineer appends the spec filename to.
 
 ---
+
+## Security model
+
+These agents process **attacker-controllable** input (PR diffs, comments, hints — anyone can
+open a PR). Hardening built into the design:
+
+- **Untrusted input is data, not instructions.** The diff/comment/hint reach agents as files,
+  and every agent that reads them is told to treat their content as inert data and ignore any
+  embedded instructions ("prompt injection").
+- **No LLM edits to CI workflow files.** The Engineer never edits `.github/workflows/**`; it
+  emits `playwright-registration.json` and a deterministic step applies a single `run_files`
+  append.
+- **Path/identifier validation before shelling out.** `spec_filename` must match
+  `^[A-Za-z0-9._-]+\.spec\.js$`; `spec_path` is regex-validated before the Healer runs it (and
+  again in the workflow).
+- **Least-privilege CI.** The live triage job runs with `contents: read`; only the PR-back job
+  requests `contents: write`.
+- **Human review remains the backstop.** All generated code lands in a PR a human reviews before
+  merge; Sentinel auto-fixes are a tiny whitelist (add import, `console.log`→`testLogger`, tag
+  `@` prefix).
 
 ## Scope (v1)
 
