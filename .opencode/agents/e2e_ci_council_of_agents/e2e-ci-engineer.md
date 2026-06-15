@@ -29,6 +29,12 @@ source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
 
 ## MANDATORY framework rules
 
+### Fully-parallel by default (non-negotiable)
+- Every `test.describe` MUST use `test.describe.configure({ mode: 'parallel' })`. NEVER emit `mode: 'serial'`.
+- Because tests run in parallel, **each test MUST be fully independent**: it sets up its own state in `beforeEach` (login/navigation/data), shares NO mutable state with sibling tests, and assumes NO execution order. Two tests must never depend on data the other created or on running first/second.
+- Do not rely on a single shared record/name across tests — give each test its own uniquely-named fixtures (e.g. suffix with a per-test unique id) so parallel runs can't collide.
+- The runner uses `--workers=4`; parallel mode is what lets those workers actually spread the tests. Design for it.
+
 ### Required imports
 ```javascript
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -40,7 +46,7 @@ const logData = require("../../fixtures/log.json");
 ### Required structure
 ```javascript
 test.describe("<feature_title> testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -126,6 +132,37 @@ deterministic (non-LLM) workflow step applies the one-line `run_files` append.
 
 > You may freely write the spec and page-object files (those are test code). You must **not**
 > modify any file under `.github/workflows/`.
+
+---
+
+## MANDATORY: Sentinel-compliance self-audit (do this BEFORE you finish)
+
+The Sentinel will audit your output and **reject** it on any of the issues below — which then
+forces a fix-and-re-audit loop. **Write the code right the first time, then re-read your spec and
+page objects against this exact checklist and fix every violation before you return.** Match the
+Sentinel's bar so the audit passes on attempt 1.
+
+**CRITICAL — Sentinel will FAIL the build on any of these:**
+1. **No raw selectors in the SPEC file** — none of `page.locator(`, `page.getByRole(`,
+   `page.getByText(`, `page.getByTestId(`, `page.$(`, **including inside `expect(...)`** (e.g.
+   `expect(page.locator(...))` is a violation). Every selector lives in a page object; the spec
+   calls `pm.<area>Page.<method>()` / `pm.<area>Page.expectXVisible()`. (Page-object FILES are
+   *expected* to contain selectors — that's fine; this rule is about the spec.)
+2. **Every test has ≥1 real, meaningful assertion.** Never `expect(true).toBe(true)`,
+   `expect(1).toBe(1)`, or `if (visible) {…} else { expect(true).toBe(true) }`. Assert on actual
+   feature state via a page-object expect method.
+3. **No `console.log`** — use `testLogger.info(...)`.
+4. **Every async call is `await`ed.**
+5. **No hardcoded credentials** — only `process.env.*`.
+
+**WARNINGS — avoid these too (Sentinel reports them):**
+- Locators must be declared at the **top** of each page-object file (as properties), not inline.
+- No brittle selectors (xpath, `nth-child`, framework-generated classes).
+- ≤3 `waitForTimeout` per test — prefer `waitForLoadState`/`toBeVisible`.
+- Use `PageManager` (`pm.…`) for all interactions; reuse existing page objects.
+- If a test creates data, add cleanup in `tests/ui-testing/playwright-tests/cleanup.spec.js`.
+
+Treat this as a gate on *yourself*: a spec that trips any CRITICAL above is not done.
 
 ---
 

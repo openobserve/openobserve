@@ -1,0 +1,19 @@
+{
+  "feature_slug": "test-demo",
+  "feature_title": "Test Demo Page",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "testDemo.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/testDemo.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/views/TestDemo.vue",
+    "web/src/composables/shared/router.ts",
+    "web/src/layouts/MainLayout.vue"
+  ],
+  "skip": false,
+  "skip_reason": "",
+  "rationale": "OSS feature (all changed paths under web/src/). No skip gates apply: not an enterprise feature, no existing test files modified, no explicit skip markers, and the change is user-facing — it adds a new page at /test-demo with interactive UI elements (fruit select, cascading country→city selects, mode toggle Basic/Advanced, conditional Priority select, and a combined-rule banner for Cherry+High). Route is registered in router.ts and a nav entry appears in MainLayout. No API changes. Placed in GeneralTests area as a standalone demo page; playwright group GeneralTests maps directly to the same folder in the CI matrix."
+}
