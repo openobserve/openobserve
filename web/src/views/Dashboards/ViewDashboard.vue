@@ -1935,12 +1935,16 @@ export default defineComponent({
   background-color: $white;
 }
 
-.stickyHeader {
+// The header wrapper is rendered inside PageLayout (a child component), so these
+// rules must use :deep() to cross the scope boundary. Without it the scoped class
+// names passed via `header-class` never match, position:sticky is never applied,
+// and the header scrolls away in print/fullscreen mode.
+:deep(.stickyHeader) {
   position: sticky;
   top: 0;
   z-index: 1001;
 }
-.stickyHeader.fullscreenHeader {
+:deep(.stickyHeader.fullscreenHeader) {
   top: 0px;
   z-index: 5100 !important;
 }
@@ -1958,14 +1962,15 @@ export default defineComponent({
 }
 
 .print-mode-container {
-  // Fill the space the chrome actually gives us, not a hard 100vh. The
-  // MainLayout content card keeps a small bottom gutter (pb-2) in print mode,
-  // so a literal 100vh here is a few px taller than the available area and
-  // overflows the scroll wrapper, producing a stray near-full-height
-  // scrollbar. 100% matches the parent exactly; this container's own
-  // overflow-y still scrolls tall dashboards.
-  height: 100% !important;
-  overflow-y: auto !important;
+  // Grow to the dashboard's natural content height and let the app's outer
+  // scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+  // model the @media print block below relies on. Pinning a viewport height here
+  // (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+  // then clipped the trailing panels, so tall dashboards could never be scrolled
+  // to the bottom. `overflow: visible` keeps the sticky header pinned to the
+  // outer scroll wrapper rather than to a dead inner scroll box.
+  height: auto !important;
+  overflow: visible !important;
 }
 
 @media print {
