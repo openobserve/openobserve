@@ -24,7 +24,6 @@
 @import 'variables';
 @import 'fonts';
 @import 'field-type-badge';
-@import 'theme-modern'; // Modern visual theme — fonts, teal accent, dark sidebar, hairline borders
 
 // ═══════════════════════════════════════════════════════════════
 // 1. CSS Reset
@@ -51,6 +50,8 @@ body {
   font-size: var(--text-sm);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -150,6 +151,26 @@ code {
   // counts and timestamps align and read as machine output.
   font-feature-settings: "tnum";
   letter-spacing: -0.2px;
+}
+
+pre,
+kbd,
+samp,
+.log-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+html.dark ::selection,
+body.body--dark ::selection {
+  background: var(--color-primary-800);
+  color: var(--color-primary-100);
 }
 
 ::placeholder {
