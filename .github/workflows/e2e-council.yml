@@ -28,14 +28,14 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number OR PR URL to triage / generate E2E tests for (REQUIRED, e.g. '1234' or 'https://github.com/openobserve/openobserve/pull/1234'). Tests are only ever generated for a PR."
+        description: "PR number or URL (required)"
         required: true
       feature_hint:
-        description: "Optional feature name/area hint for triage"
+        description: "Feature/area hint (optional)"
         required: false
         default: ""
       dry_run:
-        description: "Dry-run: only post the triage decision, do not generate"
+        description: "Dry-run: triage only, don't generate"
         type: boolean
         required: true
         default: true
