@@ -27,7 +27,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
 import config from "@/aws-exports";
-import { applyThemeColors } from "@/utils/theme";
+import { applyThemeColors, type SemanticColors } from "@/utils/theme";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 
@@ -45,6 +45,24 @@ export default {
     // This runs once when the app loads and applies the correct theme colors
     // based on priority: tempThemeColors > localStorage > org settings > defaults
     onMounted(() => {
+      // One-time migration: clear saved colors that were old defaults so the
+      // current default (#3F7994 light / #79a1b4 dark) takes effect automatically.
+      const THEME_MIGRATION_KEY = 'themeMigrationV3';
+      if (!localStorage.getItem(THEME_MIGRATION_KEY)) {
+        const OLD_LIGHT_DEFAULTS = ['#1a8a7a', '#6B76E3', '#5B9FBE'];
+        const OLD_DARK_DEFAULTS  = ['#3ab9aa', '#818CF8', '#5B9FBE'];
+        const savedLight = localStorage.getItem('customLightColor');
+        const savedDark  = localStorage.getItem('customDarkColor');
+        if (savedLight && OLD_LIGHT_DEFAULTS.map(c => c.toLowerCase()).includes(savedLight.toLowerCase())) {
+          localStorage.removeItem('customLightColor');
+          localStorage.removeItem('appliedLightTheme');
+        }
+        if (savedDark && OLD_DARK_DEFAULTS.map(c => c.toLowerCase()).includes(savedDark.toLowerCase())) {
+          localStorage.removeItem('customDarkColor');
+          localStorage.removeItem('appliedDarkTheme');
+        }
+        localStorage.setItem(THEME_MIGRATION_KEY, '1');
+      }
       initializeThemeColors();
     });
 
@@ -123,29 +141,29 @@ export default {
         ? !!localStorage.getItem('customLightColor')
         : !!localStorage.getItem('customDarkColor');
 
+      // Load persisted semantic colors for the current mode
+      const semanticColorsRaw = currentMode === 'light'
+        ? localStorage.getItem('lightSemanticColors')
+        : localStorage.getItem('darkSemanticColors');
+      const semanticColors: SemanticColors | undefined = semanticColorsRaw
+        ? JSON.parse(semanticColorsRaw)
+        : undefined;
+
       if (hasTempPreview || hasSavedColor) {
         // User has either a temp preview or saved custom color - apply it
         const color = currentMode === 'light' ? customLightColor : customDarkColor;
 
-        // Determine if this color is from org settings (backend) or custom/default
-        const isFromOrgSettings = currentMode === "light"
-          ? (store.state?.organizationData?.organizationSettings?.light_mode_theme_color === customLightColor)
-          : (store.state?.organizationData?.organizationSettings?.dark_mode_theme_color === customDarkColor);
-
-        const DEFAULT_LIGHT_COLOR = "#3F7994";
-        const DEFAULT_DARK_COLOR = "#5B9FBE";
         const isDefaultColor = (currentMode === 'light' && color === DEFAULT_LIGHT_COLOR) ||
                                (currentMode === 'dark' && color === DEFAULT_DARK_COLOR);
 
-        applyThemeColors(color, currentMode, isDefaultColor);
+        applyThemeColors(color, currentMode, isDefaultColor, semanticColors);
       } else {
         // No theme explicitly selected, apply available colors
         const color = currentMode === 'light' ? customLightColor : customDarkColor;
-        const isFromOrgSettings = currentMode === "light"
-          ? store.state?.organizationData?.organizationSettings?.light_mode_theme_color
-          : store.state?.organizationData?.organizationSettings?.dark_mode_theme_color;
-        const isDefault = !isFromOrgSettings && !hasTempPreview;
-        applyThemeColors(color, currentMode, isDefault);
+        const isDefault = !hasTempPreview && (
+          color === (currentMode === 'light' ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR)
+        );
+        applyThemeColors(color, currentMode, isDefault, semanticColors);
       }
     };
 

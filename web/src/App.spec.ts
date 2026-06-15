@@ -175,7 +175,9 @@ describe('App.vue', () => {
     });
 
     it('handles whitespace-only credentials', () => {
-      mockLocalStorage.getItem.mockReturnValue('   ');
+      mockLocalStorage.getItem.mockImplementation((key: string) =>
+        key === 'creds' ? '   ' : null
+      );
 
       wrapper = mount(App, {
         global: {

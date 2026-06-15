@@ -15,13 +15,13 @@
 
 use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
 
+use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
 use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use utoipa::ToSchema;
 
-use super::bitvec::BitVec;
 use crate::{
     get_config,
     meta::self_reporting::usage::Stats,
@@ -273,6 +273,15 @@ impl MemorySize for RemoteStreamParams {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FileSelection {
+    /// Row ids matched by the tantivy index, as a per-row bitmap of length
+    /// `num_rows` (one bit per parquet row).
+    Rows(Arc<BooleanBuffer>),
+    /// Row group ids selected by row-group-level sampling.
+    RowGroups(Arc<Vec<u32>>),
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileKey {
     pub id: i64,
@@ -280,10 +289,7 @@ pub struct FileKey {
     pub key: String,
     pub meta: FileMeta,
     pub deleted: bool,
-    pub segment_ids: Option<Arc<BitVec>>,
-    /// Parquet row group size that was in effect when the tantivy index for
-    /// this file was built. Set together with `segment_ids` after tantivy
-    /// search runs locally; not serialized over gRPC.
+    pub selection: Option<FileSelection>,
     pub row_group_size: Option<u32>,
 }
 
@@ -295,7 +301,7 @@ impl FileKey {
             key,
             meta,
             deleted,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -307,13 +313,13 @@ impl FileKey {
             key: file.to_string(),
             meta: FileMeta::default(),
             deleted: false,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
 
-    pub fn with_segment_ids(&mut self, segment_ids: BitVec, row_group_size: Option<u32>) {
-        self.segment_ids = Some(Arc::new(segment_ids));
+    pub fn with_selection(&mut self, selection: FileSelection, row_group_size: Option<u32>) {
+        self.selection = Some(selection);
         self.row_group_size = row_group_size;
     }
 }
@@ -678,7 +684,7 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             key: req.key.clone(),
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -1930,7 +1936,7 @@ mod tests {
         assert_eq!(key.id, 0);
         assert!(key.account.is_empty());
         assert!(!key.deleted);
-        assert!(key.segment_ids.is_none());
+        assert!(key.selection.is_none());
     }
 
     #[test]
@@ -1957,16 +1963,18 @@ mod tests {
         assert_eq!(key.key, "files/k.parquet");
         assert_eq!(key.meta, meta);
         assert!(!key.deleted);
-        assert!(key.segment_ids.is_none());
+        assert!(key.selection.is_none());
     }
 
     #[test]
-    fn test_file_key_with_segment_ids() {
+    fn test_file_key_with_selection() {
         let mut key = FileKey::from_file_name("files/k.parquet");
-        assert!(key.segment_ids.is_none());
-        let bv = BitVec::new();
-        key.with_segment_ids(bv, Some(1024));
-        assert!(key.segment_ids.is_some());
+        assert!(key.selection.is_none());
+        let selection = FileSelection::Rows(Arc::new(BooleanBuffer::from_iter(
+            (0..16u32).map(|i| [1u32, 5, 9].contains(&i)),
+        )));
+        key.with_selection(selection, Some(1024));
+        assert!(key.selection.is_some());
         assert_eq!(key.row_group_size, Some(1024));
     }
 

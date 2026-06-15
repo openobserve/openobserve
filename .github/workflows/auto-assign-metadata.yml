@@ -229,8 +229,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.issue.number }}
         run: |
-          gh issue edit "$NUMBER" --add-assignee "Shrinath-O2" --add-assignee "Manazsharma" --add-assignee "neha00290" \
-            && echo "Assigned Shrinath-O2, Manazsharma and neha00290 to stranger issue #$NUMBER" \
+          gh issue edit "$NUMBER" --add-assignee "simranquirky" \
+            && echo "Assigned simranquirky to stranger issue #$NUMBER" \
             || echo "::warning::Could not assign to stranger issue #$NUMBER"
 
       # ── Stranger: assign PR to oasisk + hengfeiyang ──

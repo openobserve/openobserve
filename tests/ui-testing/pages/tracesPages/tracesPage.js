@@ -22,7 +22,7 @@ export class TracesPage {
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
     this.resetFiltersButton = '[data-test="traces-search-bar-reset-filters-btn"]';
-    this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    this.sqlModeToggle = '[data-cy="syntax-guide-button"]';
     this.dateTimeDropdown = '[data-test="logs-search-bar-date-time-dropdown"]';
     this.refreshButton = '[data-test="logs-search-bar-refresh-btn"]';
     this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -120,8 +120,8 @@ export class TracesPage {
     // Query Editor
     // The traces SearchBar.vue renders <code-query-editor editor-id="traces-query-editor">
     // CodeQueryEditor.vue renders <div data-test="query-editor" id="{editorId}">
-    // SQL mode toggle is data-test="logs-search-bar-sql-mode-toggle-btn" (confirmed in traces SearchBar.vue:140)
-    this.sqlModeButton = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
+    // SQL mode toggle: SyntaxGuide OButton has data-cy="syntax-guide-button"
+    this.sqlModeButton = '[data-cy="syntax-guide-button"]';
     this.queryEditor = '[data-test="query-editor"]';
     this.queryEditorContainer = '[data-test="query-editor"]';
     this.queryErrorMessage = '[data-test="traces-search-error-message"]';

@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::hash::{Hash, Hasher};
 use std::{
     collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
     sync::LazyLock as Lazy,
 };
 
@@ -65,6 +66,7 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
+#[cfg(feature = "enterprise")]
 fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f64) -> bool {
     if sampling_rate >= 1.0 {
         return true;
@@ -722,8 +724,22 @@ async fn process_node(
                 );
             }
         }
+        #[cfg(feature = "enterprise")]
         NodeData::LlmEvaluation(params) => {
             process_llm_evaluation_node(params, metadata, channels).await;
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::LlmEvaluation(_) => {
+            log::warn!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
+            );
+            let mut skipped_count = 0usize;
+            while receiver.recv().await.is_some() {
+                skipped_count += 1;
+            }
+            log::info!(
+                "[Pipeline]: LLM evaluation node {node_idx} skipped {skipped_count} records"
+            );
         }
     }
 
@@ -736,16 +752,35 @@ async fn process_node(
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
 async fn process_llm_evaluation_node(
     params: &config::meta::pipeline::components::LlmEvaluationParams,
     metadata: ProcessMetadata,
     mut channels: ProcessChannels,
 ) {
+    let mut count: usize = 0;
+    if !o2_enterprise::enterprise::common::config::get_config()
+        .common
+        .online_evals_enabled
+    {
+        log::warn!(
+            "[Pipeline]: LLM evaluation node {} skipped because online evals are disabled",
+            metadata.node_idx
+        );
+        while channels.receiver.recv().await.is_some() {
+            count += 1;
+        }
+        log::info!(
+            "[Pipeline]: LLM evaluation node {} skipped {count} records",
+            metadata.node_idx
+        );
+        return;
+    }
+
     log::info!(
         "[Pipeline]: LLM evaluation node {} starts processing",
         metadata.node_idx
     );
-    let mut count: usize = 0;
     if let Err(e) =
         crate::service::self_reporting::ensure_llm_scores_stream_initialized(&metadata.org_id).await
     {
