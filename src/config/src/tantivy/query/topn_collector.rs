@@ -422,13 +422,9 @@ pub fn resolve_ords(col: &StrColumn, mut ords: Vec<u64>) -> HashMap<u64, String>
     let mut strings: Vec<String> = Vec::with_capacity(ords.len());
     // the callback fires once per input ordinal in order, so `strings[i]` pairs with `ords[i]`;
     // on error only the unresolved tail is dropped (zip stops at the shorter side)
-    if let Err(e) = col
-        .dictionary()
-        .sorted_ords_to_term_cb(ords.iter().copied(), |bytes| {
-            strings.push(String::from_utf8_lossy(bytes).into_owned());
-            Ok(())
-        })
-    {
+    if let Err(e) = col.dictionary().sorted_ords_to_term_cb(&ords, |bytes| {
+        strings.push(String::from_utf8_lossy(bytes).into_owned());
+    }) {
         log::warn!(
             "search->tantivy: topn failed to resolve {} of {} term ordinals: {e}",
             ords.len() - strings.len(),
