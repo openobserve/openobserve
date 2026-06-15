@@ -19,7 +19,10 @@ pub mod search;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
 
-use arrow::array::builder::BooleanBufferBuilder;
+use arrow::{
+    buffer::{BooleanBuffer, MutableBuffer},
+    util::bit_util,
+};
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -584,7 +587,6 @@ async fn search_tantivy_index(
     .await??;
 
     let key = parquet_file.key.to_string();
-    let mut percent = 0.0;
     let result = match res {
         TantivyResult::Count(count) => TantivyResult::Count(count),
         TantivyResult::Histogram(histogram) => TantivyResult::Histogram(histogram),
@@ -594,43 +596,11 @@ async fn search_tantivy_index(
         TantivyResult::TopN(top_n) => TantivyResult::TopN(top_n),
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
-            if row_ids.is_empty() || parquet_file.meta.records == 0 {
-                return Ok((key, TantivyResult::NoMatch, false));
-            }
-            // return early if the number of matched docs is too large
-            let skip_threshold = cfg.limit.inverted_index_skip_threshold;
-            let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
-            if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
-                // return empty file name means we need to add filter back and skip tantivy search
-                log::info!(
-                    "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
-                    parquet_file.key
-                );
-                return Ok((
-                    "".to_string(),
-                    TantivyResult::Skipped {
-                        percent: row_ids_percent as usize,
-                    },
-                    true,
-                ));
-            }
-            percent = row_ids_percent;
-            let max_doc_id = row_ids.iter().copied().max().unwrap() as i64;
-            if max_doc_id >= parquet_file.meta.records {
-                return Err(anyhow::anyhow!(
-                    "doc_id {max_doc_id} is out of range, records {}",
-                    parquet_file.meta.records,
-                ));
-            }
-            let num_rows = parquet_file.meta.records as usize;
-            let mut builder = BooleanBufferBuilder::new(num_rows);
-            builder.append_n(num_rows, false);
-            for &id in &row_ids {
-                builder.set_bit(id as usize, true);
-            }
-            TantivyResult::RowIdsSelection {
-                row_ids: Arc::new(builder.finish()),
-                row_group_size,
+            match build_row_ids_selection(trace_id, parquet_file, row_ids, row_group_size)? {
+                RowIdsOutcome::Return(key, result, has_skipped) => {
+                    return Ok((key, result, has_skipped));
+                }
+                RowIdsOutcome::Selection { result } => result,
             }
         }
         TantivyResult::RowIdsSelection { .. }
@@ -645,13 +615,75 @@ async fn search_tantivy_index(
     if cfg.common.inverted_index_result_cache_enabled
         && !cache_key.is_empty()
         && !has_skipped_conditions
-        && (result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
-            || percent < 1.0)
+        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
     {
         let entry = get_cache_entry(result.clone());
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
     }
     Ok((key, result, has_skipped_conditions))
+}
+
+/// Outcome of turning tantivy row-id hits into a parquet access plan.
+enum RowIdsOutcome {
+    /// Return immediately from `search_tantivy_index`, bypassing the result
+    /// cache (either no match, or too many hits so we fall back to datafusion).
+    Return(String, TantivyResult, bool),
+    /// A row-id selection to cache and return.
+    Selection { result: TantivyResult },
+}
+
+/// Convert the matched tantivy row ids into a `RowIdsSelection` access plan,
+/// or signal an early return when there is no match or too many hits.
+fn build_row_ids_selection(
+    trace_id: &str,
+    parquet_file: &FileKey,
+    row_ids: Vec<u32>,
+    row_group_size: Option<u32>,
+) -> anyhow::Result<RowIdsOutcome> {
+    if row_ids.is_empty() || parquet_file.meta.records == 0 {
+        return Ok(RowIdsOutcome::Return(
+            parquet_file.key.to_string(),
+            TantivyResult::NoMatch,
+            false,
+        ));
+    }
+    // return early if the number of matched docs is too large
+    let skip_threshold = get_config().limit.inverted_index_skip_threshold;
+    let row_ids_percent = row_ids.len() as f64 / parquet_file.meta.records as f64 * 100.0;
+    if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
+        // return empty file name means we need to add filter back and skip tantivy search
+        log::info!(
+            "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
+            parquet_file.key
+        );
+        return Ok(RowIdsOutcome::Return(
+            "".to_string(),
+            TantivyResult::Skipped {
+                percent: row_ids_percent as usize,
+            },
+            true,
+        ));
+    }
+    let max_doc_id = row_ids.iter().copied().max().unwrap() as i64;
+    if max_doc_id >= parquet_file.meta.records {
+        return Err(anyhow::anyhow!(
+            "doc_id {max_doc_id} is out of range, records {}",
+            parquet_file.meta.records,
+        ));
+    }
+    let num_rows = parquet_file.meta.records as usize;
+    let mut buffer = MutableBuffer::from_len_zeroed(bit_util::ceil(num_rows, 8));
+    let slice = buffer.as_slice_mut();
+    for &id in &row_ids {
+        bit_util::set_bit(slice, id as usize);
+    }
+    let row_ids = BooleanBuffer::new(buffer.into(), 0, num_rows);
+    Ok(RowIdsOutcome::Selection {
+        result: TantivyResult::RowIdsSelection {
+            row_ids: Arc::new(row_ids),
+            row_group_size,
+        },
+    })
 }
 
 /// if simple distinct without filter, we need to warm up the field
