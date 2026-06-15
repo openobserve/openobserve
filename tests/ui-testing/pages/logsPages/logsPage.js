@@ -3596,6 +3596,12 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
 
+    /**
+     * Assert the error state element, if visible, does NOT contain the given text.
+     * Passes trivially when no error element is shown (intended for edge-case queries
+     * that may produce a non-parser error, e.g. empty query after stripping comments).
+     * Use expectSqlErrorStateNotVisible() when the assertion must be unconditional.
+     */
     async expectSqlErrorStateNotContain(text, timeout = 5000) {
         const errorLocator = this.page.locator(this.errorMessage);
         const isVisible = await errorLocator.isVisible({ timeout }).catch(() => false);

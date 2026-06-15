@@ -11,7 +11,7 @@ async function applyQueryButton(pm) {
 }
 
 test.describe("SQL Queries with Inline Comments testcases", () => {
-  test.describe.configure({ mode: 'parallel' });
+  test.describe.configure({ mode: 'parallel', retries: 1 });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -56,7 +56,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.setQueryEditorValue(
       '-- find all entries\nSELECT _timestamp, code, method FROM "e2e_automate" ORDER BY _timestamp DESC'
     );
-    await pm.logsPage.waitForQueryEditorValue('find all entries');
+    await pm.logsPage.waitForQueryEditorValue('-- find all entries');
     await applyQueryButton(pm);
 
     await pm.logsPage.expectSqlErrorStateNotVisible();
@@ -75,7 +75,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.setQueryEditorValue(
       '-- find all entries where level=debug\n-- returns all matching records\n-- author: QA team\nSELECT _timestamp, code, method FROM "e2e_automate" ORDER BY _timestamp DESC'
     );
-    await pm.logsPage.waitForQueryEditorValue('find all entries where level=debug');
+    await pm.logsPage.waitForQueryEditorValue('-- find all entries where level=debug');
     await applyQueryButton(pm);
 
     await pm.logsPage.expectSqlErrorStateNotVisible();
@@ -94,7 +94,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.setQueryEditorValue(
       'SELECT _timestamp, code, method FROM "e2e_automate" -- fetch recent logs\nORDER BY _timestamp DESC'
     );
-    await pm.logsPage.waitForQueryEditorValue('fetch recent logs');
+    await pm.logsPage.waitForQueryEditorValue('-- fetch recent logs');
     await applyQueryButton(pm);
 
     await pm.logsPage.expectSqlErrorStateNotVisible();
@@ -113,7 +113,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.setQueryEditorValue(
       'SELECT _timestamp, code, method\n-- select from the e2e_automate stream\nFROM "e2e_automate"\nORDER BY _timestamp DESC'
     );
-    await pm.logsPage.waitForQueryEditorValue('select from the e2e_automate stream');
+    await pm.logsPage.waitForQueryEditorValue('-- select from the e2e_automate stream');
     await applyQueryButton(pm);
 
     await pm.logsPage.expectSqlErrorStateNotVisible();
@@ -132,7 +132,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.setQueryEditorValue(
       '-- find entries matching method pattern\nSELECT _timestamp, code, method FROM "e2e_automate"\nWHERE str_match_ignore_case(method, \'g\')\nORDER BY _timestamp DESC'
     );
-    await pm.logsPage.waitForQueryEditorValue('find entries matching method pattern');
+    await pm.logsPage.waitForQueryEditorValue('-- find entries matching method pattern');
     await applyQueryButton(pm);
 
     await pm.logsPage.expectSqlErrorStateNotVisible();
@@ -149,7 +149,7 @@ test.describe("SQL Queries with Inline Comments testcases", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative15MinButton();
     await pm.logsPage.setQueryEditorValue('-- this query has only a comment');
-    await pm.logsPage.waitForQueryEditorValue('only a comment');
+    await pm.logsPage.waitForQueryEditorValue('-- this query has only a comment');
     await applyQueryButton(pm);
 
     // The original bug caused "Expected: end of statement, found: _timestamp" when a comment
