@@ -5,6 +5,14 @@ name: E2E Council (Test Generation)
 #
 # REQUIRED SECRET: DEEPSEEK_API_KEY_E2E (repo Settings → Secrets and variables → Actions).
 #
+# EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
+# detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
+#   - a comment that is EXACTLY `/e2e` on a PR → triages that PR's diff (extra text won't match).
+#   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED; accepts a
+#                                     bare number, "#123", or a full PR URL).
+# No PR ⇒ no run. (There is intentionally no free-form branch option.)
+#   Example: dispatch with pr_number=1234 (or .../pull/1234).
+#
 # IMPORTANT: both triggers read this workflow's definition from the DEFAULT BRANCH (main).
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
 # `/e2e` comments take effect. The first run is dry-run, which only posts a comment.
@@ -19,16 +27,15 @@ name: E2E Council (Test Generation)
 on:
   workflow_dispatch:
     inputs:
-      oss_branch:
-        description: "OSS branch to analyze for new E2E tests"
+      pr_number:
+        description: "PR number or URL (required)"
         required: true
-        default: "main"
       feature_hint:
-        description: "Optional feature name/area hint for triage"
+        description: "Feature/area hint (optional)"
         required: false
         default: ""
       dry_run:
-        description: "Dry-run: only post the triage decision, do not generate"
+        description: "Dry-run: triage only, don't generate"
         type: boolean
         required: true
         default: true
@@ -43,7 +50,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: e2e-council-${{ github.event.issue.number || github.event.inputs.oss_branch || github.ref }}
+  group: e2e-council-${{ github.event.issue.number || github.event.inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -56,12 +63,14 @@ jobs:
   # write run-context.json, and post the decision as a PR comment.
   # ---------------------------------------------------------------------------
   triage:
-    # Run for manual dispatch, or for a `/e2e` comment on a PR by a trusted author.
+    # Run for manual dispatch, or for a comment that is EXACTLY `/e2e` on a PR by a trusted
+    # author. Exact match (not `contains`) so "Generate /e2e", "/e2e please", etc. do NOT trigger
+    # — the job never starts, so there is no reaction, no comment, and no run for those.
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/e2e') &&
+       github.event.comment.body == '/e2e' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -88,7 +97,16 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            const pr = context.eventName === 'issue_comment' ? context.payload.issue.number : '';
+            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input,
+            // which accepts a bare number, "#123", or a full PR URL. Normalize to a bare integer
+            // so downstream (gh pr diff, comment posting, concurrency) always gets a number.
+            const raw = context.eventName === 'issue_comment'
+              ? String(context.payload.issue.number)
+              : String(context.payload.inputs.pr_number || '');
+            const urlMatch = raw.match(/\/pull\/(\d+)/);   // PR URL → the /pull/<n> segment
+            const numMatch = raw.match(/\d+/);             // else first run of digits ("#123", "123")
+            const pr = urlMatch ? urlMatch[1] : (numMatch ? numMatch[0] : '');
+            if (!pr) core.setFailed(`Could not parse a PR number from input: "${raw}"`);
             core.setOutput('pr_number', pr);
 
       - name: Determine dry-run mode
@@ -100,6 +118,31 @@ jobs:
           else
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Acknowledge — react + post in-progress comment
+        # Give the user immediate feedback (within seconds) that the agent is working. We post a
+        # placeholder comment now and EDIT it in place with the decision later (no extra noise).
+        id: ack
+        if: steps.resolve.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = Number('${{ steps.resolve.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // 👀 reaction on the triggering /e2e comment (comment trigger only).
+            if (context.eventName === 'issue_comment') {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  comment_id: context.payload.comment.id, content: 'eyes',
+                });
+              } catch (e) { core.info(`reaction failed: ${e.message}`); }
+            }
+            const { data } = await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr,
+              body: `### 🤖 E2E Council — triage in progress…\n\nAnalyzing the change with DeepSeek; I'll update this comment with the decision shortly.\n\n[View run](${runUrl})`,
+            });
+            core.setOutput('comment_id', data.id);
 
       - uses: actions/checkout@v4
         # SECURITY (untrusted-checkout TOCTOU / "pwn request"): this job is privileged — the
@@ -121,23 +164,26 @@ jobs:
 
       - name: Fetch diff + untrusted inputs as files
         # The PR change is read as a DIFF via the API (data) — the PR head is never checked out.
-        # Untrusted text (comment, hint, branch name) goes through env vars + files, never
-        # interpolated into a shell command. The agent treats all of it as data, not instructions.
+        # Untrusted text (comment, hint) goes through env vars + files, never interpolated into a
+        # shell command. The agent treats all of it as data, not instructions.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OSS_BRANCH: ${{ github.event.inputs.oss_branch }}
           PR_NUMBER: ${{ steps.resolve.outputs.pr_number }}
           FEATURE_HINT: ${{ github.event.inputs.feature_hint }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           mkdir -p docs/test_generator/ci
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            # Read the PR's diff via API — do NOT check out its code.
-            gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
-          else
-            # workflow_dispatch: diff the chosen branch against main (fetch only; no checkout/run).
-            git fetch origin "$OSS_BRANCH" --depth=50 || true
-            git diff "origin/main...origin/$OSS_BRANCH" > docs/test_generator/ci/diff.patch 2>/dev/null || true
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::error::No PR number. This workflow only runs against a PR — comment /e2e on a PR, or dispatch with pr_number."
+            exit 1
+          fi
+          # Read the PR's diff via API — do NOT check out its code.
+          echo "Triaging PR #$PR_NUMBER"
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > docs/test_generator/ci/diff.patch || true
+          # Guard: empty diff (e.g. invalid/closed PR, or a PR with no file changes).
+          if [ ! -s docs/test_generator/ci/diff.patch ]; then
+            echo "::error::Empty diff for PR #$PR_NUMBER — nothing to triage (invalid PR number, or no changes)."
+            exit 1
           fi
           # Cap the diff so it can't exceed the model context window.
           if [ "$(wc -c < docs/test_generator/ci/diff.patch)" -gt "$MAX_DIFF_BYTES" ]; then
@@ -177,8 +223,10 @@ jobs:
           name: triage-context
           path: docs/test_generator/ci/
 
-      - name: Post triage comment
-        if: steps.resolve.outputs.pr_number != ''
+      - name: Post or update triage comment
+        # always() so a failed/empty run still updates the in-progress comment (never leaves it
+        # stuck on "in progress…"). Edits the ack comment in place; creates one if ack didn't run.
+        if: always() && steps.resolve.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -186,6 +234,7 @@ jobs:
             // Keep LLM-authored text out of any markdown that could render as active content.
             const clean = (s, max = 600) =>
               String(s ?? '').replace(/[<>]/g, '').slice(0, max);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             let body = '### 🤖 E2E Council — triage\n\n';
             try {
               const t = JSON.parse(fs.readFileSync('docs/test_generator/ci/triage.json', 'utf8'));
@@ -195,14 +244,22 @@ jobs:
               if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
               if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
               body += `\n**Rationale:** ${clean(t.rationale)}\n`;
+              body += `\n_Dry-run (v1 manual-first): no tests generated._`;
             } catch (e) {
-              body += `⚠️ Triage did not produce a decision file — check the run logs.\n`;
+              body += `❌ Triage did not produce a decision (the run may have failed or the diff was empty).\n\n[View run](${runUrl})`;
             }
-            body += `\n_Dry-run (v1 manual-first): no tests generated._`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: Number('${{ steps.resolve.outputs.pr_number }}'), body,
-            });
+            const commentId = '${{ steps.ack.outputs.comment_id }}';
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: Number(commentId), body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: Number('${{ steps.resolve.outputs.pr_number }}'), body,
+              });
+            }
 
   # ---------------------------------------------------------------------------
   # JOB 2 — Generate (Analyst → Architect → Engineer → Sentinel). No live env.

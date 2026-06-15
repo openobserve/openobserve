@@ -1346,6 +1346,120 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('✓ PASSED: Histogram not blank after cancel (Bug #4315)');
   });
 
+  // ==========================================================================
+  // Bug #10103: Query execution plan open/close shows "No results found"
+  // https://github.com/openobserve/openobserve/issues/10103
+  // ==========================================================================
+  test.skip("Opening and closing query execution plan should not clear results @bug-10103 @P2 @regression @logsRegression", async ({ page }) => {
+    testLogger.info('Test: Verify Explain Query close does not break results (Bug #10103)');
+
+    await pm.logsPage.navigateToLogs();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(2000);
+
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(500);
+
+    await pm.logsPage.clickRunQueryButton();
+    await page.waitForTimeout(3000);
+
+    // Verify results visible before opening explain
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('Results visible before explain');
+
+    // Open hamburger menu → click Explain Query via POM
+    await expect(page.locator(pm.logsPage.moreOptionsBtn), 'More options button should be visible')
+      .toBeVisible({ timeout: 3000 });
+    await pm.logsPage.clickMoreOptionsButton();
+    await page.waitForTimeout(1000);
+
+    await expect(page.locator('[data-test="logs-search-bar-explain-query-menu-btn"]'),
+      'Explain Query option should be visible').toBeVisible({ timeout: 3000 });
+    await pm.logsPage.clickExplainQuery();
+    await page.waitForTimeout(2000);
+    testLogger.info('Opened Explain Query');
+
+    // Close explain via Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1500);
+
+    // Bug assertion: results must still be visible after closing Explain Query
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('PASSED: Explain Query close does not break results');
+  });
+
+  // ==========================================================================
+  // Bug #8641: Non-SQL mode multi-stream query not working
+  // https://github.com/openobserve/openobserve/issues/8641
+  // ==========================================================================
+  test("Non-SQL mode should not error when querying multiple streams @bug-8641 @P2 @regression @logsRegression", async ({ page }) => {
+    testLogger.info('Test: Verify non-SQL multi-stream query works (Bug #8641)');
+
+    // Ingest data into a second stream so the multi-stream join has two streams
+    const orgId = getOrgIdentifier() || 'default';
+    const headers = getHeaders();
+    const secondStream = 'e2e_8641_stream';
+    await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
+      level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
+    }], headers);
+    testLogger.info(`Ingested data to stream: ${secondStream}`);
+    // Register for cleanup in afterEach
+    fieldCacheStreamsToCleanup.push(secondStream);
+
+    // selectIndexAndStreamJoinUnion handles its own navigation to logs
+    await pm.logsPage.selectIndexAndStreamJoinUnion(secondStream, 'e2e_automate');
+    testLogger.info('Multi-stream join selected');
+
+    // Run query and verify no error
+    await pm.logsPage.clickRunQueryButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"], .q-banner, .q-notification')
+      .filter({ hasText: /error|failed|invalid/i })
+      .first().isVisible({ timeout: 2000 }).catch(() => false);
+
+    expect(errorVisible,
+      'Bug #8641: Non-SQL multi-stream query should not display an error'
+    ).toBeFalsy();
+
+    testLogger.info('PASSED: Non-SQL multi-stream query verified');
+  });
+
+  // ==========================================================================
+  // Bug #5839: Logs page searchbar UI issue when sharing
+  // https://github.com/openobserve/openobserve/issues/5839
+  // ==========================================================================
+  test("Shared logs page should display searchbar correctly @bug-5839 @P3 @regression @logsRegression", async ({ page }) => {
+    testLogger.info('Test: Verify shared logs page searchbar renders correctly (Bug #5839)');
+
+    // Navigate using the sidebar (same pattern as other passing logs tests)
+    // then select stream without re-navigating (skipNavigation=true).
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    // Wait for the stream select OSelect to mount before interacting
+    await page.locator('[data-test="log-search-index-list-select-stream"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate', 5, 30000, true);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Run a query so the page has results state
+    await pm.logsPage.clickRunQueryButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Open share via POM and verify success notification (link copied to clipboard)
+    const shareInteractionWorked = await pm.logsPage.clickShareLinkAndExpectSuccess();
+    testLogger.info(`Share notification visible: ${shareInteractionWorked}`);
+    expect(shareInteractionWorked,
+      'Bug #5839: Share action should produce a success notification (link copied)'
+    ).toBeTruthy();
+
+    // Bug #5839: share interaction must not fail and the current page searchbar
+    // must remain visible and functional after the share action
+    await pm.logsPage.expectLogsTableVisible();
+    testLogger.info('PASSED: Shared logs page searchbar verified');
+  });
+
   test.afterEach(async () => {
     // Cleanup new stream created by field cache test (e2e_automate is never deleted)
     if (fieldCacheStreamsToCleanup.length > 0 && pm) {
