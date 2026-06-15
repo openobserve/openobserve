@@ -1,7 +1,14 @@
 name: E2E Council (Test Generation)
 
-# Manual-first, dry-run pipeline that generates Playwright E2E tests via OpenCode + DeepSeek.
-# v1 scope: OSS only. Dry-run posts a triage decision comment and stops (Jobs 2-4 are gated off).
+# Manual-first pipeline that generates Playwright E2E tests via OpenCode + DeepSeek.
+# v1 scope: OSS only. In dry-run it posts a triage decision comment and stops. With dry_run=false
+# it continues to generation: Job 1 triage → Job 2 generate (implemented) → Jobs 3-4 (scaffolds).
+#
+# ACCESS CONTROL (two gates):
+#   - TRIGGER: only the engineering-team ALLOWLIST (see the triage `if`) can start a run.
+#   - GENERATION (Jobs 2-4): only runs when the PR's AUTHOR is also on the allowlist (prinfo step).
+#     Strangers' PRs are ditched after triage — actually, before triage too: a non-allowlist
+#     author short-circuits the whole AI path (no DeepSeek call), leaving just a skip comment.
 #
 # REQUIRED SECRET: DEEPSEEK_API_KEY_E2E (repo Settings → Secrets and variables → Actions).
 #
@@ -63,15 +70,17 @@ jobs:
   # write run-context.json, and post the decision as a PR comment.
   # ---------------------------------------------------------------------------
   triage:
-    # Run for manual dispatch, or for a comment that is EXACTLY `/e2e` on a PR by a trusted
-    # author. Exact match (not `contains`) so "Generate /e2e", "/e2e please", etc. do NOT trigger
-    # — the job never starts, so there is no reaction, no comment, and no run for those.
+    # Trigger gate: the actor (commenter / dispatcher) must be on the engineering-team ALLOWLIST,
+    # AND it's either a manual dispatch or a comment that is EXACTLY `/e2e` on a PR. Exact match
+    # (not `contains`) so "Generate /e2e" etc. do NOT trigger — the job never starts (no reaction,
+    # no comment, no run). Allowlist mirrors .github/workflows/auto-assign-metadata.yml — keep in
+    # sync. (PR-AUTHOR is gated separately, in the prinfo step below, so strangers' PRs are ditched.)
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' &&
-       github.event.issue.pull_request &&
-       github.event.comment.body == '/e2e' &&
-       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      contains(fromJSON('["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"]'), github.actor) &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        github.event.comment.body == '/e2e'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -80,6 +89,9 @@ jobs:
       needs_e2e: ${{ steps.ctx.outputs.needs_e2e }}
       dry_run: ${{ steps.mode.outputs.dry_run }}
       pr_number: ${{ steps.resolve.outputs.pr_number }}
+      author_allowed: ${{ steps.prinfo.outputs.author_allowed }}
+      author: ${{ steps.prinfo.outputs.author }}
+      head_ref: ${{ steps.prinfo.outputs.head_ref }}
     steps:
       - name: Check required secret
         env:
@@ -109,6 +121,27 @@ jobs:
             if (!pr) core.setFailed(`Could not parse a PR number from input: "${raw}"`);
             core.setOutput('pr_number', pr);
 
+      - name: Inspect PR — author allowlist gate
+        # Gate the PR AUTHOR: we only generate tests for PRs authored by an allowlisted teammate.
+        # Strangers' PRs are ditched (Job 2-4 skip; the comment step posts a short skip notice).
+        # Keep this list in sync with the trigger allowlist above + auto-assign-metadata.yml.
+        id: prinfo
+        if: steps.resolve.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ALLOW = ["bjp232004","hengfeiyang","prabhatsharma","uddhavdave","oasisk","haohuaijin","Subhra264","Loaki07","007harshmahajan","chaitanya-sistla","ktx-kirtan","omkarK06","ktx-vaidehi","ktx-abhay","neha00290","ktx-akshay","ktx-sadhna","nikhilsaikethe","YashodhanJoshi1","ktx-riya","mmosarafO2","Shrinath-O2","ktx-mihir"].map(s => s.toLowerCase());
+            const pr = Number('${{ steps.resolve.outputs.pr_number }}');
+            const { data } = await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: pr,
+            });
+            const author = (data.user && data.user.login) ? data.user.login : '';
+            const allowed = ALLOW.includes(author.toLowerCase());
+            core.setOutput('author', author);
+            core.setOutput('author_allowed', allowed ? 'true' : 'false');
+            core.setOutput('head_ref', data.head ? data.head.ref : '');
+            core.info(`PR #${pr} author=@${author} allowed=${allowed} head=${data.head ? data.head.ref : '?'}`);
+
       - name: Determine dry-run mode
         id: mode
         run: |
@@ -123,7 +156,7 @@ jobs:
         # Give the user immediate feedback (within seconds) that the agent is working. We post a
         # placeholder comment now and EDIT it in place with the decision later (no extra noise).
         id: ack
-        if: steps.resolve.outputs.pr_number != ''
+        if: steps.resolve.outputs.pr_number != '' && steps.prinfo.outputs.author_allowed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -144,7 +177,11 @@ jobs:
             });
             core.setOutput('comment_id', data.id);
 
+      # From here down is the AI triage path — runs ONLY for allowlisted PR authors. Strangers'
+      # PRs are ditched here (no DeepSeek call, no diff sent to the model); the comment step posts
+      # a short skip notice instead.
       - uses: actions/checkout@v4
+        if: steps.prinfo.outputs.author_allowed == 'true'
         # SECURITY (untrusted-checkout TOCTOU / "pwn request"): this job is privileged — the
         # issue_comment trigger runs with repo secrets. So we check out ONLY the trusted default
         # branch (which provides the agent files). We NEVER check out the PR head; the PR change
@@ -153,16 +190,19 @@ jobs:
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
+        if: steps.prinfo.outputs.author_allowed == 'true'
         with:
           node-version: 20
 
       - name: Install OpenCode
+        if: steps.prinfo.outputs.author_allowed == 'true'
         run: |
           npm install -g opencode-ai || { echo "::error::OpenCode install failed (verify package name/version)"; exit 1; }
           command -v opencode >/dev/null || { echo "::error::opencode not on PATH after install"; exit 1; }
           opencode --version || true
 
       - name: Fetch diff + untrusted inputs as files
+        if: steps.prinfo.outputs.author_allowed == 'true'
         # The PR change is read as a DIFF via the API (data) — the PR head is never checked out.
         # Untrusted text (comment, hint) goes through env vars + files, never interpolated into a
         # shell command. The agent treats all of it as data, not instructions.
@@ -196,6 +236,7 @@ jobs:
           echo "diff bytes: $(wc -c < docs/test_generator/ci/diff.patch)"
 
       - name: Run Triage agent
+        if: steps.prinfo.outputs.author_allowed == 'true'
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
         run: |
@@ -204,6 +245,7 @@ jobs:
 
       - name: Parse run-context
         id: ctx
+        if: steps.prinfo.outputs.author_allowed == 'true'
         run: |
           f=docs/test_generator/ci/run-context.json
           if [ ! -f "$f" ]; then
@@ -218,6 +260,7 @@ jobs:
           echo "needs_e2e=$(jq -r '.needs_e2e' "$f")" >> "$GITHUB_OUTPUT"
 
       - name: Upload run context
+        if: steps.prinfo.outputs.author_allowed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: triage-context
@@ -235,18 +278,27 @@ jobs:
             const clean = (s, max = 600) =>
               String(s ?? '').replace(/[<>]/g, '').slice(0, max);
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            let body = '### 🤖 E2E Council — triage\n\n';
-            try {
-              const t = JSON.parse(fs.readFileSync('docs/test_generator/ci/triage.json', 'utf8'));
-              body += `- **Edition:** ${clean(t.edition, 20)}\n`;
-              body += `- **Needs E2E:** ${clean(t.needs_e2e, 10)}\n`;
-              body += `- **Skip:** ${clean(t.skip, 10)}${t.skip_reason ? ` — _${clean(t.skip_reason)}_` : ''}\n`;
-              if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
-              if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
-              body += `\n**Rationale:** ${clean(t.rationale)}\n`;
-              body += `\n_Dry-run (v1 manual-first): no tests generated._`;
-            } catch (e) {
-              body += `❌ Triage did not produce a decision (the run may have failed or the diff was empty).\n\n[View run](${runUrl})`;
+            const authorAllowed = '${{ steps.prinfo.outputs.author_allowed }}' === 'true';
+            let body = '### 🤖 E2E Council\n\n';
+            if (!authorAllowed) {
+              // Stranger PR: triage was not run at all (no DeepSeek call). Just say why.
+              const a = clean('${{ steps.prinfo.outputs.author }}', 40);
+              body += `Skipped — PR author${a ? ` @${a}` : ''} is not on the engineering-team allowlist (external PR). E2E test generation only runs for PRs authored by the team for now.`;
+            } else {
+              try {
+                const t = JSON.parse(fs.readFileSync('docs/test_generator/ci/triage.json', 'utf8'));
+                body += `- **Edition:** ${clean(t.edition, 20)}\n`;
+                body += `- **Needs E2E:** ${clean(t.needs_e2e, 10)}\n`;
+                body += `- **Skip:** ${clean(t.skip, 10)}${t.skip_reason ? ` — _${clean(t.skip_reason)}_` : ''}\n`;
+                if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
+                if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
+                body += `\n**Rationale:** ${clean(t.rationale)}\n`;
+                if ('${{ steps.mode.outputs.dry_run }}' === 'true') {
+                  body += `\n_Dry-run (v1 manual-first): no tests generated._`;
+                }
+              } catch (e) {
+                body += `❌ Triage did not produce a decision (the run may have failed or the diff was empty).\n\n[View run](${runUrl})`;
+              }
             }
             const commentId = '${{ steps.ack.outputs.comment_id }}';
             if (commentId) {
@@ -263,23 +315,85 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # JOB 2 — Generate (Analyst → Architect → Engineer → Sentinel). No live env.
-  # SCAFFOLD: gated off during dry-run. Implement when flipping the switch.
+  # Runs only for an allowlisted PR author (author_allowed), when not dry-run, not skipped, and
+  # E2E is warranted. This job READS THE PR's SOURCE to generate accurate tests — which is safe
+  # because the author is a trusted teammate (allowlist) and we restore the pipeline's own files
+  # (.opencode / opencode.jsonc / .github) from trusted main so a PR can't hijack the agents.
   # ---------------------------------------------------------------------------
   generate:
     needs: triage
-    if: needs.triage.outputs.dry_run == 'false' && needs.triage.outputs.skip == 'false' && needs.triage.outputs.needs_e2e == 'true'
+    if: >
+      needs.triage.outputs.dry_run == 'false' &&
+      needs.triage.outputs.skip == 'false' &&
+      needs.triage.outputs.needs_e2e == 'true' &&
+      needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - run: |
-          echo "TODO Job 2: checkout ref, download triage-context, install OpenCode, then run"
-          echo "  opencode run --agent e2e-ci-analyst   --model $PIPELINE_MODEL ..."
-          echo "  opencode run --agent e2e-ci-architect --model $PIPELINE_MODEL ..."
-          echo "  opencode run --agent e2e-ci-engineer  --model $PIPELINE_MODEL ..."
-          echo "  opencode run --agent e2e-ci-sentinel  --model $PIPELINE_MODEL ..."
-          echo "Gate on docs/test_generator/ci/sentinel-verdict.json (FAIL => stop). Upload artifacts."
-          echo "NOTE: the Engineer emits docs/test_generator/ci/playwright-registration.json;"
-          echo "a DETERMINISTIC step (not the LLM) applies the run_files edit in Job 4."
+      - name: Checkout PR head (feature source needed to generate accurate tests)
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ needs.triage.outputs.pr_number }}/head
+          fetch-depth: 0
+
+      - name: Restore pipeline files from trusted main (anti-hijack)
+        # Even though the author is trusted, run the pipeline's OWN definition from main — not
+        # whatever this PR happens to contain (it might be mid-edit, or unrelated). This pins the
+        # agent prompts, model config, and workflows to the reviewed main versions.
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- .opencode opencode.jsonc .github
+
+      - name: Download triage context
+        uses: actions/download-artifact@v4
+        with:
+          name: triage-context
+          path: docs/test_generator/ci/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai || { echo "::error::OpenCode install failed"; exit 1; }
+          command -v opencode >/dev/null || { echo "::error::opencode not on PATH"; exit 1; }
+          opencode --version || true
+
+      - name: Generate — Analyst → Architect → Engineer → Sentinel
+        env:
+          DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
+        run: |
+          set -e
+          run() { opencode run --agent "$1" --model "$PIPELINE_MODEL" "$2"; }
+          run e2e-ci-analyst   "Run your spec. Read docs/test_generator/ci/run-context.json, analyze the feature's source in this checkout, and write the Feature Design Document."
+          run e2e-ci-architect "Run your spec. Read run-context.json and the feature doc; write the prioritized Test Plan."
+          run e2e-ci-engineer  "Run your spec. Read run-context.json and the test plan; write the spec file + page-object changes and docs/test_generator/ci/playwright-registration.json. GENERATE ONLY — do not run tests."
+          run e2e-ci-sentinel  "Run your spec. Audit the generated spec/page objects; write docs/test_generator/ci/sentinel-verdict.json (and the audit report)."
+
+      - name: Enforce Sentinel verdict (block on critical)
+        run: |
+          v=docs/test_generator/ci/sentinel-verdict.json
+          [ -f "$v" ] || { echo "::error::Sentinel produced no verdict"; exit 1; }
+          verdict=$(jq -r '.verdict // "FAIL"' "$v"); crit=$(jq -r '.critical_count // 0' "$v")
+          echo "Sentinel verdict=$verdict critical=$crit"
+          if [ "$verdict" = "FAIL" ] || [ "$crit" -gt 0 ]; then
+            echo "::error::Sentinel blocked generation (critical issues). See audit report."; exit 1
+          fi
+
+      - name: Package generated test changes
+        # Capture ONLY the generated test code (not the restored-from-main pipeline files) as a
+        # patch that Job 4 applies onto the stacked branch.
+        run: |
+          git add tests/ui-testing >/dev/null 2>&1 || true
+          git diff --cached -- tests/ui-testing > docs/test_generator/ci/generated-tests.patch || true
+          echo "generated patch bytes: $(wc -c < docs/test_generator/ci/generated-tests.patch)"
+
+      - name: Upload generated output
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-tests
+          path: docs/test_generator/
 
   # ---------------------------------------------------------------------------
   # JOB 3 — Verify / Heal. Build + boot OSS local binary; Healer + Sentinel re-audit.
@@ -287,7 +401,7 @@ jobs:
   # ---------------------------------------------------------------------------
   verify_heal:
     needs: [triage, generate]
-    if: needs.triage.outputs.dry_run == 'false' && needs.triage.outputs.skip == 'false'
+    if: needs.triage.outputs.dry_run == 'false' && needs.triage.outputs.skip == 'false' && needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -305,7 +419,7 @@ jobs:
   # ---------------------------------------------------------------------------
   pr_back:
     needs: [triage, generate, verify_heal]
-    if: needs.triage.outputs.dry_run == 'false' && needs.triage.outputs.skip == 'false'
+    if: needs.triage.outputs.dry_run == 'false' && needs.triage.outputs.skip == 'false' && needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
