@@ -28,19 +28,17 @@ use crate::{
     service::llm_evaluations::score_configs::{self, ScoreConfigError},
 };
 
-impl From<ScoreConfigError> for Response {
-    fn from(value: ScoreConfigError) -> Self {
-        match value {
-            ScoreConfigError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            ScoreConfigError::MissingName => {
-                MetaHttpResponse::bad_request("Score config name cannot be empty")
-            }
-            ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
-            ScoreConfigError::DuplicateName => {
-                MetaHttpResponse::conflict("Score config name already exists")
-            }
-            ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
+fn score_config_error_response(value: ScoreConfigError) -> Response {
+    match value {
+        ScoreConfigError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        ScoreConfigError::MissingName => {
+            MetaHttpResponse::bad_request("Score config name cannot be empty")
         }
+        ScoreConfigError::NotFound => MetaHttpResponse::not_found("Score config not found"),
+        ScoreConfigError::DuplicateName => {
+            MetaHttpResponse::conflict("Score config name already exists")
+        }
+        ScoreConfigError::InUseByScorer => MetaHttpResponse::conflict(value),
     }
 }
 
@@ -88,7 +86,7 @@ pub async fn list_score_configs(
             let body: ListScoreConfigsResponseBody = list.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -123,7 +121,7 @@ pub async fn create_score_config(
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -155,7 +153,7 @@ pub async fn get_score_config(Path((org_id, entity_id)): Path<(String, String)>)
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -188,7 +186,7 @@ pub async fn list_score_config_versions(
             let body: ListScoreConfigVersionsResponseBody = versions.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -225,7 +223,7 @@ pub async fn update_score_config(
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 
@@ -255,7 +253,7 @@ pub async fn update_score_config(
 pub async fn delete_score_config(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match score_configs::delete_score_config(&org_id, &entity_id).await {
         Ok(()) => MetaHttpResponse::ok("Score config deactivated"),
-        Err(err) => err.into(),
+        Err(err) => score_config_error_response(err),
     }
 }
 

@@ -36,22 +36,18 @@ use crate::{
     },
 };
 
-impl From<ScorerError> for Response {
-    fn from(value: ScorerError) -> Self {
-        match value {
-            ScorerError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            ScorerError::MissingName => {
-                MetaHttpResponse::bad_request("Scorer name cannot be empty")
-            }
-            ScorerError::NotFound => MetaHttpResponse::not_found("Scorer not found"),
-            ScorerError::InvalidScorerType(_)
-            | ScorerError::ScorerTypeImmutable
-            | ScorerError::ProducesScoreConfigIdImmutable
-            | ScorerError::ScoreConfigVersionNotFound
-            | ScorerError::InvalidOutputSchema(_) => MetaHttpResponse::bad_request(value),
-            ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
-            ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
-        }
+fn scorer_error_response(value: ScorerError) -> Response {
+    match value {
+        ScorerError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        ScorerError::MissingName => MetaHttpResponse::bad_request("Scorer name cannot be empty"),
+        ScorerError::NotFound => MetaHttpResponse::not_found("Scorer not found"),
+        ScorerError::InvalidScorerType(_)
+        | ScorerError::ScorerTypeImmutable
+        | ScorerError::ProducesScoreConfigIdImmutable
+        | ScorerError::ScoreConfigVersionNotFound
+        | ScorerError::InvalidOutputSchema(_) => MetaHttpResponse::bad_request(value),
+        ScorerError::DuplicateName => MetaHttpResponse::conflict(value),
+        ScorerError::InUseByEvalJob => MetaHttpResponse::conflict(value),
     }
 }
 
@@ -103,7 +99,7 @@ pub async fn list_scorers(
             let body: ListScorersResponseBody = list.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -138,7 +134,7 @@ pub async fn create_scorer(
             let resp: ScorerResponseBody = s.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -170,7 +166,7 @@ pub async fn get_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Re
             let resp: ScorerResponseBody = s.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -201,7 +197,7 @@ pub async fn list_scorer_versions(Path((org_id, entity_id)): Path<(String, Strin
             let body: ListScorerVersionsResponseBody = versions.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -238,7 +234,7 @@ pub async fn update_scorer(
             let resp: ScorerResponseBody = s.into();
             MetaHttpResponse::json(resp)
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -268,7 +264,7 @@ pub async fn update_scorer(
 pub async fn delete_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match scorers::delete_scorer(&org_id, &entity_id).await {
         Ok(()) => MetaHttpResponse::ok("Scorer deactivated"),
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -299,7 +295,7 @@ pub async fn test_scorer(
 ) -> Response {
     match run_scorer_test(&org_id, &body).await {
         Ok(resp) => MetaHttpResponse::json(resp),
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
@@ -331,7 +327,7 @@ pub async fn preview_llm_judge_output_schema(
         Ok(output_schema) => {
             MetaHttpResponse::json(LlmJudgeOutputSchemaResponseBody { output_schema })
         }
-        Err(err) => err.into(),
+        Err(err) => scorer_error_response(err),
     }
 }
 
