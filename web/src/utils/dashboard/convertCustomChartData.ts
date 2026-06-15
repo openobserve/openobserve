@@ -199,7 +199,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
 
 
-const validateUserCode = (code: string): string | null => {
+export const validateUserCode = (code: string): string | null => {
   try {
     // Parse the code using Acorn
     const ast = acorn.parse(code, { ecmaVersion: 2020 }) as acorn.Node;
