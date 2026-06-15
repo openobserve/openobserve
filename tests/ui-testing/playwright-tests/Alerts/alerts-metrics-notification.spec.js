@@ -464,7 +464,7 @@ test.describe("Metrics Alert Notification Chain", () => {
             await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
             // Verify we landed on the metrics page
-            await expect(page.locator('[data-test="metrics-page"]'),
+            await expect(pm.metricsPage.metricsPageIndicator,
                 'Should be on the metrics page').toBeVisible({ timeout: 15000 });
             await expect(page,
                 'URL should be /web/metrics after redirect').toHaveURL(/\/web\/metrics/);
@@ -474,7 +474,7 @@ test.describe("Metrics Alert Notification Chain", () => {
                 'Metrics page should show the stream name').toBeVisible({ timeout: 10000 });
 
             // Verify data loaded — the Run Query button is no longer in loading state
-            await expect(page.locator('[data-test="metrics-apply"]'),
+            await expect(page.locator(pm.metricsPage.applyButton),
                 'Metrics page should have Run Query button').toBeVisible({ timeout: 10000 });
 
             testLogger.info('alert_url redirects to metrics page with data loaded');
