@@ -177,6 +177,15 @@ body.body--dark ::selection {
   color: var(--o2-text-placeholder);
 }
 
+// Suppress :focus-visible ring on dropdown triggers when Reka returns focus
+// after a pointer-based close. The data attribute is set by ODropdown.vue and
+// removed on blur — keyboard closes never set it so a11y is unaffected.
+[data-no-focus-visible]:focus,
+[data-no-focus-visible]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 3. Layout Utilities
 // ═══════════════════════════════════════════════════════════════

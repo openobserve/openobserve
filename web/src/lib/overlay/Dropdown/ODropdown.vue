@@ -58,15 +58,14 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
   // Reka-ui programmatically focuses the trigger after closing, which browsers
   // treat as keyboard-like and show :focus-visible — turning the icons purple.
-  // If the last interaction was pointer-based, blur the trigger to clear the ring.
-  // Keyboard closes (Escape/Enter) set lastWasPointer=false so focus correctly
-  // stays on the trigger for keyboard navigation.
+  // Mark the trigger with a data attribute so CSS can suppress the ring without
+  // blurring the element (blur is async via rAF and breaks E2E focus timing).
+  // Keyboard closes keep lastWasPointer=false so the ring stays for a11y.
   if (!v && lastWasPointer) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) {
-      requestAnimationFrame(() => {
-        if (document.activeElement === el) el.blur();
-      });
+      el.dataset.noFocusVisible = 'true';
+      el.addEventListener('blur', () => { delete el.dataset.noFocusVisible; }, { once: true });
     }
   }
 }
