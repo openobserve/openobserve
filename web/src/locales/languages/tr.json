@@ -424,7 +424,8 @@
     "invalidSql": "Geçersiz sorgu",
     "menuGroupExplain": "Açıklamak",
     "fieldValuesEmpty": "Değer bulunamadı.",
-    "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin."
+    "fieldValuesEmptyHint": "Değerleri görmek için daha geniş bir zaman aralığı deneyin.",
+    "selectLogsStreamFirst": "Önce Günlükler akışını seçin"
   },
   "menu": {
     "home": "Ana Sayfa",

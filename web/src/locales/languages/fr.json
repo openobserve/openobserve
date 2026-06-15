@@ -424,7 +424,8 @@
     "invalidSql": "Requête non valide",
     "menuGroupExplain": "Expliquez",
     "fieldValuesEmpty": "Aucune valeur n'a été trouvée.",
-    "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs."
+    "fieldValuesEmptyHint": "Essayez une plage de temps plus large pour voir les valeurs.",
+    "selectLogsStreamFirst": "Sélectionnez d'abord Logs stream"
   },
   "menu": {
     "home": "Accueil",
