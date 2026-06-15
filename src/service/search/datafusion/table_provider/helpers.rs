@@ -33,7 +33,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use hashbrown::HashMap;
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::{
     sampling::execution::generate_row_group_access_plan, vortex::generate_vortex_access_plan,
 };
@@ -94,7 +94,7 @@ fn generate_parquet_access_plan(
 
     for (start, end) in row_ids.set_slices() {
         if end > num_rows {
-            return None;
+            unreachable!("row_ids set slice end {end} exceeds num_rows {num_rows}");
         }
 
         row_group_selection.push_selected_range(start, end);
