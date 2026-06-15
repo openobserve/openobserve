@@ -501,60 +501,113 @@ export class DashboardPage {
     await this.page.keyboard.press('Delete');
   }
 
-  // Custom chart Monaco editor (data-test="dashboard-markdown-editor-query-editor")
-  // shares the page with the SQL query Monaco editor. Setting content via
-  // keyboard.insertText races against the subsequent .inputarea fill on the query
-  // editor — focus shifts before Monaco commits the chart code, leaving the chart
-  // empty when Apply runs (CI flake on custom-charts.spec.js). Set the model
-  // directly via Monaco's API and poll until the value sticks.
+  // Custom chart Monaco editor (data-test="dashboard-markdown-editor-query-editor").
+  // Drive the model via Monaco's API and confirm the value COMMITS into the panel
+  // schema (dashboardPanelData.data.customChartContent) — see _setEditorAndCommit.
   async setCustomChartCode(code) {
-    await this.page.waitForFunction(
-      (chartCode) => {
-        const host = document.querySelector('[data-test="dashboard-markdown-editor-query-editor"]');
-        if (!host || !window.monaco?.editor?.getEditors) return false;
-        const editor = window.monaco.editor.getEditors().find((ed) => {
-          const dom = ed.getDomNode?.();
-          return dom && host.contains(dom);
-        });
-        if (!editor) return false;
-        if (editor.getValue() !== chartCode) editor.setValue(chartCode);
-        return editor.getValue() === chartCode;
-      },
-      code,
-      { timeout: 10000 }
+    await this._setEditorAndCommit(
+      '[data-test="dashboard-markdown-editor-query-editor"]',
+      'customChartContent',
+      code
     );
-    // CodeQueryEditor debounces its update:query emit by 500ms — wait past the
-    // window so the panel schema receives the value before subsequent steps.
-    await this.page.waitForTimeout(600);
   }
 
   // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
-  // locator(".inputarea").fill() stopped overriding the model on main — the panel
-  // auto-generates a histogram query from the default-selected stream and the
-  // .fill() input is silently ignored, so panelSchema.queries[0].query stays
-  // whatever the auto-gen produced (or empty). Drive Monaco's model directly and
-  // poll to confirm the value lands before Apply.
+  // Drive the model via Monaco and confirm it COMMITS into
+  // dashboardPanelData.data.queries[i].query before Apply.
   async setDashboardPanelQuery(sql) {
-    await this.page.waitForFunction(
-      (query) => {
-        const host = document.querySelector('[data-test="dashboard-panel-query-editor"]');
-        if (!host || !window.monaco?.editor?.getEditors) return false;
-        const editor = window.monaco.editor.getEditors().find((ed) => {
-          const dom = ed.getDomNode?.();
-          return dom && host.contains(dom);
-        });
-        if (!editor) return false;
-        if (editor.getValue() !== query) editor.setValue(query);
-        return editor.getValue() === query;
-      },
-      sql,
-      { timeout: 10000 }
+    await this._setEditorAndCommit(
+      '[data-test="dashboard-panel-query-editor"]',
+      'query',
+      sql
     );
-    // CodeQueryEditor.vue:107 / 726 debounces its onDidChangeModelContent->
-    // emit('update:query') by 500ms. Without this wait, panelSchema.queries[i].query
-    // stays empty when Apply fires and the panel shows "Please enter query for
-    // custom chart" — even though the Monaco model already shows the SQL.
-    await this.page.waitForTimeout(600);
+  }
+
+  /**
+   * Set a Monaco editor's value AND confirm it has committed into the panel
+   * schema (`dashboardPanelData.data.*`) — the source of truth Apply validates.
+   *
+   * Why a re-set loop and not a single setValue + wait:
+   * CodeQueryEditor debounces its `update:query` emit (500ms). When an adjacent
+   * reactive change (e.g. setting customChartContent) re-renders/re-creates the
+   * editor, the pending debounced emit from our first setValue is discarded, so
+   * the value never reaches the schema and the query stays "". That left Apply
+   * showing "Please enter query for custom chart" and the unsafe-code validation
+   * (gated behind a non-empty query) never ran — the custom-charts flake. So each
+   * iteration we RE-set the model (re-arming the debounce) and re-check the
+   * committed schema value until it lands, surviving editor re-creation. The Vue
+   * vnode walk is the prod-safe way to read state (`__vueParentComponent` is
+   * dev-only in Vue 3).
+   *
+   * @param {string} selector  data-test selector of the editor host
+   * @param {'query'|'customChartContent'} field
+   * @param {string} value
+   */
+  async _setEditorAndCommit(selector, field, value, timeout = 20000) {
+    // Each attempt: (1) set the Monaco model so the editor visibly shows the
+    // value, and (2) write the value DIRECTLY into every reactive
+    // dashboardPanelData instance — the state Apply validates. Direct assignment
+    // is deterministic; it sidesteps the 500ms debounced update:query emit that
+    // gets dropped when an adjacent reactive change re-creates the editor (which
+    // left the schema query empty -> "Please enter query for custom chart" ->
+    // unsafe-code validation never ran). Returns once a re-read confirms it stuck.
+    const applyAndCheck = () =>
+      this.page.evaluate(
+        ({ selector, field, value }) => {
+          const norm = (s) => (typeof s === 'string' ? s.trim() : '');
+          // (1) editor model (display only)
+          const host = document.querySelector(selector);
+          const editor =
+            host && window.monaco?.editor?.getEditors
+              ? window.monaco.editor.getEditors().find((ed) => {
+                  const dom = ed.getDomNode?.();
+                  return dom && host.contains(dom);
+                })
+              : null;
+          if (editor && editor.getValue() !== value) editor.setValue(value);
+
+          // (2) write + verify the reactive panel state on every instance found
+          const app = document.querySelector('#app');
+          if (!app || !app._vnode) return false;
+          const visited = new Set();
+          let anyMatched = false;
+          const walk = (node, depth) => {
+            if (!node || depth > 80 || visited.has(node)) return;
+            visited.add(node);
+            const dpd = node.component?.setupState?.dashboardPanelData;
+            if (dpd && dpd.data) {
+              if (field === 'customChartContent') {
+                dpd.data.customChartContent = value;
+                if (norm(dpd.data.customChartContent) === norm(value)) anyMatched = true;
+              } else {
+                const idx = dpd.layout?.currentQueryIndex ?? 0;
+                if (dpd.data.queries?.[idx]) {
+                  dpd.data.queries[idx].query = value;
+                  if (norm(dpd.data.queries[idx].query) === norm(value)) anyMatched = true;
+                }
+              }
+            }
+            if (node.component?.subTree) walk(node.component.subTree, depth + 1);
+            if (Array.isArray(node.children)) {
+              for (const c of node.children) if (c && typeof c === 'object') walk(c, depth + 1);
+            }
+          };
+          walk(app._vnode, 0);
+          return anyMatched;
+        },
+        { selector, field, value }
+      );
+
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (await applyAndCheck()) {
+        // Let Vue reactivity flush before the next step / Apply.
+        await this.page.waitForTimeout(300);
+        return;
+      }
+      await this.page.waitForTimeout(400);
+    }
+    throw new Error(`_setEditorAndCommit: '${field}' never committed into the panel schema within ${timeout}ms`);
   }
 
 }
