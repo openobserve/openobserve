@@ -786,49 +786,46 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout the autoe2e branch (to register playwright.yml + push)
-        uses: actions/checkout@v4
-        with:
-          ref: autoe2e/${{ needs.triage.outputs.head_ref }}
-          fetch-depth: 1
-          persist-credentials: false
-
       - name: Download run metadata
         uses: actions/download-artifact@v4
         with:
           name: generated-meta
           path: meta/
 
-      - name: Register the spec in playwright.yml (deterministic; ORG_ADMIN_TOKEN may push workflows)
-        # Done HERE (not in generate) because GITHUB_TOKEN cannot push commits that touch
-        # .github/workflows/**. This job runs no untrusted code (git/gh only), so the org token is
-        # safe here. Applies the Engineer's playwright-registration.json via yq — the LLM never edits
-        # the workflow.
+      - name: Register the spec in playwright.yml via the Contents API (no PR-code checkout)
+        # GITHUB_TOKEN can't push commits touching .github/workflows/**, so this needs the
+        # ORG_ADMIN_TOKEN (it has the workflows scope). To keep that powerful token AWAY from any
+        # PR-authored code, we do NOT check out the branch — we read + write the single playwright.yml
+        # file via the Contents API and apply the run_files edit with yq. No PR code touches this
+        # runner, so there is no untrusted-checkout surface here. The LLM never edits the workflow.
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           ORIG_REF: ${{ needs.triage.outputs.head_ref }}
           REG: meta/playwright-registration.json
         run: |
-          set -e
+          set -euo pipefail
           BRANCH="autoe2e/${ORIG_REF}"
+          PW=.github/workflows/playwright.yml
           { [ -f "$REG" ] && jq -e 'has("group") and has("spec_filename")' "$REG" >/dev/null 2>&1; } \
             || { echo "::error::playwright-registration.json missing/invalid"; exit 1; }
           GROUP=$(jq -r '.group' "$REG"); FNAME=$(jq -r '.spec_filename' "$REG")
           echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' || { echo "::error::unsafe spec_filename: $FNAME"; exit 1; }
           export GROUP FNAME
-          yq -i '(.jobs.ui_integration_tests.strategy.matrix.include[] | select(.testfolder == strenv(GROUP)).run_files) += [strenv(FNAME)]' .github/workflows/playwright.yml
-          yq -e '.jobs.ui_integration_tests' .github/workflows/playwright.yml >/dev/null
-          grep -q "$FNAME" .github/workflows/playwright.yml || { echo "::error::registration did not apply (group '$GROUP' not found?)"; exit 1; }
-          if git diff --quiet -- .github/workflows/playwright.yml; then
-            echo "playwright.yml already registers $FNAME — nothing to commit."
-          else
-            git config user.name "openobserve-bot"
-            git config user.email "bot@openobserve.ai"
-            git add .github/workflows/playwright.yml
-            git commit -m "test(autoe2e): register ${FNAME} in playwright.yml"
-            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-            echo "Registered ${FNAME} in playwright.yml on ${BRANCH}."
+          # Fetch ONLY playwright.yml from the autoe2e branch (file content via API — not a checkout).
+          gh api "repos/${GITHUB_REPOSITORY}/contents/${PW}?ref=${BRANCH}" > /tmp/resp.json
+          SHA=$(jq -r '.sha' /tmp/resp.json)
+          jq -r '.content' /tmp/resp.json | tr -d '\n' | base64 -d > /tmp/pw.yml
+          if grep -q "$FNAME" /tmp/pw.yml; then
+            echo "playwright.yml already registers $FNAME — nothing to do."; exit 0
           fi
+          yq -i '(.jobs.ui_integration_tests.strategy.matrix.include[] | select(.testfolder == strenv(GROUP)).run_files) += [strenv(FNAME)]' /tmp/pw.yml
+          yq -e '.jobs.ui_integration_tests' /tmp/pw.yml >/dev/null
+          grep -q "$FNAME" /tmp/pw.yml || { echo "::error::registration did not apply (group '$GROUP' not found?)"; exit 1; }
+          NEWB64=$(base64 -w0 /tmp/pw.yml)
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/contents/${PW}" \
+            -f message="test(autoe2e): register ${FNAME} in playwright.yml" \
+            -f content="$NEWB64" -f sha="$SHA" -f branch="$BRANCH" >/dev/null
+          echo "Registered ${FNAME} in playwright.yml on ${BRANCH} (via Contents API; no checkout)."
 
       - name: Open (or refresh) the healed test PR + link it on the source PR
         env:
