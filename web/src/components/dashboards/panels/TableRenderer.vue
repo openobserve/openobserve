@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TenstackTable
       ref="tableRef"
       :rows="sortedRows"
-      :columns="data.columns || []"
+      :columns="displayColumns"
       :sort-by="localSortBy"
       :sort-order="localSortOrder"
       @sort-change="handleSortChange"
@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value-mapping="valueMapping"
           @update:override-config="onOverrideConfigUpdate"
           @edit-all="openEditAll"
+          @open-change="(open: boolean) => onFormatOpenChange(columnId, open)"
         />
       </template>
 
@@ -88,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :open="showEditAll"
       :columns="editAllColumns"
       :override-config="editAllModel"
+      :preview-data="previewByAlias"
+      :value-mapping="valueMapping"
       @close="showEditAll = false"
       @save="onOverrideConfigUpdate"
     />
@@ -196,6 +199,19 @@ export default defineComponent({
       return map;
     });
 
+    // Same preview data re-keyed by lowercased alias for the "Edit all" dialog,
+    // whose rows are keyed by the override alias rather than the TanStack id.
+    const previewByAlias = computed(() => {
+      const out: Record<string, { column: any; rows: any[] }> = {};
+      for (const data of Object.values(previewDataByColumn.value)) {
+        const alias = String(
+          (data as any).column?.alias ?? (data as any).column?.field ?? "",
+        ).toLowerCase();
+        if (alias) out[alias] = data as any;
+      }
+      return out;
+    });
+
     /** Find the converted column object for a TanStack column id (= field). */
     const columnObjFor = (columnId: string): any =>
       ((props.data?.columns as any[]) || []).find(
@@ -236,6 +252,18 @@ export default defineComponent({
     const openEditAll = () => {
       showEditAll.value = true;
     };
+
+    // Apply-on-close: freeze the rendered table's columns while a format popover
+    // is open so edits don't churn it mid-edit; the live preview still updates.
+    const frozenColumns = ref<any[] | null>(null);
+    const onFormatOpenChange = (_columnId: string, open: boolean) => {
+      frozenColumns.value = open
+        ? [...((props.data?.columns as any[]) || [])]
+        : null;
+    };
+    const displayColumns = computed(
+      () => frozenColumns.value ?? ((props.data?.columns as any[]) || []),
+    );
 
     /** Returns true when the hex colour is dark (needs white text). */
     const isDashboardColor = (hex: string): boolean => {
@@ -422,6 +450,7 @@ export default defineComponent({
       // inline column formatting
       overrideConfigs,
       previewDataByColumn,
+      previewByAlias,
       aliasForColumn,
       labelForColumn,
       isNumericColumn,
@@ -430,6 +459,8 @@ export default defineComponent({
       editAllModel,
       editAllColumns,
       openEditAll,
+      displayColumns,
+      onFormatOpenChange,
     };
   },
 });

@@ -14,24 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  InlineColumnFormat — the per-column header "Format" affordance + popover.
-
-  Brings the Column Formatting controls to the rendered table header (the same
-  "control on the column" pattern as Column Filtering). It is a SECOND editor
-  over the same `config.override_config` model the dialog edits: on every
-  change it serializes this one column and emits the full, upserted array so
-  the parent can write it back to the panel config (live preview).
-
-  Numeric-only sections (Value Format, Cell Type, Conditional) hide for text
-  columns, mirroring the dialog.
--->
+<!-- Per-column header "Format" affordance + popover — a second editor over the
+     same config.override_config model the dialog edits. Each change serializes
+     this column and emits the full upserted array (live preview). Numeric-only
+     sections hide for text columns. -->
 <template>
   <ODropdown
     side="bottom"
     align="end"
     :side-offset="6"
-    :persistent="2"
     @update:open="onOpenChange"
   >
     <template #trigger>
@@ -46,40 +37,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="tune"
           size="sm"
-          :class="
-            hasFormatting
-              ? 'tw:text-[var(--color-primary-600)]'
-              : 'tw:opacity-50'
-          "
+          :class="hasFormatting ? 'tw:text-[var(--color-primary-600)]' : 'tw:opacity-50'"
         />
       </OButton>
     </template>
 
     <!-- Popover panel -->
     <div
-      class="inline-format-panel"
+      class="inline-format-panel tw:w-[300px] tw:flex tw:flex-col tw:text-[0.8rem] tw:overflow-hidden"
       :data-test="`o2-table-column-format-panel-${field}`"
       @click.stop
       @keydown.stop
     >
       <!-- Header -->
-      <div class="ifp-head">
-        <div class="ifp-title">
-          <span class="ifp-title-label">{{ t("dashboard.formatColumn") }}</span>
+      <div class="tw:flex tw:items-center tw:shrink-0 tw:py-[9px] tw:px-3 tw:border-b tw:border-[rgba(128,128,128,0.16)]">
+        <div class="tw:flex tw:items-center tw:gap-[7px] tw:min-w-0">
+          <span class="tw:text-[length:var(--text-sm)] tw:font-medium tw:text-[var(--color-text-secondary,#757575)] tw:shrink-0">{{ t("dashboard.formatColumn") }}</span>
           <span class="ifp-title-field" :title="label">{{ label }}</span>
         </div>
       </div>
 
-      <div class="ifp-body">
-        <!-- PREVIEW -->
+      <div class="ifp-body tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:py-0.5 tw:divide-y tw:divide-[rgba(128,128,128,0.08)]">
+        <!-- Preview -->
         <div
           v-if="previewColumn && previewRows.length"
-          class="ifp-section ifp-preview"
+          class="tw:px-3 tw:py-2"
         >
-          <div class="o-input-label ifp-section-label">{{ t("dashboard.inlinePreview") }}</div>
-          <!-- wrap-cells disables TenstackTable's dashboard virtualizer (and its
-               ResizeObserver), which otherwise loops inside this popover. -->
-          <div class="ifp-preview-table">
+          <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.inlinePreview") }}</div>
+          <!-- wrap-cells disables the dashboard virtualizer (its ResizeObserver loops in the popover). -->
+          <div class="ifp-preview-table tw:border tw:border-[rgba(128,128,128,0.2)] tw:rounded-md tw:overflow-hidden tw:max-h-[150px]">
             <TableRenderer
               :data="previewTableData"
               :value-mapping="valueMapping"
@@ -88,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- VALUE FORMAT (numeric only) -->
-        <div v-if="isNumeric" class="ifp-section">
-          <div class="o-input-label ifp-section-label">
+        <!-- Value format (numeric only) -->
+        <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+          <div class="o-input-label tw:block tw:mb-1.5">
             {{ t("dashboard.sectionValueFormatting") }}
           </div>
           <OSelect
@@ -108,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- ALIGNMENT -->
-        <div class="ifp-section">
-          <div class="o-input-label ifp-section-label">
+        <!-- Alignment -->
+        <div class="tw:px-3 tw:py-2">
+          <div class="o-input-label tw:block tw:mb-1.5">
             {{ t("dashboard.sectionAlignment") }}
-            <span class="ifp-hint">· {{ t("dashboard.tapActiveToClear") }}</span>
+            <span class="tw:font-normal tw:opacity-60">· {{ t("dashboard.tapActiveToClear") }}</span>
           </div>
           <OToggleGroup
-            class="ifp-seg"
+            class="ifp-seg tw:h-8"
             type="single"
             :model-value="col.alignment"
             @update:model-value="setAlignment"
@@ -133,12 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
 
-        <!-- CELL TYPE (numeric only) -->
-        <div v-if="isNumeric" class="ifp-section">
-          <div class="o-input-label ifp-section-label">
+        <!-- Cell type (numeric only) -->
+        <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+          <div class="o-input-label tw:block tw:mb-1.5">
             {{ t("dashboard.sectionCellType") }}
           </div>
-          <OToggleGroup v-model="col.cellType" type="single" class="ifp-seg">
+          <OToggleGroup v-model="col.cellType" type="single" class="ifp-seg tw:h-8">
             <OToggleGroupItem
               v-for="ct in cellTypeOptionsCompact"
               :key="ct.value"
@@ -152,15 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'"
-            class="ifp-cs-row"
+            class="tw:flex tw:flex-col tw:gap-3 tw:mt-2.5"
           >
-            <div class="ifp-cs-col">
-              <span class="o-input-label ifp-cs-label">{{ t("dashboard.cellColor") }}</span>
-              <ColorSwatchPicker v-model="col.progressColor" :swatches="ACCENT_SWATCHES" />
-            </div>
-            <div v-if="col.cellType === 'sparkline'" class="ifp-cs-col">
-              <span class="o-input-label ifp-cs-label">{{ t("dashboard.sparklineStyle") }}</span>
-              <OToggleGroup v-model="col.sparklineStyle" type="single" class="ifp-seg">
+            <div v-if="col.cellType === 'sparkline'" class="tw:flex tw:flex-col tw:gap-1.5">
+              <span class="o-input-label tw:block">{{ t("dashboard.sparklineStyle") }}</span>
+              <OToggleGroup v-model="col.sparklineStyle" type="single" class="ifp-seg tw:h-8 tw:self-start">
                 <OToggleGroupItem
                   v-for="s in sparklineStyleOptions"
                   :key="s.value"
@@ -172,24 +154,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
+            <div class="tw:flex tw:flex-col tw:gap-1.5">
+              <span class="o-input-label tw:block">{{ t("dashboard.cellColor") }}</span>
+              <ColorSwatchPicker v-model="col.progressColor" :swatches="ACCENT_SWATCHES" />
+            </div>
           </div>
         </div>
 
-        <!-- STYLING -->
-        <div class="ifp-section">
-          <div class="o-input-label ifp-section-label">{{ t("dashboard.sectionStyling") }}</div>
-          <div class="ifp-subrow">
-            <span class="o-input-label ifp-inline-label">{{ t("dashboard.textColor") }}</span>
+        <!-- Styling -->
+        <div class="tw:px-3 tw:py-2">
+          <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
+            <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.textColor") }}</span>
             <ColorSwatchPicker v-model="col.textColor" :swatches="TEXT_SWATCHES" />
           </div>
-          <div class="ifp-subrow">
-            <span class="o-input-label ifp-inline-label">{{ t("dashboard.bgColor") }}</span>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
+            <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.bgColor") }}</span>
             <ColorSwatchPicker v-model="col.bgColor" :swatches="BG_SWATCHES" />
           </div>
           <button
             type="button"
-            class="ifp-toggle-box tw:mt-3"
-            :class="{ 'ifp-toggle-box--active': col.autoColor }"
+            class="tw:inline-flex tw:items-center tw:gap-2 tw:py-1.5 tw:px-2.5 tw:mt-3 tw:rounded-md tw:border tw:border-[rgba(128,128,128,0.28)] tw:bg-transparent tw:cursor-pointer tw:text-left tw:transition-colors tw:hover:border-[var(--color-primary-600)]"
+            :class="{ 'ifp-toggle-active': col.autoColor }"
             :data-test="`o2-format-unique-color-${field}`"
             @click="col.autoColor = !col.autoColor"
           >
@@ -198,53 +184,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               class="tw:pointer-events-none"
             />
-            <span class="o-input-label ifp-toggle-label">{{
+            <span class="o-input-label tw:cursor-pointer">{{
               t("dashboard.overrideConfigUniqueValueColor")
             }}</span>
           </button>
         </div>
 
-        <!-- CONDITIONAL (numeric only) -->
-        <div v-if="isNumeric" class="ifp-section">
-          <div class="o-input-label ifp-section-label">
+        <!-- Conditional (numeric only) -->
+        <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+          <div class="o-input-label tw:block tw:mb-1.5">
             {{ t("dashboard.sectionConditionalStyling") }}
           </div>
-          <div v-if="!col.conditions.length" class="ifp-empty">
+          <div
+            v-if="!col.conditions.length"
+            class="tw:text-[length:var(--text-sm)] tw:text-[var(--color-text-secondary,#9e9e9e)] tw:mb-1.5"
+          >
             {{ t("dashboard.conditionNoRules") }}
           </div>
           <div
             v-for="(rule, ruleIdx) in col.conditions"
             :key="ruleIdx"
-            class="ifp-rule"
+            class="tw:flex tw:items-start tw:gap-1 tw:mb-1.5"
           >
-            <div class="ifp-rule-top">
-              <OSelect
-                v-model="rule.operator"
-                :options="conditionOperators"
-                class="ifp-op"
-              />
-              <OInput
-                v-model="rule.threshold"
-                type="number"
-                :placeholder="t('dashboard.conditionThreshold')"
-                class="ifp-grow"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                icon-left="delete-outline"
-                :title="t('common.remove')"
-                @click="col.conditions.splice(ruleIdx, 1)"
-              />
+            <div class="tw:flex-1 tw:min-w-0 tw:py-[7px] tw:px-2 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]">
+              <div class="tw:flex tw:items-center tw:gap-1.5">
+                <div class="tw:w-[64px] tw:shrink-0">
+                  <OSelect
+                    v-model="rule.operator"
+                    :options="conditionOperators"
+                    class="tw:w-full"
+                  />
+                </div>
+                <OInput
+                  v-model="rule.threshold"
+                  type="number"
+                  :placeholder="t('dashboard.conditionThreshold')"
+                  class="tw:flex-1 tw:min-w-0"
+                />
+              </div>
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
+                <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.textColor") }}</span>
+                <ColorSwatchPicker v-model="rule.textColor" :swatches="COND_TEXT_SWATCHES" />
+              </div>
+              <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
+                <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.bgColor") }}</span>
+                <ColorSwatchPicker v-model="rule.bgColor" :swatches="COND_BG_SWATCHES" />
+              </div>
             </div>
-            <div class="ifp-rule-colors">
-              <span class="o-input-label ifp-inline-label ifp-inline-label--muted">{{ t("dashboard.textColor") }}</span>
-              <ColorSwatchPicker v-model="rule.textColor" :swatches="COND_TEXT_SWATCHES" />
-            </div>
-            <div class="ifp-rule-colors">
-              <span class="o-input-label ifp-inline-label ifp-inline-label--muted">{{ t("dashboard.bgColor") }}</span>
-              <ColorSwatchPicker v-model="rule.bgColor" :swatches="COND_BG_SWATCHES" />
-            </div>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="close"
+              :title="t('common.remove')"
+              class="tw:shrink-0 tw:mt-2"
+              @click="col.conditions.splice(ruleIdx, 1)"
+            />
           </div>
           <OButton
             variant="outline"
@@ -259,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Footer -->
-      <div class="ifp-foot">
+      <div class="tw:flex tw:items-center tw:shrink-0 tw:gap-2 tw:py-2 tw:px-3 tw:border-t tw:border-[rgba(128,128,128,0.16)]">
         <OButton
           variant="outline"
           size="sm"
@@ -271,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div class="tw:flex-1" />
         <OButton
-          variant="secondary"
+          variant="outline-primary"
           size="sm"
           icon-right="open-in-full"
           :data-test="`o2-table-format-editall-${field}`"
@@ -353,7 +347,7 @@ export default defineComponent({
     /** Panel value mappings, forwarded to the preview table. */
     valueMapping: { type: Array as PropType<any[]>, default: () => [] },
   },
-  emits: ["update:override-config", "edit-all"],
+  emits: ["update:override-config", "edit-all", "open-change"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const { unitOptions, sparklineStyleOptions, conditionOperators } =
@@ -394,6 +388,8 @@ export default defineComponent({
 
     const onOpenChange = (open: boolean) => {
       if (open) loadFromProps();
+      // Parent freezes (apply-on-close) the rendered table while open.
+      emit("open-change", open);
     };
 
     // Push every change up as a full, upserted override_config array (live).
@@ -412,15 +408,11 @@ export default defineComponent({
       { deep: true },
     );
 
-    // OToggleGroup blocks empty emits (single-select can't deselect via the
-    // model), so support "tap active to clear" by clearing on a direct click of
-    // the active item; picking a different item flows through @update:model-value.
+    // Tap-active-to-clear: OToggleGroup blocks empty emits, so snapshot in the
+    // capture phase and clear only when the already-active item is re-clicked.
     const setAlignment = (v: any) => {
       col.alignment = (v as string) || "";
     };
-    // OToggleGroup blocks empty emits, so support "tap active to clear" by
-    // snapshotting the alignment in the capture phase (before reka processes the
-    // click) and clearing only when the already-active item is re-clicked.
     let alignSnapshot = "";
     const onAlignPointerDown = () => {
       alignSnapshot = col.alignment;
@@ -449,8 +441,7 @@ export default defineComponent({
       ),
     );
 
-    // Stable data object for the mini preview TableRenderer — only changes when
-    // the (already-stable) column/rows props change.
+    // Stable data object for the mini preview TableRenderer.
     const previewTableData = computed(() => ({
       rows: props.previewRows,
       columns: props.previewColumn ? [props.previewColumn] : [],
@@ -483,45 +474,12 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+// Cap to the dropdown's available height so it scrolls inside, never clips.
 .inline-format-panel {
-  width: 300px;
-  // Cap to the space the dropdown actually has so it never overflows a small
-  // screen — the body scrolls inside instead of getting clipped.
-  max-height: min(
-    560px,
-    var(--reka-dropdown-menu-content-available-height, 72vh)
-  );
-  display: flex;
-  flex-direction: column;
-  font-size: 0.8rem;
-  overflow: hidden;
+  max-height: min(560px, var(--reka-dropdown-menu-content-available-height, 72vh));
 }
 
-// ── Header ──────────────────────────────────────────────────────────────────
-.ifp-head {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 9px 12px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.16);
-}
-
-.ifp-title {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-// "Format column" reads as a muted prefix so the field name is the focal point.
-.ifp-title-label {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary, #757575);
-  flex-shrink: 0;
-}
-
-// Field name as a distinct code chip — easy to scan at a glance.
+// Field-name code chip (themed).
 .ifp-title-field {
   font-family: monospace;
   font-weight: 700;
@@ -535,18 +493,13 @@ export default defineComponent({
   text-overflow: ellipsis;
   max-width: 170px;
 }
-
 .body--dark .ifp-title-field {
   background: rgba(255, 255, 255, 0.12);
   color: #e8e8e8;
 }
 
-// ── Body ────────────────────────────────────────────────────────────────────
+// Body scrollbar (layout is utilities).
 .ifp-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 2px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
 
@@ -559,183 +512,32 @@ export default defineComponent({
   }
 }
 
-.ifp-section {
-  padding: 8px 12px;
-
-  & + & {
-    border-top: 1px solid rgba(128, 128, 128, 0.08);
-  }
+// Segmented switchers: child buttons fill the 32px outer height.
+.ifp-seg :deep(button) {
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
-// Section labels reuse the global .o-input-label spec (sentence-case, 13px,
-// weight 500) so they match every other field label in the config panel.
-.ifp-section-label {
-  display: block;
-  margin-bottom: 6px;
+// "Unique value color" toggle — active tint (color-mix has no Tailwind form).
+.ifp-toggle-active {
+  border-color: var(--color-primary-600, #1976d2) !important;
+  background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent) !important;
 }
 
-.ifp-hint {
-  font-weight: 400;
-  opacity: 0.6;
-}
-
-.ifp-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ifp-grow {
-  flex: 1;
-  min-width: 0;
-}
-
-.ifp-subrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.ifp-inline-label {
-  flex-shrink: 0;
-  min-width: 64px;
-
-  &--muted {
-    color: var(--color-text-secondary, #9e9e9e);
-    min-width: 64px;
-  }
-}
-
-// Segmented switchers (alignment / cell type / style): natural width, with a
-// uniform 32px outer height that matches the OSelect/OInput controls.
-.ifp-seg {
-  height: 32px;
-
-  :deep(button) {
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-}
-
-// Cell-type Color + Style sit side by side (label above each), per the design.
-.ifp-cs-row {
-  display: flex;
-  gap: 18px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.ifp-cs-col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ifp-cs-label {
-  display: block;
-}
-
-// "Unique value color" — bordered toggle box that highlights when active.
-.ifp-toggle-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid rgba(128, 128, 128, 0.28);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.12s, background 0.12s;
-
-  &:hover {
-    border-color: var(--color-primary-600, #1976d2);
-  }
-
-  &--active {
-    border-color: var(--color-primary-600, #1976d2);
-    background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent);
-  }
-}
-
-.ifp-toggle-label {
-  cursor: pointer;
-}
-
-// Empty state for the conditional section.
-.ifp-empty {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary, #9e9e9e);
-  margin-bottom: 6px;
-}
-
-// ── Preview ─────────────────────────────────────────────────────────────────
-// A compact, header-less mini TableRenderer rendering just this column, so the
-// preview shows the real cells (progress bars / sparklines / conditional colors).
+// Mini preview: header-less, full-width column, no copy button.
 .ifp-preview-table {
-  border: 1px solid rgba(128, 128, 128, 0.2);
-  border-radius: 6px;
-  overflow: hidden;
-  max-height: 150px;
-
-  // The popover title already names the column; drop the table header + footer.
   :deep(thead) {
     display: none;
   }
-
   :deep([data-test="dashboard-table-pagination"]) {
     display: none;
   }
-
-  // Single preview column fills the box, so progress-bar tracks span the full
-  // column width (otherwise the cell sizes to content and the track is a sliver).
   :deep(.copy-cell-td) {
     width: 100% !important;
     max-width: none !important;
   }
-
-  // Hide the per-cell copy-to-clipboard button in the preview.
   :deep([data-test="dashboard-table-cell-copy-btn"]) {
     display: none !important;
   }
-}
-
-// ── Conditional rules ───────────────────────────────────────────────────────
-.ifp-rule {
-  padding: 7px 8px;
-  background: rgba(128, 128, 128, 0.04);
-  border: 1px solid rgba(128, 128, 128, 0.1);
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.ifp-rule-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ifp-op {
-  width: 64px;
-  flex-shrink: 0;
-}
-
-.ifp-rule-colors {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 7px;
-}
-
-// ── Footer ──────────────────────────────────────────────────────────────────
-.ifp-foot {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  padding: 8px 12px;
-  border-top: 1px solid rgba(128, 128, 128, 0.16);
 }
 </style>

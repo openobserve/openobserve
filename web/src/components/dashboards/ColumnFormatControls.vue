@@ -14,20 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ColumnFormatControls — the shared formatting control sections (Value Format,
-  Alignment, Cell Type, Styling, Conditional) used by BOTH the inline header
-  popover (InlineColumnFormat) and the full Column Formatting dialog
-  (OverrideConfigPopup), so the two editors look and behave identically.
-
-  Operates directly on a reactive ColumnOverrideUI object (mutated in place).
-  Numeric-only sections hide when `isNumeric` is false.
--->
+<!-- Shared formatting sections (Value Format, Alignment, Cell Type, Styling,
+     Conditional) used by both the inline popover and the "Edit all" dialog.
+     Mutates the ColumnOverrideUI in place; numeric-only sections hide when not numeric. -->
 <template>
-  <div class="cf-controls">
-    <!-- VALUE FORMATTING (numeric only) -->
-    <div v-if="isNumeric" class="cf-section">
-      <div class="o-input-label cf-section-label">
+  <div class="tw:divide-y tw:divide-[rgba(128,128,128,0.08)]">
+    <!-- Value formatting (numeric only) -->
+    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
       <OSelect
@@ -45,14 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- ALIGNMENT -->
-    <div class="cf-section">
-      <div class="o-input-label cf-section-label">
+    <!-- Alignment -->
+    <div class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">
         {{ t("dashboard.sectionAlignment") }}
-        <span class="cf-hint">· {{ t("dashboard.tapActiveToClear") }}</span>
+        <span class="tw:font-normal tw:opacity-60">· {{ t("dashboard.tapActiveToClear") }}</span>
       </div>
       <OToggleGroup
-        class="cf-seg"
+        class="cf-seg tw:h-8"
         type="single"
         :model-value="col.alignment"
         @update:model-value="setAlignment"
@@ -70,12 +64,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- CELL TYPE (numeric only) -->
-    <div v-if="isNumeric" class="cf-section">
-      <div class="o-input-label cf-section-label">
+    <!-- Cell type (numeric only) -->
+    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">
         {{ t("dashboard.sectionCellType") }}
       </div>
-      <OToggleGroup v-model="col.cellType" type="single" class="cf-seg">
+      <OToggleGroup v-model="col.cellType" type="single" class="cf-seg tw:h-8">
         <OToggleGroupItem
           v-for="ct in cellTypeOptionsCompact"
           :key="ct.value"
@@ -89,15 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="col.cellType === 'progress_bar' || col.cellType === 'sparkline'"
-        class="cf-cs-row"
+        class="tw:flex tw:flex-col tw:gap-3 tw:mt-2.5"
       >
-        <div class="cf-cs-col">
-          <span class="o-input-label">{{ t("dashboard.cellColor") }}</span>
-          <ColorSwatchPicker v-model="col.progressColor" :swatches="ACCENT_SWATCHES" />
-        </div>
-        <div v-if="col.cellType === 'sparkline'" class="cf-cs-col">
+        <div v-if="col.cellType === 'sparkline'" class="tw:flex tw:flex-col tw:gap-1.5">
           <span class="o-input-label">{{ t("dashboard.sparklineStyle") }}</span>
-          <OToggleGroup v-model="col.sparklineStyle" type="single" class="cf-seg">
+          <OToggleGroup v-model="col.sparklineStyle" type="single" class="cf-seg tw:h-8 tw:self-start">
             <OToggleGroupItem
               v-for="s in sparklineStyleOptions"
               :key="s.value"
@@ -109,78 +99,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
         </div>
+        <div class="tw:flex tw:flex-col tw:gap-1.5">
+          <span class="o-input-label">{{ t("dashboard.cellColor") }}</span>
+          <ColorSwatchPicker v-model="col.progressColor" :swatches="ACCENT_SWATCHES" />
+        </div>
       </div>
     </div>
 
-    <!-- STYLING -->
-    <div class="cf-section">
-      <div class="o-input-label cf-section-label">{{ t("dashboard.sectionStyling") }}</div>
-      <div class="cf-subrow">
-        <span class="o-input-label cf-inline-label">{{ t("dashboard.textColor") }}</span>
+    <!-- Styling -->
+    <div class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
+        <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.textColor") }}</span>
         <ColorSwatchPicker v-model="col.textColor" :swatches="TEXT_SWATCHES" />
       </div>
-      <div class="cf-subrow">
-        <span class="o-input-label cf-inline-label">{{ t("dashboard.bgColor") }}</span>
+      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
+        <span class="o-input-label tw:shrink-0 tw:min-w-16">{{ t("dashboard.bgColor") }}</span>
         <ColorSwatchPicker v-model="col.bgColor" :swatches="BG_SWATCHES" />
       </div>
       <button
         type="button"
-        class="cf-toggle-box tw:mt-3"
-        :class="{ 'cf-toggle-box--active': col.autoColor }"
+        class="tw:inline-flex tw:items-center tw:gap-2 tw:py-1.5 tw:px-2.5 tw:mt-3 tw:rounded-md tw:border tw:border-[rgba(128,128,128,0.28)] tw:bg-transparent tw:cursor-pointer tw:text-left tw:transition-colors tw:hover:border-[var(--color-primary-600)]"
+        :class="{ 'cf-toggle-active': col.autoColor }"
         @click="col.autoColor = !col.autoColor"
       >
-        <OCheckbox
-          :model-value="col.autoColor"
-          size="sm"
-          class="tw:pointer-events-none"
-        />
-        <span class="o-input-label cf-toggle-label">{{
+        <OCheckbox :model-value="col.autoColor" size="sm" class="tw:pointer-events-none" />
+        <span class="o-input-label tw:cursor-pointer">{{
           t("dashboard.overrideConfigUniqueValueColor")
         }}</span>
       </button>
     </div>
 
-    <!-- CONDITIONAL (numeric only) -->
-    <div v-if="isNumeric" class="cf-section">
-      <div class="o-input-label cf-section-label">
+    <!-- Conditional (numeric only) -->
+    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
+      <div class="o-input-label tw:block tw:mb-1.5">
         {{ t("dashboard.sectionConditionalStyling") }}
       </div>
-      <div v-if="!col.conditions.length" class="cf-empty">
+      <div
+        v-if="!col.conditions.length"
+        class="tw:text-[length:var(--text-sm)] tw:text-[var(--color-text-secondary,#9e9e9e)] tw:mb-1.5"
+      >
         {{ t("dashboard.conditionNoRules") }}
       </div>
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="cf-rule"
+        class="tw:flex tw:items-start tw:gap-1 tw:mb-1.5"
       >
-        <div class="cf-rule-top">
-          <OSelect
-            v-model="rule.operator"
-            :options="conditionOperators"
-            class="cf-op"
-          />
-          <OInput
-            v-model="rule.threshold"
-            type="number"
-            :placeholder="t('dashboard.conditionThreshold')"
-            class="cf-grow"
-          />
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="delete-outline"
-            :title="t('common.remove')"
-            @click="col.conditions.splice(ruleIdx, 1)"
-          />
+        <div class="tw:flex-1 tw:min-w-0 tw:py-[7px] tw:px-2 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]">
+          <div class="tw:flex tw:items-center tw:gap-1.5">
+            <div class="tw:w-[64px] tw:shrink-0">
+              <OSelect
+                v-model="rule.operator"
+                :options="conditionOperators"
+                class="tw:w-full"
+              />
+            </div>
+            <OInput
+              v-model="rule.threshold"
+              type="number"
+              :placeholder="t('dashboard.conditionThreshold')"
+              class="tw:flex-1 tw:min-w-0"
+            />
+          </div>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
+            <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.textColor") }}</span>
+            <ColorSwatchPicker v-model="rule.textColor" :swatches="COND_TEXT_SWATCHES" />
+          </div>
+          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-[7px]">
+            <span class="o-input-label tw:shrink-0 tw:min-w-16 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.bgColor") }}</span>
+            <ColorSwatchPicker v-model="rule.bgColor" :swatches="COND_BG_SWATCHES" />
+          </div>
         </div>
-        <div class="cf-rule-colors">
-          <span class="o-input-label cf-inline-label cf-inline-label--muted">{{ t("dashboard.textColor") }}</span>
-          <ColorSwatchPicker v-model="rule.textColor" :swatches="COND_TEXT_SWATCHES" />
-        </div>
-        <div class="cf-rule-colors">
-          <span class="o-input-label cf-inline-label cf-inline-label--muted">{{ t("dashboard.bgColor") }}</span>
-          <ColorSwatchPicker v-model="rule.bgColor" :swatches="COND_BG_SWATCHES" />
-        </div>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="close"
+          :title="t('common.remove')"
+          class="tw:shrink-0 tw:mt-2"
+          @click="col.conditions.splice(ruleIdx, 1)"
+        />
       </div>
       <OButton
         variant="outline"
@@ -226,9 +224,7 @@ export default defineComponent({
     ColorSwatchPicker,
   },
   props: {
-    /** The reactive column-override object being edited (mutated in place). */
     col: { type: Object as PropType<ColumnOverrideUI>, required: true },
-    /** Numeric columns get value-format / cell-type / conditional sections. */
     isNumeric: { type: Boolean, default: false },
   },
   setup(props) {
@@ -252,9 +248,7 @@ export default defineComponent({
       bar: "bar-chart",
     };
 
-    // Alignment: OToggleGroup blocks empty emits, so support "tap active to
-    // clear" by snapshotting before reka handles the click (capture phase) and
-    // clearing only when the already-active item is re-clicked.
+    // Tap-active-to-clear: snapshot before reka handles the click, clear if re-clicked.
     const setAlignment = (v: any) => {
       props.col.alignment = (v as string) || "";
     };
@@ -288,128 +282,15 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-.cf-section {
-  padding: 8px 12px;
-
-  & + & {
-    border-top: 1px solid rgba(128, 128, 128, 0.08);
-  }
+// Segmented switchers: child buttons fill the 32px outer height.
+.cf-seg :deep(button) {
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
-.cf-section-label {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.cf-hint {
-  font-weight: 400;
-  opacity: 0.6;
-}
-
-.cf-subrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.cf-inline-label {
-  flex-shrink: 0;
-  min-width: 64px;
-
-  &--muted {
-    color: var(--color-text-secondary, #9e9e9e);
-    min-width: 64px;
-  }
-}
-
-.cf-grow {
-  flex: 1;
-  min-width: 0;
-}
-
-// Segmented switchers: natural width, uniform 32px height matching the selects.
-.cf-seg {
-  height: 32px;
-
-  :deep(button) {
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-}
-
-// Cell-type Color + Style side by side (label above each).
-.cf-cs-row {
-  display: flex;
-  gap: 18px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.cf-cs-col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-// "Unique value color" — bordered toggle box that highlights when active.
-.cf-toggle-box {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid rgba(128, 128, 128, 0.28);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.12s, background 0.12s;
-
-  &:hover {
-    border-color: var(--color-primary-600, #1976d2);
-  }
-
-  &--active {
-    border-color: var(--color-primary-600, #1976d2);
-    background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent);
-  }
-}
-
-.cf-toggle-label {
-  cursor: pointer;
-}
-
-.cf-empty {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary, #9e9e9e);
-  margin-bottom: 6px;
-}
-
-// ── Conditional rules ───────────────────────────────────────────────────────
-.cf-rule {
-  padding: 7px 8px;
-  background: rgba(128, 128, 128, 0.04);
-  border: 1px solid rgba(128, 128, 128, 0.1);
-  border-radius: 6px;
-  margin-bottom: 6px;
-}
-
-.cf-rule-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cf-op {
-  width: 64px;
-  flex-shrink: 0;
-}
-
-.cf-rule-colors {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 7px;
+// "Unique value color" toggle — active tint (color-mix has no Tailwind form).
+.cf-toggle-active {
+  border-color: var(--color-primary-600, #1976d2) !important;
+  background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent) !important;
 }
 </style>
