@@ -70,6 +70,14 @@ test.describe("Custom Charts Tests", () => {
     await pm.dashboardPage.setCustomChartCode(lineJSON);
     await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForTimeout(3000);
+
+    // line.json is SAFE ECharts code (no forbidden identifiers), so Apply must
+    // actually render the chart — NOT surface a validation/empty-query error.
+    // (Previously this test only waited 3s and asserted nothing.)
+    await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+    await expect(page.getByText("Unsafe code detected")).toBeHidden();
+    await expect(
+      page.getByText("Please enter query for custom chart")
+    ).toBeHidden();
   });
 });
