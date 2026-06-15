@@ -15,12 +15,10 @@
 
 use std::{collections::HashSet, fmt::Display, sync::Arc};
 
+use arrow::buffer::BooleanBuffer;
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::{
-        inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
-        packed_ids::PackedRowIds,
-    },
+    meta::inverted_index::{IndexOptimizeMode, MAX_SIMPLE_TOPN_FIELDS},
     tantivy::query::{
         contains_query::ContainsAutomaton, ids_collector::SingleSegmentDocIdCollector,
         topn_collector::TopNCollector,
@@ -44,7 +42,7 @@ use crate::service::search::index::IndexCondition;
 pub enum TantivyResult {
     RowIds(Vec<u32>),
     RowIdsSelection {
-        row_ids: Arc<PackedRowIds>, // sorted doc ids, delta-bitpacked
+        row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
         row_group_size: Option<u32>,
     },
     /// coalesced [start, end) row ranges, is_add_filter_back = true
@@ -76,7 +74,9 @@ impl TantivyResult {
             Self::RowIds(row_ids) => {
                 row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
-            Self::RowIdsSelection { row_ids, .. } => row_ids.memory_size(),
+            Self::RowIdsSelection { row_ids, .. } => {
+                row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
+            }
             Self::RowRangesSelection { ranges, .. } => {
                 ranges.capacity() * std::mem::size_of::<(u32, u32)>()
                     + std::mem::size_of::<Vec<(u32, u32)>>()
@@ -874,11 +874,11 @@ mod tests {
     fn test_memory_size_edge_cases() {
         // Test with empty collections
         let result = TantivyResult::RowIdsSelection {
-            row_ids: Arc::new(PackedRowIds::from_sorted(&[])),
+            row_ids: Arc::new(BooleanBuffer::new_unset(0)),
             row_group_size: None,
         };
         let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<PackedRowIds>());
+        assert_eq!(memory_size, std::mem::size_of::<BooleanBuffer>());
 
         let result = TantivyResult::RowIds(Vec::new());
         let memory_size = result.get_memory_size();

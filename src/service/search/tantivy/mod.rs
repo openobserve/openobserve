@@ -14,19 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod cache;
-mod fragmentation;
 mod partition;
 pub mod search;
 
 use std::{collections::HashSet, ops::Bound, sync::Arc};
 
+use arrow::{array::builder::BooleanBufferBuilder, buffer::BooleanBuffer};
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::{
         inverted_index::IndexOptimizeMode,
-        packed_ids::PackedRowIds,
         search::ScanStats,
         stream::{FileKey, FileSelection, StreamType},
     },
@@ -55,7 +54,6 @@ use tokio_stream::StreamExt as _;
 
 use self::{
     cache::{self as tantivy_result_cache, CacheEntry},
-    fragmentation::{coalesce_sorted_ids, count_runs, runs_cap},
     partition::partition_tantivy_files,
 };
 use crate::service::search::{
@@ -470,7 +468,6 @@ async fn search_tantivy_index(
     // generate the tantivy query
     let condition: IndexCondition =
         index_condition.ok_or(anyhow::anyhow!("IndexCondition not found"))?;
-    let has_expensive_filter = condition.has_expensive_filter();
     let (mut query, has_skipped_conditions) =
         condition.to_tantivy_query(trace_id, tantivy_schema.clone(), fts_field)?;
 
@@ -616,7 +613,9 @@ async fn search_tantivy_index(
                 return Ok((
                     key,
                     TantivyResult::RowIdsSelection {
-                        row_ids: Arc::new(PackedRowIds::default()),
+                        row_ids: Arc::new(BooleanBuffer::new_unset(
+                            parquet_file.meta.records.max(0) as usize,
+                        )),
                         row_group_size,
                     },
                     false,
@@ -651,24 +650,15 @@ async fn search_tantivy_index(
                     parquet_file.meta.records,
                 ));
             }
-            let runs = count_runs(&row_ids);
-            let runs_cap = runs_cap(parquet_file.meta.records as usize);
-            if runs > runs_cap && !has_expensive_filter {
-                let ranges = coalesce_sorted_ids(&row_ids);
-                log::info!(
-                    "[trace_id {trace_id}] search->tantivy: file: {}, row selection too fragmented ({runs} runs > cap {runs_cap}), degraded to {} coalesced ranges with filter added back",
-                    parquet_file.key,
-                    ranges.len(),
-                );
-                TantivyResult::RowRangesSelection {
-                    ranges: Arc::new(ranges),
-                    row_group_size,
-                }
-            } else {
-                TantivyResult::RowIdsSelection {
-                    row_ids: Arc::new(PackedRowIds::from_sorted(&row_ids)),
-                    row_group_size,
-                }
+            let num_rows = parquet_file.meta.records as usize;
+            let mut builder = BooleanBufferBuilder::new(num_rows);
+            builder.append_n(num_rows, false);
+            for &id in &row_ids {
+                builder.set_bit(id as usize, true);
+            }
+            TantivyResult::RowIdsSelection {
+                row_ids: Arc::new(builder.finish()),
+                row_group_size,
             }
         }
         TantivyResult::RowIdsSelection { .. }
@@ -864,15 +854,15 @@ mod tests {
     #[test]
     fn test_get_cache_entry_row_ids_selection() {
         let result = TantivyResult::RowIdsSelection {
-            row_ids: Arc::new(PackedRowIds::from_sorted(&[0, 2])),
+            row_ids: Arc::new(BooleanBuffer::from_iter((0..4u32).map(|i| [0u32, 2].contains(&i)))),
             row_group_size: Some(1024),
         };
 
         let entry = get_cache_entry(result);
         match entry {
             CacheEntry::RowIds(packed, row_group_size) => {
-                assert_eq!(packed.len(), 2);
-                assert_eq!(packed.iter().collect::<Vec<_>>(), vec![0, 2]);
+                assert_eq!(packed.count_set_bits(), 2);
+                assert_eq!(packed.set_indices().collect::<Vec<_>>(), vec![0, 2]);
                 assert_eq!(row_group_size, Some(1024));
             }
             _ => panic!("Expected RowIds cache entry"),

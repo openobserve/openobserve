@@ -15,6 +15,7 @@
 
 use std::{cmp::max, fmt::Display, str::FromStr, sync::Arc};
 
+use arrow::buffer::BooleanBuffer;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hashbrown::HashMap;
 use proto::cluster_rpc;
@@ -23,7 +24,7 @@ use utoipa::ToSchema;
 
 use crate::{
     get_config,
-    meta::{packed_ids::PackedRowIds, self_reporting::usage::Stats},
+    meta::self_reporting::usage::Stats,
     stats::MemorySize,
     utils::{
         hash::{Sum64, gxhash},
@@ -274,8 +275,9 @@ impl MemorySize for RemoteStreamParams {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FileSelection {
-    /// Row ids matched by the tantivy index, delta-bitpacked.
-    Rows(Arc<PackedRowIds>),
+    /// Row ids matched by the tantivy index, as a per-row bitmap of length
+    /// `num_rows` (one bit per parquet row).
+    Rows(Arc<BooleanBuffer>),
     /// kept when the exact selection is too fragmented for an efficient parquet scan. 
     Ranges(Arc<Vec<(u32, u32)>>),
     /// Row group ids selected by row-group-level sampling.
@@ -1919,7 +1921,9 @@ mod tests {
     fn test_file_key_with_selection() {
         let mut key = FileKey::from_file_name("files/k.parquet");
         assert!(key.selection.is_none());
-        let selection = FileSelection::Rows(Arc::new(PackedRowIds::from_sorted(&[1, 5, 9])));
+        let selection = FileSelection::Rows(Arc::new(BooleanBuffer::from_iter(
+            (0..16u32).map(|i| [1u32, 5, 9].contains(&i)),
+        )));
         key.with_selection(selection, Some(1024));
         assert!(key.selection.is_some());
         assert_eq!(key.row_group_size, Some(1024));

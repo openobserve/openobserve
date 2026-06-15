@@ -29,7 +29,6 @@ pub mod meta_store;
 pub mod model_pricing;
 pub mod organization;
 pub mod otlp;
-pub mod packed_ids;
 pub mod pipeline;
 pub mod plan;
 pub mod projections;

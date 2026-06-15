@@ -15,11 +15,9 @@
 
 use std::sync::Arc;
 
+use arrow::buffer::BooleanBuffer;
 use arrow_schema::{DataType, SchemaRef};
-use config::{
-    FileFormat, TIMESTAMP_COL_NAME,
-    meta::{packed_ids::PackedRowIds, stream::FileSelection},
-};
+use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileSelection};
 use datafusion::{
     common::{DataFusionError, Result, project_schema, stats::Precision},
     datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
@@ -76,7 +74,9 @@ pub fn generate_access_plan(
         },
         #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => match selection {
-            FileSelection::Rows(row_ids) => generate_vortex_access_plan(row_ids.iter()),
+            FileSelection::Rows(row_ids) => {
+                generate_vortex_access_plan(row_ids.set_indices().map(|i| i as u32))
+            }
             // coalesced ranges come with the filter added back; let the
             // filter do the work instead of expanding the superset to ids
             FileSelection::Ranges(_) => None,
@@ -90,35 +90,33 @@ pub fn generate_access_plan(
 
 fn generate_parquet_access_plan(
     file: &PartitionedFile,
-    row_ids: &PackedRowIds,
+    row_ids: &BooleanBuffer,
     row_group_size: Option<u32>,
 ) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
     let (num_rows, row_group_size) = parquet_file_layout(file, row_group_size)?;
     let row_group_count = num_rows.div_ceil(row_group_size);
 
-    if let Some(last) = row_ids.last()
-        && last as usize >= num_rows
-    {
+    if row_ids.len() > num_rows {
         log::warn!(
-            "file path: file={:?}, row_id {last} out of range (num_rows={num_rows}), skip access plan",
-            file.path().as_ref()
+            "file path: file={:?}, selection bitmap len {} exceeds num_rows {num_rows}, skip access plan",
+            file.path().as_ref(),
+            row_ids.len(),
         );
         return None;
     }
 
-    // single forward pass over the packed ids: decode streams in ascending
-    // order, merge consecutive ids into select/skip runs per row group
+    // single forward pass over the bitmap's set bits: walk matched row ids in
+    // ascending order, merge consecutive ids into select/skip runs per row group
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
-    let mut it = row_ids.iter().peekable();
+    let mut it = row_ids.set_indices().peekable();
     while let Some(&first) = it.peek() {
-        let row_group_id = first as usize / row_group_size;
+        let row_group_id = first / row_group_size;
         let rg_start = row_group_id * row_group_size;
         let rg_end = (rg_start + row_group_size).min(num_rows);
 
         let mut selection: Vec<RowSelector> = Vec::new();
         let mut cursor = rg_start;
         while let Some(&id) = it.peek() {
-            let id = id as usize;
             if id >= rg_end {
                 break;
             }
@@ -129,7 +127,7 @@ fn generate_parquet_access_plan(
             // to the next row group's selection
             while run_end < rg_end {
                 match it.peek() {
-                    Some(&next) if next as usize == run_end => {
+                    Some(&next) if next == run_end => {
                         it.next();
                         run_end += 1;
                     }
@@ -343,7 +341,7 @@ mod tests {
     fn test_generate_parquet_access_plan_from_sorted_row_ids() {
         // 10 rows, row groups of 4: rg0=[0..4), rg1=[4..8), rg2=[8..10)
         let file = make_partitioned_file(10);
-        let row_ids = PackedRowIds::from_sorted(&[0u32, 1, 5, 9]);
+        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [0u32, 1, 5, 9].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
 
@@ -374,7 +372,7 @@ mod tests {
     fn test_generate_parquet_access_plan_skips_untouched_row_groups() {
         // only the middle row group has matches
         let file = make_partitioned_file(12);
-        let row_ids = PackedRowIds::from_sorted(&[4u32, 5, 6, 7]);
+        let row_ids = BooleanBuffer::from_iter((0..12u32).map(|i| [4u32, 5, 6, 7].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
 
@@ -389,7 +387,7 @@ mod tests {
         // a consecutive run 2..=5 spans rg0 [0..4) and rg1 [4..8); it must be
         // split at the boundary so both row groups get their own selection
         let file = make_partitioned_file(10);
-        let row_ids = PackedRowIds::from_sorted(&[2u32, 3, 4, 5]);
+        let row_ids = BooleanBuffer::from_iter((0..10u32).map(|i| [2u32, 3, 4, 5].contains(&i)));
 
         let plan = generate_parquet_access_plan(&file, &row_ids, Some(4)).unwrap();
 
@@ -410,7 +408,8 @@ mod tests {
     #[test]
     fn test_generate_parquet_access_plan_out_of_range_returns_none() {
         let file = make_partitioned_file(10);
-        let row_ids = PackedRowIds::from_sorted(&[0u32, 10]);
+        // bitmap longer than the file (sets a bit at row 10, beyond num_rows=10)
+        let row_ids = BooleanBuffer::from_iter((0..11u32).map(|i| [0u32, 10].contains(&i)));
 
         assert!(generate_parquet_access_plan(&file, &row_ids, Some(4)).is_none());
     }
