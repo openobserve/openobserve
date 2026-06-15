@@ -45,12 +45,12 @@ export default {
     // This runs once when the app loads and applies the correct theme colors
     // based on priority: tempThemeColors > localStorage > org settings > defaults
     onMounted(() => {
-      // One-time migration: clear saved colors from old brand palette so the new
-      // teal defaults take effect. Keyed by version so it only runs once.
-      const THEME_MIGRATION_KEY = 'themeMigrationV2';
+      // One-time migration: clear saved colors that were old defaults so the
+      // current default (#3F7994 light / #79a1b4 dark) takes effect automatically.
+      const THEME_MIGRATION_KEY = 'themeMigrationV3';
       if (!localStorage.getItem(THEME_MIGRATION_KEY)) {
-        const OLD_LIGHT_DEFAULTS = ['#3F7994', '#6B76E3', '#5B9FBE'];
-        const OLD_DARK_DEFAULTS  = ['#5B9FBE', '#818CF8', '#3F7994'];
+        const OLD_LIGHT_DEFAULTS = ['#1a8a7a', '#6B76E3', '#5B9FBE'];
+        const OLD_DARK_DEFAULTS  = ['#3ab9aa', '#818CF8', '#5B9FBE'];
         const savedLight = localStorage.getItem('customLightColor');
         const savedDark  = localStorage.getItem('customDarkColor');
         if (savedLight && OLD_LIGHT_DEFAULTS.map(c => c.toLowerCase()).includes(savedLight.toLowerCase())) {
