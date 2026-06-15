@@ -134,7 +134,8 @@
     "discardChanges": "Änderungen verwerfen",
     "unsavedChanges": "Ungespeicherte Änderungen",
     "clearFilter": "Filter löschen",
-    "noMatches": "Keine Treffer"
+    "noMatches": "Keine Treffer",
+    "remove": "Entfernen"
   },
   "search": {
     "selectIndex": "Wählen Sie Zuerst streamen",
@@ -1732,7 +1733,14 @@
     "resetColumn": "Spalte zurücksetzen",
     "editAll": "Alles bearbeiten",
     "inlinePreview": "Vorschau",
-    "tapActiveToClear": "zum Löschen auf Aktiv tippen"
+    "tapActiveToClear": "zum Löschen auf Aktiv tippen",
+    "columnFormattingSubtitle": "Steuerelemente links, eine Live-Vorschau der Spalte rechts, damit Sie sie im Kontext sehen.",
+    "columnFormattingPick": "Spalte auswählen",
+    "columnFormattingSampleNote": "Beispielzeilen aus dieser Spalte.",
+    "columnFormattingAddColumn": "Spalte hinzufügen",
+    "conditionalStyling": "Bedingte Formatierung",
+    "typeNumeric": "Num",
+    "typeText": "Text"
   },
   "panel": {
     "header": "Panel",

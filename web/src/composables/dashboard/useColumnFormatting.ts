@@ -29,6 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { useI18n } from "vue-i18n";
+import { OVERRIDE_CONFIG_TYPES } from "@/utils/dashboard/tableConfigUtils";
 
 export interface ConditionalRuleUI {
   operator: string;
@@ -36,6 +37,14 @@ export interface ConditionalRuleUI {
   textColor: string;
   bgColor: string;
 }
+
+/** A blank conditional rule row. */
+export const emptyConditionalRule = (): ConditionalRuleUI => ({
+  operator: "<",
+  threshold: "",
+  textColor: "",
+  bgColor: "",
+});
 
 export interface ColumnOverrideUI {
   field: string; // column alias
@@ -111,28 +120,28 @@ export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
 const applyConfigItems = (col: ColumnOverrideUI, items: any[]): void => {
   for (const cfg of items ?? []) {
     switch (cfg?.type) {
-      case "unit":
+      case OVERRIDE_CONFIG_TYPES.UNIT:
         col.unit = cfg.value?.unit ?? "";
         col.customUnit = cfg.value?.customUnit ?? "";
         break;
-      case "unique_value_color":
+      case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
         col.autoColor = !!cfg.autoColor;
         break;
-      case "alignment":
+      case OVERRIDE_CONFIG_TYPES.ALIGNMENT:
         col.alignment = cfg.value ?? "";
         break;
-      case "text_color":
+      case OVERRIDE_CONFIG_TYPES.TEXT_COLOR:
         col.textColor = cfg.value ?? "";
         break;
-      case "background_color":
+      case OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR:
         col.bgColor = cfg.value ?? "";
         break;
-      case "cell_type":
+      case OVERRIDE_CONFIG_TYPES.CELL_TYPE:
         col.cellType = cfg.value?.type ?? "text";
         col.progressColor = cfg.value?.color ?? "";
         col.sparklineStyle = cfg.value?.sparklineStyle ?? "line";
         break;
-      case "conditional_styles":
+      case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
         col.conditions = (cfg.rules ?? []).map((r: any) => ({
           operator: r.operator ?? "<",
           threshold: r.threshold != null ? String(r.threshold) : "",
@@ -189,17 +198,27 @@ export const serializeColumnOverride = (
 
   if (c.unit && isNumeric)
     config.push({
-      type: "unit",
+      type: OVERRIDE_CONFIG_TYPES.UNIT,
       value: { unit: c.unit, customUnit: c.customUnit },
     });
-  if (c.alignment) config.push({ type: "alignment", value: c.alignment });
-  if (c.textColor) config.push({ type: "text_color", value: c.textColor });
-  if (c.bgColor) config.push({ type: "background_color", value: c.bgColor });
-  if (c.autoColor) config.push({ type: "unique_value_color", autoColor: true });
+  if (c.alignment)
+    config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
+  if (c.textColor)
+    config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
+  if (c.bgColor)
+    config.push({
+      type: OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR,
+      value: c.bgColor,
+    });
+  if (c.autoColor)
+    config.push({
+      type: OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR,
+      autoColor: true,
+    });
 
   if (c.cellType && c.cellType !== "text") {
     config.push({
-      type: "cell_type",
+      type: OVERRIDE_CONFIG_TYPES.CELL_TYPE,
       value: {
         type: c.cellType,
         color: c.progressColor || "",
@@ -214,7 +233,7 @@ export const serializeColumnOverride = (
   );
   if (validConditions.length) {
     config.push({
-      type: "conditional_styles",
+      type: OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES,
       rules: validConditions.map((r) => ({
         operator: r.operator,
         threshold: parseFloat(r.threshold),
@@ -290,12 +309,6 @@ export const useColumnFormattingOptions = () => {
     { value: "right", label: t("dashboard.alignRight") },
   ];
 
-  const cellTypeOptions = [
-    { value: "text", label: t("dashboard.cellTypeText") },
-    { value: "progress_bar", label: t("dashboard.cellTypeProgressBar") },
-    { value: "sparkline", label: t("dashboard.cellTypeSparkline") },
-  ];
-
   const sparklineStyleOptions = [
     { value: "line", label: t("dashboard.sparklineStyleLine") },
     { value: "bar", label: t("dashboard.sparklineStyleBar") },
@@ -313,7 +326,6 @@ export const useColumnFormattingOptions = () => {
   return {
     unitOptions,
     alignOptions,
-    cellTypeOptions,
     sparklineStyleOptions,
     conditionOperators,
   };

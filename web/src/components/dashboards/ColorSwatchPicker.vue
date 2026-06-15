@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="swatch swatch--none"
       :class="{ 'swatch--active': !modelValue }"
       :title="t('dashboard.colorNone')"
+      :aria-label="t('dashboard.colorNone')"
+      :aria-pressed="!modelValue"
       :data-test="dataTest ? `${dataTest}-none` : undefined"
       @click.stop="select('')"
     >
@@ -43,6 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'swatch--active': isActive(c) }"
       :style="{ background: c }"
       :title="c"
+      :aria-label="c"
+      :aria-pressed="isActive(c)"
       @click.stop="select(c)"
     >
       <OIcon
@@ -86,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, computed, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { isColorDark } from "@/utils/dashboard/chartColorUtils";
 
 export default defineComponent({
   name: "ColorSwatchPicker",
@@ -109,19 +114,9 @@ export default defineComponent({
         !props.swatches.some((s) => s.toLowerCase() === normalized.value),
     );
 
-    /** True when the colour is dark enough to need a white check mark. */
-    const isDark = (hex: string): boolean => {
-      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
-      if (!m) return false;
-      const r = parseInt(m[1], 16),
-        g = parseInt(m[2], 16),
-        b = parseInt(m[3], 16);
-      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-    };
-
     const select = (c: string) => emit("update:modelValue", c);
 
-    return { t, isActive, isCustomActive, isDark, select };
+    return { t, isActive, isCustomActive, isDark: isColorDark, select };
   },
 });
 </script>

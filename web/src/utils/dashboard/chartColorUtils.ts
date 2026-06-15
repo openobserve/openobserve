@@ -81,6 +81,16 @@ export const applySeriesColorMappings = (
   });
 };
 
+/** True when a hex colour is dark enough to need a light foreground. */
+export const isColorDark = (hex: string): boolean => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+  if (!m) return false;
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
+};
+
 // Modify the getContrastColor function to consider theme
 export const getContrastColor = (
   backgroundColor: string,

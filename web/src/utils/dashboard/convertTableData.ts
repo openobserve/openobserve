@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
 import {
   buildValueMappingCache,
@@ -24,6 +20,9 @@ import {
   parseOverrideConfigs,
   parseTimestampValue,
   detectTimestampFields,
+  applyProgressBarBounds,
+  applyColumnOverrides,
+  formatNumericValue,
 } from "./tableConfigUtils";
 
 /**
@@ -62,9 +61,8 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap } = parseOverrideConfigs(
-    panelSchema.config.override_config,
-  );
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { colorConfigMap, unitConfigMap } = overrideMaps;
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
   // Cache timezone to avoid repeated store lookups
@@ -141,30 +139,9 @@ export const convertTableData = (
       // by the column alias, while the TanStack column id is the data field.
       obj["alias"] = it.alias;
       obj["isNumeric"] = isNumber;
-      obj["align"] = styleConfigMap?.[aliasLower]?.alignment || (!isNumber ? "left" : "right");
       obj["sortable"] = true;
 
-      // pass color mode info for renderer - use pre-lowercased lookup
-      if (colorConfigMap?.[aliasLower]?.autoColor) {
-        obj["colorMode"] = "auto";
-      }
-
-      // pass column-level style overrides to renderer
-      const colStyle = styleConfigMap?.[aliasLower];
-      if (colStyle?.textColor) obj["textColor"] = colStyle.textColor;
-      if (colStyle?.bgColor) obj["bgColor"] = colStyle.bgColor;
-
-      // cell type (progress bar / sparkline)
-      const cellTypeCfg = cellTypeConfigMap?.[aliasLower];
-      if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
-        obj["cellType"] = cellTypeCfg.type;
-        if (cellTypeCfg.progressColor) obj["progressColor"] = cellTypeCfg.progressColor;
-        if (cellTypeCfg.sparklineStyle) obj["sparklineStyle"] = cellTypeCfg.sparklineStyle;
-      }
-
-      // conditional styling rules
-      const condRules = conditionalRulesMap?.[aliasLower];
-      if (condRules?.length) obj["conditionalRules"] = condRules;
+      applyColumnOverrides(obj, aliasLower, overrideMaps, !isNumber ? "left" : "right");
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {
@@ -198,28 +175,15 @@ export const convertTableData = (
         }
         const decimals = panelSchema.config?.decimals ?? 2;
 
-        obj["format"] = (val: any) => {
-          if (val === null || val === undefined || val === "") return missingValue;
-          // value mapping - use cached lookup
-          const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-          if (valueMapping != null) {
-            return valueMapping;
-          }
-
-          return !Number.isNaN(val)
-            ? `${
-                formatUnitValue(
-                  getUnitValue(
-                    val,
-                    unitToUse,
-                    customUnitToUse,
-                    decimals,
-                  ),
-                ) ?? 0
-              }`
-            : val;
-        };
+        obj["format"] = (val: any) =>
+          formatNumericValue(
+            val,
+            valueMappingCache,
+            unitToUse,
+            customUnitToUse,
+            decimals,
+            missingValue,
+          );
       }
 
       // if current field is histogram field, timestamps are pre-formatted in rows
@@ -339,28 +303,15 @@ export const convertTableData = (
           const unitCustom = panelSchema.config?.unit_custom;
           const decimals = panelSchema.config?.decimals ?? 2;
 
-          obj["format"] = (val: any) => {
-            if (val === null || val === undefined || val === "") return missingValue;
-            // value mapping - use cached lookup
-            const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-            if (valueMapping != null) {
-              return valueMapping;
-            }
-
-            return !Number.isNaN(val)
-              ? `${
-                  formatUnitValue(
-                    getUnitValue(
-                      val,
-                      unit,
-                      unitCustom,
-                      decimals,
-                    ),
-                  ) ?? 0
-                }`
-              : val;
-          };
+          obj["format"] = (val: any) =>
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+            );
         }
 
         // Check if it's a histogram field
@@ -400,25 +351,7 @@ export const convertTableData = (
   }
 
   // Auto-compute progress bar min/max from column data (after final tableRows are set)
-  if (Array.isArray(columns) && Array.isArray(tableRows)) {
-    for (const col of columns as any[]) {
-      if (col.cellType === "progress_bar") {
-        const fieldKey = col.field;
-        const nums = (tableRows as any[])
-          .map((row) => parseFloat(String(row[fieldKey])))
-          .filter((v) => !isNaN(v));
-        if (nums.length > 0) {
-          let max = nums[0];
-          for (const v of nums) if (v > max) max = v;
-          col.progressMin = 0;
-          col.progressMax = max;
-        } else {
-          col.progressMin = 0;
-          col.progressMax = 100;
-        }
-      }
-    }
-  }
+  applyProgressBarBounds(columns as any[], tableRows as any[]);
 
   return {
     rows: tableRows,
@@ -484,11 +417,11 @@ export const convertMultiQueryTableData = (
     panelSchema.config?.mappings,
   );
 
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
-    panelSchema.config.override_config,
-  );
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { colorConfigMap, unitConfigMap } = overrideMaps;
 
   const timezone = store.state.timezone;
+  const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
 
   // Build ordered column list:
   // Columns are grouped by axis ACROSS queries (not per-query): all queries'
@@ -644,17 +577,15 @@ export const convertMultiQueryTableData = (
           const unitCustom = panelSchema.config?.unit_custom;
           const decimals = panelSchema.config?.decimals ?? 2;
 
-          col["format"] = (val: any) => {
-            const valueMapping = lookupValueMapping(val, valueMappingCache);
-            if (valueMapping != null) return valueMapping;
-            return !Number.isNaN(val)
-              ? `${
-                  formatUnitValue(
-                    getUnitValue(val, unit, unitCustom, decimals),
-                  ) ?? 0
-                }`
-              : val;
-          };
+          col["format"] = (val: any) =>
+            formatNumericValue(
+              val,
+              valueMappingCache,
+              unit,
+              unitCustom,
+              decimals,
+              missingValue,
+            );
         }
 
         if (detectedTimestampAliases.has(it)) {
@@ -699,13 +630,15 @@ export const convertMultiQueryTableData = (
       name: colName,
       field: colName,
       label: fieldConfig?.label || colName,
-      align: isNumber || fieldConfig?.aggregationFunction ? "right" : "left",
       sortable: true,
     };
 
-    if (colorConfigMap?.[colNameLower]?.autoColor) {
-      col["colorMode"] = "auto";
-    }
+    applyColumnOverrides(
+      col,
+      colNameLower,
+      overrideMaps,
+      isNumber || fieldConfig?.aggregationFunction ? "right" : "left",
+    );
 
     if (isTimestamp) {
       col["format"] = (val: any) => {
@@ -728,17 +661,15 @@ export const convertMultiQueryTableData = (
       }
       const decimals = panelSchema.config?.decimals ?? 2;
 
-      col["format"] = (val: any) => {
-        const valueMapping = lookupValueMapping(val, valueMappingCache);
-        if (valueMapping != null) return valueMapping;
-        return !Number.isNaN(val)
-          ? `${
-              formatUnitValue(
-                getUnitValue(val, unitToUse, customUnitToUse, decimals),
-              ) ?? 0
-            }`
-          : val;
-      };
+      col["format"] = (val: any) =>
+        formatNumericValue(
+          val,
+          valueMappingCache,
+          unitToUse,
+          customUnitToUse,
+          decimals,
+          missingValue,
+        );
     } else {
       col["format"] = (val: any) => {
         const valueMapping = lookupValueMapping(val, valueMappingCache);

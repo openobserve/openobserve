@@ -157,7 +157,7 @@ describe("OverrideConfig", () => {
             '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
           )
           .text(),
-      ).toBe("Add field override");
+      ).toBe("Configure column formatting");
     });
 
     it("should not show dialog initially", () => {
@@ -177,11 +177,11 @@ describe("OverrideConfig", () => {
     it("should combine x and y fields into columns", () => {
       wrapper = createWrapper();
 
-      // Component transforms columns with name, field, and format properties
+      // Columns are passed to OverrideConfigPopup as { alias, label, isNumeric }.
       expect(wrapper.vm.columns.length).toBe(4);
-      expect(wrapper.vm.columns[0].name).toBe("timestamp");
+      expect(wrapper.vm.columns[0].alias).toBe("timestamp");
       expect(wrapper.vm.columns[0].label).toBe("Timestamp");
-      expect(wrapper.vm.columns[0].field).toBe("timestamp");
+      expect(wrapper.vm.columns[0].isNumeric).toBe(false);
     });
 
     it("should handle empty x fields", () => {
@@ -333,73 +333,6 @@ describe("OverrideConfig", () => {
       expect(mockDashboardPanelData.data.config.override_config).toEqual([]);
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
     });
-
-    it("should apply override configs after saving", () => {
-      wrapper = createWrapper();
-
-      const overrideConfig = [{ field: "count", unit: "items" }];
-
-      wrapper.vm.saveOverrideConfigConfig(overrideConfig);
-
-      // Check that columns have been updated with format functions
-      const countColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "count",
-      );
-      if (countColumn && countColumn.format) {
-        expect(countColumn.format(100)).toBe("100 items");
-      }
-    });
-  });
-
-  describe("Override Config Application", () => {
-    it("should apply override configs to columns", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "ms",
-        duration: "seconds",
-      };
-
-      wrapper = createWrapper();
-
-      const countColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "count",
-      );
-      const durationColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "duration",
-      );
-
-      expect(countColumn?.format).toBeDefined();
-      expect(durationColumn?.format).toBeDefined();
-    });
-
-    it("should format values with units correctly", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "items",
-      };
-
-      wrapper = createWrapper();
-
-      const countColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "count",
-      );
-      if (countColumn && countColumn.format) {
-        expect(countColumn.format(150)).toBe("150 items");
-        expect(countColumn.format(0)).toBe("0 items");
-        expect(countColumn.format("test")).toBe("test items");
-      }
-    });
-
-    it("should handle columns without override config", () => {
-      mockDashboardPanelData.data.config.override_config = [];
-
-      wrapper = createWrapper();
-
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      if (timestampColumn && timestampColumn.format) {
-        expect(timestampColumn.format(1000)).toBe("1000 ");
-      }
-    });
   });
 
   describe("Theme Integration", () => {
@@ -496,8 +429,8 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.columns.length).toBe(2);
-      expect(wrapper.vm.columns[0].name).toBe("time");
-      expect(wrapper.vm.columns[1].name).toBe("value");
+      expect(wrapper.vm.columns[0].alias).toBe("time");
+      expect(wrapper.vm.columns[1].alias).toBe("value");
     });
   });
 
@@ -594,7 +527,6 @@ describe("OverrideConfig", () => {
       expect(wrapper.vm.store).toBeUndefined();
       expect(wrapper.vm.showOverrideConfigPopup).toBeDefined();
       expect(wrapper.vm.columns).toBeDefined();
-      expect(wrapper.vm.overrideConfigs).toBeDefined();
     });
 
     it("should have correct initial state", () => {
@@ -602,62 +534,6 @@ describe("OverrideConfig", () => {
 
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
       expect(Array.isArray(wrapper.vm.columns)).toBe(true);
-      expect(Array.isArray(wrapper.vm.overrideConfigs)).toBe(true);
-    });
-  });
-
-  describe("Column Format Functions", () => {
-    it("should create format functions for columns", () => {
-      mockDashboardPanelData.data.config.override_config = [
-        { count: "requests" },
-      ];
-
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-      const countColumn = columns.find((col: any) => col.field === "count");
-
-      expect(countColumn.format).toBeDefined();
-      expect(typeof countColumn.format).toBe("function");
-    });
-
-    it("should map column properties correctly", () => {
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-      const firstColumn = columns[0];
-
-      expect(firstColumn.name).toBe(firstColumn.field);
-      expect(firstColumn.label).toBeDefined();
-      expect(firstColumn.format).toBeDefined();
-    });
-
-    it("should handle complex override configurations", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "requests/min",
-        duration: "ms",
-        timestamp: "",
-        user_id: "ID",
-      };
-
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-
-      const countColumn = columns.find((col: any) => col.field === "count");
-      const durationColumn = columns.find(
-        (col: any) => col.field === "duration",
-      );
-      const timestampColumn = columns.find(
-        (col: any) => col.field === "timestamp",
-      );
-
-      if (countColumn?.format)
-        expect(countColumn.format(100)).toBe("100 requests/min");
-      if (durationColumn?.format)
-        expect(durationColumn.format(500)).toBe("500 ms");
-      if (timestampColumn?.format)
-        expect(timestampColumn.format(123456789)).toBe("123456789 ");
     });
   });
 

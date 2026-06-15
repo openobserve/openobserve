@@ -26,6 +26,21 @@ import { toZonedTime } from "date-fns-tz";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
 import { getDataValue } from "./aliasUtils";
 
+/**
+ * Persisted `override_config` item type discriminants. Single source of truth
+ * shared by the renderer parser (parseOverrideConfigs), the UI (de)serializers
+ * (useColumnFormatting), and the Rust schema, so a rename can't silently desync.
+ */
+export const OVERRIDE_CONFIG_TYPES = {
+  UNIT: "unit",
+  UNIQUE_VALUE_COLOR: "unique_value_color",
+  ALIGNMENT: "alignment",
+  TEXT_COLOR: "text_color",
+  BACKGROUND_COLOR: "background_color",
+  CELL_TYPE: "cell_type",
+  CONDITIONAL_STYLES: "conditional_styles",
+} as const;
+
 // ---------------------------------------------------------------------------
 // Value-mapping helpers
 // ---------------------------------------------------------------------------
@@ -44,78 +59,85 @@ export const parseRegexPattern = (
   return { pattern: input, flags: "" };
 };
 
-/** Build a fast-lookup cache from the panel's `config.mappings` array. */
+/**
+ * Build a fast-lookup cache from the panel's `config.mappings` array, keyed by
+ * value / range / regex. Stores the full mapping object so both `text` and
+ * `color` are recoverable (single engine for text and color resolution).
+ */
 export const buildValueMappingCache = (
   mappings: any,
-): Map<any, string> | null => {
+): Map<any, any> | null => {
   if (!mappings || !Array.isArray(mappings)) {
     return null;
   }
 
-  const cache = new Map<any, string>();
+  const cache = new Map<any, any>();
 
   mappings.forEach((mapping: any) => {
-    if (mapping && mapping.text != null && mapping.text !== "") {
-      if (mapping.type === "regex") {
-        // Regex mapping – stored with a special prefix; pattern tested during lookup
-        cache.set(`__regex_${mapping.pattern ?? ""}`, mapping.text);
-      } else if (mapping.from !== undefined && mapping.to !== undefined) {
-        // Range mapping – encoded key so direct + range share the same Map
-        cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
-      } else if (mapping.value !== undefined && mapping.value !== null) {
-        cache.set(mapping.value, mapping.text);
-      }
+    if (!mapping) return;
+    const hasText = mapping.text != null && mapping.text !== "";
+    const hasColor = mapping.color != null && mapping.color !== "";
+    if (!hasText && !hasColor) return;
+
+    if (mapping.type === "regex") {
+      // Regex mapping – stored with a special prefix; pattern tested during lookup
+      cache.set(`__regex_${mapping.pattern ?? ""}`, mapping);
+    } else if (mapping.from !== undefined && mapping.to !== undefined) {
+      // Range mapping – encoded key so direct + range share the same Map
+      cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
+    } else if (mapping.value !== undefined && mapping.value !== null) {
+      cache.set(mapping.value, mapping);
     }
   });
 
   return cache.size > 0 ? cache : null;
 };
 
-/** Look up a value in the pre-built mapping cache (direct then range). */
-export const lookupValueMapping = (
+/**
+ * Look up the first mapping object matching `value` (direct, then range, then
+ * regex). When `requireField` is given, only mappings whose field is non-empty
+ * match — mirroring the field-aware semantics of the previous linear scan.
+ */
+export const lookupValueMappingFull = (
   value: any,
-  cache: Map<any, string> | null,
-): string | undefined | null => {
+  cache: Map<any, any> | null,
+  requireField?: "text" | "color",
+): any | null => {
   if (!cache) return null;
 
-  // Direct match
-  if (cache.has(value)) {
-    return cache.get(value);
-  }
+  const ok = (m: any) =>
+    !requireField || (m && m[requireField] != null && m[requireField] !== "");
 
-  // Coerce to string once – mapping values are always stored as strings (from the
-  // UI text input) but cell data may be numeric. Reused for range, and regex checks.
+  // Direct match (then string-coerced, e.g. key "3" vs numeric value 3)
+  let m = cache.get(value);
+  if (m !== undefined && ok(m)) return m;
+
   const strValue = String(value);
-
-  // String coercion fallback e.g. key "3" vs numeric value 3
-  if (cache.has(strValue)) {
-    return cache.get(strValue);
-  }
+  m = cache.get(strValue);
+  if (m !== undefined && ok(m)) return m;
 
   // Range match (numbers only)
   if (typeof value === "number") {
-    const entries = Array.from(cache.entries());
-    for (let i = 0; i < entries.length; i++) {
-      const [key, text] = entries[i];
+    for (const [key, mapping] of cache.entries()) {
       if (typeof key === "string" && key.startsWith("__range_")) {
         const parts = key.split("_");
         const from = parseFloat(parts[3]);
         const to = parseFloat(parts[4]);
-        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
-          return text;
+        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to && ok(mapping)) {
+          return mapping;
         }
       }
     }
   }
 
   // Regex match
-  for (const [key, text] of cache.entries()) {
+  for (const [key, mapping] of cache.entries()) {
     if (typeof key === "string" && key.startsWith("__regex_")) {
       const rawPattern = key.slice(8); // "__regex_".length === 8
       try {
         const { pattern, flags } = parseRegexPattern(rawPattern);
-        if (new RegExp(pattern, flags).test(strValue)) {
-          return text;
+        if (new RegExp(pattern, flags).test(strValue) && ok(mapping)) {
+          return mapping;
         }
       } catch {
         // invalid regex pattern, skip
@@ -124,6 +146,15 @@ export const lookupValueMapping = (
   }
 
   return null;
+};
+
+/** Look up the mapped display text for a value (null when none has text). */
+export const lookupValueMapping = (
+  value: any,
+  cache: Map<any, any> | null,
+): string | undefined | null => {
+  const mapping = lookupValueMappingFull(value, cache, "text");
+  return mapping ? mapping.text : null;
 };
 
 // ---------------------------------------------------------------------------
@@ -278,41 +309,41 @@ export const parseOverrideConfigs = (
     for (const cfg of o?.config ?? []) {
       if (!cfg?.type) continue;
       switch (cfg.type) {
-        case "unit":
+        case OVERRIDE_CONFIG_TYPES.UNIT:
           unitConfigMap[aliasLower] = {
             unit: cfg.value?.unit ?? "",
             customUnit: cfg.value?.customUnit ?? "",
           };
           break;
-        case "unique_value_color":
+        case OVERRIDE_CONFIG_TYPES.UNIQUE_VALUE_COLOR:
           colorConfigMap[aliasLower] = { autoColor: !!cfg.autoColor };
           break;
-        case "alignment":
+        case OVERRIDE_CONFIG_TYPES.ALIGNMENT:
           styleConfigMap[aliasLower] = {
             ...styleConfigMap[aliasLower],
             alignment: cfg.value,
           };
           break;
-        case "text_color":
+        case OVERRIDE_CONFIG_TYPES.TEXT_COLOR:
           styleConfigMap[aliasLower] = {
             ...styleConfigMap[aliasLower],
             textColor: cfg.value,
           };
           break;
-        case "background_color":
+        case OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR:
           styleConfigMap[aliasLower] = {
             ...styleConfigMap[aliasLower],
             bgColor: cfg.value,
           };
           break;
-        case "cell_type":
+        case OVERRIDE_CONFIG_TYPES.CELL_TYPE:
           cellTypeConfigMap[aliasLower] = {
             type: cfg.value?.type ?? "text",
             progressColor: cfg.value?.color ?? "",
             sparklineStyle: cfg.value?.sparklineStyle ?? "line",
           };
           break;
-        case "conditional_styles":
+        case OVERRIDE_CONFIG_TYPES.CONDITIONAL_STYLES:
           conditionalRulesMap[aliasLower] = (cfg.rules ?? []).map((r: any) => ({
             operator: r.operator ?? "<",
             threshold: typeof r.threshold === "number" ? r.threshold : parseFloat(r.threshold) || 0,
@@ -327,6 +358,70 @@ export const parseOverrideConfigs = (
   return { colorConfigMap, unitConfigMap, styleConfigMap, cellTypeConfigMap, conditionalRulesMap };
 };
 
+/**
+ * Apply parsed override maps (alignment, auto-color, text/bg color, cell type,
+ * conditional rules) onto a renderer column object, keyed by lower-cased alias.
+ * Shared by the table converters so override application can't drift between
+ * the SQL, multi-query and PromQL paths.
+ */
+export const applyColumnOverrides = (
+  obj: any,
+  aliasLower: string,
+  maps: OverrideMaps,
+  defaultAlign: string,
+): void => {
+  const colStyle = maps.styleConfigMap?.[aliasLower];
+  obj.align = colStyle?.alignment || defaultAlign;
+
+  if (maps.colorConfigMap?.[aliasLower]?.autoColor) obj.colorMode = "auto";
+  if (colStyle?.textColor) obj.textColor = colStyle.textColor;
+  if (colStyle?.bgColor) obj.bgColor = colStyle.bgColor;
+
+  const cellTypeCfg = maps.cellTypeConfigMap?.[aliasLower];
+  if (cellTypeCfg?.type && cellTypeCfg.type !== "text") {
+    obj.cellType = cellTypeCfg.type;
+    if (cellTypeCfg.progressColor) obj.progressColor = cellTypeCfg.progressColor;
+    if (cellTypeCfg.sparklineStyle) obj.sparklineStyle = cellTypeCfg.sparklineStyle;
+  }
+
+  const condRules = maps.conditionalRulesMap?.[aliasLower];
+  if (condRules?.length) obj.conditionalRules = condRules;
+};
+
+/**
+ * Auto-compute `progressMin`/`progressMax` for every `progress_bar` column from
+ * the row data (min clamped to 0, extended for negative-only data). Mutates the
+ * column objects. Shared by the SQL and PromQL converters.
+ */
+export const applyProgressBarBounds = (
+  columns: any[] | undefined,
+  rows: any[] | undefined,
+): void => {
+  if (!Array.isArray(columns) || !Array.isArray(rows)) return;
+
+  for (const col of columns) {
+    if (col?.cellType !== "progress_bar") continue;
+
+    const fieldKey = col.field;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const row of rows) {
+      const v = parseFloat(String(row?.[fieldKey]));
+      if (Number.isNaN(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+
+    if (max === -Infinity) {
+      col.progressMin = 0;
+      col.progressMax = 100;
+    } else {
+      col.progressMin = Math.min(0, min);
+      col.progressMax = max;
+    }
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
@@ -338,18 +433,21 @@ export const parseOverrideConfigs = (
  */
 export const formatNumericValue = (
   val: any,
-  valueMappingCache: Map<any, string> | null,
+  valueMappingCache: Map<any, any> | null,
   unit: string | null | undefined,
   customUnit: string | null | undefined,
   decimals: number,
-  missingValue?: string,
+  missingValue = "",
 ): string => {
-  if (val === null || val === undefined) return String(missingValue ?? "");
+  if (val === null || val === undefined || val === "")
+    return String(missingValue ?? "");
 
   const mapped = lookupValueMapping(val, valueMappingCache);
   if (mapped != null) return mapped;
 
-  return typeof val === "number" && !Number.isNaN(val)
+  // !Number.isNaN (not typeof number) so numeric strings format too, matching
+  // the converter's inline closures.
+  return !Number.isNaN(val)
     ? `${formatUnitValue(getUnitValue(val, unit, customUnit, decimals)) ?? 0}`
     : val;
 };

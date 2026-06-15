@@ -134,7 +134,8 @@
     "discardChanges": "変更を破棄",
     "unsavedChanges": "未保存の変更",
     "clearFilter": "フィルターをクリア",
-    "noMatches": "一致なし"
+    "noMatches": "一致なし",
+    "remove": "削除"
   },
   "search": {
     "metrics": "メトリクス",
@@ -1749,7 +1750,14 @@
     "resetColumn": "列をリセット",
     "editAll": "すべて編集",
     "inlinePreview": "プレビュー",
-    "tapActiveToClear": "アクティブをタップしてクリア"
+    "tapActiveToClear": "アクティブをタップしてクリア",
+    "columnFormattingSubtitle": "左側にコントロール、右側に列のライブサンプルが表示され、コンテキストの中で確認できます。",
+    "columnFormattingPick": "列を選択",
+    "columnFormattingSampleNote": "この列のサンプル行。",
+    "columnFormattingAddColumn": "列を追加",
+    "conditionalStyling": "条件付きスタイル",
+    "typeNumeric": "数値",
+    "typeText": "テキスト"
   },
   "panel": {
     "header": "パネル",

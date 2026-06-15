@@ -134,7 +134,8 @@
     "discardChanges": "Wijzigingen negeren",
     "unsavedChanges": "Niet opgeslagen wijzigingen",
     "clearFilter": "Filter verwijderen",
-    "noMatches": "Geen wedstrijden"
+    "noMatches": "Geen wedstrijden",
+    "remove": "Verwijderen"
   },
   "search": {
     "selectIndex": "Selecteer eerst Stream",
@@ -1732,7 +1733,14 @@
     "resetColumn": "Kolom opnieuw instellen",
     "editAll": "Alles bewerken",
     "inlinePreview": "voorsmaak",
-    "tapActiveToClear": "tik op actief om te wissen"
+    "tapActiveToClear": "tik op actief om te wissen",
+    "columnFormattingSubtitle": "Bediening aan de linkerkant, een live voorbeeld van de kolom aan de rechterkant zodat u het in context ziet.",
+    "columnFormattingPick": "Kies een kolom",
+    "columnFormattingSampleNote": "Voorbeeldrijen uit deze kolom.",
+    "columnFormattingAddColumn": "Kolom toevoegen",
+    "conditionalStyling": "Voorwaardelijke opmaak",
+    "typeNumeric": "Num",
+    "typeText": "Tekst"
   },
   "panel": {
     "header": "Paneel",

@@ -556,40 +556,33 @@ pub struct Field {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Config {
-    #[serde(rename = "unit")]
     Unit {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<Value>,
     },
-    #[serde(rename = "unique_value_color")]
     #[serde(rename_all = "camelCase")]
     UniqueValueColor {
         #[serde(default)]
         auto_color: bool,
     },
-    #[serde(rename = "alignment")]
     Alignment {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
     },
-    #[serde(rename = "text_color")]
     TextColor {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
     },
-    #[serde(rename = "background_color")]
     BackgroundColor {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<String>,
     },
-    #[serde(rename = "cell_type")]
     CellType {
         #[serde(skip_serializing_if = "Option::is_none")]
         value: Option<CellTypeValue>,
     },
-    #[serde(rename = "conditional_styles")]
     ConditionalStyles {
         #[serde(skip_serializing_if = "Option::is_none")]
         rules: Option<Vec<ConditionalRule>>,
@@ -1338,5 +1331,99 @@ mod tests {
         assert!(json.contains("match"));
         assert!(json.contains("color"));
         assert!(json.contains("text"));
+    }
+
+    #[test]
+    fn test_config_cell_type_roundtrip() {
+        let cfg = Config::CellType {
+            value: Some(CellTypeValue {
+                type_field: "sparkline".to_string(),
+                color: Some("#3f7994".to_string()),
+                sparkline_style: Some("line".to_string()),
+            }),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"type\":\"cell_type\""));
+        // Inner CellTypeValue.type_field must serialize as "type", not "typeField".
+        assert!(json.contains("\"type\":\"sparkline\""));
+        assert!(json.contains("\"sparklineStyle\":\"line\""));
+        assert!(json.contains("\"color\":\"#3f7994\""));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_config_conditional_styles_roundtrip() {
+        let cfg = Config::ConditionalStyles {
+            rules: Some(vec![ConditionalRule {
+                operator: ">".to_string(),
+                threshold: OrdF64::from(5.0),
+                text_color: Some("#b91c1c".to_string()),
+                bg_color: Some("#fef2f2".to_string()),
+            }]),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        assert!(json.contains("\"type\":\"conditional_styles\""));
+        assert!(json.contains("\"operator\":\">\""));
+        assert!(json.contains("\"textColor\":\"#b91c1c\""));
+        assert!(json.contains("\"bgColor\":\"#fef2f2\""));
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, cfg);
+    }
+
+    #[test]
+    fn test_config_deserializes_exact_frontend_payload() {
+        // Exactly the shapes the web serializer / PromQL colOverrides emit.
+        let payloads = [
+            r##"{"type":"unit","value":{"unit":"bytes","customUnit":""}}"##,
+            r##"{"type":"alignment","value":"center"}"##,
+            r##"{"type":"text_color","value":"#ffffff"}"##,
+            r##"{"type":"background_color","value":"#000000"}"##,
+            r##"{"type":"unique_value_color","autoColor":true}"##,
+            r##"{"type":"cell_type","value":{"type":"progress_bar","color":"#15803d"}}"##,
+            r##"{"type":"conditional_styles","rules":[{"operator":"<=","threshold":10,"textColor":"#a16207","bgColor":"#fefce8"}]}"##,
+        ];
+        for p in payloads {
+            let parsed: Config =
+                serde_json::from_str(p).unwrap_or_else(|e| panic!("failed to parse {p}: {e}"));
+            let json = serde_json::to_string(&parsed).unwrap();
+            assert!(json.contains("\"type\":\""), "missing tag in {json}");
+        }
+    }
+
+    #[test]
+    fn test_config_variant_tags_are_snake_case() {
+        let cases = [
+            (
+                Config::UniqueValueColor { auto_color: true },
+                "unique_value_color",
+            ),
+            (
+                Config::Alignment {
+                    value: Some("left".into()),
+                },
+                "alignment",
+            ),
+            (
+                Config::TextColor {
+                    value: Some("#ffffff".into()),
+                },
+                "text_color",
+            ),
+            (
+                Config::BackgroundColor {
+                    value: Some("#000000".into()),
+                },
+                "background_color",
+            ),
+        ];
+        for (cfg, tag) in cases {
+            let json = serde_json::to_string(&cfg).unwrap();
+            assert!(json.contains(&format!("\"type\":\"{tag}\"")), "got {json}");
+        }
+        // UniqueValueColor keeps camelCase on its field.
+        let json =
+            serde_json::to_string(&Config::UniqueValueColor { auto_color: true }).unwrap();
+        assert!(json.contains("\"autoColor\":true"));
     }
 }

@@ -134,7 +134,8 @@
     "discardChanges": "Değişiklikleri iptal et",
     "unsavedChanges": "Kaydedilmemiş değişiklikler",
     "clearFilter": "Filtreyi temizle",
-    "noMatches": "Eşleşme yok"
+    "noMatches": "Eşleşme yok",
+    "remove": "Kaldır"
   },
   "search": {
     "selectIndex": "Önce Yayınla Seçin",
@@ -1732,7 +1733,14 @@
     "resetColumn": "Sütunu sıfırla",
     "editAll": "Tümünü düzenle",
     "inlinePreview": "Önizleme",
-    "tapActiveToClear": "temizlemek için etkin'e dokunun"
+    "tapActiveToClear": "temizlemek için etkin'e dokunun",
+    "columnFormattingSubtitle": "Solda kontroller, sağda sütunun canlı bir örneği, böylece bağlam içinde görürsünüz.",
+    "columnFormattingPick": "Bir sütun seçin",
+    "columnFormattingSampleNote": "Bu sütundan örnek satırlar.",
+    "columnFormattingAddColumn": "Sütun ekle",
+    "conditionalStyling": "Koşullu Biçimlendirme",
+    "typeNumeric": "Sayı",
+    "typeText": "Metin"
   },
   "panel": {
     "header": "Panel",

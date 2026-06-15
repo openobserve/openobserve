@@ -134,7 +134,8 @@
     "discardChanges": "Ignorer les modifications",
     "unsavedChanges": "Modifications non enregistrées",
     "clearFilter": "Effacer le filtre",
-    "noMatches": "Aucune allumette"
+    "noMatches": "Aucune allumette",
+    "remove": "Supprimer"
   },
   "search": {
     "selectIndex": "Sélectionnez Stream First",
@@ -1732,7 +1733,14 @@
     "resetColumn": "Réinitialiser la colonne",
     "editAll": "Tout modifier",
     "inlinePreview": "Aperçu",
-    "tapActiveToClear": "appuyez sur actif pour effacer"
+    "tapActiveToClear": "appuyez sur actif pour effacer",
+    "columnFormattingSubtitle": "Les contrôles à gauche, un aperçu en direct de la colonne à droite pour la voir en contexte.",
+    "columnFormattingPick": "Choisir une colonne",
+    "columnFormattingSampleNote": "Exemples de lignes de cette colonne.",
+    "columnFormattingAddColumn": "Ajouter une colonne",
+    "conditionalStyling": "Style conditionnel",
+    "typeNumeric": "Num",
+    "typeText": "Texte"
   },
   "panel": {
     "header": "Panneau",

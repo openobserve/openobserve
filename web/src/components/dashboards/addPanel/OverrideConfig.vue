@@ -34,10 +34,6 @@ interface Column {
   format?: (val: unknown) => string;
 }
 
-export interface OverrideConfig {
-  [key: string]: string;
-}
-
 export default defineComponent({
   name: "OverrideConfig",
   components: { OverrideConfigPopup, OButton },
@@ -58,7 +54,6 @@ export default defineComponent({
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
-    const overrideConfigs = ref<OverrideConfig[]>([]);
 
     const fetchColumns = () => {
       // Different logic for PromQL vs SQL queries
@@ -67,20 +62,11 @@ export default defineComponent({
         // This ensures we get exactly what's shown in the table
         const columnNames = new Set<string>();
 
-        // Try to get columns from the actual rendered panelData first.
-        // Use name-based heuristic for numeric detection: "value" and "value_*"
-        // columns are always numeric in PromQL. Do NOT use col.align — alignment
-        // can be overridden by the user's column formatting config, so a string
-        // column set to right-align would be wrongly treated as numeric.
-        const numericColumns = new Set<string>();
+        // Numeric detection is name-based ("value"/"value_*"), not alignment —
+        // alignment can be overridden by the user's column formatting.
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
-            if (col.name) {
-              columnNames.add(col.name);
-              if (col.name === "value" || col.name?.startsWith("value_")) {
-                numericColumns.add(col.name);
-              }
-            }
+            if (col.name) columnNames.add(col.name);
           });
         } else {
           // Fallback: Build columns based on table mode and available labels
@@ -131,9 +117,7 @@ export default defineComponent({
           label: columnName,
           // panelData path uses align; fallback uses name heuristic
           isNumeric:
-            numericColumns.has(columnName) ||
-            columnName === "value" ||
-            columnName.startsWith("value_"),
+            columnName === "value" || columnName.startsWith("value_"),
         }));
       } else {
         const x = dashboardPanelData.data.queries[0].fields.x || [];
@@ -161,28 +145,10 @@ export default defineComponent({
 
     const saveOverrideConfigConfig = (overrideConfig: any) => {
       dashboardPanelData.data.config.override_config = overrideConfig;
-      applyOverrideConfigs();
       showOverrideConfigPopup.value = false;
     };
 
-    const applyOverrideConfigs = () => {
-      const overrides = dashboardPanelData.data.config.override_config || [];
-
-      columns.value = columns.value.map((col: any) => {
-        return {
-          name: col.alias,
-          label: col.label,
-          field: col.alias,
-          format: (val: any) => {
-            const unit = overrides[col.alias] || "";
-            return `${val} ${unit}`;
-          },
-        };
-      });
-    };
-
     fetchColumns();
-    applyOverrideConfigs();
 
     onBeforeMount(() => {
       // Ensure that the override_config object is initialized in config
@@ -198,7 +164,6 @@ export default defineComponent({
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
       columns,
-      overrideConfigs,
     };
   },
 });

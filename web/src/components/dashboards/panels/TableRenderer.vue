@@ -106,7 +106,11 @@ import OverrideConfigPopup from "@/components/dashboards/OverrideConfigPopup.vue
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
-import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
+import { isColorDark } from "@/utils/dashboard/chartColorUtils";
+import {
+  buildValueMappingCache,
+  lookupValueMappingFull,
+} from "@/utils/dashboard/tableConfigUtils";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -162,17 +166,14 @@ export default defineComponent({
   setup(props) {
     const tableRef = ref<any>(null);
 
-    // ── Inline column formatting (edit-panel only) ────────────────────────────
-    // Writes go straight to the editable panel store, exactly like the
-    // OverrideConfig config-panel entry point — so inline edits persist through
-    // the existing Apply/Save flow and re-render the preview live.
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject<string | null>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelData =
+      props.enableInlineFormatting && dashboardPanelDataPageKey
+        ? useDashboardPanelData(dashboardPanelDataPageKey).dashboardPanelData
+        : null;
 
     const overrideConfigs = computed(
       () => dashboardPanelData?.data?.config?.override_config ?? [],
@@ -265,16 +266,6 @@ export default defineComponent({
       () => frozenColumns.value ?? ((props.data?.columns as any[]) || []),
     );
 
-    /** Returns true when the hex colour is dark (needs white text). */
-    const isDashboardColor = (hex: string): boolean => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      if (!result) return false;
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
-    };
-
     /**
      * Computes the inline style for a given TanStack cell.
      * Handles auto-color mode (stable palette per distinct value) and
@@ -282,6 +273,11 @@ export default defineComponent({
      */
     // Component-level cache: colKey → (value → hex). Avoids mutating prop-derived col objects.
     const autoColorCache = new Map<string, Map<string, string>>();
+
+    // Value-mapping lookup cache, rebuilt only when the mappings change.
+    const valueMappingCache = computed(() =>
+      buildValueMappingCache(props.valueMapping),
+    );
 
     const evalCondition = (val: number, op: string, threshold: number): boolean => {
       switch (op) {
@@ -309,15 +305,17 @@ export default defineComponent({
         const map = autoColorCache.get(colKey)!;
         if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
-      // 2) Value-mapping color.
-      const found = findFirstValidMappedValue(value, props.valueMapping, "color");
-      if (found?.color) {
+      // 2) Value-mapping color (valid hex only; else fall through).
+      const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
+      if (
+        found?.color &&
+        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
+      ) {
         const hex = found.color;
-        if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(hex)) return "";
-        return `background-color: ${hex}; color: ${isDashboardColor(hex) ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
       // 3) Conditional styling rules — first matching rule wins.
@@ -337,11 +335,10 @@ export default defineComponent({
       }
 
       // 4) Column-level text / background color override.
-      const colDef = (cell.column.columnDef.meta as any)?._col;
-      if (colDef?.bgColor || colDef?.textColor) {
+      if (col?.bgColor || col?.textColor) {
         const parts: string[] = [];
-        if (colDef.bgColor) parts.push(`background-color: ${colDef.bgColor}`);
-        if (colDef.textColor) parts.push(`color: ${colDef.textColor}`);
+        if (col.bgColor) parts.push(`background-color: ${col.bgColor}`);
+        if (col.textColor) parts.push(`color: ${col.textColor}`);
         return parts.join("; ");
       }
 

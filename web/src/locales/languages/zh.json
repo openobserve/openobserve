@@ -134,7 +134,8 @@
     "discardChanges": "放弃更改",
     "unsavedChanges": "未保存的更改",
     "clearFilter": "清除过滤器",
-    "noMatches": "没有匹配项"
+    "noMatches": "没有匹配项",
+    "remove": "移除"
   },
   "search": {
     "selectIndex": "选择数据流",
@@ -1732,7 +1733,14 @@
     "resetColumn": "重置列",
     "editAll": "全部编辑",
     "inlinePreview": "预览",
-    "tapActiveToClear": "点击激活即可清除"
+    "tapActiveToClear": "点击激活即可清除",
+    "columnFormattingSubtitle": "左侧为控制项，右侧为该列的实时示例，便于在上下文中查看。",
+    "columnFormattingPick": "选择列",
+    "columnFormattingSampleNote": "此列的示例行。",
+    "columnFormattingAddColumn": "添加列",
+    "conditionalStyling": "条件样式",
+    "typeNumeric": "数值",
+    "typeText": "文本"
   },
   "panel": {
     "header": "面板",

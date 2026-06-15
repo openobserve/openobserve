@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="col.unit"
         :options="unitOptions"
         class="tw:w-full"
-        :data-test="`o2-format-unit-${col.field}`"
+        :data-test="`${dataTestPrefix}-unit-${col.field}`"
       />
       <OInput
         v-if="col.unit === 'custom'"
         v-model="col.customUnit"
         :label="t('dashboard.customunitLabel')"
         class="tw:w-full tw:mt-2"
-        :data-test="`o2-format-custom-unit-${col.field}`"
+        :data-test="`${dataTestPrefix}-custom-unit-${col.field}`"
       />
     </div>
 
@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="button"
         class="tw:inline-flex tw:items-center tw:gap-2 tw:py-1.5 tw:px-2.5 tw:mt-3 tw:rounded-md tw:border tw:border-[rgba(128,128,128,0.28)] tw:bg-transparent tw:cursor-pointer tw:text-left tw:transition-colors tw:hover:border-[var(--color-primary-600)]"
         :class="{ 'cf-toggle-active': col.autoColor }"
+        :data-test="`${dataTestPrefix}-unique-color-${col.field}`"
         @click="col.autoColor = !col.autoColor"
       >
         <OCheckbox :model-value="col.autoColor" size="sm" class="tw:pointer-events-none" />
@@ -184,7 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         class="tw:mt-1"
-        @click="col.conditions.push({ operator: '<', threshold: '', textColor: '', bgColor: '' })"
+        :data-test="`${dataTestPrefix}-add-rule-${col.field}`"
+        @click="col.conditions.push(emptyConditionalRule())"
       >
         {{ t("dashboard.conditionAddRule") }}
       </OButton>
@@ -204,6 +206,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ColorSwatchPicker from "./ColorSwatchPicker.vue";
 import {
   type ColumnOverrideUI,
+  emptyConditionalRule,
   useColumnFormattingOptions,
   TEXT_SWATCHES,
   BG_SWATCHES,
@@ -226,6 +229,8 @@ export default defineComponent({
   props: {
     col: { type: Object as PropType<ColumnOverrideUI>, required: true },
     isNumeric: { type: Boolean, default: false },
+    /** Prefix for the data-test hooks (lets the inline editor keep its own ids). */
+    dataTestPrefix: { type: String, default: "o2-format" },
   },
   setup(props) {
     const { t } = useI18n();
@@ -276,6 +281,7 @@ export default defineComponent({
       setAlignment,
       onAlignPointerDown,
       onAlignClickItem,
+      emptyConditionalRule,
     };
   },
 });

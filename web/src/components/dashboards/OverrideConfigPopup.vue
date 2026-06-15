@@ -103,7 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Expanded split editor -->
-        <div v-show="isExpanded(idx)" class="cf-row-body">
+        <div
+          v-show="isExpanded(idx)"
+          class="cf-row-body"
+          :class="{ 'cf-row-body--single': !hasPreviewData }"
+        >
           <!-- Left: controls -->
           <div class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0">
             <div class="tw:flex tw:flex-col tw:gap-1">
@@ -123,16 +127,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <!-- Right: live preview -->
-          <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
+          <!-- Right: live preview (hidden when no sample data was supplied) -->
+          <div v-if="hasPreviewData" class="tw:min-w-0 tw:flex tw:flex-col tw:gap-1.5">
             <div class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]">
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
             </div>
             <div class="cf-preview-table tw:border tw:border-[rgba(128,128,128,0.18)] tw:rounded-md tw:overflow-hidden">
               <TableRenderer
-                v-if="col.field && previewFor(col)"
-                :data="previewFor(col)"
+                v-if="col.field && previews[idx]"
+                :data="previews[idx]"
                 :value-mapping="valueMapping"
                 :wrap-cells="true"
                 :show-pagination="false"
@@ -169,15 +173,20 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ColumnFormatControls from "./ColumnFormatControls.vue";
 import {
-  getUnitValue,
-  formatUnitValue,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
-import {
   type ColumnOverrideUI,
   emptyColumnOverride,
   loadAllFromRaw,
   serializeOverrides,
+  serializeColumnOverride,
+  useColumnFormattingOptions,
 } from "@/composables/dashboard/useColumnFormatting";
+import {
+  parseOverrideConfigs,
+  applyColumnOverrides,
+  applyProgressBarBounds,
+  buildValueMappingCache,
+  formatNumericValue,
+} from "@/utils/dashboard/tableConfigUtils";
 
 // Async import breaks the circular dependency (TableRenderer renders this dialog).
 const TableRenderer = defineAsyncComponent(
@@ -215,6 +224,7 @@ export default defineComponent({
   emits: ["close", "save"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
+    const { unitOptions, alignOptions } = useColumnFormattingOptions();
 
     const columnOverrides = ref<ColumnOverrideUI[]>([]);
     // Multi-expand: any number of rows can be open at once (indices).
@@ -285,30 +295,23 @@ export default defineComponent({
       },
     );
 
-    // Collapsed-row summary chips.
-    const UNIT_LABEL: Record<string, string> = {
-      bytes: "Bytes",
-      kilobytes: "KB",
-      megabytes: "MB",
-      bps: "B/s",
-      seconds: "s",
-      milliseconds: "ms",
-      microseconds: "µs",
-      nanoseconds: "ns",
-      percent: "%",
-      "percent-1": "%",
-      currency_dollar: "$",
-      currency_euro: "€",
-      numbers: "Number",
-      custom: "Custom",
-    };
+    const unitLabel = (unit: string) =>
+      unitOptions.find((o) => o.value === unit)?.label ?? unit;
+    const alignLabel = (align: string) =>
+      alignOptions.find((o) => o.value === align)?.label ?? align;
 
     const summaryChips = (col: ColumnOverrideUI) => {
       const chips: Array<{ text: string; swatch?: string }> = [];
       if (col.cellType === "progress_bar") chips.push({ text: t("dashboard.cellTypeBar") });
       else if (col.cellType === "sparkline") chips.push({ text: t("dashboard.cellTypeSpark") });
-      if (col.unit) chips.push({ text: col.unit === "custom" ? col.customUnit || "Custom" : UNIT_LABEL[col.unit] ?? col.unit });
-      if (col.alignment) chips.push({ text: col.alignment });
+      if (col.unit)
+        chips.push({
+          text:
+            col.unit === "custom"
+              ? col.customUnit || t("dashboard.custom")
+              : unitLabel(col.unit),
+        });
+      if (col.alignment) chips.push({ text: alignLabel(col.alignment) });
       if (col.autoColor) chips.push({ text: t("dashboard.overrideConfigUniqueValueColor") });
       else if (col.bgColor) chips.push({ text: "", swatch: col.bgColor });
       else if (col.textColor) chips.push({ text: "", swatch: col.textColor });
@@ -317,44 +320,29 @@ export default defineComponent({
       return chips;
     };
 
-    // Build a preview column def from the in-progress override.
+    // Build a preview column def from the in-progress override, routing through
+    // the SAME serialize -> parse -> apply pipeline the real table uses so the
+    // preview can never diverge from the rendered result.
     const buildPreviewColumn = (base: any, col: ColumnOverrideUI, isNumeric: boolean) => {
       const c: any = { ...base };
-      c.align = col.alignment || (isNumeric ? "right" : "left");
+      delete c.cellType;
+      delete c.progressColor;
+      delete c.sparklineStyle;
+      delete c.colorMode;
+      delete c.textColor;
+      delete c.bgColor;
+      delete c.conditionalRules;
 
-      if (isNumeric && col.cellType && col.cellType !== "text") {
-        c.cellType = col.cellType;
-        c.progressColor = col.progressColor || "";
-        if (col.cellType === "sparkline") c.sparklineStyle = col.sparklineStyle || "line";
-      } else {
-        delete c.cellType;
-        delete c.progressColor;
-        delete c.sparklineStyle;
-      }
-
-      c.colorMode = col.autoColor ? "auto" : undefined;
-      c.textColor = col.textColor || undefined;
-      c.bgColor = col.bgColor || undefined;
-
-      c.conditionalRules = (col.conditions ?? [])
-        .filter((r) => r.operator && r.threshold !== "")
-        .map((r) => ({
-          operator: r.operator,
-          threshold: r.threshold,
-          textColor: r.textColor,
-          bgColor: r.bgColor,
-        }));
+      const aliasLower = String(col.field ?? "").toLowerCase();
+      const entry = serializeColumnOverride(col, isNumeric);
+      const maps = parseOverrideConfigs(entry ? [entry] : []);
+      applyColumnOverrides(c, aliasLower, maps, isNumeric ? "right" : "left");
 
       if (isNumeric) {
-        const unit = col.unit;
-        const customUnit = col.customUnit;
-        c.format = (val: any) => {
-          if (val === null || val === undefined || val === "") return "";
-          if (Number.isNaN(Number(val))) return val;
-          if (unit)
-            return `${formatUnitValue(getUnitValue(val, unit, customUnit, 2)) ?? 0}`;
-          return Number(val).toFixed(2);
-        };
+        const cache = buildValueMappingCache(props.valueMapping);
+        const unit = maps.unitConfigMap[aliasLower]?.unit ?? "";
+        const customUnit = maps.unitConfigMap[aliasLower]?.customUnit ?? "";
+        c.format = (val: any) => formatNumericValue(val, cache, unit, customUnit, 2);
       }
       return c;
     };
@@ -374,22 +362,20 @@ export default defineComponent({
       if (!base?.column) return null;
       const isNumeric = isNumericColumn(col.field);
       const previewCol = buildPreviewColumn(base.column, col, isNumeric);
-      // Progress bars need a data range (min 0, max = largest sample value).
-      if (previewCol.cellType === "progress_bar") {
-        const fieldKey = base.column.field ?? base.column.name;
-        const nums = (base.rows ?? [])
-          .map((r: any) => parseFloat(String(r?.[fieldKey])))
-          .filter((v: number) => !isNaN(v));
-        previewCol.progressMin = 0;
-        previewCol.progressMax = nums.length
-          ? nums.reduce((a: number, b: number) => Math.max(a, b), -Infinity)
-          : 100;
-      }
+      applyProgressBarBounds([previewCol], base.rows ?? []);
       return {
         rows: base.rows ?? [],
         columns: [previewCol],
       };
     };
+
+    const hasPreviewData = computed(
+      () => Object.keys(props.previewData ?? {}).length > 0,
+    );
+
+    const previews = computed(() =>
+      columnOverrides.value.map((c) => (c.field ? previewFor(c) : null)),
+    );
 
     const addColumn = () => {
       columnOverrides.value.push(emptyColumnOverride());
@@ -426,7 +412,8 @@ export default defineComponent({
       getFieldLabel,
       isNumericColumn,
       summaryChips,
-      previewFor,
+      hasPreviewData,
+      previews,
       addColumn,
       removeColumn,
       closePopup,
@@ -464,6 +451,10 @@ export default defineComponent({
   @media (max-width: 900px) {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.cf-row-body--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 // Hide the per-cell copy button inside the mini preview.
