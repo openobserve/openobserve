@@ -8,9 +8,10 @@ name: E2E Council (Test Generation)
 # EVERY RUN IS TIED TO A PR — by design. A PR is the unit of change + review; generating tests
 # detached from a PR is not allowed. There are exactly two entry points, both PR-bound:
 #   - `/e2e` comment on a PR        → triages that PR's diff.
-#   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED).
+#   - Manual run with `pr_number`   → triages that PR's diff (pr_number is REQUIRED; accepts a
+#                                     bare number, "#123", or a full PR URL).
 # No PR ⇒ no run. (There is intentionally no free-form branch option.)
-#   Example: to triage PR #1234, dispatch with pr_number=1234.
+#   Example: dispatch with pr_number=1234 (or .../pull/1234).
 #
 # IMPORTANT: both triggers read this workflow's definition from the DEFAULT BRANCH (main).
 # So this file must be merged to main before `workflow_dispatch` appears in the Actions UI or
@@ -27,7 +28,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to triage / generate E2E tests for (REQUIRED, e.g. '1234'). Tests are only ever generated for a PR."
+        description: "PR number OR PR URL to triage / generate E2E tests for (REQUIRED, e.g. '1234' or 'https://github.com/openobserve/openobserve/pull/1234'). Tests are only ever generated for a PR."
         required: true
       feature_hint:
         description: "Optional feature name/area hint for triage"
@@ -94,10 +95,16 @@ jobs:
           script: |
             // Only the PR number is needed — we read the change as a diff (data), never check
             // out the PR head. (See the checkout step below for the security rationale.)
-            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input.
-            const pr = context.eventName === 'issue_comment'
-              ? context.payload.issue.number
-              : (context.payload.inputs.pr_number || '');
+            // issue_comment → the commented PR; workflow_dispatch → the required pr_number input,
+            // which accepts a bare number, "#123", or a full PR URL. Normalize to a bare integer
+            // so downstream (gh pr diff, comment posting, concurrency) always gets a number.
+            const raw = context.eventName === 'issue_comment'
+              ? String(context.payload.issue.number)
+              : String(context.payload.inputs.pr_number || '');
+            const urlMatch = raw.match(/\/pull\/(\d+)/);   // PR URL → the /pull/<n> segment
+            const numMatch = raw.match(/\d+/);             // else first run of digits ("#123", "123")
+            const pr = urlMatch ? urlMatch[1] : (numMatch ? numMatch[0] : '');
+            if (!pr) core.setFailed(`Could not parse a PR number from input: "${raw}"`);
             core.setOutput('pr_number', pr);
 
       - name: Determine dry-run mode
