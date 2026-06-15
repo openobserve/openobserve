@@ -151,8 +151,8 @@ export class AlertsPage {
             alertDetailsDialog: '[data-test="alert-details-dialog"]',
             alertDetailsTitle: '[data-test="alert-details-title"]',
             alertDetailsEditButton: '[data-test="alert-details-edit-btn"]',
-            alertDetailsRefreshButton: '[data-test="alert-details-refresh-btn"]',
-            alertDetailsCloseButton: '[data-test="alert-details-close-btn"]',
+            alertDetailsRefreshButton: '[data-test="alert-history-refresh-btn"]',
+            alertDetailsCloseButton: '[data-test="o-drawer-close-btn"]',
             alertDetailsCopyConditionsButton: '[data-test="alert-details-copy-conditions-btn"]',
             alertDetailsHistoryTable: '[data-test="alert-details-history-table"]',
 
