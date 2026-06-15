@@ -734,7 +734,7 @@ async fn process_node(
                 "[Pipeline]: LLM evaluation node {node_idx} skipped because online evals are enterprise-only"
             );
             let mut skipped_count = 0usize;
-            while receiver.recv().await.is_some() {
+            while channels.receiver.recv().await.is_some() {
                 skipped_count += 1;
             }
             log::info!(
