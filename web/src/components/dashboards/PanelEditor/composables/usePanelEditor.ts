@@ -31,6 +31,7 @@ import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/check
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import useNotifications from "@/composables/useNotifications";
+import { validateUserCode } from "@/utils/dashboard/convertCustomChartData";
 
 /**
  * Options for usePanelEditor composable
@@ -327,6 +328,21 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
             "There are some errors, please fix them and try again",
           );
           // Do not return early — query still fires to allow partial results
+        }
+      }
+
+      // For custom_chart panels, validate JS code safety before firing any backend query.
+      // This check runs eagerly so CI environments where the backend may return an API
+      // error (stream not yet ready, etc.) still surface the validation error immediately.
+      if (dashboardPanelData.data.type === "custom_chart") {
+        const userCode = dashboardPanelData.data.customChartContent;
+        if (userCode) {
+          const validationError = validateUserCode(userCode);
+          if (validationError) {
+            errorData.errors.splice(0);
+            errorData.errors.push(`Unsafe code detected: ${validationError}`);
+            return;
+          }
         }
       }
 
