@@ -50,3 +50,5 @@ pub mod timed_annotation_panels;
 pub mod timed_annotations;
 pub mod trial_quota_usage;
 pub mod users;
+pub mod workflow_errors;
+pub mod workflows;

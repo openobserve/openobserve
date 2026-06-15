@@ -125,6 +125,8 @@ mod m20260520_000005_drop_eval_templates_table;
 mod m20260604_000001_add_kind_to_pipeline;
 mod m20260622_000001_add_org_id_to_short_urls;
 mod m20260629_000001_create_gen_ai_agents_table;
+mod m20260615_00001_create_workflow_errors_table;
+mod m20260615_00001_create_workflows_table;
 
 pub struct Migrator;
 
@@ -239,9 +241,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260604_000001_add_kind_to_pipeline::Migration),
             Box::new(m20260622_000001_add_org_id_to_short_urls::Migration),
             Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),
+            Box::new(m20260615_00001_create_workflows_table::Migration),
+            Box::new(m20260615_00001_create_workflow_errors_table::Migration),
         ]
     }
-}
 
 pub fn get_text_type() -> &'static str {
     "text"
