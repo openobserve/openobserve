@@ -117,6 +117,31 @@ jobs:
             echo "dry_run=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Acknowledge — react + post in-progress comment
+        # Give the user immediate feedback (within seconds) that the agent is working. We post a
+        # placeholder comment now and EDIT it in place with the decision later (no extra noise).
+        id: ack
+        if: steps.resolve.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = Number('${{ steps.resolve.outputs.pr_number }}');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            // 👀 reaction on the triggering /e2e comment (comment trigger only).
+            if (context.eventName === 'issue_comment') {
+              try {
+                await github.rest.reactions.createForIssueComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  comment_id: context.payload.comment.id, content: 'eyes',
+                });
+              } catch (e) { core.info(`reaction failed: ${e.message}`); }
+            }
+            const { data } = await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: pr,
+              body: `### 🤖 E2E Council — triage in progress…\n\nAnalyzing the change with DeepSeek; I'll update this comment with the decision shortly.\n\n[View run](${runUrl})`,
+            });
+            core.setOutput('comment_id', data.id);
+
       - uses: actions/checkout@v4
         # SECURITY (untrusted-checkout TOCTOU / "pwn request"): this job is privileged — the
         # issue_comment trigger runs with repo secrets. So we check out ONLY the trusted default
@@ -196,8 +221,10 @@ jobs:
           name: triage-context
           path: docs/test_generator/ci/
 
-      - name: Post triage comment
-        if: steps.resolve.outputs.pr_number != ''
+      - name: Post or update triage comment
+        # always() so a failed/empty run still updates the in-progress comment (never leaves it
+        # stuck on "in progress…"). Edits the ack comment in place; creates one if ack didn't run.
+        if: always() && steps.resolve.outputs.pr_number != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -205,6 +232,7 @@ jobs:
             // Keep LLM-authored text out of any markdown that could render as active content.
             const clean = (s, max = 600) =>
               String(s ?? '').replace(/[<>]/g, '').slice(0, max);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             let body = '### 🤖 E2E Council — triage\n\n';
             try {
               const t = JSON.parse(fs.readFileSync('docs/test_generator/ci/triage.json', 'utf8'));
@@ -214,14 +242,22 @@ jobs:
               if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
               if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
               body += `\n**Rationale:** ${clean(t.rationale)}\n`;
+              body += `\n_Dry-run (v1 manual-first): no tests generated._`;
             } catch (e) {
-              body += `⚠️ Triage did not produce a decision file — check the run logs.\n`;
+              body += `❌ Triage did not produce a decision (the run may have failed or the diff was empty).\n\n[View run](${runUrl})`;
             }
-            body += `\n_Dry-run (v1 manual-first): no tests generated._`;
-            await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: Number('${{ steps.resolve.outputs.pr_number }}'), body,
-            });
+            const commentId = '${{ steps.ack.outputs.comment_id }}';
+            if (commentId) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: Number(commentId), body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: Number('${{ steps.resolve.outputs.pr_number }}'), body,
+              });
+            }
 
   # ---------------------------------------------------------------------------
   # JOB 2 — Generate (Analyst → Architect → Engineer → Sentinel). No live env.
