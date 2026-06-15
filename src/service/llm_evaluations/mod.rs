@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod eval_jobs;
-pub mod evaluator_trace;
 pub mod evaluator_trace_exporter;
-pub mod prepared_scorers;
-pub mod score_configs;
-pub mod score_writer;
-pub mod scorers;
+
+pub use o2_enterprise::enterprise::llm_evaluations::{
+    evaluator_trace, prepared_scorers, score_configs, score_writer, scorers,
+};

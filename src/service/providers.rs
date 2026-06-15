@@ -83,6 +83,9 @@ pub async fn update_provider(
     let existing = table::providers::get(provider_id)
         .await?
         .ok_or(ProviderError::NotFound)?;
+    if existing.org_id != org_id {
+        return Err(ProviderError::NotFound);
+    }
 
     // Check name uniqueness excluding self
     let all = table::providers::get_all_by_org(org_id).await?;
