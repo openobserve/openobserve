@@ -1,5 +1,5 @@
 import { reactive, ref } from "vue"
-import type { ToastVariant, ToastOptions, ToastPosition } from "./OToast.types"
+import type { ToastVariant, ToastOptions, ToastPosition, ToastDetail } from "./OToast.types"
 
 // ── Internal record shape ────────────────────────────────────────────────────
 
@@ -17,6 +17,8 @@ interface ToastRecord {
   timer?: ReturnType<typeof setTimeout> // auto-dismiss handle, reset on dedup
   timerStart?: number                   // epoch ms when the current timer was started
   remainingTimeout?: number             // ms left when the timer was last paused
+  details?: ToastDetail[]
+  onDismiss?: () => void
 }
 
 // ── Default timeouts per variant ─────────────────────────────────────────────
@@ -156,6 +158,8 @@ function toast(options: ToastOptions): DismissFn {
     action: options.action,
     count: 1,
     timerKey: 0,
+    details: options.details,
+    onDismiss: options.onDismiss,
   }
 
   // Loading variant is suppressed — callers use the returned dismiss fn to
@@ -166,6 +170,22 @@ function toast(options: ToastOptions): DismissFn {
   }
 
   return makeDismissFn(id, position)
+}
+
+// Update mutable fields of an existing open toast in-place.
+// Used by the unauthorized-error grouper to append newly-failed resources
+// to an already-visible notification rather than stacking a second one.
+function updateToast(
+  id: string,
+  updates: { title?: string; message?: string; details?: ToastDetail[] },
+): void {
+  const record = toastRecords.find((r) => r.id === id)
+  if (!record) return
+  if (updates.title !== undefined)
+    record.title = capitalizeFirst(updates.title)
+  if (updates.message !== undefined)
+    record.message = capitalizeFirst(updates.message)
+  if (updates.details !== undefined) record.details = updates.details
 }
 
 function makeDismissFn(id: string, position: ToastPosition): DismissFn {
@@ -222,5 +242,5 @@ export function useToast(): UseToastReturn {
 }
 
 // ── Direct export — for use outside Vue tree (services, main.ts) ─────────────
-export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer }
+export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer, updateToast }
 export type { ToastRecord, DismissFn }

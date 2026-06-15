@@ -131,6 +131,8 @@ const screenReaderTitle = computed(() =>
 const isTopPosition = computed(() =>
   props.position.startsWith("top-"),
 )
+
+const detailsExpanded = ref(false)
 </script>
 
 <template>
@@ -139,7 +141,8 @@ const isTopPosition = computed(() =>
     :duration="0"
     :class="[
       'tw:relative tw:pointer-events-auto',
-      'tw:w-[22rem] tw:max-w-[calc(100vw-2rem)]',
+      details && details.length > 0 ? 'tw:w-[28rem]' : 'tw:w-[22rem]',
+      'tw:max-w-[calc(100vw-2rem)]',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
       isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
@@ -234,6 +237,46 @@ const isTopPosition = computed(() =>
               {{ action.label }}
             </button>
           </ToastAction>
+        </div>
+
+        <!-- Expandable affected-sections list -->
+        <div
+          v-if="details && details.length > 0"
+          class="tw:mt-2 tw:w-full"
+          data-test="o-toast-details"
+        >
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            :aria-expanded="detailsExpanded"
+            data-test="o-toast-details-toggle"
+            @click.stop="detailsExpanded = !detailsExpanded"
+          >
+            <OIcon
+              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+              size="sm"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            />
+            Affected Sections
+          </button>
+          <ul
+            v-if="detailsExpanded"
+            class="tw:mt-1.5 tw:space-y-1.5"
+            data-test="o-toast-details-list"
+          >
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
+            >
+              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span
+                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                :title="detail.url"
+              >{{ detail.url }}</span>
+            </li>
+          </ul>
         </div>
       </div>
 
