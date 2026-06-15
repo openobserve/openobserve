@@ -813,6 +813,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/groups/bulk", delete(authz::fga::delete_group_bulk))
         .route("/{org_id}/resources", get(authz::fga::get_resources))
         .route("/{org_id}/roles/{role_id}/users", get(authz::fga::get_users_with_role))
+        .route("/{org_id}/users/roles/all", get(authz::fga::get_roles_for_all_users))
         .route("/{org_id}/users/{user_id}/roles", get(authz::fga::get_roles_for_user))
         .route("/{org_id}/users/{user_id}/groups", get(authz::fga::get_groups_for_user))
 
