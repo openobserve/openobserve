@@ -497,6 +497,10 @@ export class DashboardPage {
   // empty when Apply runs (CI flake on custom-charts.spec.js). Set the model
   // directly via Monaco's API and poll until the value sticks.
   async setCustomChartCode(code) {
+    // Set the Monaco model value directly via the API and confirm it lands.
+    // Pass trimmed code because CodeQueryEditor emits getValue().trim(), so
+    // trailing newlines in JSON files would cause Vue state to differ from raw input.
+    const trimmedCode = code.trim();
     await this.page.waitForFunction(
       (chartCode) => {
         const host = document.querySelector('[data-test="dashboard-markdown-editor-query-editor"]');
@@ -506,15 +510,15 @@ export class DashboardPage {
           return dom && host.contains(dom);
         });
         if (!editor) return false;
-        if (editor.getValue() !== chartCode) editor.setValue(chartCode);
-        return editor.getValue() === chartCode;
+        if (editor.getValue().trim() !== chartCode) editor.setValue(chartCode);
+        return editor.getValue().trim() === chartCode;
       },
-      code,
+      trimmedCode,
       { timeout: 10000 }
     );
-    // CodeQueryEditor debounces its update:query emit by 500ms — wait past the
-    // window so the panel schema receives the value before subsequent steps.
-    await this.page.waitForTimeout(600);
+    // Wait past CodeQueryEditor's 500ms debounce so Vue state is updated before
+    // the next step (Apply). 1000ms gives a 500ms margin on slow CI runners.
+    await this.page.waitForTimeout(1000);
   }
 
   // Dashboard panel SQL query editor (data-test="dashboard-panel-query-editor").
@@ -524,6 +528,8 @@ export class DashboardPage {
   // whatever the auto-gen produced (or empty). Drive Monaco's model directly and
   // poll to confirm the value lands before Apply.
   async setDashboardPanelQuery(sql) {
+    // Trim for the same reason as setCustomChartCode — CodeQueryEditor emits trim().
+    const trimmedSql = sql.trim();
     await this.page.waitForFunction(
       (query) => {
         const host = document.querySelector('[data-test="dashboard-panel-query-editor"]');
@@ -533,17 +539,14 @@ export class DashboardPage {
           return dom && host.contains(dom);
         });
         if (!editor) return false;
-        if (editor.getValue() !== query) editor.setValue(query);
-        return editor.getValue() === query;
+        if (editor.getValue().trim() !== query) editor.setValue(query);
+        return editor.getValue().trim() === query;
       },
-      sql,
+      trimmedSql,
       { timeout: 10000 }
     );
-    // CodeQueryEditor.vue:107 / 726 debounces its onDidChangeModelContent->
-    // emit('update:query') by 500ms. Without this wait, panelSchema.queries[i].query
-    // stays empty when Apply fires and the panel shows "Please enter query for
-    // custom chart" — even though the Monaco model already shows the SQL.
-    await this.page.waitForTimeout(600);
+    // Wait past CodeQueryEditor's 500ms debounce so Vue state is updated before Apply.
+    await this.page.waitForTimeout(1000);
   }
 
 }
