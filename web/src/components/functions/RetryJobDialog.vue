@@ -328,7 +328,7 @@ export default defineComponent({
 
 .retry-dialog.dark-theme {
   background-color: #1e1e1e;
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 .retry-dialog-header {
@@ -351,7 +351,7 @@ export default defineComponent({
 }
 
 .dark-theme .retry-dialog-title {
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 
@@ -397,7 +397,7 @@ export default defineComponent({
 }
 
 .dark-theme .info-value {
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 .url-text {
@@ -460,11 +460,11 @@ export default defineComponent({
 }
 
 .dark-theme .options-title {
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 .option-card {
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--o2-border);
   border-radius: 8px;
   margin-bottom: 12px;
   transition: all 0.2s;
@@ -522,7 +522,7 @@ export default defineComponent({
 }
 
 .dark-theme .option-header {
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 .option-icon {

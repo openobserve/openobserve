@@ -2940,7 +2940,7 @@ watch(
 .metric-splitter-separator {
   width: 1px;
   height: 100%;
-  background: var(--o2-border-color, #e0e0e0);
+  background: var(--o2-border-color, var(--o2-border));
   cursor: col-resize;
 }
 
@@ -2973,7 +2973,7 @@ body.body--dark .metric-splitter-separator {
   justify-content: space-between;
   padding: 0.375rem 0.5rem;
   background: var(--q-color-grey-2, #f5f5f5);
-  border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
+  border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
   position: sticky;
   top: 0;
   z-index: 1;
@@ -3023,7 +3023,7 @@ body.body--dark .metric-splitter-separator {
 
   .metric-list-item {
     padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
+    border-bottom: 0.0625rem solid var(--q-border-color, var(--o2-border));
 
     &:hover {
       background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));

@@ -1913,17 +1913,17 @@ export default defineComponent({
 
 .q-table {
   &__top {
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
     justify-content: flex-end;
   }
 }
 
 .dark-mode {
-  background-color: $dark-page;
+  background-color: var(--o2-primary-background);
 }
 
 .bg-white {
-  background-color: $white;
+  background-color: #FFFFFF;
 }
 
 .stickyHeader {
@@ -2021,7 +2021,7 @@ export default defineComponent({
 }
 
 .refresh-btn-group .apply-btn-dropdown.q-btn--outline::before {
-  border-left: 1px solid $border-color !important;
+  border-left: 1px solid var(--o2-border) !important;
 }
 
 /* Flat state borders (when loading/cancel) - using pseudo-elements to avoid layout shifts */
@@ -2032,7 +2032,7 @@ export default defineComponent({
   left: 0;
   right: 0;
   bottom: 0;
-  border: 1px solid $border-color !important;
+  border: 1px solid var(--o2-border) !important;
   border-right: none !important;
   border-radius: inherit;
   pointer-events: none;
@@ -2045,8 +2045,8 @@ export default defineComponent({
   left: 0;
   right: 0;
   bottom: 0;
-  border: 1px solid $border-color !important;
-  border-left: 1px solid $border-color !important;
+  border: 1px solid var(--o2-border) !important;
+  border-left: 1px solid var(--o2-border) !important;
   border-radius: inherit;
   pointer-events: none;
 }

@@ -2516,7 +2516,7 @@ export default defineComponent({
 }
 
 .body--light .actions-section .action-btn {
-  border-color: #e0e0e0;
+  border-color: var(--o2-border);
   color: #333;
   background: #f9f9f9;
 
@@ -2559,7 +2559,7 @@ export default defineComponent({
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #e0e0e0;
+    background: var(--o2-border);
 
     &:hover {
       background: #d0d0d0;

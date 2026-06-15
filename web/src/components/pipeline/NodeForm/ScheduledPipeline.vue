@@ -2802,7 +2802,7 @@ defineExpose({
 .scheduled-pipeline-tabs {
   padding: 0px !important;
   height: 28px !important;
-  border: 1px solid $primary;
+  border: 1px solid var(--o2-theme-color);
   width: 200px;
   border-radius: 4px;
   overflow: hidden;
@@ -2902,8 +2902,8 @@ defineExpose({
     padding: 0px !important;
 
     .q-tab--active {
-      background-color: $primary;
-      color: $white;
+      background-color: var(--o2-theme-color);
+      color: #FFFFFF;
     }
 
     .q-tab__indicator {
@@ -2951,7 +2951,7 @@ defineExpose({
   color: white;
 
   .q-btn__content {
-    background: $secondary;
+    background: var(--o2-theme-color);
     border-radius: 3px 3px 3px 3px;
     padding: 0px 5px;
 }

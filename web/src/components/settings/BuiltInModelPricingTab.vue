@@ -403,7 +403,7 @@ export default defineComponent({
 .tier-row {
   padding: 1px 0;
   & + .tier-row {
-    border-top: 1px dashed #e0e0e0;
+    border-top: 1px dashed var(--o2-border);
     margin-top: 2px;
     padding-top: 2px;
   }

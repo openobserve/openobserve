@@ -717,7 +717,7 @@ body.body--dark {
   .exception-message {
     background: rgba(255, 255, 255, 0.05);
     border-left-color: #ffb74d;
-    color: #e0e0e0;
+    color: var(--o2-border);
   }
 
   .stacktrace-container {

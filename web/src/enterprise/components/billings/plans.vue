@@ -483,7 +483,7 @@ export default defineComponent({
 }
 
 .subtitle {
-  color: $primary;
+  color: var(--o2-theme-color);
 }
 
 .feature-card {

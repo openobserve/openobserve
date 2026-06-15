@@ -640,10 +640,10 @@ export default defineComponent({
 }
 
 .dark-mode-regex-pattern-input .q-field__control {
-  background-color: #181a1b !important;
-  border-left: 1px solid #212121 !important;
-  border-right: 1px solid #212121 !important;
-  border-bottom: 1px solid #212121 !important;
+  background-color: var(--o2-primary-background) !important;
+  border-left: 1px solid var(--o2-primary-background) !important;
+  border-right: 1px solid var(--o2-primary-background) !important;
+  border-bottom: 1px solid var(--o2-primary-background) !important;
 }
 .light-mode-regex-pattern-input .q-field__control {
   background-color: #ffffff !important;
@@ -658,10 +658,10 @@ export default defineComponent({
 }
 
 .dark-mode-regex-test-string-input .q-field__control {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
+  background-color: var(--o2-primary-background) !important;
+  border-left: 2px solid var(--o2-primary-background) !important;
+  border-right: 2px solid var(--o2-primary-background) !important;
+  border-bottom: 2px solid var(--o2-primary-background) !important;
 }
 .light-mode-regex-test-string-input {
   background-color: #ffffff !important;
@@ -693,7 +693,7 @@ export default defineComponent({
 }
 .dark-mode-regex-test-string-input {
   .monaco-editor-background {
-    background-color: #181a1b !important;
+    background-color: var(--o2-primary-background) !important;
   }
 }
 .regex-pattern-input-label {
@@ -740,10 +740,10 @@ export default defineComponent({
   margin-left: -4px;
 }
 .dark-mode-regex-no-output {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
+  background-color: var(--o2-primary-background) !important;
+  border-left: 2px solid var(--o2-primary-background) !important;
+  border-right: 2px solid var(--o2-primary-background) !important;
+  border-bottom: 2px solid var(--o2-primary-background) !important;
 }
 .light-mode-regex-no-output {
   background-color: #ffffff !important;

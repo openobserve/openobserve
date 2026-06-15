@@ -136,7 +136,7 @@ export default defineComponent({
 }
 
 .bordered-scroll-area-light {
-  border-color: #e0e0e0;
+  border-color: var(--o2-border);
   background-color: #f5f5f5;
 }
 

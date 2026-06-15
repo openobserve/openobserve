@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="_rowKey"
             pagination="none"
             :default-columns="false"
-            class="o2-quasar-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="o2-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">
@@ -892,8 +892,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/logs/detail-table.scss";
-@import "@/styles/logs/json-preview.scss";
 
 // Make correlation tab panels use full remaining height (no footer space)
 .full-height-panels {

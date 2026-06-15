@@ -532,6 +532,6 @@ onMounted(async () => {
 
 .expanded-details {
   background-color: var(--q-background);
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
+  border-top: 1px solid var(--q-border-color, var(--o2-border));
 }
 </style>

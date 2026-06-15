@@ -81,7 +81,7 @@ export default defineComponent({
 <style scoped lang="scss">
 .q-table {
   &__top {
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
     justify-content: flex-end;
   }
 }
@@ -105,7 +105,7 @@ export default defineComponent({
           }
         }
         &--active {
-          background-color: $accent;
+          background-color: #F5F5F5;
           color: black;
         }
       }

@@ -1247,9 +1247,6 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-@import "../styles/app.scss";
-</style>
 
 <style lang="scss" scoped>
 // Print mode — hide header + sidebar, show body overflow

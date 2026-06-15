@@ -3104,7 +3104,6 @@ body.body--dark .ai-chat-panel::-webkit-scrollbar-thumb {
 </style>
 
 <style lang="scss">
-@import './RcaReport.scss';
 
 .o2-incident-card-bg {
   background-color: var(--o2-card-bg);

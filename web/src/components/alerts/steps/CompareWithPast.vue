@@ -340,11 +340,11 @@ export default defineComponent({
 
   &.dark-mode {
     .step-content {
-      background-color: #212121;
+      background-color: var(--o2-primary-background);
       border: 1px solid #343434;
     }
     .section-header { border-bottom: 1px solid #343434; }
-    .section-header-title { color: #e0e0e0; }
+    .section-header-title { color: var(--o2-border); }
     .section-header-accent { background: var(--q-primary); }
   }
 
@@ -398,7 +398,7 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .reference-window-container {
-  background-color: var(--o2-card-bg, #212121);
+  background-color: var(--o2-card-bg, var(--o2-primary-background));
   border: 1px solid var(--o2-border-color, #343434);
 }
 
@@ -413,7 +413,7 @@ export default defineComponent({
 }
 
 .dark-mode-multi-window .multi-window-container {
-  background-color: var(--o2-card-bg, #212121);
+  background-color: var(--o2-card-bg, var(--o2-primary-background));
   border: 1px solid var(--o2-border-color, #343434);
 }
 

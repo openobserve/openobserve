@@ -53,7 +53,7 @@ defineProps({
 <style lang="scss">
 .error_type {
   font-size: 1rem;
-  color: $info;
+  color: var(--o2-info);
 }
 
 .error_description {

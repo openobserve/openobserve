@@ -888,7 +888,7 @@ defineExpose({
   }
 
   :deep(.active) {
-    background-color: $primary !important;
+    background-color: var(--o2-theme-color) !important;
     color: white !important;
   }
 }

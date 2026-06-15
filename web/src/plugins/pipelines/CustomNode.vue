@@ -1322,7 +1322,7 @@ function getIcon(data, ioType) {
 .function-definition {
   background-color: #f5f5f5;
   border-radius: 4px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   overflow: hidden;
 }
 
@@ -1396,7 +1396,7 @@ function getIcon(data, ioType) {
 .conditions-container {
   background-color: #f5f5f5;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   padding: 16px;
 }
 
@@ -1524,7 +1524,7 @@ function getIcon(data, ioType) {
 .query-content {
   background-color: #f5f5f5;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   overflow: hidden;
   max-height: 300px;
   overflow-y: auto;
@@ -1549,7 +1549,7 @@ function getIcon(data, ioType) {
 .trigger-details {
   background-color: #f8f9fa;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   padding: 16px;
   display: flex;
   flex-direction: column;

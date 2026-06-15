@@ -497,7 +497,7 @@ export default defineComponent({
   width: 100%;
   height: 100%;
   min-height: 600px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   border-radius: 4px;
   position: relative;
 }
@@ -622,7 +622,7 @@ export default defineComponent({
       .custom-node {
         background: #2a2a2a;
         border-color: #64b5f6;
-        color: #e0e0e0;
+        color: var(--o2-border);
         border-width: 2px;
         max-width: 180px;
 

@@ -2778,7 +2778,7 @@ body.body--dark {
 
     .io-section .section-label {
       background: #1e1e1e;
-      color: #e0e0e0; // Ensure text is visible in dark mode
+      color: var(--o2-border); // Ensure text is visible in dark mode
     }
   }
 

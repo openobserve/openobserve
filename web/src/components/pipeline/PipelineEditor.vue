@@ -1278,7 +1278,7 @@ const cleanupPipelinesContextProvider = () => {
     padding: 8px 16px;
 
     border: 1px solid rgba(74, 222, 128, 0.4);
-    color: #181a1B;
+    color: var(--o2-primary-background);
     border-radius: 8px;
     background: rgba(240, 253, 244, 0.9);
     box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);

@@ -615,7 +615,7 @@ function updateUrlQueryParams() {
     color: white;
 
     .q-btn__content {
-      background: $secondary;
+      background: var(--o2-theme-color);
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 }
   }

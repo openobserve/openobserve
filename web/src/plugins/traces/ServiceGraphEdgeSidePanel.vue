@@ -897,7 +897,7 @@ export default defineComponent({
 }
 
 .body--light .panel-header {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--o2-border);
   background: #f5f5f5;
 
   .edge-name {
@@ -938,7 +938,7 @@ export default defineComponent({
   background: #ffffff;
   &::-webkit-scrollbar-track { background: #f8f9fa; }
   &::-webkit-scrollbar-thumb {
-    background: #e0e0e0;
+    background: var(--o2-border);
     &:hover { background: #d0d0d0; }
   }
 }
@@ -1299,6 +1299,6 @@ export default defineComponent({
 .body--light .service-graph-edge-side-panel {
   background: #ffffff;
   color: #333333;
-  border-left: 1px solid #e0e0e0;
+  border-left: 1px solid var(--o2-border);
 }
 </style>

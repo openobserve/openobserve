@@ -186,7 +186,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .invite-user {
-  background: $input-bg;
+  background: transparent;
   border-radius: 4px;
 
   .separator {
@@ -196,6 +196,6 @@ export default defineComponent({
 
 .inputHint {
   font-size: 11px;
-  color: $light-text;
+  color: var(--o2-text-secondary);
 }
 </style>

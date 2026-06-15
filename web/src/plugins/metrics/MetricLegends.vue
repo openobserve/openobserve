@@ -73,6 +73,6 @@ export default defineComponent({
 }
 
 .q-btn:before {
-  border: 0px solid #d5d5d5;
+  border: 0px solid var(--o2-border-input);
 }
 </style>

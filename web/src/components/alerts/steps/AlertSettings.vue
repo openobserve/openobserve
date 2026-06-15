@@ -1004,14 +1004,14 @@ export default defineComponent({
   }
 
   &.dark-mode {
-    background-color: #212121;
+    background-color: var(--o2-primary-background);
     border: 1px solid #343434;
 
     .section-header {
       border-bottom: 1px solid #343434;
     }
     .section-header-title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
     .section-header-accent {
       background: var(--q-primary);

@@ -164,7 +164,7 @@ export default defineComponent({
   line-height: 23px;
 }
 .q-btn:before {
-  border: 0px solid #d5d5d5;
+  border: 0px solid var(--o2-border-input);
 }
 
 .syntax-guide-title {
@@ -177,7 +177,7 @@ export default defineComponent({
 }
 
 .syntax-guide-sub-title {
-  color: $primary;
+  color: var(--o2-theme-color);
   font-size: 15px;
   margin-left: 5px;
 }

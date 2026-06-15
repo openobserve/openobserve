@@ -99,14 +99,14 @@ const activeTab = ref("raw");
 }
 
 .error_stack {
-  border-bottom: 1px solid #e0e0e0;
-  border-left: 1px solid #e0e0e0;
-  border-right: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--o2-border);
+  border-left: 1px solid var(--o2-border);
+  border-right: 1px solid var(--o2-border);
   font-size: 13px;
   padding: 6px 8px;
 }
 
 .error_stacks:first-child .error_stack {
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--o2-border);
 }
 </style>

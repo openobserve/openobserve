@@ -2360,14 +2360,14 @@ export default defineComponent({
 
   &.dark-mode {
     .step-content {
-      background-color: #212121;
+      background-color: var(--o2-primary-background);
       border: 1px solid #343434;
     }
     .section-header {
       border-bottom: 1px solid #343434;
     }
     .section-header-title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
     .section-header-accent {
       background: var(--q-primary);
@@ -2443,11 +2443,11 @@ export default defineComponent({
   }
 
   &.dark-mode-preview {
-    background-color: #181a1b;
+    background-color: var(--o2-primary-background);
     border: 1px solid #343434;
 
     .preview-header {
-      background-color: #212121;
+      background-color: var(--o2-primary-background);
       border-bottom-color: #343434;
     }
 
@@ -2456,7 +2456,7 @@ export default defineComponent({
     }
 
     .preview-code {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
   }
 

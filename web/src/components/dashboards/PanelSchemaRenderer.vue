@@ -1656,7 +1656,7 @@ export default defineComponent({
   position: absolute;
   z-index: 9999999;
   background: white;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   min-width: 200px;
@@ -1681,7 +1681,7 @@ export default defineComponent({
   }
 
   &:active {
-    background-color: #e0e0e0;
+    background-color: var(--o2-border);
   }
 
   span {
@@ -1696,7 +1696,7 @@ export default defineComponent({
 }
 
 .crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item {
-  color: #e0e0e0;
+  color: var(--o2-border);
 }
 
 .crosslink-drilldown-menu--dark .crosslink-drilldown-menu-item:hover {

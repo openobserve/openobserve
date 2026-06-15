@@ -1655,12 +1655,12 @@ export default defineComponent({
 }
 .dark-theme-page {
   .floating-buttons {
-    background-color: $dark;
+    background-color: var(--o2-primary-background);
   }
 }
 .light-theme-page {
   .floating-buttons {
-    background-color: $white;
+    background-color: #FFFFFF;
   }
 }
 .light-theme-page {

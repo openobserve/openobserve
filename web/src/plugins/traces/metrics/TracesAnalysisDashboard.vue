@@ -1202,7 +1202,7 @@ watch(
 // Dimension sidebar (in splitter)
 .dimension-sidebar {
   background: #ffffff;
-  // border-right: 1px solid var(--q-border-color, #e0e0e0);
+  // border-right: 1px solid var(--q-border-color, var(--o2-border));
 }
 
 .dimension-list-container {

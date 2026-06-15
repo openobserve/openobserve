@@ -248,7 +248,7 @@ export default defineComponent({
     }
 
     .step-title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
 
     .step-description {
@@ -265,11 +265,11 @@ export default defineComponent({
     .step-indicator {
       background-color: #f5f5f5;
       color: #757575;
-      border: 2px solid #e0e0e0;
+      border: 2px solid var(--o2-border);
     }
 
     .step-connector {
-      background-color: #e0e0e0;
+      background-color: var(--o2-border);
     }
 
     .step-active .step-indicator {

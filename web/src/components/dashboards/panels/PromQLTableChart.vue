@@ -331,13 +331,13 @@ export default defineComponent({
   :deep(.q-table__bottom),
   :deep(thead tr:first-child th) {
     /* bg color is important for th; just specify one */
-    background-color: $dark-page !important;
+    background-color: var(--o2-primary-background) !important;
   }
 
   // Sticky columns in dark mode
   :deep(thead tr th.sticky-column),
   :deep(tbody tr td.sticky-column) {
-    background-color: $dark-page !important;
+    background-color: var(--o2-primary-background) !important;
   }
 }
 </style>

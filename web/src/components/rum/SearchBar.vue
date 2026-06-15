@@ -360,7 +360,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .search-bar-component {
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--o2-border);
   padding-bottom: 1px;
 
   .q-toggle__inner {
@@ -374,7 +374,7 @@ export default defineComponent({
   .casesensitive-btn {
     padding: 0.5rem;
     margin-left: -0.375rem;
-    background-color: #d5d5d5;
+    background-color: var(--o2-border-input);
     border-radius: 0 0.1875rem 0.1875rem 0;
   }
   .search-field .q-field {
@@ -399,12 +399,12 @@ export default defineComponent({
   .search-dropdown {
     padding: 0;
     .block {
-      color: $dark-page;
+      color: var(--o2-primary-background);
       font-weight: 600;
       font-size: 0.75rem;
     }
     .q-btn-dropdown__arrow-container {
-      color: $light-text2;
+      color: var(--o2-gray);
     }
   }
   .refresh-rate-dropdown-container {
@@ -425,7 +425,7 @@ export default defineComponent({
   .resultsOverChart {
     margin-bottom: 0.75rem;
     font-size: 0.875rem;
-    color: $dark-page;
+    color: var(--o2-primary-background);
     font-weight: 700;
   }
 
@@ -469,7 +469,7 @@ export default defineComponent({
     color: white;
 
     .q-btn__content {
-      background: $secondary;
+      background: var(--o2-theme-color);
       border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
 }
   }

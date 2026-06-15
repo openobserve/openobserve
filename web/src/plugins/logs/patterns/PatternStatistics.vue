@@ -51,5 +51,4 @@ const summaryText = computed(() => {
 </script>
 
 <style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
 </style>

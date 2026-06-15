@@ -488,7 +488,7 @@ export default defineComponent({
 <style lang="scss" scoped>
 .q-table {
   &__top {
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
     justify-content: flex-end;
   }
 }

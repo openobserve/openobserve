@@ -1287,7 +1287,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   padding: 20px 12px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--o2-border);
   border-radius: 12px;
   background: #ffffff;
   cursor: pointer;

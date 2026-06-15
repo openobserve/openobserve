@@ -73,7 +73,7 @@ const handleErrorTypeClick = () => {
 <style lang="scss" scoped>
 .error_type {
   font-size: 1rem;
-  color: $info;
+  color: var(--o2-info);
   text-transform: capitalize;
 }
 

@@ -961,7 +961,6 @@ import { useStore } from "vuex";
 import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import "../../styles/schema.scss";
 import {
   formatSizeFromMB,
   getImageURL,
@@ -2744,7 +2743,7 @@ export default defineComponent({
 
   .titleContainer {
     background-color: #00000005;
-    border: 1px solid $input-field-border-color;
+    border: 1px solid var(--o2-border-input);
     border-radius: 5px;
     padding: 1rem;
   }
@@ -2793,21 +2792,21 @@ export default defineComponent({
         font-size: 0.875rem;
 
         &:not(:first-child) {
-          border-left: 1px solid $input-field-border-color;
+          border-left: 1px solid var(--o2-border-input);
           align-items: flex-start;
           min-width: 29%;
         }
       }
 
       &.list-head {
-        border: 1px solid $input-field-border-color;
+        border: 1px solid var(--o2-border-input);
         border-radius: 0.5rem 0.5rem 0 0;
         border-bottom: none;
       }
 
       &.list-item {
-        border-right: 1px solid $input-field-border-color;
-        border-left: 1px solid $input-field-border-color;
+        border-right: 1px solid var(--o2-border-input);
+        border-left: 1px solid var(--o2-border-input);
 
         &,
         &--side {
@@ -2815,7 +2814,7 @@ export default defineComponent({
         }
 
         &:last-of-type {
-          border-bottom: 1px solid $input-field-border-color;
+          border-bottom: 1px solid var(--o2-border-input);
           border-radius: 0 0 0.5rem 0.5rem;
         }
       }
@@ -2823,7 +2822,7 @@ export default defineComponent({
   }
 
   .data-retention-input {
-    border: 1px solid $input-field-border-color;
+    border: 1px solid var(--o2-border-input);
     border-radius: 0.2rem;
     width: 80px;
     height: 39px;
@@ -2850,7 +2849,7 @@ export default defineComponent({
   min-height: 30px;
 
   &.q-router-link--active {
-    background-color: $primary;
+    background-color: var(--o2-theme-color);
     color: white;
 
     &::before {

@@ -666,7 +666,7 @@ export default defineComponent({
   }
   .param-row {
     background: #fff;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--o2-border);
   }
   .param-key {
     color: #333;
@@ -686,7 +686,7 @@ export default defineComponent({
   .dark &,
   body.body--dark & {
     .title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
     .description,
     .detail-value,

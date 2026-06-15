@@ -267,7 +267,7 @@ export default defineComponent({
   flex-direction: column;
 
   .dark-mode {
-    background-color: $dark-page;
+    background-color: var(--o2-primary-background);
   }
 
   :deep(.monaco-editor) {

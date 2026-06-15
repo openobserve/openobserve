@@ -1296,11 +1296,11 @@ export default defineComponent({
   .head {
     line-height: 2.125rem;
     margin-bottom: 0.5rem;
-    color: $dark-page;
+    color: var(--o2-primary-background);
   }
 
   .para {
-    color: $light-text;
+    color: var(--o2-text-secondary);
   }
 }
 
@@ -1315,7 +1315,7 @@ export default defineComponent({
 }
 
 .invite-user {
-  background: $input-bg;
+  background: transparent;
   border-radius: 4px;
 
   .separator {
@@ -1325,7 +1325,7 @@ export default defineComponent({
 
 .inputHint {
   font-size: 11px;
-  color: $light-text;
+  color: var(--o2-text-secondary);
 }
 
 .role-badge {

@@ -2040,7 +2040,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/logs/search-result.scss";
 
 /* Correlation Panel Styles */
 .correlation-panel-overlay {

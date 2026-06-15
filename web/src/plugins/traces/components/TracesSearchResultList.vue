@@ -387,7 +387,6 @@ const totalPages = computed(() =>
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/pagination.scss";
 
 :deep(.traces-table-container) {
   .table-container {

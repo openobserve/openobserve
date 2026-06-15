@@ -1227,7 +1227,7 @@ export default defineComponent({
   .relative-row {
     display: flex;
     align-items: center;
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
 
     .block {
       font-weight: 700;
@@ -1270,7 +1270,7 @@ export default defineComponent({
 .rp-selector-selected {
   height: 32px;
   width: 32px;
-  // border: $secondary;
+  // border: var(--o2-theme-color);
   background: rgba(0, 0, 0, 0.07);
   font-weight: 700;
 
@@ -1336,7 +1336,7 @@ export default defineComponent({
       }
     }
     .block {
-      color: $dark-page;
+      color: var(--o2-primary-background);
     }
   }
 }
@@ -1352,7 +1352,7 @@ export default defineComponent({
   }
   .label {
     font-size: 0.75rem;
-    // color: $dark-page;
+    // color: var(--o2-primary-background);
     font-weight: 600;
   }
   .timeInput {
@@ -1383,7 +1383,7 @@ export default defineComponent({
 
     &.clearBtn {
       margin-right: 1rem;
-      color: $dark-page;
+      color: var(--o2-primary-background);
     }
   }
 }

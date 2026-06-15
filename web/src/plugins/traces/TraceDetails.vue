@@ -2853,7 +2853,7 @@ $traceChartCollapseHeight: 42px;
 .dag-resizer-line {
   width: 3px;
   height: 100%;
-  background-color: #e0e0e0;
+  background-color: var(--o2-border);
   border-radius: 2px;
   transition: background-color 0.2s ease;
 }

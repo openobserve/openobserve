@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="alerts-incident-list"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
+        class="o2-table o2-row-md o2-table-header-sticky"
         data-test="incident-list-table"
         @row-click="viewIncident"
       >

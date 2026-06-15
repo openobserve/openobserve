@@ -266,7 +266,7 @@ export default defineComponent({
     }
 
     .tile-name {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
 
     .tile-description {

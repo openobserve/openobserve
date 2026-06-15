@@ -914,12 +914,12 @@ export default defineComponent({
   }
 
   .para {
-    color: $light-text;
+    color: var(--o2-text-secondary);
   }
 }
 
 .delete-associated-alerts-pipelines-text {
-  color: $light-text;
+  color: var(--o2-text-secondary);
   font-size: 12px;
   font-weight: 500;
 }

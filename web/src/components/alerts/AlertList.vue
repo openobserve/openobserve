@@ -2808,7 +2808,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .dark-theme {
-  background-color: $dark-page;
+  background-color: var(--o2-primary-background);
 
   .alerts-list-tabs {
     height: fit-content;

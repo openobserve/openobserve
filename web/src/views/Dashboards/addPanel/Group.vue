@@ -194,7 +194,7 @@ export default defineComponent({
 }
 
 .group-remove {
-  border-left: 1px solid $grey-2;
+  border-left: 1px solid #f5f5f5;
   display: flex;
   justify-content: space-between;
   align-items: center;

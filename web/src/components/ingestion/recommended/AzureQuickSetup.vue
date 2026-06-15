@@ -411,7 +411,7 @@ export default defineComponent({
     }
 
     .service-item {
-      border: 1px solid #e0e0e0;
+      border: 1px solid var(--o2-border);
       background-color: #fafafa;
 
       &:hover {
@@ -427,7 +427,7 @@ export default defineComponent({
 
   .body--dark & {
     .title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
 
     .description,
@@ -436,7 +436,7 @@ export default defineComponent({
     }
 
     .service-name {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
 
     .service-description {

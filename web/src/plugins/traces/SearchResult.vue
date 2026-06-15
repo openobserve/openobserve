@@ -436,7 +436,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/pagination.scss";
 /* ── Traces list section ─────────────────────────────────────────────────── */
 .traces-section {
   flex: 1;

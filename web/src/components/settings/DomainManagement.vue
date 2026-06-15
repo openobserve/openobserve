@@ -865,14 +865,14 @@ const resetForm = () => {
 }
 
 .domain-card {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   border-radius: 8px;
   background: white;
 }
 
 .domain-header {
   background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--o2-border);
   border-radius: 8px 8px 0 0;
 }
 
@@ -883,7 +883,7 @@ const resetForm = () => {
 .email-item {
   background: #f9f9f9;
   border-radius: 4px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
 }
 
 .error-section {

@@ -216,7 +216,6 @@ function highlightLevels(text: string): HighlightSegment[] {
 </script>
 
 <style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
 
 .pattern-template-text {
   font-family: monospace;

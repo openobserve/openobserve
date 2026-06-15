@@ -341,7 +341,7 @@ const copyTemplate = () => {
   max-width: 600px;
   margin: 0 auto;
   background: #ffffff;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);

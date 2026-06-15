@@ -1421,7 +1421,7 @@ export default defineComponent({
 
 <style lang="scss" scoped>
 .dragItem {
-  background-color: $primary;
+  background-color: var(--o2-theme-color);
   width: 20px;
   height: 100%;
   border-radius: 5px;

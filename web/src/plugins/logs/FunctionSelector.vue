@@ -168,7 +168,6 @@ const applyFunction = (
 </script>
 
 <style scoped lang="scss">
-@import "@/styles/logs/function-selector.scss";
 .save-function-btn {
   border-left: 1px solid var(--o2-border-color);
 }

@@ -277,7 +277,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/logs/syntax-guide.scss";
 
 .syntax-guide-no-border {
   border: none !important;

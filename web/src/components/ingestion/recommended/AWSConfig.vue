@@ -177,7 +177,7 @@ Access Key: [BASIC_PASSCODE]`;
   .dark &,
   body.body--dark & {
     .page-title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
 
     .page-description,

@@ -1083,7 +1083,7 @@ export default defineComponent({
   }
 }
 .dark-mode-regex-test-string-input .q-field__control {
-  background-color: #181a1b !important;
+  background-color: var(--o2-primary-background) !important;
   border-top: 1px solid #666666 !important;
   border-left: 1px solid #666666 !important;
   border-right: 1px solid #666666 !important;
@@ -1103,10 +1103,10 @@ export default defineComponent({
   background-color: #1f1f1f !important;
 }
 .dark-mode-regex-no-output {
-  background-color: #181a1b !important;
-  border-left: 2px solid #212121 !important;
-  border-right: 2px solid #212121 !important;
-  border-bottom: 2px solid #212121 !important;
+  background-color: var(--o2-primary-background) !important;
+  border-left: 2px solid var(--o2-primary-background) !important;
+  border-right: 2px solid var(--o2-primary-background) !important;
+  border-bottom: 2px solid var(--o2-primary-background) !important;
 }
 .light-mode-regex-no-output {
   background-color: #ffffff !important;

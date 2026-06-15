@@ -145,11 +145,11 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .dark-mode {
-  background-color: $dark-page;
+  background-color: var(--o2-primary-background);
 }
 .q-table {
   &__top {
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
     justify-content: flex-end;
   }
 }
@@ -165,7 +165,7 @@ export default defineComponent({
       .o-tab {
         justify-content: flex-start;
         padding: 0 1rem 0 1.25rem;
-        // color: $dark;
+        // color: var(--o2-primary-background);
         text-transform: capitalize;
         &__content.tab_content {
           .o-tab {
@@ -185,7 +185,7 @@ export default defineComponent({
 }
 
 :deep(.o-splitter__before) {
-  border-right: 1px solid $border-color;
+  border-right: 1px solid var(--o2-border);
 }
 
 .dark-mode {

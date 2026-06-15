@@ -724,11 +724,11 @@ export default defineComponent({
   .head {
     line-height: 2.125rem;
     margin-bottom: 0.5rem;
-    color: $dark-page;
+    color: var(--o2-primary-background);
   }
 
   .para {
-    color: $light-text;
+    color: var(--o2-text-secondary);
   }
 }
 

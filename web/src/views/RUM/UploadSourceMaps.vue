@@ -307,7 +307,7 @@ const uploadSourceMaps = async () => {
 
 .header-bar {
   flex-shrink: 0;
-  border-bottom: 1px solid var(--q-border-color, #e0e0e0);
+  border-bottom: 1px solid var(--q-border-color, var(--o2-border));
 }
 
 .form-content-area {
@@ -322,11 +322,11 @@ const uploadSourceMaps = async () => {
 
 .action-bar {
   flex-shrink: 0;
-  border-top: 1px solid var(--q-border-color, #e0e0e0);
+  border-top: 1px solid var(--q-border-color, var(--o2-border));
 }
 
 .upload-area {
-  border: 2px dashed var(--q-border-color, #e0e0e0);
+  border: 2px dashed var(--q-border-color, var(--o2-border));
   border-radius: 8px;
   padding: 2rem 2rem;
   text-align: center;

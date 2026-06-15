@@ -108,7 +108,7 @@ export default defineComponent({
 .pre-text {
   text-wrap: auto;
   word-wrap: break-word;
-  border: 1px solid #E1E1E1;
+  border: 1px solid var(--o2-border-input);
   padding: 5px;
   margin-bottom: 5px;
 }

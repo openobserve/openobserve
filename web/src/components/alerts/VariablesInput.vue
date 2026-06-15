@@ -136,7 +136,7 @@ const addVariable = () => {
 }
 
 .input-bg-dark .q-field__control{
-  background-color: #181a1b !important;
+  background-color: var(--o2-primary-background) !important;
 }
 .input-bg-light .q-field__control{
   background-color: #ffffff !important;

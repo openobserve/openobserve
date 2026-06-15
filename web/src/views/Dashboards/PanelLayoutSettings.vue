@@ -141,6 +141,6 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .dark-mode {
-  background-color: $dark-page;
+  background-color: var(--o2-primary-background);
 }
 </style>

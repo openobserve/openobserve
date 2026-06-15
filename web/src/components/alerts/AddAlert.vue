@@ -861,7 +861,7 @@ body.body--dark .query-mode-tabs {
 
 .dark-mode {
   .alert-setup-container {
-    background-color: #212121;
+    background-color: var(--o2-primary-background);
     padding: 8px 16px;
     margin-left: 8px;
     border: 1px solid #343434;
@@ -871,11 +871,11 @@ body.body--dark .query-mode-tabs {
   }
   .q-text-area-input > div > div {
     background-color: rgb(30, 31, 31) !important;
-    border: 1px solid $input-border !important;
+    border: 1px solid var(--o2-border-input) !important;
   }
   .dark-mode-row-template > div > div {
     background-color: rgb(30, 31, 31) !important;
-    border: 1px solid $input-border !important;
+    border: 1px solid var(--o2-border-input) !important;
   }
   .custom-input-label {
     color: #bdbdbd;
@@ -901,21 +901,21 @@ body.body--dark .query-mode-tabs {
     border: 1px solid #d4d4d4;
   }
   .dark-mode .q-text-area-input > div > div {
-    background-color: #181a1b !important;
+    background-color: var(--o2-primary-background) !important;
     border: 1px solid black !important;
   }
 
   .light-mode .q-text-area-input > div > div {
     background-color: #ffffff !important;
-    border: 1px solid #e0e0e0 !important;
+    border: 1px solid var(--o2-border) !important;
   }
   .dark-mode-row-template > div > div {
-    background-color: #181a1b !important;
+    background-color: var(--o2-primary-background) !important;
     border: 1px solid black !important;
   }
   .light-mode-row-template > div > div {
     background-color: #ffffff !important;
-    border: 1px solid #e0e0e0 !important;
+    border: 1px solid var(--o2-border) !important;
   }
 }
 .q-text-area-input > div > div > div > textarea {
@@ -927,20 +927,20 @@ body.body--dark .query-mode-tabs {
   resize: none !important;
 }
 .bottom-sticky-dark {
-  background-color: #212121;
+  background-color: var(--o2-primary-background);
 }
 .bottom-sticky-light {
   background-color: #ffffff;
   border-top: 1px solid #d4d4d4;
 }
 .input-box-bg-dark .q-field__control {
-  background-color: #181a1b !important;
+  background-color: var(--o2-primary-background) !important;
 }
 .input-box-bg-light .q-field__control {
   background-color: #ffffff !important;
 }
 .input-border-dark .q-field__control {
-  border: 1px solid #181a1b !important;
+  border: 1px solid var(--o2-primary-background) !important;
 }
 .input-border-light .q-field__control {
   border: 1px solid #d4d4d4 !important;

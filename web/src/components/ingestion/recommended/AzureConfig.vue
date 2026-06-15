@@ -387,7 +387,7 @@ export default defineComponent({
     }
     .step-card {
       background: #fafafa;
-      border-color: #e0e0e0;
+      border-color: var(--o2-border);
     }
     .step-title {
       color: #1a1a1a;
@@ -400,7 +400,7 @@ export default defineComponent({
 
   .body--dark & {
     .title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
     .page-description,
     .step-desc {
@@ -414,7 +414,7 @@ export default defineComponent({
       border-color: #404040;
     }
     .step-title {
-      color: #e0e0e0;
+      color: var(--o2-border);
     }
     .step-number {
       background: #1976d2;

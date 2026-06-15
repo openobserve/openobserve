@@ -1077,7 +1077,7 @@ export default defineComponent({
   .casesensitive-btn {
     padding: 8px;
     margin-left: -6px;
-    background-color: #d5d5d5;
+    background-color: var(--o2-border-input);
     border-radius: 0px 3px 3px 0px;
   }
   .search-field .q-field {
@@ -1101,12 +1101,12 @@ export default defineComponent({
   .search-dropdown {
     padding: 0px;
     .block {
-      color: $dark-page;
+      color: var(--o2-primary-background);
       font-weight: 600;
       font-size: 12px;
     }
     .q-btn-dropdown__arrow-container {
-      color: $light-text2;
+      color: var(--o2-gray);
     }
   }
   .refresh-rate-dropdown-container {
@@ -1127,7 +1127,7 @@ export default defineComponent({
   .resultsOverChart {
     margin-bottom: 0.75rem;
     font-size: 0.875rem;
-    color: $dark-page;
+    color: var(--o2-primary-background);
     font-weight: 700;
   }
 
@@ -1168,7 +1168,7 @@ export default defineComponent({
     padding: 0px 5px;
 
     .q-btn__content {
-      background: $secondary;
+      background: var(--o2-theme-color);
       border-radius: 3px 3px 3px 3px;
       padding: 0px 5px;
 }

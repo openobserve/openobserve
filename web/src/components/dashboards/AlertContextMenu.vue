@@ -151,7 +151,7 @@ export default defineComponent({
   position: fixed;
   z-index: 9999;
   background: white;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--o2-border);
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   min-width: 280px;
@@ -172,7 +172,7 @@ export default defineComponent({
     }
 
     &:active {
-      background-color: #e0e0e0;
+      background-color: var(--o2-border);
     }
 
     span {
@@ -188,7 +188,7 @@ body.body--dark {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 
     .menu-item {
-      color: #e0e0e0;
+      color: var(--o2-border);
 
       &.hovered,
       &:hover {

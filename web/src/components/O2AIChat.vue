@@ -6261,7 +6261,7 @@ export default defineComponent({
 
     .dark-mode .generated-code-block {
       code {
-        background-color: #181a1b;
+        background-color: var(--o2-primary-background);
         border: 0.5px solid #e1e1e124;
         border-top: none;
       }
@@ -6464,7 +6464,7 @@ export default defineComponent({
 
 .dark-mode .code-block-header {
   background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid #e1e1e1;
+  border: 1px 1px 0px 1px solid var(--o2-border-input);
 }
 .light-mode .code-block-header {
   background-color: #ecf0f5;

@@ -428,7 +428,7 @@ export default defineComponent({
   .relative-row {
     display: flex;
     align-items: center;
-    border-bottom: 1px solid $border-color;
+    border-bottom: 1px solid var(--o2-border);
 
     .block {
       font-weight: 700;
@@ -440,13 +440,13 @@ export default defineComponent({
       }
 
       &__native {
-        color: $light-text2;
+        color: var(--o2-gray);
         font-size: 0.875rem;
         font-weight: 600;
       }
 
       .q-select__dropdown-icon {
-        color: $light-text2;
+        color: var(--o2-gray);
       }
     }
 
@@ -478,7 +478,7 @@ export default defineComponent({
 .rp-selector-selected {
   height: 32px;
   width: 32px;
-  // border: $secondary;
+  // border: var(--o2-theme-color);
   background: rgba(0, 0, 0, 0.07);
 }
 
@@ -495,7 +495,7 @@ export default defineComponent({
   padding-right: 1.5rem;
   padding-left: 1.5rem;
   font-size: 0.625rem;
-  color: $light-text;
+  color: var(--o2-text-secondary);
 }
 
 .q-date {
@@ -515,14 +515,14 @@ export default defineComponent({
 
     .q-btn .block {
       font-size: 0.75rem;
-      color: $dark-page;
+      color: var(--o2-primary-background);
       font-weight: 700;
     }
   }
 
   &__calendar {
     &-item .block {
-      color: $light-text;
+      color: var(--o2-text-secondary);
       font-weight: 700;
     }
 
@@ -548,7 +548,7 @@ export default defineComponent({
     }
 
     .block {
-      color: $dark-page;
+      color: var(--o2-primary-background);
     }
   }
 }
@@ -565,7 +565,7 @@ export default defineComponent({
 
   .label {
     font-size: 0.75rem;
-    // color: $dark-page;
+    // color: var(--o2-primary-background);
     font-weight: 600;
   }
 
@@ -598,7 +598,7 @@ export default defineComponent({
 
     &.clearBtn {
       margin-right: 1rem;
-      color: $dark-page;
+      color: var(--o2-primary-background);
     }
   }
 }

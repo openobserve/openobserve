@@ -261,13 +261,13 @@
 
   .titleContainer {
     background-color: #00000005;
-    border: 1px solid $input-field-border-color;
+    border: 1px solid var(--o2-border-input);
     border-radius: 5px;
     padding: 1rem;
   }
 
   .q-table {
-    border: 1px solid $input-field-border-color;
+    border: 1px solid var(--o2-border-input);
 
   }
   .display-total-fields{
@@ -277,7 +277,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: $primary;
+    background-color: var(--o2-theme-color);
     color: white;
   }
 

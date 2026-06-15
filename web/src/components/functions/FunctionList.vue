@@ -740,7 +740,7 @@ export default defineComponent({
   overflow-y: auto;
 }
 .dialog-heading {
-  border-bottom: 1px solid $border-color;
+  border-bottom: 1px solid var(--o2-border);
 }
 
 .scrollable-list {

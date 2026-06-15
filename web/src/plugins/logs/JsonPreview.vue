@@ -941,7 +941,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/logs/json-preview.scss";
 
 // No custom cross-link CSS needed — cross-links render as q-items inside existing q-btn-dropdown
 </style>

@@ -181,7 +181,7 @@ export default defineComponent({
         }
         &--active {
           color: black;
-          background-color: $accent;
+          background-color: #F5F5F5;
         }
       }
     }

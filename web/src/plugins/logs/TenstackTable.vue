@@ -1185,7 +1185,6 @@ defineExpose({
 @import "@/assets/styles/log-highlighting.css";
 </style>
 <style scoped lang="scss">
-@import "@/styles/logs/tenstack-table.scss";
 
 // Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat
 .log-row-expand-btn {

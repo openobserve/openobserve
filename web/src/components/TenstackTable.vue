@@ -2370,7 +2370,7 @@ defineExpose({
   padding-bottom: 5px;
   border-right: 1px solid rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
+  background-color: var(--o2-border);
 }
 
 .pivot-value-header {
@@ -2382,7 +2382,7 @@ defineExpose({
   padding-bottom: 5px;
   border-right: 1px solid rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
-  background-color: #E0E0E0;
+  background-color: var(--o2-border);
 }
 
 .body--dark .pivot-group-header {

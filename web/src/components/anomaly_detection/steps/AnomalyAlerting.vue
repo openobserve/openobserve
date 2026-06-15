@@ -211,7 +211,7 @@ export default defineComponent({
 
   &.dark-mode {
     .step-content {
-      background-color: #212121;
+      background-color: var(--o2-primary-background);
       border: 1px solid #343434;
     }
   }

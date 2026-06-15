@@ -919,7 +919,6 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import "@/styles/pagination.scss";
 
 :deep(.services-catalog-table-container) {
   .container {

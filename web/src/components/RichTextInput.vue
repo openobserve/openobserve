@@ -846,8 +846,8 @@ export default defineComponent({
   overflow: hidden;
 
   &.dark-mode {
-    background: #181a1b;
-    border-color: #181a1b;
+    background: var(--o2-primary-background);
+    border-color: var(--o2-primary-background);
   }
 
   .card-header {

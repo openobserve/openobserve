@@ -259,7 +259,7 @@ export default defineComponent({
         font-size: 0.75rem;
         text-align: center;
         font-weight: 600;
-        // color: $dark;
+        // color: var(--o2-primary-background);
         padding: 0;
         width: fit-content;
       }

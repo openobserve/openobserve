@@ -88,8 +88,8 @@ export default defineComponent({
 .custom-border {
   border-top: 0px solid !important;
   border-bottom: 0px solid !important;
-  border-left: 1px solid #d5d5d5 !important;
-  border-right: 1px solid #d5d5d5 !important;
+  border-left: 1px solid var(--o2-border-input) !important;
+  border-right: 1px solid var(--o2-border-input) !important;
 }
 
 .q-btn {

@@ -385,7 +385,7 @@ const getTimeRangeValue = (dateTime: any) => {
 
 <style lang="scss" scoped>
 .dark-mode {
-  background-color: $dark-page;
+  background-color: var(--o2-primary-background);
 
   &.scheduled-dashboards {
     height: fit-content;

@@ -514,7 +514,7 @@ defineExpose({
       }
     }
     .group-container.dark-mode-group {
-    scrollbar-color: #818181 #212121; /* thumb color, track color */
+    scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
   }
 
 .group-container.light-mode-group {
@@ -546,11 +546,11 @@ defineExpose({
 }
 
   .group-tabs {
-      border: 1px solid $border-color;
+      border: 1px solid var(--o2-border);
       background-color: transparent !important;
     .q-tab--active {
       background-color: var(--o2-primary-btn-bg);
-      color: $white;
+      color: #FFFFFF;
     }
 
       .q-tab__indicator {
