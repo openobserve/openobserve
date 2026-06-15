@@ -848,7 +848,10 @@
     "feature_correlation_management": "Correlatiebeheer",
     "feature_log_patterns": "Logpatronen",
     "environment_type": "Omgevingstype",
-    "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe."
+    "license_allows_unlimited_ingestion": "De huidige licentie staat onbeperkte gegevensinvoer toe.",
+    "refresh_license_limits": "Licentielimieten vernieuwen",
+    "license_refresh_success": "De vernieuwing van de licentielimiet is met succes geactiveerd",
+    "failed_to_refresh_license": "Het vernieuwen van de licentielimieten is mislukt"
   },
   "login": {
     "userid": "Gebruikers-ID",

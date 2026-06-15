@@ -152,7 +152,7 @@ export class PipelinesPage {
         );
         this.tableRowsLocator = page.locator("tbody tr");
         this.confirmButton = page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
-        this.settingsMenu = page.locator('[data-test="menu-link-/settings-item"]');
+        this.settingsMenu = page.locator('[data-test="menu-link-\\/settings-item"]');
         this.pipelineDestinationsTab = page.locator('button[data-test="pipeline-destinations-tab"]');
         this.searchInput = page.locator('[data-test="destination-list-search-input"]');
         this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
