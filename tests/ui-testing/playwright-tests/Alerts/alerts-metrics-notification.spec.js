@@ -456,19 +456,28 @@ test.describe("Metrics Alert Notification Chain", () => {
             const urlMatch = notificationText.match(/https?:\/\/\S+/);
             expect(urlMatch, 'Notification should contain a clickable alert_url').not.toBeNull();
             const alertUrl = urlMatch[0];
-            testLogger.info('Extracted alert_url', { url: alertUrl });
+            testLogger.info('Navigating to alert_url', { url: alertUrl });
 
-            // Navigate to the alert_url and verify it lands on the metrics page
-            await page.goto(alertUrl);
-            await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+            // Navigate to the alert_url — if it's a short URL, the browser
+            // follows the redirect chain and lands on the full metrics page.
+            const response = await page.goto(alertUrl);
+            await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-            // The metrics page should show the stream name and query-related UI
-            await expect(page.getByText(METRICS_STREAM_NAME).first(),
-                'Metrics page should show the stream name').toBeVisible({ timeout: 15000 });
+            // Verify we landed on the metrics page
+            await expect(page.locator('[data-test="metrics-page"]'),
+                'Should be on the metrics page').toBeVisible({ timeout: 15000 });
             await expect(page,
-                'Should be on the metrics page').toHaveURL(/\/web\/metrics/);
+                'URL should be /web/metrics after redirect').toHaveURL(/\/web\/metrics/);
 
-            testLogger.info('alert_url redirects to metrics page verified');
+            // Verify the stream name is shown (query context loaded)
+            await expect(page.getByText(METRICS_STREAM_NAME).first(),
+                'Metrics page should show the stream name').toBeVisible({ timeout: 10000 });
+
+            // Verify data loaded — the Run Query button is no longer in loading state
+            await expect(page.locator('[data-test="metrics-apply"]'),
+                'Metrics page should have Run Query button').toBeVisible({ timeout: 10000 });
+
+            testLogger.info('alert_url redirects to metrics page with data loaded');
         } else {
             testLogger.warn('Webhook capture not active — skipping payload verification');
         }
