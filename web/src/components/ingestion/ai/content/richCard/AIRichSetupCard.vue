@@ -37,7 +37,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import type { CardSubstitutions } from "../renderMarkdown";
+import { safeHttpUrl, type CardSubstitutions } from "../renderMarkdown";
 import type { RichCardContent, RichCardStep, StepChipKind } from "./types";
 import { useSpanDetect, prefersReducedMotion } from "./useSpanDetect";
 
@@ -562,14 +562,17 @@ function fireConfetti() {
       <div class="pv-foot">
         <OIcon name="open-in-new" size="sm" /> Full integration docs:&nbsp;
         <a
-          :href="content.docUrl || '#'"
+          :href="safeHttpUrl(content.docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
         <span v-if="content.slackUrl" class="tw:ml-auto"
           >Stuck?
-          <a :href="content.slackUrl" target="_blank" rel="noopener noreferrer"
+          <a
+            :href="safeHttpUrl(content.slackUrl)"
+            target="_blank"
+            rel="noopener noreferrer"
             >Ask on Slack</a
           ></span
         >

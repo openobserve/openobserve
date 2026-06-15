@@ -23,7 +23,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
-import { renderCardSegments, type CardSubstitutions } from "./renderMarkdown";
+import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
@@ -122,7 +122,7 @@ const renderedSections = computed(() =>
       <div v-if="docUrl" class="tw:font-bold tw:pt-6 tw:pb-2">
         Click
         <a
-          :href="docUrl"
+          :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-blue-500 hover:text-blue-600"

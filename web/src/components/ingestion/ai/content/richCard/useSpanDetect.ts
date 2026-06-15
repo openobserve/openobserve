@@ -84,8 +84,11 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     (nowMs() - (cfg.lookbackMs ?? 600000)) * 1000;
 
   // One cheap COUNT over [windowStart, now]. >0 matches → connected.
+  // `stream` is user-typed (the stream-name input), so escape it for the quoted
+  // identifier (double any `"`) — it can't break out of the FROM clause. `filter`
+  // is authored config (a SQL WHERE fragment by design), interpolated as-is.
   const countSql = (cfg: SpanDetectConfig) => {
-    const stream = cfg.streamName || "default";
+    const stream = (cfg.streamName || "default").replaceAll('"', '""');
     return `SELECT COUNT(*) as zo_count FROM "${stream}" WHERE (${cfg.filter}) AND _timestamp >= ${windowStartMicros(cfg)}`;
   };
 

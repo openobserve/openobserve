@@ -45,6 +45,23 @@ export type CardSegment =
   | { type: "html"; html: string }
   | { type: "code"; code: string; lang: string };
 
+/**
+ * Returns `url` only if it's a safe http(s)/mailto link, else "#". External
+ * content (manifest / md frontmatter) can supply these hrefs, and Vue does NOT
+ * sanitize `:href` — so this blocks `javascript:` / `data:` URL XSS on click.
+ */
+export function safeHttpUrl(url?: string): string {
+  if (!url) return "#";
+  try {
+    const proto = new URL(url, window.location.origin).protocol;
+    return proto === "http:" || proto === "https:" || proto === "mailto:"
+      ? url
+      : "#";
+  } catch {
+    return "#";
+  }
+}
+
 function substitute(md: string, subs: CardSubstitutions): string {
   return md
     .replaceAll("{url}", subs.url)

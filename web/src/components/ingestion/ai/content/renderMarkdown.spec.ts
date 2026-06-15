@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import { renderCardSegments } from "./renderMarkdown";
+import { renderCardSegments, safeHttpUrl } from "./renderMarkdown";
 
 const SUBS = {
   url: "https://api.example.com",
@@ -67,5 +67,26 @@ describe("renderCardSegments", () => {
       .map((s) => (s.type === "html" ? s.html : ""))
       .join("");
     expect(html).toContain("<table");
+  });
+});
+
+describe("safeHttpUrl", () => {
+  it("allows http(s) and mailto URLs", () => {
+    expect(safeHttpUrl("https://openobserve.ai/docs")).toBe(
+      "https://openobserve.ai/docs",
+    );
+    expect(safeHttpUrl("http://x.test")).toBe("http://x.test");
+    expect(safeHttpUrl("mailto:a@b.com")).toBe("mailto:a@b.com");
+  });
+
+  it("blocks javascript: / data: and other schemes (returns '#')", () => {
+    expect(safeHttpUrl("javascript:alert(1)")).toBe("#");
+    expect(safeHttpUrl("data:text/html,<script>alert(1)</script>")).toBe("#");
+    expect(safeHttpUrl("vbscript:msgbox(1)")).toBe("#");
+  });
+
+  it("returns '#' for empty / invalid input", () => {
+    expect(safeHttpUrl(undefined)).toBe("#");
+    expect(safeHttpUrl("")).toBe("#");
   });
 });

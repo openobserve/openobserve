@@ -23,7 +23,7 @@ import { b64EncodeStandard } from "@/utils/zincutils";
 import { aiCategories } from "./data";
 import type { AICategory, AIIntegration } from "./data";
 import { getAICardRaw } from "./content";
-import type { CardSubstitutions } from "./content/renderMarkdown";
+import { safeHttpUrl, type CardSubstitutions } from "./content/renderMarkdown";
 import { getRichCardContent } from "./content/richCard/registry";
 import AIIntegrationCard from "./content/AIIntegrationCard.vue";
 import AIRichSetupCard from "./content/richCard/AIRichSetupCard.vue";
@@ -97,7 +97,7 @@ const richContent = computed(() =>
       <div class="tw:font-bold tw:pt-6 tw:pb-2">
         Click
         <a
-          :href="docURL"
+          :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-blue-500 hover:text-blue-600"
