@@ -77,6 +77,9 @@ export function buildFromMarkdown(
   const detect = data.detect ?? {};
   const extras = data.extras ?? {};
   const steps: any[] = Array.isArray(data.steps) ? data.steps : [];
+  // `{stream}` in code is intentionally NOT substituted here — it resolves
+  // reactively in the card from the stream-name input (see AIRichSetupCard.vue).
+  const si = data.stream_input;
 
   return {
     provider: {
@@ -90,6 +93,14 @@ export function buildFromMarkdown(
       setupTime: str(card.setup_time),
     },
     steps: steps.map((s, i) => buildStep(s, slug, i, subs)),
+    streamInput: si
+      ? {
+          label: str(si.label) ?? "Stream Name",
+          default: str(si.default) ?? "default",
+          placeholder: str(si.placeholder),
+          help: str(si.help),
+        }
+      : undefined,
     detect: {
       streamType: detect.stream_type === "logs" ? "logs" : "traces",
       streamName: str(detect.stream),

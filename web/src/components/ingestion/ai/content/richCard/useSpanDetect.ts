@@ -18,18 +18,28 @@
 //
 // states: idle → listening → connected | stalled   ·   recheck() re-arms.
 //
-// The check is cheap and self-terminating: a COUNT over a window that starts at
-// listen-time, so OpenObserve's time-partition pruning scans only the newest
-// file(s); a tiny size, no rows materialized; ~3s backoff; a hard timeout →
-// "stalled"; and polling pauses while the tab is hidden. So it only does work
-// during an active, visible setup and stops on the first hit / unmount.
+// Detection is a two-stage gate per poll:
+//   1. Existence — the target stream isn't created until the first span lands,
+//      so we first check the cheap streams-list ("stream stats") API. While the
+//      stream is absent we just wait, instead of hammering _search and getting
+//      404 "stream not found" back every tick.
+//   2. Confirm — once the stream exists, a COUNT over a window that starts at
+//      listen-time (so time-partition pruning scans only the newest file(s),
+//      tiny size, no rows materialized) confirms it carries THIS provider's
+//      spans; >0 → connected.
+// Plus ~3s backoff, a hard timeout → "stalled", and polling pauses while the
+// tab is hidden. So it only works during an active, visible setup and stops on
+// the first hit / unmount.
 //
-// TODO(detect): confirm the real stored span attribute + traces stream name on
-// the ingest side (the filter/stream come from RichCardDetect, so it's
-// config-only) so the count matches on day one.
+// The stream is whatever the install command writes to: when the card declares
+// a `stream_input`, the user's value drives BOTH the command's {stream}
+// placeholder and this `streamName` (see AIRichSetupCard.vue), else it falls
+// back to the SDK default. TODO(detect): confirm each provider's stored span
+// attribute on the ingest side so the `filter` matches on day one.
 
 import { onUnmounted, ref, computed } from "vue";
 import searchService from "@/services/search";
+import streamService from "@/services/stream";
 
 export type DetectState = "idle" | "listening" | "connected" | "stalled";
 
@@ -72,6 +82,11 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
   const timers: ReturnType<typeof setTimeout>[] = [];
   let listenStartMs = 0;
   let visibilityBound = false;
+  // Once the stream is seen to exist we skip the existence probe (streams don't
+  // vanish mid-setup) and go straight to the COUNT confirm. Re-armed if the
+  // target stream name changes (e.g. the user edits the stream-name input).
+  let streamSeen = false;
+  let lastStream = "";
 
   const clearTimers = () => {
     timers.forEach((t) => clearTimeout(t));
@@ -97,6 +112,28 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     return `SELECT COUNT(*) as zo_count FROM "${stream}" WHERE (${cfg.filter}) AND _timestamp >= ${windowStartMicros(cfg)}`;
   };
 
+  // Stage 1 — does the target stream exist yet? Uses the streams-list ("stream
+  // stats") API, which returns 200 with an empty/filtered list (no 404) until
+  // the first span creates the stream.
+  const streamExists = async (cfg: SpanDetectConfig): Promise<boolean> => {
+    const stream = cfg.streamName || "default";
+    try {
+      const res = await streamService.nameList(
+        cfg.orgId,
+        cfg.streamType,
+        false,
+        -1,
+        -1,
+        stream,
+      );
+      const list: any[] = res?.data?.list ?? [];
+      // keyword is a substring match → require the exact stream name.
+      return list.some((s) => s?.name === stream);
+    } catch {
+      return false;
+    }
+  };
+
   const poll = async () => {
     if (state.value !== "listening") return;
     const cfg = opts.config();
@@ -110,6 +147,22 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
       scheduleNextPoll(cfg);
       return;
     }
+    // Re-arm the existence probe if the target stream changed mid-listen.
+    const stream = cfg.streamName || "default";
+    if (stream !== lastStream) {
+      lastStream = stream;
+      streamSeen = false;
+    }
+    // Stage 1 — wait for the stream to exist before touching _search.
+    if (!streamSeen) {
+      streamSeen = await streamExists(cfg);
+      if (state.value !== "listening") return;
+      if (!streamSeen) {
+        scheduleNextPoll(cfg);
+        return;
+      }
+    }
+    // Stage 2 — stream exists: confirm it carries this provider's spans.
     try {
       const res = await searchService.search(
         {
@@ -157,6 +210,7 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     clearTimers();
     state.value = "listening";
     count.value = 0;
+    streamSeen = false;
     listenStartMs = nowMs();
     if (!visibilityBound && typeof document !== "undefined") {
       document.addEventListener("visibilitychange", onVisible);
@@ -170,6 +224,7 @@ export function useSpanDetect(opts: UseSpanDetectOptions) {
     clearTimers();
     state.value = "idle";
     count.value = 0;
+    streamSeen = false;
   };
 
   // "I fixed it" — re-arm from now.

@@ -31,6 +31,7 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import CodeBlock from "../CodeBlock.vue";
 import type { CardSubstitutions } from "../renderMarkdown";
 import type { RichCardContent, RichCardStep, StepChipKind } from "./types";
@@ -57,11 +58,27 @@ const logoSrc = computed(() =>
 
 const confettiCanvas = ref<HTMLCanvasElement | null>(null);
 
+// ── stream-name input (optional) ─────────────────────────────────────────────
+// Rendered only when the content declares `streamInput`. Its value flows
+// reactively into the install command (the `{stream}` placeholder) AND the live
+// detection below, so the stream the installer writes to and the stream the card
+// listens on always match.
+const streamName = ref(props.content.streamInput?.default ?? "");
+const watchedStream = computed(() =>
+  props.content.streamInput
+    ? streamName.value.trim() || props.content.streamInput.default || "default"
+    : props.content.detect.streamName || "default",
+);
+// Substitute the live stream value into authored code at display/copy time
+// (kept out of build-time subs because it changes as the user types).
+const subStream = (text?: string): string | undefined =>
+  text == null ? text : text.replaceAll("{stream}", watchedStream.value);
+
 const detect = useSpanDetect({
   config: () => ({
     orgId: props.subs.org,
     streamType: props.content.detect.streamType,
-    streamName: props.content.detect.streamName,
+    streamName: watchedStream.value,
     filter: props.content.detect.filter,
     pollMs: props.content.detect.pollMs,
     timeoutMs: props.content.detect.timeoutMs,
@@ -234,6 +251,19 @@ function fireConfetti() {
         </div>
       </div>
 
+      <!-- Optional stream-name input — flows into the install command + detection -->
+      <div v-if="content.streamInput" class="c-config" data-test="ai-stream-config">
+        <OInput
+          v-model="streamName"
+          :label="content.streamInput.label"
+          :placeholder="content.streamInput.placeholder || content.streamInput.default"
+          :help-text="content.streamInput.help"
+          size="sm"
+          width="md"
+          data-test="ai-stream-name-input"
+        />
+      </div>
+
       <!-- Steps -->
       <div class="steps">
         <div
@@ -277,8 +307,8 @@ function fireConfetti() {
               :lang="step.code.lang"
               :chrome="codeChrome(step)"
               :filename="step.code.filename"
-              :code="step.code.raw"
-              :code-masked="step.code.masked"
+              :code="subStream(step.code.raw)"
+              :code-masked="subStream(step.code.masked)"
               :download-env="step.code.downloadEnv"
               @copy="onStepCopy(step, i)"
               @download-env="downloadEnv"
@@ -307,7 +337,7 @@ function fireConfetti() {
                 >
                 <span v-else-if="detect.listening.value" class="sb-txt"
                   >Listening for your first span…<span class="sb-sub"
-                    >stream {{ subs.org }}</span
+                    >watching {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
@@ -321,7 +351,7 @@ function fireConfetti() {
                 >
                 <span v-else class="sb-txt sb-warn"
                   >No Spans Yet After ~60s<span class="sb-sub"
-                    >nothing detected on {{ subs.org }}</span
+                    >nothing detected on {{ watchedStream }}</span
                   ></span
                 >
 
@@ -621,6 +651,20 @@ function fireConfetti() {
 }
 .dark .pv-chip.time {
   background: var(--clay-soft);
+}
+
+/* ---- stream-name config input ---- */
+/* Left-aligned field with breathing room before the steps (no divider). */
+.c-config {
+  margin-bottom: 28px;
+}
+.c-config :deep(label) {
+  margin-bottom: 2px;
+}
+/* Keep the hint on one line — it overflows the 280px field into the empty space
+   to its right rather than wrapping (the input box itself stays md width). */
+.c-config :deep(.tw\:text-input-hint) {
+  white-space: nowrap;
 }
 
 /* ---- numbered steps ---- */

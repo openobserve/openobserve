@@ -103,10 +103,29 @@ export interface RichCardProvider {
   setupTime?: string;
 }
 
+/**
+ * Optional user-set stream name. When present, the card renders a text field;
+ * its value flows reactively into the install command (the `{stream}`
+ * placeholder) AND the live detection, keeping the stream the installer writes
+ * to and the stream the card listens on in lockstep.
+ */
+export interface RichCardStreamInput {
+  /** Field label, e.g. "Traces Stream Name". */
+  label: string;
+  /** Stream used when the field is left blank (e.g. "default"). */
+  default: string;
+  /** Placeholder (falls back to `default`). */
+  placeholder?: string;
+  /** Helper text under the field. */
+  help?: string;
+}
+
 export interface RichCardContent {
   provider: RichCardProvider;
   steps: RichCardStep[];
   detect: RichCardDetect;
+  /** When set, the card shows a stream-name input (see RichCardStreamInput). */
+  streamInput?: RichCardStreamInput;
   extras?: RichCardExtras;
   docUrl?: string;
   slackUrl?: string;
