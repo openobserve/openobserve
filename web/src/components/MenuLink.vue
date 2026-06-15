@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       'nav-menu-item',
       'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-md tw:transition-colors tw:duration-250 tw:ease-in-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
-      'tw:text-[#404040] tw:border-l-2 tw:border-transparent',
+      'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent',
       { 'menu-link-function': title === 'Functions' }
     ]"
     :aria-current="isActive ? 'page' : undefined"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="icon" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
-        :class="'tw:text-[#404040] tw:group-hover:bg-tabs-hover-bg tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:bg-tabs-hover-bg tw:group-hover:text-primary-600'"
       >
         <OIcon
           :name="icon"
@@ -52,13 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="'tw:text-[#404040] tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-block tw:transition-colors tw:duration-250"
-        :class="'tw:text-[#404040] tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >
         <component
           :is="iconComponent"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         class="nav-menu-item-label tw:text-[10.5px] tw:font-medium tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
-        :class="'tw:text-[#404040] tw:group-hover:text-primary-600'"
+        :class="'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
   </a>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'tw:group tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1',
       isActive
         ? activePillClass
-        : 'tw:text-[#404040] tw:border-l-2 tw:border-transparent tw:hover:bg-tabs-hover-bg',
+        : 'tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:hover:bg-tabs-hover-bg',
       { 'nav-menu-item--active': isActive, 'menu-link-function': title === 'Functions' }
     ]"
     :target="target"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="isActive
           ? activeIconClass
-          : 'tw:text-[#404040] tw:group-hover:text-primary-600'"
+          : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >
         <OIcon
           :name="icon"
@@ -127,14 +127,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
         :class="isActive
           ? activeLabelClass
-          : 'tw:font-medium tw:text-[#404040] tw:group-hover:text-primary-600'"
+          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
     <div v-else-if="iconComponent" class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
       <div
         class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
         :class="[
-          isActive ? activeIconClass : 'tw:text-[#404040] tw:group-hover:text-primary-600'
+          isActive ? activeIconClass : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'
         ]"
       >
         <component
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="nav-menu-item-label tw:text-[10.5px] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight"
         :class="isActive
           ? activeLabelClass
-          : 'tw:font-medium tw:text-[#404040] tw:group-hover:text-primary-600'"
+          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
   </router-link>

@@ -121,8 +121,17 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   document.body.classList.toggle('body--dark', isDarkMode);
   document.body.classList.toggle('body--light', !isDarkMode);
 
-  // Sync O2 library tokens with the custom theme color
-  syncO2LibraryTokens(themeColor);
+  // Sync O2 library tokens with the custom theme color.
+  // When using the default theme, clear any previously-set inline primary palette so
+  // the CSS token values in base.css take effect (inline styles beat stylesheets).
+  if (isDefault) {
+    const root = document.documentElement;
+    ['50','100','200','300','400','500','600','700','800','900','950'].forEach(shade => {
+      root.style.removeProperty(`--color-primary-${shade}`);
+    });
+  } else {
+    syncO2LibraryTokens(themeColor);
+  }
 
   if (isDarkMode) {
     // Apply dark mode theme color

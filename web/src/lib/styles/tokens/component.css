@@ -114,7 +114,7 @@
   --color-toggle-item-active-bg: var(--color-primary-100);
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
-  --color-toggle-border: var(--color-border-strong);
+  --color-toggle-border: var(--color-border-default);
   --color-toggle-focus-ring: var(--color-primary-400);
 
   /* Dropdown */
@@ -182,7 +182,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-grey-600);
+  --color-field-list-label-text:       var(--color-grey-text-primary);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -999,7 +999,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-field-list-label-text);
+  --color-field-list-label-text:       var(--color-text-primary);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);

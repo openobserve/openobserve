@@ -588,38 +588,10 @@ const predefinedThemes = [
     light: {
       themeColor: "#6B76E3",
       themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F45B49",
-        errorBg: "#FEF0EE",
-        errorText: "#C0392B",
-        success: "#5ACA7A",
-        successBg: "#EAF9EF",
-        successText: "#208A3C",
-        secondaryBtnBg: "#EFF1FD",
-        secondaryBtnText: "#575FC5",
-        secondaryBtnBorder: "#C8D0F9",
-        outlineText: "#575FC5",
-        outlineBorder: "#B3BDF1",
-        ghostText: "#575FC5",
-      },
     },
     dark: {
       themeColor: "#8B8DF0",
       themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F47D6E",
-        errorBg: "#402929",
-        errorText: "#F47D6E",
-        success: "#73BD79",
-        successBg: "#253627",
-        successText: "#A0DBA5",
-        secondaryBtnBg: "#22264A",
-        secondaryBtnText: "#A1AFFF",
-        secondaryBtnBorder: "#3A4180",
-        outlineText: "#A1AFFF",
-        outlineBorder: "#454D93",
-        ghostText: "#A1AFFF",
-      },
     },
   },
   {
@@ -671,126 +643,6 @@ const predefinedThemes = [
     },
   },
   {
-    id: 11,
-    name: "O2 Midnight Ocean",
-    light: {
-      themeColor: "#0EA5E9",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F43F5E",
-        errorBg: "#FFF1F3",
-        errorText: "#BE123C",
-        success: "#10B981",
-        successBg: "#ECFDF5",
-        successText: "#065F46",
-        secondaryBtnBg: "#E0F2FE",
-        secondaryBtnText: "#0369A1",
-        secondaryBtnBorder: "#BAE6FD",
-        outlineText: "#0369A1",
-        outlineBorder: "#7DD3FC",
-        ghostText: "#0369A1",
-      },
-    },
-    dark: {
-      themeColor: "#38BDF8",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#FB7185",
-        errorBg: "#3D1520",
-        errorText: "#FB7185",
-        success: "#34D399",
-        successBg: "#022C22",
-        successText: "#6EE7B7",
-        secondaryBtnBg: "#0C2A3A",
-        secondaryBtnText: "#7DD3FC",
-        secondaryBtnBorder: "#164E63",
-        outlineText: "#7DD3FC",
-        outlineBorder: "#0E7490",
-        ghostText: "#7DD3FC",
-      },
-    },
-  },
-  {
-    id: 12,
-    name: "O2 Forest & Fire",
-    light: {
-      themeColor: "#10B981",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F97316",
-        errorBg: "#FFF7ED",
-        errorText: "#C2410C",
-        success: "#10B981",
-        successBg: "#ECFDF5",
-        successText: "#065F46",
-        secondaryBtnBg: "#D1FAE5",
-        secondaryBtnText: "#065F46",
-        secondaryBtnBorder: "#6EE7B7",
-        outlineText: "#059669",
-        outlineBorder: "#6EE7B7",
-        ghostText: "#059669",
-      },
-    },
-    dark: {
-      themeColor: "#34D399",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#FB923C",
-        errorBg: "#3A1A08",
-        errorText: "#FB923C",
-        success: "#34D399",
-        successBg: "#022C22",
-        successText: "#6EE7B7",
-        secondaryBtnBg: "#052E1C",
-        secondaryBtnText: "#6EE7B7",
-        secondaryBtnBorder: "#065F46",
-        outlineText: "#6EE7B7",
-        outlineBorder: "#065F46",
-        ghostText: "#6EE7B7",
-      },
-    },
-  },
-  {
-    id: 13,
-    name: "O2 Royal Dusk",
-    light: {
-      themeColor: "#8B5CF6",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F59E0B",
-        errorBg: "#FFFBEB",
-        errorText: "#92400E",
-        success: "#06B6D4",
-        successBg: "#ECFEFF",
-        successText: "#155E75",
-        secondaryBtnBg: "#EDE9FE",
-        secondaryBtnText: "#6D28D9",
-        secondaryBtnBorder: "#C4B5FD",
-        outlineText: "#6D28D9",
-        outlineBorder: "#C4B5FD",
-        ghostText: "#6D28D9",
-      },
-    },
-    dark: {
-      themeColor: "#A78BFA",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#FCD34D",
-        errorBg: "#2D1F00",
-        errorText: "#FCD34D",
-        success: "#22D3EE",
-        successBg: "#031D26",
-        successText: "#67E8F9",
-        secondaryBtnBg: "#1E1530",
-        secondaryBtnText: "#C4B5FD",
-        secondaryBtnBorder: "#4C1D95",
-        outlineText: "#C4B5FD",
-        outlineBorder: "#4C1D95",
-        ghostText: "#C4B5FD",
-      },
-    },
-  },
-  {
     id: 14,
     name: "O2 Crimson Ink",
     light: {
@@ -830,126 +682,6 @@ const predefinedThemes = [
       },
     },
   },
-  {
-    id: 15,
-    name: "Gemini Modern SaaS",
-    light: {
-      themeColor: "#4F46E5",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F43F5E",
-        errorBg: "#FFF1F3",
-        errorText: "#BE123C",
-        success: "#0D9488",
-        successBg: "#F0FDFA",
-        successText: "#115E59",
-        secondaryBtnBg: "#EEF2FF",
-        secondaryBtnText: "#4338CA",
-        secondaryBtnBorder: "#C7D2FE",
-        outlineText: "#4338CA",
-        outlineBorder: "#C7D2FE",
-        ghostText: "#4338CA",
-      },
-    },
-    dark: {
-      themeColor: "#818CF8",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#FB7185",
-        errorBg: "#3D1520",
-        errorText: "#FB7185",
-        success: "#2DD4BF",
-        successBg: "#042F2E",
-        successText: "#99F6E4",
-        secondaryBtnBg: "#1E1B4B",
-        secondaryBtnText: "#A5B4FC",
-        secondaryBtnBorder: "#3730A3",
-        outlineText: "#A5B4FC",
-        outlineBorder: "#3730A3",
-        ghostText: "#A5B4FC",
-      },
-    },
-  },
-  {
-    id: 16,
-    name: "Gemini Dark Tech",
-    light: {
-      themeColor: "#0891B2",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#DB2777",
-        errorBg: "#FDF2F8",
-        errorText: "#9D174D",
-        success: "#0D9488",
-        successBg: "#F0FDFA",
-        successText: "#115E59",
-        secondaryBtnBg: "#ECFEFF",
-        secondaryBtnText: "#0E7490",
-        secondaryBtnBorder: "#A5F3FC",
-        outlineText: "#0E7490",
-        outlineBorder: "#A5F3FC",
-        ghostText: "#0E7490",
-      },
-    },
-    dark: {
-      themeColor: "#00F0FF",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#FF00E6",
-        errorBg: "#2D0033",
-        errorText: "#F0ABFC",
-        success: "#FFE600",
-        successBg: "#1A1500",
-        successText: "#FEF08A",
-        secondaryBtnBg: "#001A1C",
-        secondaryBtnText: "#67E8F9",
-        secondaryBtnBorder: "#164E63",
-        outlineText: "#67E8F9",
-        outlineBorder: "#164E63",
-        ghostText: "#67E8F9",
-      },
-    },
-  },
-  {
-    id: 17,
-    name: "Gemini Creative Earth",
-    light: {
-      themeColor: "#6B46C1",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#ED8936",
-        errorBg: "#FFFAF0",
-        errorText: "#C05621",
-        success: "#48BB78",
-        successBg: "#F0FFF4",
-        successText: "#276749",
-        secondaryBtnBg: "#FAF5FF",
-        secondaryBtnText: "#553C9A",
-        secondaryBtnBorder: "#D6BCFA",
-        outlineText: "#553C9A",
-        outlineBorder: "#D6BCFA",
-        ghostText: "#553C9A",
-      },
-    },
-    dark: {
-      themeColor: "#9F7AEA",
-      themeColorOpacity: 10,
-      semanticColors: {
-        error: "#F6AD55",
-        errorBg: "#2D1A00",
-        errorText: "#F6AD55",
-        success: "#68D391",
-        successBg: "#1A3626",
-        successText: "#9AE6B4",
-        secondaryBtnBg: "#1A1030",
-        secondaryBtnText: "#D6BCFA",
-        secondaryBtnBorder: "#44337A",
-        outlineText: "#D6BCFA",
-        outlineBorder: "#44337A",
-        ghostText: "#D6BCFA",
-      },
-    },
-  },
 ];
 
 // Slugify a theme name into a kebab-case identifier for data-test attributes
@@ -968,10 +700,20 @@ const applyTheme = (theme: any, mode: "light" | "dark") => {
     appliedLightTheme.value = theme.id;
     localStorage.setItem("appliedLightTheme", theme.id.toString());
     localStorage.setItem("customLightColor", modeColors.themeColor);
+    if (modeColors.semanticColors) {
+      localStorage.setItem("lightSemanticColors", JSON.stringify(modeColors.semanticColors));
+    } else {
+      localStorage.removeItem("lightSemanticColors");
+    }
   } else {
     appliedDarkTheme.value = theme.id;
     localStorage.setItem("appliedDarkTheme", theme.id.toString());
     localStorage.setItem("customDarkColor", modeColors.themeColor);
+    if (modeColors.semanticColors) {
+      localStorage.setItem("darkSemanticColors", JSON.stringify(modeColors.semanticColors));
+    } else {
+      localStorage.removeItem("darkSemanticColors");
+    }
   }
 
   // Show success notification
@@ -1067,6 +809,7 @@ const resetToDefaultTheme = () => {
   customLightColor.value = lightResetColor;
   localStorage.removeItem("customLightColor");
   localStorage.removeItem("appliedLightTheme");
+  localStorage.removeItem("lightSemanticColors");
   appliedLightTheme.value = -1;
   localStorage.setItem("appliedLightTheme", "-1");
 
@@ -1075,6 +818,7 @@ const resetToDefaultTheme = () => {
   customDarkColor.value = darkResetColor;
   localStorage.removeItem("customDarkColor");
   localStorage.removeItem("appliedDarkTheme");
+  localStorage.removeItem("darkSemanticColors");
   appliedDarkTheme.value = -1;
   localStorage.setItem("appliedDarkTheme", "-1");
 

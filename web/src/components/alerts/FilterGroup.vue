@@ -511,11 +511,7 @@ defineExpose({
       }
     }
   .group-container {
-    scrollbar-color: #999 #ffffff;
-  }
-
-  .dark .group-container {
-    scrollbar-color: #818181 #212121;
+    scrollbar-color: var(--o2-text-muted) var(--o2-primary-background);
   }
 
 /* For more control using WebKit scrollbar styling */
@@ -525,20 +521,11 @@ defineExpose({
 }
 
 .group-container::-webkit-scrollbar-track {
-  background: #ffffff;
+  background: var(--o2-primary-background);
 }
 
 .group-container::-webkit-scrollbar-thumb {
-  background-color: #999;
-  border-radius: 4px;
-}
-
-.dark .group-container::-webkit-scrollbar-track {
-  background: #212121;
-}
-
-.dark .group-container::-webkit-scrollbar-thumb {
-  background-color: #818181;
+  background-color: var(--o2-text-muted);
   border-radius: 4px;
 }
 

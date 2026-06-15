@@ -910,7 +910,7 @@ watch(isIncidentsEnabled, (enabled) => {
   align-items: center;
   gap: 0.125em;
   padding: 0.125em 0.5em;
-  border-radius: 0.375em;
+  border-radius: 0.75em;
   font-size: 0.6875em;
   font-weight: 600;
   margin: 0 0.125em;
@@ -929,10 +929,10 @@ watch(isIncidentsEnabled, (enabled) => {
 .badge-green  { border: 0.0625em solid var(--o2-positive); }
 .badge-yellow { border: 0.0625em solid var(--o2-warning); }
 .badge-pink   { border: 0.0625em solid var(--o2-negative); }
-.badge-purple { border: 0.0625em solid var(--o2-status-info-text); }
+.badge-purple { border: 0.0625em solid var(--o2-primary-color); }
 .badge-orange { border: 0.0625em solid var(--o2-status-warning-text); }
-.badge-cyan   { border: 0.0625em solid var(--o2-status-info-text); }
-.badge-indigo { border: 0.0625em solid var(--o2-status-info-text); }
+.badge-cyan   { border: 0.0625em solid var(--o2-positive); }
+.badge-indigo { border: 0.0625em solid var(--o2-theme-color); }
 .badge-teal   { border: 0.0625em solid var(--o2-positive); }
 .badge-red    { border: 0.0625em solid var(--o2-negative); }
 .badge-gray   { border: 0.0625em solid var(--o2-border-color); }

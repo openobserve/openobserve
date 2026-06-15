@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-1 tw:px-2.5 tw:pb-2.5">
+      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
         <!-- O2 AI Assistant tab -->
         <div v-if="activeHomeTab === 'ai'" class="home-tab-panel home-ai-panel">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />

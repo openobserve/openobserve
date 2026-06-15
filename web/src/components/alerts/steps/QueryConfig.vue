@@ -2497,7 +2497,7 @@ export default defineComponent({
 
   &.sql-status-bar--hint    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
   &.sql-status-bar--idle    { background: var(--color-surface-panel); color: var(--color-text-secondary); }
-  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
+  &.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: var(--o2-negative); cursor: pointer; }
 }
 
 .pane-accent-bar {

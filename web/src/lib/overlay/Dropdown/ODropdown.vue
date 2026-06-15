@@ -2,7 +2,10 @@
 // Module-level flag: true when the last document interaction was pointer-based.
 // Shared across all ODropdown instances (only one is open at a time).
 let lastWasPointer = false;
-if (typeof document !== 'undefined') {
+// Guard prevents duplicate listeners on HMR re-execution of this module block.
+const _oDdKey = '__oDropdownListenersRegistered__';
+if (typeof document !== 'undefined' && !(globalThis as any)[_oDdKey]) {
+  (globalThis as any)[_oDdKey] = true;
   document.addEventListener('pointerdown', () => { lastWasPointer = true; }, true);
   document.addEventListener('keydown', () => { lastWasPointer = false; }, true);
 }

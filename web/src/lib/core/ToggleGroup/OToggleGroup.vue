@@ -62,7 +62,6 @@ const wrapperClasses = computed(() => {
         'tw:inline-flex tw:items-stretch',
         orientation === 'vertical' ? 'tw:flex-col' : 'tw:flex-row',
         'tw:bg-[var(--color-toggle-track-bg)] tw:rounded-lg tw:p-0.5',
-        'tw:border tw:border-toggle-border',
       ]"
       @update:model-value="
         (v) => {

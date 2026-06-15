@@ -1,0 +1,63 @@
+// ============================================================
+// OpenObserve — Modern Theme Override
+// Layered on top of the token system. No layout changes.
+//
+// What this does:
+//   • Font — Geist / Geist Mono (defined in _base.scss + index.html)
+//   • Heading letter-spacing — negative tracking on display sizes
+//   • ALL CAPS labels — enforced positive tracking (required by craft rules)
+//   • Scrollbar — slim 6px pill
+//   • Body antialiasing
+// ============================================================
+
+// ── Font smoothing ────────────────────────────────────────────
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// ── Heading tracking ─────────────────────────────────────────
+// Negative letter-spacing on large display text is the single most
+// visible typography improvement — without it headlines look loose.
+h1 { letter-spacing: -0.03em; }
+h2 { letter-spacing: -0.025em; }
+h3 { letter-spacing: -0.02em; }
+h4 { letter-spacing: -0.015em; }
+h5, h6 { letter-spacing: -0.01em; }
+
+// ── ALL CAPS must have positive tracking ─────────────────────
+// Any uppercase text (table headers, nav section labels) needs ≥ 0.06em
+// or the counters collide and it reads as cramped/amateurish.
+.tw\:uppercase,
+[class*="uppercase"],
+.text-uppercase,
+th {
+  letter-spacing: 0.08em;
+}
+
+// ── Scrollbar — slim 6px pill ────────────────────────────────
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-grey-300);
+  border-radius: 99px;
+
+  &:hover {
+    background: var(--color-grey-400);
+  }
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-grey-700);
+
+  &:hover {
+    background: var(--color-grey-600);
+  }
+}
