@@ -334,6 +334,8 @@ jobs:
       needs.triage.outputs.author_allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write # push the generated tests to the autoe2e/<branch> (never to main)
     steps:
       - name: Checkout PR head (feature source needed to generate accurate tests)
         uses: actions/checkout@v4
@@ -347,12 +349,12 @@ jobs:
           persist-credentials: false
 
       - name: Restore pipeline files from trusted main (anti-hijack)
-        # Even though the author is trusted, run the pipeline's OWN definition from main — not
-        # whatever this PR happens to contain (it might be mid-edit, or unrelated). This pins the
-        # agent prompts, model config, and workflows to the reviewed main versions.
+        # Run the pipeline's OWN agent prompts + model config from trusted main — not whatever this
+        # PR happens to contain. (We do NOT restore .github here: those workflows aren't executed by
+        # this job, and restoring them would dirty the test PR's diff against the dev's branch.)
         run: |
           git fetch origin main --depth=1
-          git checkout origin/main -- .opencode opencode.jsonc .github
+          git checkout origin/main -- .opencode opencode.jsonc
 
       - name: Download triage context
         uses: actions/download-artifact@v4
@@ -397,28 +399,49 @@ jobs:
             echo "::error::Sentinel blocked generation (not a clean PASS). See audit report."; exit 1
           fi
 
-      - name: Package generated test changes
-        # Capture ONLY the generated test code (not the restored-from-main pipeline files) as a
-        # patch that Job 4 applies onto the stacked branch.
+      - name: Register the spec in playwright.yml (deterministic — NOT the LLM)
+        # The Engineer emits playwright-registration.json; a non-LLM step applies the one-line
+        # run_files append (yq, preinstalled on ubuntu runners). The LLM never edits the workflow.
+        env:
+          REG: docs/test_generator/ci/playwright-registration.json
         run: |
-          git add tests/ui-testing >/dev/null 2>&1 || true
-          git diff --cached -- tests/ui-testing > docs/test_generator/ci/generated-tests.patch || true
-          echo "generated patch bytes: $(wc -c < docs/test_generator/ci/generated-tests.patch)"
+          [ -f "$REG" ] || { echo "::error::no playwright-registration.json from the Engineer"; exit 1; }
+          GROUP=$(jq -r '.group' "$REG")
+          FNAME=$(jq -r '.spec_filename' "$REG")
+          echo "$FNAME" | grep -Eq '^[A-Za-z0-9._-]+\.spec\.js$' || { echo "::error::unsafe spec_filename: $FNAME"; exit 1; }
+          export GROUP FNAME
+          # Append the bare filename to the matching testfolder's run_files array.
+          yq -i '(.jobs.ui_integration_tests.strategy.matrix.include[] | select(.testfolder == strenv(GROUP)).run_files) += [strenv(FNAME)]' .github/workflows/playwright.yml
+          # Sanity: the file must still parse and now contain the filename.
+          yq -e '.jobs.ui_integration_tests' .github/workflows/playwright.yml >/dev/null
+          grep -q "$FNAME" .github/workflows/playwright.yml || { echo "::error::registration did not apply (group '$GROUP' not found?)"; exit 1; }
 
-      - name: Upload generated output
-        # Job 4 consumes ci/ (run-context, playwright-registration, generated-tests.patch); the
-        # report dirs ride along for the PR body. Scope to these — not the whole docs/test_generator
-        # (which also holds unrelated pre-existing docs) — and expire quickly.
+      - name: Create autoe2e branch, commit, push (no PR yet)
+        # Branch early (silent) off the dev's PR branch so it inherits the feature code → the tests
+        # pass before the feature merges. The PR is opened later by Job 4. Force-push so a re-run of
+        # /e2e refreshes the same branch (idempotent — one test PR per source PR).
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORIG_REF: ${{ needs.triage.outputs.head_ref }}
+          PR_NUMBER: ${{ needs.triage.outputs.pr_number }}
+        run: |
+          SLUG=$(jq -r '.feature_slug // "feature"' docs/test_generator/ci/run-context.json)
+          BRANCH="autoe2e/${ORIG_REF}"
+          git config user.name "openobserve-bot"
+          git config user.email "bot@openobserve.ai"
+          git checkout -b "$BRANCH"
+          git add tests/ui-testing .github/workflows/playwright.yml
+          git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})"
+          # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+          echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it)."
+
+      - name: Upload run metadata (for Job 3/4)
         uses: actions/upload-artifact@v4
         with:
-          name: generated-tests
+          name: generated-meta
           retention-days: 2
-          path: |
-            docs/test_generator/ci/
-            docs/test_generator/features/
-            docs/test_generator/test-plans/
-            docs/test_generator/generation-reports/
-            docs/test_generator/audit-reports/
+          path: docs/test_generator/ci/
 
   # ---------------------------------------------------------------------------
   # JOB 3 — Verify / Heal. Build + boot OSS local binary; Healer + Sentinel re-audit.
