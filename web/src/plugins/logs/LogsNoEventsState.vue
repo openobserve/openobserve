@@ -16,11 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   LogsNoEventsState — context-aware empty state for the logs search page.
-  Detects whether the current query has active filter conditions and adapts
-  its copy and action cards accordingly:
 
-    • No filters → "No events in this time range" + Expand time range card
-    • Has filters → "Nothing matched this query" + Expand + Remove filter cards
+  Three distinct states based on stream stats vs. current window:
+
+    1. Window misses the stream's data entirely (doc_time_max outside window)
+       → "Jump to latest data" card (last 15 min around doc_time_max)
+
+    2. Window overlaps stream data but query returned nothing (filters too tight)
+       → "Adjust your filters" message + fallback expand-range card
+
+    3. No stream stats available (fallback)
+       → generic "Expand time range" card
 
   Emits action IDs to the parent rather than mutating state directly.
   The "Ask AI" ghost button is only shown when aiEnabled is true.
@@ -30,26 +36,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #title>{{ t("logs.noEvents.title") }}</template>
 
     <template #description>
-      <span v-if="hasFilters" v-html="filteredDescription" />
-      <span v-else>{{ plainDescription }}</span>
+      <!-- Stream has data in window but filters matched nothing -->
+      <span v-if="windowHasStreamData && hasFilters" v-html="t('logs.noEvents.descWithFilters')" />
+      <!-- Stream has data in window, no filters — data is at the boundary or sparse -->
+      <span v-else-if="windowHasStreamData && !hasFilters" v-html="t('logs.noEvents.descDataAtBoundary')" />
+      <!-- Window is entirely outside stream's data range -->
+      <span v-else-if="jumpTarget">{{ t("logs.noEvents.descOutOfRange") }}</span>
+      <!-- No stream stats — generic fallback -->
+      <span v-else>{{ t("logs.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
     <template #actions>
+      <!-- Window is outside the stream's data range: offer a precise jump -->
       <EmptyStateActionCard
+        v-if="jumpTarget"
+        icon="schedule"
+        :label="t('logs.noEvents.jumpToData')"
+        :sublabel="jumpTargetSublabel"
+        data-test="logs-no-events-jump-to-data-card"
+        @click="emit('jump-to-stream-data', jumpTarget!.from, jumpTarget!.to)"
+      />
+      <!-- No stream stats: generic expand is the only reasonable suggestion -->
+      <EmptyStateActionCard
+        v-else-if="!streamDocTimeRange"
         icon="schedule"
         :label="t('logs.noEvents.expandRange')"
         :sublabel="expandRangeSublabel"
         data-test="logs-no-events-expand-range-card"
         @click="emit('widen-range', suggestedPeriod)"
       />
-      <EmptyStateActionCard
-        v-if="hasFilters"
-        icon="filter-list"
-        :label="t('logs.noEvents.removeFilter')"
-        :sublabel="removeFilterSublabel"
-        data-test="logs-no-events-remove-filter-card"
-        @click="emit('remove-filter')"
-      />
+      <!-- windowHasStreamData (with or without filters): no action card — Ask AI / history in #extra -->
     </template>
 
     <template #extra>
@@ -64,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("logs.noEvents.openHistory") }}
         </OButton>
         <OButton
-          v-if="aiEnabled"
+          v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
           class="ai-hover-btn"
@@ -88,25 +104,30 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useAiIcon } from "@/composables/useAiIcon";
+import { DateTime } from "luxon";
+
+const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
+// Backend uses exclusive end boundary, so nudge end by 1s to include the record at doc_time_max.
+const END_NUDGE_US = 1_000_000;
 
 const props = defineProps<{
-  /** True when SQL mode is active; affects how filter presence is detected. */
   sqlMode: boolean;
-  /** In non-SQL mode: the WHERE-clause expression string. */
   query: string;
-  /** In SQL mode: the full SQL text from the editor. */
   editorValue: string;
-  /** The current relative time period code, e.g. "15m", "1h", "7d". */
   relativeTimePeriod: string;
-  /** "relative" or "absolute" */
   dateType: string;
-  /** Show the "Ask AI" button only when AI is enabled (enterprise + zoConfig.ai_enabled). */
   aiEnabled: boolean;
+  /** doc_time_min/max from stream stats, in microseconds. */
+  streamDocTimeRange?: { min: number; max: number };
+  /** Resolved microsecond bounds of the active query window. */
+  queryWindowUs?: { start: number; end: number };
+  /** User-selected timezone string, e.g. "America/New_York" or "UTC". */
+  timezone?: string;
 }>();
 
 const emit = defineEmits<{
   "widen-range": [period: string];
-  "remove-filter": [];
+  "jump-to-stream-data": [fromUs: number, toUs: number];
   "open-history": [];
   "ask-ai": [];
 }>();
@@ -117,22 +138,53 @@ const { aiIconSrc } = useAiIcon();
 // --- filter detection -------------------------------------------------------
 
 const hasFilters = computed<boolean>(() => {
-  if (props.sqlMode) {
-    return /\bWHERE\b/i.test(props.editorValue || "");
-  }
+  if (props.sqlMode) return /\bWHERE\b/i.test(props.editorValue || "");
   return (props.query || "").trim().length > 0;
 });
 
-/** Number of AND/OR-separated conditions in non-SQL mode. 0 in SQL mode. */
-const conditionCount = computed<number>(() => {
-  if (props.sqlMode) return 0;
-  const q = (props.query || "").trim();
-  if (!q) return 0;
-  const matches = q.match(/\b(AND|OR)\b/gi);
-  return (matches?.length ?? 0) + 1;
+// --- stream data vs. window overlap -----------------------------------------
+
+/**
+ * True when the current query window overlaps the stream's known data range.
+ * If stream stats are unavailable we assume overlap (conservative fallback).
+ */
+const windowHasStreamData = computed<boolean>(() => {
+  const r = props.streamDocTimeRange;
+  const w = props.queryWindowUs;
+  if (!r || !w) return true;
+  // Allow 1-second tolerance: setAbsoluteTime round-trips through date strings
+  // and loses sub-second precision, so w.end may be fractionally less than r.max.
+  const TOLERANCE_US = 30_000_000;
+  return w.start <= r.max + TOLERANCE_US && w.end >= r.min - TOLERANCE_US;
 });
 
-// --- time-range helpers -----------------------------------------------------
+/**
+ * When the window has no overlap with stream data, compute a 15-minute window
+ * ending at doc_time_max so the user lands on the most recent data.
+ */
+const jumpTarget = computed<{ from: number; to: number } | null>(() => {
+  if (windowHasStreamData.value) return null;
+  const r = props.streamDocTimeRange;
+  if (!r) return null;
+  return { from: r.max - FIFTEEN_MINS_US, to: r.max + END_NUDGE_US };
+});
+
+const jumpTargetSublabel = computed(() => {
+  if (!jumpTarget.value) return "";
+  const tz = props.timezone || "UTC";
+  const zone = tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : tz;
+  // Show doc_time_max (before nudge) as the "last data" label
+  const lastDataUs = props.streamDocTimeRange!.max;
+  const formatted = DateTime
+    .fromMillis(lastDataUs / 1000)
+    .setZone(zone)
+    .toFormat("MMM d, yyyy HH:mm:ss");
+  return `Last data: ${formatted} (${zone})`;
+});
+
+// --- time-range helpers (fallback expand) -----------------------------------
 
 function periodToLabel(period: string): string {
   if (!period || period === "absolute") return "";
@@ -154,12 +206,7 @@ function nextWiderPeriod(period: string): string {
   const value = parseInt(period, 10);
   const unit = period.slice(-1);
   const toMins: Record<string, number> = {
-    s: 1 / 60,
-    m: 1,
-    h: 60,
-    d: 1440,
-    w: 10080,
-    M: 43200,
+    s: 1 / 60, m: 1, h: 60, d: 1440, w: 10080, M: 43200,
   };
   const mins = value * (toMins[unit] ?? 1);
   if (mins <= 60) return "1d";
@@ -176,28 +223,9 @@ const suggestedPeriod = computed(() =>
 );
 const suggestedPeriodLabel = computed(() => periodToLabel(suggestedPeriod.value));
 
-// --- copy -------------------------------------------------------------------
-
-const plainDescription = computed(() =>
-  t("logs.noEvents.descNoFilters", { range: currentPeriodLabel.value }),
-);
-
-// Uses v-html — content is fully i18n-controlled, no user input.
-const filteredDescription = computed(() =>
-  t("logs.noEvents.descWithFilters"),
-);
-
-// --- action card sublabels --------------------------------------------------
-
 const expandRangeSublabel = computed(() => {
   if (!isRelative.value) return t("logs.noEvents.expandRangeDescAbsolute");
   return `${currentPeriodLabel.value} → ${suggestedPeriodLabel.value}`;
 });
 
-const removeFilterSublabel = computed(() => {
-  if (props.sqlMode) return t("logs.noEvents.removeFilterDescSql");
-  const n = conditionCount.value;
-  const noun = n === 1 ? "condition" : "conditions";
-  return `You have ${n} active ${noun} on this query`;
-});
 </script>
