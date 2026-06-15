@@ -289,5 +289,62 @@ class UnflattenedPage {
         }
         return -1;
     }
+
+    /**
+     * Poll the search API until at least one record in the stream exposes the
+     * `_o2_id` field. This is the deterministic readiness signal that "Store
+     * Original Data" has taken effect and the freshly-ingested rows carrying
+     * `_o2_id` are queryable.
+     *
+     * Replaces blind `waitForTimeout` schema-propagation sleeps and the UI-level
+     * re-ingestion retry loop. Both were the dominant source of the unflattened
+     * timeout flake: under contended CI runners the indexing lag grew and the
+     * 5-attempt UI loop (≈30s of row probing + re-ingest per attempt) ballooned
+     * past the 5-minute per-test budget. Gating on the backend instead lets the
+     * subsequent single UI scan find `_o2_id` on the first attempt.
+     *
+     * Returns true as soon as `_o2_id` appears; false if it never appears within
+     * `timeout` (caller may fall back to its own UI retry).
+     */
+    async waitForO2IdQueryable({ streamName = 'e2e_automate', timeout = 90000, pollInterval = 2000 } = {}) {
+        const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        const orgId = getOrgIdentifier();
+        const headers = getAuthHeaders();
+        const deadline = Date.now() + timeout;
+
+        while (Date.now() < deadline) {
+            try {
+                const end = Date.now() * 1000;            // microseconds
+                const start = end - 60 * 60 * 1000 * 1000; // last hour
+                const resp = await this.page.request.post(
+                    `${baseUrl}/api/${orgId}/_search?type=logs`,
+                    {
+                        headers: { ...headers, 'Content-Type': 'application/json' },
+                        data: {
+                            query: {
+                                sql: `SELECT * FROM "${streamName}" ORDER BY _timestamp DESC`,
+                                start_time: start,
+                                end_time: end,
+                                from: 0,
+                                size: 5,
+                            },
+                        },
+                    }
+                );
+                if (resp.ok()) {
+                    const body = await resp.json().catch(() => ({}));
+                    const hits = Array.isArray(body.hits) ? body.hits : [];
+                    if (hits.some((h) => h && Object.prototype.hasOwnProperty.call(h, '_o2_id'))) {
+                        return true;
+                    }
+                }
+            } catch (e) {
+                // Transient backend/network error — keep polling until the deadline.
+            }
+            await this.page.waitForTimeout(pollInterval);
+        }
+        return false;
+    }
 }
 export default UnflattenedPage;
