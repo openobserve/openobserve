@@ -806,6 +806,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/roles", get(authz::fga::get_roles).post(authz::fga::create_role))
         .route("/{org_id}/roles/bulk", delete(authz::fga::delete_role_bulk))
         .route("/{org_id}/roles/{role_id}", put(authz::fga::update_role).delete(authz::fga::delete_role))
+        .route("/{org_id}/roles/{role_id}/permissions", get(authz::fga::get_all_role_permissions))
         .route("/{org_id}/roles/{role_id}/permissions/{resource}", get(authz::fga::get_role_permissions))
         .route("/{org_id}/groups", get(authz::fga::get_groups).post(authz::fga::create_group))
         .route("/{org_id}/groups/{group_name}", get(authz::fga::get_group_details).put(authz::fga::update_group).delete(authz::fga::delete_group))
