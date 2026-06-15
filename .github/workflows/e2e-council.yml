@@ -304,7 +304,7 @@ jobs:
                 body += `- **Skip:** ${clean(t.skip, 10)}${t.skip_reason ? ` — _${clean(t.skip_reason)}_` : ''}\n`;
                 if (t.feature_title) body += `- **Feature:** ${clean(t.feature_title, 120)} (area: ${clean(t.area, 40) || '?'})\n`;
                 if (t.spec_path) body += `- **Would write:** \`${clean(t.spec_path, 200)}\`\n`;
-                body += `\n**Rationale:** ${clean(t.rationale)}\n`;
+                body += `\n**Rationale:** ${clean(t.rationale, 4000)}\n`;
                 if ('${{ steps.mode.outputs.dry_run }}' === 'true') {
                   body += `\n_Dry-run (v1 manual-first): no tests generated._`;
                 }
