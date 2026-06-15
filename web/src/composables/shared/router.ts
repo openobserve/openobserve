@@ -132,6 +132,17 @@ const useRoutes = () => {
         title: "Empty State Demo",
       },
     },
+    // THROWAWAY: test-target page for E2E Council generation. Reachable at
+    // /test-demo. Remove with src/views/TestDemo.vue — this branch is not for merge.
+    {
+      path: "test-demo",
+      name: "testDemo",
+      component: () => import("@/views/TestDemo.vue"),
+      meta: {
+        keepAlive: false,
+        title: "Test Demo",
+      },
+    },
     {
       path: "logs",
       name: "logs",

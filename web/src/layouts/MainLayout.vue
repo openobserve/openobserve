@@ -361,6 +361,14 @@ export default defineComponent({
         link: "/logs",
         name: "logs",
       },
+      // THROWAWAY: nav entry for the E2E Council test-target page (/test-demo).
+      // Remove with src/views/TestDemo.vue — this branch is not for merge.
+      {
+        title: "TEST",
+        icon: "science",
+        link: "/test-demo",
+        name: "testDemo",
+      },
       {
         title: t("menu.metrics"),
         icon: "bar-chart",
