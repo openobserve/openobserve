@@ -286,7 +286,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-theme-mode: #{$theme-mode};
   // Backgrounds
   --o2-primary-background: #{$o2-gray-100};  // White background
-  --o2-secondary-background: #{$o2-iris-200}; // Light iris background
+  --o2-secondary-background: var(--color-primary-50); // Light teal background
   --o2-muted-background: #{$o2-gray-300};    // Subtle gray background
   
   // Text Colors — grey-based semantic hierarchy (Datadog/Grafana pattern)
@@ -298,8 +298,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-text-label:       #{$o2-gray-800};       // form labels, metadata, badges
   --o2-text-muted:       #{$o2-gray-700};       // disabled, placeholder, de-emphasized
   --o2-text-placeholder: #{$o2-gray-700};       // input placeholders
-  --o2-text-link:        #{$o2-iris-1000};      // clickable links
-  --o2-text-link-hover:  #{$o2-iris-1100};      // link hover state
+  --o2-text-link:        var(--color-primary-600);  // clickable links
+  --o2-text-link-hover:  var(--color-primary-700); // link hover state
   --o2-text-code:        #{$o2-gray-1000};      // inline code, monospace
   --o2-text-inverse:     #{$o2-gray-100};       // text on dark/colored backgrounds
 
@@ -321,11 +321,11 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-border-input: #{$o2-gray-500};       // Input field borders
   
   // Interactive Elements
-  --o2-primary-color: #{$o2-iris-1100};     // Primary actions/buttons
+  --o2-primary-color: var(--color-primary-600); // Primary actions/buttons
   --o2-primary-foreground: #{$o2-gray-100}; // Text on primary color
   --o2-hover-accent: color-mix(in srgb, #{$theme-color} 15%, white);       // Hover state accent
   --o2-destructive-foreground: #{$o2-gray-100}; // Text on destructive buttons
-  --o2-focus-ring: #{$o2-iris-1200};        // Focus state indicator
+  --o2-focus-ring: var(--color-primary-400); // Focus state indicator
   --o2-hover-shadow: #dddddd;
 
   --o2-hover-gray: color-mix(in srgb, #{$theme-color} 2%, rgb(244, 244, 244));
@@ -437,8 +437,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-label-chip-ipv6-text:   #{$o2-green-800};
   --o2-label-chip-method-bg:   #{$o2-red-200};
   --o2-label-chip-method-text: #{$o2-red-900};
-  --o2-label-chip-url-bg:      #{$o2-iris-400};
-  --o2-label-chip-url-text:    #{$o2-iris-1100};
+  --o2-label-chip-url-bg:      var(--color-primary-100);
+  --o2-label-chip-url-text:    var(--color-primary-700);
   --o2-label-chip-num-bg:      #{$o2-orange-100};
   --o2-label-chip-num-text:    #{$o2-orange-900};
   --o2-label-chip-float-bg:    #{$o2-orange-100};
@@ -463,7 +463,7 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-label-chip-pattern-text: #{$o2-blue-1100};
 
   // Dashboard
-  --o2-dashboard-placeholder-bg: #{$o2-iris-700};
+  --o2-dashboard-placeholder-bg: var(--color-primary-700);
 
   // Field Type Badge Colors
   --o2-field-type-string-bg: oklch(95% 0.052 163.051);
@@ -547,8 +547,8 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-text-label:       #{$o2-dark-gray-800};     // form labels, metadata, badges
   --o2-text-muted:       #{$o2-dark-gray-700};     // disabled, de-emphasized
   --o2-text-placeholder: #{$o2-dark-gray-700};     // input placeholders
-  --o2-text-link:        #{$o2-dark-iris-800};     // clickable links
-  --o2-text-link-hover:  #{$o2-dark-iris-700};     // link hover state
+  --o2-text-link:        var(--color-primary-400);  // clickable links
+  --o2-text-link-hover:  var(--color-primary-300); // link hover state
   --o2-text-code:        #{$o2-dark-gray-1000};    // inline code, monospace
   --o2-text-inverse:     #{$o2-dark-gray-200};     // text on dark/colored backgrounds
 
@@ -570,11 +570,11 @@ $json-object-dark: #D1D5DB;         // Light gray
   --o2-border-input: #{$o2-dark-gray-1000};   // Input borders
   
   // Interactive Elements
-  --o2-primary-color: #{$o2-dark-iris-1000};  // Primary actions
+  --o2-primary-color: var(--color-primary-400); // Primary actions
   --o2-primary-foreground: #{$o2-dark-gray-100}; // Text on primary
   --o2-hover-accent: color-mix(in srgb, #{$theme-color} 20%, rgb(39, 39, 39));   // Hover accents
   --o2-destructive-foreground: #{$o2-dark-gray-100}; // Destructive text
-  --o2-focus-ring: #{$o2-dark-iris-600};      // Focus indicators
+  --o2-focus-ring: var(--color-primary-500);  // Focus indicators
   --o2-hover-shadow: rgba(0, 0, 0, 0.6);
   --o2-hover-gray: color-mix(in srgb, #{$theme-color} 8%, rgb(38, 38, 38));
 
