@@ -322,9 +322,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         testLogger.info('=== PHASE 4: Verify action buttons and close ===');
         await pm.alertsPage.expectAlertDetailsActionButtonsVisible();
 
-        const closeBtn = page.locator(pm.alertsPage.locators.alertDetailsCloseButton);
-        await closeBtn.click();
-        await page.waitForTimeout(1000);
+        await pm.alertsPage.closeAlertDetailsDialog();
 
         testLogger.info('=== METRICS NOTIFICATION TEST COMPLETE ===');
     });
