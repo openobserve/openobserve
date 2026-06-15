@@ -20,13 +20,17 @@ import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingGroup from "@/enterprise/components/billings/BillingGroup.vue";
 import AzureMarketplaceSetup from "@/views/AzureMarketplaceSetup.vue";
 import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
-import useAIRoutes from "@/composables/shared/useAIRoutes";
+import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
+import { routeGuard } from "@/utils/zincutils";
+
+const AIObservabilityShell = () =>
+  import("@/enterprise/views/AIObservability/Index.vue");
+const AILLMInsightsPage = () =>
+  import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
+const AISessionsPage = () =>
+  import("@/enterprise/views/AIObservability/SessionsPage.vue");
 
 const useEnvRoutes = () => {
-  // AI Observability / Online Evals routes are shared with the open-source
-  // router so the feature is available in every build.
-  const ai = useAIRoutes();
-
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register
   // The backend sets a cookie and redirects to Dex login
   const parentRoutes: any = [
@@ -57,7 +61,48 @@ const useEnvRoutes = () => {
   ];
 
   const homeChildRoutes = [
-    ...ai.homeChildRoutes,
+    {
+      path: "ai",
+      component: AIObservabilityShell,
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+      meta: {
+        title: "AI Monitoring",
+        keepAlive: false,
+      },
+      children: [
+        {
+          path: "",
+          name: "aiObservability",
+          redirect: { name: "aiLLMInsights" },
+        },
+        {
+          path: "llm-insights",
+          name: "aiLLMInsights",
+          component: AILLMInsightsPage,
+          meta: { title: "LLM Insights", keepAlive: false },
+        },
+        {
+          path: "sessions",
+          name: "aiSessions",
+          component: AISessionsPage,
+          meta: { title: "Sessions", keepAlive: false },
+        },
+        {
+          path: "evaluations",
+          name: "aiEvaluations",
+          component: OnlineEvals,
+          props: { hideTabBar: true },
+          meta: { title: "Evaluations", keepAlive: false },
+        },
+      ],
+    },
+    {
+      // Legacy URL — keep saved/bookmarked links working
+      path: "online-evals",
+      redirect: { name: "aiEvaluations" },
+    },
     {
       path: "billings",
       name: "billings",
