@@ -487,6 +487,10 @@ jobs:
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
           git checkout -b "$BRANCH"
+          # The anti-hijack restore staged .opencode/opencode.jsonc (trusted-ref agents) — those are
+          # PIPELINE files and must NOT land in the test PR. Unstage them before committing so the
+          # commit carries ONLY the generated tests + hand-off.
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
           git add tests/ui-testing
           # Commit the hand-off too (force — docs/test_generator is gitignored) so the branch is
           # SELF-CONTAINED: verify_heal reads it straight from the checkout, no artifact dependency.
@@ -756,6 +760,9 @@ jobs:
           BRANCH="autoe2e/${ORIG_REF}"
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
+          # The anti-hijack restore staged .opencode/opencode.jsonc — unstage so healer commits carry
+          # ONLY test changes (pipeline files must never reach the test PR).
+          git restore --staged .opencode opencode.jsonc 2>/dev/null || true
           git add tests/ui-testing
           # Strip the hand-off from the branch BEFORE the PR: --cached removes it from the commit/branch
           # but keeps the working-tree copy so the "Upload heal logs" step below can still archive it.
@@ -884,9 +891,16 @@ jobs:
           if grep -q "$FNAME" /tmp/pw.yml; then
             echo "playwright.yml already registers $FNAME — nothing to do."; exit 0
           fi
-          yq -i '(.jobs.ui_integration_tests.strategy.matrix.include[] | select(.testfolder == strenv(GROUP)).run_files) += [strenv(FNAME)]' /tmp/pw.yml
-          yq -e '.jobs.ui_integration_tests' /tmp/pw.yml >/dev/null
-          grep -q "$FNAME" /tmp/pw.yml || { echo "::error::registration did not apply (group '$GROUP' not found?)"; exit 1; }
+          # SURGICAL insert (NOT yq -i): yq reformats the whole file (strips blank lines/comments →
+          # a huge, merge-polluting diff). This line-based inserter adds exactly ONE entry to the
+          # target group's run_files and touches nothing else (verified locally: +1 line diff).
+          # The script is base64-embedded (pr_back does no checkout, so it can't read a repo file;
+          # base64 is immune to YAML/heredoc indentation pitfalls). Source lives in PR #12674 notes.
+          REGISTER_PY_B64="aW1wb3J0IHN5cywgcmUKZ3JvdXAsIGZuYW1lLCBwYXRoID0gc3lzLmFyZ3ZbMV0sIHN5cy5hcmd2WzJdLCBzeXMuYXJndlszXQpsaW5lcyA9IG9wZW4ocGF0aCkucmVhZCgpLnNwbGl0KCdcbicpCm91dCwgaW5fZ3JvdXAsIGRvbmUsIGksIG4gPSBbXSwgRmFsc2UsIEZhbHNlLCAwLCBsZW4obGluZXMpCndoaWxlIGkgPCBuOgogICAgbGluZSA9IGxpbmVzW2ldCiAgICBpZiByZS5zZWFyY2gocictXHMqdGVzdGZvbGRlcjpccyoiJXMiJyAlIHJlLmVzY2FwZShncm91cCksIGxpbmUpOgogICAgICAgIGluX2dyb3VwID0gVHJ1ZQogICAgZWxpZiByZS5zZWFyY2gocictXHMqdGVzdGZvbGRlcjpccyoiJywgbGluZSk6CiAgICAgICAgaW5fZ3JvdXAgPSBGYWxzZQogICAgaWYgaW5fZ3JvdXAgYW5kIG5vdCBkb25lIGFuZCAncnVuX2ZpbGVzOicgaW4gbGluZToKICAgICAgICBtID0gcmUuc2VhcmNoKHIncnVuX2ZpbGVzOlxzKlxbKC4qKVxdXHMqJCcsIGxpbmUpCiAgICAgICAgaWYgbTogICMgaW5saW5lIGZvcm0KICAgICAgICAgICAgb3V0LmFwcGVuZChyZS5zdWIocidcXVxzKiQnLCAnLCAiJXMiXScgJSBmbmFtZSwgbGluZSkpOyBkb25lID0gVHJ1ZTsgaSArPSAxOyBjb250aW51ZQogICAgICAgIG91dC5hcHBlbmQobGluZSk7IGkgKz0gMSAgIyBtdWx0aWxpbmUgZm9ybQogICAgICAgIHdoaWxlIGkgPCBuOgogICAgICAgICAgICBsMiA9IGxpbmVzW2ldCiAgICAgICAgICAgIGlmIHJlLm1hdGNoKHInXlxzKlxdXHMqJCcsIGwyKToKICAgICAgICAgICAgICAgIGluZGVudCA9IHJlLm1hdGNoKHInXihccyopJywgbDIpLmdyb3VwKDEpCiAgICAgICAgICAgICAgICBvdXQuYXBwZW5kKCclcyAgIiVzIiwnICUgKGluZGVudCwgZm5hbWUpKTsgb3V0LmFwcGVuZChsMik7IGRvbmUgPSBUcnVlOyBpICs9IDE7IGJyZWFrCiAgICAgICAgICAgIG91dC5hcHBlbmQobDIpOyBpICs9IDEKICAgICAgICBjb250aW51ZQogICAgb3V0LmFwcGVuZChsaW5lKTsgaSArPSAxCmlmIG5vdCBkb25lOgogICAgc3lzLnN0ZGVyci53cml0ZSgiZ3JvdXAgJXIgLyBydW5fZmlsZXMgbm90IGZvdW5kXG4iICUgZ3JvdXApOyBzeXMuZXhpdCgyKQpvcGVuKHBhdGgsICd3Jykud3JpdGUoJ1xuJy5qb2luKG91dCkpCg=="
+          printf '%s' "$REGISTER_PY_B64" | base64 -d > /tmp/register_spec.py
+          python3 /tmp/register_spec.py "$GROUP" "$FNAME" /tmp/pw.yml \
+            || { echo "::error::registration did not apply (group '$GROUP' / run_files not found?)"; exit 1; }
+          grep -q "\"$FNAME\"" /tmp/pw.yml || { echo "::error::registration did not apply"; exit 1; }
           NEWB64=$(base64 -w0 /tmp/pw.yml)
           gh api -X PUT "repos/${GITHUB_REPOSITORY}/contents/${PW}" \
             -f message="test(autoe2e): register ${FNAME} in playwright.yml" \
