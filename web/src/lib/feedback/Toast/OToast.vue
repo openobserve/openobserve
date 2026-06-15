@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import type { ToastProps, ToastEmits } from "./OToast.types"
-import { computed, ref } from "vue"
+import { computed, ref, onUnmounted } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue"
 import OBadge from "@/lib/core/Badge/OBadge.vue"
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
@@ -149,6 +149,10 @@ function handleActionClick() {
     }, 2000)
   }
 }
+
+onUnmounted(() => {
+  clearTimeout(actionResetTimer)
+})
 </script>
 
 <template>
