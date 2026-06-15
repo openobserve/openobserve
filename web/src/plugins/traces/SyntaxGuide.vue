@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else
         data-cy="syntax-guide-button"
+        v-bind="$attrs"
         variant="outline"
         size="icon-xs"
         :class="[sqlmode ? 'sql-mode' : 'normal-mode']"

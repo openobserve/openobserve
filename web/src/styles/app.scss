@@ -50,6 +50,8 @@ body {
   font-size: var(--text-sm);
   font-weight: var(--font-normal);
   line-height: var(--leading-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -70,23 +72,21 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: var(--text-2xl);
-  // Design-system weight scale (HANDOFF.md §2.2): the title peak is 700.
-  // Never 800/900 — when everything is heavy, nothing stands out.
-  font-weight: var(--font-bold);
+  font-weight: var(--font-semibold);
   line-height: var(--leading-2xl);
   letter-spacing: var(--tracking-tight);
 }
 
 h2 {
   font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-xl);
   letter-spacing: var(--tracking-normal);
 }
 
 h3 {
   font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-medium);
   line-height: var(--leading-lg);
   letter-spacing: var(--tracking-normal);
 }
@@ -153,8 +153,37 @@ code {
   letter-spacing: -0.2px;
 }
 
+pre,
+kbd,
+samp,
+.log-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+::selection {
+  background: var(--color-primary-200);
+  color: var(--color-primary-900);
+}
+
+html.dark ::selection,
+body.body--dark ::selection {
+  background: var(--color-primary-800);
+  color: var(--color-primary-100);
+}
+
 ::placeholder {
   color: var(--o2-text-placeholder);
+}
+
+// Suppress :focus-visible ring on dropdown triggers when Reka returns focus
+// after a pointer-based close. The data attribute is set by ODropdown.vue and
+// removed on blur — keyboard closes never set it so a11y is unaffected.
+[data-no-focus-visible]:focus,
+[data-no-focus-visible]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 // ═══════════════════════════════════════════════════════════════

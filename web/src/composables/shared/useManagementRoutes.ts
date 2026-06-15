@@ -89,23 +89,25 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
-        {
-          // Available in all builds (used by the AI Observability / Online
-          // Evals flows), not just enterprise.
-          path: "llm_providers",
-          name: "llmProviders",
-          component: () =>
-            import("@/components/settings/LlmProvidersSettings.vue"),
-          meta: {
-            title: "LLM Providers",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
       ],
     },
   ];
+  // LLM Providers (used by the AI Observability / Online Evals flows) is an
+  // enterprise/cloud-only feature — not available in OSS builds.
+  if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "llm_providers",
+      name: "llmProviders",
+      component: () =>
+        import("@/components/settings/LlmProvidersSettings.vue"),
+      meta: {
+        title: "LLM Providers",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+  }
   if (config.isEnterprise == "true") {
     routes[0].children.push(
       ...[

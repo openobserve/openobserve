@@ -625,9 +625,7 @@ describe("CodeQueryEditor", () => {
     const hasFunctionSuggestion = (result: any) =>
       result.suggestions.some(
         (s: any) =>
-          typeof s.label === "string" &&
-          (s.label.startsWith("match_all") ||
-            s.label.startsWith("fuzzy_match")),
+          typeof s.label === "string" && s.label.startsWith("match_all"),
       );
 
     it.skip(

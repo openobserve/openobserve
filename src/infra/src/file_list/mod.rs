@@ -759,7 +759,7 @@ impl From<&FileRecord> for FileKey {
             key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
             meta: r.into(),
             deleted: r.deleted,
-            segment_ids: None,
+            selection: None,
             row_group_size: None,
         }
     }
@@ -1008,7 +1008,7 @@ mod tests {
             "files/default/logs/nginx/2024-01-15/chunk001.parquet"
         );
         assert!(!key.deleted);
-        assert!(key.segment_ids.is_none());
+        assert!(key.selection.is_none());
         assert_eq!(key.meta.min_ts, 100);
         assert_eq!(key.meta.max_ts, 200);
     }

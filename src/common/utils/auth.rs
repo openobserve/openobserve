@@ -109,6 +109,7 @@ pub fn is_ofga_unsupported(name: &str) -> bool {
     RE_OFGA_UNSUPPORTED_NAME.is_match(name)
 }
 
+#[cfg(feature = "enterprise")]
 pub(crate) fn is_ofga_object_visible(
     org_id: &str,
     object_type: &str,
