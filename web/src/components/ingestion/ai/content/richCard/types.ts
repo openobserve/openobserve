@@ -58,6 +58,7 @@ export interface RichCardStep {
   /** Monospace pills rendered after the description (e.g. captured attributes). */
   pills?: string[];
   completeOn: StepCompleteOn;
+  /** Marks the step as required (renders a "Required" emphasis on its chip). */
   required?: boolean;
   /** The step that hosts the live status bar + "most likely fix" box. */
   detectionAnchor?: boolean;

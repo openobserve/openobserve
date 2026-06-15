@@ -24,10 +24,20 @@
 import { Marked } from "marked";
 import DOMPurify from "dompurify";
 
+// One reusable parser for this module (a Marked instance is stateless across
+// parse calls). Kept separate from the app-wide `marked` singleton so our
+// options never leak into it.
+const marked = new Marked({ gfm: true, breaks: false });
+
 export interface CardSubstitutions {
   url: string;
   org: string;
-  /** Base64 of email:password, WITHOUT the leading "Basic " (snippets add it). */
+  /**
+   * OpenObserve ingestion token: base64 of `email:<org ingestion passcode>`,
+   * WITHOUT the leading "Basic " (snippets add it). This is the same Basic-auth
+   * token shown on every other Data Sources card — not the user's login
+   * password. Substituted only into runnable code, never into prose.
+   */
   token: string;
 }
 
@@ -46,12 +56,10 @@ export function renderCardSegments(
   md: string,
   subs: CardSubstitutions,
 ): CardSegment[] {
-  // Fresh instance so we never mutate the app-wide `marked` singleton.
-  const marked = new Marked({ gfm: true, breaks: false });
   // Lex the RAW markdown. We substitute {url}/{org}/{token} ONLY inside code
   // blocks (the runnable commands), never in prose — so explanatory text like
   // the "Substitutions" list keeps the placeholder names, and the base64 token
-  // (which decodes to email:password) isn't rendered across the prose.
+  // isn't rendered across the prose.
   const tokens = marked.lexer(md);
 
   const segments: CardSegment[] = [];

@@ -196,9 +196,13 @@ const openTroubleshooting = () => {
 
 // ── confetti (canvas burst on connect) ───────────────────────────────────────
 const CONFETTI_COLORS = ["#d97757", "#16a34a", "#2b7de9", "#f5b53d", "#7c3aed"];
+// Track the active animation frame so rapid re-triggers can't stack overlapping
+// rAF loops (which would drop frames and leak canvas work).
+let confettiRaf = 0;
 function fireConfetti() {
   const cv = confettiCanvas.value;
   if (!cv || prefersReducedMotion()) return;
+  cancelAnimationFrame(confettiRaf); // cancel any in-flight burst
   const ctx = cv.getContext("2d");
   if (!ctx) return;
   const dpr = window.devicePixelRatio || 1;
@@ -245,10 +249,10 @@ function fireConfetti() {
         ctx.restore();
       }
     });
-    if (alive && t < 260) requestAnimationFrame(frame);
+    if (alive && t < 260) confettiRaf = requestAnimationFrame(frame);
     else ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   };
-  requestAnimationFrame(frame);
+  confettiRaf = requestAnimationFrame(frame);
 }
 </script>
 

@@ -33,7 +33,11 @@ export function parseFrontmatter(md: string): ParsedFrontmatter {
   if (!match) return { data: {}, body: md };
   let data: Record<string, any> = {};
   try {
-    const loaded = yaml.load(match[1]);
+    // JSON_SCHEMA restricts parsing to plain JSON-compatible types — no custom
+    // tags, dates, or other non-JSON YAML constructs — since this content can
+    // come from an external repo. (js-yaml v4's `load` is already free of the
+    // code-execution sinks that older `!!js/*` tags allowed.)
+    const loaded = yaml.load(match[1], { schema: yaml.JSON_SCHEMA });
     if (loaded && typeof loaded === "object") data = loaded as Record<string, any>;
   } catch {
     // Malformed frontmatter → treat as no structured data (plain card).

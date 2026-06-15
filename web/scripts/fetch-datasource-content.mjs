@@ -49,6 +49,24 @@ const TIMEOUT_MS =
   Number(process.env.DS_CONTENT_TIMEOUT_MS) || (STRICT ? 60_000 : 30_000);
 const GIT_OPTS = { stdio: "inherit", timeout: TIMEOUT_MS };
 
+// Validate the git inputs before they reach `git`. execFileSync already prevents
+// shell injection (no shell is spawned), but an attacker who can set these env
+// vars could otherwise pass a value that git reads as a flag (e.g. a REF like
+// `--upload-pack=…`). Restrict to an https(s) URL and to ref/path characters
+// that can't begin with a dash.
+const isSafeRepoUrl = (s) => /^https?:\/\/[\w.@:/\-~%]+$/.test(s);
+const isSafeRefOrPath = (s) => /^[\w][\w.\-/]*$/.test(s);
+for (const [name, val, ok] of [
+  ["DS_CONTENT_REPO", REPO, isSafeRepoUrl(REPO)],
+  ["DS_CONTENT_REF", REF, isSafeRefOrPath(REF)],
+  ["DS_CONTENT_SUBDIR", SUBDIR, isSafeRefOrPath(SUBDIR)],
+]) {
+  if (!ok) {
+    console.error(`[ds-content] refusing unsafe ${name}: ${JSON.stringify(val)}`);
+    process.exit(1);
+  }
+}
+
 const log = (m) => console.log(`[ds-content] ${m}`);
 // `.fetch.json` is our own fetch metadata (sha/time); `manifest.json` is the
 // placement manifest copied verbatim from the content repo and consumed by the UI.

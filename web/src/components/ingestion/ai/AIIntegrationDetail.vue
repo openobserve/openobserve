@@ -56,8 +56,9 @@ const cardContent = computed(() =>
 );
 
 // Per-org url/org/token used by the rich card's commands + .env download (mirrors
-// AIIntegrationCard.vue's substitutions). `token` is the base64 of email:password
-// WITHOUT the "Basic " prefix — the snippets add it.
+// AIIntegrationCard.vue's substitutions). `token` is the base64 of
+// email:<org ingestion passcode> WITHOUT the "Basic " prefix — the snippets add
+// it. Same Basic-auth token as every other Data Sources card, not a login password.
 const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
