@@ -56,7 +56,7 @@ test.describe("Custom Charts Tests", () => {
     await expect(errorBtn).toBeVisible({ timeout: 30000 });
     await errorBtn.hover();
     await expect(
-      page.locator('[data-test="o-tooltip-content"]').getByText(
+      page.locator('[data-test="o-tooltip-content"] div').getByText(
         "Unsafe code detected: Access to 'document' is not allowed"
       )
     ).toBeVisible({ timeout: 5000 });
