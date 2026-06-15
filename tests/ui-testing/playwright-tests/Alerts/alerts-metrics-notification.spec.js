@@ -387,6 +387,21 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         const triggered = await pm.alertsPage.triggerAlertManually(ALERT_NAME);
         expect(triggered, 'Manual trigger should succeed (API response or toast)').toBe(true);
-        testLogger.info('Manual trigger verified via UI');
+        testLogger.info('Manual trigger API call succeeded');
+
+        testLogger.info('=== PHASE 2: Verify trigger recorded in alert history ===');
+        await pm.alertsPage.openAlertDetailsDialog(ALERT_NAME);
+        await pm.alertsPage.expectAlertDetailsDialogVisible();
+
+        const historyVisible = await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
+        expect(historyVisible, 'Alert history section should be visible').toBeTruthy();
+
+        const historyRows = page.locator(pm.alertsPage.locators.alertDetailsHistoryTable + ' tbody tr');
+        const rowCount = await historyRows.count();
+        expect(rowCount, 'Alert history should have a manual trigger entry').toBeGreaterThan(0);
+        testLogger.info('Manual trigger history entry verified', { rowCount });
+
+        await pm.alertsPage.closeAlertDetailsDialog();
+        testLogger.info('Manual trigger test complete');
     });
 });
