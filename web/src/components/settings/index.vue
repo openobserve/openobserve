@@ -321,7 +321,7 @@ export default defineComponent({
           description: "LLM providers for online evaluations",
           icon: "smart-toy",
           to: { name: "llmProviders", query: { org_identifier: org } },
-          visible: !!z.online_evals_enabled,
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
           dataTest: "llm-providers-tab",
           group: "Data & AI",
         },
