@@ -1,3 +1,13 @@
+<script lang="ts">
+// Module-level flag: true when the last document interaction was pointer-based.
+// Shared across all ODropdown instances (only one is open at a time).
+let lastWasPointer = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener('pointerdown', () => { lastWasPointer = true; }, true);
+  document.addEventListener('keydown', () => { lastWasPointer = false; }, true);
+}
+</script>
+
 <script setup lang="ts">
 import type {
   DropdownProps,
@@ -43,6 +53,19 @@ watch(
 function handleOpenChange(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
+  // Reka-ui programmatically focuses the trigger after closing, which browsers
+  // treat as keyboard-like and show :focus-visible — turning the icons purple.
+  // If the last interaction was pointer-based, blur the trigger to clear the ring.
+  // Keyboard closes (Escape/Enter) set lastWasPointer=false so focus correctly
+  // stays on the trigger for keyboard navigation.
+  if (!v && lastWasPointer) {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) {
+      requestAnimationFrame(() => {
+        if (document.activeElement === el) el.blur();
+      });
+    }
+  }
 }
 
 // Register with the nearest ancestor ODropdown while this dropdown is open
