@@ -151,8 +151,8 @@ export class AlertsPage {
             alertDetailsDialog: '[data-test="alert-details-dialog"]',
             alertDetailsTitle: '[data-test="alert-details-title"]',
             alertDetailsEditButton: '[data-test="alert-details-edit-btn"]',
-            alertDetailsRefreshButton: '[data-test="alert-details-refresh-btn"]',
-            alertDetailsCloseButton: '[data-test="alert-details-close-btn"]',
+            alertDetailsRefreshButton: '[data-test="alert-history-refresh-btn"]',
+            alertDetailsCloseButton: '[data-test="o-drawer-close-btn"]',
             alertDetailsCopyConditionsButton: '[data-test="alert-details-copy-conditions-btn"]',
             alertDetailsHistoryTable: '[data-test="alert-details-history-table"]',
 
@@ -2647,6 +2647,30 @@ export class AlertsPage {
         await dialogBackBtn.click();
         await expect(dialog).not.toBeAttached({ timeout: 10000 });
         testLogger.info('Closed editor dialog via scoped back button');
+    }
+
+    // ==================== TEMPLATE LIST HELPERS ====================
+
+    /**
+     * Search for a template by name in the template list search input.
+     * Uses getByPlaceholder because OSearchInput does not expose a data-test attribute.
+     * @param {string} name - The template name to search for
+     */
+    async searchTemplate(name) {
+        const searchInput = this.page.getByPlaceholder('Search Template');
+        await searchInput.click();
+        await searchInput.fill(name);
+        testLogger.info('Searched for template', { name });
+    }
+
+    /**
+     * Click the update (edit) button for a template in the template list.
+     * @param {string} name - The template name
+     */
+    async clickTemplateUpdateButton(name) {
+        const updateBtn = this.page.locator(`[data-test="alert-template-list-${name}-update-template"]`);
+        await updateBtn.click();
+        testLogger.info('Clicked template update button', { name });
     }
 
     // ==================== STEP 2 / QUERY CONFIG HELPERS (scheduled features) ====================
