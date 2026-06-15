@@ -34,9 +34,9 @@ use datafusion::{
 };
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::search::{
-    sampling::execution::generate_row_group_access_plan, vortex::generate_vortex_access_plan,
-};
+use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan;
+#[cfg(all(feature = "enterprise", feature = "vortex"))]
+use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
 use crate::service::search::{datafusion::storage, index::IndexCondition};
 
