@@ -23,7 +23,10 @@ use crate::common::utils::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
+    },
     handler::http::models::scorers::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
         LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
@@ -38,7 +41,10 @@ use crate::{
 
 fn scorer_error_response(value: ScorerError) -> Response {
     match value {
-        ScorerError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        ScorerError::InfraError(err) => {
+            log::error!("[Scorer] internal error: {err}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
         ScorerError::MissingName => MetaHttpResponse::bad_request("Scorer name cannot be empty"),
         ScorerError::NotFound => MetaHttpResponse::not_found("Scorer not found"),
         ScorerError::InvalidScorerType(_)
@@ -91,11 +97,19 @@ pub async fn list_scorers(
             Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
         }
     };
-    #[cfg(not(feature = "enterprise"))]
-    let permitted_objects = None;
-
-    match scorers::list_scorers(&org_id, query.scorer_type.as_ref(), permitted_objects).await {
+    match scorers::list_scorers(&org_id, query.scorer_type.as_ref()).await {
         Ok(list) => {
+            let list: Vec<infra::table::scorers::Scorer> = list
+                .into_iter()
+                .filter(|scorer| {
+                    is_ofga_object_visible(
+                        &org_id,
+                        "scorer",
+                        &scorer.entity_id,
+                        permitted_objects.as_deref(),
+                    )
+                })
+                .collect();
             let body: ListScorersResponseBody = list.into();
             MetaHttpResponse::json(body)
         }
@@ -131,6 +145,7 @@ pub async fn create_scorer(
     let scorer: infra::table::scorers::Scorer = body.into();
     match scorers::save_scorer(&org_id, scorer).await {
         Ok(s) => {
+            set_ownership(&org_id, "scorers", Authz::new(&s.entity_id)).await;
             let resp: ScorerResponseBody = s.into();
             MetaHttpResponse::json(resp)
         }
@@ -263,7 +278,10 @@ pub async fn update_scorer(
 )]
 pub async fn delete_scorer(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match scorers::delete_scorer(&org_id, &entity_id).await {
-        Ok(()) => MetaHttpResponse::ok("Scorer deactivated"),
+        Ok(()) => {
+            remove_ownership(&org_id, "scorers", Authz::new(&entity_id)).await;
+            MetaHttpResponse::ok("Scorer deactivated")
+        }
         Err(err) => scorer_error_response(err),
     }
 }
@@ -544,7 +562,7 @@ mod tests {
             (ScorerError::InUseByEvalJob, 409),
         ];
         for (err, expected) in cases {
-            let resp: Response = err.into();
+            let resp = scorer_error_response(err);
             assert_eq!(resp.status().as_u16(), expected);
         }
     }
@@ -552,7 +570,7 @@ mod tests {
     #[test]
     fn test_scorer_error_infra_is_500() {
         let err = ScorerError::InfraError(infra::errors::Error::Message("db".to_string()));
-        let resp: Response = err.into();
+        let resp = scorer_error_response(err);
         assert_eq!(resp.status().as_u16(), 500);
     }
 

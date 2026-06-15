@@ -20,7 +20,10 @@ use crate::common::utils::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+        utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
+    },
     handler::http::models::score_configs::{
         ListScoreConfigVersionsResponseBody, ListScoreConfigsResponseBody, ScoreConfigRequestBody,
         ScoreConfigResponseBody, ScoreConfigUpdateRequestBody,
@@ -30,7 +33,10 @@ use crate::{
 
 fn score_config_error_response(value: ScoreConfigError) -> Response {
     match value {
-        ScoreConfigError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        ScoreConfigError::InfraError(err) => {
+            log::error!("[ScoreConfig] internal error: {err}");
+            MetaHttpResponse::internal_error("Internal server error")
+        }
         ScoreConfigError::MissingName => {
             MetaHttpResponse::bad_request("Score config name cannot be empty")
         }
@@ -78,11 +84,19 @@ pub async fn list_score_configs(
             Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
         }
     };
-    #[cfg(not(feature = "enterprise"))]
-    let permitted_objects = None;
-
-    match score_configs::list_score_configs(&org_id, permitted_objects).await {
+    match score_configs::list_score_configs(&org_id).await {
         Ok(list) => {
+            let list: Vec<infra::table::score_configs::ScoreConfig> = list
+                .into_iter()
+                .filter(|config| {
+                    is_ofga_object_visible(
+                        &org_id,
+                        "score_config",
+                        &config.entity_id,
+                        permitted_objects.as_deref(),
+                    )
+                })
+                .collect();
             let body: ListScoreConfigsResponseBody = list.into();
             MetaHttpResponse::json(body)
         }
@@ -118,6 +132,7 @@ pub async fn create_score_config(
     let config: infra::table::score_configs::ScoreConfig = body.into();
     match score_configs::save_score_config(&org_id, config).await {
         Ok(c) => {
+            set_ownership(&org_id, "score_configs", Authz::new(&c.entity_id)).await;
             let resp: ScoreConfigResponseBody = c.into();
             MetaHttpResponse::json(resp)
         }
@@ -252,7 +267,10 @@ pub async fn update_score_config(
 )]
 pub async fn delete_score_config(Path((org_id, entity_id)): Path<(String, String)>) -> Response {
     match score_configs::delete_score_config(&org_id, &entity_id).await {
-        Ok(()) => MetaHttpResponse::ok("Score config deactivated"),
+        Ok(()) => {
+            remove_ownership(&org_id, "score_configs", Authz::new(&entity_id)).await;
+            MetaHttpResponse::ok("Score config deactivated")
+        }
         Err(err) => score_config_error_response(err),
     }
 }
@@ -270,7 +288,7 @@ mod tests {
             (ScoreConfigError::InUseByScorer, 409),
         ];
         for (err, expected) in cases {
-            let resp: Response = err.into();
+            let resp = score_config_error_response(err);
             assert_eq!(resp.status().as_u16(), expected);
         }
     }
@@ -278,7 +296,7 @@ mod tests {
     #[test]
     fn test_score_config_error_infra_is_500() {
         let err = ScoreConfigError::InfraError(infra::errors::Error::Message("db".to_string()));
-        let resp: Response = err.into();
+        let resp = score_config_error_response(err);
         assert_eq!(resp.status().as_u16(), 500);
     }
 }

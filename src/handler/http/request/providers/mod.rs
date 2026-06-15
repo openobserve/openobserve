@@ -30,7 +30,10 @@ use crate::{
 impl From<ProviderError> for Response {
     fn from(value: ProviderError) -> Self {
         match value {
-            ProviderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            ProviderError::InfraError(err) => {
+                log::error!("[Provider] internal error: {err}");
+                MetaHttpResponse::internal_error("Internal server error")
+            }
             ProviderError::MissingName => {
                 MetaHttpResponse::bad_request("Provider name cannot be empty")
             }
