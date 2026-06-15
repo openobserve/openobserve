@@ -113,6 +113,15 @@ const confettiCanvas = ref<HTMLCanvasElement | null>(null);
 // detection below, so the stream the installer writes to and the stream the card
 // listens on always match.
 const streamName = ref(props.content.streamInput?.default ?? "");
+// Stream names accept letters, digits and underscore only — a '-' or other
+// punctuation produces an invalid stream the installer can't write to. Warn the
+// user inline (matches the platform's AddStream rule, minus the colon).
+const STREAM_NAME_RE = /^[a-zA-Z0-9_]+$/;
+const streamNameError = computed(() =>
+  streamName.value.trim() && !STREAM_NAME_RE.test(streamName.value.trim())
+    ? "Use letters, numbers and _ only."
+    : "",
+);
 const watchedStream = computed(() =>
   props.content.streamInput
     ? streamName.value.trim() || props.content.streamInput.default || "default"
@@ -346,7 +355,9 @@ function fireConfetti() {
           v-model="streamName"
           :label="content.streamInput.label"
           :placeholder="content.streamInput.placeholder || content.streamInput.default"
-          :help-text="content.streamInput.help"
+          :help-text="!streamNameError ? content.streamInput.help : undefined"
+          :error="!!streamNameError"
+          :error-message="streamNameError"
           size="sm"
           width="md"
           data-test="ai-stream-name-input"

@@ -83,6 +83,7 @@ const richContent = computed(() =>
   <div v-if="integration" class="tw:p-2">
     <AIRichSetupCard
       v-if="richContent"
+      :key="integrationSlug"
       :content="richContent"
       :subs="subs"
       :logo-url="integration.logo"
