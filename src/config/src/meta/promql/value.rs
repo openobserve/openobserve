@@ -1551,8 +1551,8 @@ mod tests {
 
     #[test]
     fn test_value_get_float() {
-        let val = Value::Float(3.15);
-        assert_eq!(val.get_float(), Some(3.15));
+        let val = Value::Float(3.14);
+        assert_eq!(val.get_float(), Some(3.14));
 
         assert!(Value::String("x".to_string()).get_float().is_none());
         assert!(Value::None.get_float().is_none());

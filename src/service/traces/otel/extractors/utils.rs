@@ -61,8 +61,8 @@ mod tests {
 
     #[test]
     fn test_extract_f64_from_float() {
-        let result = extract_f64(&json::json!(3.15f64)).unwrap();
-        assert!((result - 3.15).abs() < 1e-10);
+        let result = extract_f64(&json::json!(3.14f64)).unwrap();
+        assert!((result - 3.14).abs() < 1e-10);
     }
 
     #[test]
@@ -73,8 +73,8 @@ mod tests {
 
     #[test]
     fn test_extract_f64_from_string() {
-        let result = extract_f64(&json::json!("2.75")).unwrap();
-        assert!((result - 2.75).abs() < 1e-6);
+        let result = extract_f64(&json::json!("2.718")).unwrap();
+        assert!((result - 2.718).abs() < 1e-6);
     }
 
     #[test]

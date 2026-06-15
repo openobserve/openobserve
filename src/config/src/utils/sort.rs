@@ -128,9 +128,9 @@ mod tests {
         let mut empty: [f64; 0] = [];
         empty.sort_by(sort_float);
 
-        let mut single = [3.15_f64];
+        let mut single = [3.14_f64];
         single.sort_by(sort_float);
-        assert_eq!(single[0], 3.15);
+        assert_eq!(single[0], 3.14);
     }
 
     #[test]

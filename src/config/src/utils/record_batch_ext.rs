@@ -2004,7 +2004,7 @@ mod test {
     fn test_format_recordbatch_float64_to_utf8() {
         let target = Arc::new(Schema::new(vec![Field::new("f", DataType::Utf8, true)]));
         let src_schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
-        let arr: ArrayRef = Arc::new(Float64Array::from(vec![3.15_f64]));
+        let arr: ArrayRef = Arc::new(Float64Array::from(vec![3.14_f64]));
         let batch = RecordBatch::try_new(src_schema, vec![arr]).unwrap();
         let result = format_recordbatch_by_schema(target, batch);
         let col = result
@@ -2012,7 +2012,7 @@ mod test {
             .as_any()
             .downcast_ref::<StringArray>()
             .unwrap();
-        assert_eq!(col.value(0), "3.15");
+        assert_eq!(col.value(0), "3.14");
     }
 
     #[test]
@@ -2316,7 +2316,7 @@ mod test {
     fn test_convert_json_to_record_batch_float64() {
         let schema = Arc::new(Schema::new(vec![Field::new("f", DataType::Float64, true)]));
         let data = vec![
-            Arc::new(serde_json::json!({"f": 3.15})),
+            Arc::new(serde_json::json!({"f": 3.14})),
             Arc::new(serde_json::json!({"f": "2.71"})),
             Arc::new(serde_json::json!({"f": true})),
             Arc::new(serde_json::json!({"f": false})),
@@ -2329,7 +2329,7 @@ mod test {
             .as_any()
             .downcast_ref::<Float64Array>()
             .unwrap();
-        assert!((col.value(0) - 3.15).abs() < 1e-10);
+        assert!((col.value(0) - 3.14).abs() < 1e-10);
         assert!((col.value(1) - 2.71).abs() < 1e-10);
         assert!((col.value(2) - 1.0).abs() < f64::EPSILON);
         assert!((col.value(3) - 0.0).abs() < f64::EPSILON);
@@ -2720,7 +2720,7 @@ mod test {
             .as_any()
             .downcast_ref::<Float64Array>()
             .unwrap();
-        assert!((col.value(0) - 3.15).abs() < 1e-10);
+        assert!((col.value(0) - 3.14).abs() < 1e-10);
         assert!((col.value(1) - 0.0).abs() < f64::EPSILON);
         assert!((col.value(2) - 0.0).abs() < f64::EPSILON);
     }

@@ -490,8 +490,8 @@ mod tests {
 
     #[test]
     fn test_array_get_value_float64() {
-        let arr = Array::Float64(Float64Array::from(vec![3.15]));
-        assert_eq!(arr.get_value(0), Value::Float64(3.15));
+        let arr = Array::Float64(Float64Array::from(vec![3.14]));
+        assert_eq!(arr.get_value(0), Value::Float64(3.14));
     }
 
     #[test]

@@ -1106,9 +1106,9 @@ mod tests {
 
     #[test]
     fn test_get_val_for_attr_double_value() {
-        let attr = json!({"doubleValue": 3.15});
+        let attr = json!({"doubleValue": 3.14});
         let result = get_val_for_attr(&attr);
-        assert_eq!(result.as_str().unwrap(), "3.15");
+        assert_eq!(result.as_str().unwrap(), "3.14");
     }
 
     #[test]
