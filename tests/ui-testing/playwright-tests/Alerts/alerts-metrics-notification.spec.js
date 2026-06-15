@@ -449,6 +449,25 @@ test.describe("Metrics Alert Notification Chain", () => {
             expect(notificationText, 'Notification should not contain unreplaced {alert_agg_value}').not.toContain('{alert_agg_value}');
 
             testLogger.info('Webhook notification payload verified');
+
+            testLogger.info('=== PHASE 4: Verify alert_url redirects to metrics page ===');
+            // Extract the rendered alert_url from the notification text
+            const urlMatch = notificationText.match(/https?:\/\/\S+/);
+            expect(urlMatch, 'Notification should contain a clickable alert_url').not.toBeNull();
+            const alertUrl = urlMatch[0];
+            testLogger.info('Extracted alert_url', { url: alertUrl });
+
+            // Navigate to the alert_url and verify it lands on the metrics page
+            await page.goto(alertUrl);
+            await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+
+            // The metrics page should show the stream name and query-related UI
+            await expect(page.getByText(METRICS_STREAM_NAME).first(),
+                'Metrics page should show the stream name').toBeVisible({ timeout: 15000 });
+            await expect(page,
+                'Should be on the metrics page').toHaveURL(/\/web\/metrics/);
+
+            testLogger.info('alert_url redirects to metrics page verified');
         } else {
             testLogger.warn('Webhook capture not active — skipping payload verification');
         }
