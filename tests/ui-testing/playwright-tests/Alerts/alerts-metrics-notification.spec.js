@@ -16,6 +16,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { WebhookCapture } = require('../utils/webhook-capture.js');
 
 // ============================================================================
 // TEST DATA CONFIGURATION
@@ -31,6 +32,9 @@ const ALERT_NAME = `e2e_metrics_${RUN_ID}_alert`;
 const TEMPLATE_BODY = JSON.stringify({
     text: "{alert_name} is active. Stream: {stream_name}. Triggered: {alert_trigger_time_str}. Value: {alert_agg_value}. URL: {alert_url}"
 });
+
+const webhookCapture = new WebhookCapture();
+let DESTINATION_URL = 'https://httpbin.org/post'; // Fallback if webhook mock can't start
 
 let ALERT_ID = null; // Cached after creation to avoid redundant list+detail API calls
 
@@ -73,13 +77,13 @@ async function ensureDestination(page) {
     const org = getOrgIdentifier();
     const resp = await apiCall(page, 'POST', `/api/${org}/alerts/destinations`, {
         name: DESTINATION_NAME,
-        url: 'https://httpbin.org/post',
+        url: DESTINATION_URL,
         method: 'post',
         skip_tls_verify: false,
         template: TEMPLATE_NAME,
         headers: {}
     });
-    testLogger.info('Destination', { name: DESTINATION_NAME, status: resp.status });
+    testLogger.info('Destination', { name: DESTINATION_NAME, status: resp.status, url: DESTINATION_URL });
 }
 
 async function createMetricsAlert(page) {
@@ -219,6 +223,17 @@ test.describe("Metrics Alert Notification Chain", () => {
             await page.goto(`${baseUrl}?org_identifier=${org}`);
             await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
+            // Start webhook capture server so the backend can POST notifications
+            // to localhost and we can assert on the rendered payload.
+            // Only works when backend runs locally (CI / local dev).
+            if (baseUrl.includes('localhost')) {
+                await webhookCapture.start();
+                DESTINATION_URL = `http://localhost:${webhookCapture.port}/webhook`;
+                testLogger.info('Webhook capture server started', { port: webhookCapture.port });
+            } else {
+                testLogger.warn('Backend is remote — webhook capture disabled, using httpbin fallback');
+            }
+
             await ensureTemplate(page);
             await ensureDestination(page);
 
@@ -268,6 +283,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         } finally {
             await page.close();
             await context.close();
+            await webhookCapture.stop();
         }
     });
 
@@ -383,6 +399,8 @@ test.describe("Metrics Alert Notification Chain", () => {
     test("Manual trigger sends notification from alert list", {
         tag: ['@metricsAlert', '@trigger', '@P1', '@all', '@alerts']
     }, async ({ page }) => {
+        webhookCapture.clear(); // Clear any payloads from scheduled triggers
+
         testLogger.info('=== PHASE 1: Trigger alert manually via more-options menu ===');
 
         const triggered = await pm.alertsPage.triggerAlertManually(ALERT_NAME);
@@ -402,6 +420,39 @@ test.describe("Metrics Alert Notification Chain", () => {
         testLogger.info('Manual trigger history entry verified', { rowCount });
 
         await pm.alertsPage.closeAlertDetailsDialog();
+
+        testLogger.info('=== PHASE 3: Verify webhook notification payload ===');
+        if (webhookCapture.port > 0) {
+            // Wait up to 10s for the backend to POST to the capture server
+            await expect(async () => {
+                const payload = webhookCapture.getLatestPayload();
+                expect(payload, 'Webhook should have received a POST').not.toBeNull();
+                expect(payload.method, 'Should be a POST request').toBe('POST');
+                expect(payload.body, 'Payload should have a body').toBeTruthy();
+            }).toPass({ timeout: 10000, intervals: [500] });
+
+            const captured = webhookCapture.getLatestPayload();
+            const notificationText = captured.body?.text || '';
+
+            testLogger.info('Captured webhook payload', {
+                method: captured.method,
+                bodyKeys: Object.keys(captured.body || {}),
+                textPreview: notificationText.substring(0, 120),
+            });
+
+            // Verify template variables were substituted (no raw {placeholders} in output)
+            expect(notificationText, 'Notification should contain alert name').toContain(ALERT_NAME);
+            expect(notificationText, 'Notification should contain stream name').toContain(METRICS_STREAM_NAME);
+            expect(notificationText, 'Notification should not contain unreplaced {alert_name}').not.toContain('{alert_name}');
+            expect(notificationText, 'Notification should not contain unreplaced {stream_name}').not.toContain('{stream_name}');
+            expect(notificationText, 'Notification should not contain unreplaced {alert_url}').not.toContain('{alert_url}');
+            expect(notificationText, 'Notification should not contain unreplaced {alert_agg_value}').not.toContain('{alert_agg_value}');
+
+            testLogger.info('Webhook notification payload verified');
+        } else {
+            testLogger.warn('Webhook capture not active — skipping payload verification');
+        }
+
         testLogger.info('Manual trigger test complete');
     });
 });
