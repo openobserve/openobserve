@@ -424,7 +424,8 @@
     "invalidSql": "Consulta inválida",
     "menuGroupExplain": "Explique",
     "fieldValuesEmpty": "Nenhum valor encontrado.",
-    "fieldValuesEmptyHint": "Experimente um intervalo de tempo mais amplo para ver os valores."
+    "fieldValuesEmptyHint": "Experimente um intervalo de tempo mais amplo para ver os valores.",
+    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro"
   },
   "menu": {
     "home": "Início",
