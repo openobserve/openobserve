@@ -377,6 +377,7 @@ jobs:
           opencode --version || true
 
       - name: Generate — Analyst → Architect → Engineer → Sentinel
+        id: gen
         env:
           DEEPSEEK_API_KEY_E2E: ${{ secrets.DEEPSEEK_API_KEY_E2E }}
         run: |
@@ -386,6 +387,20 @@ jobs:
           run e2e-ci-architect "Run your spec. Read run-context.json and the feature doc; write the prioritized Test Plan."
           run e2e-ci-engineer  "Run your spec. Read run-context.json and the test plan; write the spec file + page-object changes and docs/test_generator/ci/playwright-registration.json. GENERATE ONLY — do not run tests."
           run e2e-ci-sentinel  "Run your spec. Audit the generated spec/page objects; write docs/test_generator/ci/sentinel-verdict.json (and the audit report)."
+
+      - name: Validate hand-off artifacts (fail fast on a broken hand-off)
+        # The agents hand off via files; if an agent "finished" without writing its artifact, catch
+        # it HERE with a clear message instead of a confusing downstream error.
+        id: validate
+        run: |
+          RC=docs/test_generator/ci/run-context.json
+          { [ -f "$RC" ] && jq empty "$RC" 2>/dev/null; } || { echo "::error::run-context.json missing/invalid (triage hand-off broken)"; exit 1; }
+          SPEC=$(jq -r '.spec_path // empty' "$RC")
+          [ -n "$SPEC" ] || { echo "::error::run-context.json has no spec_path"; exit 1; }
+          [ -f "$SPEC" ] || { echo "::error::Engineer did not write the spec at $SPEC (engineer hand-off broken)"; exit 1; }
+          REG=docs/test_generator/ci/playwright-registration.json
+          { [ -f "$REG" ] && jq -e '.group and .spec_filename' "$REG" >/dev/null 2>&1; } || { echo "::error::playwright-registration.json missing/invalid (engineer hand-off broken)"; exit 1; }
+          echo "Hand-off OK: spec=$SPEC"
 
       - name: Enforce Sentinel verdict (block on critical)
         # Verdict schema (written by e2e-ci-sentinel): { "verdict": "PASS"|"FAIL",
@@ -441,11 +456,41 @@ jobs:
           echo "Pushed generated tests to $BRANCH (no PR yet — Job 4 opens it)."
 
       - name: Upload run metadata (for Job 3/4)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-meta
           retention-days: 2
           path: docs/test_generator/ci/
+
+      - name: Report generation failure on the source PR
+        # If any generation step failed (agent error, broken hand-off, Sentinel block, push),
+        # tell the dev on their PR with the likely cause + a link to this run — no silent failure.
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          GEN_OUTCOME: ${{ steps.gen.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          CAUSE="Generation failed before tests could be produced."
+          if [ "$VALIDATE_OUTCOME" = "failure" ]; then
+            CAUSE="A hand-off between agents broke — an expected artifact (spec or registration) was missing/invalid."
+          elif [ "$GEN_OUTCOME" = "failure" ]; then
+            CAUSE="One of the generation agents (Analyst/Architect/Engineer/Sentinel) errored, OR the Sentinel quality gate blocked it."
+          fi
+          MARKER="<!-- e2e-council-testpr -->"
+          printf '%s\n🤖 **E2E Council** — generation **failed** for #%s, so no test PR was opened.\n\n**Likely cause:** %s\n\n[View run for details](%s)' \
+            "$MARKER" "$SRC_PR" "$CAUSE" "$RUN_URL" > /tmp/genfail.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            URL=$(gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/genfail.md --jq '.html_url')
+          else
+            URL=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/genfail.md --jq '.html_url')
+          fi
+          echo "::notice::Posted generation-failure comment: $URL"
 
   # ---------------------------------------------------------------------------
   # JOB 3 — Verify / Heal (HEAVY). Build + boot a REAL OpenObserve from the autoe2e
@@ -533,6 +578,7 @@ jobs:
           node-version: 22
 
       - name: Build OpenObserve binary + frontend
+        id: build
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
@@ -543,6 +589,7 @@ jobs:
           wait
 
       - name: Start OpenObserve + wait for ready
+        id: boot
         run: |
           BIN=./target/x86_64-unknown-linux-gnu/release-ci/openobserve
           chmod +x "$BIN"
@@ -572,6 +619,7 @@ jobs:
           echo "rel=${SPEC#tests/ui-testing/}" >> "$GITHUB_OUTPUT"
 
       - name: Heal — run ONLY the generated spec, fix until passing (<=3 iters)
+        id: heal
         # HARD-GATED: timeout-minutes kills a runaway/hung healer; continue-on-error lets the
         # pipeline proceed to the authoritative run + comment instead of getting stuck. Any
         # fixes the healer wrote to disk before the cap are kept (committed below).
@@ -638,6 +686,48 @@ jobs:
             docs/test_generator/ci/
             tests/ui-testing/test-results/
 
+      - name: Report heal failure on the source PR (root cause + run link)
+        # Runs whenever the spec did NOT end up passing (build error, boot error, healer timeout,
+        # or still-failing). Posts the ROOT CAUSE + run link on the dev's PR, then logs the
+        # comment URL as the final step (so the dev can go verify). No PR is opened in this case.
+        if: always() && steps.finalrun.outputs.status != 'passing'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          SRC_PR: ${{ needs.triage.outputs.pr_number }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          BOOT_OUTCOME: ${{ steps.boot.outcome }}
+          HEAL_OUTCOME: ${{ steps.heal.outcome }}
+          FINAL_STATUS: ${{ steps.finalrun.outputs.status }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          # Root cause = the most-upstream failing stage.
+          if [ "$BUILD_OUTCOME" = "failure" ]; then
+            CAUSE="Building OpenObserve from the feature branch failed (compile / frontend build error)."
+          elif [ "$BOOT_OUTCOME" = "failure" ]; then
+            CAUSE="OpenObserve built but failed to boot/serve on :5080 within the timeout."
+          elif [ "$HEAL_OUTCOME" = "failure" ] || [ "$HEAL_OUTCOME" = "cancelled" ]; then
+            CAUSE="The healer hit its 30-minute cap (hung or too-slow heal loop) and was stopped before the tests passed."
+          elif [ "$FINAL_STATUS" = "failing" ]; then
+            CAUSE="The generated spec still failed after healing (<=3 iterations) — likely a genuinely broken/flaky test or a real product issue."
+          else
+            CAUSE="Verify/heal did not complete (see the run)."
+          fi
+          MARKER="<!-- e2e-council-testpr -->"
+          {
+            printf '%s\n' "$MARKER"
+            printf '🤖 **E2E Council** — I generated E2E tests for #%s but could **not** get them passing, so **no test PR was opened** (working code only).\n\n' "$SRC_PR"
+            printf '**Root cause:** %s\n\n' "$CAUSE"
+            printf '[View run + logs](%s)\n' "$RUN_URL"
+          } > /tmp/healfail.md
+          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          if [ -n "$CID" ]; then
+            URL=$(gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/healfail.md --jq '.html_url')
+          else
+            URL=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/healfail.md --jq '.html_url')
+          fi
+          echo "::notice::Posted heal-failure comment with root cause: $URL"
+
   # ---------------------------------------------------------------------------
   # JOB 4 — Open the test PR — ONLY if Job 3 healed the tests to passing. The branch +
   # commits were pushed by Jobs 2/3; this job just opens the PR (stacked on the dev's
@@ -647,24 +737,25 @@ jobs:
   # ---------------------------------------------------------------------------
   pr_back:
     needs: [triage, generate, verify_heal]
+    # Only opens a PR when the tests were actually HEALED to passing. Failure cases (generation
+    # error, heal timeout, still-failing) are reported on the source PR by the generate/verify_heal
+    # jobs themselves — so there's never a junk PR and never a missing notification.
     if: >
-      always() &&
       needs.triage.outputs.dry_run == 'false' &&
       needs.triage.outputs.skip == 'false' &&
       needs.triage.outputs.needs_e2e == 'true' &&
-      needs.triage.outputs.author_allowed == 'true'
+      needs.triage.outputs.author_allowed == 'true' &&
+      needs.verify_heal.outputs.heal_status == 'passing'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Download run metadata
-        if: needs.verify_heal.outputs.heal_status == 'passing'
         uses: actions/download-artifact@v4
         with:
           name: generated-meta
           path: meta/
 
       - name: Open (or refresh) the healed test PR + link it on the source PR
-        if: needs.verify_heal.outputs.heal_status == 'passing'
         env:
           # ORG_ADMIN_TOKEN (already used by auto-assign-metadata.yml) so the test PR triggers
           # the repo's existing playwright.yml. A PR opened with GITHUB_TOKEN would not.
@@ -704,22 +795,3 @@ jobs:
             gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/sticky.md >/dev/null
           fi
           echo "Linked test PR #$TEST_PR on source PR #$SRC_PR."
-
-      - name: Healing did not pass — no PR, just comment (no junk)
-        if: needs.verify_heal.outputs.heal_status != 'passing'
-        env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
-          SRC_PR: ${{ needs.triage.outputs.pr_number }}
-        run: |
-          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          MARKER="<!-- e2e-council-testpr -->"
-          printf '%s\n🤖 **E2E Council** — I generated E2E tests but could not get them passing after healing (max 3 iterations), so **no test PR was opened** (working code only). Logs: %s' \
-            "$MARKER" "$RUN_URL" > /tmp/sticky.md
-          CID=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" \
-            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
-          if [ -n "$CID" ]; then
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${CID}" -F body=@/tmp/sticky.md >/dev/null
-          else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${SRC_PR}/comments" -F body=@/tmp/sticky.md >/dev/null
-          fi
-          echo "Healing failed — posted a comment, no PR opened."
