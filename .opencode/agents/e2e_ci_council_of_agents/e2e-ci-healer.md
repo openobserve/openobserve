@@ -45,9 +45,9 @@ For iteration `i` in 1..3:
 1. **Run headless:**
    ```bash
    cd tests/ui-testing && npx playwright test "<spec_path relative to tests/ui-testing>" \
-     --reporter=line --timeout=360000 2>&1 | tee /tmp/heal-run-$i.log
+     --workers=4 --reporter=line --timeout=360000 2>&1 | tee /tmp/heal-run-$i.log
    ```
-   (`--timeout=360000` = 6 min/test cap.)
+   (`--workers=4` matches the authoritative run; `--timeout=360000` = 6 min/test cap.)
 2. **If all tests pass →** record success and exit the loop.
 3. **Diagnose** the failure from the log and the page. Classify:
    - **Selector** — "element not found", "Timeout waiting for selector", "strict mode
@@ -65,6 +65,13 @@ For iteration `i` in 1..3:
 Keep fixes minimal and framework-compliant. Never weaken assertions or wrap tests in
 always-true conditionals to force a pass — that fails the Sentinel re-audit and defeats the
 purpose.
+
+**Preserve full parallelism.** The Engineer writes every describe with `mode: 'parallel'`. Do
+**not** switch it to `mode: 'serial'` (or remove parallelism) as a quick fix — a flaky parallel
+test almost always means shared state or a missing per-test setup, so fix *that* (make each test
+self-contained: own login/navigation/data, unique fixture names). Changing the parallel mode is
+an absolute **last resort**, only if you've genuinely exhausted the independence fixes; if you
+ever do it, state the concrete reason in the execution report.
 
 ---
 

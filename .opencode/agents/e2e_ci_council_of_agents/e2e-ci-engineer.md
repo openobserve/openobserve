@@ -29,6 +29,12 @@ source: `grep -oE 'data-test="[^"]*"' web/src/path/to/Component.vue | sort -u`.
 
 ## MANDATORY framework rules
 
+### Fully-parallel by default (non-negotiable)
+- Every `test.describe` MUST use `test.describe.configure({ mode: 'parallel' })`. NEVER emit `mode: 'serial'`.
+- Because tests run in parallel, **each test MUST be fully independent**: it sets up its own state in `beforeEach` (login/navigation/data), shares NO mutable state with sibling tests, and assumes NO execution order. Two tests must never depend on data the other created or on running first/second.
+- Do not rely on a single shared record/name across tests — give each test its own uniquely-named fixtures (e.g. suffix with a per-test unique id) so parallel runs can't collide.
+- The runner uses `--workers=4`; parallel mode is what lets those workers actually spread the tests. Design for it.
+
 ### Required imports
 ```javascript
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -40,7 +46,7 @@ const logData = require("../../fixtures/log.json");
 ### Required structure
 ```javascript
 test.describe("<feature_title> testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {

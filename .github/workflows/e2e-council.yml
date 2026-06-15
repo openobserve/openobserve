@@ -471,6 +471,10 @@ jobs:
           git config user.email "bot@openobserve.ai"
           git checkout -b "$BRANCH"
           git add tests/ui-testing
+          # Commit the hand-off too (force — docs/test_generator is gitignored) so the branch is
+          # SELF-CONTAINED: verify_heal reads it straight from the checkout, no artifact dependency.
+          # Job 4 strips it back out before opening the PR, so it never reaches the PR diff or main.
+          git add -f docs/test_generator/ci
           git commit -m "test(autoe2e): generated E2E tests for #${PR_NUMBER} (${SLUG})"
           # Explicit one-shot token (checkout used persist-credentials:false). Push only to autoe2e/*.
           git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
@@ -600,11 +604,9 @@ jobs:
           git fetch origin main --depth=1
           git checkout origin/main -- .opencode opencode.jsonc
 
-      - name: Download run metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: generated-meta
-          path: docs/test_generator/ci/
+      # No artifact download here on purpose: the hand-off (docs/test_generator/ci/) is committed on
+      # the autoe2e branch by generate, so the checkout above already has it. Self-contained = robust
+      # (the artifact-structure bug that broke an earlier run can't recur on this path).
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -726,13 +728,17 @@ jobs:
           BRANCH="autoe2e/${ORIG_REF}"
           git config user.name "openobserve-bot"
           git config user.email "bot@openobserve.ai"
-          if ! git diff --quiet -- tests/ui-testing; then
-            git add tests/ui-testing
-            git commit -m "test(autoe2e): heal generated tests (auto-fixes)"
+          git add tests/ui-testing
+          # Strip the hand-off from the branch BEFORE the PR: --cached removes it from the commit/branch
+          # but keeps the working-tree copy so the "Upload heal logs" step below can still archive it.
+          # Net branch tip = tests only → the test PR diff and main never carry the hand-off.
+          git rm -r --cached --ignore-unmatch docs/test_generator >/dev/null 2>&1 || true
+          if ! git diff --cached --quiet; then
+            git commit -m "test(autoe2e): heal generated tests + strip hand-off before PR"
             git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-            echo "Pushed healer fixes to $BRANCH"
+            echo "Pushed healed tests (hand-off stripped) to $BRANCH"
           else
-            echo "No healer changes to push."
+            echo "Nothing to commit."
           fi
 
       - name: Upload heal logs
