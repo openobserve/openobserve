@@ -248,33 +248,31 @@ describe("PredefinedThemes", () => {
       expect(vm.predefinedThemes.length).toBeGreaterThan(0);
     });
 
-    it("includes O2 Signature as the first predefined theme", () => {
+    it("includes O2 Crimson Ink as a predefined theme with semanticColors", () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
-      const o2Theme = (vm as any).predefinedThemes[0];
-      expect(o2Theme.name).toBe('O2 Signature');
-      expect(o2Theme.light.themeColor).toBe('#6B76E3');
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Crimson Ink');
+      expect(o2Theme).toBeDefined();
+      expect(o2Theme.light.themeColor).toBe('#E11D48');
       expect(o2Theme.light.semanticColors).toBeDefined();
-      expect(o2Theme.light.semanticColors.error).toBe('#F45B49');
-      expect(o2Theme.light.semanticColors.success).toBe('#5ACA7A');
-      expect(o2Theme.dark.themeColor).toBe('#8B8DF0');
+      expect(o2Theme.light.semanticColors.error).toBe('#F97316');
+      expect(o2Theme.light.semanticColors.success).toBe('#6366F1');
       expect(o2Theme.dark.semanticColors).toBeDefined();
     });
 
-    it("passes semanticColors to applyThemeColors when applying O2 Signature", async () => {
+    it("passes semanticColors to applyThemeColors when applying O2 Crimson Ink", async () => {
       const wrapper = createWrapper();
       const { vm } = wrapper;
       const { applyThemeColors } = await import('@/utils/theme');
-      const o2Theme = (vm as any).predefinedThemes[0];
+      const o2Theme = (vm as any).predefinedThemes.find((t: any) => t.name === 'O2 Crimson Ink');
       (vm as any).applyTheme(o2Theme, 'light');
       expect(applyThemeColors).toHaveBeenCalledWith(
-        '#6B76E3',
+        '#E11D48',
         'light',
         false,
         expect.objectContaining({
-          error: '#F45B49',
-          success: '#5ACA7A',
-          secondaryBtnBg: '#EFF1FD',
+          error: '#F97316',
+          success: '#6366F1',
         }),
       );
     });
