@@ -18,6 +18,7 @@ interface ToastRecord {
   timerStart?: number                   // epoch ms when the current timer was started
   remainingTimeout?: number             // ms left when the timer was last paused
   details?: ToastDetail[]
+  titleCount?: number
   onDismiss?: () => void
 }
 
@@ -159,6 +160,7 @@ function toast(options: ToastOptions): DismissFn {
     count: 1,
     timerKey: 0,
     details: options.details,
+    titleCount: options.titleCount,
     onDismiss: options.onDismiss,
   }
 
@@ -177,7 +179,7 @@ function toast(options: ToastOptions): DismissFn {
 // to an already-visible notification rather than stacking a second one.
 function updateToast(
   id: string,
-  updates: { title?: string; message?: string; details?: ToastDetail[] },
+  updates: { title?: string; message?: string; details?: ToastDetail[]; titleCount?: number },
 ): void {
   const record = toastRecords.find((r) => r.id === id)
   if (!record) return
@@ -186,6 +188,7 @@ function updateToast(
   if (updates.message !== undefined)
     record.message = capitalizeFirst(updates.message)
   if (updates.details !== undefined) record.details = updates.details
+  if (updates.titleCount !== undefined) record.titleCount = updates.titleCount
 }
 
 function makeDismissFn(id: string, position: ToastPosition): DismissFn {

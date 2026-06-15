@@ -15,6 +15,7 @@
 
 import { toast, toastRecords, updateToast } from "@/lib/feedback/Toast/useToast"
 import type { ToastDetail } from "@/lib/feedback/Toast/OToast.types"
+import { copyToClipboard } from "@/utils/clipboard"
 
 // ── Friendly name overrides ──────────────────────────────────────────────────
 
@@ -90,11 +91,11 @@ function capitalize(s: string): string {
 }
 
 function buildTitle(): string {
-  return "You don't have access to some items"
+  return "Access Required"
 }
 
-function buildMessage(count: number): string {
-  return `${count} section${count !== 1 ? "s" : ""} on this page couldn't load because your role lacks permission. Ask an admin for access.`
+function buildMessage(_count: number): string {
+  return "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access."
 }
 
 // ── Module-level singleton state ─────────────────────────────────────────────
@@ -112,9 +113,9 @@ function copyDetails(): void {
   const text = accumulatedErrors
     .map((e) => `${e.label}: ${e.url}`)
     .join("\n")
-  navigator.clipboard.writeText(text).catch(() => {
-    // clipboard write can fail in non-secure contexts — silently ignore
-  })
+  // silent: true — feedback is shown on the button itself via successLabel,
+  // not as a separate toast notification.
+  copyToClipboard(text, { silent: true })
 }
 
 function flushGroupedToast(): void {
@@ -128,21 +129,22 @@ function flushGroupedToast(): void {
       (r) => r.id === activeToastId && r.open,
     )
     if (record) {
-      updateToast(activeToastId, { title, message, details })
+      updateToast(activeToastId, { title, message, details, titleCount: details.length })
       return
     }
     // Toast was dismissed before the debounce fired
     activeToastId = null
   }
 
-  // Show a fresh grouped notification
+  // Show a fresh grouped notification.
+  // No explicit timeout — the default error timeout (30 s) applies.
   toast({
     variant: "error",
     title,
     message,
-    timeout: 0,
+    titleCount: details.length,
     details,
-    action: { label: "Copy details", handler: copyDetails },
+    action: { label: "Copy details", handler: copyDetails, successLabel: "Copied!" },
     onDismiss: onToastDismissed,
   })
 

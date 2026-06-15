@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { ToastProps, ToastEmits } from "./OToast.types"
 import { computed, ref } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue"
+import OBadge from "@/lib/core/Badge/OBadge.vue"
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
 import {
   ToastRoot,
   ToastTitle,
   ToastDescription,
-  ToastAction,
   ToastClose,
 } from "reka-ui"
 
@@ -133,6 +133,22 @@ const isTopPosition = computed(() =>
 )
 
 const detailsExpanded = ref(false)
+
+// Temporary success state for the action button (e.g. "Copied!")
+const actionSucceeded = ref(false)
+let actionResetTimer: ReturnType<typeof setTimeout> | undefined
+
+function handleActionClick() {
+  if (!props.action) return
+  props.action.handler()
+  if (props.action.successLabel) {
+    actionSucceeded.value = true
+    clearTimeout(actionResetTimer)
+    actionResetTimer = setTimeout(() => {
+      actionSucceeded.value = false
+    }, 2000)
+  }
+}
 </script>
 
 <template>
@@ -196,15 +212,22 @@ const detailsExpanded = ref(false)
 
       <!-- Content -->
       <div class="tw:flex-1 tw:min-w-0">
-        <!-- Title — visible when provided, sr-only otherwise (carries message text for screen readers) -->
-        <ToastTitle
+        <!-- Title row: text + optional count badge side-by-side -->
+        <div
           :class="[
-            'tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug',
-            !title ? 'tw:sr-only' : ''
+            'tw:flex tw:items-center tw:gap-2',
+            !title ? 'tw:sr-only' : '',
           ]"
         >
-          {{ title ?? screenReaderTitle }}
-        </ToastTitle>
+          <ToastTitle class="tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug">
+            {{ title ?? screenReaderTitle }}
+          </ToastTitle>
+          <OBadge
+            v-if="title && titleCount !== undefined"
+            variant="error"
+            size="sm"
+          >{{ titleCount }}</OBadge>
+        </div>
 
         <!-- Message + inline action -->
         <div
@@ -223,20 +246,24 @@ const detailsExpanded = ref(false)
             {{ message }}
           </ToastDescription>
 
-          <!-- Action button -->
-          <ToastAction
+          <!-- Action button — plain <button>, NOT wrapped in ToastAction.
+               reka-ui's ToastAction wraps ToastClose internally, which means
+               any click on a ToastAction automatically dismisses the toast.
+               Using a plain button preserves click behaviour without closing. -->
+          <button
             v-if="action"
-            :alt-text="action.label"
-            as-child
+            type="button"
+            :class="[
+              'tw:inline-flex tw:items-center tw:gap-1 tw:justify-center tw:rounded tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:shadow-sm tw:transition-all tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1',
+              actionSucceeded
+                ? 'tw:bg-toast-success-icon tw:text-white tw:focus-visible:ring-toast-success-icon'
+                : 'tw:bg-toast-action-text tw:text-white tw:hover:bg-toast-action-hover tw:focus-visible:ring-toast-action-text',
+            ]"
+            @click.stop="handleActionClick"
           >
-            <button
-              type="button"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:rounded tw:bg-toast-action-text tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
-              @click="action.handler"
-            >
-              {{ action.label }}
-            </button>
-          </ToastAction>
+            <OIcon v-if="actionSucceeded" name="check" size="sm" class="tw:size-3.5" aria-hidden="true" />
+            {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
+          </button>
         </div>
 
         <!-- Expandable affected-sections list -->

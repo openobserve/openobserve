@@ -18,6 +18,8 @@ export type ToastPosition =
 export interface ToastAction {
   label: string
   handler: () => void
+  /** When provided, temporarily replaces the button label after click (e.g. "Copied!"). */
+  successLabel?: string
 }
 
 /** A single entry in the collapsible "affected sections" detail list */
@@ -35,6 +37,8 @@ export interface ToastOptions {
   message: string
   /** Optional bold title above message */
   title?: string
+  /** Numeric count rendered as an OBadge next to the title */
+  titleCount?: number
   /** Auto-dismiss delay in ms. 0 = persistent. Defaults per variant. */
   timeout?: number
   /** Where the toast appears on screen */
@@ -55,6 +59,7 @@ export interface ToastProps extends ToastOptions {
   /** Increments each time a duplicate resets the timer; used to restart the progress bar animation */
   timerKey?: number
   details?: ToastDetail[]
+  titleCount?: number
 }
 
 export interface ToastEmits {
