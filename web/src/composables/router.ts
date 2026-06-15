@@ -14,17 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import useIngestionRoutes from "./shared/useIngestionRoutes";
-import useAIRoutes from "./shared/useAIRoutes";
 
 const useOSRoutes = () => {
   const parentRoutes: any = [];
 
-  const ai = useAIRoutes();
-
-  const homeChildRoutes: any[] = [
-    ...useIngestionRoutes(),
-    ...ai.homeChildRoutes,
-  ];
+  const homeChildRoutes: any[] = [...useIngestionRoutes()];
 
   return { parentRoutes, homeChildRoutes };
 };

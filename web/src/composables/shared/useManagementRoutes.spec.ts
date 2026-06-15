@@ -145,6 +145,11 @@ describe("useManagementRoutes", () => {
       expect(templateRoute.path).toBe("templates");
     });
 
+    it("should NOT have llmProviders route in OSS builds", () => {
+      const llmRoute = routes[0].children.find((child: any) => child.name === "llmProviders");
+      expect(llmRoute).toBeUndefined();
+    });
+
     it("should have beforeEnter hook for general route", () => {
       const generalRoute = routes[0].children.find((child: any) => child.name === "general");
       expect(typeof generalRoute.beforeEnter).toBe("function");
@@ -502,63 +507,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only), since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only), since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // Only base routes
+      expect(routes[0].children).toHaveLength(6); // Only base routes (llm_providers is enterprise/cloud-only)
     });
 
     it("should return the same structure on multiple calls", () => {
