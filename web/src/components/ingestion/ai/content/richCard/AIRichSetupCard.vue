@@ -28,6 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import useStreams from "@/composables/useStreams";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -51,7 +54,49 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const router = useRouter();
+const { getStreams } = useStreams();
 const isDark = computed(() => store.state?.theme === "dark");
+
+// "View Logs" / "View Traces" — the destination + label follow the detected
+// stream type (codex etc. are logs, most others are traces).
+const isLogsStream = computed(() => props.content.detect.streamType === "logs");
+const viewDataLabel = computed(() =>
+  isLogsStream.value ? "View Logs" : "View Traces",
+);
+
+// Open the Logs/Traces view for the detected stream, pre-filtered to this
+// integration's data over a 15m window (covers detection's 10m lookback). The
+// detection filter is a SQL WHERE fragment — passed base64-encoded as the
+// search-bar query, matching how the rest of the app deep-links into search.
+const viewData = async () => {
+  // The destination Logs/Traces view reads its stream list from the cached
+  // streams store. A stream this integration just created won't be in that
+  // cache yet, so the deep-link can't select it. Force-refresh this stream type
+  // first so the new stream is present before we navigate. Best-effort — if the
+  // refetch fails we still navigate (the view runs its own fetch on load).
+  try {
+    await getStreams(props.content.detect.streamType, false, false, true);
+  } catch {
+    // ignore — navigate anyway
+  }
+
+  const query: Record<string, string> = {
+    org_identifier: props.subs.org,
+    stream: watchedStream.value,
+    period: "15m",
+    refresh: "0",
+    query: b64EncodeUnicode(props.content.detect.filter),
+  };
+  if (isLogsStream.value) {
+    query.stream_type = "logs";
+  } else {
+    query.tab = "spans";
+  }
+  router
+    .push({ name: isLogsStream.value ? "logs" : "traces", query })
+    .catch(() => {});
+};
 
 // Logo precedence: manifest override → content (frontmatter/bundled) → none.
 // `logoFailed` falls back to the monogram if the remote image can't load.
@@ -437,10 +482,11 @@ function fireConfetti() {
                   v-else-if="detect.connected.value"
                   variant="primary"
                   size="sm"
-                  icon-left="timeline"
+                  :icon-left="isLogsStream ? 'article' : 'timeline'"
                   data-test="ai-c-traces"
+                  @click="viewData()"
                 >
-                  View Traces
+                  {{ viewDataLabel }}
                 </OButton>
                 <OButton
                   v-else-if="detect.stalled.value"
