@@ -422,7 +422,8 @@
     "menuGroupInspect": "Inspecionar",
     "validSql": "SQL válido",
     "invalidSql": "Consulta inválida",
-    "menuGroupExplain": "Explique"
+    "menuGroupExplain": "Explique",
+    "selectLogsStreamFirst": "Selecione o fluxo de registros primeiro"
   },
   "menu": {
     "home": "Início",

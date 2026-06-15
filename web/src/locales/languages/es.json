@@ -422,7 +422,8 @@
     "menuGroupInspect": "Inspeccionar",
     "validSql": "SQL válido",
     "invalidSql": "Consulta no válida",
-    "menuGroupExplain": "Explique"
+    "menuGroupExplain": "Explique",
+    "selectLogsStreamFirst": "Selecciona la transmisión de registros primero"
   },
   "menu": {
     "home": "Inicio",

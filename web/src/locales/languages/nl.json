@@ -422,7 +422,8 @@
     "menuGroupInspect": "Inspecteer",
     "validSql": "Geldige SQL",
     "invalidSql": "Ongeldige vraag",
-    "menuGroupExplain": "Leg uit"
+    "menuGroupExplain": "Leg uit",
+    "selectLogsStreamFirst": "Selecteer eerst de stream van de logboeken"
   },
   "menu": {
     "home": "Home",

@@ -422,7 +422,8 @@
     "menuGroupInspect": "检查",
     "validSql": "有效的 SQL",
     "invalidSql": "查询无效",
-    "menuGroupExplain": "解释一下"
+    "menuGroupExplain": "解释一下",
+    "selectLogsStreamFirst": "先选择日志直播"
   },
   "menu": {
     "home": "主页",
