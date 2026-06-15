@@ -365,7 +365,7 @@ export default defineComponent({
       // Remove with src/views/TestDemo.vue — this branch is not for merge.
       {
         title: "TEST",
-        icon: "science",
+        icon: "fact-check",
         link: "/test-demo",
         name: "testDemo",
       },

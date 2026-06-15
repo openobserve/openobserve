@@ -2,136 +2,129 @@
 
   ⚠️ THROWAWAY TEST-TARGET PAGE — NOT FOR MERGE.
 
-  This page exists only as a deterministic, multi-mode UI surface for exercising
-  the E2E Council test-generation pipeline (non-dry-run). Reachable at /test-demo.
-  It has no backend dependency: every output is a pure function of the dropdown
-  selections, so generated Playwright tests are stable and self-contained.
+  A deterministic, multi-mode UI surface for exercising the E2E Council
+  test-generation pipeline (non-dry-run). Reachable at /test-demo. No backend
+  dependency: every output is a pure function of the selections, so generated
+  Playwright tests are stable and self-contained.
+
+  Built with the in-house component library (@/lib/*), NOT Quasar — Quasar has
+  been removed from this codebase.
 
   Test surface (all interactive/asserted elements carry data-test ids):
-    1. Fruit dropdown   -> single mapping to a description line.
-    2. Country + City   -> cascading dropdowns (city options depend on country)
-                           -> combined location sentence.
-    3. Mode toggle      -> Basic | Advanced. "Advanced" reveals an extra Priority
-                           dropdown and a conditional banner that only appears
-                           when Fruit = Cherry AND Priority = High.
+    1. Fruit select    -> single mapping to a description line.
+    2. Country + City  -> cascading selects (city options depend on country)
+                          -> combined location sentence.
+    3. Mode toggle     -> Basic | Advanced. "Advanced" reveals an extra Priority
+                          select and a conditional banner that only appears when
+                          Fruit = Cherry AND Priority = High.
 -->
 <template>
-  <div class="test-demo-page q-pa-lg" data-test="test-demo-page">
-    <div class="q-mb-lg">
-      <div class="text-h5" data-test="test-demo-title">TEST — Demo Page</div>
-      <div class="text-caption text-grey" data-test="test-demo-subtitle">
+  <div class="test-demo-page tw:p-6 tw:flex tw:flex-col tw:gap-4" data-test="test-demo-page">
+    <div>
+      <div class="tw:text-2xl tw:font-semibold tw:text-text-primary" data-test="test-demo-title">
+        TEST — Demo Page
+      </div>
+      <div class="tw:text-sm tw:text-text-secondary tw:mt-1" data-test="test-demo-subtitle">
         Throwaway multi-mode surface for E2E Council test generation. No backend —
         every output is derived purely from the selections below.
       </div>
     </div>
 
-    <!-- ───────────── Section 1: single dropdown -> text ───────────── -->
-    <q-card flat bordered class="q-pa-md q-mb-md" data-test="test-demo-fruit-card">
-      <div class="text-subtitle1 q-mb-sm">1. Pick a fruit</div>
-      <q-select
+    <!-- ───────────── Section 1: single select -> text ───────────── -->
+    <OCard class="tw:p-4" data-test="test-demo-fruit-card">
+      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">1. Pick a fruit</div>
+      <OSelect
         v-model="fruit"
         :options="fruitOptions"
-        label="Fruit"
-        outlined
-        dense
-        emit-value
-        map-options
+        placeholder="Select a fruit"
         style="max-width: 320px"
         data-test="test-demo-fruit-select"
       />
-      <div class="q-mt-md text-body1" data-test="test-demo-fruit-output">
+      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-fruit-output">
         {{ fruitOutput }}
       </div>
-    </q-card>
+    </OCard>
 
-    <!-- ───────────── Section 2: cascading dropdowns -> text ───────────── -->
-    <q-card flat bordered class="q-pa-md q-mb-md" data-test="test-demo-location-card">
-      <div class="text-subtitle1 q-mb-sm">2. Pick a location</div>
-      <div class="row q-col-gutter-md" style="max-width: 660px">
-        <div class="col">
-          <q-select
-            v-model="country"
-            :options="countryOptions"
-            label="Country"
-            outlined
-            dense
-            emit-value
-            map-options
-            data-test="test-demo-country-select"
-            @update:model-value="onCountryChange"
-          />
-        </div>
-        <div class="col">
-          <q-select
-            v-model="city"
-            :options="cityOptions"
-            label="City"
-            outlined
-            dense
-            emit-value
-            map-options
-            :disable="!country"
-            data-test="test-demo-city-select"
-          />
-        </div>
+    <!-- ───────────── Section 2: cascading selects -> text ───────────── -->
+    <OCard class="tw:p-4" data-test="test-demo-location-card">
+      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">2. Pick a location</div>
+      <div class="tw:flex tw:gap-4 tw:flex-wrap">
+        <OSelect
+          v-model="country"
+          :options="countryOptions"
+          placeholder="Select a country"
+          style="width: 280px"
+          data-test="test-demo-country-select"
+          @update:model-value="onCountryChange"
+        />
+        <OSelect
+          v-model="city"
+          :options="cityOptions"
+          placeholder="Select a city"
+          :disabled="!country"
+          style="width: 280px"
+          data-test="test-demo-city-select"
+        />
       </div>
-      <div class="q-mt-md text-body1" data-test="test-demo-location-output">
+      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-location-output">
         {{ locationOutput }}
       </div>
-    </q-card>
+    </OCard>
 
     <!-- ───────────── Section 3: mode toggle + conditional banner ───────────── -->
-    <q-card flat bordered class="q-pa-md" data-test="test-demo-mode-card">
-      <div class="text-subtitle1 q-mb-sm">3. Mode</div>
-      <q-btn-toggle
-        v-model="mode"
-        :options="modeOptions"
-        toggle-color="primary"
-        outline
-        data-test="test-demo-mode-toggle"
-      />
+    <OCard class="tw:p-4" data-test="test-demo-mode-card">
+      <div class="tw:text-base tw:font-medium tw:mb-2 tw:text-text-primary">3. Mode</div>
+      <OToggleGroup v-model="mode" data-test="test-demo-mode-toggle">
+        <OToggleGroupItem
+          v-for="opt in modeOptions"
+          :key="opt.value"
+          :value="opt.value"
+          size="sm"
+          :data-test="`test-demo-mode-option-${opt.value}`"
+        >
+          {{ opt.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
 
-      <div class="q-mt-md text-body1" data-test="test-demo-mode-output">
+      <div class="tw:mt-3 tw:text-text-primary" data-test="test-demo-mode-output">
         {{ modeOutput }}
       </div>
 
       <!-- Advanced-only controls -->
-      <div v-if="mode === 'advanced'" class="q-mt-md" data-test="test-demo-advanced-panel">
-        <q-select
+      <div v-if="mode === 'advanced'" class="tw:mt-4" data-test="test-demo-advanced-panel">
+        <OSelect
           v-model="priority"
           :options="priorityOptions"
-          label="Priority"
-          outlined
-          dense
-          emit-value
-          map-options
+          placeholder="Select a priority"
           style="max-width: 320px"
           data-test="test-demo-priority-select"
         />
-        <div class="q-mt-sm text-body1" data-test="test-demo-priority-output">
+        <div class="tw:mt-2 tw:text-text-primary" data-test="test-demo-priority-output">
           {{ priorityOutput }}
         </div>
 
         <!-- Combined rule: Fruit=Cherry AND Priority=High -->
-        <q-banner
+        <div
           v-if="showCriticalBanner"
-          class="bg-red-1 text-red-9 q-mt-md"
-          rounded
-          dense
+          class="tw:mt-4 tw:flex tw:items-center tw:gap-2 tw:rounded-md tw:px-3 tw:py-2 tw:bg-red-100 tw:text-red-700"
           data-test="test-demo-combined-banner"
         >
-          <template #avatar>
-            <q-icon name="warning" color="red" />
-          </template>
-          Critical cherry alert — Cherry selected at High priority.
-        </q-banner>
+          <OIcon name="warning" size="sm" />
+          <span>Critical cherry alert — Cherry selected at High priority.</span>
+        </div>
       </div>
-    </q-card>
+    </OCard>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+
+import OCard from "@/lib/core/Card/OCard.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 // ───────────── Section 1: fruit ─────────────
 const fruit = ref<string>("");
