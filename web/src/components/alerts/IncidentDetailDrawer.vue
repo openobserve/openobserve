@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
 
         <!-- Status, Severity, Alerts badges — grouped with title as metadata -->
-        <template v-if="!isEditingTitle">
+        <template v-if="incidentDetails && !isEditingTitle">
           <OBadge
             :variant="getStatusVariant(incidentDetails.status)"
             class="tw:cursor-default tw:h-7 tw:px-2.5 tw:ring-1 tw:ring-inset tw:ring-current tw:ring-opacity-40"
