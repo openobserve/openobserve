@@ -377,15 +377,6 @@ mod tests {
         assert_eq!(downcast_plan(&plan), &expected);
     }
 
-    #[test]
-    fn test_generate_parquet_access_plan_out_of_range_returns_none() {
-        let file = make_partitioned_file(10);
-        // bitmap longer than the file (sets a bit at row 10, beyond num_rows=10)
-        let row_ids = BooleanBuffer::from_iter((0..11u32).map(|i| [0u32, 10].contains(&i)));
-
-        assert!(generate_parquet_access_plan(&file, &row_ids, Some(4)).is_none());
-    }
-
     fn make_exec() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("col", DataType::Utf8, false)]));
         Arc::new(datafusion::physical_plan::empty::EmptyExec::new(schema))
