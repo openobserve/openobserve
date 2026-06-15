@@ -190,17 +190,16 @@ class="tw:mr-1" />
       v-if="unifiedChips.length > 0 || props.hideDimensionFilters"
       class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
     >
-      <div
+      <OBadge
         v-for="chip in visibleChips"
         :key="chip.key"
-        class="dim-chip dim-chip-active"
-        :style="{ background: chipColors(chip.key).border, borderColor: chipColors(chip.key).border, color: '#fff' }"
+        :variant="chipVariant(chip.key)"
+        size="sm"
+        icon="check"
+        :data-test="`correlated-logs-table-dim-chip-${chip.key}`"
       >
-        <OIcon name="check" size="xs" class="dim-chip-check" />
-        <span class="dim-chip-label">{{ chip.label }}</span>
-        <span class="dim-chip-eq">=</span>
-        <span class="dim-chip-value">{{ chip.value }}</span>
-      </div>
+        {{ chip.label }} = {{ chip.value }}
+      </OBadge>
       <div
         v-if="hiddenChipCount > 0"
         class="dim-chip-more"
@@ -1332,18 +1331,14 @@ const unifiedChips = computed<DimensionChip[]>(() =>
     })),
 );
 
-const CHIP_COLOR_PALETTE = [
-  { border: "#7c3aed", text: "#7c3aed" },
-  { border: "#ea580c", text: "#ea580c" },
-  { border: "#0d9488", text: "#0d9488" },
-  { border: "#dc2626", text: "#dc2626" },
-  { border: "#2563eb", text: "#2563eb" },
-  { border: "#65a30d", text: "#65a30d" },
-  { border: "#d97706", text: "#d97706" },
-  { border: "#0891b2", text: "#0891b2" },
-];
 const hashKey = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); };
-const chipColors = (key: string) => CHIP_COLOR_PALETTE[hashKey(key) % CHIP_COLOR_PALETTE.length];
+const CHIP_VARIANTS = [
+  "primary-soft", "success-soft", "warning-soft", "error-soft",
+  "teal-soft", "orange-soft", "lime-soft", "amber-soft",
+  "cyan-soft", "blue-soft", "purple-soft", "indigo-soft"
+] as const;
+const chipVariant = (key: string): (typeof CHIP_VARIANTS)[number] =>
+  CHIP_VARIANTS[hashKey(key) % CHIP_VARIANTS.length];
 
 const CHIP_OVERFLOW_THRESHOLD = 4;
 const chipOverflowExpanded = ref(false);
@@ -1486,30 +1481,6 @@ const severityClass = (sev: string | undefined): string => {
   }
 }
 
-.dim-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0.625rem;
-  border: 1.5px solid var(--o2-border-color, #d4d4d4);
-  border-radius: 0.5rem;
-  background: transparent;
-  font-size: 0.75rem;
-  line-height: 1;
-  user-select: none;
-  transition: background 0.15s ease, opacity 0.15s ease;
-}
-.dim-chip-active { font-weight: 600; }
-.dim-chip-active .dim-chip-label { opacity: 0.9; }
-.dim-chip-active .dim-chip-eq { opacity: 0.7; }
-.dim-chip-check {
-  margin-right: 0.25rem;
-  color: #4ade80;
-  flex-shrink: 0;
-}
-.dim-chip-label { font-weight: 500; opacity: 0.8; }
-.dim-chip-eq { opacity: 0.5; }
-.dim-chip-value { font-weight: 700; }
 .dim-chip-more {
   display: inline-flex;
   align-items: center;
